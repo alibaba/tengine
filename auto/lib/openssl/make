@@ -1,0 +1,66 @@
+
+# Copyright (C) Igor Sysoev
+
+
+case "$CC" in
+
+    cl)
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$OPENSSL/openssl/include/openssl/ssl.h:	$NGX_MAKEFILE
+	\$(MAKE) -f auto/lib/openssl/makefile.msvc			\
+		OPENSSL="$OPENSSL" OPENSSL_OPT="$OPENSSL_OPT"
+
+END
+
+    ;;
+
+    bcc32)
+
+        ngx_opt=`echo "-DOPENSSL=\"$OPENSSL\" -DOPENSSL_OPT=\"$OPENSSL_OPT\"" \
+            | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+`echo "$OPENSSL\\openssl\\lib\\libeay32.lib:				\
+	$OPENSSL\\openssl\\include\\openssl\\ssl.h"			\
+	| sed -e "s/\//$ngx_regex_dirsep/g"`
+
+`echo "$OPENSSL\\openssl\\lib\\ssleay32.lib:				\
+	$OPENSSL\\openssl\\include\\openssl\\ssl.h"			\
+	| sed -e "s/\//$ngx_regex_dirsep/g"`
+
+`echo "$OPENSSL\\openssl\\include\\openssl\\ssl.h:	$NGX_MAKEFILE"	\
+	| sed -e "s/\//$ngx_regex_dirsep/g"`
+	\$(MAKE) -f auto/lib/openssl/makefile.bcc $ngx_opt
+
+END
+
+    ;;
+
+    *)
+        case $USE_THREADS in
+            NO) OPENSSL_OPT="$OPENSSL_OPT no-threads" ;;
+            *)  OPENSSL_OPT="$OPENSSL_OPT threads" ;;
+        esac
+
+        case $OPENSSL in
+            /*) ngx_prefix="$OPENSSL/.openssl" ;;
+            *)  ngx_prefix="$PWD/$OPENSSL/.openssl" ;;
+        esac
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$OPENSSL/.openssl/include/openssl/ssl.h:	$NGX_MAKEFILE
+	cd $OPENSSL \\
+	&& \$(MAKE) clean \\
+	&& ./config --prefix=$ngx_prefix no-shared $OPENSSL_OPT \\
+	&& \$(MAKE) \\
+	&& \$(MAKE) install LIBDIR=lib
+
+END
+
+    ;;
+
+esac

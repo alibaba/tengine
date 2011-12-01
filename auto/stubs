@@ -1,0 +1,7 @@
+
+# Copyright (C) Igor Sysoev
+
+
+have=NGX_SUPPRESS_WARN . auto/have
+
+have=NGX_SMP . auto/have
