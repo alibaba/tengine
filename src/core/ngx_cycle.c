@@ -384,7 +384,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
         if (file[i].name.len >= NGX_MAX_PATH) {
             ngx_log_error(NGX_LOG_EMERG, log, 0,
-                          "path \"%V\" is too long",
+                          "path \"%s\" is too long",
                           file[i].name.data);
             goto failed;
         }
