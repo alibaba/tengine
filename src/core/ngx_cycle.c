@@ -43,6 +43,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 {
     void                *rv;
     char               **senv, **env;
+    u_char              *temppath;
     ngx_err_t            err;
     ngx_uint_t           i, n;
     ngx_log_t           *log;
@@ -364,6 +365,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     part = &cycle->open_files.part;
     file = part->elts;
 
+    temppath = ngx_palloc(conf.temp_pool, NGX_MAX_PATH);
+
     for (i = 0; /* void */ ; i++) {
 
         if (i >= part->nelts) {
@@ -378,6 +381,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         if (file[i].name.len == 0) {
             continue;
         }
+
+        if (file[i].name.len >= NGX_MAX_PATH) {
+            ngx_log_error(NGX_LOG_EMERG, log, 0,
+                          "path \"%V\" is too long",
+                          file[i].name.data);
+            goto failed;
+        }
+
+        ngx_cpystrn(temppath, file[i].name.data, file[i].name.len + 1);
 
         err = ngx_create_full_path(file[i].name.data, 0755);
         if (err != 0) {

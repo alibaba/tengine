@@ -1,3 +1,9 @@
+Changes with Tengine 1.2.1                                         6 Dev 2011
+
+    *) Bugfix: fixes the segmentation fault in case of using default error log
+       or access log of tengine. This bug was introduced by creating file
+       doesn't exist.
+       Thanks to Yuanzhuo.
 
 Changes with Tengine 1.2.0                                         29 Nov 2011
 
