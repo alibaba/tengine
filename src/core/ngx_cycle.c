@@ -391,7 +391,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
         ngx_cpystrn(temppath, file[i].name.data, file[i].name.len + 1);
 
-        err = ngx_create_full_path(file[i].name.data, 0755);
+        err = ngx_create_full_path(temppath, 0755);
         if (err != 0) {
             ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
                           ngx_create_dir_n " \"%s\" failed",
