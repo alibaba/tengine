@@ -19,6 +19,7 @@ typedef struct {
     ngx_fd_t          pfd[2];
     ngx_pid_t         pid;
     ngx_str_t         backup;         /* when pipe is broken, log into it */
+    ngx_uid_t         user;
     ngx_uint_t        generation;
     ngx_array_t      *argv;
     ngx_open_file_t  *open_fd;        /* the fd of pipe left open in master */
