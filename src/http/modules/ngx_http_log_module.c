@@ -401,6 +401,9 @@ ngx_http_log_write(ngx_http_request_t *r, ngx_http_log_t *log, u_char *buf,
 
     if (log->script == NULL) {
         name = log->file->name.data;
+        if (name == NULL) {
+            name = (u_char *) "The pipe";
+        }
         n = ngx_write_fd(log->file->fd, buf, len);
 
     } else {

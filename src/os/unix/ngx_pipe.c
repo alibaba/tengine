@@ -177,8 +177,11 @@ ngx_increase_pipe_generation(void)
 ngx_int_t
 ngx_open_pipes(ngx_cycle_t *cycle)
 {
-    ngx_int_t  stat;
-    ngx_uint_t i;
+    ngx_int_t          stat;
+    ngx_uint_t         i;
+    ngx_core_conf_t   *ccf;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     for (i = 0; i < ngx_last_pipe; i++) {
 
@@ -189,6 +192,9 @@ ngx_open_pipes(ngx_cycle_t *cycle)
         if (ngx_pipes[i].generation != ngx_pipe_generation) {
             continue;
         }
+
+        ngx_pipes[i].backup = ngx_pipes[i].open_fd->name;
+        ngx_pipes[i].user = ccf->user;
 
         stat = ngx_open_pipe(cycle, &ngx_pipes[i]);
 
@@ -218,7 +224,6 @@ ngx_open_pipes(ngx_cycle_t *cycle)
             return NGX_ERROR;
         }
 
-        ngx_pipes[i].backup = ngx_pipes[i].open_fd->name;
         ngx_pipes[i].open_fd->name.len = 0;
         ngx_pipes[i].open_fd->name.data = NULL;
     }
@@ -323,6 +328,15 @@ ngx_pipe_broken_action(ngx_log_t *log, ngx_pid_t pid, ngx_int_t master)
             }
 
             if (master) {
+                if (chown((const char *) ngx_pipes[i].backup.data,
+                          ngx_pipes[i].user, -1)
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                                  "chown() \"%s\" failed",
+                                  ngx_pipes[i].backup.data);
+                }
+
                 ngx_signal_pipe_broken(log, pid);
             }
         }
