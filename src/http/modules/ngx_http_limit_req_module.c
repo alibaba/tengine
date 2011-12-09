@@ -1014,7 +1014,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             s.len = value[i].len - 14;
             s.data = value[i].data + 14;
 
-            if (s.len < 2 || s.data[0] != '@' || s.data[0] != '/') {
+            if (s.len < 2 || (s.data[0] != '@' && s.data[0] != '/')) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "invalid forbid_action \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;

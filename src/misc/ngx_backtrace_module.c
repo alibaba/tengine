@@ -22,7 +22,7 @@ static void *ngx_backtrace_create_conf(ngx_cycle_t *cycle);
 
 typedef struct {
     ngx_log_t              *log;
-    ngx_uint_t              max_stack_size;
+    ngx_int_t               max_stack_size;
 } ngx_backtrace_conf_t;
 
 
@@ -140,7 +140,7 @@ ngx_error_signal_handler(int signo)
                       "sigaction(%s) failed", sig->signame);
     }
 
-    if (bcf->max_stack_size == 0) {
+    if (bcf->max_stack_size == NGX_CONF_UNSET) {
         bcf->max_stack_size = NGX_BACKTRACE_DEFAULT_STACK_MAX_SIZE;
     }
 
@@ -211,9 +211,10 @@ ngx_backtrace_create_conf(ngx_cycle_t *cycle)
     /*
      * set by ngx_pcalloc()
      *
-     *     bcf->max_stack_size = 0;
      *     bcf->log = NULL;
      */
+
+    bcf->max_stack_size = NGX_CONF_UNSET;
 
     return bcf;
 }
