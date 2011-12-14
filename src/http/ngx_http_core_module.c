@@ -3598,7 +3598,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->keepalive_requests,
                               prev->keepalive_requests, 100);
     ngx_conf_merge_uint_value(conf->lingering_close,
-                              prev->lingering_close, NGX_HTTP_LINGERING_ON);
+                              prev->lingering_close, NGX_HTTP_LINGERING_OFF);
     ngx_conf_merge_msec_value(conf->lingering_time,
                               prev->lingering_time, 30000);
     ngx_conf_merge_msec_value(conf->lingering_timeout,
