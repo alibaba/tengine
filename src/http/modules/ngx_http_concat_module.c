@@ -102,15 +102,15 @@ ngx_module_t  ngx_http_concat_module = {
 static ngx_int_t
 ngx_http_concat_handler(ngx_http_request_t *r)
 {
+    off_t                       length;
     u_char                     *p, *v, *e, *last, *last_type;
     size_t                      root, last_len;
-    off_t                       length;
     time_t                      last_modified;
+    ngx_buf_t                  *b;
+    ngx_str_t                  *uri, *filename, path;
     ngx_int_t                   rc;
     ngx_uint_t                  i, j, level;
-    ngx_str_t                  *uri, *filename, path;
     ngx_array_t                 uris;
-    ngx_buf_t                  *b;
     ngx_chain_t                 out, **last_out, *cl;
     ngx_open_file_info_t        of;
     ngx_http_core_loc_conf_t   *ccf;

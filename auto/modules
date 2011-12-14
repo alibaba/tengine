@@ -87,10 +87,10 @@ fi
 #     ngx_http_static_module
 #     ngx_http_gzip_static_module
 #     ngx_http_dav_module
-#     ngx_http_concat_module
 #     ngx_http_autoindex_module
 #     ngx_http_index_module
 #     ngx_http_random_index_module
+#     ngx_http_concat_module
 #
 #     ngx_http_access_module
 #     ngx_http_realip_module
@@ -191,11 +191,6 @@ if [ $HTTP_DAV = YES ]; then
     HTTP_SRCS="$HTTP_SRCS $HTTP_DAV_SRCS"
 fi
 
-if [ $HTTP_CONCAT = YES ]; then
-    HTTP_MODULES="$HTTP_MODULES $HTTP_CONCAT_MODULE"
-    HTTP_SRCS="$HTTP_SRCS $HTTP_CONCAT_SRCS"
-fi
-
 if [ $HTTP_AUTOINDEX = YES ]; then
     HTTP_MODULES="$HTTP_MODULES $HTTP_AUTOINDEX_MODULE"
     HTTP_SRCS="$HTTP_SRCS $HTTP_AUTOINDEX_SRCS"
@@ -206,6 +201,11 @@ HTTP_MODULES="$HTTP_MODULES $HTTP_INDEX_MODULE"
 if [ $HTTP_RANDOM_INDEX = YES ]; then
     HTTP_MODULES="$HTTP_MODULES $HTTP_RANDOM_INDEX_MODULE"
     HTTP_SRCS="$HTTP_SRCS $HTTP_RANDOM_INDEX_SRCS"
+fi
+
+if [ $HTTP_CONCAT = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES $HTTP_CONCAT_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_CONCAT_SRCS"
 fi
 
 if [ $HTTP_AUTH_BASIC = YES ]; then
