@@ -1,0 +1,152 @@
+Changes for Test::Nginx
+
+0.17 - 2011-11-04
+* bugfix: do not strip trailing CRCF for response headers in Test::Nginx::Socket's response parser.
+* bugfix: fixed issues in Content-Length response header handling in case of pipelined reqeusts.
+* bugfix: fixed the pipelined_requests section support.
+* feature: added support for user file timestamp.
+
+0.16 - 2011-07-07
+* fixed a bug that length(undef) produced lots of warnings on perl 5.10.x. thanks Guo Ying (shrimp).
+* now we automatically retry connecting for 3 times (1 sec delay)
+  in Test::Nginx::Socket::send_request. this will help automatically recovering
+  from random slow valgrind loading problems.
+* when the directories specified in --- user_files do not exist, Test::Nginx will create it
+  automatically.
+* now we'll issue warning when there is extra bytes after the last chunk in the chunked response parser.
+
+0.15 - 2011-05-23
+* fixed a bug when using arrays in the "response_body" (and other similar) section when there was only one request.
+* fixed presentation problems in the HTML generated from the POD.
+* added documentation for the TEST_NGINX_* variables.
+* added "local $?" in Test::Nginx::Util::END to avoid confusing Test::Builder::_ending()
+* removed "use Test::More" from Test::Nginx::Socket because Test::Base already loads it.
+
+0.14 - 2011-05-12
+* now we require Parallel::ForkManager, Text::Diff, and Test::Base.
+* the --- request section now supports multiple requests and even "packeting"
+  (see documentation for details). And it should be backward compatible.
+  Of course, the "expected" sections have been upgraded to expect
+ (and even require) arrays in this situation.
+* updated quite a bit the documentation.
+* deprecated request_eval and response_body_eval. If you use them, the
+  test will pass but you will be issued a "diag" statement telling you
+  to move to "request eval" and "response_body eval" respectively.
+* added new implementation for pipelined requests and raw requests.
+  Rewrote SKIP statement to be less verbose and more in line with what
+  is recommended on Test::Nginx.
+* added support for environment variable TEST_NGINX_FORCE_RESTART_ON_TEST.
+  Defaults to 1. Must be explicitly set to 0 to avoid restarting the nginx
+  server when the config does not change between two tests.
+  This also brings support for allowing config not to be set.
+  This way, using TEST_NGINX_FORCE_RESTART_ON_TEST=1 with TEST_NGINX_NO_SHUFFLE=1
+  and having a config section only on the first test, you can have all tests
+  use the same config.
+* added support for environment variable TEST_NGINX_NO_NGINX_MANAGER (defaults
+    to 0) which will disable the nginx management code (stop/config/start).
+    Very useful when you want to run tests on an already running NGINX (set
+    TEST_NGINX_NO_NGINX_MANAGER to 1 and TEST_NGINX_CLIENT_PORT to the
+    port your running nginx is listening on).
+
+0.13 - 2011-03-08
+* documented the TEST_NGINX_PORT environment.
+
+0.12 - 2011-03-08
+* documented the etcproxy and valgrind integration support.
+* implemented the no_nginx_manager utility function
+* documented the difference between Test::Nginx::Socket and Test::Nginx::LWP.
+* allow numbers in TEST_NGINX_BLAH_BLAH_BLAH env names.
+* added support for --- raw_response_headers_like.
+* fixed a bug in the can_run sub.
+
+0.11 - 2010-10-09
+* add TEST_NGINX_BUILDSLAVE and --- skip_slave.
+* implemented the TEST_NGINX_IGNORE_MISSING_DIRECTIVES which can
+  force test cases to skip when the directive is not
+  found in the current nginx.
+* added support for env TEST_NGINX_TIMEOUT.
+* implemented TEST_NGINX_XXX env expansion in --- config and --- http_config sections.
+
+0.10 - 2010-08-19
+* we use our own can_run function rather than Module::Install::Can's.
+* added TEST_NGINX_MASTER_PROCESS, rename TEST_NGINX_ROOT to less confusing TEST_NGINX_SERVROOT and reorder priority of TEST_NGINX_{CLIENT_,SERVER_,}PORT environment options. (Piotr Sikora)
+* added support for TEST_NGINX_NO_SHUFFLE env as requested by Piotr Sikora :)
+* added support for TEST_NGINX_LOG_LEVEL env but it can be overriden on the script level by calling the log_level function.
+* added support for TEST_NGINX_ERROR_LOG: if this env is specified to some file path, then all the error log by all the test cases will be accumulated to that file.
+* Now the test script driven by Test::Nginx will tell nginx to quit by default. The TEST_NGINX_NO_CLEAN=1 env setting will give back the old behavior :) Thanks Piotr Sikora for requesting this.
+* added support for --- main_config.
+* Make Test::Nginx more friendly to the environment (Piotr Sikora)
+    Added environment variables:
+    TEST_NGINX_BINARY - full path to the nginx binary,
+    TEST_NGINX_ROOT - path where server root should be created,
+    TEST_NGINX_PORT - port number that should be used by client and server
+                      (takes precedence over _CLIENT_PORT and _SERVER_PORT),
+    TEST_NGINX_SERVER_PORT - port number that should be used by the server.
+* add environment variable TEST_NGINX_SLEEP
+* added support for ngx_openresty in nginx version parser.
+
+0.09 - Wed 07 Jul 2010 02:57:13 PM CST
+* added new section --- user_files which will create user files under html/.
+* applied the patch from Piotr Sikora to add the --- skip_nginx2 directive.
+* use the latest nginx version as the default if the version number can not be parsed from "nginx -V".
+* added support for ! HEADER syntax to --- response_headers such that we can test if a response header exists.
+* fixed some bugs in --- response_headers.
+* now TEST_NGINX_USE_VALGRIND=1 works out of the box. one can ualso use test/valgrind.suppress file to serve as a default suppression file.
+* better diagnostics for socket timeout outputs.
+* added support for the --- charset section.
+* use localhost as the server_name in the test nginx.conf.
+* added support for the server_addr sub as well as the TEST_NGINX_CLIENT_PORT environment.
+* always use Time::HiRes's sleep. this issue was reported by leicheng++.
+* added new config function no_root_location as well as the new section --- init.
+
+0.08 - Tue 26 Jan 2010 12:20:03 PM CST
+* fixed a bug in the chunked parser in Test::Nginx::Socket:
+  now we immediately stop reading more data chunks when
+  seeing the last chunk.
+* added func no_long_string to Test::Nginx::Socket and
+  Test::Nginx::LWP so that we can disable
+  Test::LongString in the test scaffold.
+* added utility config functions "workers", "log_level", and
+  "master_on" to Test::Nginx::Socket.
+* added ngx_rds_json and ngx_xss modules to the module
+  list that uses Test::Nginx::Socket.
+
+0.07 - Tue 05 Jan 2010 10:06:56 AM CST
+* we now use IO::Select in Test::Nginx::Socket to save CPU resources
+  while polling the non-blocking socket.
+* POD: added ngx_drizzle to the module list that use Test::Nginx::Socket.
+* added utility config functions "worker_connections" and
+  "master_process_enabled".
+
+0.06 - Thu 24 Dec 2009 10:59:29 AM CST
+* we now disable the nginx daemon mode in the config file by default.
+* we now generate a default index.html page under the root /.
+* added support for the new --- http_config section so that you can
+  put upstream foo { ... } in it.
+
+0.05 - Tue 22 Dec 2009 10:17:44 AM CST
+* added support for gcc profiling via the
+  $Nginx::Util::Profiling variable.
+* fixed the chunked decoder for large chunks.
+
+0.04 - Fri 18 Dec 2009 04:09:02 PM CST
+* added new sections --- raw_request and
+  --- raw_request_middle_delay to Test::Nginx::Socket.
+* added new functions config_preamble and repeat which
+  are exported by default.
+
+0.03 - Tue 15 Dec 2009 11:35:07 AM CST
+- refactored a lot of duplicate code between
+  Test::Nginx::LWP and Test::Nginx::Socket to
+  a separate module named Test::Nginx::Util.
+- now Test::Nginx::Socket also restart the nginx
+  server at every test case run.
+- added support for --- request_eval and
+  --- response_eval to Test::Nginx::Socket.
+
+0.02 - Wed 09 Dec 2009 09:50:11 AM CST
+- skipped the POD coverage tests for now.
+
+0.01 - Tue 08 Dec 2009 11:07:51 AM CST
+- initial release.
+

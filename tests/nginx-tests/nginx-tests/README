@@ -1,0 +1,39 @@
+Test suite for nginx.
+
+Use prove to run tests as one usually do for perl tests.  Individual tests
+may be run as well.
+
+Note: tests run nginx (and backend daemons if needed) listening on localhost
+and may use various ports in 8000 .. 8999 range.
+
+Usage:
+
+    $ TEST_NGINX_BINARY=/path/to/nginx prove .
+
+By default tests expect nginx binary to be at ../nginx/objs/nginx.
+
+Environment variables:
+
+TEST_NGINX_BINARY
+
+    Sets path to nginx binary to be tested, defaults to "../nginx/objs/nginx".
+
+TEST_NGINX_VERBOSE
+
+    Be a bit more verbose (in particular, print requests sent and responses
+    got from nginx).  Note that this requires prove -v (or HARNESS_VERBOSE).
+
+TEST_NGINX_LEAVE
+
+    If set temporary directory with configs and logs won't be deleted on test
+    completion.  Usefull for debugging.
+
+TEST_NGINX_CATLOG
+
+    Cat error log to stdout after test completion.  Usefull for debugging.
+
+TEST_NGINX_UNSAFE
+
+    Run unsafe tests.
+
+Happy testing!
