@@ -33,6 +33,7 @@ typedef struct {
 
     ngx_str_t        certificate;
     ngx_str_t        certificate_key;
+    ngx_str_t        pass_phrase_dialog;
     ngx_str_t        dhparam;
     ngx_str_t        ecdh_curve;
 

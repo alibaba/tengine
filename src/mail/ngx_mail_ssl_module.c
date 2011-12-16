@@ -41,6 +41,9 @@ static ngx_conf_bitmask_t  ngx_mail_ssl_protocols[] = {
 };
 
 
+static ngx_str_t ngx_mail_ssl_unknown_server_name = ngx_string("unknown");
+
+
 static ngx_command_t  ngx_mail_ssl_commands[] = {
 
     { ngx_string("ssl"),
@@ -48,6 +51,13 @@ static ngx_command_t  ngx_mail_ssl_commands[] = {
       ngx_mail_ssl_enable,
       NGX_MAIL_SRV_CONF_OFFSET,
       offsetof(ngx_mail_ssl_conf_t, enable),
+      NULL },
+
+    { ngx_string("ssl_pass_phrase_dialog"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, pass_phrase_dialog),
       NULL },
 
     { ngx_string("starttls"),
@@ -195,6 +205,9 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     char                *mode;
     ngx_pool_cleanup_t  *cln;
 
+    ngx_mail_core_srv_conf_t           *cscf;
+    ngx_http_ssl_pphrase_dialog_conf_t  dialog;
+
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_uint_value(conf->starttls, prev->starttls,
                          NGX_MAIL_STARTTLS_OFF);
@@ -218,6 +231,8 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
+    ngx_conf_merge_str_value(conf->pass_phrase_dialog, prev->pass_phrase_dialog,
+                             "builtin");
 
     conf->ssl.log = cf->log;
 
@@ -276,8 +291,17 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
 
+    cscf = ngx_mail_conf_get_module_srv_conf(cf, ngx_mail_core_module);
+    dialog.ssl = &conf->ssl;
+    dialog.type = &conf->pass_phrase_dialog;
+    if (cscf->server_name.len != 0) {
+        dialog.server_name = &cscf->server_name;
+    } else {
+        dialog.server_name = &ngx_mail_ssl_unknown_server_name;
+    }
+
     if (ngx_ssl_certificate(cf, &conf->ssl, &conf->certificate,
-                            &conf->certificate_key)
+                            &conf->certificate_key, &dialog)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
