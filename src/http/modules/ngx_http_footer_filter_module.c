@@ -161,11 +161,6 @@ ngx_http_footer_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
-    nl = ngx_alloc_chain_link(r->pool);
-    if (nl == NULL) {
-        return NGX_ERROR;
-    }
-
     buf->pos = ctx->footer.data;
     buf->last = buf->pos + ctx->footer.len;
     buf->start = buf->pos;
@@ -173,10 +168,19 @@ ngx_http_footer_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     buf->last_buf = 1;
     buf->memory = 1;
 
-    nl->buf = buf;
-    nl->next = NULL;
-    cl->next = nl;
-    cl->buf->last_buf = 0;
+    if (ngx_buf_size(cl->buf) == 0) {
+        cl->buf = buf;
+    } else {
+        nl = ngx_alloc_chain_link(r->pool);
+        if (nl == NULL) {
+            return NGX_ERROR;
+        }
+
+        nl->buf = buf;
+        nl->next = NULL;
+        cl->next = nl;
+        cl->buf->last_buf = 0;
+    }
 
     return ngx_http_next_body_filter(r, in);
 }
