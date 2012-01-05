@@ -90,9 +90,19 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     u_char  *p, *last, *msg;
     u_char   errstr[NGX_MAX_ERROR_STR];
 
+#if (NGX_SYSLOG)
+
+    if (log->syslog == NULL && log->file->fd == NGX_INVALID_FILE) {
+        return;
+    }
+
+#else
+
     if (log->file->fd == NGX_INVALID_FILE) {
         return;
     }
+
+#endif
 
     last = errstr + NGX_MAX_ERROR_STR;
 

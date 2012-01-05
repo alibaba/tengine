@@ -146,7 +146,7 @@ static char *
 ngx_syslog_init_conf(ngx_cycle_t *cycle, void *conf)
 {
     ngx_syslog_hostname.len = cycle->hostname.len;
-    ngx_cpystrn(ngx_syslog_host_buf, cycle->hostname.data, cycle->hostname.len);
+    ngx_memcpy(ngx_syslog_host_buf, cycle->hostname.data, cycle->hostname.len);
     ngx_syslog_hostname.data = ngx_syslog_host_buf;
 
     return NGX_OK;
