@@ -30,7 +30,8 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 {
     size_t                     preread;
     ssize_t                    size;
-    ngx_buf_t                 *b;
+    ngx_buf_t                 *b, buf;
+    ngx_int_t                  rc;
     ngx_chain_t               *cl, **next;
     ngx_temp_file_t           *tf;
     ngx_http_request_body_t   *rb;
@@ -126,6 +127,18 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         b->pos = r->header_in->pos;
         b->last = r->header_in->last;
         b->end = r->header_in->end;
+
+        buf.start = r->header_in->pos;
+        buf.pos = r->header_in->pos;
+        buf.last = (off_t) preread >= r->headers_in.content_length_n
+                 ? r->header_in->pos + (size_t) r->headers_in.content_length_n
+                 : r->header_in->last;
+        buf.end = r->header_in->end;
+
+        rc = ngx_http_top_input_body_filter(r, &buf);
+        if (rc != NGX_OK) {
+            return rc;
+        }
 
         rb->bufs = ngx_alloc_chain_link(r->pool);
         if (rb->bufs == NULL) {
@@ -262,7 +275,8 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 {
     size_t                     size;
     ssize_t                    n;
-    ngx_buf_t                 *b;
+    ngx_buf_t                 *b, buf;
+    ngx_int_t                  rc;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
@@ -308,6 +322,16 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             if (n == 0 || n == NGX_ERROR) {
                 c->error = 1;
                 return NGX_HTTP_BAD_REQUEST;
+            }
+
+            buf.start = rb->buf->last;
+            buf.pos = rb->buf->last;
+            buf.last = buf.start + n;
+            buf.end = buf.last;
+
+            rc = ngx_http_top_input_body_filter(r, &buf);
+            if (rc != NGX_OK) {
+                return rc;
             }
 
             rb->buf->last += n;

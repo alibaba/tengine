@@ -65,11 +65,17 @@ static ngx_int_t ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
     ngx_http_conf_addr_t *addr);
 #endif
 
+static ngx_int_t ngx_http_dummy_input_body_filter(ngx_http_request_t *r,
+    ngx_buf_t *buf);
+
 ngx_uint_t   ngx_http_max_module;
 
 
 ngx_int_t  (*ngx_http_top_header_filter) (ngx_http_request_t *r);
 ngx_int_t  (*ngx_http_top_body_filter) (ngx_http_request_t *r, ngx_chain_t *ch);
+
+ngx_int_t  (*ngx_http_top_input_body_filter) (ngx_http_request_t *r,
+    ngx_buf_t *buf);
 
 
 ngx_str_t  ngx_http_html_default_types[] = {
@@ -216,6 +222,10 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     pcf = *cf;
     cf->ctx = ctx;
+
+    /* init input body filter pointer */
+
+    ngx_http_top_input_body_filter = ngx_http_dummy_input_body_filter;
 
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_HTTP_MODULE) {
@@ -2068,5 +2078,14 @@ ngx_http_set_default_types(ngx_conf_t *cf, ngx_array_t **types,
         default_type++;
     }
 
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_dummy_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
+{
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http dummy input body filter");
     return NGX_OK;
 }
