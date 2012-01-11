@@ -171,6 +171,7 @@ ngx_http_headers_filter(ngx_http_request_t *r)
     if (r != r->main
         || (r->headers_out.status != NGX_HTTP_OK
             && r->headers_out.status != NGX_HTTP_NO_CONTENT
+            && r->headers_out.status != NGX_HTTP_PARTIAL_CONTENT
             && r->headers_out.status != NGX_HTTP_MOVED_PERMANENTLY
             && r->headers_out.status != NGX_HTTP_MOVED_TEMPORARILY
             && r->headers_out.status != NGX_HTTP_NOT_MODIFIED))
@@ -278,7 +279,9 @@ ngx_http_set_expires(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (exp_time->expires_time == 0) {
+    if (exp_time->expires_time == 0
+        && exp_time->expires != NGX_HTTP_EXPIRES_DAILY)
+    {
         ngx_memcpy(expires->value.data, ngx_cached_http_time.data,
                    ngx_cached_http_time.len + 1);
         ngx_str_set(&cc->value, "max-age=0");
@@ -287,15 +290,15 @@ ngx_http_set_expires(ngx_http_request_t *r,
 
     now = ngx_time();
 
-    if (exp_time->expires == NGX_HTTP_EXPIRES_ACCESS
-        || r->headers_out.last_modified_time == -1)
+    if (exp_time->expires == NGX_HTTP_EXPIRES_DAILY) {
+        expires_time = ngx_next_time(exp_time->expires_time);
+        max_age = expires_time - now;
+
+    } else if (exp_time->expires == NGX_HTTP_EXPIRES_ACCESS
+               || r->headers_out.last_modified_time == -1)
     {
         expires_time = now + exp_time->expires_time;
         max_age = exp_time->expires_time;
-
-    } else if (exp_time->expires == NGX_HTTP_EXPIRES_DAILY) {
-        expires_time = ngx_next_time(exp_time->expires_time);
-        max_age = expires_time - now;
 
     } else {
         expires_time = r->headers_out.last_modified_time

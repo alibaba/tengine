@@ -94,6 +94,7 @@ ngx_http_footer_header_filter(ngx_http_request_t *r)
 
     if (lcf->variable == (ngx_http_complex_value_t *) -1
         || r->header_only
+        || (r->method & NGX_HTTP_HEAD)
         || r != r->main
         || r->headers_out.status == NGX_HTTP_NO_CONTENT
         || ngx_http_test_content_type(r, &lcf->types) == NULL)
