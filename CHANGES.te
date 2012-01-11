@@ -1,4 +1,34 @@
-Changes with Tengine 1.2.1                                         6 Dev 2011
+
+Changes with Tengine 1.2.2                                         11 Jan 2012
+
+    *) Feature: adds input body filter mechanism.
+       Thanks to Weiyue.
+
+    *) Feature: adds SSL dialog support to mail module.
+       Thanks to Weiyue.
+
+    *) Change: merges changes between nginx-1.0.10 and nginx-1.0.11.
+       Thanks to Shudu.
+
+    *) Change: now 'lingering_close' is off by default.
+       Thanks to Shudu.
+
+    *) Bugfix: fixes the bug with pipe logs.
+       Thanks to Weiyue.
+
+    *) Bugfix: fixes the 'forbid_action' bug of limit_req module.
+       Thanks to Diaoliang.
+
+    *) Bugfix: fixes the 'backtrace_max_stack_size' bug.
+       Thanks to Diaoliang.
+
+    *) Bugfix: fixes the footer module bug when output body is empty.
+       Thanks to Xiongjunmin.
+
+    *) Bugfix: fixes the last hostname letter bug of syslog.
+       Thanks to Weiyue.
+
+Changes with Tengine 1.2.1                                         06 Dev 2011
 
     *) Bugfix: fixes the segmentation fault in case of using default error log
        or access log of tengine. This bug was introduced by creating file
