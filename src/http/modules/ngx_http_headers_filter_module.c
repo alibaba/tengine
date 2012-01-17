@@ -515,7 +515,8 @@ ngx_http_headers_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
             if (conf->default_expires.expires == NGX_HTTP_EXPIRES_OFF) {
                 /* prev expires set to off */
-                if (conf->types_keys != NULL) {
+                /* or prev expires off by inherited but enable types */
+                if (conf->types_keys != NULL || prev->enable_types) {
                     /*
                      * current set expires_by_types
                      * ignored prev expires set to off
