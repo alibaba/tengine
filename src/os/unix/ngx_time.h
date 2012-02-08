@@ -13,6 +13,7 @@
 
 
 typedef ngx_rbtree_key_t      ngx_msec_t;
+typedef ngx_rbtree_key_t      ngx_usec_t;
 typedef ngx_rbtree_key_int_t  ngx_msec_int_t;
 typedef ngx_rbtree_key_int_t  ngx_usec_int_t;
 

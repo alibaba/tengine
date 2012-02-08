@@ -238,6 +238,7 @@ ngx_http_init_request(ngx_event_t *rev)
 {
     ngx_time_t                 *tp;
     ngx_uint_t                  i;
+    struct timeval              tv;
     ngx_connection_t           *c;
     ngx_http_request_t         *r;
     struct sockaddr_in         *sin;
@@ -488,9 +489,17 @@ ngx_http_init_request(ngx_event_t *rev)
     r->main = r;
     r->count = 1;
 
-    tp = ngx_timeofday();
-    r->start_sec = tp->sec;
-    r->start_msec = tp->msec;
+    if (clcf->request_time_cached) {
+        tp = ngx_timeofday();
+        r->start_sec = tp->sec;
+        r->start_msec = tp->msec;
+        r->start_usec = tp->usec;
+    } else {
+        ngx_gettimeofday(&tv);
+        r->start_sec = tv.tv_sec;
+        r->start_msec = tv.tv_usec / 1000;
+        r->start_usec = tv.tv_usec % 1000;
+    }
 
     r->method = NGX_HTTP_UNKNOWN;
 

@@ -152,15 +152,25 @@ ngx_http_set_status(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_int_t
 ngx_http_status_log_handler(ngx_http_request_t *r)
 {
-    ngx_time_t      *tp;
-    ngx_msec_int_t   ms;
+    ngx_time_t                *tp;
+    ngx_msec_int_t             ms;
+    struct timeval             tv;
+    ngx_http_core_loc_conf_t  *clcf;
 
-    tp = ngx_timeofday();
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (clcf->request_time_cached) {
+        tp = ngx_timeofday();
 
-    ms = (ngx_msec_int_t)
-             ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+        ms = (ngx_msec_int_t)
+                 ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+    } else {
+        ngx_gettimeofday(&tv);
+
+        ms = (ngx_msec_int_t) ((tv.tv_sec - r->start_sec) * 1000
+                 + (tv.tv_usec / 1000 - r->start_msec));
+    }
+
     ms = ngx_max(ms, 0);
-
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http status: request_time %d", ms);
 

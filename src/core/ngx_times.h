@@ -15,6 +15,7 @@
 typedef struct {
     time_t      sec;
     ngx_uint_t  msec;
+    ngx_uint_t  usec;
     ngx_int_t   gmtoff;
 } ngx_time_t;
 

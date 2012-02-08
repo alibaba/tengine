@@ -374,6 +374,7 @@ struct ngx_http_request_s {
     time_t                            lingering_time;
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
+    ngx_usec_t                        start_usec;
 
     ngx_uint_t                        method;
     ngx_uint_t                        http_version;
