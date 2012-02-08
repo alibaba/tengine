@@ -158,7 +158,7 @@ ngx_http_status_log_handler(ngx_http_request_t *r)
     ngx_http_core_loc_conf_t  *clcf;
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-    if (clcf->request_time_cached) {
+    if (clcf->request_time_cache) {
         tp = ngx_timeofday();
 
         ms = (ngx_msec_int_t)

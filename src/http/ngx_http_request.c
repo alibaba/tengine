@@ -489,7 +489,7 @@ ngx_http_init_request(ngx_event_t *rev)
     r->main = r;
     r->count = 1;
 
-    if (clcf->request_time_cached) {
+    if (clcf->request_time_cache) {
         tp = ngx_timeofday();
         r->start_sec = tp->sec;
         r->start_msec = tp->msec;
