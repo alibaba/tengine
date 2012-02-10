@@ -1560,7 +1560,7 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
         if (rc == NGX_AGAIN) {
 
-            if (u->buffer.pos == u->buffer.end) {
+            if (u->buffer.last == u->buffer.end) {
                 ngx_log_error(NGX_LOG_ERR, c->log, 0,
                               "upstream sent too big header");
 
@@ -1993,14 +1993,14 @@ ngx_http_upstream_process_body_in_memory(ngx_http_request_t *r,
             return;
         }
 
+        if (u->length == 0) {
+            ngx_http_upstream_finalize_request(r, u, 0);
+            return;
+        }
+
         if (!rev->ready) {
             break;
         }
-    }
-
-    if (u->length == 0) {
-        ngx_http_upstream_finalize_request(r, u, 0);
-        return;
     }
 
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
