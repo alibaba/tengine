@@ -44,7 +44,7 @@ static ngx_command_t  ngx_http_concat_commands[] = {
       NULL },
 
     { ngx_string("concat_max_files"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_concat_loc_conf_t, max_files),
@@ -370,7 +370,7 @@ ngx_http_concat_add_path(ngx_http_request_t *r, ngx_array_t *uris,
 
     if (uris->nelts >= max) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "client sent two many concat filenames");
+                      "client sent too many concat filenames");
         return NGX_HTTP_BAD_REQUEST;
     }
 
