@@ -1,6 +1,7 @@
 
 /*
  * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
  */
 
 
@@ -133,23 +134,6 @@ failed:
     rc->err.len = ngx_snprintf(rc->err.data, rc->err.len, p, &rc->pattern, n)
                   - rc->err.data;
     return NGX_OK;
-}
-
-
-ngx_int_t
-ngx_regex_capture_count(ngx_regex_t *re)
-{
-    int  rc, n;
-
-    n = 0;
-
-    rc = pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &n);
-
-    if (rc < 0) {
-        return (ngx_int_t) rc;
-    }
-
-    return (ngx_int_t) n;
 }
 
 

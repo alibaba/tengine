@@ -1,4 +1,59 @@
 
+Changes with nginx 1.0.12                                        06 Feb 2012
+
+    *) Feature: the "TLSv1.1" and "TLSv1.2" parameters of the
+       "ssl_protocols" directive.
+
+    *) Feature: the "if" SSI command supports captures in regular
+       expressions.
+
+    *) Bugfix: the "if" SSI command did not work inside the "block" command.
+
+    *) Bugfix: in AIO error handling on FreeBSD.
+
+    *) Bugfix: in the OpenSSL library initialization.
+
+    *) Bugfix: the "worker_cpu_affinity" directive might not work.
+
+    *) Bugfix: the "limit_conn_log_level" and "limit_req_log_level"
+       directives might not work.
+
+    *) Bugfix: the "read_ahead" directive might not work combined with
+       "try_files" and "open_file_cache".
+
+    *) Bugfix: the "proxy_cache_use_stale" directive with "error" parameter
+       did not return answer from cache if there were no live upstreams.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if small
+       time was used in the "inactive" parameter of the "proxy_cache_path"
+       directive.
+
+    *) Bugfix: responses from cache might hang.
+
+    *) Bugfix: in error handling while connecting to a backend.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: in the "epoll" event method.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: the $sent_http_cache_control variable might contain a wrong
+       value if the "expires" directive was used.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: the "limit_rate" directive did not allow to use full
+       throughput, even if limit value was very high.
+
+    *) Bugfix: the "sendfile_max_chunk" directive did not work, if the
+       "limit_rate" directive was used.
+
+    *) Bugfix: nginx could not be built on Solaris; the bug had appeared in
+       1.0.11.
+
+    *) Bugfix: in the ngx_http_scgi_module.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+
+
 Changes with nginx 1.0.11                                        15 Dec 2011
 
     *) Change: now double quotes are encoded in an "echo" SSI-command
@@ -4447,8 +4502,8 @@ Changes with nginx 0.3.6                                         24 Oct 2005
     *) Bugfix: if at least in one server was no the "listen" directive, then
        nginx did not listen on the 80 port; the bug had appeared in 0.3.3.
 
-    *) Bugfix: if the URI part is omitted in "proxy_pass" directive, the the
-       80 port was always used.
+    *) Bugfix: if the URI part is omitted in "proxy_pass" directive, the 80
+       port was always used.
 
 
 Changes with nginx 0.3.5                                         21 Oct 2005
@@ -4693,7 +4748,7 @@ Changes with nginx 0.1.43                                        30 Aug 2005
     *) Bugfix: the segmentation fault occurred or the worker process may got
        caught in an endless loop if the proxied or FastCGI server sent the
        "Cache-Control" header line and the "expires" directive was used; in
-       the proxied mode the the bug had appeared in 0.1.29.
+       the proxied mode the bug had appeared in 0.1.29.
 
 
 Changes with nginx 0.1.42                                        23 Aug 2005
@@ -4768,8 +4823,8 @@ Changes with nginx 0.1.39                                        14 Jul 2005
 
 Changes with nginx 0.1.38                                        08 Jul 2005
 
-    *) Feature: the "limit_rate" directive is supported in in proxy and
-       FastCGI mode.
+    *) Feature: the "limit_rate" directive is supported in proxy and FastCGI
+       mode.
 
     *) Feature: the "X-Accel-Limit-Rate" response header line is supported
        in proxy and FastCGI mode.
@@ -4921,8 +4976,7 @@ Changes with nginx 0.1.30                                        14 May 2005
 
     *) Bugfix: if the length of the response part received at once from
        proxied or FastCGI server was equal to 500, then nginx returns the
-       500 response code; in proxy mode the the bug had appeared in 0.1.29
-       only.
+       500 response code; in proxy mode the bug had appeared in 0.1.29 only.
 
     *) Bugfix: nginx did not consider the directives with 8 or 9 parameters
        as invalid.
@@ -5165,7 +5219,7 @@ Changes with nginx 0.1.19                                        16 Feb 2005
 
     *) Bugfix: nginx could not be built on NetBSD 2.0.
 
-    *) Bugfix: the timeout may occur while reading of the the client request
+    *) Bugfix: the timeout may occur while reading of the client request
        body via SSL connections.
 
 
