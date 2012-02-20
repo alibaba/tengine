@@ -95,6 +95,7 @@ HTTP_SECURE_LINK=NO
 HTTP_DEGRADATION=NO
 HTTP_SYSGUARD=NO
 HTTP_FLV=NO
+HTTP_SLICE=NO
 HTTP_MP4=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
@@ -210,6 +211,7 @@ do
         --with-http_sub_module)          HTTP_SUB=YES               ;;
         --with-http_dav_module)          HTTP_DAV=YES               ;;
         --with-http_flv_module)          HTTP_FLV=YES               ;;
+        --with-http_slice_module)        HTTP_SLICE=YES             ;;
         --with-http_mp4_module)          HTTP_MP4=YES               ;;
         --with-http_gzip_static_module)  HTTP_GZIP_STATIC=YES       ;;
         --with-http_concat_module)       HTTP_CONCAT=YES            ;;
@@ -351,6 +353,7 @@ cat << END
   --with-http_sub_module             enable ngx_http_sub_module
   --with-http_dav_module             enable ngx_http_dav_module
   --with-http_flv_module             enable ngx_http_flv_module
+  --with-http_slice_module           enable ngx_http_slice_module
   --with-http_mp4_module             enable ngx_http_mp4_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
   --with-http_concat_module          enable ngx_http_concat_module
