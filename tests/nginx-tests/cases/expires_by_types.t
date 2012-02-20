@@ -27,7 +27,7 @@ print $ENV{TEST_NGINX_BINARY};
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(71)
+my $t = Test::Nginx->new()->plan(72)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%

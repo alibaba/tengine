@@ -32,7 +32,7 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
-    
+
     include mime.types;
     default_type application/octet-stream;
 
