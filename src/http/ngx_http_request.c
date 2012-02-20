@@ -1496,17 +1496,12 @@ ngx_http_process_user_agent(ngx_http_request_t *r, ngx_table_elt_t *h,
 
     if (!r->headers_in.msie && !r->headers_in.opera) {
 
-        if (ngx_strstrn(user_agent, "Gecko/", 6 - 1)) {
-            r->headers_in.gecko = 1;
-
-        } else if (ngx_strstrn(user_agent, "Chrome/", 7 - 1)) {
+        if (ngx_strstrn(user_agent, "Chrome/", 7 - 1)) {
             r->headers_in.chrome = 1;
 
         } else if (ngx_strstrn(user_agent, "Safari/", 7 - 1)) {
             r->headers_in.safari = 1;
 
-        } else if (ngx_strstrn(user_agent, "Konqueror", 9 - 1)) {
-            r->headers_in.konqueror = 1;
         }
     }
 

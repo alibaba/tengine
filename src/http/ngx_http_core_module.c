@@ -3660,7 +3660,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->chunked_transfer_encoding,
                               prev->chunked_transfer_encoding, 1);
     ngx_conf_merge_value(conf->request_time_cache,
-			      prev->request_time_cache, 1);
+                              prev->request_time_cache, 1);
 
     ngx_conf_merge_ptr_value(conf->open_file_cache,
                               prev->open_file_cache, NULL);
