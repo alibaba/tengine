@@ -1,4 +1,26 @@
 
+Changes with Tengine 1.2.3                                         27 Feb 2012
+
+    *) Feature: adds the 'request_time_cache' directive, so we can get more 
+       precise $request_time/$request_time_msec/$request_time_usec by turning
+       it off.
+       Thanks to Yuanzhuo.
+
+    *) Feature: adds the 'slice' module to get a slice of a static file.
+       Thanks to Shudu.
+
+    *) Change: merges changes between nginx-1.0.11 and nginx-1.0.12.
+       Thanks to Shudu.
+
+    *) Change: deletes unused browsers detection.
+       Thanks to Shudu.
+
+    *) Bugfix: fixes a bug in upstream when reading header.
+       Thanks to Lizi.
+
+    *) Bugfix: fixes a bug in 'expires_by_types'.
+       Thanks to Lizi.
+
 Changes with Tengine 1.2.2                                         11 Jan 2012
 
     *) Feature: adds input body filter mechanism.
