@@ -502,7 +502,8 @@ static ngx_int_t
 ngx_http_limit_req_lookup(ngx_http_request_t *r,
     ngx_http_limit_req_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep)
 {
-    u_char                          *data, *last;
+    u_char                          *lr_data, *lr_last;
+    size_t                           lr_vv_len;
     ngx_int_t                        rc, excess;
     ngx_uint_t                       i;
     ngx_time_t                      *tp;
@@ -538,25 +539,33 @@ ngx_http_limit_req_lookup(ngx_http_request_t *r,
         do {
             lr = (ngx_http_limit_req_node_t *) &node->color;
 
-            data = lr->data;
-            last = data + lr->len;
+            lr_data = lr->data;
+            lr_last = lr_data + lr->len;
+
             for (i = 0; i < ctx->limit_vars->nelts; i++) {
                 vv = ngx_http_get_indexed_variable(r, lrv[i].index);
 
                 ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                                "limit_req vv is %i %v node is %s",
-                               lrv[i].index, vv, data);
-                if ((rc = ngx_memn2cmp(data, vv->data, vv->len, vv->len)) != 0)
-                {
+                               lrv[i].index, vv, lr_data);
+
+                lr_vv_len = ngx_min(lr_last - lr_data, vv->len);
+
+                if ((rc = ngx_memcmp(vv->data, lr_data, lr_vv_len)) != 0) {
                     break;
                 }
 
-                data += vv->len;
-
-                if (data > last) {
-                    rc = -1;
+                if (lr_vv_len != vv->len) {
+                    rc = 1;
                     break;
                 }
+
+                /* lr_vv_len == vv->len */
+                lr_data += lr_vv_len;
+            }
+
+            if (rc == 0 && lr_last > lr_data) {
+                rc = -1;
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
