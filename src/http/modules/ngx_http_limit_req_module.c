@@ -353,7 +353,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
                           "limit_req limiting requests, "
                           "excess: %ui.%03ui by zone \"%V\"",
                           excess / 1000, excess % 1000,
-                         &limit_req[i].shm_zone->shm.name);
+                          &limit_req[i].shm_zone->shm.name);
 
             if (limit_req[i].forbid_action.len == 0) {
 
@@ -522,6 +522,7 @@ ngx_http_limit_req_lookup(ngx_http_request_t *r,
     rc = -1;
 
     lrv = ctx->limit_vars->elts;
+
     while (node != sentinel) {
 
         if (hash < node->key) {
@@ -536,78 +537,73 @@ ngx_http_limit_req_lookup(ngx_http_request_t *r,
 
         /* hash == node->key */
 
-        do {
-            lr = (ngx_http_limit_req_node_t *) &node->color;
+        lr = (ngx_http_limit_req_node_t *) &node->color;
 
-            lr_data = lr->data;
-            lr_last = lr_data + lr->len;
+        lr_data = lr->data;
+        lr_last = lr_data + lr->len;
 
-            for (i = 0; i < ctx->limit_vars->nelts; i++) {
-                vv = ngx_http_get_indexed_variable(r, lrv[i].index);
+        for (i = 0; i < ctx->limit_vars->nelts; i++) {
+            vv = ngx_http_get_indexed_variable(r, lrv[i].index);
 
-                ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                               "limit_req vv is %i %v node is %s",
-                               lrv[i].index, vv, lr_data);
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "limit_req vv is %i %v node is %s",
+                           lrv[i].index, vv, lr_data);
 
-                lr_vv_len = ngx_min(lr_last - lr_data, vv->len);
+            lr_vv_len = ngx_min(lr_last - lr_data, vv->len);
 
-                if ((rc = ngx_memcmp(vv->data, lr_data, lr_vv_len)) != 0) {
-                    break;
-                }
-
-                if (lr_vv_len != vv->len) {
-                    rc = 1;
-                    break;
-                }
-
-                /* lr_vv_len == vv->len */
-                lr_data += lr_vv_len;
+            if ((rc = ngx_memcmp(vv->data, lr_data, lr_vv_len)) != 0) {
+                break;
             }
 
-            if (rc == 0 && lr_last > lr_data) {
-                rc = -1;
+            if (lr_vv_len != vv->len) {
+                rc = 1;
+                break;
             }
 
-            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "limit_req lookup is : %i, size is %i",
-                           rc, ctx->limit_vars->nelts);
+            /* lr_vv_len == vv->len */
+            lr_data += lr_vv_len;
+        }
 
-            if (rc == 0) {
-                ngx_queue_remove(&lr->queue);
-                ngx_queue_insert_head(&ctx->sh->queue, &lr->queue);
+        if (rc == 0 && lr_last > lr_data) {
+            rc = -1;
+        }
 
-                tp = ngx_timeofday();
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "limit_req lookup is : %i, size is %i",
+                       rc, ctx->limit_vars->nelts);
 
-                now = (ngx_msec_t) (tp->sec * 1000 + tp->msec);
-                ms = (ngx_msec_int_t) (now - lr->last);
+        if (rc == 0) {
+            ngx_queue_remove(&lr->queue);
+            ngx_queue_insert_head(&ctx->sh->queue, &lr->queue);
 
-                excess = lr->excess - ctx->rate * ngx_abs(ms) / 1000 + 1000;
+            tp = ngx_timeofday();
 
-                if (excess < 0) {
-                    excess = 0;
-                }
+            now = (ngx_msec_t) (tp->sec * 1000 + tp->msec);
+            ms = (ngx_msec_int_t) (now - lr->last);
 
-                *ep = excess;
+            excess = lr->excess - ctx->rate * ngx_abs(ms) / 1000 + 1000;
 
-                if ((ngx_uint_t) excess > limit_req->burst) {
-                    return NGX_BUSY;
-                }
-
-                lr->excess = excess;
-                lr->last = now;
-
-                if (excess) {
-                    return NGX_AGAIN;
-                }
-
-                return NGX_OK;
+            if (excess < 0) {
+                excess = 0;
             }
 
-            node = (rc < 0) ? node->left : node->right;
+            *ep = excess;
 
-        } while (node != sentinel && hash == node->key);
+            if ((ngx_uint_t) excess > limit_req->burst) {
+                return NGX_BUSY;
+            }
 
-        break;
+            lr->excess = excess;
+            lr->last = now;
+
+            if (excess) {
+                return NGX_AGAIN;
+            }
+
+            return NGX_OK;
+        }
+
+        node = (rc < 0) ? node->left : node->right;
     }
 
     *ep = 0;

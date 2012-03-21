@@ -47,7 +47,18 @@ ngx_os_init(ngx_log_t *log)
 
     for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
 
+#if (NGX_HAVE_SC_NPROCESSORS_ONLN)
     if (ngx_ncpu <= 0) {
+        ngx_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+
+        if (ngx_ncpu <= 0) {
+            ngx_log_error(NGX_LOG_ALERT, log, 0,
+                          "sysconf(_SC_NPROCESSORS_ONLN): %d", ngx_ncpu);
+        }
+    }
+#endif
+
+    if (ngx_ncpu < 1) {
         ngx_ncpu = 1;
     }
 

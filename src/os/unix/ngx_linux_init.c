@@ -74,15 +74,6 @@ ngx_os_specific_init(ngx_log_t *log)
 
     ngx_os_io = ngx_linux_io;
 
-#ifdef _SC_NPROCESSORS_ONLN
-    ngx_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
-
-    if (ngx_ncpu <= 0) {
-        ngx_log_error(NGX_LOG_ALERT, log, 0,
-                      "sysconf(_SC_NPROCESSORS_ONLN): %d", ngx_ncpu);
-    }
-
     return NGX_OK;
 }
 

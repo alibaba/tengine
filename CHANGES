@@ -1,4 +1,49 @@
 
+Changes with nginx 1.0.14                                        15 Mar 2012
+
+    *) Security: content of previously freed memory might be sent to a
+       client if backend returned specially crafted response.
+       Thanks to Matthew Daley.
+
+
+Changes with nginx 1.0.13                                        05 Mar 2012
+
+    *) Feature: the "return" and "error_page" directives can now be used to
+       return 307 redirections.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "resolver" directive was used and there was no "error_log" directive
+       specified at global level.
+       Thanks to Roman Arutyunyan.
+
+    *) Bugfix: memory leaks.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: nginx might log incorrect error "upstream prematurely closed
+       connection" instead of correct "upstream sent too big header" one.
+       Thanks to Feibo Li.
+
+    *) Bugfix: on ZFS filesystem disk cache size might be calculated
+       incorrectly; the bug had appeared in 1.0.1.
+
+    *) Bugfix: the number of internal redirects to named locations was not
+       limited.
+
+    *) Bugfix: temporary files might be not removed if the "proxy_store"
+       directive was used with SSI includes.
+
+    *) Bugfix: in some cases non-cacheable variables (such as the $args
+       variable) returned old empty cached value.
+
+    *) Bugfix: the "proxy_redirect" directives might be inherited
+       incorrectly.
+
+    *) Bugfix: nginx could not be built with the ngx_http_perl_module if the
+       --with-openssl option was used.
+
+    *) Bugfix: nginx could not be built by the icc 12.1 compiler.
+
+
 Changes with nginx 1.0.12                                        06 Feb 2012
 
     *) Feature: the "TLSv1.1" and "TLSv1.2" parameters of the
