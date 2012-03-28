@@ -2373,7 +2373,6 @@ ngx_http_subrequest(ngx_http_request_t *r,
     ngx_connection_t              *c;
     ngx_http_request_t            *sr;
     ngx_http_core_srv_conf_t      *cscf;
-    ngx_http_core_main_conf_t     *cmcf;
     ngx_http_postponed_request_t  *pr, *p;
 
     r->main->subrequests--;
@@ -2454,14 +2453,7 @@ ngx_http_subrequest(ngx_http_request_t *r,
         c->data = sr;
     }
 
-    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
-
-    /* avoid variables operation on one request may affect others */
-    sr->variables = ngx_pcalloc(sr->pool, cmcf->variables.nelts
-                                          * sizeof(ngx_http_variable_value_t));
-    if (sr->variables == NULL) {
-        return NGX_ERROR;
-    }
+    sr->variables = r->variables;
 
     sr->log_handler = r->log_handler;
 
