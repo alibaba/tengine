@@ -65,6 +65,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #if (NGX_PCRE)
 #include <ngx_regex.h>
 #endif
+#include <ngx_trie.h>
 #include <ngx_radix_tree.h>
 #include <ngx_times.h>
 #include <ngx_shmtx.h>

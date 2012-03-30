@@ -152,6 +152,17 @@ install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 END
 
 
+if [ $HTTP_USER_AGENT = YES ]; then
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/browsers' \
+		|| cp conf/browsers '\$(DESTDIR)$NGX_CONF_PREFIX'
+	cp conf/browsers '\$(DESTDIR)$NGX_CONF_PREFIX/browsers'
+END
+
+fi
+
+
 if test -n "$NGX_ERROR_LOG_PATH"; then
     cat << END                                                >> $NGX_MAKEFILE
 

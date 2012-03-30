@@ -100,6 +100,7 @@ HTTP_MP4=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
+HTTP_USER_AGENT=YES
 
 # STUB
 HTTP_STUB_STATUS=NO
@@ -243,6 +244,7 @@ do
         --without-http_limit_req_module) HTTP_LIMIT_REQ=NO          ;;
         --without-http_empty_gif_module) HTTP_EMPTY_GIF=NO          ;;
         --without-http_browser_module)   HTTP_BROWSER=NO            ;;
+        --without-http_user_agent_module) HTTP_USER_AGENT=NO        ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
@@ -387,6 +389,7 @@ cat << END
   --without-http_browser_module      disable ngx_http_browser_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
+  --without-http_user_agent_module   disable ngx_http_user_agent_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

@@ -27,6 +27,7 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_md5.h \
            src/core/ngx_sha1.h \
            src/core/ngx_rbtree.h \
+           src/core/ngx_trie.h \
            src/core/ngx_radix_tree.h \
            src/core/ngx_slab.h \
            src/core/ngx_times.h \
@@ -56,6 +57,7 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_murmurhash.c \
            src/core/ngx_md5.c \
            src/core/ngx_rbtree.c \
+           src/core/ngx_trie.c
            src/core/ngx_radix_tree.c \
            src/core/ngx_slab.c \
            src/core/ngx_times.c \
@@ -466,6 +468,10 @@ HTTP_EMPTY_GIF_SRCS=src/http/modules/ngx_http_empty_gif_module.c
 
 HTTP_BROWSER_MODULE=ngx_http_browser_module
 HTTP_BROWSER_SRCS=src/http/modules/ngx_http_browser_module.c
+
+
+HTTP_USER_AGENT_MODULE=ngx_http_user_agent_module
+HTTP_USER_AGENT_SRCS=src/http/modules/ngx_http_user_agent_module.c
 
 
 HTTP_SECURE_LINK_MODULE=ngx_http_secure_link_module
