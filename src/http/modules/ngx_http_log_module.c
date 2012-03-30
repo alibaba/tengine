@@ -10,6 +10,11 @@
 #include <ngx_http.h>
 
 
+#define NGX_HTTP_LOG_ESCAPE_ON      1
+#define NGX_HTTP_LOG_ESCAPE_OFF     2
+#define NGX_HTTP_LOG_ESCAPE_ASCII   3
+
+
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
 
 typedef u_char *(*ngx_http_log_op_run_pt) (ngx_http_request_t *r, u_char *buf,
@@ -85,6 +90,8 @@ typedef struct {
     time_t                      open_file_cache_valid;
     ngx_uint_t                  open_file_cache_min_uses;
 
+    ngx_uint_t                  escape;
+
     ngx_uint_t                  off;        /* unsigned  off:1 */
 } ngx_http_log_loc_conf_t;
 
@@ -134,7 +141,8 @@ static size_t ngx_http_log_variable_getlen(ngx_http_request_t *r,
     uintptr_t data);
 static u_char *ngx_http_log_variable(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
-static uintptr_t ngx_http_log_escape(u_char *dst, u_char *src, size_t size);
+static uintptr_t ngx_http_log_escape(u_char *dst, u_char *src, size_t size,
+    ngx_uint_t flag);
 
 
 static void *ngx_http_log_create_main_conf(ngx_conf_t *cf);
@@ -152,6 +160,14 @@ static char *ngx_http_log_compile_format(ngx_conf_t *cf,
 static char *ngx_http_log_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_log_init(ngx_conf_t *cf);
+
+
+static ngx_conf_enum_t ngx_http_log_var_escape_types[] = {
+    { ngx_string("on"), NGX_HTTP_LOG_ESCAPE_ON },
+    { ngx_string("off"), NGX_HTTP_LOG_ESCAPE_OFF },
+    { ngx_string("ascii"), NGX_HTTP_LOG_ESCAPE_ASCII },
+    { ngx_null_string, 0 }
+};
 
 
 static ngx_command_t  ngx_http_log_commands[] = {
@@ -177,6 +193,13 @@ static ngx_command_t  ngx_http_log_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
+
+    { ngx_string("log_escape"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_log_loc_conf_t, escape),
+      &ngx_http_log_var_escape_types },
 
       ngx_null_command
 };
@@ -793,6 +816,7 @@ static size_t
 ngx_http_log_variable_getlen(ngx_http_request_t *r, uintptr_t data)
 {
     uintptr_t                   len;
+    ngx_http_log_loc_conf_t    *llcf;
     ngx_http_variable_value_t  *value;
 
     value = ngx_http_get_indexed_variable(r, data);
@@ -801,7 +825,9 @@ ngx_http_log_variable_getlen(ngx_http_request_t *r, uintptr_t data)
         return 1;
     }
 
-    len = ngx_http_log_escape(NULL, value->data, value->len);
+    llcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
+
+    len = ngx_http_log_escape(NULL, value->data, value->len, llcf->escape);
 
     value->escape = len ? 1 : 0;
 
@@ -812,6 +838,7 @@ ngx_http_log_variable_getlen(ngx_http_request_t *r, uintptr_t data)
 static u_char *
 ngx_http_log_variable(ngx_http_request_t *r, u_char *buf, ngx_http_log_op_t *op)
 {
+    ngx_http_log_loc_conf_t    *llcf;
     ngx_http_variable_value_t  *value;
 
     value = ngx_http_get_indexed_variable(r, op->data);
@@ -825,18 +852,22 @@ ngx_http_log_variable(ngx_http_request_t *r, u_char *buf, ngx_http_log_op_t *op)
         return ngx_cpymem(buf, value->data, value->len);
 
     } else {
-        return (u_char *) ngx_http_log_escape(buf, value->data, value->len);
+        llcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
+
+        return (u_char *) ngx_http_log_escape(buf, value->data, value->len,
+                                              llcf->escape);
     }
 }
 
 
 static uintptr_t
-ngx_http_log_escape(u_char *dst, u_char *src, size_t size)
+ngx_http_log_escape(u_char *dst, u_char *src, size_t size, ngx_uint_t flag)
 {
-    ngx_uint_t      n;
-    static u_char   hex[] = "0123456789ABCDEF";
+    ngx_uint_t       n;
+    uint32_t        *escape;
+    static u_char    hex[] = "0123456789ABCDEF";
 
-    static uint32_t   escape[] = {
+    static uint32_t   table[] = {
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
 
                     /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
@@ -854,6 +885,25 @@ ngx_http_log_escape(u_char *dst, u_char *src, size_t size)
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
     };
 
+    static uint32_t   ascii_table[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000004, /* 0000 0000 0000 0000  0000 0000 0000 0100 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x10000000, /* 0001 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    };
+
+    escape = (flag == NGX_HTTP_LOG_ESCAPE_ON) ? table : ascii_table;
 
     if (dst == NULL) {
 
@@ -861,12 +911,15 @@ ngx_http_log_escape(u_char *dst, u_char *src, size_t size)
 
         n = 0;
 
-        while (size) {
-            if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
-                n++;
+        if (flag != NGX_HTTP_LOG_ESCAPE_OFF) {
+
+            while (size) {
+                if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
+                    n++;
+                }
+                src++;
+                size--;
             }
-            src++;
-            size--;
         }
 
         return (uintptr_t) n;
@@ -937,6 +990,7 @@ ngx_http_log_create_loc_conf(ngx_conf_t *cf)
     }
 
     conf->open_file_cache = NGX_CONF_UNSET_PTR;
+    conf->escape = NGX_CONF_UNSET_UINT;
 
     return conf;
 }
@@ -951,6 +1005,9 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_log_t            *log;
     ngx_http_log_fmt_t        *fmt;
     ngx_http_log_main_conf_t  *lmcf;
+
+    ngx_conf_merge_uint_value(conf->escape, prev->escape,
+                              NGX_HTTP_LOG_ESCAPE_ON);
 
     if (conf->open_file_cache == NGX_CONF_UNSET_PTR) {
 
