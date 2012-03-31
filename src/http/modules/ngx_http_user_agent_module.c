@@ -133,7 +133,7 @@ ngx_http_user_agent_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     rv = ngx_conf_parse(cf, NULL);
     if (NGX_OK != ctx->trie->build_clue(ctx->trie)) {
-        return NGX_CONF_OK;
+        return NGX_CONF_ERROR;
     }
 
     *cf = save;
