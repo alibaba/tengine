@@ -1,203 +1,155 @@
 
 Changes with Tengine 1.2.4                                         30 Mar 2012
 
-    *) Feature: adds the user_agent module.
-       Thanks to Junmin Xiong.
+    *) Feature: added the user_agent module. (Junmin Xiong)
 
-    *) Feature: adds the 'log_escape' directive.
-       Thanks to Zhang "agentzh" Yichun and Yixiao.
+    *) Feature: added the 'log_escape' directive. (agentzh, Yixiao)
 
-    *) Change: merges changes between nginx-1.0.12 and nginx-1.0.14.
-       Thanks to Shudu.
+    *) Change: merged changes between nginx-1.0.12 and nginx-1.0.14. (Shudu)
 
-    *) Bugfix: fixes a bug in the limit_req module.
-       Thanks to liseen.wan.
+    *) Bugfix: fixed a bug in the limit_req module. (liseen.wan)
 
-    *) Bugfix: fixes a bug in subrequest.
-       Thanks to Lizi.
+    *) Bugfix: fixed a bug in subrequest. (Lizi)
 
 
 Changes with Tengine 1.2.3                                         27 Feb 2012
 
-    *) Feature: adds the 'request_time_cache' directive, so we can get more 
-       precise $request_time/$request_time_msec/$request_time_usec by turning
-       it off.
-       Thanks to Yuanzhuo.
+    *) Feature: added the 'request_time_cache' directive to get more precise
+       $request_time/$request_time_msec/$request_time_usec. (Yuanzhuo)
 
-    *) Feature: adds the 'slice' module to get a slice of a static file.
-       Thanks to Shudu.
+    *) Feature: added the slice module. (Shudu)
 
-    *) Change: merges changes between nginx-1.0.11 and nginx-1.0.12.
-       Thanks to Shudu.
+    *) Change: merged changes between nginx-1.0.11 and nginx-1.0.12. (Shudu)
 
-    *) Change: deletes unused browsers detection.
-       Thanks to Shudu.
+    *) Change: deleted unused browsers detection. (Shudu)
 
-    *) Bugfix: fixes a bug in upstream when reading header.
-       Thanks to Lizi.
+    *) Bugfix: fixed a bug in upstream when reading header. (Lizi)
 
-    *) Bugfix: fixes a bug in 'expires_by_types'.
-       Thanks to Lizi.
+    *) Bugfix: fixed a bug in 'expires_by_types'. (Lizi)
 
 
 Changes with Tengine 1.2.2                                         11 Jan 2012
 
-    *) Feature: adds input body filter mechanism.
-       Thanks to Weiyue.
+    *) Feature: added the input body filter mechanism. (Weiyue)
 
-    *) Feature: adds SSL dialog support to mail module.
-       Thanks to Weiyue.
+    *) Feature: added SSL dialog support to the mail module. (Weiyue)
 
-    *) Change: merges changes between nginx-1.0.10 and nginx-1.0.11.
-       Thanks to Shudu.
+    *) Change: merged changes between nginx-1.0.10 and nginx-1.0.11. (Shudu)
 
-    *) Change: now 'lingering_close' is off by default.
-       Thanks to Shudu.
+    *) Change: turned 'lingering_close' off by default. (Shudu)
 
-    *) Bugfix: fixes the bug with pipe logs.
-       Thanks to Weiyue.
+    *) Bugfix: fixed a bug in pipe logs. (Weiyue)
 
-    *) Bugfix: fixes the 'forbid_action' bug of limit_req module.
-       Thanks to Diaoliang.
+    *) Bugfix: fixed a 'forbid_action' bug in the limit_req module. (Diaoliang)
 
-    *) Bugfix: fixes the 'backtrace_max_stack_size' bug.
-       Thanks to Diaoliang.
+    *) Bugfix: fixed a bug in 'backtrace_max_stack_size'. (Diaoliang)
 
-    *) Bugfix: fixes the footer module bug when output body is empty.
-       Thanks to Junmin Xiong.
+    *) Bugfix: fixed a bug in the footer module when output body is empty.
+       (Junmin Xiong)
 
-    *) Bugfix: fixes the last hostname letter bug of syslog.
-       Thanks to Weiyue.
+    *) Bugfix: fixed the last hostname letter omitted bug in syslog. (Weiyue)
 
 
 Changes with Tengine 1.2.1                                         06 Dev 2011
 
-    *) Bugfix: fixes the segmentation fault in case of using default error log
-       or access log of tengine. This bug was introduced by creating file
-       doesn't exist.
-       Thanks to Yuanzhuo.
+    *) Bugfix: fixed a segmentation fault bug when using default error log
+       or access log. (Yuanzhuo)
 
 
 Changes with Tengine 1.2.0                                         29 Nov 2011
 
-    *) The first public release.
+    *) This is the first public release.
 
-    *) Feature: adds syslog support to error_log and access_log.
-       Thanks to Weiyue.
+    *) Feature: added syslog support to error_log and access_log. (Weiyue)
 
-    *) Feature: adds pipe support to error_log and access_log.
-       Thanks to Weiyue.
+    *) Feature: added pipe support to error_log and access_log. (Weiyue)
 
-    *) Feature: adds realloc() APIs.
-       Thanks to Gongyuan.
+    *) Feature: added realloc() related APIs. (Gongyuan)
 
-    *) Feature: supports more time specific variables.
-       Thanks to Yixiao.
+    *) Feature: added time specific variables. (Yixiao)
 
-    *) Feature: the backtrace module.
-       Thanks to Diaoliang.
+    *) Feature: added the backtrace module. (Diaoliang)
 
-    *) Feature: add whitelist to limit_req and more limit_req directives
-       are allowed in a location.
-       Thanks to Diaoliang.
+    *) Feature: added whitelist support to the limit_req module. (Diaoliang)
 
-    *) Feature: the sysguard module.
-       Thanks to Lizi.
+    *) Feature: now more limit_req directives are allowed in a single location.
+       (Diaoliang)
 
-    *) Change: suppresses warnings when dumping config contents.
-       Thanks to Piaoling.
+    *) Feature: added the sysguard module. (Lizi)
 
-    *) Feature: adds two new APIs, ngx_http_header_in and ngx_http_header_out.
-       Thanks to Lizi.
+    *) Feature: added two APIs, ngx_http_header_in and ngx_http_header_out.
+       (Lizi)
 
-    *) Feature: adds two variables, $request_time_msec and $request_time_usec.
-       Thanks to Jinglong.
+    *) Feature: added two variables, $request_time_msec and $request_time_usec.
+       (Jinglong)
 
-    *) Feature: the module ngx_http_footer_filter_module.
-       Thanks to Yunxing.
+    *) Feature: added the footer module. (Yunxing)
 
-    *) Feature: adds variable $conn_requests which is similar %K in Apache.
-       Thanks to Lieyuan.
+    *) Feature: added the $conn_requests variable which is similar to Apache's
+       '%K'. (Lieyuan)
 
-    *) Feature: adds variable $host_comment to show hostnames and time.
-       Thanks to Yunxing.
+    *) Feature: added the $host_comment variable. (Yunxing)
 
-    *) Bugfix: fixes $sent_http_connection and $sent_http_keep_alive.
-       Thanks to Zhongsheng.
+    *) Feature: added a 'ratio' parameter to access_log so now access log can be
+       sampled. (Weiyue)
 
-    *) Feature: adds 'ratio' parameter to access_log so now access log can be
-       sampled.
-       Thanks to Weiyue.
-    *) Bugfix: fixes the file in open_file_cache can't be updated.
-       Thanks to Weiyue.
+    *) Feature: added the 'server_info' and 'server_admin' directives to show
+       more information when 4xx/5xx errors encountered. (Lieyuan)
 
-    *) Feature: adds the 'server_info' and 'server_admin' directives to show
-       more information when 4xx/5xx errors encountered.
-       Thanks to Lieyuan.
+    *) Feature: added the '-d' command line option to dump contents of
+       the configuration files. (Piaoling)
 
-    *) Feature: adds the '-d' option to dump content of configuration file.
-       Thanks to Piaoling.
+    *) Feature: added response time statistics to the stub_status module.
+       (Jinglong)
 
-    *) Change: 'msie_padding' is now turned off by default.
-       Thanks to Shudu.
+    *) Feature: added the 'server_tag' directive. (Shudu)
 
-    *) Bugfix: fixes the bug when subrequest_in_memory and upstream keepalive
-       being used.
-       Thanks to Lizi.
+    *) Feature: now the 'worker_processes' supports the 'auto' parameter, which
+       sets the worker process numbers to the cores automatically. (Weiyue)
 
-    *) Feature: adds the 'expires_by_types' directive.
-       Thanks to Lizi.
+    *) Feature: now the 'worker_cpu_affinity' directive supports the 'auto'
+       parameter, which binds the worker processes to the cores automatically.
+       (Weiyue)
 
-    *) Feature: adds the '-l' option to list all supported directives.
-       Thanks to Junmin Xiong.
+    *) Feature: added the 'ssl_pass_phrase_dialog' directive. (Weiyue)
 
-    *) Feature: adds the ngx_atoll() API, which can convert a string to a long
-       long integer (64 bits).
-       Thanks to Lizi.
+    *) Feature: added the '-s start' command line option. (Shudu)
 
-    *) Feature: now status lines (302, 405) are RFC-2616 compatibale.
-       Thanks to Shudu.
+    *) Feature: added '-m' command line option to list all compiled-in modules.
+       (Shudu)
+
+    *) Feature: added the 'expires_by_types' directive. (Lizi)
+
+    *) Feature: added the '-l' command line option to list all supported
+       directives. (Junmin Xiong)
+
+    *) Feature: added the ngx_atoll() API, which can convert a string to a long
+       long integer (64 bits). (Lizi)
+
+    *) Feature: now status lines (302, 405) are RFC-2616 compatibale. (Shudu)
 
     *) Feature: now ngx_escape_uri/ngx_unescape_uri supports encoding/decoding
-       style of Java and PHP.
-       Thanks to Shudu.
+       style of Java and PHP. (Shudu)
 
-    *) Feature: now config files included are sorted.
-       Thanks to Shudu.
+    *) Feature: now configuration files included are sorted. (Shudu)
 
-    *) Feature: error_page now supports default error page (nginx).
-       Thanks to Shudu.
+    *) Feature: now 'error_page' can be reset to 'default' (Shudu)
 
-    *) Bugfix: error_page directive can't detect duplicate codes and inherited
-       correctly.
-       Thanks to Shudu.
+    *) Change: turned 'msie_padding' off by default. (Shudu)
 
-    *) Feature: add response time statistics to the stub_status module.
-       Thanks to Jinglong.
+    *) Bugfix: fixed a bug when subrequest_in_memory and upstream keepalive
+       being used. (Lizi)
 
-    *) Feature: the "server_tag" directive.
-       Thanks to Shudu.
+    *) Bugfix: fixed a bug in $sent_http_connection and $sent_http_keep_alive.
+       (Zhongsheng)
 
-    *) Feature: now the "worker_processes" supports "auto" parameter, which
-       sets the worker process numbers to the cores automatically.
-       Thanks to Weiyue.
+    *) Bugfix: fixed a bug that error_page directive can't detect duplicate
+       codes and inherited correctly. (Shudu)
 
-    *) Feature: now the "worker_cpu_affinity" supports "auto" parameter,
-       which binds the worker processes to the cores automatically.
-       Thanks to Weiyue.
+    *) Bugfix: fixed a segmentation fault bug in the FastCGI module, while
+       processing duplicated HTTP headers. (Diaoliang)
 
-    *) Feature: the "ssl_pass_phrase_dialog" directive.
-       Thanks to Weiyue.
+    *) Bugfix: fixed a bug that file in open_file_cache can't be updated.
+       (Weiyue)
 
-    *) Feature: adds "-s start" option.
-       Thanks to Shudu.
-
-    *) Feature: adds "-m" option to list all compiled in modules.
-       Thanks to Shudu.
-
-    *) Bugfix: a segmentation fault might occur in FastCGI module, while
-       processing duplicated HTTP headers; the bug had appeared in 0.8.40.
-       Thanks to Diaoliang.
-
-    *) Bugfix: "worker_cpu_affinity" might be wrong.
-       Thanks to Weiyue.
+    *) Bugfix: fixed a bug in 'worker_cpu_affinity'. (Weiyue)
