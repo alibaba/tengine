@@ -195,7 +195,6 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
     ngx_http_variable_value_t     *vv;
     ngx_http_limit_req_variable_t *lrv;
 
-    len = 0;
     total_len = 0;
     p = NULL;
 
@@ -937,7 +936,6 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (shm_zone->data) {
-        ctx = shm_zone->data;
 
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                    "limit_req_zone \"%V\" is already bound to variable \"%V\"",

@@ -265,7 +265,6 @@ ngx_http_user_agent(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     nelts = cf->args->nelts;
 
     name = NULL;
-    mode = 0;
 
     if (nelts <= 1) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,

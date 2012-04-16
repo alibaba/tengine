@@ -4862,7 +4862,7 @@ ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         p = ngx_cpymem(p, "Server: ", sizeof("Server: ") - 1);
         p = ngx_cpymem(p, value[1].data, value[1].len);
-        p = ngx_cpymem(p, CRLF, sizeof(CRLF) - 1);
+        ngx_memcpy(p, CRLF, sizeof(CRLF) - 1);
     }
 
     return NGX_CONF_OK;
