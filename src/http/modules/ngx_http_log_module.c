@@ -1176,7 +1176,7 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             && ngx_strcasecmp(fmt[i].name.data, name.data) == 0)
         {
             log->format = &fmt[i];
-            goto ratio;
+            goto rest;
         }
     }
 
@@ -1184,52 +1184,59 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                        "unknown log format \"%V\"", &name);
     return NGX_CONF_ERROR;
 
-ratio:
+rest:
 
-    if (cf->args->nelts >= 4) {
-        if (ngx_http_log_set_ratio(cf, &value[3], log) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
+    if (cf->args->nelts == 3) {
+        return NGX_CONF_OK;
     }
 
-    if (cf->args->nelts == 5 && skip_file == 0) {
-        if (ngx_strncmp(value[4].data, "buffer=", 7) != 0) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid parameter \"%V\"", &value[4]);
-            return NGX_CONF_ERROR;
-        }
+    for (i = 3; i < cf->args->nelts; i++) {
+        if (ngx_strncmp(value[i].data, "ratio=", 6) == 0) {
+            if (ngx_http_log_set_ratio(cf, &value[i], log) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        } else if (ngx_strncmp(value[i].data, "buffer=", 7) == 0) {
+            if (skip_file == 0) {
+                continue;
+            }
 
-        if (log->script) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+            if (log->script) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "buffered logs cannot have variables in name");
-            return NGX_CONF_ERROR;
-        }
+                return NGX_CONF_ERROR;
+            }
 
-        name.len = value[4].len - 7;
-        name.data = value[4].data + 7;
+            name.len = value[i].len - 7;
+            name.data = value[i].data + 7;
 
-        buf = ngx_parse_size(&name);
+            buf = ngx_parse_size(&name);
 
-        if (buf == NGX_ERROR) {
+            if (buf == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid parameter \"%V\"", &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            if (log->file->buffer && log->file->last - log->file->pos != buf) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "access_log \"%V\" already defined "
+                                   "with different buffer size", &value[1]);
+                return NGX_CONF_ERROR;
+            }
+
+            log->file->buffer = ngx_palloc(cf->pool, buf);
+            if (log->file->buffer == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            log->file->pos = log->file->buffer;
+            log->file->last = log->file->buffer + buf;
+
+        } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid parameter \"%V\"", &value[4]);
+                               "invalid parameter \"%V\"", &value[i]);
             return NGX_CONF_ERROR;
         }
-
-        if (log->file->buffer && log->file->last - log->file->pos != buf) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "access_log \"%V\" already defined "
-                               "with different buffer size", &value[1]);
-            return NGX_CONF_ERROR;
-        }
-
-        log->file->buffer = ngx_palloc(cf->pool, buf);
-        if (log->file->buffer == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        log->file->pos = log->file->buffer;
-        log->file->last = log->file->buffer + buf;
     }
 
     return NGX_CONF_OK;
@@ -1242,10 +1249,6 @@ ngx_http_log_set_ratio(ngx_conf_t *cf, ngx_str_t *value, ngx_http_log_t *log)
     u_char     *p, *last;
     uint64_t    scope;
     ngx_uint_t  rp;
-
-    if (ngx_strncmp(value->data, "ratio=", 6) != 0) {
-        goto invalid;
-    }
 
     rp = 0;
     scope = 0;
