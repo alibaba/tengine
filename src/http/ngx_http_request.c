@@ -434,6 +434,7 @@ ngx_http_init_request(ngx_event_t *rev)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     c->log->file = clcf->error_log->file;
+    c->log->syslog = clcf->error_log->syslog;
     if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
         c->log->log_level = clcf->error_log->log_level;
     }
@@ -1790,6 +1791,7 @@ found:
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     r->connection->log->file = clcf->error_log->file;
+    r->connection->log->syslog = clcf->error_log->syslog;
 
     if (!(r->connection->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
         r->connection->log->log_level = clcf->error_log->log_level;
