@@ -1,4 +1,14 @@
 
+Changes with nginx 1.0.15                                        12 Apr 2012
+
+    *) Security: specially crafted mp4 file might allow to overwrite memory
+       locations in a worker process if the ngx_http_mp4_module was used,
+       potentially resulting in arbitrary code execution (CVE-2012-2089).
+       Thanks to Matthew Daley.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+
+
 Changes with nginx 1.0.14                                        15 Mar 2012
 
     *) Security: content of previously freed memory might be sent to a
