@@ -11,18 +11,15 @@ use strict;
 
 use Test::More;
 use File::Copy;
-use Time::Parse;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use Time::Parse;
 
 
 ###############################################################################
-
-
-print $ENV{TEST_NGINX_BINARY};
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
