@@ -1451,7 +1451,9 @@ ngx_http_update_location_config(ngx_http_request_t *r)
 
     if (r == r->main) {
         r->connection->log->file = clcf->error_log->file;
+#if (NGX_SYSLOG)
         r->connection->log->syslog = clcf->error_log->syslog;
+#endif
 
         if (!(r->connection->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
             r->connection->log->log_level = clcf->error_log->log_level;
