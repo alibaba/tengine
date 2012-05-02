@@ -41,7 +41,7 @@ sub send {
 sub read {
 	my ($self) = @_;
 	eval {
-		local $SIG{ALRM} = sub { die "alarm\n" };
+		local $SIG{ALRM} = sub { die "timeout\n" };
 		alarm(2);
 		while (<$self>) {
 			log_in($_);
@@ -52,6 +52,7 @@ sub read {
 	};
 	alarm(0);
 	if ($@) {
+		log_in("died: $@");
 		return undef;
 	}
 	return $_;

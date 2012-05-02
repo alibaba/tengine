@@ -76,6 +76,7 @@ eval {
 plan(skip_all => 'no proxy_cache_lock') if $@;
 
 $t->plan(19);
+$t->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
 
@@ -178,7 +179,7 @@ sub http_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalAddr => '127.0.0.1:8081',
-		Listen => 1,
+		Listen => 5,
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
@@ -194,10 +195,12 @@ sub http_fake_daemon {
 				$uri = $1;
 				$num = 0;
 			}
-				
+
 			$uri = $1 if /GET (.*) HTTP/;
 			last if /^\x0d?\x0a?$/;
 		}
+
+		next unless $uri;
 
 		sleep(1);
 

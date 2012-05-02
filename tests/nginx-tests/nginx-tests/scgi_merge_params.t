@@ -75,26 +75,13 @@ $t->run();
 
 like(http_get_ims('/'), qr/ims=;/,
 	'if-modified-since cleared with cache');
-
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/'), qr/iums=;/,
 	'if-unmodified-since cleared with cache');
-
-}
-
 like(http_get_ims('/'), qr/blah=blah;/,
 	'custom params with cache');
 
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/no/'), qr/ims=blah;/,
 	'if-modified-since preserved without cache');
-
-}
-
 like(http_get_ims('/no/'), qr/iums=blah;/,
 	'if-unmodified-since preserved without cache');
 like(http_get_ims('/'), qr/blah=blah;/,
@@ -102,14 +89,8 @@ like(http_get_ims('/'), qr/blah=blah;/,
 
 like(http_get_ims('/custom/'), qr/ims=;/,
 	'if-modified-since cleared with cache custom');
-
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/custom/'), qr/iums=;/,
 	'if-unmodified-since cleared with cache custom');
-}
-
 like(http_get_ims('/custom/'), qr/blah=custom;/,
 	'custom params with cache custom');
 
@@ -140,7 +121,7 @@ sub scgi_daemon {
 
 	my $scgi = SCGI->new($server, blocking => 1);
 	my $count = 0;
-  
+
 	while (my $request = $scgi->accept()) {
 		$count++;
 		$request->read_env();

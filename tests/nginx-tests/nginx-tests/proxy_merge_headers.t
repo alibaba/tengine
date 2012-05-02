@@ -79,21 +79,11 @@ $t->run();
 like(http_get_ims('/'), qr/ims=;blah=blah;/,
 	'if-modified-since cleared with cache');
 
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/no/'), qr/ims=blah;blah=blah;/,
 	'if-modified-since preserved without cache');
 
-}
-
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/setbody/'), qr/blah=blah;/,
 	'proxy_set_header inherited with proxy_set_body');
-
-}
 
 ###############################################################################
 

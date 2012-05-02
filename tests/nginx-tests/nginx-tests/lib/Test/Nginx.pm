@@ -119,7 +119,7 @@ sub has_daemon($) {
 	my ($self, $daemon) = @_;
 
 	Test::More::plan(skip_all => "$daemon not found")
-		unless `which $daemon`;
+		unless `command -v $daemon`;
 
 	return $self;
 }
@@ -252,6 +252,7 @@ sub run_daemon($;@) {
 			exit 0;
 		} else {
 			exec($code, @args);
+			exit 0;
 		}
 	}
 
@@ -378,9 +379,8 @@ sub http($;%) {
 	if ($@) {
 		log_in("died: $@");
 		return undef;
-	} else {
-		log_in($reply);
 	}
+	log_in($reply);
 	return $reply;
 }
 

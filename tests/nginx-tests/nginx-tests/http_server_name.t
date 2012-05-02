@@ -34,6 +34,8 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    server_names_hash_bucket_size 64;
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;

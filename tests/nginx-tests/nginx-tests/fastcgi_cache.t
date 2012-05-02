@@ -83,7 +83,7 @@ sub fastcgi_daemon {
 		if ($ENV{REQUEST_URI} eq '/stderr') {
 			warn "sample stderr text" x 512;
 		}
-		
+
 		print <<EOF;
 Location: http://127.0.0.1:8080/redirect
 Content-Type: text/html

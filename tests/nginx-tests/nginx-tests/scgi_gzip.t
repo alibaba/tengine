@@ -58,12 +58,7 @@ $t->run();
 
 ###############################################################################
 
-TODO: {
-local $TODO = 'not yet';
-
 like(http_gzip_request('/'), qr/Content-Encoding: gzip/, 'scgi request');
-
-}
 
 ###############################################################################
 
@@ -77,7 +72,7 @@ sub scgi_daemon {
 		or die "Can't create listening socket: $!\n";
 
 	my $scgi = SCGI->new($server, blocking => 1);
-  
+
 	while (my $request = $scgi->accept()) {
 		$request->read_env();
 

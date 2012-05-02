@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(6);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(15);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -61,6 +61,20 @@ http {
         location /impl_default/ {
             proxy_pass http://127.0.0.1:8081/replace_this/;
         }
+
+        location /off/ {
+            proxy_pass http://127.0.0.1:8081/;
+            proxy_redirect off;
+
+            location /off/on/ {
+                proxy_pass http://127.0.0.1:8081;
+                proxy_redirect http://127.0.0.1:8081/off/ /;
+
+                location /off/on/on/ {
+                    proxy_pass http://127.0.0.1:8081;
+                }
+            }
+        }
     }
 
     server {
@@ -68,6 +82,7 @@ http {
         server_name  localhost;
 
         location / {
+            add_header Refresh "7; url=http://127.0.0.1:8081$uri";
             return http://127.0.0.1:8081$uri;
         }
     }
@@ -85,18 +100,40 @@ is(http_get_location('http://127.0.0.1:8080/impl_default/test.html'),
 is(http_get_location('http://127.0.0.1:8080/expl_default/test.html'),
 	'http://127.0.0.1:8080/expl_default/test.html', 'explicit default');
 
+is(http_get_refresh('http://127.0.0.1:8080/impl_default/test.html'),
+	'7; url=/impl_default/test.html', 'implicit default (refresh)');
+is(http_get_refresh('http://127.0.0.1:8080/expl_default/test.html'),
+	'7; url=/expl_default/test.html', 'explicit default (refresh)');
+
 is(http_get_location('http://127.0.0.1:8080/var_in_second/test.html'),
 	'http://127.0.0.1:8080/var_here/test.html', 'variable in second arg');
+is(http_get_refresh('http://127.0.0.1:8080/var_in_second/test.html'),
+	'7; url=/var_here/test.html', 'variable in second arg (refresh)');
 
-TODO:{
+is(http_get_location('http://127.0.0.1:8080/off/test.html'),
+	'http://127.0.0.1:8081/test.html', 'rewrite off');
+is(http_get_location('http://127.0.0.1:8080/off/on/test.html'),
+	'http://127.0.0.1:8080/on/test.html', 'rewrite off overwrite');
+
+TODO: {
+local $TODO = 'rewrite off inheritance bug';
+
+is(http_get_location('http://127.0.0.1:8080/off/on/on/test.html'),
+	'http://127.0.0.1:8080/on/on/test.html', 'rewrite inheritance');
+
+}
+
+TODO: {
 local $TODO = 'support variables in first argument';
 
 is(http_get_location('http://127.0.0.1:8080/var_here/test.html'),
 	'http://127.0.0.1:8080/replaced/test.html', 'variable in first arg');
+is(http_get_refresh('http://127.0.0.1:8080/var_here/test.html'),
+	'7; url=/replaced/test.html', 'variable in first arg (refresh)');
 
 }
 
-TODO:{
+TODO: {
 local $TODO = 'support for regular expressions';
 
 is(http_get_location('http://127.0.0.1:8080/ReeegEX/test.html'),
@@ -106,11 +143,27 @@ is(http_get_location('http://127.0.0.1:8080/regex_w_captures/test.html'),
 
 }
 
+TODO: {
+local $TODO = 'regular expressions and Refresh header';
+
+is(http_get_refresh('http://127.0.0.1:8080/ReeegEX/test.html'),
+	'7; url=/replaced/test.html', 'caseless regexp (refresh)');
+is(http_get_refresh('http://127.0.0.1:8080/regex_w_captures/test.html'),
+	'7; url=http://127.0.0.1:8080/captures/test.html',
+	'regexp w/captures (refresh)');
+
+}
 
 ###############################################################################
 
 sub http_get_location {
 	my ($url) = @_;
 	http_get($url) =~ /^Location:\s(.+?)\x0d?$/mi;
+	return $1;
+}
+
+sub http_get_refresh {
+	my ($url) = @_;
+	http_get($url) =~ /^Refresh:\s(.+?)\x0d?$/mi;
 	return $1;
 }

@@ -36,7 +36,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    log_format cc "CC: $sent_http_cache_control";
+    log_format cc "$uri: $sent_http_cache_control";
 
     server {
         listen       127.0.0.1:8080;
@@ -73,25 +73,20 @@ http_get('/redefine');
 
 $t->stop();
 
-my @log;
+my $log;
 
-open LOG, $t->testdir() . '/cc.log'
-	or die("Can't open nginx access log file.\n");
-
-foreach my $line (<LOG>) {
-	chomp $line;
-	push @log, $line;
+{
+	open LOG, $t->testdir() . '/cc.log'
+		or die("Can't open nginx access log file.\n");
+	local $/;
+	$log = <LOG>;
+	close LOG;
 }
 
-close LOG;
+like($log, qr!^/: -$!m, 'no header');
+like($log, qr!^/set: max-age=3600; private; must-revalidate$!m,
+	'multi headers');
 
-is(shift @log, 'CC: -', 'no header');
-is(shift @log, 'CC: max-age=3600; private; must-revalidate', 'multi headers');
-
-TODO:{
-local $TODO = 'add hash checks';
-
-is(shift @log, 'CC: no-cache', 'ignoring headers with (hash == 0)');
-}
+like($log, qr!^/redefine: no-cache$!m, 'ignoring headers with (hash == 0)');
 
 ###############################################################################

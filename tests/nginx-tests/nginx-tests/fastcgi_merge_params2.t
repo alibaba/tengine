@@ -67,15 +67,10 @@ $t->run();
 
 ###############################################################################
 
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get_ims('/'), qr/ims=;/,
 	'if-modified-since cleared with cache');
 like(http_get_ims('/'), qr/iums=;/,
 	'if-unmodified-since cleared with cache');
-
-}
 
 like(http_get_ims('/no/'), qr/ims=blah;/,
 	'if-modified-since preserved without cache');

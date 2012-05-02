@@ -107,7 +107,7 @@ is(http_host_header('[abcd::ef98:0:7654:321]'), '[abcd::ef98:0:7654:321]',
 
 is(http_host_header('[abcd::ef98:0:7654:321]:80'), '[abcd::ef98:0:7654:321]',
 	'ipv6 literal w/port (host header)');
-	
+
 TODO: {
 local $TODO = 'ipv6 literals';
 

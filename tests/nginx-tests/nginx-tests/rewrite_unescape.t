@@ -73,7 +73,7 @@ $t->run();
 ###############################################################################
 
 # Some rewrites and expected (?) behaviour
-# 
+#
 # /t1?r=http%3A%2F%2Fexample.com%2F%3Ffrom
 # rewrite ^ $arg_r? redirect;
 # expected: http://example.com/?from
