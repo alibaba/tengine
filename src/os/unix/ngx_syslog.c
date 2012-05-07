@@ -10,6 +10,13 @@
 #include <nginx.h>
 
 
+/**
+ * syslog message is 2048 max length
+ * http://tools.ietf.org/html/rfc5424#section-6.1
+ */
+#define  NGX_SYSLOG_MAX_LENGTH                 2048
+
+
 static ngx_syslog_code ngx_syslog_priorities[] = {
     { "alert",   NGX_SYSLOG_ALERT },
     { "crit",    NGX_SYSLOG_CRIT },
@@ -57,11 +64,10 @@ static ngx_syslog_code ngx_syslog_facilities[] = {
 static time_t        ngx_syslog_retry_interval = 1800; /* half an hour */
 static ngx_str_t     ngx_syslog_hostname;
 static u_char        ngx_syslog_host_buf[NGX_MAXHOSTNAMELEN];
-static ngx_str_t     ngx_syslog_line;
 
 
 static char *ngx_syslog_init_conf(ngx_cycle_t *cycle, void *conf);
-static ngx_int_t ngx_syslog_init_process(ngx_cycle_t *cycle);
+static void ngx_syslog_prebuild_header(ngx_syslog_t *task);
 static ngx_int_t ngx_open_log_connection(ngx_syslog_t *task);
 
 static char *ngx_syslog_set_retry_interval(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -97,7 +103,7 @@ ngx_module_t  ngx_syslog_module = {
     NGX_CORE_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
-    ngx_syslog_init_process,               /* init process */
+    NULL,                                  /* init process */
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -105,34 +111,6 @@ ngx_module_t  ngx_syslog_module = {
     NGX_MODULE_V1_PADDING
 };
 
-
-static ngx_int_t
-ngx_syslog_init_process(ngx_cycle_t *cycle)
-{
-    u_char       *p, pid[20];
-
-    p = ngx_snprintf(pid, 20, "%P", ngx_log_pid);
-
-    ngx_syslog_line.len = sizeof(" ") - 1
-                        + ngx_syslog_hostname.len
-                        + sizeof(" " NGINX_VAR "[") - 1
-                        + p - pid
-                        + sizeof("]: ") - 1;
-
-    ngx_syslog_line.data = ngx_alloc(ngx_syslog_line.len, cycle->log);
-    if (ngx_syslog_line.data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_snprintf(ngx_syslog_line.data,
-                 ngx_syslog_line.len,
-                 " %V " NGINX_VAR "[%*s]: ",
-                 &ngx_syslog_hostname,
-                 p - pid,
-                 pid);
-
-    return NGX_OK;
-}
 
 static char *
 ngx_syslog_set_retry_interval(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -157,19 +135,52 @@ ngx_int_t
 ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
 {
     size_t                 len;
-    u_char                *p = value->data, *p_bak;
-    ngx_int_t              rc, t, port;
-    ngx_int_t              facility = -1, loglevel = -1;
+    u_char                *p, *p_bak, pri[5];
+    ngx_int_t              rc, port, facility, loglevel;
+    ngx_str_t              ident;
     ngx_addr_t             addr;
     ngx_uint_t             i;
+    enum {
+        sw_facility = 0,
+        sw_loglevel,
+        sw_address,
+        sw_port,
+        sw_ident,
+        sw_done
+    } state;
 
-    /* syslog:user::127.0.0.1:514 --> 4 paragraphs */
-    for (t = 3; t > 0; t--) {
+    p = value->data;
+    facility = -1;
+    loglevel = -1;
+    ident.len = 0;
+    ident.data = NULL;
+    state = sw_facility;
+
+    /**
+     * format example:
+     *     syslog:user:info:127.0.0.1:514:ident
+     *     syslog:user:info:/dev/log:ident
+     *     syslog:user:info:127.0.0.1::ident
+     *         is short for syslog:user:info:127.0.0.1:514:ident
+     *     syslog:user:info:/dev/log
+     *         is short for syslog:user:info:/dev/log:NGINX
+     *     syslog:user:info:127.0.0.1
+     *         is short for syslog:user:info:127.0.0.1:514:NGINX
+     *     syslog:user::/dev/log:ident
+     *         is short for syslog:user:info:/dev/log:ident
+     *     syslog:user:info::ident
+     *         is short for syslog:user:info:/dev/log:ident
+     *     syslog:user:info
+     *         is short for syslog:user:info:/dev/log:NGINX
+     *     syslog:user
+     *         is short for syslog:user:info:/dev/log:NGINX
+     */
+    while (state != sw_done) {
         p_bak = p;
         while (*p != ':' && (size_t) (p - value->data) < value->len) p++;
 
-        switch (t) {
-        case 3:
+        switch (state) {
+        case sw_facility:
             len = p - p_bak;
 
             for (i = 0; ngx_syslog_facilities[i].name != NULL; i++) {
@@ -186,9 +197,11 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
                 return NGX_ERROR;
             }
 
+            state = sw_loglevel;
+
             break;
 
-        case 2:
+        case sw_loglevel:
             len = p - p_bak;
 
             if (len == 0) {
@@ -210,9 +223,11 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
                 }
             }
 
+            state = sw_address;
+
             break;
 
-        case 1:
+        case sw_address:
             len = p - p_bak;
 
             if (len == 0) {
@@ -221,19 +236,73 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
 
                 rc = ngx_set_unix_domain(pool, &addr,
                          (u_char *) "/dev/log", sizeof("/dev/log") - 1);
+
+                state = sw_ident;
+
             } else {
                 addr.name.data = p_bak;
-                addr.name.len = value->data + value->len - p_bak;
+                addr.name.len = len;
 
                 rc = ngx_parse_addr(pool, &addr, p_bak, len);
                 if (rc == NGX_DECLINED) {
                     rc = ngx_set_unix_domain(pool, &addr, p_bak, len);
+                    state = sw_ident;
+                } else {
+                    state = sw_port;
                 }
             }
 
             if (rc != NGX_OK) {
                 return NGX_ERROR;
             }
+
+            break;
+
+        case sw_port:
+            len = p - p_bak;
+
+            port = ngx_atoi(p_bak, len);
+            if (port < 1) {
+                port = 514;
+            } else if (port > 65535) {
+                return NGX_ERROR;
+            } else {
+                addr.name.len += 1 + len;
+            }
+
+            switch (addr.sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+            case AF_INET6:
+                ((struct sockaddr_in6 *) addr.sockaddr)->sin6_port =
+                                         htons((in_port6_t) port);
+                break;
+#endif
+
+            case AF_INET:
+                ((struct sockaddr_in *) addr.sockaddr)->sin_port =
+                                        htons((in_port_t) port);
+                break;
+
+            default: /* AF_UNIX */
+                break;
+            }
+
+            state = sw_ident;
+
+            break;
+
+        case sw_ident:
+            len = p - p_bak;
+
+            ident.len = len;
+            ident.data = p_bak;
+
+            state = sw_done;
+
+            break;
+
+        default:
 
             break;
         }
@@ -243,41 +312,23 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
         }
     }
 
-    len = value->data + value->len - p;
-
-    port = ngx_atoi(p, len);
-    if (port < 1) {
-        port = 514;
-    } else if (port > 65535) {
-        return NGX_ERROR;
-    }
-
-    switch (addr.sockaddr->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        ((struct sockaddr_in6 *) addr.sockaddr)->sin6_port =
-                                 htons((in_port6_t) port);
-        break;
-#endif
-
-    case AF_INET:
-        ((struct sockaddr_in *) addr.sockaddr)->sin_port =
-                                htons((in_port_t) port);
-        break;
-
-    default: /* AF_UNIX */
-        break;
-    }
-
     log->syslog = ngx_pcalloc(pool, sizeof(ngx_syslog_t));
     if (log->syslog == NULL) {
         return NGX_ERROR;
     }
 
-    log->syslog->syslog_pri = facility + loglevel;
+    p = ngx_snprintf(pri, 5, "<%d>", facility + loglevel);
+    log->syslog->syslog_pri.len = p - pri;
+    log->syslog->syslog_pri.data = ngx_pcalloc(pool, p - pri);
+    if (log->syslog->syslog_pri.data == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_memcpy(log->syslog->syslog_pri.data, pri, p - pri);
+
     log->syslog->addr = addr;
+    log->syslog->ident = ident;
     log->syslog->fd = -1;
+    log->syslog->header.data = log->syslog->header_buf;
 
     return NGX_OK;
 }
@@ -351,7 +402,6 @@ err:
 int
 ngx_write_syslog(ngx_syslog_t *task, u_char *buf, size_t len)
 {
-    u_char       *p, pri[5];
     size_t        l;
     ngx_int_t     n;
     struct iovec  iovs[4];
@@ -364,24 +414,24 @@ ngx_write_syslog(ngx_syslog_t *task, u_char *buf, size_t len)
         return NGX_ERROR;
     }
 
-    l = 0;
+    if (task->header.len == 0) {
+        ngx_syslog_prebuild_header(task);
+    }
 
-    p = ngx_snprintf(pri, 5, "<%d>", task->syslog_pri);
-    iovs[0].iov_base = (void *) pri;
-    iovs[0].iov_len = p - pri;
-    l += p - pri;
+    iovs[0].iov_base = (void *) task->syslog_pri.data;
+    iovs[0].iov_len = task->syslog_pri.len;
+    l = task->syslog_pri.len;
 
     iovs[1].iov_base = (void *) ngx_cached_syslog_time.data;
     iovs[1].iov_len = ngx_cached_syslog_time.len;
     l += ngx_cached_syslog_time.len;
 
-    iovs[2].iov_base = (void *) ngx_syslog_line.data;
-    iovs[2].iov_len = ngx_syslog_line.len;
-    l += ngx_syslog_line.len;
+    iovs[2].iov_base = (void *) task->header.data;
+    iovs[2].iov_len = task->header.len;
+    l += task->header.len;
 
-    /* syslog message is 1024 max length */
     iovs[3].iov_base = (void *) buf;
-    iovs[3].iov_len = 1024 - l > len ? len : 1024 - l;
+    iovs[3].iov_len = ngx_min(len, NGX_SYSLOG_MAX_LENGTH - l);
 
     n = writev(task->fd, iovs, 4);
 
@@ -390,4 +440,37 @@ ngx_write_syslog(ngx_syslog_t *task, u_char *buf, size_t len)
     }
 
     return NGX_OK;
+}
+
+static void
+ngx_syslog_prebuild_header(ngx_syslog_t *task)
+{
+    size_t        len;
+    u_char       *p, pid[NGX_INT64_LEN], *appname;
+    ngx_int_t     ident_len;
+
+    appname = (u_char *) NGINX_VAR;
+
+    p = ngx_snprintf(pid, NGX_INT64_LEN, "%P", ngx_log_pid);
+
+    len = sizeof(" ") - 1
+        + ngx_syslog_hostname.len
+        + (task->ident.len == 0
+            ? (ident_len = sizeof(NGINX_VAR) - 1)
+            : (ident_len = task->ident.len))
+        + sizeof(" [") - 1
+        + p - pid
+        + sizeof("]: ") - 1;
+
+    task->header.len = ngx_min(NGX_SYSLOG_HEADER_LEN, len);
+    ident_len -= ngx_max((ngx_int_t) (len - task->header.len), 0);
+
+    ngx_snprintf(task->header.data,
+                 task->header.len,
+                 " %V %*s[%*s]: ",
+                 &ngx_syslog_hostname,
+                 ident_len,
+                 (task->ident.len == 0 ? appname : task->ident.data),
+                 p - pid,
+                 pid);
 }

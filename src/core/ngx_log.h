@@ -44,11 +44,18 @@
 
 #if (NGX_SYSLOG)
 
+#define NGX_SYSLOG_HEADER_LEN     100
+
+
 typedef struct {
     time_t               next_try;
     ngx_addr_t           addr;
-    ngx_uint_t           syslog_pri;      /* pri field comput for syslog */
+    ngx_str_t            syslog_pri;      /* pri field comput for syslog */
+    ngx_str_t            ident;
+
     ngx_socket_t         fd;
+    ngx_str_t            header;
+    u_char               header_buf[NGX_SYSLOG_HEADER_LEN];
 } ngx_syslog_t;
 
 #endif
