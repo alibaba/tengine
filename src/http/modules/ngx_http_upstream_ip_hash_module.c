@@ -182,6 +182,12 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
 
             if (!peer->down) {
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                               "get ip_hash peer, check_index: %ui",
+                               peer->check_index);
+                if (!ngx_http_upstream_check_peer_down(peer->check_index)) {
+#endif
                 if (peer->max_fails == 0 || peer->fails < peer->max_fails) {
                     break;
                 }
@@ -190,6 +196,9 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
                     peer->fails = 0;
                     break;
                 }
+#if (NGX_HTTP_UPSTREAM_CHECK)
+                }
+#endif
             }
 
             iphp->rrp.tried[n] |= m;

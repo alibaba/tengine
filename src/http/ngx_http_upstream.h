@@ -348,6 +348,19 @@ ngx_int_t ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
     uscf->srv_conf[module.ctx_index]
 
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+
+ngx_uint_t ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
+    ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer);
+
+ngx_uint_t ngx_http_upstream_check_peer_down(ngx_uint_t index);
+
+void ngx_http_upstream_check_get_peer(ngx_uint_t index);
+void ngx_http_upstream_check_free_peer(ngx_uint_t index);
+
+#endif
+
+
 extern ngx_module_t        ngx_http_upstream_module;
 extern ngx_conf_bitmask_t  ngx_http_upstream_cache_method_mask[];
 extern ngx_conf_bitmask_t  ngx_http_upstream_ignore_headers_masks[];
