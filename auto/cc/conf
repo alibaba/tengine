@@ -173,8 +173,8 @@ if [ "$NGX_PLATFORM" != win32 ]; then
                       if (buf[0] != '1') return 1"
     . auto/feature
 
-    ngx_feature="Compiler Structure-Packing Pragmas"
-    ngx_feature_name="NGX_HAVE_PACK_PRAGMAS"
+    ngx_feature="compiler structure-packing pragma"
+    ngx_feature_name="NGX_HAVE_PACK_PRAGMA"
     ngx_feature_run=yes
     ngx_feature_incs=
     ngx_feature_path=

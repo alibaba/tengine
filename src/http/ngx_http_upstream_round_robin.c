@@ -79,9 +79,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
 #if (NGX_HTTP_UPSTREAM_CHECK)
                 if (!server[i].down) {
                     peers->peer[n].check_index =
-                        ngx_http_upstream_check_add_peer(cf, us, &server[i].addrs[j]);
-                }
-                else {
+                        ngx_http_upstream_check_add_peer(cf, us,
+                                                         &server[i].addrs[j]);
+                } else {
                     peers->peer[n].check_index = (ngx_uint_t) NGX_ERROR;
                 }
 #endif
@@ -143,9 +143,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
 #if (NGX_HTTP_UPSTREAM_CHECK)
                 if (!server[i].down) {
                     backup->peer[n].check_index =
-                        ngx_http_upstream_check_add_peer(cf, us, &server[i].addrs[j]);
-                }
-                else {
+                        ngx_http_upstream_check_add_peer(cf, us,
+                                                         &server[i].addrs[j]);
+                } else {
                     backup->peer[n].check_index = (ngx_uint_t) NGX_ERROR;
                 }
 #endif
@@ -477,7 +477,10 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
                         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                                        "get rr peer, check_index: %ui",
                                        peer->check_index);
-                        if (!ngx_http_upstream_check_peer_down(peer->check_index)) {
+
+                        if (!ngx_http_upstream_check_peer_down(
+                                peer->check_index))
+                        {
 #endif
                         if (peer->max_fails == 0
                             || peer->fails < peer->max_fails)
@@ -489,6 +492,7 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
                             peer->fails = 0;
                             break;
                         }
+
 #if (NGX_HTTP_UPSTREAM_CHECK)
                         }
 #endif
@@ -534,7 +538,10 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
                         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                                        "get rr peer2, check_index: %ui",
                                        peer->check_index);
-                        if (!ngx_http_upstream_check_peer_down(peer->check_index)) {
+
+                        if (!ngx_http_upstream_check_peer_down(
+                                peer->check_index))
+                        {
 #endif
                         if (peer->max_fails == 0
                             || peer->fails < peer->max_fails)
