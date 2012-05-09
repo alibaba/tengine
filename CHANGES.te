@@ -1,4 +1,23 @@
 
+Changes with Tengine 1.2.5                                         09 May 2012
+
+    *) Feature: added the upstream_check module which could be used to do
+       proactive health check of upstream servers. (Wenjing)
+
+    *) Feature: now allow to specify program identifiers with syslogs. (Weiyue)
+
+    *) Change: merged changes between nginx-1.0.14 and nginx-1.0.15. (Shudu)
+
+    *) Change: the default value of 'accept_mutex_delay' was changed from
+       500ms to 100ms to gain better performance. (Shudu)
+
+    *) Bugfix: fixed a segmentation fault bug in syslog when failed to connect
+       to an upstream server. (Weiyue)
+
+    *) Bugfix: fixed the bug of 'access_log' might not be compatible with the
+       'buffer' parameter. (Weiyue)
+
+
 Changes with Tengine 1.2.4                                         30 Mar 2012
 
     *) Feature: added the user_agent module. (Junmin Xiong)
