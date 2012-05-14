@@ -2,7 +2,7 @@
 #
 # user_agent $variable_name {
 #     default         value;
-#     nongreedy        name;
+#     greedy        name;
 #
 #     name [([+|-]version) | (version1~version2)]  value;
 # }
@@ -12,10 +12,10 @@ user_agent $browser {
     # default
     default                                             unknown;
 
-    # nongreedy
-    nongreedy                                           Chrome;
-    nongreedy                                           Safari;
-    nongreedy                                           Firefox;
+    # greedy
+    greedy                                              Chrome;
+    greedy                                              Safari;
+    greedy                                              Firefox;
 
     # name                   version                     value
 

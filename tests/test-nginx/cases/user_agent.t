@@ -8,8 +8,8 @@ __DATA__
 --- http_config
    user_agent $browser {
        default                                    1;
-       nongreedy                               safari;
-       nongreedy                               Safari;
+       greedy                                     safari;
+       greedy                                     Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Firefox        5.0+                          5;
@@ -49,8 +49,8 @@ Firefox
 --- http_config
    user_agent $browser {
        default                                     1;
-       nongreedy                                safari;
-       nongreedy                                Safari;
+       greedy                                      safari;
+       greedy                                      Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Firefox        5.0+                          5;
@@ -91,8 +91,8 @@ msie6
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Firefox        5.0+                          5;
@@ -132,8 +132,8 @@ Opera
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Firefox        5.0+                          5;
@@ -173,8 +173,8 @@ msie6
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Firefox        5.0+                          5;
@@ -214,8 +214,8 @@ msie6
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Chrome         6~8                           8;
@@ -260,8 +260,8 @@ Chrome2
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Chrome         6~8                           8;
@@ -307,8 +307,8 @@ msie9
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Chrome         6~8                           8;
@@ -358,8 +358,8 @@ Chrome3
 --- http_config
    user_agent $browser {
        default                                      1;
-       nongreedy                                 safari;
-       nongreedy                                 Safari;
+       greedy                                       safari;
+       greedy                                       Safari;
 
        Chrome         12.0.742.112~15.0.872.0       4;
        Chrome         6~8                           8;

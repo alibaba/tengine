@@ -97,7 +97,7 @@ ngx_trie_insert(ngx_trie_t *trie, ngx_str_t *str, ngx_uint_t mode)
 
     p->key = str->len;
     if (mode & NGX_TRIE_CONTINUE) {
-        p->nongreedy = 1;
+        p->greedy = 1;
     }
 
     return p;
@@ -207,7 +207,7 @@ ngx_trie_query(ngx_trie_t *trie, ngx_str_t *str, ngx_int_t *version_pos,
         if (p->key) {
             value = p->value;
             *version_pos = pos + p->key;
-            if (!p->nongreedy) {
+            if (!p->greedy) {
                 return value;
             }
             p = root;

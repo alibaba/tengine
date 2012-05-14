@@ -32,7 +32,7 @@ struct ngx_trie_node_s {
     ngx_trie_node_t               **next;
 
     unsigned                        key:31;
-    unsigned                        nongreedy:1;
+    unsigned                        greedy:1;
 };
 
 
