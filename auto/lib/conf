@@ -70,6 +70,10 @@ if [ $USE_PERL = YES ]; then
     . auto/lib/perl/conf
 fi
 
+if [ $USE_LUA = YES ]; then
+    . auto/lib/lua/conf
+fi
+
 if [ $HTTP_GEOIP = YES ]; then
     . auto/lib/geoip/conf
 fi
