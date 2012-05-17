@@ -415,7 +415,7 @@ cat << END
   --with-luajit-inc=PATH             set LuaJIT headers path (where lua.h/lauxlib.h/... are placed into)
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are placed into)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are placed into)
-  --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are placed into)
+  --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are placed into, only support lua 5.1.x)
 
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
