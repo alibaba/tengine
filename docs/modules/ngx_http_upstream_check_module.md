@@ -2,7 +2,9 @@
 
 **ngx\_http\_upstream\_check\_module**
 
-# Synopsis #
+Add proactive health check for the upstream servers.
+
+# Examples #
 
 	http {
 		upstream cluster {
@@ -32,21 +34,15 @@
 		}
 	}
 
-# Description #
-
-Add proactive health check for the upstream servers.
-
 # Directives #
 
 ## check ##
 
-**syntax:** `check interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|ssl_hello|mysql|ajp]`
+Syntax: **check** `interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|ssl_hello|mysql|ajp]`
 
-**default:** If the parameters are omitted, default values are: `interval=30000 fall=5 rise=2 timeout=1000 default_down=true type=tcp`
+Default: If the parameters are omitted, default values are: `interval=30000 fall=5 rise=2 timeout=1000 default_down=true type=tcp`
 
-**context:** `upstream`
-
-**description:**
+Context: `upstream`
 
 Add health check for the upstream servers.
 
@@ -66,48 +62,40 @@ The parameters' meanings are:
 
 ## check\_http\_send ##
 
-**syntax:** `check_http_send http_packet`
+Syntax: **check\_http\_send** `http_packet`
 
-**default:** `"GET / HTTP/1.0\r\n\r\n"`
+Default: `"GET / HTTP/1.0\r\n\r\n"`
 
-**context:** `upstream`
-
-**description:**
+Context: `upstream`
 
 If the check type is http, the check function will send this http packet to the upstream server.
 
 ## check\_http\_expect\_alive ##
 
-**syntax:** `check_http_expect_alive [ http_2xx | http_3xx | http_4xx | http_5xx ]`
+Syntax: **check\_http\_expect\_alive** `[ http_2xx | http_3xx | http_4xx | http_5xx ]`
 
-**default:** `http_2xx | http_3xx`
+Default: `http_2xx | http_3xx`
 
-**context:** `upstream`
-
-**description:**
+Context: `upstream`
 
 These status codes indicate the upstream server's http response is OK and the check response is successful.
 
 ## check\_shm\_size ##
 
-**syntax:** `check_shm_size size`
+Syntax: **check\_shm\_size** `size`
 
-**default:** `1M`
+Default: `1M`
 
-**context:** `http`
-
-**description:**
+Context: `http`
 
 Default size is one megabytes. If you want to check thousands of servers, the shared memory may be not enough, you can enlarge it with this directive.
 
 ## check\_status ##
 
-**syntax:** `check_status`
+Syntax: **check\_status**
 
-**default:** `none`
+Default: `none`
 
-**context:** `location`
-
-**description:**
+Context: `location`
 
 Display the status of checking servers. This directive should be used in the http block.
