@@ -43,12 +43,20 @@ static ngx_int_t ngx_http_lua_handle_rewrite_jump(lua_State *L,
     ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx, int cc_ref);
 static int ngx_http_lua_ngx_check_aborted(lua_State *L);
 
+static int debug_traceback(lua_State *L, lua_State *L1);
+
 
 #ifndef LUA_PATH_SEP
 #define LUA_PATH_SEP ";"
 #endif
 
 #define AUX_MARK "\1"
+
+
+enum {
+    LEVELS1	= 12,       /* size of the first part of the stack */
+    LEVELS2	= 10        /* size of the second part of the stack */
+};
 
 
 static void
@@ -318,7 +326,7 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
     }
 #endif
 
-    if (!r->header_only && (r->method & NGX_HTTP_HEAD)) {
+    if ((r->method & NGX_HTTP_HEAD) && !r->header_only) {
         r->header_only = 1;
     }
 
@@ -722,7 +730,7 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
     int                      rv;
     int                      cc_ref;
     lua_State               *cc;
-    const char              *err, *msg;
+    const char              *err, *msg, *trace;
     ngx_int_t                rc;
 #if (NGX_PCRE)
     ngx_pool_t              *old_pool;
@@ -845,8 +853,12 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
             msg = "unknown reason";
         }
 
+        debug_traceback(L, cc);
+        trace = lua_tostring(L, -1);
+        lua_pop(L, -1);
+
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "lua handler aborted: %s: %s", err, msg);
+                      "lua handler aborted: %s: %s\n%s", err, msg, trace);
 
         ngx_http_lua_del_thread(r, L, cc_ref);
         ctx->cc_ref = LUA_NOREF;
@@ -2057,7 +2069,7 @@ done:
     of->uniq = ngx_file_uniq(&fi);
     of->mtime = ngx_file_mtime(&fi);
     of->size = ngx_file_size(&fi);
-#if defined(nginx_version) && nginx_version >= 1000001 
+#if defined(nginx_version) && nginx_version >= 1000001
     of->fs_size = ngx_file_fs_size(&fi);
 #endif
     of->is_dir = ngx_is_dir(&fi);
@@ -2221,5 +2233,64 @@ ngx_http_lua_chains_get_free_buf(ngx_log_t *log, ngx_pool_t *p,
     cl->next = NULL;
 
     return cl;
+}
+
+
+static int
+debug_traceback(lua_State *L, lua_State *L1) {
+    int         arg = 0;
+    int         level = 0;
+    int         firstpart = 1;  /* still before eventual `...' */
+    lua_Debug   ar;
+
+    lua_pushliteral(L, "stack traceback:");
+
+    while (lua_getstack(L1, level++, &ar)) {
+
+        if (level > LEVELS1 && firstpart) {
+            /* no more than `LEVELS2' more levels? */
+            if (!lua_getstack(L1, level + LEVELS2, &ar)) {
+                level--;  /* keep going */
+
+            } else {
+                lua_pushliteral(L, "\n\t...");  /* too many levels */
+                /* This only works with LuaJIT 2.x. Avoids O(n^2) behaviour. */
+                lua_getstack(L1, -10, &ar);
+                level = ar.i_ci - LEVELS2;
+            }
+
+            firstpart = 0;
+            continue;
+        }
+
+        lua_pushliteral(L, "\n\t");
+        lua_getinfo(L1, "Snl", &ar);
+        lua_pushfstring(L, "%s:", ar.short_src);
+
+        if (ar.currentline > 0) {
+            lua_pushfstring(L, "%d:", ar.currentline);
+        }
+
+        if (*ar.namewhat != '\0') {  /* is there a name? */
+            lua_pushfstring(L, " in function " LUA_QS, ar.name);
+
+        } else {
+            if (*ar.what == 'm') {  /* main? */
+                lua_pushfstring(L, " in main chunk");
+
+            } else if (*ar.what == 'C' || *ar.what == 't') {
+                lua_pushliteral(L, " ?");  /* C function or tail call */
+
+            } else {
+                lua_pushfstring(L, " in function <%s:%d>",
+                                ar.short_src, ar.linedefined);
+            }
+        }
+
+        lua_concat(L, lua_gettop(L) - arg);
+    }
+
+    lua_concat(L, lua_gettop(L) - arg);
+    return 1;
 }
 

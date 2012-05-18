@@ -197,11 +197,11 @@ attempt to send data on a closed socket:
 
 
 === TEST 4: with resolver
---- timeout: 5
+--- timeout: 10
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER;
-    resolver_timeout 3s;
+    resolver_timeout 5s;
     location /t {
         content_by_lua '
             local sock = ngx.socket.tcp()

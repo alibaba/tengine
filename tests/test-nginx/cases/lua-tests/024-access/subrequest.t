@@ -579,7 +579,8 @@ GET /lua
 a=3&b=4
 
 
-=== TEST 23: I/O in named location
+
+=== TEST 22: I/O in named location
 the nginx core requires the patch https://github.com/agentzh/ngx_openresty/blob/master/patches/nginx-1.0.15-reset_wev_handler_in_named_locations.patch
 --- config
     location /t {

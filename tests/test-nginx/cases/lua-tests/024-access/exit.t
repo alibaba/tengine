@@ -516,6 +516,8 @@ This is our own content
 
 === TEST 17: exit(404) after I/O
 --- config
+    error_page 400 /400.html;
+    error_page 404 /404.html;
     location /foo {
         access_by_lua '
             ngx.location.capture("/sleep")
@@ -527,8 +529,14 @@ This is our own content
     location /sleep {
         echo_sleep 0.002;
     }
+--- user_files
+>>> 400.html
+Bad request, dear...
+>>> 404.html
+Not found, dear...
 --- request
-    GET /foo
---- response_body_like: 404 Not Found
+    GET /bah
+--- response_body
+Not found, dear...
 --- error_code: 404
 

@@ -165,6 +165,9 @@ ngx_http_lua_ngx_req_get_body_data(lua_State *L)
     ngx_http_request_t          *r;
     int                          n;
     size_t                       len;
+    ngx_chain_t                 *cl;
+    u_char                      *p;
+    u_char                      *buf;
 
     n = lua_gettop(L);
 
@@ -184,14 +187,41 @@ ngx_http_lua_ngx_req_get_body_data(lua_State *L)
         return 1;
     }
 
-    len = r->request_body->bufs->buf->last - r->request_body->bufs->buf->pos;
+    cl = r->request_body->bufs;
+
+    if (cl->next == NULL) {
+        len = cl->buf->last - cl->buf->pos;
+
+        if (len == 0) {
+            lua_pushnil(L);
+            return 1;
+        }
+
+        lua_pushlstring(L, (char *) cl->buf->pos, len);
+        return 1;
+    }
+
+    /* found multi-buffer body */
+
+    len = 0;
+
+    for (; cl; cl = cl->next) {
+        len += cl->buf->last - cl->buf->pos;
+    }
 
     if (len == 0) {
         lua_pushnil(L);
         return 1;
     }
 
-    lua_pushlstring(L, (char *) r->request_body->bufs->buf->pos, len);
+    buf = (u_char *) lua_newuserdata(L, len);
+
+    p = buf;
+    for (cl = r->request_body->bufs; cl; cl = cl->next) {
+        p = ngx_copy(p, cl->buf->pos, cl->buf->last - cl->buf->pos);
+    }
+
+    lua_pushlstring(L, (char *) buf, len);
     return 1;
 }
 

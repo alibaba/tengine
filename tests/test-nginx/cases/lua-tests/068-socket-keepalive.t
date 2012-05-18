@@ -5,7 +5,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 5 + 10);
+plan tests => repeat_each() * (blocks() * 5 + 8);
 
 our $HtmlDir = html_dir;
 
@@ -898,4 +898,63 @@ lua socket get keepalive peer: using connection
 --- no_error_log
 [error]
 [alert]
+
+
+
+=== TEST 13: github issue #110: ngx.exit with HTTP_NOT_FOUND causes worker process to exit
+--- http_config eval
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+--- config
+    error_page 404 /404.html;
+    location /t {
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+        access_by_lua '
+            local test = require "test"
+            local port = ngx.var.port
+            test.go(port)
+            ngx.exit(404)
+        ';
+        echo hello;
+    }
+--- user_files
+>>> 404.html
+Not found, dear...
+>>> test.lua
+module("test", package.seeall)
+
+function go(port)
+    local sock = ngx.socket.tcp()
+    local ok, err = sock:connect("127.0.0.1", port)
+    if not ok then
+        ngx.log(ngx.ERR, "failed to connect: ", err)
+        return
+    end
+
+    local req = "flush_all\r\n"
+
+    local bytes, err = sock:send(req)
+    if not bytes then
+        ngx.log(ngx.ERR, "failed to send request: ", err)
+        return
+    end
+
+    local line, err, part = sock:receive()
+    if not line then
+        ngx.log(ngx.ERR, "failed to receive a line: ", err, " [", part, "]")
+        return
+    end
+
+    -- local ok, err = sock:setkeepalive()
+    -- if not ok then
+        -- ngx.log(ngx.ERR, "failed to set reusable: ", err)
+        -- return
+    -- end
+end
+--- request
+GET /t
+--- response_body
+Not found, dear...
+--- error_code: 404
+--- no_error_log
+[error]
 

@@ -535,7 +535,7 @@ res4.body = f
 " x 4
 --- no_error_log eval
 ["[error]", "[alert]"]
---- timeout: 5
+--- timeout: 10
 
 
 

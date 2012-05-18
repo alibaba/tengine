@@ -10,8 +10,9 @@ static int ngx_http_lua_print(lua_State *L);
 static int ngx_http_lua_ngx_log(lua_State *L);
 
 
-static int log_wrapper(ngx_http_request_t *r, const char *ident, int level,
-        lua_State *L);
+static int log_wrapper(ngx_http_request_t *r, const char *ident,
+        ngx_uint_t level, lua_State *L);
+
 static void ngx_http_lua_inject_log_consts(lua_State *L);
 
 
@@ -37,7 +38,7 @@ ngx_http_lua_ngx_log(lua_State *L)
         /* remove log-level param from stack */
         lua_remove(L, 1);
 
-        return log_wrapper(r, "", level, L);
+        return log_wrapper(r, "", (ngx_uint_t) level, L);
     }
 
     dd("(lua-log) can't output log due to invalid logging context!");
@@ -75,7 +76,8 @@ ngx_http_lua_print(lua_State *L)
 
 
 static int
-log_wrapper(ngx_http_request_t *r, const char *ident, int level, lua_State *L)
+log_wrapper(ngx_http_request_t *r, const char *ident, ngx_uint_t level,
+        lua_State *L)
 {
     u_char              *buf;
     u_char              *p;
@@ -84,6 +86,10 @@ log_wrapper(ngx_http_request_t *r, const char *ident, int level, lua_State *L)
     size_t               size, len;
     int                  type;
     const char          *msg;
+
+    if (level > r->connection->log->log_level) {
+        return 0;
+    }
 
     nargs = lua_gettop(L);
     if (nargs == 0) {
@@ -185,7 +191,7 @@ log_wrapper(ngx_http_request_t *r, const char *ident, int level, lua_State *L)
     *p++ = '\0';
 
 done:
-    ngx_log_error((ngx_uint_t) level, r->connection->log, 0,
+    ngx_log_error(level, r->connection->log, 0,
             "%s%s", ident, (buf == NULL) ? (u_char *) "(null)" : buf);
     return 0;
 }

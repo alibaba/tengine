@@ -8,7 +8,7 @@ use Test::Nginx::Socket;
 
 #repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 24);
+plan tests => repeat_each() * (blocks() * 4 + 1);
 
 #no_diff();
 no_long_string();
@@ -31,6 +31,8 @@ POST /test
 hello, world
 --- response_body
 hello, world
+--- no_error_log
+[error]
 
 
 
@@ -52,6 +54,8 @@ Connection: close\r
 hello, world"
 --- response_body:
 --- error_code_like: ^(?:500)?$
+--- no_error_log
+[error]
 
 
 
@@ -74,6 +78,8 @@ hello, world
 --- response_body
 hello, world
 sub: foo
+--- no_error_log
+[error]
 
 
 
@@ -96,6 +102,8 @@ hello, world
 --- response_body
 hello, world
 sub: foo
+--- no_error_log
+[error]
 
 
 
@@ -114,6 +122,8 @@ sub: foo
 GET /test
 --- response_body
 ngx.req.read_body: undef
+--- no_error_log
+[error]
 
 
 
@@ -136,6 +146,8 @@ ngx.req.read_body: undef
 GET /test
 --- response_body
 ngx.req.read_body: undef
+--- no_error_log
+[error]
 
 
 
@@ -162,6 +174,8 @@ hiya, world"]
 --- response_body eval
 ["body: nil\n",
 "body: hiya, world\n"]
+--- no_error_log
+[error]
 
 
 
@@ -189,6 +203,8 @@ hiya, world"]
 qr/400 Bad Request/]
 --- error_code eval
 [200, '']
+--- no_error_log
+[error]
 
 
 
@@ -205,6 +221,8 @@ POST /test
 hello, world
 --- response_body
 hello, world
+--- no_error_log
+[error]
 
 
 
@@ -222,6 +240,8 @@ POST /test
 hello, world
 --- response_body
 nil
+--- no_error_log
+[error]
 
 
 
@@ -238,6 +258,8 @@ nil
 POST /test
 hello, world
 --- response_body_like: client_body_temp/
+--- no_error_log
+[error]
 
 
 
@@ -254,6 +276,8 @@ POST /test
 hello, world
 --- response_body
 nil
+--- no_error_log
+[error]
 
 
 
@@ -275,6 +299,8 @@ hello, world
 hiya, dear
 hiya, dear
 hiya, dear
+--- no_error_log
+[error]
 
 
 
@@ -296,6 +322,8 @@ yeah
 --- response_body
 hello, baby
 hello, baby
+--- no_error_log
+[error]
 
 
 
@@ -323,6 +351,8 @@ hello, baby
 "hello, baby
 hello, baby
 "]
+--- no_error_log
+[error]
 
 
 
@@ -360,6 +390,8 @@ X-Old: \S+/client_body_temp/\d+\r
 .*?X-New: \S+/html/a\.txt\r
 --- response_body
 Will you change this world?
+--- no_error_log
+[error]
 
 
 
@@ -397,6 +429,8 @@ X-Old: \S+/client_body_temp/\d+\r
 .*?X-New: \S+/html/a\.txt\r
 --- response_body
 Will you change this world?
+--- no_error_log
+[error]
 
 
 
@@ -433,6 +467,8 @@ Sure I will!
 --- response_body
 a.txt exists: no
 b.txt exists: yes
+--- no_error_log
+[error]
 
 
 
@@ -501,6 +537,8 @@ Will you change this world?
 "Will you change this world?\n"]
 --- error_code eval
 [200, 200]
+--- no_error_log
+[error]
 
 
 
@@ -534,6 +572,8 @@ Will you change this world?
 "Will you change this world?\n"]
 --- error_code eval
 [200, 200]
+--- no_error_log
+[error]
 
 
 
@@ -567,6 +607,9 @@ Will you change this world?
 qr/500 Internal Server Error/]
 --- error_code eval
 [200, 500]
+--- error_log eval
+[qr{\[error\].*? lua handler aborted: runtime error: \[string "rewrite_by_lua"\]:3: stat\(\) "[^"]+/a\.txt" failed}
+]
 
 
 
@@ -588,6 +631,8 @@ POST /test
 hello, world
 --- response_body chomp
 hiya, dear dear friend!
+--- no_error_log
+[error]
 
 
 
@@ -641,6 +686,8 @@ hello, world",
 hello, world"]
 --- response_body eval
 ["nil","nil"]
+--- no_error_log
+[error]
 
 
 
@@ -665,6 +712,8 @@ hello, world",
 hello, world"]
 --- response_body eval
 ["body: [nil]\n","body: [nil]\n"]
+--- no_error_log
+[error]
 
 
 
@@ -691,6 +740,8 @@ hello, world",
 hello, world"]
 --- response_body eval
 ["body: [nil]\n","body: [nil]\n"]
+--- no_error_log
+[error]
 
 
 
@@ -723,6 +774,8 @@ POST /test
 a=1&a=2&b=hello&c=world
 --- response_body
 B=HELLO&A=1&A=2&C=WORLD
+--- no_error_log
+[error]
 --- SKIP
 
 
@@ -746,6 +799,8 @@ POST /test
 hello, world
 --- response_body chomp
 howdy, my dear little sister!
+--- no_error_log
+[error]
 
 
 
@@ -771,6 +826,8 @@ POST /test
 hello, world
 --- response_body
 howdy, my dear little sister!
+--- no_error_log
+[error]
 
 
 
@@ -792,4 +849,34 @@ howdy, my dear little sister!
 POST /test
 hello, world
 --- response_body chomp
+--- no_error_log
+[error]
+
+
+
+=== TEST 32: multi-buffer request body
+--- config
+    location /foo {
+        default_type text/css;
+        srcache_store POST /store;
+
+        echo hello;
+        echo world;
+    }
+
+    location /store {
+        content_by_lua '
+            local body = ngx.req.get_body_data()
+            ngx.log(ngx.WARN, "srcache_store: request body len: ", #body)
+        ';
+    }
+--- request
+GET /foo
+--- response_body
+hello
+world
+--- error_log
+srcache_store: request body len: 55
+--- no_error_log
+[error]
 

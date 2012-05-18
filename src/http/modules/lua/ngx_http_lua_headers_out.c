@@ -339,6 +339,9 @@ static ngx_int_t ngx_http_set_last_modified_header(ngx_http_request_t *r,
 
     r->headers_out.last_modified_time = ngx_http_parse_time(value->data,
                                                             value->len);
+
+    dd("last modified time: %d", (int) r->headers_out.last_modified_time);
+
     return ngx_http_set_builtin_header(r, hv, value);
 }
 

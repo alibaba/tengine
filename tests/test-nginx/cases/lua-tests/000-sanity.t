@@ -3,9 +3,9 @@
 use lib 'lib';
 use Test::Nginx::Socket;
 
-repeat_each(10);
+repeat_each(2);
 
-plan tests => blocks() * 1;
+plan tests => blocks() * repeat_each() * 2;
 
 run_tests();
 
@@ -18,6 +18,18 @@ __DATA__
     }
 --- request
 GET /lua
---- response_body_like
+--- response_body
 2
+
+
+
+=== TEST 2: sanity (string)
+--- config
+    location /lua {
+        echo "helloworld";
+    }
+--- request
+GET /lua
+--- response_body
+helloworld
 
