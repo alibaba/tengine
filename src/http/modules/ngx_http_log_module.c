@@ -1050,6 +1050,9 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     log->disk_full_time = 0;
     log->error_log_time = 0;
     log->scope = 0;
+#if NGX_SYSLOG
+    log->syslog = NULL;
+#endif
 
     lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_log_module);
     fmt = lmcf->formats.elts;
