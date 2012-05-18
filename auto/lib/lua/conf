@@ -138,6 +138,7 @@ END
  exit 1
 fi
 
+CFLAGS="$CFLAGS -DNDK_SET_VAR"
 ngx_feature="export symbols by default"
 ngx_feature_libs="-Wl,-E"
 ngx_feature_name=
