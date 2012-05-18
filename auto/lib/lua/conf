@@ -1,4 +1,4 @@
-ngx_feature="lua library"
+ngx_feature="Lua library"
 ngx_feature_libs="-llua -lm"
 ngx_feature_name=
 ngx_feature_run=no
@@ -7,7 +7,7 @@ ngx_feature_path=
 ngx_feature_test="(void) luaL_newstate();"
 
 if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
-    # explicit set lua lib path
+    # explicitly set Lua lib path
     ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env)"
     ngx_feature_path="$LUAJIT_INC"
     if [ $NGX_RPATH = YES ]; then
@@ -20,7 +20,7 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
 
     if [ $ngx_found = no ]; then
         cat << END
-        $0: error: the ngx_lua addon requires the lua or luajit library and LUAJIT_LIB is defined as $LUAJIT_LIB and LUAJIT_INC $LUAJIT_INC, but we cannot find LuaJIT there.
+        $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUAJIT_LIB is defined as $LUAJIT_LIB and LUAJIT_INC $LUAJIT_INC, but we cannot find LuaJIT there.
 END
         exit 1
     fi
@@ -43,8 +43,8 @@ END
     esac
 else
     if [ -n "$LUA_INC" -o -n "$LUA_LIB" ]; then
-        # explicit set lua lib path
-        ngx_feature="lua library in $LUA_LIB and $LUA_INC (specified by the LUA_LIB and LUA_INC env)"
+        # explicitly set Lua lib path
+        ngx_feature="Lua library in $LUA_LIB and $LUA_INC (specified by the LUA_LIB and LUA_INC env)"
         ngx_feature_path="$LUA_INC"
         if [ $NGX_RPATH = YES ]; then
             ngx_feature_libs="-R$LUA_LIB -L$LUA_LIB -llua -lm"
@@ -56,19 +56,19 @@ else
 
         if [ $ngx_found = no ]; then
             cat << END
-            $0: error: the ngx_lua addon requires the lua or luajit library and LUA_LIB is defined as $LUA_LIB and LUA_INC is $LUA_INC, but we cannot find standard Lua there.
+            $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUA_LIB is defined as $LUA_LIB and LUA_INC is $LUA_INC, but we cannot find standard Lua there.
 END
             exit 1
         fi
     else
         # auto-discovery
-        ngx_feature="lua library"
+        ngx_feature="Lua library"
         ngx_feature_libs="-llua -lm"
         . auto/feature
 
         if [ $ngx_found = no ]; then
             # OpenBSD
-            ngx_feature="lua library in /usr/local/"
+            ngx_feature="Lua library in /usr/local/"
             ngx_feature_path="/usr/local/include"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -llua -lm"
@@ -80,7 +80,7 @@ END
 
         if [ $ngx_found = no ]; then
             # NetBSD
-            ngx_feature="lua library in /usr/pkg/"
+            ngx_feature="Lua library in /usr/pkg/"
             ngx_feature_path="/usr/pkg/include/"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/usr/pkg/lib -L/usr/pkg/lib -lm -llua"
@@ -92,7 +92,7 @@ END
 
         if [ $ngx_found = no ]; then
             # MacPorts
-            ngx_feature="lua library in /opt/local/"
+            ngx_feature="Lua library in /opt/local/"
             ngx_feature_path="/opt/local/include"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/opt/local/lib -L/opt/local/lib -lm -llua"
@@ -104,7 +104,7 @@ END
 
         if [ $ngx_found = no ]; then
             # FreeBSD
-            ngx_feature="lua library in /usr/local/../lua51/"
+            ngx_feature="Lua library in /usr/local/../lua51/"
             ngx_feature_path="/usr/local/include/lua51"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/usr/local/lib/lua51 -L/usr/local/lib/lua51 -llua -lm"
@@ -116,7 +116,7 @@ END
 
         if [ $ngx_found = no ]; then
             # Debian
-            ngx_feature="lua library in /usr/"
+            ngx_feature="Lua library in /usr/"
             ngx_feature_path="/usr/include/lua5.1"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -llua5.1"
@@ -133,7 +133,7 @@ if [ $ngx_found = yes ]; then
     CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
 else
  cat << END
- $0: error: the ngx_lua addon requires the lua library.
+ $0: error: ngx_http_lua_module requires the Lua library.
 END
  exit 1
 fi
