@@ -85,6 +85,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #endif
 #include <ngx_pipe.h>
 
+#if (NGX_PROCS)
+#include <ngx_proc.h>
+#endif
 
 #define LF     (u_char) 10
 #define CR     (u_char) 13

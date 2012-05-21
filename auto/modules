@@ -61,6 +61,16 @@ if [ $NGX_TEST_BUILD_SOLARIS_SENDFILEV = YES ]; then
 fi
 
 
+if [ $PROCS = YES ]; then
+    have=NGX_PROCS . auto/have
+    CORE_SRCS="$CORE_SRCS $PROCS_SRCS"
+    CORE_DEPS="$CORE_DEPS $PROCS_DEPS"
+    CORE_INCS="$CORE_INCS $PROCS_INCS"
+else
+    PROCS_MODULES=
+fi
+
+
 if [ $HTTP != YES ]; then
     have=NGX_CRYPT . auto/nohave
     CRYPT_LIB=
@@ -429,7 +439,7 @@ if [ $NGX_SYSLOG = YES ]; then
     CORE_MODULES="$CORE_MODULES ngx_syslog_module"
 fi
 
-modules="$CORE_MODULES $EVENT_MODULES"
+modules="$CORE_MODULES $EVENT_MODULES $PROCS_MODULES"
 
 
 if [ $USE_OPENSSL = YES ]; then

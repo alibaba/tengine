@@ -147,6 +147,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                                NGX_PROCESS_RESPAWN);
     ngx_start_cache_manager_processes(cycle, 0);
 
+#if (NGX_PROCS)
+    ngx_procs_start(cycle, 0);
+#endif
+
     ngx_new_binary = 0;
     close_old_pipe = 0;
     delay = 0;
@@ -245,6 +249,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                 ngx_start_worker_processes(cycle, ccf->worker_processes,
                                            NGX_PROCESS_RESPAWN);
                 ngx_start_cache_manager_processes(cycle, 0);
+
+#if (NGX_PROCS)
+                ngx_procs_start(cycle, 0);
+#endif
                 ngx_noaccepting = 0;
 
                 continue;
@@ -264,6 +272,11 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_start_worker_processes(cycle, ccf->worker_processes,
                                        NGX_PROCESS_JUST_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 1);
+
+#if (NGX_PROCS)
+            ngx_procs_start(cycle, 1);
+#endif
+
             live = 1;
             close_old_pipe = 1;
             ngx_signal_worker_processes(cycle,
@@ -275,6 +288,11 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_start_worker_processes(cycle, ccf->worker_processes,
                                        NGX_PROCESS_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 0);
+
+#if (NGX_PROCS)
+            ngx_procs_start(cycle, 0);
+#endif
+
             live = 1;
         }
 
@@ -1348,8 +1366,8 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
 {
     ngx_cache_manager_ctx_t *ctx = data;
 
-    void         *ident[4];
-    ngx_event_t   ev;
+    void                    *ident[4];
+    ngx_event_t              ev;
 
     cycle->connection_n = 512;
 

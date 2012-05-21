@@ -126,6 +126,13 @@ RTSIG_SRCS=src/event/modules/ngx_rtsig_module.c
 IOCP_MODULE=ngx_iocp_module
 IOCP_SRCS=src/event/modules/ngx_iocp_module.c
 
+
+PROCS_MODULES="ngx_procs_module ngx_proc_core_module"
+PROCS_DEPS="src/proc/ngx_proc.h"
+PROCS_INCS="src/proc"
+PROCS_SRCS="src/proc/ngx_proc.c"
+
+
 AIO_MODULE=ngx_aio_module
 AIO_SRCS="src/event/modules/ngx_aio_module.c \
           src/os/unix/ngx_aio_read.c \
