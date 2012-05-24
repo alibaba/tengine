@@ -4,6 +4,8 @@
 
 Add proactive health check for the upstream servers.
 
+This module is not built by default, it should be enabled with the `--with-http_upstream_check_module` configuration parameter.
+
 # Examples #
 
 	http {
