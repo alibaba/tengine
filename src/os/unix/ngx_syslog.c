@@ -275,7 +275,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
 #if (NGX_HAVE_INET6)
             case AF_INET6:
                 ((struct sockaddr_in6 *) addr.sockaddr)->sin6_port =
-                                         htons((in_port6_t) port);
+                                         htons((in_port_t) port);
                 break;
 #endif
 
