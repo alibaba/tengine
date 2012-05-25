@@ -1,4 +1,22 @@
 
+Changes with Tengine 1.3.0                                         25 May 2012
+
+    *) Feature: added the Lua module which embeds the power of Lua into Tengine.
+       (chaoslawful)
+
+    *) Feature: added the procs module which provides a mechanism to support
+       standalone process more easily. (Yuanzhuo)
+
+    *) Change: renamed the parameter from nogreedy to greedy in the user_agent
+       module. (Junmin Xiong)
+
+    *) Bugfix: fixed a segmentation fault bug in syslog with uninitialized
+       pointer problem. (Weiyue)
+
+    *) Bugfix: fixed a compile error in syslog with --with-ipv6 configuration
+       parameter. (Weiyue)
+
+
 Changes with Tengine 1.2.5                                         09 May 2012
 
     *) Feature: added the upstream_check module which could be used to do

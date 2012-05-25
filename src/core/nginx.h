@@ -13,8 +13,8 @@
 #define NGINX_VERSION      "1.0.15"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
-#define tengine_version    1002005
-#define TENGINE_VERSION    "1.2.5"
+#define tengine_version    1003000
+#define TENGINE_VERSION    "1.3.0"
 #define TENGINE_VER        "Tengine/" TENGINE_VERSION
 
 #define NGINX_VAR          "NGINX"
