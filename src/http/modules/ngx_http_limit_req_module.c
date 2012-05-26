@@ -109,7 +109,7 @@ static ngx_command_t  ngx_http_limit_req_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
       ngx_http_limit_req,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_limit_req_conf_t, enable),
+      0,
       NULL },
 
     { ngx_string("limit_req_whitelist"),
@@ -955,7 +955,6 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_limit_req_conf_t  *lrcf = conf;
 
-    char                          *rv;
     ngx_int_t                      burst;
     ngx_str_t                     *value, s;
     ngx_uint_t                     i;
@@ -979,8 +978,12 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     if (cf->args->nelts == 2) {
-        rv = ngx_conf_set_flag_slot(cf, cmd, lrcf);
-        return rv;
+        if (ngx_strncmp(value[1].data, "off", 3) == 0) {
+            lrcf->enable = 0;
+            return NGX_CONF_OK;
+        }
+
+        lrcf->enable = 1;
     }
 
     burst = 0;
@@ -993,7 +996,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             s.data = value[i].data + 5;
 
             limit_req->shm_zone = ngx_shared_memory_add(cf, &s, 0,
-                                                   &ngx_http_limit_req_module);
+                                                        &ngx_http_limit_req_module);
             if (limit_req->shm_zone == NULL) {
                 return NGX_CONF_ERROR;
             }
@@ -1004,7 +1007,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ngx_strncmp(value[i].data, "burst=", 6) == 0) {
 
             burst = ngx_atoi(value[i].data + 6, value[i].len - 6);
-            if (burst <= 0) {
+            if (burst == NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "invalid burst rate \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;
@@ -1054,9 +1057,6 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     limit_req->burst = burst * 1000;
-    if (lrcf->enable == NGX_CONF_UNSET) {
-        lrcf->enable = 1;
-    }
 
     return NGX_CONF_OK;
 }
