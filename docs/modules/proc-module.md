@@ -44,7 +44,7 @@ Default: `1`
 
 Context: `process`
 
-Specify the number of processes which will be forked. 
+Specify the number of processes which will be forked.
 
 
 ## priority ##
@@ -55,7 +55,7 @@ Default: `0`
 
 Context: `process`
 
-Priority is a value in the range -20 to 20.Lower priorities cause more favorable scheduling. 
+Priority is a value in the range -20 to 20. Lower priorities cause more favorable scheduling.
 
 
 ## delay\_start ##
@@ -66,7 +66,7 @@ Default: `0s`
 
 Context: `process`
 
-The directive specifies the time to wait before process start. 
+The directive specifies the time to wait before process starts.
 
 
 ## respawn ##
@@ -77,4 +77,4 @@ Default: `on`
 
 Context: `process`
 
-The directive specifies whether the process will be restarted by nginx when it encounters some errors and exits. 
+The directive specifies whether the process will be restarted by nginx when it encounters some errors and exits.
