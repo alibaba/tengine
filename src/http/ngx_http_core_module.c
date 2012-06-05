@@ -4299,20 +4299,21 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_compile_complex_value_t   ccv;
 
     if (clcf->error_pages == NULL) {
-        return "conflicts with or repeated \"error_page off\"";
+        return "conflicts with or repeated \"error_page default\"";
     }
 
     value = cf->args->elts;
 
     if (cf->args->nelts == 2) {
-        if (value[1].len != 3 || ngx_memcmp(value[1].data, "off", 3)) {
+        if (value[1].len != 7 || ngx_memcmp(value[1].data, "default", 7)) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid value \"%V\"", &value[1]);
             return NGX_CONF_ERROR;
         }
 
         if (clcf->error_pages != NGX_CONF_UNSET_PTR) {
-            return "with off conflicts with other \"error_page\" directives";
+            return "with argument - default conflicts with other "
+                   "\"error_page\" directives";
         }
 
         clcf->error_pages = NULL;
