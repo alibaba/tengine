@@ -664,7 +664,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
 
     { ngx_string("error_page"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
-                        |NGX_CONF_2MORE,
+                        |NGX_CONF_1MORE,
       ngx_http_core_error_page,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -3305,7 +3305,6 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
      *     clcf->types = NULL;
      *     clcf->default_type = { 0, NULL };
      *     clcf->error_log = NULL;
-     *     clcf->error_pages = NULL;
      *     clcf->try_files = NULL;
      *     clcf->client_body_path = NULL;
      *     clcf->regex = NULL;
@@ -3317,6 +3316,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
      *     clcf->keepalive_disable = 0;
      */
 
+    clcf->error_pages = NGX_CONF_UNSET_PTR;
     clcf->client_max_body_size = NGX_CONF_UNSET;
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
@@ -3512,9 +3512,17 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
-    if (conf->error_pages == NULL && prev->error_pages) {
+    if (conf->error_pages == NGX_CONF_UNSET_PTR &&
+        prev->error_pages != NGX_CONF_UNSET_PTR)
+    {
         conf->error_pages = prev->error_pages;
-    } else if (conf->error_pages && prev->error_pages) {
+    } else if (conf->error_pages == NGX_CONF_UNSET_PTR &&
+               prev->error_pages == NGX_CONF_UNSET_PTR)
+    {
+        conf->error_pages = NULL;
+    } else if (conf->error_pages && prev->error_pages &&
+               prev->error_pages != NGX_CONF_UNSET_PTR)
+    {
         ep = prev->error_pages->elts;
         ec = conf->error_pages->elts;
 
@@ -4291,14 +4299,35 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_compile_complex_value_t   ccv;
 
     if (clcf->error_pages == NULL) {
+        return "conflicts with or repeated \"error_page default\"";
+    }
+
+    value = cf->args->elts;
+
+    if (cf->args->nelts == 2) {
+        if (value[1].len != 7 || ngx_memcmp(value[1].data, "default", 7)) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid value \"%V\"", &value[1]);
+            return NGX_CONF_ERROR;
+        }
+
+        if (clcf->error_pages != NGX_CONF_UNSET_PTR) {
+            return "with argument - default conflicts with other "
+                   "\"error_page\" directives";
+        }
+
+        clcf->error_pages = NULL;
+
+        return NGX_CONF_OK;
+    }
+
+    if (clcf->error_pages == NGX_CONF_UNSET_PTR) {
         clcf->error_pages = ngx_array_create(cf->pool, 4,
                                              sizeof(ngx_http_err_page_t));
         if (clcf->error_pages == NULL) {
             return NGX_CONF_ERROR;
         }
     }
-
-    value = cf->args->elts;
 
     i = cf->args->nelts - 2;
 
