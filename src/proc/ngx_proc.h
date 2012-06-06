@@ -65,12 +65,15 @@ typedef struct {
 
 
 #define ngx_proc_get_main_conf(conf_ctx, module)           \
-    ((ngx_proc_conf_ctx_t *)(ngx_get_conf(conf_ctx,        \
-          ngx_procs_module)))->main_conf[module.ctx_index]
+    ((ngx_get_conf(conf_ctx, ngx_procs_module)) ?          \
+        ((ngx_proc_conf_ctx_t *) (ngx_get_conf(conf_ctx,   \
+              ngx_procs_module)))->main_conf[module.ctx_index] : NULL)
+
 
 #define ngx_proc_get_conf(conf_ctx, module)                \
-    ((ngx_proc_conf_ctx_t *)(ngx_get_conf(conf_ctx,        \
-          ngx_procs_module)))->proc_conf[module.ctx_index]
+    ((ngx_get_conf(conf_ctx, ngx_procs_module)) ?          \
+        ((ngx_proc_conf_ctx_t *) (ngx_get_conf(conf_ctx,   \
+              ngx_procs_module)))->proc_conf[module.ctx_index] : NULL)
 
 
 ngx_int_t ngx_procs_start(ngx_cycle_t *cycle, ngx_int_t type);
