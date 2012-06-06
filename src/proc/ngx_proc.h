@@ -83,7 +83,4 @@ extern ngx_module_t  ngx_procs_module;
 extern ngx_module_t  ngx_proc_core_module;
 
 
-
-
-
 #endif /* _NGX_PROC_H_INCLUDED_ */
