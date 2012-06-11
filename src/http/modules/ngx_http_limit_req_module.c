@@ -980,7 +980,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     shm_zone = NULL;
     burst = 0;
     nodelay = 1;
-    forbid_action.len = 0;
+    ngx_str_null(&forbid_action);
 
     for (i = 1; i < cf->args->nelts; i++) {
 
