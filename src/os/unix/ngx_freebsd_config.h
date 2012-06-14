@@ -23,6 +23,7 @@
 #include <grp.h>
 #include <dirent.h>
 #include <glob.h>
+#include <time.h>
 #include <sys/param.h>          /* ALIGN() */
 #include <sys/mount.h>          /* statfs() */
 
@@ -110,6 +111,7 @@ pid_t rfork_thread(int flags, void *stack, int (*func)(void *arg), void *arg);
 
 
 #define NGX_HAVE_OS_SPECIFIC_INIT    1
+#define NGX_HAVE_DEBUG_MALLOC        1
 
 
 extern char **environ;

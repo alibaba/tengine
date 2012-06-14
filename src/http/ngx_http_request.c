@@ -624,6 +624,8 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 
         c->ssl->no_wait_shutdown = 1;
 
+        c->log->action = "reading client request line";
+
         c->read->handler = ngx_http_process_request_line;
         /* STUB: epoll edge */ c->write->handler = ngx_http_empty_handler;
 
@@ -1187,7 +1189,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
 
     if (n == 0) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                      "client closed prematurely connection");
+                      "client prematurely closed connection");
     }
 
     if (n == 0 || n == NGX_ERROR) {
@@ -1502,7 +1504,9 @@ ngx_http_process_user_agent(ngx_http_request_t *r, ngx_table_elt_t *h,
         if (ngx_strstrn(user_agent, "Chrome/", 7 - 1)) {
             r->headers_in.chrome = 1;
 
-        } else if (ngx_strstrn(user_agent, "Safari/", 7 - 1)) {
+        } else if (ngx_strstrn(user_agent, "Safari/", 7 - 1)
+                   && ngx_strstrn(user_agent, "Mac OS X", 8 - 1))
+        {
             r->headers_in.safari = 1;
 
         }
@@ -1682,56 +1686,85 @@ static ssize_t
 ngx_http_validate_host(ngx_http_request_t *r, u_char **host, size_t len,
     ngx_uint_t alloc)
 {
-    u_char      *h, ch;
-    size_t       i, last;
-    ngx_uint_t   dot;
+    u_char  *h, ch;
+    size_t   i, dot_pos, host_len;
 
-    last = len;
+    enum {
+        sw_usual = 0,
+        sw_literal,
+        sw_rest
+    } state;
+
+    dot_pos = len;
+    host_len = len;
+
     h = *host;
-    dot = 0;
+
+    state = sw_usual;
 
     for (i = 0; i < len; i++) {
         ch = h[i];
 
-        if (ch == '.') {
-            if (dot) {
+        switch (ch) {
+
+        case '.':
+            if (dot_pos == i - 1) {
+                return 0;
+            }
+            dot_pos = i;
+            break;
+
+        case ':':
+            if (state == sw_usual) {
+                host_len = i;
+                state = sw_rest;
+            }
+            break;
+
+        case '[':
+            if (i == 0) {
+                state = sw_literal;
+            }
+            break;
+
+        case ']':
+            if (state == sw_literal) {
+                host_len = i + 1;
+                state = sw_rest;
+            }
+            break;
+
+        case '\0':
+            return 0;
+
+        default:
+
+            if (ngx_path_separator(ch)) {
                 return 0;
             }
 
-            dot = 1;
-            continue;
-        }
+            if (ch >= 'A' && ch <= 'Z') {
+                alloc = 1;
+            }
 
-        dot = 0;
-
-        if (ch == ':') {
-            last = i;
-            continue;
-        }
-
-        if (ngx_path_separator(ch) || ch == '\0') {
-            return 0;
-        }
-
-        if (ch >= 'A' || ch < 'Z') {
-            alloc = 1;
+            break;
         }
     }
 
-    if (dot) {
-        last--;
+    if (dot_pos == host_len - 1) {
+        host_len--;
     }
 
     if (alloc) {
-        *host = ngx_pnalloc(r->pool, last) ;
+        *host = ngx_pnalloc(r->pool, host_len);
         if (*host == NULL) {
             return -1;
         }
 
-        ngx_strlow(*host, h, last);
+        ngx_strlow(*host, h, host_len);
     }
 
-    return last;
+    return host_len;
 }
 
 
@@ -1991,6 +2024,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         if (r == c->data) {
 
             r->main->count--;
+            r->main->subrequests++;
 
             if (!r->logged) {
 
@@ -2404,7 +2438,7 @@ closed:
     }
 
     ngx_log_error(NGX_LOG_INFO, c->log, err,
-                  "client closed prematurely connection");
+                  "client prematurely closed connection");
 
     ngx_http_finalize_request(r, 0);
 }

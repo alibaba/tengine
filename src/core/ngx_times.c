@@ -37,7 +37,7 @@ volatile ngx_tm_t       *ngx_cached_tm;
 #if !(NGX_WIN32)
 
 /*
- * locatime() and localtime_r() are not Async-Signal-Safe functions, therefore,
+ * localtime() and localtime_r() are not Async-Signal-Safe functions, therefore,
  * they must not be called by a signal handler, so we use the cached
  * GMT offset value. Fortunately the value is changed only two times a year.
  */
@@ -347,7 +347,7 @@ ngx_gmtime(time_t t, ngx_tm_t *tp)
     /*
      * The "days" should be adjusted to 1 only, however, some March 1st's go
      * to previous year, so we adjust them to 2.  This causes also shift of the
-     * last Feburary days to next year, but we catch the case when "yday"
+     * last February days to next year, but we catch the case when "yday"
      * becomes negative.
      */
 
