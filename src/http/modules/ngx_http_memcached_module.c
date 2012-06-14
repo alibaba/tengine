@@ -345,8 +345,8 @@ found:
 
         while (*p && *p++ != CR) { /* void */ }
 
-        r->headers_out.content_length_n = ngx_atoof(len, p - len - 1);
-        if (r->headers_out.content_length_n == -1) {
+        u->headers_in.content_length_n = ngx_atoof(len, p - len - 1);
+        if (u->headers_in.content_length_n == -1) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "memcached sent invalid length in response \"%V\" "
                           "for key \"%V\"",
@@ -367,6 +367,7 @@ found:
 
         u->headers_in.status_n = 404;
         u->state->status = 404;
+        u->keepalive = 1;
 
         return NGX_OK;
     }
@@ -408,7 +409,7 @@ ngx_http_memcached_filter(void *data, ssize_t bytes)
     u = ctx->request->upstream;
     b = &u->buffer;
 
-    if (u->length == ctx->rest) {
+    if (u->length == (ssize_t) ctx->rest) {
 
         if (ngx_strncmp(b->last,
                    ngx_http_memcached_end + NGX_HTTP_MEMCACHED_END - ctx->rest,
@@ -426,6 +427,10 @@ ngx_http_memcached_filter(void *data, ssize_t bytes)
 
         u->length -= bytes;
         ctx->rest -= bytes;
+
+        if (u->length == 0) {
+            u->keepalive = 1;
+        }
 
         return NGX_OK;
     }
@@ -464,12 +469,23 @@ ngx_http_memcached_filter(void *data, ssize_t bytes)
     if (ngx_strncmp(last, ngx_http_memcached_end, b->last - last) != 0) {
         ngx_log_error(NGX_LOG_ERR, ctx->request->connection->log, 0,
                       "memcached sent invalid trailer");
+
+        b->last = last;
+        cl->buf->last = last;
+        u->length = 0;
+        ctx->rest = 0;
+
+        return NGX_OK;
     }
 
     ctx->rest -= b->last - last;
     b->last = last;
     cl->buf->last = last;
     u->length = ctx->rest;
+
+    if (u->length == 0) {
+        u->keepalive = 1;
+    }
 
     return NGX_OK;
 }

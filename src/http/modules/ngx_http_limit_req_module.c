@@ -109,7 +109,7 @@ static ngx_command_t  ngx_http_limit_req_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
       ngx_http_limit_req,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_limit_req_conf_t, enable),
+      0,
       NULL },
 
     { ngx_string("limit_req_whitelist"),
@@ -1001,7 +1001,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ngx_strncmp(value[i].data, "burst=", 6) == 0) {
 
             burst = ngx_atoi(value[i].data + 6, value[i].len - 6);
-            if (burst <= 0) {
+            if (burst == NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "invalid burst rate \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;

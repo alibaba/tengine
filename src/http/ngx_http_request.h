@@ -10,7 +10,7 @@
 
 
 #define NGX_HTTP_MAX_URI_CHANGES           10
-#define NGX_HTTP_MAX_SUBREQUESTS           50
+#define NGX_HTTP_MAX_SUBREQUESTS           200
 
 /* must be 2^n */
 #define NGX_HTTP_LC_HEADER_LEN             32
@@ -480,10 +480,10 @@ struct ngx_http_request_s {
 
     /*
      * instead of using the request context data in
-     * ngx_http_limit_zone_module and ngx_http_limit_req_module
+     * ngx_http_limit_conn_module and ngx_http_limit_req_module
      * we use the single bits in the request structure
      */
-    unsigned                          limit_zone_set:1;
+    unsigned                          limit_conn_set:1;
     unsigned                          limit_req_set:1;
     unsigned                          sysguard_set:1;
 

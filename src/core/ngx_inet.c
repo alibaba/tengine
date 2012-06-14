@@ -44,11 +44,7 @@ ngx_inet_addr(u_char *text, size_t len)
         return INADDR_NONE;
     }
 
-    if (n != 3) {
-        return INADDR_NONE;
-    }
-
-    if (octet < 256) {
+    if (n == 3 && octet < 256) {
         addr = (addr << 8) + octet;
         return htonl(addr);
     }
@@ -407,6 +403,10 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
 
 #if (NGX_HAVE_INET6)
     case AF_INET6:
+        if (shift > 128) {
+            return NGX_ERROR;
+        }
+
         addr = cidr->u.in6.addr.s6_addr;
         mask = cidr->u.in6.mask.s6_addr;
         rc = NGX_OK;
@@ -416,7 +416,7 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
             s = (shift > 8) ? 8 : shift;
             shift -= s;
 
-            mask[i] = (u_char) (0 - (1 << (8 - s)));
+            mask[i] = (u_char) (0xffu << (8 - s));
 
             if (addr[i] != (addr[i] & mask[i])) {
                 rc = NGX_DONE;
@@ -428,9 +428,12 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
 #endif
 
     default: /* AF_INET */
+        if (shift > 32) {
+            return NGX_ERROR;
+        }
 
         if (shift) {
-            cidr->u.in.mask = htonl((ngx_uint_t) (0 - (1 << (32 - shift))));
+            cidr->u.in.mask = htonl((uint32_t) (0xffffffffu << (32 - shift)));
 
         } else {
             /* x86 compilers use a shl instruction that shifts by modulo 32 */
@@ -459,7 +462,7 @@ ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
     struct sockaddr_in6  *sin6;
 
     /*
-     * prevent MSVC8 waring:
+     * prevent MSVC8 warning:
      *    potentially uninitialized local variable 'inaddr6' used
      */
     ngx_memzero(inaddr6.s6_addr, sizeof(struct in6_addr));
