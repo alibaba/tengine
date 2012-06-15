@@ -85,7 +85,7 @@ typedef struct {
 
 
     ngx_shmtx_t                              mutex;
-    ngx_atomic_t                             lock;
+    ngx_shmtx_sh_t                           lock;
 
     ngx_atomic_t                             down;
 
@@ -2523,11 +2523,11 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
         return NGX_ERROR;
     }
 
-    (void) ngx_sprintf(file, "%V%V%Z", &ngx_cycle->lock_file, name->name);
+    (void) ngx_sprintf(file, "%V%V%Z", &ngx_cycle->lock_file, name);
 
 #endif
 
-    if (ngx_shmtx_create(&psh->mutex, (void *) &psh->lock, file) != NGX_OK) {
+    if (ngx_shmtx_create(&psh->mutex, &psh->lock, file) != NGX_OK) {
         return NGX_ERROR;
     }
 
