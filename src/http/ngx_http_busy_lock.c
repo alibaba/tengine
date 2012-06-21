@@ -274,7 +274,7 @@ char *ngx_http_set_busy_lock_slot(ngx_conf_t *cf, ngx_command_t *cmd,
             line.data = value[i].data + 2;
 
             bl->timeout = ngx_parse_time(&line, 1);
-            if (bl->timeout == NGX_ERROR) {
+            if (bl->timeout == (time_t) NGX_ERROR) {
                 invalid = 1;
                 break;
             }
@@ -300,7 +300,7 @@ char *ngx_http_set_busy_lock_slot(ngx_conf_t *cf, ngx_command_t *cmd,
 
     if (bl->timeout == 0 && bl->max_waiting) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-            "busy lock waiting is useless with zero timeout, ignoring");
+                   "busy lock waiting is useless with zero timeout, ignoring");
     }
 
     return NGX_CONF_OK;

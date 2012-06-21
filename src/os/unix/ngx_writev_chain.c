@@ -54,7 +54,6 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
     }
 
     send = 0;
-    complete = 0;
 
     vec.elts = iovs;
     vec.size = sizeof(struct iovec);
@@ -65,14 +64,15 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         prev = NULL;
         iov = NULL;
         eintr = 0;
+        complete = 0;
         prev_send = send;
 
         vec.nelts = 0;
 
         /* create the iovec and coalesce the neighbouring bufs */
 
-        for (cl = in; cl && vec.nelts < IOV_MAX && send < limit; cl = cl->next)
-        {
+        for (cl = in; cl && send < limit; cl = cl->next) {
+
             if (ngx_buf_special(cl->buf)) {
                 continue;
             }
@@ -93,6 +93,10 @@ ngx_writev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 iov->iov_len += size;
 
             } else {
+                if (vec.nelts >= IOV_MAX) {
+                    break;
+                }
+
                 iov = ngx_array_push(&vec);
                 if (iov == NULL) {
                     return NGX_CHAIN_ERROR;
