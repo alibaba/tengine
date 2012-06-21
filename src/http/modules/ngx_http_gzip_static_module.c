@@ -130,6 +130,10 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
     of.errors = clcf->open_file_cache_errors;
     of.events = clcf->open_file_cache_events;
 
+    if (ngx_http_set_disable_symlinks(r, clcf, &path, &of) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     if (ngx_open_cached_file(clcf->open_file_cache, &path, &of, r->pool)
         != NGX_OK)
     {
@@ -145,6 +149,10 @@ ngx_http_gzip_static_handler(ngx_http_request_t *r)
             return NGX_DECLINED;
 
         case NGX_EACCES:
+#if (NGX_HAVE_OPENAT)
+        case NGX_EMLINK:
+        case NGX_ELOOP:
+#endif
 
             level = NGX_LOG_ERR;
             break;

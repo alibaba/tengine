@@ -23,7 +23,8 @@ int     ngx_freebsd_machdep_hlt_logical_cpus;
 
 ngx_uint_t  ngx_freebsd_sendfile_nbytes_bug;
 ngx_uint_t  ngx_freebsd_use_tcp_nopush;
-ngx_uint_t  ngx_freebsd_debug_malloc;
+
+ngx_uint_t  ngx_debug_malloc;
 
 
 static ngx_os_io_t ngx_freebsd_io = {
@@ -81,7 +82,7 @@ ngx_debug_init()
     malloc_options = "J";
 #endif
 
-    ngx_freebsd_debug_malloc = 1;
+    ngx_debug_malloc = 1;
 
 #else
     char  *mo;
@@ -89,7 +90,7 @@ ngx_debug_init()
     mo = getenv("MALLOC_OPTIONS");
 
     if (mo && ngx_strchr(mo, 'J')) {
-        ngx_freebsd_debug_malloc = 1;
+        ngx_debug_malloc = 1;
     }
 #endif
 }
