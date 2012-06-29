@@ -28,7 +28,7 @@ This module is enabled by default. It can be disabled with the --without-http_us
 Syntax: user_agent $variable_name   
 Default: none   
 Context: http   
-you can use this variable like other nginx variables in your configuration file.This block contains three parts, **default**, **greedy** and **analysis items**.
+Set a variable whose value depends on the value of user_agent string.This block contains three parts, **default**, **greedy** and **analysis items**.
 
 * **default**:         
  - *Syntax*: **default   value**           
