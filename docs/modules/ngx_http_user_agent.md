@@ -2,7 +2,7 @@
 
 **ngx\_http\_user\_agent\_module**
 
-Add a directive to an analyse user_agent string
+This module can analyse the header of User-Agent.
 
 This module is built by default in tengine, it should not be enabled with the --without-http_user_agent_module configuration parameter.
 
