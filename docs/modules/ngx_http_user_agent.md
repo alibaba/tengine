@@ -10,14 +10,14 @@ This module is enabled by default. It can be disabled with the --without-http_us
 
 	http {
 		user_agent $ngx_browser {
-			default						unknown;
+			default                     unknown;
 
 
-			greedy						Firefox;
+			greedy                      Firefox;
 
-			Chrome	   18.0+			chrome18;
-			Chrome     17.0~17.9999		chrome17;
-			Chrome     5.0-				chrome_low;
+			Chrome      18.0+           chrome18;
+			Chrome      17.0~17.9999    chrome17;
+			Chrome      5.0-            chrome_low;
 		}
 	}
 
@@ -37,8 +37,8 @@ Context: This block contains three parts, **default**, **greedy** and **analysis
   - *Syntax*: **greedy   keyword**
   - *Context*: If the keyword is greedy, it will continue to scan the user-agent string until it can find other item which is not greedy. If it can\'t find any other item, this keyword will be returned at last.
   - e.g.: "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.112 Safari/535.1",this user_agent string will return Chrome13,if configuration file like this:
-	greedy					Safari;
-	Chrome	13.0~13.9999	chrome13;
+	greedy                  Safari;
+	Chrome  13.0~13.9999    chrome13;
 
 * **analysis items**:
  - *Syntax*: **keyword version value**
