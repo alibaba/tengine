@@ -2,15 +2,15 @@
 
 **ngx\_http\_user\_agent\_module**
 
-add a directive to an analyse user_agent string
+Add a directive to an analyse user_agent string
 
-this module is bult by default in tengine, it should not be enabled with the --without-http_user_agent_module configuration parameter.
+This module is built by default in tengine, it should not be enabled with the --without-http_user_agent_module configuration parameter.
 
 # Examples #
 
 	http {
 		user_agent $ngx_browser {
-			default						unkown;
+			default						unknown;
 
 
 			greedy						Firefox;
@@ -27,11 +27,11 @@ this module is bult by default in tengine, it should not be enabled with the --w
 
 Syntax: **$variable_name** you can use this variable like other nginx variables in your configuration file.
 
-this block contains three parts, **default**, **greedy** and **analysis iteams**.
+This block contains three parts, **default**, **greedy** and **analysis items**.
 
 * **default**:
  - *syntax*: **default   value**
- - note: the variable defined will return thie value if an user_agent string is not in analysis iteams.
+ - note: the variable defined will return this value if an user_agent string is not in analysis iteams.
 
  * **greedy**:
   - *syntax*: **greedy   keyword**
@@ -40,12 +40,12 @@ this block contains three parts, **default**, **greedy** and **analysis iteams**
 	greedy					Safari;
 	Chrome	13.0~13.9999	chrome13;
 
-* **analysis iateams**:
+* **analysis items**:
  - *syntax*: **keyword version value**
-   - *keyword*: this is the word we analysised from user_agent string.
+   - *keyword*: this is the word we analysed from user_agent string.
    - *version*: the version of keyword.
      - version\+:greater or equal should be matched;
-	 - version\-:less or equal shoul be matched;
-	 - version:equal shold be matched;
+	 - version\-:less or equal should be matched;
+	 - version:equal should be matched;
 	 - version1~version2:matched in [version1,version2];
-   - *value*:if this iteam has been matched,the variable defined will return this value.
+   - *value*:if this item has been matched,the variable defined will return this value.
