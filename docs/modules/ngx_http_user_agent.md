@@ -48,4 +48,4 @@ Context: This block contains three parts, **default**, **greedy** and **analysis
 	 - version\-:less or equal should be matched;
 	 - version:equal should be matched;
 	 - version1~version2:matched in [version1,version2];
-   - *value*:if this item has been matched,the variable defined will return this value.
+   - *value*:If this item is matched, the value will be filled to the defined variable.
