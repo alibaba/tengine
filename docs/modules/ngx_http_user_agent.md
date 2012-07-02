@@ -41,9 +41,10 @@ Set a variable whose value depends on the value of user_agent string.This block 
  - *Default*: none  
  - *Context*: user_agent block  
  If the keyword is greedy, it will continue to scan the user-agent string until it can find other item which is not greedy. If it can't find any other item, this keyword will be returned at last.    
-  - e.g.: "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.112 Safari/535.1",this user_agent string will return Chrome13,if configuration file like this:    
-	greedy                  Safari;
-	Chrome  13.0~13.9999    chrome13;
+e.g.: "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.112 Safari/535.1",this user_agent string will return Chrome13,if configuration file like this:    
+
+    greedy                  Safari;     
+    Chrome  13.0~13.9999    chrome13;   
 
 * **analysis items**:
  - *Syntax*: **keyword version value**
