@@ -54,8 +54,8 @@ static int debug_traceback(lua_State *L, lua_State *L1);
 
 
 enum {
-    LEVELS1	= 12,       /* size of the first part of the stack */
-    LEVELS2	= 10        /* size of the second part of the stack */
+    LEVELS1     = 12,       /* size of the first part of the stack */
+    LEVELS2     = 10        /* size of the second part of the stack */
 };
 
 
