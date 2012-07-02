@@ -57,4 +57,4 @@ e.g.: "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome
 	   - version\-:less or equal should be matched;   
 	   - version:equal should be matched;     
 	   - version1~version2:matched in [version1,version2];    
-* *value*:If this item is matched, the value will be filled to the defined variable.  
+* *value*:If this item is matched, the value will be filled to the defined variable. 
