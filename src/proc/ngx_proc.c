@@ -13,7 +13,7 @@
 static char *ngx_procs_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_procs_cycle(ngx_cycle_t *cycle, void *data);
 static void ngx_procs_process_init(ngx_cycle_t *cycle,
-    ngx_proc_module_t *module, int priority);
+    ngx_proc_module_t *module, ngx_int_t priority);
 static void ngx_procs_channel_handler(ngx_event_t *ev);
 static void ngx_procs_process_exit(ngx_cycle_t *cycle,
     ngx_proc_module_t *module);
@@ -385,12 +385,12 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
     ctx = module->ctx;
     ngx_process = NGX_PROCESS_WORKER;
 
-    ngx_procs_process_init(cycle, ctx, cpcf->priority);
     ngx_setproctitle((char *) ctx->name.data);
+    ngx_msleep(cpcf->delay_start);
+
+    ngx_procs_process_init(cycle, ctx, cpcf->priority);
     ngx_close_listening_sockets(cycle);
     ngx_use_accept_mutex = 0;
-
-    ngx_msleep(cpcf->delay_start);
 
     for ( ;; ) {
         if (ngx_exiting || ngx_quit) {
@@ -442,7 +442,7 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
 
 static void
 ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
-    int priority)
+    ngx_int_t priority)
 {
     sigset_t          set;
     ngx_int_t         n;
@@ -459,7 +459,7 @@ ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     if (priority != 0) {
-        if (setpriority(PRIO_PROCESS, 0, priority) == -1) {
+        if (setpriority(PRIO_PROCESS, 0, (int) priority) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "process %V setpriority(%d) failed", &module->name,
                           priority);
@@ -970,7 +970,7 @@ ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_proc_conf_t  *prev = parent;
     ngx_proc_conf_t  *conf = child;
 
-    ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 0);
+    ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 300);
     ngx_conf_merge_uint_value(conf->count, prev->count, 1);
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
 

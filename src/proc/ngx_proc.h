@@ -29,7 +29,7 @@ typedef struct {
 typedef struct {
     ngx_str_t                      name;
 
-    int                            priority;
+    ngx_int_t                      priority;
     ngx_msec_t                     delay_start;
     ngx_uint_t                     count;
     ngx_flag_t                     respawn;
