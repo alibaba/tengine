@@ -29,9 +29,9 @@ typedef struct {
 typedef struct {
     ngx_str_t                      name;
 
+    int                            priority;
     ngx_msec_t                     delay_start;
     ngx_uint_t                     count;
-    ngx_uint_t                     priority;
     ngx_flag_t                     respawn;
 
     ngx_proc_conf_ctx_t           *ctx;
