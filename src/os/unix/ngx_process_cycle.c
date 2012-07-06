@@ -753,6 +753,8 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 #endif
 
     ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
@@ -1131,6 +1133,8 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 #endif
 
     ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
