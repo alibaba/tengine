@@ -402,7 +402,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
         }
 
     } else {
-        len += sizeof("Connection: closed" CRLF) - 1;
+        len += sizeof("Connection: close" CRLF) - 1;
     }
 
 #if (NGX_HTTP_GZIP)
@@ -452,7 +452,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
         b->last = ngx_copy(b->last, status_line->data, status_line->len);
 
     } else {
-        b->last = ngx_sprintf(b->last, "%ui", status);
+        b->last = ngx_sprintf(b->last, "%03ui", status);
     }
     *b->last++ = CR; *b->last++ = LF;
 

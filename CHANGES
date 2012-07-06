@@ -1,4 +1,109 @@
 
+Changes with nginx 1.2.2                                         03 Jul 2012
+
+    *) Change: the "single" parameter of the "keepalive" directive is now
+       ignored.
+
+    *) Change: SSL compression is now disabled when using all versions of
+       OpenSSL, including ones prior to 1.0.0.
+
+    *) Feature: the "proxy_pass", "fastcgi_pass", "scgi_pass", "uwsgi_pass"
+       directives, and the "server" directive inside the "upstream" block,
+       now support IPv6 addresses.
+
+    *) Feature: the "resolver" directive now support IPv6 addresses and an
+       optional port specification.
+
+    *) Feature: the "least_conn" directive inside the "upstream" block.
+
+    *) Feature: it is now possible to specify a weight for servers while
+       using the "ip_hash" directive.
+
+    *) Feature: it is now possible to use the "ip_hash" directive to balance
+       IPv6 clients.
+
+    *) Feature: the $status variable can now be used not only in the
+       "log_format" directive.
+
+    *) Bugfix: nginx could not be built with ngx_cpp_test_module; the bug
+       had appeared in 1.1.12.
+
+    *) Bugfix: access to variables from SSI and embedded perl module might
+       not work after reconfiguration.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: in the ngx_http_xslt_filter_module.
+       Thanks to Kuramoto Eiji.
+
+    *) Bugfix: memory leak if $geoip_org variable was used.
+       Thanks to Denis F. Latypoff.
+
+    *) Bugfix: in the "proxy_cookie_domain" and "proxy_cookie_path"
+       directives.
+
+    *) Bugfix: a segmentation fault might occur in a worker process on
+       shutdown if the "resolver" directive was used.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       ngx_http_mp4_module was used.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       conflicting wildcard server names were used.
+
+    *) Bugfix: nginx might be terminated abnormally on a SIGBUS signal on
+       ARM platform.
+
+    *) Bugfix: an alert "sendmsg() failed (9: Bad file number)" on HP-UX
+       while reconfiguration.
+
+
+Changes with nginx 1.2.1                                         05 Jun 2012
+
+    *) Security: now nginx/Windows ignores trailing dot in URI path
+       component, and does not allow URIs with ":$" in it.
+       Thanks to Vladimir Kochetkov, Positive Research Center.
+
+    *) Feature: the "debug_connection" directive now supports IPv6 addresses
+       and the "unix:" parameter.
+
+    *) Feature: the "set_real_ip_from" directive and the "proxy" parameter
+       of the "geo" directive now support IPv6 addresses.
+
+    *) Feature: the "real_ip_recursive", "geoip_proxy", and
+       "geoip_proxy_recursive" directives.
+
+    *) Feature: the "proxy_recursive" parameter of the "geo" directive.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "resolver" directive was used.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "fastcgi_pass", "scgi_pass", or "uwsgi_pass" directives were used and
+       backend returned incorrect response.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "rewrite" directive was used and new request arguments in a
+       replacement used variables.
+
+    *) Bugfix: nginx might hog CPU if the open file resource limit was
+       reached.
+
+    *) Bugfix: nginx might loop infinitely over backends if the
+       "proxy_next_upstream" directive with the "http_404" parameter was
+       used and there were backup servers specified in an upstream block.
+
+    *) Bugfix: adding the "down" parameter of the "server" directive might
+       cause unneeded client redistribution among backend servers if the
+       "ip_hash" directive was used.
+
+    *) Bugfix: socket leak.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: in the ngx_http_fastcgi_module.
+
+
 Changes with nginx 1.2.0                                         23 Apr 2012
 
     *) Bugfix: a segmentation fault might occur in a worker process if the
