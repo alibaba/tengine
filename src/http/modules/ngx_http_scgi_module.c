@@ -247,6 +247,20 @@ static ngx_command_t ngx_http_scgi_commands[] = {
       offsetof(ngx_http_scgi_loc_conf_t, upstream.cache_methods),
       &ngx_http_upstream_cache_method_mask },
 
+    { ngx_string("scgi_cache_lock"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.cache_lock),
+      NULL },
+
+    { ngx_string("scgi_cache_lock_timeout"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.cache_lock_timeout),
+      NULL },
+
 #endif
 
     { ngx_string("scgi_temp_path"),
@@ -278,8 +292,8 @@ static ngx_command_t ngx_http_scgi_commands[] = {
       &ngx_http_scgi_next_upstream_masks },
 
     { ngx_string("scgi_param"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
-      ngx_conf_set_keyval_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      ngx_http_upstream_param_set_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_scgi_loc_conf_t, params_source),
       NULL },
@@ -519,10 +533,10 @@ static ngx_int_t
 ngx_http_scgi_create_request(ngx_http_request_t *r)
 {
     u_char                        ch, *key, *val, *lowcase_key;
-    size_t                        len, allocated;
+    size_t                        len, key_len, val_len, allocated;
     ngx_buf_t                    *b;
     ngx_str_t                    *content_length;
-    ngx_uint_t                    i, n, hash, header_params;
+    ngx_uint_t                    i, n, hash, skip_empty, header_params;
     ngx_chain_t                  *cl, *body;
     ngx_list_part_t              *part;
     ngx_table_elt_t              *header, **ignored;
@@ -554,15 +568,21 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
         while (*(uintptr_t *) le.ip) {
 
             lcode = *(ngx_http_script_len_code_pt *) le.ip;
-            len += lcode(&le);
+            key_len = lcode(&le);
 
-            while (*(uintptr_t *) le.ip) {
+            lcode = *(ngx_http_script_len_code_pt *) le.ip;
+            skip_empty = lcode(&le);
+
+            for (val_len = 0; *(uintptr_t *) le.ip; val_len += lcode(&le)) {
                 lcode = *(ngx_http_script_len_code_pt *) le.ip;
-                len += lcode(&le);
             }
-            len++;
-
             le.ip += sizeof(uintptr_t);
+
+            if (skip_empty && val_len == 0) {
+                continue;
+            }
+
+            len += key_len + val_len + 1;
         }
     }
 
@@ -665,7 +685,34 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
         e.request = r;
         e.flushed = 1;
 
-        while (*(uintptr_t *) e.ip) {
+        le.ip = scf->params_len->elts;
+
+        while (*(uintptr_t *) le.ip) {
+
+            lcode = *(ngx_http_script_len_code_pt *) le.ip;
+            lcode(&le); /* key length */
+
+            lcode = *(ngx_http_script_len_code_pt *) le.ip;
+            skip_empty = lcode(&le);
+
+            for (val_len = 0; *(uintptr_t *) le.ip; val_len += lcode(&le)) {
+                lcode = *(ngx_http_script_len_code_pt *) le.ip;
+            }
+            le.ip += sizeof(uintptr_t);
+
+            if (skip_empty && val_len == 0) {
+                e.skip = 1;
+
+                while (*(uintptr_t *) e.ip) {
+                    code = *(ngx_http_script_code_pt *) e.ip;
+                    code((ngx_http_script_engine_t *) &e);
+                }
+                e.ip += sizeof(uintptr_t);
+
+                e.skip = 0;
+
+                continue;
+            }
 
 #if (NGX_DEBUG)
             key = e.pos;
@@ -1032,6 +1079,8 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.cache_bypass = NGX_CONF_UNSET_PTR;
     conf->upstream.no_cache = NGX_CONF_UNSET_PTR;
     conf->upstream.cache_valid = NGX_CONF_UNSET_PTR;
+    conf->upstream.cache_lock = NGX_CONF_UNSET;
+    conf->upstream.cache_lock_timeout = NGX_CONF_UNSET_MSEC;
 #endif
 
     conf->upstream.hide_headers = NGX_CONF_UNSET_PTR;
@@ -1124,8 +1173,8 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->upstream.busy_buffers_size < size) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-            "\"scgi_busy_buffers_size\" must be equal or bigger "
-            "than maximum of the value of \"scgi_buffer_size\" and "
+            "\"scgi_busy_buffers_size\" must be equal to or greater "
+            "than the maximum of the value of \"scgi_buffer_size\" and "
             "one of the \"scgi_buffers\"");
 
         return NGX_CONF_ERROR;
@@ -1155,8 +1204,8 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->upstream.temp_file_write_size < size) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-            "\"scgi_temp_file_write_size\" must be equal or bigger than "
-            "maximum of the value of \"scgi_buffer_size\" and "
+            "\"scgi_temp_file_write_size\" must be equal to or greater than "
+            "the maximum of the value of \"scgi_buffer_size\" and "
             "one of the \"scgi_buffers\"");
 
         return NGX_CONF_ERROR;
@@ -1178,8 +1227,8 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         && conf->upstream.max_temp_file_size < size) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
             "\"scgi_max_temp_file_size\" must be equal to zero to disable "
-            "the temporary files usage or must be equal or bigger than "
-            "maximum of the value of \"scgi_buffer_size\" and "
+            "temporary files usage or must be equal to or greater than "
+            "the maximum of the value of \"scgi_buffer_size\" and "
             "one of the \"scgi_buffers\"");
 
         return NGX_CONF_ERROR;
@@ -1263,6 +1312,12 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->cache_key = prev->cache_key;
     }
 
+    ngx_conf_merge_value(conf->upstream.cache_lock,
+                              prev->upstream.cache_lock, 0);
+
+    ngx_conf_merge_msec_value(conf->upstream.cache_lock_timeout,
+                              prev->upstream.cache_lock_timeout, 5000);
+
 #endif
 
     ngx_conf_merge_value(conf->upstream.pass_request_headers,
@@ -1320,9 +1375,9 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
 #if (NGX_HTTP_CACHE)
     ngx_array_t                   params_merged;
 #endif
-    ngx_keyval_t                 *src;
     ngx_hash_key_t               *hk;
     ngx_hash_init_t               hash;
+    ngx_http_upstream_param_t    *src;
     ngx_http_script_compile_t     sc;
     ngx_http_script_copy_code_t  *copy;
 
@@ -1331,7 +1386,8 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
 
         if (prev->headers_hash.buckets
 #if (NGX_HTTP_CACHE)
-            && ((conf->upstream.cache == NULL) == (prev->upstream.cache == NULL))
+            && ((conf->upstream.cache == NULL)
+                == (prev->upstream.cache == NULL))
 #endif
            )
         {
@@ -1383,9 +1439,11 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
 #if (NGX_HTTP_CACHE)
 
     if (conf->upstream.cache) {
-        ngx_keyval_t  *h, *s;
+        ngx_keyval_t               *h;
+        ngx_http_upstream_param_t  *s;
 
-        if (ngx_array_init(&params_merged, cf->temp_pool, 4, sizeof(ngx_keyval_t))
+        if (ngx_array_init(&params_merged, cf->temp_pool, 4,
+                           sizeof(ngx_http_upstream_param_t))
             != NGX_OK)
         {
             return NGX_ERROR;
@@ -1419,7 +1477,9 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
                 return NGX_ERROR;
             }
 
-            *s = *h;
+            s->key = h->key;
+            s->value = h->value;
+            s->skip_empty = 0;
 
         next:
 
@@ -1460,6 +1520,15 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
 
         copy->code = (ngx_http_script_code_pt) ngx_http_script_copy_len_code;
         copy->len = src[i].key.len + 1;
+
+        copy = ngx_array_push_n(conf->params_len,
+                                sizeof(ngx_http_script_copy_code_t));
+        if (copy == NULL) {
+            return NGX_ERROR;
+        }
+
+        copy->code = (ngx_http_script_code_pt) ngx_http_script_copy_len_code;
+        copy->len = src[i].skip_empty;
 
 
         size = (sizeof(ngx_http_script_copy_code_t)

@@ -50,7 +50,7 @@ our @EXPORT = qw(
     HTTP_INSUFFICIENT_STORAGE
 );
 
-our $VERSION = '1.0.15';
+our $VERSION = '1.2.0';
 
 require XSLoader;
 XSLoader::load('nginx', $VERSION);
@@ -132,6 +132,7 @@ Igor Sysoev
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) Igor Sysoev
+Copyright (C) Nginx, Inc.
 
 
 =cut

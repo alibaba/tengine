@@ -85,9 +85,9 @@ typedef struct {
 
      int                      priority;
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
+#if (NGX_HAVE_CPU_AFFINITY)
      ngx_uint_t               cpu_affinity_n;
-     cpu_set_t               *cpu_affinity;
+     CPU_SET_T               *cpu_affinity;
 #endif
 
      char                    *username;
@@ -129,8 +129,8 @@ ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
 ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag);
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
-cpu_set_t *ngx_get_cpu_affinity(ngx_uint_t n);
+#if (NGX_HAVE_CPU_AFFINITY)
+CPU_SET_T *ngx_get_cpu_affinity(ngx_uint_t n);
 #endif
 
 
