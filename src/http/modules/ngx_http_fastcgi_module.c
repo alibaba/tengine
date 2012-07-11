@@ -619,6 +619,7 @@ ngx_http_fastcgi_handler(ngx_http_request_t *r)
     u->process_header = ngx_http_fastcgi_process_header;
     u->abort_request = ngx_http_fastcgi_abort_request;
     u->finalize_request = ngx_http_fastcgi_finalize_request;
+    r->state = 0;
 
     u->buffering = 1;
 
@@ -1194,6 +1195,8 @@ ngx_http_fastcgi_reinit_request(ngx_http_request_t *r)
     f->fastcgi_stdout = 0;
     f->large_stderr = 0;
 
+    r->state = 0;
+
     return NGX_OK;
 }
 
@@ -1353,7 +1356,11 @@ ngx_http_fastcgi_process_header(ngx_http_request_t *r)
                 }
 
             } else {
-                f->state = ngx_http_fastcgi_st_version;
+                if (f->padding) {
+                    f->state = ngx_http_fastcgi_st_padding;
+                } else {
+                    f->state = ngx_http_fastcgi_st_version;
+                }
             }
 
             continue;
@@ -1686,7 +1693,12 @@ ngx_http_fastcgi_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
             }
 
             if (f->type == NGX_HTTP_FASTCGI_STDOUT && f->length == 0) {
-                f->state = ngx_http_fastcgi_st_version;
+
+                if (f->padding) {
+                    f->state = ngx_http_fastcgi_st_padding;
+                } else {
+                    f->state = ngx_http_fastcgi_st_version;
+                }
 
                 if (!flcf->keep_conn) {
                     p->upstream_done = 1;
@@ -1699,7 +1711,13 @@ ngx_http_fastcgi_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
             }
 
             if (f->type == NGX_HTTP_FASTCGI_END_REQUEST) {
-                f->state = ngx_http_fastcgi_st_version;
+
+                if (f->padding) {
+                    f->state = ngx_http_fastcgi_st_padding;
+                } else {
+                    f->state = ngx_http_fastcgi_st_version;
+                }
+
                 p->upstream_done = 1;
 
                 if (flcf->keep_conn) {
@@ -1772,7 +1790,11 @@ ngx_http_fastcgi_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
                 }
 
             } else {
-                f->state = ngx_http_fastcgi_st_version;
+                if (f->padding) {
+                    f->state = ngx_http_fastcgi_st_padding;
+                } else {
+                    f->state = ngx_http_fastcgi_st_version;
+                }
             }
 
             continue;

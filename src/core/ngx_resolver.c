@@ -96,7 +96,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 {
     ngx_str_t              s;
     ngx_url_t              u;
-    ngx_uint_t             i;
+    ngx_uint_t             i, j;
     ngx_resolver_t        *r;
     ngx_pool_cleanup_t    *cln;
     ngx_udp_connection_t  *uc;
@@ -171,24 +171,31 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 
         ngx_memzero(&u, sizeof(ngx_url_t));
 
-        u.host = names[i];
-        u.port = 53;
+        u.url = names[i];
+        u.default_port = 53;
 
-        if (ngx_inet_resolve_host(cf->pool, &u) != NGX_OK) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%V: %s", &u.host, u.err);
+        if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
+            if (u.err) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "%s in resolver \"%V\"",
+                                   u.err, &u.url);
+            }
+
             return NULL;
         }
 
-        uc = ngx_array_push(&r->udp_connections);
+        uc = ngx_array_push_n(&r->udp_connections, u.naddrs);
         if (uc == NULL) {
             return NULL;
         }
 
-        ngx_memzero(uc, sizeof(ngx_udp_connection_t));
+        ngx_memzero(uc, u.naddrs * sizeof(ngx_udp_connection_t));
 
-        uc->sockaddr = u.addrs->sockaddr;
-        uc->socklen = u.addrs->socklen;
-        uc->server = u.addrs->name;
+        for (j = 0; j < u.naddrs; j++) {
+            uc[j].sockaddr = u.addrs[j].sockaddr;
+            uc[j].socklen = u.addrs[j].socklen;
+            uc[j].server = u.addrs[j].name;
+        }
     }
 
     return r;
@@ -513,8 +520,10 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx)
 
         /* lock alloc mutex */
 
-        ngx_resolver_free_locked(r, rn->query);
-        rn->query = NULL;
+        if (rn->query) {
+            ngx_resolver_free_locked(r, rn->query);
+            rn->query = NULL;
+        }
 
         if (rn->cnlen) {
             ngx_resolver_free_locked(r, rn->u.cname);
@@ -970,12 +979,11 @@ ngx_resolver_resend(ngx_resolver_t *r, ngx_rbtree_t *tree, ngx_queue_t *queue)
 
         if (rn->waiting) {
 
-            if (ngx_resolver_send_query(r, rn) == NGX_OK) {
+            (void) ngx_resolver_send_query(r, rn);
 
-                rn->expire = now + r->resend_timeout;
+            rn->expire = now + r->resend_timeout;
 
-                ngx_queue_insert_head(queue, &rn->queue);
-            }
+            ngx_queue_insert_head(queue, q);
 
             continue;
         }
@@ -1033,7 +1041,7 @@ ngx_resolver_process_response(ngx_resolver_t *r, u_char *buf, size_t n)
     nan = (query->nan_hi << 8) + query->nan_lo;
 
     ngx_log_debug6(NGX_LOG_DEBUG_CORE, r->log, 0,
-                   "resolver DNS response %ui fl:%04Xui %ui/%ui/%ui/%ui",
+                   "resolver DNS response %ui fl:%04Xui %ui/%ui/%ud/%ud",
                    ident, flags, nqs, nan,
                    (query->nns_hi << 8) + query->nns_lo,
                    (query->nar_hi << 8) + query->nar_lo);
@@ -1409,6 +1417,9 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t last,
             ngx_resolver_free(r, addrs);
         }
 
+        ngx_resolver_free(r, rn->query);
+        rn->query = NULL;
+
         return;
 
     } else if (cname) {
@@ -1440,6 +1451,9 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t last,
 
             (void) ngx_resolve_name_locked(r, ctx);
         }
+
+        ngx_resolver_free(r, rn->query);
+        rn->query = NULL;
 
         return;
     }
@@ -1834,6 +1848,10 @@ ngx_resolver_create_name_query(ngx_resolver_node_t *rn, ngx_resolver_ctx_t *ctx)
     p--;
     *p-- = '\0';
 
+    if (ctx->name.len == 0)  {
+        return NGX_DECLINED;
+    }
+
     for (s = ctx->name.data + ctx->name.len - 1; s >= ctx->name.data; s--) {
         if (*s != '.') {
             *p = *s;
@@ -2172,7 +2190,7 @@ ngx_udp_connect(ngx_udp_connection_t *uc)
     ngx_socket_t       s;
     ngx_connection_t  *c;
 
-    s = ngx_socket(AF_INET, SOCK_DGRAM, 0);
+    s = ngx_socket(uc->sockaddr->sa_family, SOCK_DGRAM, 0);
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, &uc->log, 0, "UDP socket %d", s);
 
