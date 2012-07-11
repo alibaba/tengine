@@ -73,6 +73,16 @@ case ".$NGX_HTTP_LOG_PATH" in
 esac
 
 
+case ".$NGX_DSO_PATH" in
+    ./*)
+    ;;
+
+    *)
+        NGX_DSO_PATH=$NGX_PREFIX/$NGX_DSO_PATH
+    ;;
+esac
+
+
 if test -f man/nginx.8 ; then
     NGX_MAN=man/nginx.8
 else
@@ -96,8 +106,27 @@ $NGX_OBJS/nginx.8:	$NGX_MAN $NGX_AUTO_CONFIG_H
 		-e "s|%%ERROR_LOG_PATH%%|${NGX_ERROR_LOG_PATH:-stderr}|" \\
 		< $NGX_MAN > \$@
 
+END
+
+if test -n "$NGX_SHARED_MODULES"; then
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+install:	all \
+		$NGX_INSTALL_PERL_MODULES
+END
+
+else
+cat << END                                                    >> $NGX_MAKEFILE
+
 install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 		$NGX_INSTALL_PERL_MODULES
+END
+
+fi
+
+cat << END                                                    >> $NGX_MAKEFILE
+
 	test -d '\$(DESTDIR)$NGX_PREFIX' || mkdir -p '\$(DESTDIR)$NGX_PREFIX'
 
 	test -d '\$(DESTDIR)`dirname "$NGX_SBIN_PATH"`' \
@@ -168,6 +197,34 @@ if test -n "$NGX_ERROR_LOG_PATH"; then
 
 	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
+END
+
+fi
+
+
+if [ $NGX_DSO = YES ] ; then
+
+    cat << END                                                >> $NGX_MAKEFILE
+	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
+		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
+END
+
+    for ngx_dso_module in $NGX_DSO_ALL_TARGETS
+    do
+        cat << END                                                >> $NGX_MAKEFILE
+
+	cp $ngx_dso_module \$(DESTDIR)$NGX_DSO_PATH
+
+END
+    done
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_order' \
+		|| cp $NGX_MODULE_ORDER '\$(DESTDIR)$NGX_CONF_PREFIX'
+	cp $NGX_MODULE_ORDER '\$(DESTDIR)$NGX_CONF_PREFIX/module_order'
+	chmod 0755 $NGX_DSO_COMPILE
+	cp $NGX_DSO_COMPILE '$NGX_PREFIX/sbin'
 END
 
 fi
