@@ -1,0 +1,24 @@
+
+# Copyright (C) Igor Sysoev
+# Copyright (C) Nginx, Inc.
+
+
+CFLAGS =	-c -zq -bt=nt -ot -op -oi -oe -s -bm $(CPU_OPT)
+PCREFLAGS =	-DHAVE_CONFIG_H -DPCRE_STATIC -DPOSIX_MALLOC_THRESHOLD=10
+
+
+pcre.lib:
+	cd $(PCRE)
+
+	wcl386 $(CFLAGS) -i=. $(PCREFLAGS) pcre_*.c
+
+	dir /b *.obj > pcre.lst
+
+	wlib -n pcre.lib @pcre.lst
+
+pcre.h:
+	cd $(PCRE)
+
+	copy /y pcre.h.generic pcre.h
+	copy /y config.h.generic config.h
+	copy /y pcre_chartables.c.dist pcre_chartables.c
