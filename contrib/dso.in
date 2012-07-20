@@ -27,6 +27,7 @@ do
 
     case "$option" in
         --help)                          help=yes                       ;;
+        --h)                             help=yes                       ;;
 
         --prefix=)                       NGX_DSO_PREFIX="!"             ;;
         --prefix=*)                      NGX_DSO_PREFIX="$value"        ;;
@@ -54,9 +55,9 @@ cat << END
 
   --prefix=PATH                      set module installation prefix
 
-  --add-module=PATH                  external module of will compile;;
+  --add-module=PATH                  external module of will compile
 
-  --with-nginx-source=NGX_SOURCE_HOM set nginx source path;;
+  --with-nginx-source=NGX_SOURCE_HOM set nginx source path
 
 END
 
@@ -333,7 +334,7 @@ if test -n "$NGX_DSO_ADDONS"; then
         fi
     done
 else
-    echo "please assign module path"
+    echo "please specify the module path"
     exit 1
 fi
 

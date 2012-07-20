@@ -538,7 +538,7 @@ ngx_show_dso_modules(ngx_conf_t *cf)
         module_name = dl_m[i].name;
         module = dl_m[i].module;
 
-        ngx_log_stderr(0, "    %V (shared), version (%d.%d)",
+        ngx_log_stderr(0, "    %V (shared), require nginx version (%d.%d)",
                        &module_name, module->major_version, module->minor_version);
     }
 }
