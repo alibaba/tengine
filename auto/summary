@@ -97,6 +97,10 @@ cat << END
   nginx http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"
 END
 
+if [ $NGX_DSO = YES ]; then
+    echo "  nginx dso module path: \"$NGX_DSO_PATH\""
+fi
+
 if [ $HTTP_PROXY = YES ]; then
     echo "  nginx http proxy temporary files: \"$NGX_HTTP_PROXY_TEMP_PATH\""
 fi

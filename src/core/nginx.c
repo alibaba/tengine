@@ -187,9 +187,9 @@ ngx_module_t  ngx_core_module = {
 ngx_uint_t          ngx_max_module;
 ngx_uint_t          ngx_dump_config;
 
+
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
-static ngx_uint_t   ngx_show_modules;
 static ngx_uint_t   ngx_show_configure;
 static ngx_uint_t   ngx_show_directives;
 static u_char      *ngx_prefix;
@@ -270,14 +270,6 @@ main(int argc, char *const *argv)
                 "configure arguments:" NGX_CONFIGURE NGX_LINEFEED);
         }
 
-        if (ngx_show_modules) {
-            ngx_log_stderr(0, "compiled in modules:");
-
-            for (i = 0; ngx_module_names[i]; i++) {
-                ngx_log_stderr(0, "    %s", ngx_module_names[i]);
-            }
-        }
-
         if (ngx_show_directives) {
             ngx_log_stderr(0, "all available directives:");
 
@@ -295,7 +287,7 @@ main(int argc, char *const *argv)
             }
         }
 
-        if(!ngx_test_config) {
+        if(!ngx_test_config && !ngx_show_modules) {
             return 0;
         }
     }
@@ -379,6 +371,10 @@ main(int argc, char *const *argv)
                            cycle->conf_file.data);
         }
 
+        return 0;
+    }
+
+    if (ngx_show_modules) {
         return 0;
     }
 
