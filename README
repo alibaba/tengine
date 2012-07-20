@@ -9,5 +9,7 @@ Basic usage:
         --with-dtrace=/usr/sbin/dtrace \
         ...
 
+For now, only tested on Solaris 11.
+
 The original Nginx documentation is available at http://nginx.org
 
