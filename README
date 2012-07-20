@@ -1,3 +1,13 @@
 
-Documentation is available at http://nginx.org
+This is an Nginx fork that adds dtrace USDT probes.
+
+This is still under development and not usable yet.
+
+Basic usage:
+
+    ./configure --with-dtrace-probes \
+        --with-dtrace=/usr/sbin/dtrace \
+        ...
+
+The original Nginx documentation is available at http://nginx.org
 
