@@ -64,8 +64,11 @@ fi
 
 
 if [ $ngx_found = yes ]; then
-    CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
-
+   if [ $HTTP_GEOIP_SHARED = YES ]; then
+       DSO_LIBS="$DSO_LIBS|$HTTP_GEOIP_MODULE:$ngx_feature_libs"
+   else
+       CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+   fi
 else
 
 cat << END

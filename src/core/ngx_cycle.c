@@ -10,6 +10,11 @@
 #include <ngx_event.h>
 
 
+#if (NGX_DSO)
+void ngx_show_dso_modules(ngx_conf_t *cf);
+#endif
+
+
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
 static ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, struct sockaddr *sa2);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
@@ -26,6 +31,7 @@ static ngx_event_t     ngx_cleaner_event;
 
 ngx_uint_t             ngx_test_config;
 ngx_uint_t             ngx_quiet_mode;
+ngx_uint_t             ngx_show_modules;
 
 #if (NGX_THREADS)
 ngx_tls_key_t          ngx_core_tls_key;
@@ -273,6 +279,20 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
+    }
+
+    if (ngx_show_modules) {
+        ngx_log_stderr(0, "loaded modules:");
+
+        for (i = 0; ngx_module_names[i]; i++) {
+            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
+        }
+
+#if (NGX_DSO)
+        ngx_show_dso_modules(&conf);
+#endif
+        ngx_destroy_cycle_pools(&conf);
+        return cycle;
     }
 
     if (ngx_test_config && !ngx_quiet_mode) {
