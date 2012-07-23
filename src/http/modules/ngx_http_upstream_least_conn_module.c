@@ -203,6 +203,16 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
             continue;
         }
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                       "get least_conn peer, check_index: %ui",
+                       peer->check_index);
+
+        if (ngx_http_upstream_check_peer_down(peer->check_index)) {
+            continue;
+        }
+#endif
+
         if (peer->max_fails
             && peer->fails >= peer->max_fails
             && now - peer->checked <= peer->fail_timeout)
@@ -255,6 +265,16 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
             if (peer->down) {
                 continue;
             }
+
+#if (NGX_HTTP_UPSTREAM_CHECK)
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                           "get least_conn peer, check_index: %ui",
+                           peer->check_index);
+
+            if (ngx_http_upstream_check_peer_down(peer->check_index)) {
+                continue;
+            }
+#endif
 
             if (lcp->conns[i] * best->weight != lcp->conns[p] * peer->weight) {
                 continue;
