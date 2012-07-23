@@ -39,6 +39,11 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_crypt.h"
 
 
+if [ $NGX_DTRACE = YES ]; then
+    CORE_DEPS="$CORE_DEPS objs/ngx_dtrace_provider.h"
+fi
+
+
 CORE_SRCS="src/core/nginx.c \
            src/core/ngx_log.c \
            src/core/ngx_palloc.c \
@@ -291,7 +296,8 @@ HTTP_DEPS="src/http/ngx_http.h \
            src/http/ngx_http_script.h \
            src/http/ngx_http_upstream.h \
            src/http/ngx_http_upstream_round_robin.h \
-           src/http/ngx_http_busy_lock.h"
+           src/http/ngx_http_busy_lock.h \
+           src/http/ngx_http_probe.h"
 
 HTTP_SRCS="src/http/ngx_http.c \
            src/http/ngx_http_core_module.c \

@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_http_probe.h>
 
 
 typedef struct {
@@ -2377,6 +2378,8 @@ ngx_http_subrequest(ngx_http_request_t *r,
     r->main->subrequests--;
 
     if (r->main->subrequests == 0) {
+        ngx_http_probe_subrequest_cycle(r, &uri, &args);
+
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "subrequests cycle while processing \"%V\"", uri);
         r->main->subrequests = 1;
@@ -2488,6 +2491,8 @@ ngx_http_subrequest(ngx_http_request_t *r,
     r->main->count++;
 
     *psr = sr;
+
+    ngx_http_probe_subrequest_start(sr);
 
     return ngx_http_post_request(sr, NULL);
 }

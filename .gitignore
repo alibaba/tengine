@@ -3,3 +3,4 @@
 *.swo
 objs
 Makefile
+tags
