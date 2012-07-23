@@ -11,10 +11,37 @@
 #define ngx_http_probe_subrequest_start(r)                                   \
     NGINX_HTTP_SUBREQUEST_START(r)
 
+#define ngx_http_probe_subrequest_finalize_writing(r)                        \
+    NGINX_HTTP_SUBREQUEST_FINALIZE_WRITING(r)
+
+#define ngx_http_probe_subrequest_finalize_nonactive(r)                      \
+    NGINX_HTTP_SUBREQUEST_FINALIZE_NONACTIVE(r)
+
+#define ngx_http_probe_subrequest_finalize_nonactive(r)                      \
+    NGINX_HTTP_SUBREQUEST_FINALIZE_NONACTIVE(r)
+
+#define ngx_http_probe_subrequest_wake_parent(r)                             \
+    NGINX_HTTP_SUBREQUEST_WAKE_PARENT(r)
+
+#define ngx_http_probe_subrequest_done(r)                                    \
+    NGINX_HTTP_SUBREQUEST_DONE(r)
+
+#define ngx_http_probe_subrequest_post_start(r, rc)                          \
+    NGINX_HTTP_SUBREQUEST_POST_START(r, rc)
+
+#define ngx_http_probe_subrequest_post_done(r, rc)                               \
+    NGINX_HTTP_SUBREQUEST_POST_DONE(r, rc)
+
 #else /* !(NGX_DTRACE) */
 
 #define ngx_http_probe_subrequest_cycle(pr, uri, args)
-#define ngx_http_probe_subrequest_start(r)                       \
+#define ngx_http_probe_subrequest_start(r)
+#define ngx_http_probe_subrequest_finalize_writing(r)
+#define ngx_http_probe_subrequest_finalize_nonactive(r)
+#define ngx_http_probe_subrequest_wake_parent(r)
+#define ngx_http_probe_subrequest_done(r)
+#define ngx_http_probe_subrequest_post_start(r, rc)
+#define ngx_http_probe_subrequest_post_done(r, rc)
 
 #endif /* NGX_DTRACE */
 

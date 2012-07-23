@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_http_probe.h>
 
 
 static void ngx_http_init_request(ngx_event_t *ev);
@@ -1959,7 +1960,11 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 
     if (r != r->main && r->post_subrequest) {
+        ngx_http_probe_subrequest_post_start(r, rc);
+
         rc = r->post_subrequest->handler(r, r->post_subrequest->data, rc);
+
+        ngx_http_probe_subrequest_post_done(r, rc);
     }
 
     if (rc == NGX_ERROR
@@ -2009,6 +2014,8 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
         if (r->buffered || r->postponed) {
 
+            ngx_http_probe_subrequest_finalize_writing(r);
+
             if (ngx_http_set_write_handler(r) != NGX_OK) {
                 ngx_http_terminate_request(r, 0);
             }
@@ -2045,9 +2052,13 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
                 pr->postponed = pr->postponed->next;
             }
 
+            ngx_http_probe_subrequest_done(r);
+
             c->data = pr;
 
         } else {
+
+            ngx_http_probe_subrequest_finalize_nonactive(r);
 
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http finalize non-active request: \"%V?%V\"",
@@ -2059,6 +2070,8 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
                 r->done = 1;
             }
         }
+
+        ngx_http_probe_subrequest_wake_parent(r);
 
         if (ngx_http_post_request(pr, NULL) != NGX_OK) {
             r->main->count++;
