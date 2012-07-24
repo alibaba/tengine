@@ -6,3 +6,4 @@ Makefile
 tags
 build.sh
 test.stp
+gen-patch
