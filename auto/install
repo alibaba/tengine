@@ -16,6 +16,20 @@ END
 fi
 
 
+case ".$NGX_STAP_NGX_PATH" in
+    ./*)
+    ;;
+
+    .)
+        NGX_STAP_NGX_PATH=$NGX_PREFIX/sbin/stap-nginx
+    ;;
+
+    *)
+        NGX_STAP_NGX_PATH=$NGX_PREFIX/$NGX_STAP_NGX_PATH
+    ;;
+esac
+
+
 case ".$NGX_SBIN_PATH" in
     ./*)
     ;;
@@ -168,6 +182,11 @@ if [ $NGX_DTRACE = YES ]; then
 	test -d '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`'
 	cp $NGX_OBJS/nginx.stp '\$(DESTDIR)$NGX_TAPSET_PATH'
+
+	test -d '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`' || \
+		mkdir -p '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`'
+	cp $NGX_OBJS/stap-nginx '\$(DESTDIR)$NGX_STAP_NGX_PATH'
+	chmod 0755 '\$(DESTDIR)$NGX_STAP_NGX_PATH'
 END
 
 fi
@@ -186,9 +205,11 @@ if [ $NGX_DTRACE = YES ]; then
     cat << END                                                >> $NGX_MAKEFILE
 
 $NGX_OBJS${ngx_dirsep}nginx.stp: src/dtrace/nginx.stp
-	sed -e "s!NGX_SBIN_PATH!$NGX_SBIN_PATH!g" src/dtrace/nginx.stp > $NGX_OBJS${ngx_dirsep}nginx.stp
-END
+	sed -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" src/dtrace/nginx.stp > $NGX_OBJS${ngx_dirsep}nginx.stp
 
+$NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
+	sed -e "s|NGX_STAP_NGX_PATH|$NGX_STAP_NGX_PATH|g" $ngx_long_cont -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
+END
 fi
 
 
