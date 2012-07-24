@@ -4,3 +4,5 @@
 objs
 Makefile
 tags
+build.sh
+test.stp
