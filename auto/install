@@ -53,6 +53,16 @@ case ".$NGX_PID_PATH" in
 esac
 
 
+case ".$NGX_TAPSET_PATH" in
+    ./* | .)
+    ;;
+
+    *)
+        NGX_TAPSET_PATH=$NGX_PREFIX/$NGX_TAPSET_PATH
+    ;;
+esac
+
+
 case ".$NGX_ERROR_LOG_PATH" in
     ./* | .)
     ;;
@@ -151,12 +161,32 @@ install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
 END
 
+if [ $NGX_DTRACE = YES ]; then
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -d '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`' || \
+		mkdir -p '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`'
+	cp $NGX_OBJS/nginx.stp '\$(DESTDIR)$NGX_TAPSET_PATH'
+END
+
+fi
 
 if test -n "$NGX_ERROR_LOG_PATH"; then
     cat << END                                                >> $NGX_MAKEFILE
 
 	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
+END
+
+fi
+
+
+if [ $NGX_DTRACE = YES ]; then
+    cat << END                                                >> $NGX_MAKEFILE
+
+$NGX_OBJS${ngx_dirsep}nginx.stp: src/dtrace/nginx.stp
+	sed -e "s!NGX_SBIN_PATH!$NGX_SBIN_PATH!g" src/dtrace/nginx.stp > $NGX_OBJS${ngx_dirsep}nginx.stp
 END
 
 fi

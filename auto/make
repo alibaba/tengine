@@ -196,7 +196,7 @@ $ngx_dtrace_obj: $ngx_dtrace_d $ngx_deps$ngx_spacer
 	\$(DTRACE) -xnolibs -G -o $ngx_dtrace_obj -s $ngx_dtrace_d $ngx_objs
 END
 
-    ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj"
+    ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj$ngx_long_cont$NGX_OBJS${ngx_dirsep}nginx.stp"
     ngx_objs="$ngx_objs$ngx_long_cont$ngx_dtrace_obj"
 fi
 

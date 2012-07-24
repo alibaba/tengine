@@ -1,0 +1,22 @@
+function ngx_http_req_uri(r)
+{
+    len = @cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->uri->len
+
+    if (len == 0) {
+        return ""
+    }
+
+    return user_string_n(@cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->uri->data, len)
+}
+
+function ngx_http_req_args(r)
+{
+    len = @cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->args->len
+
+    if (len == 0) {
+        return ""
+    }
+
+    return user_string_n(@cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->args->data, len)
+}
+
