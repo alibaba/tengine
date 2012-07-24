@@ -4696,7 +4696,7 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         for (j = 0; j < clcf->error_pages->nelts; j++) {
             if (err[j].status == status) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "error_page code \"%d\" duplicated",
+                                   "error_page code \"%i\" duplicated",
                                    status);
                 return NGX_CONF_ERROR;
             }
