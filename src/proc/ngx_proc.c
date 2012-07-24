@@ -461,7 +461,7 @@ ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
     if (priority != 0) {
         if (setpriority(PRIO_PROCESS, 0, (int) priority) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                          "process %V setpriority(%d) failed", &module->name,
+                          "process %V setpriority(%i) failed", &module->name,
                           priority);
         }
     }
@@ -662,7 +662,7 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                       "process channel command: %d", ch.command);
+                       "process channel command: %ui", ch.command);
 
         switch (ch.command) {
 
