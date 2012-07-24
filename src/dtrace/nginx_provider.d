@@ -15,3 +15,10 @@ provider nginx {
     probe http__subrequest__post__done(ngx_http_request_t *r, ngx_int_t rc);
 };
 
+
+#pragma D attributes Evolving/Evolving/Common      provider nginx provider
+#pragma D attributes Private/Private/Unknown       provider nginx module
+#pragma D attributes Private/Private/Unknown       provider nginx function
+#pragma D attributes Private/Private/Common        provider nginx name
+#pragma D attributes Evolving/Evolving/Common      provider nginx args
+
