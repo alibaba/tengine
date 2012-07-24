@@ -1,13 +1,38 @@
-
 This is an Nginx fork that adds dtrace USDT probes.
 
 This is still under development and not usable yet.
 
-Basic usage:
+Installation:
 
     ./configure --with-dtrace-probes \
         --with-dtrace=/usr/sbin/dtrace \
         ...
+    make
+    make install
+
+Usage on Linux (with systemtap):
+
+    # make the stap-nginx script visiable in your PATH
+    export PATH=/usr/local/nginx/sbin:$PATH
+
+    # list all the static probes available in your nginx
+    stap-nginx -L 'process("nginx").mark("*")'
+
+    # run the test.stp file
+    stap-nginx test.stp
+
+Sample test.stp file:
+
+    probe begin
+    {
+        print("Tracing.  Hit CTRL-C to stop.\n")
+    }
+
+    probe process("nginx").mark("http-subrequest-start")
+    {
+        printf("uri: %s?%s\n", ngx_http_req_uri($arg1),
+            ngx_http_req_args($arg1))
+    }
 
 For now, only tested on Solaris 11 Express and Fedora Linux 17.
 
