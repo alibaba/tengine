@@ -1,5 +1,6 @@
 #!/bin/sh
 
-export PATH=NGX_SBIN_DIR:$PATH
+PATH="NGX_SBIN_DIR:$PATH"
+export PATH
 exec stap -I "NGX_TAPSET_DIR" "$@"
 

@@ -1,6 +1,12 @@
 #ifndef _NGX_HTTP_PROBE_H_INCLUDED_
 #define _NGX_HTTP_PROBE_H_INCLUDED_
 
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_http.h>
+
+
 #if (NGX_DTRACE)
 
 #include <ngx_dtrace_provider.h>

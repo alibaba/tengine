@@ -92,6 +92,14 @@ else
     echo "  nginx logs errors to stderr"
 fi
 
+if [ $NGX_DTRACE = YES ]; then
+    cat << END
+  nginx dtrace static probes enabled
+  nginx systemtap tapset prefix: "$NGX_TAPSET_PREFIX"
+  nginx systemtap wrapper script: "$NGX_STAP_NGX_PATH"
+END
+fi
+
 cat << END
   nginx http access log file: "$NGX_HTTP_LOG_PATH"
   nginx http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"

@@ -67,12 +67,12 @@ case ".$NGX_PID_PATH" in
 esac
 
 
-case ".$NGX_TAPSET_PATH" in
+case ".$NGX_TAPSET_PREFIX" in
     ./* | .)
     ;;
 
     *)
-        NGX_TAPSET_PATH=$NGX_PREFIX/$NGX_TAPSET_PATH
+        NGX_TAPSET_PREFIX=$NGX_PREFIX/$NGX_TAPSET_PREFIX
     ;;
 esac
 
@@ -177,11 +177,26 @@ END
 
 if [ $NGX_DTRACE = YES ]; then
 
-    cat << END                                                >> $NGX_MAKEFILE
+    ngx_tapset_srcs="$NGX_TAPSET_SRCS"
 
-	test -d '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`' || \
-		mkdir -p '\$(DESTDIR)`dirname "$NGX_TAPSET_PATH"`'
-	cp $NGX_OBJS/nginx.stp '\$(DESTDIR)$NGX_TAPSET_PATH'
+        cat << END                                            >> $NGX_MAKEFILE
+	test -d '\$(DESTDIR)$NGX_TAPSET_PREFIX' || \
+		mkdir -p '\$(DESTDIR)$NGX_TAPSET_PREFIX'
+END
+
+    for ngx_tapset_src in $ngx_tapset_srcs
+    do
+        ngx_tapset_file=`basename $ngx_tapset_src`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+	sed -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
+                $ngx_tapset_src > '\$(DESTDIR)$NGX_TAPSET_PREFIX/$ngx_tapset_file'
+END
+
+    done
+
+    cat << END                                                >> $NGX_MAKEFILE
 
 	test -d '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`'
@@ -204,11 +219,8 @@ fi
 if [ $NGX_DTRACE = YES ]; then
     cat << END                                                >> $NGX_MAKEFILE
 
-$NGX_OBJS${ngx_dirsep}nginx.stp: src/dtrace/nginx.stp
-	sed -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" src/dtrace/nginx.stp > $NGX_OBJS${ngx_dirsep}nginx.stp
-
 $NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
-	sed -e "s|NGX_TAPSET_DIR|`dirname $NGX_TAPSET_PATH`|g" $ngx_long_cont -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
+	sed -e "s|NGX_TAPSET_DIR|`dirname $NGX_TAPSET_PREFIX`|g" $ngx_long_cont -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
 END
 fi
 

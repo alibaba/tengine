@@ -531,5 +531,7 @@ NGX_GOOGLE_PERFTOOLS_SRCS=src/misc/ngx_google_perftools_module.c
 
 NGX_CPP_TEST_SRCS=src/misc/ngx_cpp_test_module.cpp
 
-NGX_DTRACE_D=src/dtrace/nginx_provider.d
+NGX_DTRACE_PROVIDERS=src/dtrace/nginx_provider.d
+
+NGX_TAPSET_SRCS=src/dtrace/nginx.stp
 

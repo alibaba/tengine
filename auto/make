@@ -181,13 +181,23 @@ ngx_objs=`echo $ngx_all_objs $ngx_modules_obj \
           -e "s/\//$ngx_regex_dirsep/g"`
 
 if [ $NGX_DTRACE = YES ]; then
-    ngx_dtrace_obj=$NGX_OBJS${ngx_dirsep}ngx_dtrace_provider.$ngx_objext
-    ngx_dtrace_h=$NGX_OBJS${ngx_dirsep}ngx_dtrace_provider.h
-    ngx_dtrace_d=$NGX_DTRACE_D
 
-cat << END                                                    >> $NGX_MAKEFILE
+    ngx_dtrace_obj=$NGX_OBJS${ngx_dirsep}ngx_dtrace_provider.$ngx_objext
+
+    ngx_dtrace_h=$NGX_OBJS${ngx_dirsep}ngx_dtrace_provider.h
+
+    ngx_dtrace_d=$NGX_OBJS${ngx_dirsep}dtrace_providers.d
+
+    ngx_dtrace_providers=`echo $NGX_DTRACE_PROVIDERS \
+        | sed -e "s/  *\([^ ][^ ]*\)/$ngx_long_regex_cont\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
+    cat << END                                                >> $NGX_MAKEFILE
 
 all: $NGX_OBJS${ngx_dirsep}nginx${ngx_binext}
+
+$ngx_dtrace_d: $ngx_dtrace_providers
+	cat $ngx_dtrace_providers > $ngx_dtrace_d
 
 $ngx_dtrace_h: $ngx_dtrace_d
 	\$(DTRACE) -xnolibs -h -o $ngx_dtrace_h -s $ngx_dtrace_d
@@ -196,7 +206,7 @@ $ngx_dtrace_obj: $ngx_dtrace_d $ngx_deps$ngx_spacer
 	\$(DTRACE) -xnolibs -G -o $ngx_dtrace_obj -s $ngx_dtrace_d $ngx_objs
 END
 
-    ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj$ngx_long_cont$NGX_OBJS${ngx_dirsep}nginx.stp$ngx_long_cont$NGX_OBJS${ngx_dirsep}stap-nginx"
+    ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj$ngx_long_cont$NGX_OBJS${ngx_dirsep}stap-nginx"
     ngx_objs="$ngx_objs$ngx_long_cont$ngx_dtrace_obj"
 fi
 
