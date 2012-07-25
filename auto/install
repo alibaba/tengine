@@ -208,7 +208,7 @@ $NGX_OBJS${ngx_dirsep}nginx.stp: src/dtrace/nginx.stp
 	sed -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" src/dtrace/nginx.stp > $NGX_OBJS${ngx_dirsep}nginx.stp
 
 $NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
-	sed -e "s|NGX_STAP_NGX_PATH|$NGX_STAP_NGX_PATH|g" $ngx_long_cont -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
+	sed -e "s|NGX_TAPSET_DIR|`dirname $NGX_TAPSET_PATH`|g" $ngx_long_cont -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
 END
 fi
 
