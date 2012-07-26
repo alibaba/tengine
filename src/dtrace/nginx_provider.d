@@ -1,6 +1,8 @@
 typedef struct { int dummy; } ngx_http_request_t;
 typedef struct { int dummy; } ngx_str_t;
 typedef int64_t ngx_int_t;
+typedef struct { int dummy; } ngx_module_t;
+typedef struct { int dummy; } ngx_http_module_t;
 
 
 provider nginx {
@@ -13,6 +15,7 @@ provider nginx {
     probe http__subrequest__done(ngx_http_request_t *r);
     probe http__subrequest__post__start(ngx_http_request_t *r, ngx_int_t rc);
     probe http__subrequest__post__done(ngx_http_request_t *r, ngx_int_t rc);
+    probe http__module__post__config(ngx_module_t *m);
 };
 
 

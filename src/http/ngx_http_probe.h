@@ -35,8 +35,11 @@
 #define ngx_http_probe_subrequest_post_start(r, rc)                          \
     NGINX_HTTP_SUBREQUEST_POST_START(r, rc)
 
-#define ngx_http_probe_subrequest_post_done(r, rc)                               \
+#define ngx_http_probe_subrequest_post_done(r, rc)                           \
     NGINX_HTTP_SUBREQUEST_POST_DONE(r, rc)
+
+#define ngx_http_probe_module_post_config(m)                                 \
+    NGINX_HTTP_MODULE_POST_CONFIG(m)
 
 #else /* !(NGX_DTRACE) */
 
@@ -48,6 +51,7 @@
 #define ngx_http_probe_subrequest_done(r)
 #define ngx_http_probe_subrequest_post_start(r, rc)
 #define ngx_http_probe_subrequest_post_done(r, rc)
+#define ngx_http_probe_module_post_config(m)
 
 #endif /* NGX_DTRACE */
 

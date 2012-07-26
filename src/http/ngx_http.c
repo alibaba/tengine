@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_http_probe.h>
 
 
 static char *ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
@@ -307,6 +308,9 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         module = ngx_modules[m]->ctx;
 
         if (module->postconfiguration) {
+
+            ngx_http_probe_module_post_config(ngx_modules[m]);
+
             if (module->postconfiguration(cf) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }

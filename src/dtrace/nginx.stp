@@ -1,3 +1,6 @@
+/* tapset for nginx */
+
+/* retrieve the request uri string from the ngx_http_request_t pointer */
 function ngx_http_req_uri(r)
 {
     len = @cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->uri->len
@@ -9,6 +12,8 @@ function ngx_http_req_uri(r)
     return user_string_n(@cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->uri->data, len)
 }
 
+
+/* retrieve the request query string from the ngx_http_request_t pointer */
 function ngx_http_req_args(r)
 {
     len = @cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->args->len
@@ -18,5 +23,24 @@ function ngx_http_req_args(r)
     }
 
     return user_string_n(@cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->args->data, len)
+}
+
+
+/* retrieve the first command name (or directive name) from
+ * the ngx_module_t pointer */
+function ngx_http_module_cmd(m)
+{
+    cmds = @cast(m, "ngx_module_t", "NGX_SBIN_PATH")->commands
+    if (cmds == 0) {
+        return ""
+    }
+
+    len = @cast(cmds, "ngx_command_t", "NGX_SBIN_PATH")->name->len
+
+    if (len == 0) {
+        return ""
+    }
+
+    return user_string_n(@cast(cmds, "ngx_command_t", "NGX_SBIN_PATH")->name->data, len)
 }
 
