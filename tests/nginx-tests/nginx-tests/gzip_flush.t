@@ -64,14 +64,9 @@ $t->run();
 
 like(http_get('/'), qr/DATA/, 'request with flush');
 
-TODO: {
-local $TODO = 'not yet';
-
-# gzip filter doesn't properly handle empty flush buffers, see
+# gzip filter wasn't able to handle empty flush buffers, see
 # http://nginx.org/pipermail/nginx/2010-November/023693.html
 
 http_gzip_like(http_gzip_request('/'), qr/DATA/, 'gzip request with flush');
-
-}
 
 ###############################################################################
