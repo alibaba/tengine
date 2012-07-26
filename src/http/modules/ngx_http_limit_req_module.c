@@ -302,7 +302,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
         ngx_log_debug5(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "limit_req module: %i %ui.%03ui "
-                       "hash is %ui total_len is %i",
+                       "hash is %D total_len is %uz",
                        rc, excess / 1000, excess % 1000, hash, total_len);
 
         /* first limit_req */
@@ -400,7 +400,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         delay_time = (ngx_msec_t) delay_excess * 1000 / ctx->rate;
         ngx_log_error(lrcf->delay_log_level, r->connection->log, 0,
                       "delaying request,"
-                      "excess: %ui.%03ui, by zone \"%V\", delay \"%ui\" s",
+                      "excess: %ui.%03ui, by zone \"%V\", delay \"%M\" s",
                       delay_excess / 1000, delay_excess % 1000,
                       &limit_req[delay_postion].shm_zone->shm.name, delay_time);
 
@@ -566,7 +566,7 @@ ngx_http_limit_req_lookup(ngx_http_request_t *r,
         }
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "limit_req lookup is : %i, size is %i",
+                       "limit_req lookup is : %i, size is %ui",
                        rc, ctx->limit_vars->nelts);
 
         if (rc == 0) {

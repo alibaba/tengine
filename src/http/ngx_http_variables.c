@@ -2012,7 +2012,7 @@ ngx_http_variables_time_fmt(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%02d", t) - p;
+    v->len = ngx_sprintf(p, "%02i", t) - p;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
