@@ -317,7 +317,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    p = ngx_snprintf(pri, 5, "<%d>", facility + loglevel);
+    p = ngx_snprintf(pri, 5, "<%i>", facility + loglevel);
     log->syslog->syslog_pri.len = p - pri;
     log->syslog->syslog_pri.data = ngx_pcalloc(pool, p - pri);
     if (log->syslog->syslog_pri.data == NULL) {

@@ -68,11 +68,17 @@ $t->run();
 
 like(http_get('/'), qr!401 Unauthorized!ms, 'rejects unathorized');
 
+SKIP: {
+
+skip 'no crypt on win32', 4 if $^O eq 'MSWin32';
+
 like(http_get_auth('/', 'crypt', 'password'), qr!SEETHIS!, 'normal crypt');
 unlike(http_get_auth('/', 'crypt', '123'), qr!SEETHIS!, 'normal wrong');
 
 like(http_get_auth('/', 'crypt1', 'password'), qr!SEETHIS!, 'crypt $1$ (md5)');
 unlike(http_get_auth('/', 'crypt1', '123'), qr!SEETHIS!, 'crypt $1$ wrong');
+
+}
 
 like(http_get_auth('/', 'apr1', 'password'), qr!SEETHIS!, 'apr1 md5');
 like(http_get_auth('/', 'plain', 'password'), qr!SEETHIS!, 'plain password');
