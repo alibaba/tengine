@@ -10,6 +10,6 @@ TEST_NGINX_DSO=1 TEST_NGINX_BINARY=/path/to/nginx/sbin/nginx prove cases
 TEST_NGINX_DSO=1 TEST_NGINX_BINARY=/path/to/nginx/sbin/nginx prove dso-nginx-tests
 
 2. Add the dso module to the test script (The example module shared library should be under the modules directory):
-$t->set_dso("ngx_http_example_module", "lib_ngx_http_example_module.so");
+$t->set_dso("ngx_http_example_module", "ngx_http_example_module.so");
 ...
 %%TEST_GLOBALS_DSO%%

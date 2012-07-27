@@ -26,10 +26,10 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http secure_link/)->plan(8);
 
-$t->set_dso("ngx_http_secure_link_module", "lib_ngx_http_secure_link_module.so");
-$t->set_dso("ngx_http_fastcgi_module", "lib_ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "lib_ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "lib_ngx_http_scgi_module.so");
+$t->set_dso("ngx_http_secure_link_module", "ngx_http_secure_link_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 

@@ -31,9 +31,9 @@ local $SIG{PIPE} = 'IGNORE';
 my $t = Test::Nginx->new()
 	->has(qw/mail imap http rewrite/)->plan(9);
 
-$t->set_dso("ngx_http_fastcgi_module", "lib_ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "lib_ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "lib_ngx_http_scgi_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
 
 $t->run_daemon(\&Test::Nginx::IMAP::imap_test_daemon)
   ->write_file_expand('nginx.conf', <<'EOF')->run();

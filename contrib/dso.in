@@ -153,8 +153,8 @@ END
 
     cat << END                                                    >> $NGX_DSO_MAKEFILE
 
-$NGX_OBJS${ngx_dirsep}lib_${dso_binout}${ngx_soext}:	$ngx_deps$ngx_spacer
-	\$(LINK) ${ngx_long_start}${ngx_binout} $NGX_OBJS${ngx_dirsep}lib_${dso_binout}${ngx_soext}$ngx_long_cont$ngx_objs$ngx_libs$ngx_link
+$NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext}:	$ngx_deps$ngx_spacer
+	\$(LINK) ${ngx_long_start}${ngx_binout} $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext}$ngx_long_cont$ngx_objs$ngx_libs$ngx_link
 	$ngx_rcc
 ${ngx_long_end}
 END
@@ -187,9 +187,9 @@ END
 
     make -f $NGX_DSO_MAKEFILE
     if test -n "$NGX_DSO_PREFIX"; then
-        cp $NGX_OBJS${ngx_dirsep}lib_${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
+        cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
     else
-        cp $NGX_OBJS${ngx_dirsep}lib_${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
+        cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
     fi
 }
 

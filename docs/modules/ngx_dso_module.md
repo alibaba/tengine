@@ -20,12 +20,12 @@ Exampe
 
     dso_path /home/nginx-dso/module/;
 
-    dso_load ngx_http_hat_filter_module  lib_ngx_http_hat_filter_module.so;
-    dso_load ngx_http_lua_module   lib_ngx_http_lua_module.so;
-    dso_load ngx_http_addition_filter_module lib_ngx_http_addition_filter_module.so;
-    dso_load ngx_http_concat_module  lib_ngx_http_concat_module.so;
-    dso_load ngx_http_empty_gif_module  lib_ngx_http_empty_gif_module.so;
-    dso_load ngx_http_image_filter_module lib_ngx_http_image_filter_module.so;
+    dso_load ngx_http_hat_filter_module  ngx_http_hat_filter_module.so;
+    dso_load ngx_http_lua_module   ngx_http_lua_module.so;
+    dso_load ngx_http_addition_filter_module ngx_http_addition_filter_module.so;
+    dso_load ngx_http_concat_module  ngx_http_concat_module.so;
+    dso_load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
+    dso_load ngx_http_image_filter_module ngx_http_image_filter_module.so;
 
 Directives
 ==========
@@ -99,7 +99,7 @@ There are three possibility with the module_path. It will search the module in b
 
 Example:
 
-    dso_load ngx_http_empty_gif_module  lib_ngx_http_empty_gif_module.so;
+    dso_load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
 
 load empty_gif module from lib\_ngx\_http\_empty\_gif\_module.so.
 

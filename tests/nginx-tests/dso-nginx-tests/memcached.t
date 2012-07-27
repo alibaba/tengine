@@ -27,10 +27,10 @@ plan(skip_all => 'Cache::Memcached not installed') if $@;
 my $t = Test::Nginx->new()->has(qw/http rewrite memcached/)
 	->has_daemon('memcached')->plan(4);
 
-$t->set_dso("ngx_http_memcached_module", "lib_ngx_http_memcached_module.so");
-$t->set_dso("ngx_http_fastcgi_module", "lib_ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "lib_ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "lib_ngx_http_scgi_module.so");
+$t->set_dso("ngx_http_memcached_module", "ngx_http_memcached_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 

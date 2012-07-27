@@ -23,10 +23,10 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http xslt/)->plan(5);
 
-$t->set_dso("ngx_http_xslt_filter_module", "lib_ngx_http_xslt_filter_module.so");
-$t->set_dso("ngx_http_fastcgi_module", "lib_ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "lib_ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "lib_ngx_http_scgi_module.so");
+$t->set_dso("ngx_http_xslt_filter_module", "ngx_http_xslt_filter_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 

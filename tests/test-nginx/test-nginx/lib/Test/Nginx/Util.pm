@@ -330,7 +330,7 @@ sub include_dso_modules ($) {
             }
         }
 
-        my $dso_module_lib = $modules_dir . "/lib_" . $name . ".so";
+        my $dso_module_lib = $modules_dir . $name . ".so";
 
         if (-f "$dso_module_lib") {
             push @DSO_modules, [$name, $dso_module_lib];

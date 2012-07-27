@@ -31,9 +31,9 @@ local $SIG{PIPE} = 'IGNORE';
 my $t = Test::Nginx->new()
 	->has(qw/mail pop3 http rewrite/)->plan(8);
 
-$t->set_dso("ngx_http_fastcgi_module", "lib_ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "lib_ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "lib_ngx_http_scgi_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
 
 $t->run_daemon(\&Test::Nginx::POP3::pop3_test_daemon)
   ->write_file_expand('nginx.conf', <<'EOF')->run();
