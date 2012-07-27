@@ -110,3 +110,41 @@ function ngx_pool_cleanup_file_name(c)
     return user_string(@cast(c, "ngx_pool_cleanup_file_t", "NGX_SBIN_PATH")->name)
 }
 
+
+function ngx_http_req_content_length(r)
+{
+    return @cast(r, "ngx_http_request_t", "NGX_SBIN_PATH")->headers_in->content_length_n
+}
+
+
+function ngx_http_req_body_temp_file_name(r)
+{
+    rb = @cast(r, "ngx_http_request_t", "NGX_SBIN_PATH")->request_body
+    if (!rb) {
+        return ""
+    }
+
+    tf = @cast(rb, "ngx_http_request_body_t", "NGX_SBIN_PATH")->temp_file
+    if (!tf) {
+        return ""
+    }
+
+    return user_string(@cast(tf, "ngx_temp_file_t", "NGX_SBIN_PATH")->file->name)
+}
+
+
+function ngx_table_elt_key(e)
+{
+    len = @cast(e, "ngx_table_elt_t", "NGX_SBIN_PATH")->key->len
+
+    return user_string_n(@cast(e, "ngx_table_elt_t", "NGX_SBIN_PATH")->key->data, len)
+}
+
+
+function ngx_table_elt_value(e)
+{
+    len = @cast(e, "ngx_table_elt_t", "NGX_SBIN_PATH")->value->len
+
+    return user_string_n(@cast(e, "ngx_table_elt_t", "NGX_SBIN_PATH")->value->data, len)
+}
+
