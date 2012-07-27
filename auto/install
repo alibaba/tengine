@@ -222,6 +222,7 @@ if [ $NGX_DTRACE = YES ]; then
 $NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
 	sed -e "s|NGX_TAPSET_PREFIX|$NGX_TAPSET_PREFIX|g" $ngx_long_cont \
             -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont \
+            -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
             src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
 END
 fi
