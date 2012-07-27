@@ -31,8 +31,6 @@ struct ngx_event_pipe_s {
     ngx_chain_t      **last_in;
 
     ngx_chain_t       *out;
-    ngx_chain_t      **last_out;
-
     ngx_chain_t       *free;
     ngx_chain_t       *busy;
 
@@ -66,6 +64,7 @@ struct ngx_event_pipe_s {
     ssize_t            busy_size;
 
     off_t              read_length;
+    off_t              length;
 
     off_t              max_temp_file_size;
     ssize_t            temp_file_write_size;

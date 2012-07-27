@@ -72,6 +72,7 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_crypt.c"
 
 
+REGEX_MODULE=ngx_regex_module
 REGEX_DEPS=src/core/ngx_regex.h
 REGEX_SRCS=src/core/ngx_regex.c
 
@@ -159,6 +160,7 @@ UNIX_DEPS="$CORE_DEPS $EVENT_DEPS \
             src/os/unix/ngx_channel.h \
             src/os/unix/ngx_shmem.h \
             src/os/unix/ngx_process.h \
+            src/os/unix/ngx_setaffinity.h \
             src/os/unix/ngx_setproctitle.h \
             src/os/unix/ngx_atomic.h \
             src/os/unix/ngx_gcc_atomic_x86.h \
@@ -461,8 +463,8 @@ HTTP_MEMCACHED_MODULE=ngx_http_memcached_module
 HTTP_MEMCACHED_SRCS=src/http/modules/ngx_http_memcached_module.c
 
 
-HTTP_LIMIT_ZONE_MODULE=ngx_http_limit_zone_module
-HTTP_LIMIT_ZONE_SRCS=src/http/modules/ngx_http_limit_zone_module.c
+HTTP_LIMIT_CONN_MODULE=ngx_http_limit_conn_module
+HTTP_LIMIT_CONN_SRCS=src/http/modules/ngx_http_limit_conn_module.c
 
 
 HTTP_LIMIT_REQ_MODULE=ngx_http_limit_req_module
@@ -496,8 +498,10 @@ HTTP_SYSGUARD_SRCS=src/http/modules/ngx_http_sysguard_module.c
 HTTP_FLV_MODULE=ngx_http_flv_module
 HTTP_FLV_SRCS=src/http/modules/ngx_http_flv_module.c
 
+
 HTTP_SLICE_MODULE=ngx_http_slice_module
 HTTP_SLICE_SRCS=src/http/modules/ngx_http_slice_module.c
+
 
 HTTP_MP4_MODULE=ngx_http_mp4_module
 HTTP_MP4_SRCS=src/http/modules/ngx_http_mp4_module.c
@@ -513,6 +517,16 @@ HTTP_UPSTREAM_IP_HASH_SRCS=src/http/modules/ngx_http_upstream_ip_hash_module.c
 
 HTTP_UPSTREAM_CHECK_MODULE=ngx_http_upstream_check_module
 HTTP_UPSTREAM_CHECK_SRCS=src/http/ngx_http_upstream_check_module.c
+
+
+HTTP_UPSTREAM_LEAST_CONN_MODULE=ngx_http_upstream_least_conn_module
+HTTP_UPSTREAM_LEAST_CONN_SRCS=" \
+    src/http/modules/ngx_http_upstream_least_conn_module.c"
+
+
+HTTP_UPSTREAM_KEEPALIVE_MODULE=ngx_http_upstream_keepalive_module
+HTTP_UPSTREAM_KEEPALIVE_SRCS=" \
+    src/http/modules/ngx_http_upstream_keepalive_module.c"
 
 
 MAIL_INCS="src/mail"

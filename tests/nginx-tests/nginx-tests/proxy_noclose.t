@@ -73,14 +73,15 @@ $t->run();
 
 ###############################################################################
 
-TODO: {
-local $TODO = 'not fixed yet, patches under review';
-local $SIG{__WARN__} = sub {};
-
 like(http_get('/'), qr/SEE-THIS/, 'request to bad backend');
 like(http_get('/multi'), qr/AND-THIS/, 'bad backend - multiple packets');
-like(http_get('/nolen'), qr/SEE-THIS/, 'bad backend - no content length');
 like(http_get('/uselen'), qr/SEE-THIS/, 'content-length actually used');
+
+TODO: {
+local $TODO = 'not yet';
+local $SIG{__WARN__} = sub {};
+
+like(http_get('/nolen'), qr/SEE-THIS/, 'bad backend - no content length');
 
 }
 

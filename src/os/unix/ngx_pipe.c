@@ -199,7 +199,7 @@ ngx_open_pipes(ngx_cycle_t *cycle)
         stat = ngx_open_pipe(cycle, &ngx_pipes[i]);
 
         ngx_log_debug4(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                       "pipe: %p(%d, %d) \"%s\"",
+                       "pipe: %ui(%d, %d) \"%s\"",
                        i, ngx_pipes[i].pfd[0],
                        ngx_pipes[i].pfd[1], ngx_pipes[i].cmd);
 

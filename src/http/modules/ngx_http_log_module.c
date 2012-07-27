@@ -110,8 +110,8 @@ static ssize_t ngx_http_log_script_write(ngx_http_request_t *r,
 
 static u_char *ngx_http_log_connection(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
-static u_char *ngx_http_log_conn_requests(ngx_http_request_t *r, u_char *buf,
-    ngx_http_log_op_t *op);
+static u_char *ngx_http_log_connection_requests(ngx_http_request_t *r,
+    u_char *buf, ngx_http_log_op_t *op);
 static u_char *ngx_http_log_pipe(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static u_char *ngx_http_log_time(ngx_http_request_t *r, u_char *buf,
@@ -247,8 +247,8 @@ static ngx_str_t  ngx_http_combined_fmt =
 
 static ngx_http_log_var_t  ngx_http_log_vars[] = {
     { ngx_string("connection"), NGX_ATOMIC_T_LEN, ngx_http_log_connection },
-    { ngx_string("conn_requests"), NGX_ATOMIC_T_LEN,
-                          ngx_http_log_conn_requests },
+    { ngx_string("connection_requests"), NGX_INT_T_LEN,
+                          ngx_http_log_connection_requests },
     { ngx_string("pipe"), 1, ngx_http_log_pipe },
     { ngx_string("time_local"), sizeof("28/Sep/1970:12:00:00 +0600") - 1,
                           ngx_http_log_time },
@@ -261,7 +261,7 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
                           ngx_http_log_request_time_msec },
     { ngx_string("request_time_usec"), NGX_TIME_T_LEN,
                           ngx_http_log_request_time_usec },
-    { ngx_string("status"), 3, ngx_http_log_status },
+    { ngx_string("status"), NGX_INT_T_LEN, ngx_http_log_status },
     { ngx_string("bytes_sent"), NGX_OFF_T_LEN, ngx_http_log_bytes_sent },
     { ngx_string("body_bytes_sent"), NGX_OFF_T_LEN,
                           ngx_http_log_body_bytes_sent },
@@ -479,6 +479,8 @@ ngx_http_log_script_write(ngx_http_request_t *r, ngx_http_log_script_t *script,
     ngx_http_log_loc_conf_t   *llcf;
     ngx_http_core_loc_conf_t  *clcf;
 
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
     if (!r->root_tested) {
 
         /* test root directory existence */
@@ -490,8 +492,6 @@ ngx_http_log_script_write(ngx_http_request_t *r, ngx_http_log_script_t *script,
 
         path.data[root] = '\0';
 
-        clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
         ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 
         of.valid = clcf->open_file_cache_valid;
@@ -500,6 +500,11 @@ ngx_http_log_script_write(ngx_http_request_t *r, ngx_http_log_script_t *script,
         of.test_only = 1;
         of.errors = clcf->open_file_cache_errors;
         of.events = clcf->open_file_cache_events;
+
+        if (ngx_http_set_disable_symlinks(r, clcf, &path, &of) != NGX_OK) {
+            /* simulate successful logging */
+            return len;
+        }
 
         if (ngx_open_cached_file(clcf->open_file_cache, &path, &of, r->pool)
             != NGX_OK)
@@ -547,6 +552,11 @@ ngx_http_log_script_write(ngx_http_request_t *r, ngx_http_log_script_t *script,
     of.valid = llcf->open_file_cache_valid;
     of.min_uses = llcf->open_file_cache_min_uses;
     of.directio = NGX_OPEN_FILE_DIRECTIO_OFF;
+
+    if (ngx_http_set_disable_symlinks(r, clcf, &log, &of) != NGX_OK) {
+        /* simulate successful logging */
+        return len;
+    }
 
     if (ngx_open_cached_file(llcf->open_file_cache, &log, &of, r->pool)
         != NGX_OK)
@@ -597,12 +607,12 @@ static u_char *
 ngx_http_log_connection(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op)
 {
-    return ngx_sprintf(buf, "%ui", r->connection->number);
+    return ngx_sprintf(buf, "%uA", r->connection->number);
 }
 
 
 static u_char *
-ngx_http_log_conn_requests(ngx_http_request_t *r, u_char *buf,
+ngx_http_log_connection_requests(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op)
 {
     return ngx_sprintf(buf, "%ui", r->connection->requests);
@@ -740,16 +750,13 @@ ngx_http_log_status(ngx_http_request_t *r, u_char *buf, ngx_http_log_op_t *op)
         status = r->headers_out.status;
 
     } else if (r->http_version == NGX_HTTP_VERSION_9) {
-        *buf++ = '0';
-        *buf++ = '0';
-        *buf++ = '9';
-        return buf;
+        status = 9;
 
     } else {
         status = 0;
     }
 
-    return ngx_sprintf(buf, "%ui", status);
+    return ngx_sprintf(buf, "%03ui", status);
 }
 
 
@@ -1237,7 +1244,7 @@ rest:
 
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid parameter \"%V\"", &value[i]);
+                               "invalid buffer value \"%V\"", &name);
             return NGX_CONF_ERROR;
         }
     }
@@ -1563,7 +1570,7 @@ ngx_http_log_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             s.data = value[i].data + 9;
 
             inactive = ngx_parse_time(&s, 1);
-            if (inactive < 0) {
+            if (inactive == (time_t) NGX_ERROR) {
                 goto failed;
             }
 
@@ -1586,7 +1593,7 @@ ngx_http_log_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             s.data = value[i].data + 6;
 
             valid = ngx_parse_time(&s, 1);
-            if (valid < 0) {
+            if (valid == (time_t) NGX_ERROR) {
                 goto failed;
             }
 

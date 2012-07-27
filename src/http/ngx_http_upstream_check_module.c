@@ -85,7 +85,7 @@ typedef struct {
 
 
     ngx_shmtx_t                              mutex;
-    ngx_atomic_t                             lock;
+    ngx_shmtx_sh_t                           lock;
 
     ngx_atomic_t                             down;
 
@@ -721,8 +721,8 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     interval = ngx_current_msec - peer->shm->access_time;
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, event->log, 0,
-                   "http check begin handler index:%ud, owner: %d, "
-                   "ngx_pid: %ud, interval:%ud, check_interval:%ud",
+                   "http check begin handler index: %ui, owner: %P, "
+                   "ngx_pid: %P, interval: %M, check_interval: %M",
                    peer->index, peer->shm->owner,
                    ngx_pid, interval,
                    ucscf->check_interval);
@@ -839,7 +839,7 @@ ngx_http_upstream_check_peek_handler(ngx_event_t *event)
     err = ngx_socket_errno;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
-                   "http check upstream recv(): %d, fd: %d",
+                   "http check upstream recv(): %i, fd: %d",
                    n, c->fd);
 
     if (n >= 0 || err == NGX_EAGAIN) {
@@ -923,7 +923,7 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
 
         err = (size >=0) ? 0 : ngx_socket_errno;
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
-                       "http check send size: %d, total: %d",
+                       "http check send size: %z, total: %z",
                        size, ctx->send.last - ctx->send.pos);
         }
 #endif
@@ -956,7 +956,8 @@ static void
 ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 {
     u_char                         *new_buf;
-    ssize_t                         size, n, rc;
+    ssize_t                         size, n;
+    ngx_int_t                       rc;
     ngx_connection_t               *c;
     ngx_http_upstream_check_ctx_t  *ctx;
     ngx_http_upstream_check_peer_t *peer;
@@ -1018,7 +1019,7 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 
         err = (size >= 0) ? 0 : ngx_socket_errno;
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
-                       "http check recv size: %d, peer: %V",
+                       "http check recv size: %z, peer: %V",
                        size, &peer->peer_addr->name);
         }
 #endif
@@ -1037,7 +1038,7 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
     rc = peer->parse(peer);
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check parse rc: %d, peer: %V",
+                   "http check parse rc: %i, peer: %V",
                    rc, &peer->peer_addr->name);
 
     switch (rc) {
@@ -1098,7 +1099,8 @@ ngx_http_upstream_check_http_init(ngx_http_upstream_check_peer_t *peer)
 static ngx_int_t
 ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 {
-    ngx_int_t                            rc, code, code_n;
+    ngx_int_t                            rc;
+    ngx_uint_t                           code, code_n;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
@@ -1136,7 +1138,7 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
         }
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                       "http_parse: code_n: %d, conf: %d",
+                       "http_parse: code_n: %ui, conf: %ui",
                        code_n, ucscf->code.status_alive);
 
         if (code_n & ucscf->code.status_alive) {
@@ -1400,9 +1402,8 @@ ngx_http_upstream_check_ssl_hello_parse(ngx_http_upstream_check_peer_t *peer)
     resp = (ngx_ssl_server_hello_t *) ctx->recv.pos;
 
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "http check ssl_parse, type: %d, version: %d.%d, "
-                   "length: %d, handshanke_type: %d, "
-                   "hello_version: %d.%d",
+                   "http check ssl_parse, type: %ud, version: %ud.%ud, "
+                   "length: %ud, handshanke_type: %ud, hello_version: %ud.%ud",
                    resp->msg_type, resp->version.major, resp->version.minor,
                    ntohs(resp->length), resp->handshake_type,
                    resp->hello_version.major, resp->hello_version.minor);
@@ -1470,7 +1471,7 @@ ngx_http_upstream_check_mysql_parse(ngx_http_upstream_check_peer_t *peer)
     handshake = (ngx_mysql_handshake_init_t *) ctx->recv.pos;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "mysql_parse: packet_number=%d, protocol=%d, server=%s",
+                   "mysql_parse: packet_number=%ud, protocol=%ud, server=%s",
                    handshake->packet_number, handshake->protocol_version,
                    handshake->others);
 
@@ -1538,7 +1539,7 @@ ngx_http_upstream_check_ajp_parse(ngx_http_upstream_check_peer_t *peer)
 
     ajp = (ngx_ajp_raw_packet_t *) p;
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ajp_parse: preamble=0x%xd, length=0x%xd, type=0x%xd",
+                   "ajp_parse: preamble=0x%uxd, length=0x%uxd, type=0x%uxd",
                    ntohs(ajp->preamble), ntohs(ajp->length), ajp->type);
     }
 #endif
@@ -1600,7 +1601,7 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
     c = peer->pc.connection;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check clean event: index:%d, fd: %d",
+                   "http check clean event: index:%i, fd: %d",
                    peer->index, c->fd);
 
     ngx_close_connection(c);
@@ -2523,11 +2524,11 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
         return NGX_ERROR;
     }
 
-    (void) ngx_sprintf(file, "%V%V%Z", &ngx_cycle->lock_file, name->name);
+    (void) ngx_sprintf(file, "%V%V%Z", &ngx_cycle->lock_file, name);
 
 #endif
 
-    if (ngx_shmtx_create(&psh->mutex, (void *) &psh->lock, file) != NGX_OK) {
+    if (ngx_shmtx_create(&psh->mutex, &psh->lock, file) != NGX_OK) {
         return NGX_ERROR;
     }
 

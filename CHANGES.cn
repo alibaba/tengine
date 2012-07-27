@@ -1,3 +1,13 @@
+
+Tengine-1.3.1 [2012-07-27]
+* Feature：error_page可以被重设为默认错误页面 [jinglong]
+* Change：合并nginx-1.0.15至nginx-1.2.2之间的修改 [shudu, wenjing]
+* Change：加入搜狗公司的版权 [Lanshun Zhou, shudu]
+* Bugfix：修正procs模块中因为没有配置该模块而出现的段错误 [yuanzhuo]
+* Bugfix：修正procs模块中优先级的bug [yuanzhuo]
+* Bugfix：修正limit_req命令的格式bug [diaoliang]
+* Bugfix：修正Tengine中的日志中变量格式问题 [wenjing]
+
 Tengine-1.3.0 [2012-05-25]
 * Feature：加入Lua模块，可以在配置中使用Lua语言 [chaoslawful, agentzh]
 * Feature：加入procs模块，可以更方便的开启独立进程 [yuanzhuo]

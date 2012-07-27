@@ -26,7 +26,7 @@ __DATA__
     location / {
         proxy_pass https://test;
     }
-
+   
 --- request
 GET /
 --- response_body_like: ^<(.*)>[\r\n\s\t]*$
@@ -70,3 +70,24 @@ GET /
 --- request
 GET /
 --- response_body_like: ^<(.*)>[\r\n\s\t]*$
+
+=== TEST 4: the ssl_hello_check test with least_conn
+--- http_config
+    upstream test{
+        server www.alipay.com:443;
+        server www.alipay.com:444;
+        server www.alipay.com:445;
+        least_conn;
+
+        check interval=4000 rise=1 fall=5 timeout=2000 type=ssl_hello;
+    }
+
+--- config
+    location / {
+        proxy_pass https://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>[\r\n\s\t]*$
+

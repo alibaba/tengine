@@ -64,8 +64,8 @@ volatile ngx_thread_t  ngx_threads[NGX_MAX_THREADS];
 ngx_int_t              ngx_threads_n;
 #endif
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
-cpu_set_t             *cpu_affinity;
+#if (NGX_HAVE_CPU_AFFINITY)
+CPU_SET_T             *cpu_affinity;
 #endif
 
 static u_char  master_process[] = "master process";
@@ -389,7 +389,7 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     for (i = 0; i < n; i++) {
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
+#if (NGX_HAVE_CPU_AFFINITY)
         cpu_affinity = ngx_get_cpu_affinity(i);
 #endif
 
@@ -753,6 +753,8 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 #endif
 
     ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
@@ -889,8 +891,8 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_uint_t priority)
     ngx_core_conf_t  *ccf;
     ngx_listening_t  *ls;
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
-    u_char            buf[2 * sizeof(cpu_set_t) + 1];
+#if (NGX_HAVE_CPU_AFFINITY)
+    u_char            buf[2 * sizeof(CPU_SET_T) + 1];
     u_char           *p;
 #endif
 
@@ -966,10 +968,10 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_uint_t priority)
         }
     }
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
+#if (NGX_HAVE_CPU_AFFINITY)
 
     if (cpu_affinity) {
-        n = ngx_min(sizeof(cpu_set_t) - 1, 7);
+        n = ngx_min(sizeof(CPU_SET_T) - 1, 7);
         for (p = buf; n >= 0; n--) {
             p = ngx_snprintf(p, 2, "%02Xd", *((u_char *) cpu_affinity + n));
         }
@@ -979,7 +981,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_uint_t priority)
         ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
                       "sched_setaffinity(0x%s)", buf);
 
-        if (sched_setaffinity(0, sizeof(cpu_set_t), cpu_affinity) == -1) {
+        if (ngx_setaffinity(cpu_affinity) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "sched_setaffinity(0x%s) failed", buf);
         }
@@ -1131,6 +1133,8 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 #endif
 
     ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
