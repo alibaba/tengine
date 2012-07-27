@@ -861,6 +861,8 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
 #endif
 
+            ngx_http_probe_read_req_line_done(r);
+
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http request line: \"%V\"", &r->request_line);
 
@@ -1105,6 +1107,8 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
                 return;
             }
+
+            ngx_http_probe_read_req_header_done(r, h);
 
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http header: \"%V: %V\"",

@@ -3,6 +3,7 @@ typedef struct { int dummy; } ngx_str_t;
 typedef int64_t ngx_int_t;
 typedef struct { int dummy; } ngx_module_t;
 typedef struct { int dummy; } ngx_http_module_t;
+typedef struct { int dummy; } ngx_table_elt_t;
 
 
 provider nginx {
@@ -18,6 +19,8 @@ provider nginx {
     probe http__module__post__config(ngx_module_t *m);
     probe http__read__body__abort(ngx_request_t *r, char *reason);
     probe http__read__body__done(ngx_request_t *r);
+    probe http__read__req__line__done(ngx_request_t *r);
+    probe http__read__req__header__done(ngx_request_t *r, ngx_table_elt_t *h);
 };
 
 
