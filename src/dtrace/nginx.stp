@@ -129,7 +129,9 @@ function ngx_http_req_body_temp_file_name(r)
         return ""
     }
 
-    return user_string(@cast(tf, "ngx_temp_file_t", "NGX_SBIN_PATH")->file->name)
+    len = @cast(tf, "ngx_temp_file_t", "NGX_SBIN_PATH")->file->name->len
+
+    return user_string_n(@cast(tf, "ngx_temp_file_t", "NGX_SBIN_PATH")->file->name->data, len)
 }
 
 
