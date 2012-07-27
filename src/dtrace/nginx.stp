@@ -44,3 +44,69 @@ function ngx_http_module_cmd(m)
     return user_string_n(@cast(cmds, "ngx_command_t", "NGX_SBIN_PATH")->name->data, len)
 }
 
+
+function ngx_chain_buf(cl)
+{
+    return @cast(cl, "ngx_chain_t", "NGX_SBIN_PATH")->buf
+}
+
+
+function ngx_buf_in_memory(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->temporary
+        || @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->memory
+        || @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->mmap
+}
+
+
+function ngx_buf_pos(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->pos
+}
+
+
+function ngx_buf_file_pos(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->file_pos
+}
+
+
+function ngx_buf_last(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->last
+}
+
+
+function ngx_buf_file_last(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->file_last
+}
+
+
+function ngx_buf_end(b)
+{
+    return @cast(b, "ngx_buf_t", "NGX_SBIN_PATH")->end
+}
+
+
+function ngx_buf_size(b)
+{
+    if (ngx_buf_in_memory(b)) {
+        return ngx_buf_last(b) - ngx_buf_pos(b)
+    }
+
+    return ngx_buf_file_last(b) - ngx_buf_file_pos(b)
+}
+
+
+function ngx_buf_data(b)
+{
+    return user_string_n(ngx_buf_pos(b), ngx_buf_last(b) - ngx_buf_pos(b))
+}
+
+
+function ngx_pool_cleanup_file_name(c)
+{
+    return user_string(@cast(c, "ngx_pool_cleanup_file_t", "NGX_SBIN_PATH")->name)
+}
+

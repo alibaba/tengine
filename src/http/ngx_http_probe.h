@@ -41,6 +41,12 @@
 #define ngx_http_probe_module_post_config(m)                                 \
     NGINX_HTTP_MODULE_POST_CONFIG(m)
 
+#define ngx_http_probe_read_body_abort(r, reason)                            \
+    NGINX_HTTP_READ_BODY_ABORT(r, reason)
+
+#define ngx_http_probe_read_body_done(r)                                     \
+    NGINX_HTTP_READ_BODY_DONE(r)
+
 #else /* !(NGX_DTRACE) */
 
 #define ngx_http_probe_subrequest_cycle(pr, uri, args)
@@ -52,6 +58,8 @@
 #define ngx_http_probe_subrequest_post_start(r, rc)
 #define ngx_http_probe_subrequest_post_done(r, rc)
 #define ngx_http_probe_module_post_config(m)
+#define ngx_http_probe_read_body_abort(r, reason)
+#define ngx_http_probe_read_body_done(r)
 
 #endif /* NGX_DTRACE */
 
