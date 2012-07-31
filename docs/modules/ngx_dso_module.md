@@ -12,39 +12,77 @@ Description
 
 * DSO loaded module will limit to 128.
 
+* DSO just support HTTP module;
+
 * This module are tested successfully in Linux/FreeeBSD/MacOS.
 
 
 Exampe
 ===========
 
-    dso_path /home/nginx-dso/module/;
+    worker_processes  1;
+    
+    dso {
+         path /home/nginx-dso/module/;
+         load ngx_http_lua_module             ngx_http_lua_module.so;
+         load ngx_http_access_module          ngx_http_access_module.so;
+         load ngx_http_flv_module             ngx_http_flv_module.so;
+         load ngx_http_memcached_module       ngx_http_memcached_module.so;
+         load ngx_http_sub_filter_module      ngx_http_sub_filter_module.so;
+         load ngx_http_addition_filter_module ngx_http_addition_filter_module.so;
+         load ngx_http_footer_filter_module   ngx_http_footer_filter_module.so;
+    }
 
-    dso_load ngx_http_hat_filter_module  ngx_http_hat_filter_module.so;
-    dso_load ngx_http_lua_module   ngx_http_lua_module.so;
-    dso_load ngx_http_addition_filter_module ngx_http_addition_filter_module.so;
-    dso_load ngx_http_concat_module  ngx_http_concat_module.so;
-    dso_load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
-    dso_load ngx_http_image_filter_module ngx_http_image_filter_module.so;
+    events {
+       worker_connections  1024;
+    }
 
 Directives
 ==========
 
-dso_order
--------------
+load
+------------------------
 
-**Syntax**: *dso_order {.....}*
+**Syntax**: *load module_name module_path*
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *dso*
+
+The load directive links in the object file or library filename and adds the module structure named module to the list of active modules,module\_name is the name of the DSO module, module\_path is the path of the DSO module.
+
+There are three possibility with the module_path. It will search the module in below order.
+
+1 absolute path.
+2 relative to path that path directive.
+3 relative to default path(NGX\_PREFIX/modules or path which is specified with --dso-path when configure).
+
+
+Example:
+
+    load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
+
+load empty_gif module from lib\_ngx\_http\_empty\_gif\_module.so.
+
+
+order
+-------------
+
+**Syntax**: *order file*
+
+**Default**: *none*
+
+**Context**: *dso*
 
 
 This directive can insert your module to nginx' module order list(please see conf/module_order). Be careful, it will change the module runtime order. This directive does not need to be set in most cases.
 
 Example:
 
-     dso_order {
+     order module_order;
+     
+in module_order file:
+ 
         ngx_core_module;
         ngx_errlog_module;
         ngx_conf_module;
@@ -57,51 +95,26 @@ Example:
         .......................
         ngx_http_addition_filter_module;
         ngx_http_my_filter_module;
-    }
 
 this will insert my\_filter before addition\_filter module.
 
 
-dso_path
+path
 ------------------------
 
-**Syntax**: *dso_path path*
+**Syntax**: *path path*
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *dso*
 
 The dso_path set default path for DSO module
 
 Example:
 
-    dso_path /home/dso/module/;
+    path /home/dso/module/;
 
 Set default path to /home/dso/module/.
-
-dso_load
-------------------------
-
-**Syntax**: *dso_load module_name module_path*
-
-**Default**: *none*
-
-**Context**: *main*
-
-The dso_load directive links in the object file or library filename and adds the module structure named module to the list of active modules,module\_name is the name of the DSO module, module\_path is the path of the DSO module.
-
-There are three possibility with the module_path. It will search the module in below order.
-
-1 absolute path.
-2 relative to path that dso_path directive.
-3 relative to default path(NGX\_PREFIX/modules or path which is specified with --dso-path when configure).
-
-
-Example:
-
-    dso_load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
-
-load empty_gif module from lib\_ngx\_http\_empty\_gif\_module.so.
 
 
 Tools

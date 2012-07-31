@@ -341,17 +341,19 @@ sub include_dso_modules ($) {
 }
 
 sub write_dso_config () {
-    my $content = <<EOC;
-dso_order {
-    "ngx_core_module";
-}
-EOC
+#     my $content = <<EOC;
+# dso_order {
+#     "ngx_core_module";
+# }
+# EOC
 
+    $content .= "dso {\n";
     for my $module (@DSO_modules) {
         my ($name, $lib) = @$module;
 
         $content .= "dso_load $name $lib;\n";
     }
+    $content .= "}\n";
 
     return $content;
 }

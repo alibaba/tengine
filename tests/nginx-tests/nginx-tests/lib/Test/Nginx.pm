@@ -299,9 +299,11 @@ sub test_globals_dso() {
 
         my $s = '';
         
+        $s .= "dso {\n";
         while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
-          $s .= "dso_load $key $value;\n";
+          $s .= "load $key $value;\n";
         }
+        $s .= "}\n";
 
         $self->{_test_globals_dso} = $s;
 }

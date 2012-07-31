@@ -779,13 +779,9 @@ if [ $NGX_DSO = YES ] ; then
 
 END
 
-
-    echo 'dso_order {'                            > $NGX_MODULE_ORDER
-
-    for mod in $NGX_ALL_MODULES
+for mod in $NGX_ALL_MODULES
     do
-        echo "    $mod;"                          >> $NGX_MODULE_ORDER
+        echo "$mod;"                          >> $NGX_MODULE_ORDER
     done
-    echo '}'                                      >> $NGX_MODULE_ORDER
 
 fi
