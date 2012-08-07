@@ -330,7 +330,7 @@ sub include_dso_modules ($) {
             }
         }
 
-        my $dso_module_lib = $modules_dir . $name . ".so";
+        my $dso_module_lib = $modules_dir . "/" . $name . ".so";
 
         if (-f "$dso_module_lib") {
             push @DSO_modules, [$name, $dso_module_lib];
@@ -341,17 +341,13 @@ sub include_dso_modules ($) {
 }
 
 sub write_dso_config () {
-#     my $content = <<EOC;
-# dso_order {
-#     "ngx_core_module";
-# }
-# EOC
+    my $content;
 
     $content .= "dso {\n";
     for my $module (@DSO_modules) {
         my ($name, $lib) = @$module;
 
-        $content .= "dso_load $name $lib;\n";
+        $content .= "load $name $lib;\n";
     }
     $content .= "}\n";
 
