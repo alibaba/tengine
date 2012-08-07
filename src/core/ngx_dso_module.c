@@ -595,20 +595,16 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
 
     if (ctx->order == NULL || ctx->order->nelts == 0) {
 
-        for (i = 0; ngx_all_module_names[i]; i++) {
+        for (i = 1; ngx_all_module_names[i]; i++) {
             len1 = ngx_strlen(ngx_all_module_names[i]);
             if (len1 == module_name.len
                && ngx_strncmp(ngx_all_module_names[i], module_name.data, len1) == 0)
             {
-                if (near < ctx->flag_postion) {
+                if (near <= ctx->flag_postion) {
                     ++ctx->flag_postion;
                 }
 
                 return near;
-            }
-
-            if (i == 0) {
-                continue;
             }
 
             len2 = ngx_strlen(ngx_all_module_names[i - 1]);
@@ -632,19 +628,15 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
     name = ctx->order->elts;
     near = ctx->flag_postion;
 
-    for (i = 0; i < ctx->order->nelts; i++) {
+    for (i = 1; i < ctx->order->nelts; i++) {
         if (name[i].len == module_name.len
            && ngx_strncmp(name[i].data, module_name.data, name[i].len) == 0)
         {
-            if (near < ctx->flag_postion) {
+            if (near <= ctx->flag_postion) {
                 ++ctx->flag_postion;
             }
 
             return near;
-        }
-
-        if (i == 0) {
-            continue;
         }
 
         for (k = 0; ngx_module_names[k]; k++) {
