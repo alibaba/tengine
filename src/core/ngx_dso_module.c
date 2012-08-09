@@ -41,7 +41,8 @@ static char *ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 static ngx_int_t ngx_dso_get_position(ngx_str_t *module_entry);
 
-static ngx_int_t ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name);
+static ngx_int_t ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx,
+    ngx_str_t module_name);
 
 
 static ngx_command_t  ngx_dso_module_commands[] = {
@@ -88,7 +89,7 @@ static ngx_str_t ngx_default_modules_prefix = ngx_string(NGX_DSO_PATH);
 static ngx_dso_flagpole_t module_flagpole[] = {
 
     { ngx_string("filter"), ngx_string("ngx_http_copy_filter_module")},
-    {ngx_null_string, ngx_null_string}
+    { ngx_null_string, ngx_null_string}
 };
 
 
@@ -121,29 +122,31 @@ ngx_dso_cleanup(void *data)
     ngx_cycle_t       *cycle = data;
 
     ngx_uint_t                           i;
-    ngx_dso_module_t                    *old_dl_m;
-    ngx_dso_conf_ctx_t                  *old_ctx;
+    ngx_dso_module_t                    *dl_m;
+    ngx_dso_conf_ctx_t                  *ctx;
 
     if (cycle != ngx_cycle) {
 
-        if (cycle->old_cycle->conf_ctx) {
-            old_ctx = (ngx_dso_conf_ctx_t *) cycle->old_cycle->conf_ctx[ngx_dso_module.index];
+        if (cycle->conf_ctx) {
+            ctx = (ngx_dso_conf_ctx_t *)
+                   cycle->conf_ctx[ngx_dso_module.index];
 
-            if (old_ctx != NULL) {
-                old_dl_m = old_ctx->modules->elts;
+            if (ctx != NULL) {
+                dl_m = ctx->modules->elts;
 
-                for (i = 0; i < old_ctx->modules->nelts; i++) {
-                    if (old_dl_m[i].name.len == 0) {
+                for (i = 0; i < ctx->modules->nelts; i++) {
+                    if (dl_m[i].name.len == 0) {
                         continue;
                     }
 
-                    dlclose(old_dl_m[i].dl_handle);
+                    dlclose(dl_m[i].dl_handle);
                 }
             }
         }
 
         ngx_memzero(ngx_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_modules, ngx_old_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
+        ngx_memcpy(ngx_modules, ngx_old_modules,
+                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
     }
 }
 
@@ -318,8 +321,7 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
                                  &value[1], &value[2]);
-    if (rc == NGX_DECLINED)
-    {
+    if (rc == NGX_DECLINED) {
         return NGX_CONF_OK;
     }
 
@@ -365,10 +367,11 @@ ngx_dso_load(ngx_conf_t *cf)
            || dl_m[i].module->minor_version > NGX_NUMBER_MINOR)
         {
             ngx_log_stderr(0,"Module \"%V\" is not compatible with this "
-                           "version of Tengine (found %d.%d, need %d.%d). Please "
-                           "contact the vendor for the correct version.",
+                           "version of Tengine (found %d.%d, need %d.%d)."
+                           " Please contact the vendor for the correct version.",
                            &dl_m[i].name, dl_m[i].module->major_version,
-                           dl_m[i].module->minor_version, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR);
+                           dl_m[i].module->minor_version, NGX_NUMBER_MAJOR,
+                           NGX_NUMBER_MINOR);
             return NGX_CONF_ERROR;
         }
 
@@ -376,7 +379,6 @@ ngx_dso_load(ngx_conf_t *cf)
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso find postion(%i)", postion);
 
-        /* ngx_log_stderr(0, "dso find  postion(%i)", postion); */
         rv = ngx_dso_insert_module(dl_m[i].module, postion);
         if (rv == NGX_CONF_ERROR) {
             ngx_log_stderr(0, "dso find error postion(%i)", postion);
@@ -517,11 +519,15 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (ngx_is_init_cycle(cf->cycle->old_cycle)) {
         ngx_memzero(ngx_static_modules, sizeof(ngx_module_t *) * ngx_max_module);
-        ngx_memcpy(ngx_static_modules, ngx_modules, sizeof(ngx_module_t *) * ngx_max_module);
+        ngx_memcpy(ngx_static_modules, ngx_modules,
+                   sizeof(ngx_module_t *) * ngx_max_module);
     } else {
         ngx_memzero(ngx_old_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_old_modules, ngx_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_modules, ngx_static_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
+
+        ngx_memcpy(ngx_old_modules, ngx_modules,
+                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
+        ngx_memcpy(ngx_modules, ngx_static_modules,
+                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
     }
 
     pcf = *cf;
@@ -612,7 +618,8 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
                 len3 = ngx_strlen(ngx_module_names[k]);
 
                 if (len2 == len3
-                   && ngx_strncmp(ngx_all_module_names[i - 1], ngx_module_names[k], len2) == 0)
+                   && ngx_strncmp(ngx_all_module_names[i - 1],
+                                  ngx_module_names[k], len2) == 0)
                 {
                     near = k + 1;
                     break;
