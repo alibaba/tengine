@@ -5,6 +5,8 @@
 
 
 #include "ngx_http_lua_shdict.h"
+#include "ngx_http_lua_util.h"
+#include "ngx_http_lua_conf.h"
 
 
 static int ngx_http_lua_shdict_set(lua_State *L);
@@ -33,6 +35,9 @@ ngx_http_lua_shdict_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     size_t                      len;
     ngx_http_lua_shdict_ctx_t  *ctx;
+    ngx_http_lua_main_conf_t   *lmcf;
+
+    dd("init zone");
 
     ctx = shm_zone->data;
 
@@ -40,7 +45,7 @@ ngx_http_lua_shdict_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         ctx->sh = octx->sh;
         ctx->shpool = octx->shpool;
 
-        return NGX_OK;
+        goto done;
     }
 
     ctx->shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
@@ -48,7 +53,7 @@ ngx_http_lua_shdict_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     if (shm_zone->shm.exists) {
         ctx->sh = ctx->shpool->data;
 
-        return NGX_OK;
+        goto done;
     }
 
     ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_lua_shdict_shctx_t));
@@ -72,6 +77,24 @@ ngx_http_lua_shdict_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     ngx_sprintf(ctx->shpool->log_ctx, " in lua_shared_dict zone \"%V\"%Z",
                 &shm_zone->shm.name);
+
+done:
+    dd("get lmcf");
+
+    lmcf = ctx->main_conf;
+
+    dd("lmcf->lua: %p", lmcf->lua);
+
+    lmcf->shm_zones_inited++;
+
+    if (lmcf->shm_zones_inited == lmcf->shm_zones->nelts
+        && lmcf->init_handler)
+    {
+        if (lmcf->init_handler(ctx->log, lmcf, lmcf->lua) != 0) {
+            /* an error happened */
+            return NGX_ERROR;
+        }
+    }
 
     return NGX_OK;
 }
@@ -310,9 +333,6 @@ ngx_http_lua_inject_shdict_api(ngx_http_lua_main_conf_t *lmcf, lua_State *L)
 static int
 ngx_http_lua_shdict_get(lua_State *L)
 {
-#if (NGX_DEBUG)
-    ngx_http_request_t          *r;
-#endif
     int                          n;
     ngx_str_t                    name;
     ngx_str_t                    key;
@@ -361,11 +381,7 @@ ngx_http_lua_shdict_get(lua_State *L)
     hash = ngx_crc32_short(key.data, key.len);
 
 #if (NGX_DEBUG)
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
-    r = lua_touserdata(L, -1);
-    lua_pop(L, 1);
-
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ctx->log, 0,
                    "fetching key \"%V\" in shared dict \"%V\"", &key, &name);
 #endif /* NGX_DEBUG */
 
@@ -541,9 +557,6 @@ ngx_http_lua_shdict_set(lua_State *L)
 static int
 ngx_http_lua_shdict_set_helper(lua_State *L, int flags)
 {
-#if (NGX_DEBUG)
-    ngx_http_request_t          *r;
-#endif
     int                          i, n;
     ngx_str_t                    name;
     ngx_str_t                    key;
@@ -582,12 +595,6 @@ ngx_http_lua_shdict_set_helper(lua_State *L, int flags)
     ctx = zone->data;
 
     name = ctx->name;
-
-#if (NGX_DEBUG)
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
-    r = lua_touserdata(L, -1);
-    lua_pop(L, 1);
-#endif
 
     key.data = (u_char *) luaL_checklstring(L, 2, &key.len);
 
@@ -710,7 +717,7 @@ ngx_http_lua_shdict_set_helper(lua_State *L, int flags)
 replace:
         if (value.data && value.len == (size_t) sd->value_len) {
 
-            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ctx->log, 0,
                 "lua shared dict set: found old entry and value size matched, "
                 "reusing it");
 
@@ -747,7 +754,7 @@ replace:
             return 3;
         }
 
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ctx->log, 0,
             "lua shared dict set: found old entry bug value size NOT matched, "
             "removing it first");
 
@@ -775,7 +782,7 @@ insert:
         return 3;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ctx->log, 0,
         "lua shared dict set: creating a new entry");
 
     n = offsetof(ngx_rbtree_node_t, color)
@@ -787,7 +794,7 @@ insert:
 
     if (node == NULL) {
 
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ctx->log, 0,
             "lua shared dict set: overriding non-expired items due to memory "
             "shortage for entry \"%V\"", &name);
 

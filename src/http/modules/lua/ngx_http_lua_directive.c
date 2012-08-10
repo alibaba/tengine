@@ -14,7 +14,10 @@
 #include "ngx_http_lua_contentby.h"
 #include "ngx_http_lua_accessby.h"
 #include "ngx_http_lua_rewriteby.h"
+#include "ngx_http_lua_logby.h"
 #include "ngx_http_lua_headerfilterby.h"
+#include "ngx_http_lua_bodyfilterby.h"
+#include "ngx_http_lua_initby.h"
 #include "ngx_http_lua_shdict.h"
 
 #if defined(NDK) && NDK
@@ -22,16 +25,10 @@
 #endif
 
 
-unsigned  ngx_http_lua_requires_rewrite = 0;
-unsigned  ngx_http_lua_requires_access  = 0;
-unsigned  ngx_http_lua_requires_header_filter = 0;
-unsigned  ngx_http_lua_requires_capture_filter = 0;
-
-
 char *
 ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_lua_main_conf_t *lmcf = conf;
+    ngx_http_lua_main_conf_t   *lmcf = conf;
 
     ngx_str_t                  *value, name;
     ngx_shm_zone_t             *zone;
@@ -74,6 +71,8 @@ ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     ctx->name = name;
+    ctx->main_conf = lmcf;
+    ctx->log = &cf->cycle->new_log;
 
     zone = ngx_shared_memory_add(cf, &name, (size_t) size,
                                      &ngx_http_lua_module);
@@ -95,6 +94,8 @@ ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     zp = ngx_array_push(lmcf->shm_zones);
     *zp = zone;
+
+    lmcf->requires_shm = 1;
 
     return NGX_CONF_OK;
 }
@@ -169,17 +170,17 @@ ngx_http_lua_package_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 char *
 ngx_http_lua_set_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    u_char              *p;
     ngx_str_t           *value;
     ngx_str_t            target;
     ndk_set_var_t        filter;
-    u_char              *p;
 
     ngx_http_lua_set_var_data_t     *filter_data;
 
     /*
      * value[0] = "set_by_lua"
      * value[1] = target variable name
-     * value[2] = lua script to be executed
+     * value[2] = lua script source to be executed
      * value[3..] = real params
      * */
     value = cf->args->elts;
@@ -187,8 +188,7 @@ ngx_http_lua_set_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     filter.type = NDK_SET_VAR_MULTI_VALUE_DATA;
     filter.func = cmd->post;
-    filter.size = cf->args->nelts - 2;    /*  get number of real params
-                                              + 1 (lua script) */
+    filter.size = cf->args->nelts - 3;    /*  get number of real params */
 
     filter_data = ngx_palloc(cf->pool, sizeof(ngx_http_lua_set_var_data_t));
     if (filter_data == NULL) {
@@ -207,6 +207,58 @@ ngx_http_lua_set_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     p = ngx_copy(p, NGX_HTTP_LUA_INLINE_TAG, NGX_HTTP_LUA_INLINE_TAG_LEN);
     p = ngx_http_lua_digest_hex(p, value[2].data, value[2].len);
     *p = '\0';
+
+    filter_data->script = value[2];
+
+    filter.data = filter_data;
+
+    return ndk_set_var_multi_value_core(cf, &target, &value[3], &filter);
+}
+
+
+char *
+ngx_http_lua_set_by_lua_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    u_char              *p;
+    ngx_str_t           *value;
+    ngx_str_t            target;
+    ndk_set_var_t        filter;
+
+    ngx_http_lua_set_var_data_t     *filter_data;
+
+    /*
+     * value[0] = "set_by_lua_file"
+     * value[1] = target variable name
+     * value[2] = lua script file path to be executed
+     * value[3..] = real params
+     * */
+    value = cf->args->elts;
+    target = value[1];
+
+    filter.type = NDK_SET_VAR_MULTI_VALUE_DATA;
+    filter.func = cmd->post;
+    filter.size = cf->args->nelts - 2;    /*  get number of real params and
+                                              lua script */
+
+    filter_data = ngx_palloc(cf->pool, sizeof(ngx_http_lua_set_var_data_t));
+    if (filter_data == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    filter_data->size = filter.size;
+
+    p = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+    if (p == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    filter_data->key = p;
+
+    p = ngx_copy(p, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
+    p = ngx_http_lua_digest_hex(p, value[2].data, value[2].len);
+    *p = '\0';
+
+    ngx_str_null(&filter_data->script);
 
     filter.data = filter_data;
 
@@ -233,9 +285,10 @@ ngx_http_lua_filter_set_by_lua_inline(ngx_http_request_t *r, ngx_str_t *val,
     llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
 
     /*  load Lua inline script (w/ cache)        sp = 1 */
-    rc = ngx_http_lua_cache_loadbuffer(L, v[0].data, v[0].len,
-            filter_data->key, "set_by_lua_inline", &err,
-            llcf->enable_code_cache ? 1 : 0);
+    rc = ngx_http_lua_cache_loadbuffer(L, filter_data->script.data,
+                                       filter_data->script.len,
+                                       filter_data->key, "set_by_lua", &err,
+                                       llcf->enable_code_cache ? 1 : 0);
 
     if (rc != NGX_OK) {
         if (err == NULL) {
@@ -243,12 +296,13 @@ ngx_http_lua_filter_set_by_lua_inline(ngx_http_request_t *r, ngx_str_t *val,
         }
 
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "Failed to load Lua inlined code: %s", err);
+                "failed to load Lua inlined code: %s", err);
 
         return NGX_ERROR;
     }
 
-    rc = ngx_http_lua_set_by_chunk(L, r, val, v, filter_data->size);
+    rc = ngx_http_lua_set_by_chunk(L, r, val, v, filter_data->size,
+                                   &filter_data->script);
     if (rc != NGX_OK) {
         return NGX_ERROR;
     }
@@ -267,11 +321,24 @@ ngx_http_lua_filter_set_by_lua_file(ngx_http_request_t *r, ngx_str_t *val,
     ngx_http_lua_main_conf_t    *lmcf;
     ngx_http_lua_loc_conf_t     *llcf;
     char                        *err;
+    size_t                       nargs;
 
     ngx_http_lua_set_var_data_t     *filter_data = data;
 
-    script_path = ngx_http_lua_rebase_path(r->pool, v[0].data, v[0].len);
+    dd("set by lua file");
 
+    filter_data->script.data = v[0].data;
+    filter_data->script.len = v[0].len;
+
+    /* skip the lua file path argument */
+    v++;
+    nargs = filter_data->size - 1;
+
+    dd("script: %.*s", (int) filter_data->script.len, filter_data->script.data);
+    dd("nargs: %d", (int) nargs);
+
+    script_path = ngx_http_lua_rebase_path(r->pool, filter_data->script.data,
+                                           filter_data->script.len);
     if (script_path == NULL) {
         return NGX_ERROR;
     }
@@ -292,12 +359,12 @@ ngx_http_lua_filter_set_by_lua_file(ngx_http_request_t *r, ngx_str_t *val,
         }
 
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "Failed to load Lua file: %s", err);
+                      "failed to load Lua file: %s", err);
 
         return NGX_ERROR;
     }
 
-    rc = ngx_http_lua_set_by_chunk(L, r, val, v, filter_data->size);
+    rc = ngx_http_lua_set_by_chunk(L, r, val, v, nargs, &filter_data->script);
     if (rc != NGX_OK) {
         return NGX_ERROR;
     }
@@ -310,9 +377,10 @@ ngx_http_lua_filter_set_by_lua_file(ngx_http_request_t *r, ngx_str_t *val,
 char *
 ngx_http_lua_rewrite_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                   *value;
-    ngx_http_lua_loc_conf_t     *llcf = conf;
     u_char                      *p;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_loc_conf_t     *llcf = conf;
 
     ngx_http_compile_complex_value_t         ccv;
 
@@ -383,10 +451,10 @@ ngx_http_lua_rewrite_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     llcf->rewrite_handler = cmd->post;
 
-    if (!ngx_http_lua_requires_rewrite) {
-        ngx_http_lua_requires_rewrite = 1;
-        ngx_http_lua_requires_capture_filter = 1;
-    }
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_rewrite = 1;
+    lmcf->requires_capture_filter = 1;
 
     return NGX_CONF_OK;
 }
@@ -395,9 +463,10 @@ ngx_http_lua_rewrite_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 char *
 ngx_http_lua_access_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                   *value;
-    ngx_http_lua_loc_conf_t     *llcf = conf;
     u_char                      *p;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_loc_conf_t     *llcf = conf;
 
     ngx_http_compile_complex_value_t         ccv;
 
@@ -464,10 +533,10 @@ ngx_http_lua_access_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     llcf->access_handler = cmd->post;
 
-    if (!ngx_http_lua_requires_access) {
-        ngx_http_lua_requires_access = 1;
-        ngx_http_lua_requires_capture_filter = 1;
-    }
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_access = 1;
+    lmcf->requires_capture_filter = 1;
 
     return NGX_CONF_OK;
 }
@@ -476,10 +545,11 @@ ngx_http_lua_access_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 char *
 ngx_http_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    u_char                      *p;
     ngx_str_t                   *value;
     ngx_http_core_loc_conf_t    *clcf;
+    ngx_http_lua_main_conf_t    *lmcf;
     ngx_http_lua_loc_conf_t     *llcf = conf;
-    u_char                      *p;
 
     ngx_http_compile_complex_value_t         ccv;
 
@@ -545,7 +615,9 @@ ngx_http_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     llcf->content_handler = cmd->post;
 
-    ngx_http_lua_requires_capture_filter = 1;
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_capture_filter = 1;
 
     /*  register location content handler */
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
@@ -560,12 +632,94 @@ ngx_http_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
+ngx_http_lua_log_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    u_char                      *p;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_loc_conf_t     *llcf = conf;
+
+    ngx_http_compile_complex_value_t         ccv;
+
+    dd("enter");
+
+    /*  must specifiy a content handler */
+    if (cmd->post == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (llcf->log_handler) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        /*  Oops...Invalid location conf */
+        ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                "Invalid location config: no runnable Lua code");
+
+        return NGX_CONF_ERROR;
+    }
+
+    if (cmd->post == ngx_http_lua_log_handler_inline) {
+        /* Don't eval nginx variables for inline lua code */
+        llcf->log_src.value = value[1];
+
+        p = ngx_palloc(cf->pool, NGX_HTTP_LUA_INLINE_KEY_LEN + 1);
+        if (p == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        llcf->log_src_key = p;
+
+        p = ngx_copy(p, NGX_HTTP_LUA_INLINE_TAG, NGX_HTTP_LUA_INLINE_TAG_LEN);
+        p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
+        *p = '\0';
+
+    } else {
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+        ccv.cf = cf;
+        ccv.value = &value[1];
+        ccv.complex_value = &llcf->log_src;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (llcf->log_src.lengths == NULL) {
+            /* no variable found */
+            p = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+            if (p == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            llcf->log_src_key = p;
+
+            p = ngx_copy(p, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
+            p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
+            *p = '\0';
+        }
+    }
+
+    llcf->log_handler = cmd->post;
+
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_log = 1;
+
+    return NGX_CONF_OK;
+}
+
+
+char *
 ngx_http_lua_header_filter_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
         void *conf)
 {
-    ngx_str_t                   *value;
-    ngx_http_lua_loc_conf_t     *llcf = conf;
     u_char                      *p;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_loc_conf_t     *llcf = conf;
 
     ngx_http_compile_complex_value_t         ccv;
 
@@ -631,8 +785,138 @@ ngx_http_lua_header_filter_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
 
     llcf->header_filter_handler = cmd->post;
 
-    if (!ngx_http_lua_requires_header_filter) {
-        ngx_http_lua_requires_header_filter = 1;
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_header_filter = 1;
+
+    return NGX_CONF_OK;
+}
+
+
+char *
+ngx_http_lua_body_filter_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+        void *conf)
+{
+    u_char                      *p;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_loc_conf_t     *llcf = conf;
+
+    ngx_http_compile_complex_value_t         ccv;
+
+    dd("enter");
+
+    /*  must specifiy a content handler */
+    if (cmd->post == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (llcf->body_filter_handler) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        /*  Oops...Invalid location conf */
+        ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                "Invalid location config: no runnable Lua code");
+        return NGX_CONF_ERROR;
+    }
+
+    if (cmd->post == ngx_http_lua_body_filter_inline) {
+        /* Don't eval nginx variables for inline lua code */
+        llcf->body_filter_src.value = value[1];
+
+        p = ngx_palloc(cf->pool, NGX_HTTP_LUA_INLINE_KEY_LEN + 1);
+        if (p == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        llcf->body_filter_src_key = p;
+
+        p = ngx_copy(p, NGX_HTTP_LUA_INLINE_TAG, NGX_HTTP_LUA_INLINE_TAG_LEN);
+        p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
+        *p = '\0';
+
+    } else {
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+        ccv.cf = cf;
+        ccv.value = &value[1];
+        ccv.complex_value = &llcf->body_filter_src;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (llcf->body_filter_src.lengths == NULL) {
+            /* no variable found */
+            p = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+            if (p == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            llcf->body_filter_src_key = p;
+
+            p = ngx_copy(p, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
+            p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
+            *p = '\0';
+        }
+    }
+
+    llcf->body_filter_handler = cmd->post;
+
+    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
+    lmcf->requires_body_filter = 1;
+    lmcf->requires_header_filter = 1;
+
+    return NGX_CONF_OK;
+}
+
+
+char *
+ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+        void *conf)
+{
+    u_char                      *name;
+    ngx_str_t                   *value;
+    ngx_http_lua_main_conf_t    *lmcf = conf;
+
+    dd("enter");
+
+    /*  must specifiy a content handler */
+    if (cmd->post == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (lmcf->init_handler) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].len == 0) {
+        /*  Oops...Invalid location conf */
+        ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                "Invalid location config: no runnable Lua code");
+        return NGX_CONF_ERROR;
+    }
+
+    lmcf->init_handler = cmd->post;
+
+    if (cmd->post == ngx_http_lua_init_by_file) {
+        name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
+                                        value[1].len);
+        if (name == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        lmcf->init_src.data = name;
+        lmcf->init_src.len = ngx_strlen(name);
+
+    } else {
+        lmcf->init_src = value[1];
     }
 
     return NGX_CONF_OK;
