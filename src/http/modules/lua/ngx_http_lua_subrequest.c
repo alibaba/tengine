@@ -15,13 +15,13 @@
 
 #define ngx_http_lua_method_name(m) { sizeof(m) - 1, (u_char *) m " " }
 
-static ngx_str_t  ngx_http_lua_get_method = ngx_http_lua_method_name("GET");
-static ngx_str_t  ngx_http_lua_put_method = ngx_http_lua_method_name("PUT");
-static ngx_str_t  ngx_http_lua_post_method = ngx_http_lua_method_name("POST");
-static ngx_str_t  ngx_http_lua_head_method = ngx_http_lua_method_name("HEAD");
-static ngx_str_t  ngx_http_lua_delete_method =
+ngx_str_t  ngx_http_lua_get_method = ngx_http_lua_method_name("GET");
+ngx_str_t  ngx_http_lua_put_method = ngx_http_lua_method_name("PUT");
+ngx_str_t  ngx_http_lua_post_method = ngx_http_lua_method_name("POST");
+ngx_str_t  ngx_http_lua_head_method = ngx_http_lua_method_name("HEAD");
+ngx_str_t  ngx_http_lua_delete_method =
         ngx_http_lua_method_name("DELETE");
-static ngx_str_t  ngx_http_lua_options_method =
+ngx_str_t  ngx_http_lua_options_method =
         ngx_http_lua_method_name("OPTIONS");
 
 
@@ -116,7 +116,8 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
         return luaL_error(L, "at least one subrequest should be specified");
     }
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -128,6 +129,10 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
     if (ctx == NULL) {
         return luaL_error(L, "no ctx found");
     }
+
+    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_REWRITE
+                               | NGX_HTTP_LUA_CONTEXT_ACCESS
+                               | NGX_HTTP_LUA_CONTEXT_CONTENT);
 
     sr_statuses_len = nsubreqs * sizeof(ngx_int_t);
     sr_headers_len  = nsubreqs * sizeof(ngx_http_headers_out_t *);
@@ -149,9 +154,6 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
     ctx->sr_bodies = (void *) p;
 
     ctx->nsubreqs = nsubreqs;
-
-    n = lua_gettop(L);
-    dd("top before loop: %d", n);
 
     ctx->done = 0;
     ctx->waiting = 0;
@@ -414,9 +416,6 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
 
         /* stack: queries query uri ctx? */
 
-        n = lua_gettop(L);
-        dd("top size so far: %d", n);
-
         p = (u_char *) luaL_checklstring(L, 3, &len);
 
         uri.data = ngx_palloc(r->pool, len);
@@ -454,7 +453,7 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
 
             q = ngx_copy(p, args.data, args.len);
             *q++ = '&';
-            q = ngx_copy(q, extra_args.data, extra_args.len);
+            ngx_memcpy(q, extra_args.data, extra_args.len);
 
             args.data = p;
             args.len = len;
