@@ -1703,6 +1703,7 @@ ngx_http_upstream_check_clear_all_events()
 ngx_int_t
 ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
 {
+    size_t                               buffer_size;
     ngx_int_t                            rc;
     ngx_buf_t                           *b;
     ngx_uint_t                           i;
@@ -1748,7 +1749,11 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
     peer = peers->peers.elts;
     peer_shm = peers_shm->peers;
 
-    b = ngx_create_temp_buf(r->pool, 16 * ngx_pagesize);
+    /* 128 bytes for each record */
+    buffer_size = peers->peers.nelts * ngx_pagesize / 4;
+    buffer_size = ngx_align(buffer_size, ngx_pagesize) + ngx_pagesize;
+
+    b = ngx_create_temp_buf(r->pool, buffer_size);
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
