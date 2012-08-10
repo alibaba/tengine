@@ -168,7 +168,7 @@ typedef struct {
 typedef struct {
     ngx_uint_t                               type;
 
-    char                                    *name;
+    ngx_str_t                                name;
 
     ngx_str_t                                default_send;
 
@@ -447,7 +447,7 @@ static char ngx_ajp_cpong_packet[] = {
 static ngx_check_conf_t  ngx_check_types[] = {
 
     { NGX_HTTP_CHECK_TCP,
-      "tcp",
+      ngx_string("tcp"),
       ngx_null_string,
       0,
       ngx_http_upstream_check_peek_handler,
@@ -458,7 +458,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       0 },
 
     { NGX_HTTP_CHECK_HTTP,
-      "http",
+      ngx_string("http"),
       ngx_string("GET / HTTP/1.0\r\n\r\n"),
       NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
       ngx_http_upstream_check_send_handler,
@@ -469,7 +469,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       1 },
 
     { NGX_HTTP_CHECK_SSL_HELLO,
-      "ssl_hello",
+      ngx_string("ssl_hello"),
       ngx_string(sslv3_client_hello_pkt),
       0,
       ngx_http_upstream_check_send_handler,
@@ -480,7 +480,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       1 },
 
     { NGX_HTTP_CHECK_MYSQL,
-      "mysql",
+      ngx_string("mysql"),
       ngx_null_string,
       0,
       ngx_http_upstream_check_send_handler,
@@ -491,7 +491,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       1 },
 
     { NGX_HTTP_CHECK_AJP,
-      "ajp",
+      ngx_string("ajp"),
       ngx_string(ngx_ajp_cping_packet),
       0,
       ngx_http_upstream_check_send_handler,
@@ -501,7 +501,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       ngx_http_upstream_check_ajp_reinit,
       1 },
 
-    { 0, "", ngx_null_string, 0, NULL, NULL, NULL, NULL, NULL, 0 }
+    { 0, ngx_null_string, ngx_null_string, 0, NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
 
@@ -1836,7 +1836,11 @@ ngx_http_get_check_type_conf(ngx_str_t *str)
             break;
         }
 
-        if (ngx_strncmp(str->data, (u_char *) ngx_check_types[i].name,
+        if (str->len != ngx_check_types[i].name.len) {
+            continue;
+        }
+
+        if (ngx_strncmp(str->data, ngx_check_types[i].name.data,
                         str->len) == 0)
         {
             return &ngx_check_types[i];
