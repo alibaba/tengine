@@ -1879,21 +1879,76 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
             "</table>\n"
             "</body>\n"
             "</html>\n");
-
 }
 
 
 static void
-ngx_http_upstream_check_status_csv_format (ngx_buf_t *b,
+ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
 {
+    ngx_uint_t                           i;
+    ngx_http_upstream_check_peer_t      *peer;
+
+    peer = peers->peers.elts;
+            
+    for (i = 0; i < peers->peers.nelts; i++) {
+        b->last = ngx_snprintf(b->last, b->end - b->last,
+                "%ui,%V,%V,%s,%ui,%ui,%V\n",
+                i,
+                peer[i].upstream_name,
+                &peer[i].peer_addr->name,
+                peer[i].shm->down ? "down" : "up",
+                peer[i].shm->rise_count,
+                peer[i].shm->fall_count,
+                &peer[i].conf->check_type_conf->name);
+    }
 }
 
 
 static void
-ngx_http_upstream_check_status_json_format (ngx_buf_t *b,
+ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
 {
+    ngx_uint_t                           i, last;
+    ngx_http_upstream_check_peer_t      *peer;
+
+    peer = peers->peers.elts;
+
+    b->last = ngx_snprintf(b->last, b->end - b->last,
+            "{\"servers\": {\n"
+            "  \"total\": %ui,\n"
+            "  \"generation\": %ui,\n"
+            "  \"server\": [\n",
+            peers->peers.nelts,
+            ngx_http_upstream_check_shm_generation);
+
+    last = peers->peers.nelts - 1;
+            
+    for (i = 0; i < peers->peers.nelts; i++) {
+        b->last = ngx_snprintf(b->last, b->end - b->last,
+                "    {\"index\": %ui, "
+                "\"upstream\": \"%V\", "
+                "\"name\": \"%V\", "
+                "\"status\": \"%s\", "
+                "\"rise\": %ui, "
+                "\"fall\": %ui, "
+                "\"type\": \"%V\"}"
+                "%s\n",
+                i,
+                peer[i].upstream_name,
+                &peer[i].peer_addr->name,
+                peer[i].shm->down ? "down" : "up",
+                peer[i].shm->rise_count,
+                peer[i].shm->fall_count,
+                &peer[i].conf->check_type_conf->name,
+                (i == last) ? "" : ",");
+    }
+
+    b->last = ngx_snprintf(b->last, b->end - b->last,
+            "  ]\n");
+
+    b->last = ngx_snprintf(b->last, b->end - b->last,
+            "}}\n");
 }
 
 
