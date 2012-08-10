@@ -42,6 +42,9 @@ ngx_http_lua_capture_header_filter(ngx_http_request_t *r)
     ngx_http_lua_ctx_t              *old_ctx;
     ngx_http_lua_ctx_t              *ctx;
 
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua capture header filter, uri \"%V\"", &r->uri);
+
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
     dd("old ctx: %p", ctx);
@@ -62,8 +65,8 @@ ngx_http_lua_capture_header_filter(ngx_http_request_t *r)
 
             } else {
                 ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                        "lua restoring ctx with capture %d, index %d",
-                        old_ctx->capture, old_ctx->index);
+                               "lua restoring ctx with capture %d, index %d",
+                               old_ctx->capture, old_ctx->index);
 
                 ctx->capture = old_ctx->capture;
                 ctx->index = old_ctx->index;
@@ -74,7 +77,7 @@ ngx_http_lua_capture_header_filter(ngx_http_request_t *r)
 
     if (ctx && ctx->capture) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua capturing response body");
+                       "lua capturing response body");
 
         /* force subrequest response body buffer in memory */
         r->filter_need_in_memory = 1;
@@ -93,6 +96,9 @@ ngx_http_lua_capture_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_http_lua_ctx_t              *ctx;
     ngx_http_lua_ctx_t              *pr_ctx;
 
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua capture body filter, uri \"%V\"", &r->uri);
+
     if (in == NULL) {
         return ngx_http_lua_next_body_filter(r, NULL);
     }
@@ -107,13 +113,15 @@ ngx_http_lua_capture_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     if (ctx->run_post_subrequest) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua body filter skipped because post subrequest already run");
+                       "lua body filter skipped because post subrequest "
+                       "already run");
         return NGX_OK;
     }
 
     if (r->parent == NULL) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua body filter skipped because no parent request found");
+                       "lua body filter skipped because no parent request "
+                       "found");
 
         return NGX_ERROR;
     }
@@ -124,8 +132,8 @@ ngx_http_lua_capture_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua capture body filter capturing response body, uri \"%V\"",
-            &r->uri);
+                   "lua capture body filter capturing response body, uri "
+                   "\"%V\"", &r->uri);
 
     rc = ngx_http_lua_add_copy_chain(r, pr_ctx, &ctx->body, in);
     if (rc != NGX_OK) {
