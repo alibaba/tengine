@@ -186,6 +186,17 @@ typedef struct {
 } ngx_check_conf_t;
 
 
+typedef void (*ngx_http_upstream_check_status_format_pt) (ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag);
+
+typedef struct {
+    ngx_str_t                                format;
+    ngx_str_t                                content_type;
+
+    ngx_http_upstream_check_status_format_pt output;
+} ngx_check_status_conf_t;
+
+
 typedef struct {
     ngx_uint_t                               check_shm_size;
     ngx_http_upstream_check_peers_t         *peers;
@@ -208,6 +219,11 @@ struct ngx_http_upstream_check_srv_conf_s {
 
     ngx_uint_t                               default_down;
 };
+
+
+typedef struct {
+    ngx_check_status_conf_t                 *format;
+} ngx_http_upstream_check_loc_conf_t;
 
 
 static ngx_int_t ngx_http_upstream_check_add_timers(ngx_cycle_t *cycle);
@@ -267,6 +283,14 @@ static void ngx_http_upstream_check_clear_all_events();
 static ngx_int_t ngx_http_upstream_check_status_handler(
     ngx_http_request_t *r);
 
+static void ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag);
+static void ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag);
+static void ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag);
+
+
 static ngx_check_conf_t *ngx_http_get_check_type_conf(ngx_str_t *str);
 
 static char *ngx_http_upstream_check(ngx_conf_t *cf,
@@ -287,6 +311,10 @@ static char *ngx_http_upstream_check_init_main_conf(ngx_conf_t *cf,
 
 static void *ngx_http_upstream_check_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf);
+
+static void *ngx_http_upstream_check_create_loc_conf(ngx_conf_t *cf);
+static char * ngx_http_upstream_check_merge_loc_conf(ngx_conf_t *cf,
+    void *parent, void *child);
 
 #define SHM_NAME_LEN 256
 
@@ -352,7 +380,7 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
       NULL },
 
     { ngx_string("check_status"),
-      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1|NGX_CONF_NOARGS,
       ngx_http_upstream_check_status,
       0,
       0,
@@ -363,17 +391,17 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_upstream_check_module_ctx = {
-    NULL,                                  /* preconfiguration */
-    NULL,                                  /* postconfiguration */
+    NULL,                                     /* preconfiguration */
+    NULL,                                     /* postconfiguration */
 
     ngx_http_upstream_check_create_main_conf, /* create main configuration */
-    ngx_http_upstream_check_init_main_conf,/* init main configuration */
+    ngx_http_upstream_check_init_main_conf,   /* init main configuration */
 
-    ngx_http_upstream_check_create_srv_conf, /* create server configuration */
-    NULL,                                  /* merge server configuration */
+    ngx_http_upstream_check_create_srv_conf,  /* create server configuration */
+    NULL,                                     /* merge server configuration */
 
-    NULL,                                  /* create location configuration */
-    NULL                                   /* merge location configuration */
+    ngx_http_upstream_check_create_loc_conf, /* create location configuration */
+    ngx_http_upstream_check_merge_loc_conf  /* merge location configuration */
 };
 
 
@@ -502,6 +530,24 @@ static ngx_check_conf_t  ngx_check_types[] = {
       1 },
 
     { 0, ngx_null_string, ngx_null_string, 0, NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+
+static ngx_check_status_conf_t  ngx_check_status_formats[] = {
+
+    { ngx_string("html"),
+      ngx_string("text/html"),
+      ngx_http_upstream_check_status_html_format },
+
+    { ngx_string("csv"),
+      ngx_string("text/plain"),
+      ngx_http_upstream_check_status_csv_format },
+
+    { ngx_string("json"),
+      ngx_string("application/json"), /* RFC 4627 */
+      ngx_http_upstream_check_status_json_format },
+
+    { ngx_null_string, ngx_null_string, NULL }
 };
 
 
@@ -1706,12 +1752,9 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
     size_t                               buffer_size;
     ngx_int_t                            rc;
     ngx_buf_t                           *b;
-    ngx_uint_t                           i;
     ngx_chain_t                          out;
-    ngx_http_upstream_check_peer_t      *peer;
     ngx_http_upstream_check_peers_t     *peers;
-    ngx_http_upstream_check_peer_shm_t  *peer_shm;
-    ngx_http_upstream_check_peers_shm_t *peers_shm;
+    ngx_http_upstream_check_loc_conf_t  *uclcf;
 
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
@@ -1723,7 +1766,9 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
         return rc;
     }
 
-    ngx_str_set(&r->headers_out.content_type, "text/html; charset=utf-8");
+    uclcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_check_module);
+
+    r->headers_out.content_type = uclcf->format->content_type;
 
     if (r->method == NGX_HTTP_HEAD) {
         r->headers_out.status = NGX_HTTP_OK;
@@ -1744,11 +1789,6 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    peers_shm = peers->peers_shm;
-
-    peer = peers->peers.elts;
-    peer_shm = peers_shm->peers;
-
     /* 128 bytes for each record */
     buffer_size = peers->peers.nelts * ngx_pagesize / 4;
     buffer_size = ngx_align(buffer_size, ngx_pagesize) + ngx_pagesize;
@@ -1760,6 +1800,36 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
 
     out.buf = b;
     out.next = NULL;
+
+    uclcf->format->output(b, peers, 0);
+
+    r->headers_out.status = NGX_HTTP_OK;
+    r->headers_out.content_length_n = b->last - b->pos;
+
+    if (r->headers_out.content_length_n == 0) {
+        r->header_only = 1;
+    }
+
+    b->last_buf = 1;
+
+    rc = ngx_http_send_header(r);
+
+    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+        return rc;
+    }
+
+    return ngx_http_output_filter(r, &out);
+}
+
+
+static void
+ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
+{
+    ngx_uint_t                           i;
+    ngx_http_upstream_check_peer_t      *peer;
+
+    peer = peers->peers.elts;
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
             "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\n"
@@ -1793,16 +1863,16 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
                 "    <td>%s</td>\n"
                 "    <td>%ui</td>\n"
                 "    <td>%ui</td>\n"
-                "    <td>%s</td>\n"
+                "    <td>%V</td>\n"
                 "  </tr>\n",
-                peer_shm[i].down ? " bgcolor=\"#FF0000\"" : "",
+                peer[i].shm->down ? " bgcolor=\"#FF0000\"" : "",
                 i,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
-                peer_shm[i].down ? "down" : "up",
-                peer_shm[i].rise_count,
-                peer_shm[i].fall_count,
-                peer[i].conf->check_type_conf->name);
+                peer[i].shm->down ? "down" : "up",
+                peer[i].shm->rise_count,
+                peer[i].shm->fall_count,
+                &peer[i].conf->check_type_conf->name);
     }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
@@ -1810,18 +1880,20 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
             "</body>\n"
             "</html>\n");
 
-    r->headers_out.status = NGX_HTTP_OK;
-    r->headers_out.content_length_n = b->last - b->pos;
+}
 
-    b->last_buf = 1;
 
-    rc = ngx_http_send_header(r);
+static void
+ngx_http_upstream_check_status_csv_format (ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
+{
+}
 
-    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
-        return rc;
-    }
 
-    return ngx_http_output_filter(r, &out);
+static void
+ngx_http_upstream_check_status_json_format (ngx_buf_t *b,
+    ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
+{
 }
 
 
@@ -2080,14 +2152,57 @@ ngx_http_upstream_check_shm_size(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+static ngx_check_status_conf_t *
+ngx_http_get_check_status_format_conf(ngx_str_t *str)
+{
+    ngx_uint_t  i;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (ngx_check_status_formats[i].format.len == 0) {
+            break;
+        }
+
+        if (str->len != ngx_check_status_formats[i].format.len) {
+            continue;
+        }
+
+        if (ngx_strncmp(str->data, ngx_check_status_formats[i].format.data,
+                        str->len) == 0)
+        {
+            return &ngx_check_status_formats[i];
+        }
+    }
+
+    return NULL;
+}
+
+
 static char *
 ngx_http_upstream_check_status(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_core_loc_conf_t  *clcf;
+    ngx_str_t                            *value;
+    ngx_http_core_loc_conf_t             *clcf;
+    ngx_http_upstream_check_loc_conf_t   *uclcf;
+
+    value = cf->args->elts;
 
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
 
     clcf->handler = ngx_http_upstream_check_status_handler;
+
+    if (cf->args->nelts == 2) {
+        uclcf = ngx_http_conf_get_module_loc_conf(cf,
+                                              ngx_http_upstream_check_module);
+
+        uclcf->format = ngx_http_get_check_status_format_conf(&value[1]);
+        if (uclcf->format == NULL) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid check format \"%V\"", &value[1]);
+
+            return NGX_CONF_ERROR;
+        }
+    }
 
     return NGX_CONF_OK;
 }
@@ -2161,6 +2276,22 @@ ngx_http_upstream_check_create_srv_conf(ngx_conf_t *cf)
 }
 
 
+static void *
+ngx_http_upstream_check_create_loc_conf(ngx_conf_t *cf)
+{
+    ngx_http_upstream_check_loc_conf_t  *uclcf;
+
+    uclcf = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_check_loc_conf_t));
+    if (uclcf == NULL) {
+        return NULL;
+    }
+
+    uclcf->format = NGX_CONF_UNSET_PTR;
+
+    return uclcf;
+}
+
+
 static char *
 ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
 {
@@ -2205,6 +2336,21 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
             ucscf->code.status_alive = check->default_status_alive;
         }
     }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_upstream_check_merge_loc_conf(ngx_conf_t *cf, void *parent,
+    void *child)
+{
+    ngx_str_t                            format = ngx_string("html");
+    ngx_http_upstream_check_loc_conf_t  *prev = parent;
+    ngx_http_upstream_check_loc_conf_t  *conf = child;
+
+    ngx_conf_merge_ptr_value(conf->format, prev->format,
+                             ngx_http_get_check_status_format_conf(&format));
 
     return NGX_CONF_OK;
 }
@@ -2298,7 +2444,7 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
-    number =  peers->peers.nelts;
+    number = peers->peers.nelts;
     if (number == 0) {
         return NGX_OK;
     }
@@ -2309,7 +2455,6 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
     }
 
     shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
-
 
     if (data) {
         opeers_shm = data;
