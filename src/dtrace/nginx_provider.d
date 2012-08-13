@@ -17,10 +17,10 @@ provider nginx {
     probe http__subrequest__post__start(ngx_http_request_t *r, ngx_int_t rc);
     probe http__subrequest__post__done(ngx_http_request_t *r, ngx_int_t rc);
     probe http__module__post__config(ngx_module_t *m);
-    probe http__read__body__abort(ngx_request_t *r, char *reason);
-    probe http__read__body__done(ngx_request_t *r);
-    probe http__read__req__line__done(ngx_request_t *r);
-    probe http__read__req__header__done(ngx_request_t *r, ngx_table_elt_t *h);
+    probe http__read__body__abort(ngx_http_request_t *r, char *reason);
+    probe http__read__body__done(ngx_http_request_t *r);
+    probe http__read__req__line__done(ngx_http_request_t *r);
+    probe http__read__req__header__done(ngx_http_request_t *r, ngx_table_elt_t *h);
 };
 
 
