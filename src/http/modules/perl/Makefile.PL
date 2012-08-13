@@ -19,6 +19,7 @@ WriteMakefile(
     INC               => "-I ../../../../../src/core " .
                          "-I ../../../../../src/event " .
                          "-I ../../../../../src/os/unix " .
+                         "-I ../../../../../src/proc " .
                          "-I ../../../../../src/http " .
                          "-I ../../../../../src/http/modules " .
                          "-I ../../../../../src/http/modules/perl " .
