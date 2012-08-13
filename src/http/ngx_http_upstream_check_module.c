@@ -197,6 +197,24 @@ typedef struct {
 } ngx_check_status_conf_t;
 
 
+#define NGX_CHECK_STATUS_DOWN                0x0001
+#define NGX_CHECK_STATUS_UP                  0x0002
+
+typedef struct {
+    ngx_check_status_conf_t                 *format;
+    ngx_flag_t                               flag;
+} ngx_http_upstream_check_status_ctx_t;
+
+
+typedef ngx_int_t (*ngx_http_upstream_check_status_command_pt)
+    (ngx_http_upstream_check_status_ctx_t *ctx, ngx_str_t *value);
+
+typedef struct {
+    ngx_str_t                                 name;
+    ngx_http_upstream_check_status_command_pt handler;
+} ngx_check_status_command_t;
+
+
 typedef struct {
     ngx_uint_t                               check_shm_size;
     ngx_http_upstream_check_peers_t         *peers;
@@ -283,6 +301,14 @@ static void ngx_http_upstream_check_clear_all_events();
 static ngx_int_t ngx_http_upstream_check_status_handler(
     ngx_http_request_t *r);
 
+static void ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
+    ngx_http_upstream_check_status_ctx_t *ctx);
+
+static ngx_int_t ngx_http_upstream_check_status_command_format(
+    ngx_http_upstream_check_status_ctx_t *ctx, ngx_str_t *value);
+static ngx_int_t ngx_http_upstream_check_status_command_status(
+    ngx_http_upstream_check_status_ctx_t *ctx, ngx_str_t *value);
+
 static void ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag);
 static void ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
@@ -302,6 +328,9 @@ static char *ngx_http_upstream_check_http_expect_alive(ngx_conf_t *cf,
 
 static char *ngx_http_upstream_check_shm_size(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
+
+static ngx_check_status_conf_t *ngx_http_get_check_status_format_conf(
+    ngx_str_t *str);
 static char *ngx_http_upstream_check_status(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 
@@ -548,6 +577,18 @@ static ngx_check_status_conf_t  ngx_check_status_formats[] = {
       ngx_http_upstream_check_status_json_format },
 
     { ngx_null_string, ngx_null_string, NULL }
+};
+
+
+static ngx_check_status_command_t ngx_check_status_commands[] =  {
+
+    { ngx_string("format"),
+      ngx_http_upstream_check_status_command_format },
+
+    { ngx_string("status"),
+      ngx_http_upstream_check_status_command_status },
+
+    { ngx_null_string, NULL }
 };
 
 
@@ -1746,15 +1787,16 @@ ngx_http_upstream_check_clear_all_events()
 }
 
 
-ngx_int_t
+static ngx_int_t
 ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
 {
-    size_t                               buffer_size;
-    ngx_int_t                            rc;
-    ngx_buf_t                           *b;
-    ngx_chain_t                          out;
-    ngx_http_upstream_check_peers_t     *peers;
-    ngx_http_upstream_check_loc_conf_t  *uclcf;
+    size_t                                    buffer_size;
+    ngx_int_t                                 rc;
+    ngx_buf_t                                *b;
+    ngx_chain_t                               out;
+    ngx_http_upstream_check_peers_t          *peers;
+    ngx_http_upstream_check_loc_conf_t       *uclcf;
+    ngx_http_upstream_check_status_ctx_t     *ctx;
 
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
@@ -1768,7 +1810,18 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
 
     uclcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_check_module);
 
-    r->headers_out.content_type = uclcf->format->content_type;
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_check_status_ctx_t));
+    if (ctx == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    ngx_http_upstream_check_status_parse_args(r, ctx);
+
+    if (ctx->format == NULL) {
+        ctx->format = uclcf->format;
+    }
+
+    r->headers_out.content_type = ctx->format->content_type;
 
     if (r->method == NGX_HTTP_HEAD) {
         r->headers_out.status = NGX_HTTP_OK;
@@ -1801,7 +1854,7 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
 
-    uclcf->format->output(b, peers, 0);
+    ctx->format->output(b, peers, ctx->flag);
 
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;
@@ -1823,13 +1876,104 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
 
 
 static void
+ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
+    ngx_http_upstream_check_status_ctx_t *ctx)
+{
+    ngx_str_t                    value;
+    ngx_uint_t                   i;
+    ngx_check_status_command_t  *command;
+
+    if (r->args.len == 0) {
+        return;
+    }
+
+    for (i = 0; /* void */ ; i++) {
+
+        command = &ngx_check_status_commands[i];
+
+        if (command->name.len == 0) {
+            break;
+        }
+
+        if (ngx_http_arg(r, command->name.data, command->name.len, &value) 
+            == NGX_OK) {
+
+           if (command->handler(ctx, &value) != NGX_OK) {
+               ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                             "http upstream check, bad argument: \"%V\"", &value);
+           }
+        }
+    }
+
+    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+            "http upstream check, flag: \"%ui\"", ctx->flag);
+}
+
+
+static ngx_int_t
+ngx_http_upstream_check_status_command_format(
+    ngx_http_upstream_check_status_ctx_t *ctx, ngx_str_t *value)
+{
+    ctx->format = ngx_http_get_check_status_format_conf(value);
+    if (ctx->format == NULL) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_check_status_command_status(
+    ngx_http_upstream_check_status_ctx_t *ctx, ngx_str_t *value)
+{
+    if (value->len == (sizeof("down") - 1)
+        && ngx_strncasecmp(value->data, (u_char *) "down", value->len) == 0) {
+
+        ctx->flag |= NGX_CHECK_STATUS_DOWN;
+
+    } else if (value->len == (sizeof("up") - 1)
+               && ngx_strncasecmp(value->data, (u_char *) "up", value->len)
+               == 0) {
+
+        ctx->flag |= NGX_CHECK_STATUS_UP;
+
+    } else {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static void
 ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
 {
-    ngx_uint_t                           i;
+    ngx_uint_t                           i, count;
     ngx_http_upstream_check_peer_t      *peer;
 
     peer = peers->peers.elts;
+
+    count = 0;
+
+    for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (flag & NGX_CHECK_STATUS_DOWN) {
+
+            if (!peer[i].shm->down) {
+                continue;
+            }
+
+        } else if (flag & NGX_CHECK_STATUS_UP) {
+
+            if (peer[i].shm->down) {
+                continue;
+            }
+        }
+
+        count++;
+    }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
             "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\n"
@@ -1852,9 +1996,23 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
             "    <th>Fall counts</th>\n"
             "    <th>Check type</th>\n"
             "  </tr>\n",
-            peers->peers.nelts, ngx_http_upstream_check_shm_generation);
+            count, ngx_http_upstream_check_shm_generation);
 
     for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (flag & NGX_CHECK_STATUS_DOWN) {
+
+            if (!peer[i].shm->down) {
+                continue;
+            }
+
+        } else if (flag & NGX_CHECK_STATUS_UP) {
+
+            if (peer[i].shm->down) {
+                continue;
+            }
+        }
+
         b->last = ngx_snprintf(b->last, b->end - b->last,
                 "  <tr%s>\n"
                 "    <td>%ui</td>\n"
@@ -1892,6 +2050,20 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     peer = peers->peers.elts;
             
     for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (flag & NGX_CHECK_STATUS_DOWN) {
+
+            if (!peer[i].shm->down) {
+                continue;
+            }
+
+        } else if (flag & NGX_CHECK_STATUS_UP) {
+
+            if (peer[i].shm->down) {
+                continue;
+            }
+        }
+
         b->last = ngx_snprintf(b->last, b->end - b->last,
                 "%ui,%V,%V,%s,%ui,%ui,%V\n",
                 i,
@@ -1909,22 +2081,56 @@ static void
 ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
 {
-    ngx_uint_t                           i, last;
+    ngx_uint_t                           count, i, last;
     ngx_http_upstream_check_peer_t      *peer;
 
     peer = peers->peers.elts;
+
+    count = 0;
+
+    for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (flag & NGX_CHECK_STATUS_DOWN) {
+
+            if (!peer[i].shm->down) {
+                continue;
+            }
+
+        } else if (flag & NGX_CHECK_STATUS_UP) {
+
+            if (peer[i].shm->down) {
+                continue;
+            }
+        }
+
+        count++;
+    }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
             "{\"servers\": {\n"
             "  \"total\": %ui,\n"
             "  \"generation\": %ui,\n"
             "  \"server\": [\n",
-            peers->peers.nelts,
+            count,
             ngx_http_upstream_check_shm_generation);
 
     last = peers->peers.nelts - 1;
             
     for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (flag & NGX_CHECK_STATUS_DOWN) {
+
+            if (!peer[i].shm->down) {
+                continue;
+            }
+
+        } else if (flag & NGX_CHECK_STATUS_UP) {
+
+            if (peer[i].shm->down) {
+                continue;
+            }
+        }
+
         b->last = ngx_snprintf(b->last, b->end - b->last,
                 "    {\"index\": %ui, "
                 "\"upstream\": \"%V\", "
