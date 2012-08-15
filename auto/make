@@ -201,13 +201,21 @@ $ngx_dtrace_d: $ngx_dtrace_providers
 
 $ngx_dtrace_h: $ngx_dtrace_d
 	\$(DTRACE) -xnolibs -h -o $ngx_dtrace_h -s $ngx_dtrace_d
+END
 
+    if [ $DTRACE_PROBE_OBJ = YES ]; then
+        cat << END                                            >> $NGX_MAKEFILE
 $ngx_dtrace_obj: $ngx_dtrace_d $ngx_deps$ngx_spacer
 	\$(DTRACE) -xnolibs -G -o $ngx_dtrace_obj -s $ngx_dtrace_d $ngx_objs
 END
 
-    ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj$ngx_long_cont$NGX_OBJS${ngx_dirsep}stap-nginx"
-    ngx_objs="$ngx_objs$ngx_long_cont$ngx_dtrace_obj"
+        ngx_deps="$ngx_deps$ngx_long_cont$ngx_dtrace_obj"
+        ngx_objs="$ngx_objs$ngx_long_cont$ngx_dtrace_obj"
+
+        if [ "$DTRACE_FROM_SYSTEMTAP" = YES ]; then
+            ngx_deps="$ngx_deps$ngx_long_cont$NGX_OBJS${ngx_dirsep}stap-nginx"
+        fi
+    fi
 fi
 
 if test -n "$NGX_LD_OPT$CORE_LIBS"; then

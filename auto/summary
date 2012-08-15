@@ -95,9 +95,14 @@ fi
 if [ $NGX_DTRACE = YES ]; then
     cat << END
   nginx dtrace static probes enabled
+END
+
+    if [ $DTRACE_FROM_SYSTEMTAP = YES ]; then
+        cat << END
   nginx systemtap tapset prefix: "$NGX_TAPSET_PREFIX"
   nginx systemtap wrapper script: "$NGX_STAP_NGX_PATH"
 END
+    fi
 fi
 
 cat << END

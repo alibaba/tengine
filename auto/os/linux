@@ -151,3 +151,5 @@ ngx_include="sys/vfs.h";     . auto/include
 
 
 CC_AUX_FLAGS="$cc_aux_flags -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64"
+
+DTRACE_FROM_SYSTEMTAP=YES

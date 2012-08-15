@@ -175,7 +175,7 @@ install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
 END
 
-if [ $NGX_DTRACE = YES ]; then
+if [ $NGX_DTRACE = YES -a $DTRACE_FROM_SYSTEMTAP = YES ]; then
 
     ngx_tapset_srcs="$NGX_TAPSET_SRCS"
 
