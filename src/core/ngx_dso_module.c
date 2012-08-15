@@ -10,6 +10,9 @@
 #include <dlfcn.h>
 
 
+#define NGX_DSO_EXT ".so"
+
+
 typedef struct {
     ngx_str_t     type;
     ngx_str_t     entry;
@@ -304,8 +307,9 @@ ngx_dso_insert_module(ngx_module_t *module, ngx_int_t flag_postion)
 static char *
 ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    u_char                              *p;
     ngx_int_t                            rc;
-    ngx_str_t                           *value;
+    ngx_str_t                           *value, module_path;
     ngx_dso_module_t                    *dl_m;
     ngx_dso_conf_ctx_t                  *ctx;
 
@@ -319,8 +323,24 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
-                                 &value[1], &value[2]);
+    if (cf->args->nelts == 3) {
+        rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
+                                      &value[1], &value[2]);
+        module_path = value[2];
+    } else {
+        /* cf->args->nelts == 2 */
+        module_path.len = value[1].len + sizeof(NGX_DSO_EXT);
+        module_path.data = ngx_pcalloc(cf->pool, module_path.len);
+        if (module_path.data == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        p = ngx_cpymem(module_path.data, value[1].data, value[1].len);
+        ngx_memcpy(p, NGX_DSO_EXT, sizeof(NGX_DSO_EXT) - 1);
+        rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
+                                      &value[1], &module_path);
+    }
+
     if (rc == NGX_DECLINED) {
         return NGX_CONF_OK;
     }
@@ -331,7 +351,7 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     dl_m->name = value[1];
-    dl_m->path = value[2];
+    dl_m->path = module_path;
 
     return NGX_CONF_OK;
 }
@@ -435,7 +455,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 
     if (ngx_strcmp(value[0].data, "load") == 0) {
 
-        if (cf->args->nelts != 3) {
+        if (cf->args->nelts != 2 && cf->args->nelts != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                 "invalid number of arguments in \"load\" directive");
             return NGX_CONF_ERROR;

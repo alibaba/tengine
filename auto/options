@@ -615,51 +615,51 @@ cat << END
   --with-http_stub_status_module     enable ngx_http_stub_status_module
   --with-http_upstream_check_module  enable ngx_http_upstream_check_module
 
-  --with-http_addition_module=shared enable ngx_http_addition_filter_module(shared)
-  --with-http_xslt_module=shared     enable ngx_http_xslt_filter_module(shared)
+  --with-http_addition_module=shared enable ngx_http_addition_filter_module (shared)
+  --with-http_xslt_module=shared     enable ngx_http_xslt_filter_module (shared)
   --with-http_image_filter_module=shared
-                                     enable ngx_http_image_filter_module(shared)
+                                     enable ngx_http_image_filter_module (shared)
   --with-http_geoip_module=shared    enable ngx_http_geoip_module
-  --with-http_sub_module=shared      enable ngx_http_sub_filter_module(shared)
-  --with-http_flv_module=shared      enable ngx_http_flv_module(shared)
-  --with-http_slice_module=shared    enable ngx_http_slice_module(shared)
-  --with-http_mp4_module=shared      enable ngx_http_mp4_module(shared)
-  --with-http_concat_module=shared   enable ngx_http_concat_module(shared)
+  --with-http_sub_module=shared      enable ngx_http_sub_filter_module (shared)
+  --with-http_flv_module=shared      enable ngx_http_flv_module (shared)
+  --with-http_slice_module=shared    enable ngx_http_slice_module (shared)
+  --with-http_mp4_module=shared      enable ngx_http_mp4_module (shared)
+  --with-http_concat_module=shared   enable ngx_http_concat_module (shared)
   --with-http_random_index_module=shared
-                                     enable ngx_http_random_index_module(shared)
+                                     enable ngx_http_random_index_module (shared)
   --with-http_secure_link_module=shared
-                                     enable ngx_http_secure_link_module(shared)
-  --with-http_sysguard_module=shared enable ngx_http_sysguard_module(shared)
+                                     enable ngx_http_secure_link_module (shared)
+  --with-http_sysguard_module=shared enable ngx_http_sysguard_module (shared)
   --with-http_charset_filter_module=shared
-                                     enable ngx_http_charset_filter_module(shared)
+                                     enable ngx_http_charset_filter_module (shared)
   --with-http_userid_filter_module=shared
-                                     enable ngx_http_userid_filter_module(shared)
+                                     enable ngx_http_userid_filter_module (shared)
   --with-http_footer_filter_module=shared
-                                     enable ngx_http_footer_filter_module(shared)
-  --with-http_access_module=shared   enable ngx_http_access_module(shared)
+                                     enable ngx_http_footer_filter_module (shared)
+  --with-http_access_module=shared   enable ngx_http_access_module (shared)
   --with-http_autoindex_module=shared
-                                     enable ngx_http_autoindex_module(shared)
-  --with-http_map_module=shared      enable ngx_http_map_module(shared)
+                                     enable ngx_http_autoindex_module (shared)
+  --with-http_map_module=shared      enable ngx_http_map_module (shared)
   --with-http_split_clients_module=shared
-                                     enable ngx_http_split_clients_module(shared)
-  --with-http_referer_module=shared  enable ngx_http_referer_module(shared)
-  --with-http_rewrite_module=shared  enable ngx_http_rewrite_module(shared)
-  --with-http_fastcgi_module=shared  enable ngx_http_fastcgi_module(shared)
-  --with-http_uwsgi_module=shared    enable ngx_http_uwsgi_module(shared)
-  --with-http_scgi_module=shared     enable ngx_http_scgi_module(shared)
+                                     enable ngx_http_split_clients_module (shared)
+  --with-http_referer_module=shared  enable ngx_http_referer_module (shared)
+  --with-http_rewrite_module=shared  enable ngx_http_rewrite_module (shared)
+  --with-http_fastcgi_module=shared  enable ngx_http_fastcgi_module (shared)
+  --with-http_uwsgi_module=shared    enable ngx_http_uwsgi_module (shared)
+  --with-http_scgi_module=shared     enable ngx_http_scgi_module (shared)
   --with-http_memcached_module=shared
-                                     enable ngx_http_memcached_module(shared)
+                                     enable ngx_http_memcached_module (shared)
   --with-http_limit_conn_module=shared
-                                     enable ngx_http_limit_conn_module(shared)
+                                     enable ngx_http_limit_conn_module (shared)
   --with-http_limit_req_module=shared
-                                     enable ngx_http_limit_req_module(shared)
+                                     enable ngx_http_limit_req_module (shared)
   --with-http_empty_gif_module=shared
-                                     enable ngx_http_empty_gif_module(shared)
-  --with-http_browser_module=shared  enable ngx_http_browser_module(shared)
+                                     enable ngx_http_empty_gif_module (shared)
+  --with-http_browser_module=shared  enable ngx_http_browser_module (shared)
   --with-http_user_agent_module=shared
-                                     enable ngx_http_user_agent_module(shared)
+                                     enable ngx_http_user_agent_module (shared)
   --with-http_upstream_ip_hash_module=shared
-                                     enable ngx_http_upstream_ip_hash_module(shared)
+                                     enable ngx_http_upstream_ip_hash_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
