@@ -28,7 +28,7 @@
     
     dso {
          path /home/nginx-dso/module/;
-         load ngx_http_lua_module             ngx_http_lua_module.so;
+         load ngx_http_lua_module;
          load ngx_http_access_module          ngx_http_access_module.so;
          load ngx_http_flv_module             ngx_http_flv_module.so;
          load ngx_http_memcached_module       ngx_http_memcached_module.so;
@@ -48,13 +48,13 @@
 load
 ------------------------
 
-**Syntax**: *load module_name module_path*
+**Syntax**: *load module_name [module_path]*
 
 **Default**: *none*
 
 **Context**: *dso*
 
-load命令用于在指定的路径(module\_path),将指定的模块(module\_name)动态加载到Nginx中。
+load命令用于在指定的路径(module\_path),将指定的模块(module\_name)动态加载到Nginx中。其中module\_path是可选的,如果没有module\_path参数，那么默认path是 $(modulename).so.
 
 对于module\_path的路径查找，这里是严格按照下面的顺序的
 
@@ -65,9 +65,9 @@ load命令用于在指定的路径(module\_path),将指定的模块(module\_name
 例子:
 
     load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
+    load ngx_http_test_module;
 
-将会从lib\_ngx\_http\_empty\_gif\_module.so.加载empty\_gif模块。
-
+将会从ngx\_http\_empty\_gif\_module.so.加载empty\_gif模块。以及从ngx\_http\_test\_module.so加载ngx\_http\_test\_module模块.
 
 order
 -------------

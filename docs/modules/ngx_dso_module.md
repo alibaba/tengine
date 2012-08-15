@@ -24,7 +24,7 @@ Exampe
     
     dso {
          path /home/nginx-dso/module/;
-         load ngx_http_lua_module             ngx_http_lua_module.so;
+         load ngx_http_lua_module;
          load ngx_http_access_module          ngx_http_access_module.so;
          load ngx_http_flv_module             ngx_http_flv_module.so;
          load ngx_http_memcached_module       ngx_http_memcached_module.so;
@@ -43,13 +43,15 @@ Directives
 load
 ------------------------
 
-**Syntax**: *load module_name module_path*
+**Syntax**: *load module_name [module_path]*
 
 **Default**: *none*
 
 **Context**: *dso*
 
 The load directive links in the object file or library filename and adds the module structure named module to the list of active modules,module\_name is the name of the DSO module, module\_path is the path of the DSO module.
+
+If module_path is miss, default module\_path is $(module_name).so.
 
 There are three possibility with the module_path. It will search the module in below order.
 
@@ -61,9 +63,9 @@ There are three possibility with the module_path. It will search the module in b
 Example:
 
     load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
+    load ngx_http_test_module;
 
-load empty_gif module from lib\_ngx\_http\_empty\_gif\_module.so.
-
+load ngx_http_empty_gif_module module from ngx\_http\_empty\_gif\_module.so, and load ngx_http_test_module module from ngx\_http\_test\_module.so.
 
 order
 -------------
