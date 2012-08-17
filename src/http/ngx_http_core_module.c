@@ -2378,7 +2378,7 @@ ngx_http_subrequest(ngx_http_request_t *r,
     r->main->subrequests--;
 
     if (r->main->subrequests == 0) {
-        ngx_http_probe_subrequest_cycle(r, &uri, &args);
+        ngx_http_probe_subrequest_cycle(r, uri, args);
 
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "subrequests cycle while processing \"%V\"", uri);
