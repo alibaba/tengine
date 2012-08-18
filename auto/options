@@ -108,6 +108,7 @@ HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
 HTTP_STUB_STATUS=NO
+HTTP_TRAFFIC_STATUS=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -287,6 +288,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
+        --with-http_traffic_status_module) HTTP_TRAFFIC_STATUS=YES  ;;
         --with-http_stub_status_module)  HTTP_STUB_STATUS=YES       ;;
 
         --with-mail)                     MAIL=YES                   ;;
@@ -401,6 +403,7 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_sysguard_module        enable ngx_http_sysguard_module
+  --with-http_traffic_status_module  enable ngx_http_traffic_status_module
   --with-http_stub_status_module     enable ngx_http_stub_status_module
   --with-http_upstream_check_module  enable ngx_http_upstream_check_module
 

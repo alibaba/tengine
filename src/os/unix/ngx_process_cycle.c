@@ -11,7 +11,7 @@
 #include <ngx_channel.h>
 
 
-#define NGX_PIPE_STILL_NEEDED     2
+#define NGX_CYCLE_STILL_NEEDED     2
 
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
@@ -96,7 +96,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     u_char            *p;
     size_t             size;
     ngx_int_t          i;
-    ngx_uint_t         n, sigio, close_old_pipe;
+    ngx_uint_t         n, sigio, rm_old_cycles;
     sigset_t           set;
     struct itimerval   itv;
     ngx_uint_t         live;
@@ -152,7 +152,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 #endif
 
     ngx_new_binary = 0;
-    close_old_pipe = 0;
+    rm_old_cycles = 0;
     delay = 0;
     sigio = 0;
     live = 1;
@@ -193,9 +193,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
             live = ngx_reap_children(cycle);
-            if (!(live & NGX_PIPE_STILL_NEEDED) && close_old_pipe) {
+            if (!(live & NGX_CYCLE_STILL_NEEDED) && rm_old_cycles) {
                 ngx_close_old_pipes();
-                close_old_pipe = 0;
+                ngx_free_old_shm_cycles();
+                rm_old_cycles = 0;
             }
         }
 
@@ -278,7 +279,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 #endif
 
             live = 1;
-            close_old_pipe = 1;
+            rm_old_cycles = 1;
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
@@ -707,7 +708,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
             live |= 1;
 
             if (ngx_processes[i].exiting) {
-                live |= NGX_PIPE_STILL_NEEDED;
+                live |= NGX_CYCLE_STILL_NEEDED;
             }
         }
     }
