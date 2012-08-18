@@ -125,6 +125,11 @@ struct ngx_connection_s {
     ngx_listening_t    *listening;
 
     off_t               sent;
+#if (NGX_TRAFFIC_STATUS)
+    off_t               received;
+
+    void               *status;
+#endif
 
     ngx_log_t          *log;
 
