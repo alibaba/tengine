@@ -4,6 +4,7 @@ typedef int64_t ngx_int_t;
 typedef struct { int dummy; } ngx_module_t;
 typedef struct { int dummy; } ngx_http_module_t;
 typedef struct { int dummy; } ngx_table_elt_t;
+typedef struct { int dummy; } ngx_event_t;
 
 
 provider nginx {
@@ -21,6 +22,9 @@ provider nginx {
     probe http__read__body__done(ngx_http_request_t *r);
     probe http__read__req__line__done(ngx_http_request_t *r);
     probe http__read__req__header__done(ngx_http_request_t *r, ngx_table_elt_t *h);
+    probe timer__add(ngx_event_t *ev, ngx_msec_t timer);
+    probe timer__del(ngx_event_t *ev);
+    probe timer__expire(ngx_event_t *ev);
 };
 
 

@@ -144,6 +144,8 @@ ngx_event_expire_timers(void)
             }
 #endif
 
+            ngx_event_probe_timer_expire(ev);
+
             ev->timedout = 1;
 
             ev->handler(ev);
