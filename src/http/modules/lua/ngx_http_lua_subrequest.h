@@ -12,5 +12,13 @@ ngx_int_t ngx_http_lua_post_subrequest(ngx_http_request_t *r, void *data,
         ngx_int_t rc);
 
 
+extern ngx_str_t  ngx_http_lua_get_method;
+extern ngx_str_t  ngx_http_lua_put_method;
+extern ngx_str_t  ngx_http_lua_post_method;
+extern ngx_str_t  ngx_http_lua_head_method;
+extern ngx_str_t  ngx_http_lua_delete_method;
+extern ngx_str_t  ngx_http_lua_options_method;
+
+
 #endif /* NGX_HTTP_LUA_SUBREQUEST_H */
 
