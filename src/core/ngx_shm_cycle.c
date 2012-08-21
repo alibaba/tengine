@@ -15,8 +15,9 @@
 typedef struct {
     ngx_list_t        shared_memory;
     ngx_uint_t        generation;
-    unsigned          used:1;
     ngx_pool_t       *pool;
+    unsigned          used:1;
+    unsigned          ready:1;
 } ngx_shm_cycle_t;
 
 
@@ -59,7 +60,10 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
             continue;
         }
 
-        if (ngx_shm_cycles[i].generation + 1 == ngx_shm_cycle_generation) {
+        if (ngx_shm_cycles[i].ready
+            && (last_use == -1 || ngx_shm_cycles[i].generation
+                                        > ngx_shm_cycles[last_use].generation))
+        {
             last_use = i;
         }
     }
@@ -157,6 +161,7 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
     }
 
     shm_zone->data = NULL;
+    shm_zone->shm.addr = NULL;
     shm_zone->shm.log = cf->cycle->log;
     shm_zone->shm.size = size;
     shm_zone->shm.name = *name;
@@ -186,7 +191,10 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
             continue;
         }
 
-        if (ngx_shm_cycles[i].generation + 1 == ngx_shm_cycle_generation) {
+        if (ngx_shm_cycles[i].ready
+            && (last_use == -1 || ngx_shm_cycles[i].generation
+                                        > ngx_shm_cycles[last_use].generation))
+        {
             last_use = i;
         }
     }
@@ -234,7 +242,7 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
-            return NGX_OK;
+            continue;
         }
 
         opart = &ngx_shm_cycles[last_use].shared_memory.part;
@@ -271,6 +279,8 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
             }
         }
     }
+
+    ngx_shm_cycles[i].ready = 1;
 
     return NGX_OK;
 }
@@ -318,10 +328,13 @@ ngx_close_shm_cycle(ngx_shm_cycle_t *shm_cycle)
             i = 0;
         }
 
-        ngx_shm_free(&shm_zone[i].shm);
+        if (shm_zone[i].shm.addr != NULL) {
+            ngx_shm_free(&shm_zone[i].shm);
+        }
     }
 
     ngx_destroy_pool(shm_cycle->pool);
+    shm_cycle->ready = 0;
     shm_cycle->used = 0;
 }
 

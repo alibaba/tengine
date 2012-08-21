@@ -6,7 +6,7 @@
 
 
 typedef struct {
-    ngx_uint_t             key;
+    uintptr_t              key;
     unsigned               ipv6:1;
     unsigned               port:16;
 } ngx_http_status_vip_index_t;
@@ -492,6 +492,8 @@ ngx_http_status_init_process(ngx_cycle_t *cycle)
         if (*ppid == 0) {
             goto found;
         }
+
+        /* when a worker is down, the new one will take place its position */
 
         for (j = 0; j < ngx_last_process; j++) {
             if (ngx_processes[j].pid == -1) {
