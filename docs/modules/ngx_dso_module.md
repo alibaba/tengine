@@ -1,36 +1,37 @@
 Name
 ====
 
-* dso module
+* Dynamic Module Loading Support (DSO)
 
 Description
 ===========
 
-* On selected operating systems this module can be used to load modules into Tengine at runtime via the DSO (Dynamic Shared Object) mechanism, rather than requiring a recompilation.
+* You can choose which functionalities to include by selecting a set of modules. A module will be compiled as a Dynamic Shared Object (DSO) that exists from the main Tengine binary. So you don't have to recompile Tengine when you want to add or enable a functionality to it.
 
-* If you want to compile official module with DSO, you should add the configure argument named --with-http\_xxx_module, see the ./configure --help for detail.
+* If you want to enable an standard module, you should enable it via configure's option while compiling Tengine, for instance, --with-http\_example_module or --with-http\_example_module=shared. Run ./configure --help for more details.
 
-* DSO loaded module will limit to 128.
+* The maximum of dynamic loaded modules is limited to 128.
 
-* DSO just support HTTP module;
+* For now, only HTTP modules are dynamic-loaded supported.
 
-* This module are tested successfully in Linux/FreeeBSD/MacOS.
+* This feature is tested only on Linux/FreeBSD/MacOS.
 
 
-Exampe
+Example
 ===========
 
     worker_processes  1;
     
     dso {
-         path /home/nginx-dso/module/;
-         load ngx_http_lua_module;
-         load ngx_http_access_module          ngx_http_access_module.so;
-         load ngx_http_flv_module             ngx_http_flv_module.so;
-         load ngx_http_memcached_module       ngx_http_memcached_module.so;
-         load ngx_http_sub_filter_module      ngx_http_sub_filter_module.so;
-         load ngx_http_addition_filter_module ngx_http_addition_filter_module.so;
-         load ngx_http_footer_filter_module   ngx_http_footer_filter_module.so;
+         path /home/nginx-dso/module;
+
+         load ngx_http_lua_module.so;
+         load ngx_http_access_module.so;
+         load ngx_http_flv_module.so;
+         load ngx_http_memcached_module.so;
+         load ngx_http_sub_filter_module.so;
+         load ngx_http_addition_filter_module.so;
+         load ngx_http_footer_filter_module.so;
     }
 
     events {
@@ -43,29 +44,27 @@ Directives
 load
 ------------------------
 
-**Syntax**: *load module_name [module_path]*
+**Syntax**: *load [module_name] [module_path]*
 
 **Default**: *none*
 
 **Context**: *dso*
 
-The load directive links in the object file or library filename and adds the module structure named module to the list of active modules,module\_name is the name of the DSO module, module\_path is the path of the DSO module.
+The load directive loads the object file or library file and adds the specified module to the list of active modules. module\_name is the name of the DSO module, and module\_path is the path of the DSO module.
 
-If module_path is miss, default module\_path is $(module_name).so.
+The order in which the module is searched is as follows:
 
-There are three possibility with the module_path. It will search the module in below order.
-
-1 absolute path.
-2 relative to path that path directive.
-3 relative to default path(NGX\_PREFIX/modules or path which is specified with --dso-path when configure).
+* the absolute path.
+* relative path to the prefix specified by the 'path' directive.
+* relative path to the default path (NGX\_PREFIX/modules or path which is specified by the '--dso-path' configure option).
 
 
 Example:
 
     load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
-    load ngx_http_test_module;
 
-load ngx_http_empty_gif_module module from ngx\_http\_empty\_gif\_module.so, and load ngx_http_test_module module from ngx\_http\_test\_module.so.
+It will load the ngx\_http\_empty\_gif\_module from ngx\_http\_empty\_gif\_module.so.
+
 
 order
 -------------
@@ -77,13 +76,13 @@ order
 **Context**: *dso*
 
 
-This directive can insert your module to nginx' module order list(please see conf/module_order). Be careful, it will change the module runtime order. This directive does not need to be set in most cases.
+This directive can insert a module into Nginx's module array in order (see conf/module_order for more details). Note it will change the module runtime order. This directive does not need to be used in most cases.
 
 Example:
 
      order module_order;
      
-in module_order file:
+in the 'module_order' file:
  
         ngx_core_module;
         ngx_errlog_module;
@@ -98,7 +97,7 @@ in module_order file:
         ngx_http_addition_filter_module;
         ngx_http_my_filter_module;
 
-this will insert my\_filter before addition\_filter module.
+It will insert ngx\_http\_my\_filter\_module before ngx\_http\_addition\_filter\_module.
 
 
 path
@@ -110,13 +109,13 @@ path
 
 **Context**: *dso*
 
-The dso_path set default path for DSO module
+This directive specifies the default path (prefix) for DSO modules.
 
 Example:
 
-    path /home/dso/module/;
+    path /home/dso/module;
 
-Set default path to /home/dso/module/.
+Sets the default path to /home/dso/module.
 
 
 Tools
@@ -125,10 +124,10 @@ Tools
 dso_tools
 ------------------------
 
-This tools is used to compile the third nginx'module.
+This tools can be used to compile a third party nginx module.
 
 Example:
 
     ./dso_tools --add-module=/home/dso/lua-nginx-module
 
-This will compile ngx_lua module to dso, and install dso to default module path.
+It will compile the ngx_lua module into a shared object, and install it to the default module path.
