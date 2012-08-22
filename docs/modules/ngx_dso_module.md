@@ -41,6 +41,23 @@ Example
 Directives
 ==========
 
+include
+-------------
+
+**Syntax**: *include file_name*
+
+**Default**: *none*
+
+**Context**: *dso*
+
+Specifies a file contain order of module(via module_order directive).
+
+Example:
+    
+    include module_order
+
+It will load conf/module_order file and define order of module(via module\_order directive).
+
 load
 ------------------------
 
@@ -66,10 +83,10 @@ Example:
 It will load the ngx\_http\_empty\_gif\_module from ngx\_http\_empty\_gif\_module.so.
 
 
-order
+module_order
 -------------
 
-**Syntax**: *order file*
+**Syntax**: *module_order module_name*
 
 **Default**: *none*
 
@@ -80,22 +97,18 @@ This directive can insert a module into Nginx's module array in order (see conf/
 
 Example:
 
-     order module_order;
-     
-in the 'module_order' file:
- 
-        ngx_core_module;
-        ngx_errlog_module;
-        ngx_conf_module;
-        ngx_events_module;
-        ngx_event_core_module;
-        ngx_epoll_module;
-        ngx_openssl_module;
-        ngx_http_module;
-        ngx_http_core_module;
+        module_order ngx_core_module;
+        module_order ngx_errlog_module;
+        module_order ngx_conf_module;
+        module_order ngx_events_module;
+        module_order ngx_event_core_module;
+        module_order ngx_epoll_module;
+        module_order ngx_openssl_module;
+        module_order ngx_http_module;
+        module_order ngx_http_core_module;
         .......................
-        ngx_http_addition_filter_module;
-        ngx_http_my_filter_module;
+        module_order ngx_http_addition_filter_module;
+        module_order ngx_http_my_filter_module;
 
 It will insert ngx\_http\_my\_filter\_module before ngx\_http\_addition\_filter\_module.
 

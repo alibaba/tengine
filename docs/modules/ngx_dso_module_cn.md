@@ -45,6 +45,24 @@
 指令
 ==========
 
+include
+-------------
+
+**Syntax**: *include file_name*
+
+**Default**: *none*
+
+**Context**: *dso*
+
+include命令主要用于指定一个文件，这个文件里面包含了对应模块顺序(module_order指令),有关于module\_order指令可以看下面的module\_order部分.
+
+例子:
+
+    include module_order
+    
+将会加载conf/module_order这个文件，这个文件主要是由(module_order指令组成).
+
+
 load
 ------------------------
 
@@ -69,36 +87,32 @@ load命令用于在指定的路径(module\_path),将指定的模块(module\_name
 
 将会从ngx\_http\_empty\_gif\_module.so.加载empty\_gif模块。以及从ngx\_http\_test\_module.so加载ngx\_http\_test\_module模块.
 
-order
+module_order
 -------------
 
-**Syntax**: *order file*
+**Syntax**: *module_order module_name*
 
 **Default**: *none*
 
 **Context**: *dso*
 
 
-这个指令主要是将你需要的动态模块插入到你所需要的位置(可以看conf/module\_order这个文件),这个模块要很小心使用，因为它将会改变你的模块的运行时顺序(在Nginx中模块都是有严格顺序的).而大多数时候这个命令都是不需要设置的。
+这个指令主要是将你需要的动态模块插入到你所需要的位置(可以看conf/module\_order这个文件),这个命令要很小心使用，因为它将会改变你的模块的运行时顺序(在Nginx中模块都是有严格顺序的).而大多数时候这个命令都是不需要设置的。
 
 例子:
-
-     order module_order;
-     
- 在 module_order这个文件中:
  
-        ngx_core_module;
-        ngx_errlog_module;
-        ngx_conf_module;
-        ngx_events_module;
-        ngx_event_core_module;
-        ngx_epoll_module;
-        ngx_openssl_module;
-        ngx_http_module;
-        ngx_http_core_module;
+        module_order ngx_core_module;
+        module_order ngx_errlog_module;
+        module_order ngx_conf_module;
+        module_order ngx_events_module;
+        module_order ngx_event_core_module;
+        module_order ngx_epoll_module;
+        module_order ngx_openssl_module;
+        module_order ngx_http_module;
+        module_order ngx_http_core_module;
         .......................
-        ngx_http_addition_filter_module;
-        ngx_http_my_filter_module;
+        module_order ngx_http_addition_filter_module;
+        module_order ngx_http_my_filter_module;
 
 上面这个例子将会插入my\_filter模块到addition\_filter之前执行。
 

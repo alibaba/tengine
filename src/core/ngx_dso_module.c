@@ -434,7 +434,6 @@ ngx_dso_template(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
     pcf = *cf;
     cf->ctx = ctx;
     cf->module_type = NGX_CORE_MODULE;
-    cf->handler = ngx_dso_order;
 
     rv = ngx_conf_parse(cf, &file);
 
@@ -480,7 +479,18 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
         return NGX_CONF_OK;
     }
 
-    if (ngx_strcmp(value[0].data, "order") == 0) {
+    if (ngx_strcmp(value[0].data, "module_order") == 0) {
+
+        if (cf->args->nelts != 2) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                "invalid number of arguments in \"sequence\" directive");
+            return NGX_CONF_ERROR;
+        }
+
+        return ngx_dso_order(cf, dummy, conf);
+    }
+
+    if (ngx_strcmp(value[0].data, "include") == 0) {
 
         if (cf->args->nelts != 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -592,7 +602,7 @@ ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
     ctx = cf->ctx;
 
-    if (cf->args->nelts != 1) {
+    if (cf->args->nelts != 2) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                 "unknown directive \"%s\"", value[0].data);
         return NGX_CONF_ERROR;
@@ -603,7 +613,7 @@ ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    *module_name = value[0];
+    *module_name = value[1];
 
     return NGX_CONF_OK;
 }
