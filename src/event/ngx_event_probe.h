@@ -9,6 +9,7 @@
 
 #if (NGX_DTRACE)
 
+#include <ngx_http.h>
 #include <ngx_dtrace_provider.h>
 
 #define ngx_event_probe_timer_add(ev, timer)                                 \

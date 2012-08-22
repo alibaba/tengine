@@ -1,10 +1,13 @@
 typedef struct { int dummy; } ngx_http_request_t;
 typedef struct { int dummy; } ngx_str_t;
 typedef int64_t ngx_int_t;
+typedef uint64_t ngx_uint_t;
+typedef ngx_uint_t ngx_msec_t;
 typedef struct { int dummy; } ngx_module_t;
 typedef struct { int dummy; } ngx_http_module_t;
 typedef struct { int dummy; } ngx_table_elt_t;
 typedef struct { int dummy; } ngx_event_t;
+typedef char unsigned u_char;
 
 
 provider nginx {
