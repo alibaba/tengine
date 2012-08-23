@@ -103,6 +103,8 @@ ngx_os_status(ngx_log_t *log)
 }
 
 
+#if 0
+
 ngx_int_t
 ngx_posix_post_conf_init(ngx_log_t *log)
 {
@@ -127,3 +129,5 @@ ngx_posix_post_conf_init(ngx_log_t *log)
 
     return NGX_OK;
 }
+
+#endif
