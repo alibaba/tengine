@@ -10,7 +10,7 @@
 #include <ngx_http.h>
 
 #if (NGX_TRAFFIC_STATUS)
-#include <ngx_http_status_module.h>
+#include <ngx_http_ipstat_module.h>
 #endif
 
 
@@ -409,11 +409,12 @@ ngx_http_init_request(ngx_event_t *rev)
     }
 
 #if (NGX_TRAFFIC_STATUS)
-    c->status = ngx_http_status_find_vip(vip_key);
+    c->status = ngx_http_ipstat_find_vip(vip_key);
 
     if (c->requests == 1) {
-        ngx_http_status_count(c->status, NGX_HTTP_STATUS_CONN_CURRENT, 1);
-        ngx_http_status_count(c->status, NGX_HTTP_STATUS_CONN_TOTAL, 1);
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_CURRENT, 1);
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_TOTAL, 1);
+        ngx_http_ipstat_rate(c->status, NGX_HTTP_IPSTAT_CONN_RATE, 1);
     }
 #endif
 
@@ -500,11 +501,12 @@ ngx_http_init_request(ngx_event_t *rev)
         return;
     }
 
-    cln->handler = ngx_http_status_close_request;
+    cln->handler = ngx_http_ipstat_close_request;
     cln->data = c;
 
-    ngx_http_status_count(c->status, NGX_HTTP_STATUS_REQ_CURRENT, 1);
-    ngx_http_status_count(c->status, NGX_HTTP_STATUS_REQ_TOTAL, 1);
+    ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_REQ_CURRENT, 1);
+    ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_REQ_TOTAL, 1);
+    ngx_http_ipstat_rate(c->status, NGX_HTTP_IPSTAT_REQ_RATE, 1);
 #endif
 
 
@@ -3181,7 +3183,7 @@ ngx_http_close_connection(ngx_connection_t *c)
 
 #if (NGX_TRAFFIC_STATUS)
     if (c->status) {
-        ngx_http_status_count(c->status, NGX_HTTP_STATUS_CONN_CURRENT, -1);
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_CURRENT, -1);
     }
 #endif
 

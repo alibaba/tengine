@@ -230,12 +230,13 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
             return NGX_ERROR;
         }
 
-
         if (!shm_zone[i].shm.exists
             && ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK)
         {
             return NGX_ERROR;
         }
+
+        shm_zone[i].shm.exists = 0;
 
         if (last_use == -1) {
             if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
@@ -280,7 +281,7 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
         }
     }
 
-    ngx_shm_cycles[i].ready = 1;
+    ngx_shm_cycles[use].ready = 1;
 
     return NGX_OK;
 }
