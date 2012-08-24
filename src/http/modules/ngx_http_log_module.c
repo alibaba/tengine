@@ -92,6 +92,8 @@ typedef struct {
 
     ngx_uint_t                  escape;
 
+    ngx_flag_t                  log_empty_request;
+
     ngx_uint_t                  off;        /* unsigned  off:1 */
 } ngx_http_log_loc_conf_t;
 
@@ -201,6 +203,13 @@ static ngx_command_t  ngx_http_log_commands[] = {
       offsetof(ngx_http_log_loc_conf_t, escape),
       &ngx_http_log_var_escape_types },
 
+    { ngx_string("log_empty_request"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_log_loc_conf_t, log_empty_request),
+      NULL },
+
       ngx_null_command
 };
 
@@ -291,6 +300,12 @@ ngx_http_log_handler(ngx_http_request_t *r)
     lcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
 
     if (lcf->off) {
+        return NGX_OK;
+    }
+
+    if (r->headers_out.status == NGX_HTTP_BAD_REQUEST && !lcf->log_empty_request
+        && (r->header_in && r->header_in->last == r->header_in->start))
+    {
         return NGX_OK;
     }
 
@@ -998,6 +1013,7 @@ ngx_http_log_create_loc_conf(ngx_conf_t *cf)
 
     conf->open_file_cache = NGX_CONF_UNSET_PTR;
     conf->escape = NGX_CONF_UNSET_UINT;
+    conf->log_empty_request = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1015,6 +1031,7 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->escape, prev->escape,
                               NGX_HTTP_LOG_ESCAPE_ON);
+    ngx_conf_merge_value(conf->log_empty_request, prev->log_empty_request, 1);
 
     if (conf->open_file_cache == NGX_CONF_UNSET_PTR) {
 
