@@ -12,8 +12,8 @@ struct ngx_http_reqstat_rbnode_s {
     unsigned                     new:1;
     ngx_http_reqstat_rbnode_t   *next;
     ngx_queue_t                  queue;
-    ngx_atomic_t                 byte_in;
-    ngx_atomic_t                 byte_out;
+    ngx_atomic_t                 bytes_in;
+    ngx_atomic_t                 bytes_out;
     ngx_atomic_t                 conn_total;
     ngx_atomic_t                 req_total;
     u_char                       data[1];
@@ -42,22 +42,28 @@ typedef struct {
 } ngx_http_reqstat_ctx_t;
 
 
-static off_t               ct_off[4] = {
-    offsetof(ngx_http_reqstat_rbnode_t, byte_in),
-    offsetof(ngx_http_reqstat_rbnode_t, byte_out),
-    offsetof(ngx_http_reqstat_rbnode_t, conn_total),
+#define NGX_HTTP_REQSTAT_BYTES_IN                                       \
+    offsetof(ngx_http_reqstat_rbnode_t, bytes_in)
+
+#define NGX_HTTP_REQSTAT_BYTES_OUT                                      \
+    offsetof(ngx_http_reqstat_rbnode_t, bytes_out)
+
+#define NGX_HTTP_REQSTAT_CONN_TOTAL                                     \
+    offsetof(ngx_http_reqstat_rbnode_t, conn_total)
+
+#define NGX_HTTP_REQSTAT_REQ_TOTAL                                      \
     offsetof(ngx_http_reqstat_rbnode_t, req_total)
-};
-
-
-#define NGX_HTTP_REQSTAT_BYTE_IN             0
-#define NGX_HTTP_REQSTAT_BYTE_OUT            1
-#define NGX_HTTP_REQSTAT_CONN_TOTAL          2
-#define NGX_HTTP_REQSTAT_REQ_TOTAL           3
-
 
 #define REQ_FIELD(node, offset)                                         \
     ((ngx_atomic_t *) ((char *) node + offset))
+
+
+static off_t               fields[4] = {
+    NGX_HTTP_REQSTAT_BYTES_IN,
+    NGX_HTTP_REQSTAT_BYTES_OUT,
+    NGX_HTTP_REQSTAT_CONN_TOTAL,
+    NGX_HTTP_REQSTAT_REQ_TOTAL
+};
 
 
 static void * ngx_http_reqstat_create_main_conf(ngx_conf_t *cf);
@@ -71,7 +77,8 @@ static char * ngx_http_reqstat_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char * ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static void ngx_http_reqstat_count(void *data, int index, ngx_int_t incr);
+static void ngx_http_reqstat_count(void *data, off_t offset,
+    ngx_int_t incr);
 static ngx_int_t ngx_http_reqstat_init_zone(ngx_shm_zone_t *shm_zone,
     void *data);
 
@@ -79,7 +86,8 @@ static ngx_int_t ngx_http_reqstat_log_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_reqstat_show_handler(ngx_http_request_t *r);
 
 static ngx_http_reqstat_rbnode_t *
-    ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val);
+    ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone,
+    ngx_str_t *val);
 static void ngx_http_reqstat_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
@@ -437,9 +445,9 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
             }
 
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_REQ_TOTAL, 1);
-            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTE_IN,
+            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN,
                                    r->connection->received);
-            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTE_OUT,
+            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT,
                                    r->connection->sent);
         }
     }
@@ -514,9 +522,9 @@ ngx_http_reqstat_show_handler(ngx_http_request_t *r)
             b->last = ngx_slprintf(b->last, b->end, "%*s,",
                                    (size_t) node->len, node->data);
 
-            for (j = 0; j < sizeof(ct_off) / sizeof(off_t); j++) {
+            for (j = 0; j < sizeof(fields) / sizeof(off_t); j++) {
                 b->last = ngx_slprintf(b->last, b->end, "%ud,",
-                                       *REQ_FIELD(node, ct_off[j]));
+                                       *REQ_FIELD(node, fields[j]));
             }
 
             *(b->last - 1) = '\n';
@@ -543,12 +551,12 @@ ngx_http_reqstat_show_handler(ngx_http_request_t *r)
 
 
 void
-ngx_http_reqstat_count(void *data, int index, ngx_int_t incr)
+ngx_http_reqstat_count(void *data, off_t offset, ngx_int_t incr)
 {
     ngx_http_reqstat_rbnode_t    *node;
 
     for (node = data; node; node = node->next) {
-        (void) ngx_atomic_fetch_add(REQ_FIELD(node, ct_off[index]), incr);
+        (void) ngx_atomic_fetch_add(REQ_FIELD(node, offset), incr);
     }
 }
 
@@ -671,8 +679,8 @@ ngx_http_reqstat_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
         rs = ngx_http_reqstat_rbtree_lookup(shm_zone, &val);
 
-        ngx_memcpy((char *) rs + ct_off[0], (char *) ors + ct_off[0],
-                   offsetof(ngx_http_reqstat_rbnode_t, data) - ct_off[0]);
+        ngx_memcpy((char *) rs + fields[0], (char *) ors + fields[0],
+                   offsetof(ngx_http_reqstat_rbnode_t, data) - fields[0]);
 
         ors->next = rs;
     }
