@@ -272,13 +272,22 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
                 continue;
             }
 
-
             if (shm_zone[i].init(&shm_zone[i], oshm_zone[n].data)
                 != NGX_OK)
             {
                 return NGX_ERROR;
             }
+
+            goto found;
         }
+
+        if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+found:
+
+        continue;
     }
 
     ngx_shm_cycles[use].ready = 1;
