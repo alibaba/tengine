@@ -1,21 +1,25 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010 Taobao Inc. <http://www.taobao.com>
+ * Copyright (C) 2010 Joshua Zhu  <shudu@taobao.com>
  */
 
 
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <nginx.h>
 
 
 typedef struct {
-    ngx_flag_t        enable;
-    ngx_uint_t        max_files;
-    ngx_flag_t        unique;
+    ngx_str_t    delimiter;
+    ngx_flag_t   enable;
+    ngx_flag_t   neglection;
+    ngx_uint_t   max_files;
+    ngx_flag_t   unique;
 
-    ngx_hash_t        types;
-    ngx_array_t      *types_keys;
+    ngx_hash_t   types;
+    ngx_array_t *types_keys;
 } ngx_http_concat_loc_conf_t;
 
 
@@ -27,7 +31,7 @@ static char *ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child);
 
 
-static ngx_str_t  ngx_http_concat_default_types[] = {
+ngx_str_t  ngx_http_concat_default_types[] = {
     ngx_string("application/x-javascript"),
     ngx_string("text/css"),
     ngx_null_string
@@ -44,7 +48,7 @@ static ngx_command_t  ngx_http_concat_commands[] = {
       NULL },
 
     { ngx_string("concat_max_files"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_concat_loc_conf_t, max_files),
@@ -63,6 +67,20 @@ static ngx_command_t  ngx_http_concat_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_concat_loc_conf_t, types_keys),
       &ngx_http_concat_default_types[0] },
+    
+    { ngx_string("concat_delimiter"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_concat_loc_conf_t, delimiter),
+      NULL },
+    
+    { ngx_string("concat_neglection"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_concat_loc_conf_t, neglection),
+      NULL },
 
       ngx_null_command
 };
@@ -102,15 +120,15 @@ ngx_module_t  ngx_http_concat_module = {
 static ngx_int_t
 ngx_http_concat_handler(ngx_http_request_t *r)
 {
-    off_t                       length;
     u_char                     *p, *v, *e, *last, *last_type;
     size_t                      root, last_len;
+    off_t                       length;
     time_t                      last_modified;
-    ngx_buf_t                  *b;
-    ngx_str_t                  *uri, *filename, path;
     ngx_int_t                   rc;
     ngx_uint_t                  i, j, level;
+    ngx_str_t                  *uri, *filename, path;
     ngx_array_t                 uris;
+    ngx_buf_t                  *b;
     ngx_chain_t                 out, **last_out, *cl;
     ngx_open_file_info_t        of;
     ngx_http_core_loc_conf_t   *ccf;
@@ -164,16 +182,19 @@ ngx_http_concat_handler(ngx_http_request_t *r)
     e = r->args.data + r->args.len;
     for (p = r->args.data + 1, v = p; p != e; p++) {
         if (*p == ',') {
-            rc = ngx_http_concat_add_path(r, &uris, clcf->max_files, &path,
-                                          p, v);
+            if (p == v) {
+                v = p + 1;
+                continue;
+            }
+
+            rc = ngx_http_concat_add_path(r, &uris, clcf->max_files, &path, p, v);
             if (rc != NGX_OK) {
                 return rc;
             }
 
             v = p + 1;
         } else if (*p == '?') {
-            rc = ngx_http_concat_add_path(r, &uris, clcf->max_files, &path,
-                                          p, v);
+            rc = ngx_http_concat_add_path(r, &uris, clcf->max_files, &path, p, v);
             if (rc != NGX_OK) {
                 return rc;
             }
@@ -226,9 +247,7 @@ ngx_http_concat_handler(ngx_http_request_t *r)
                 && (last_len != r->headers_out.content_type_len
                     || (last_type != NULL
                         && r->headers_out.content_type_lowcase != NULL
-                        && ngx_memcmp(last_type,
-                                      r->headers_out.content_type_lowcase,
-                                      last_len) != 0)))
+                        && ngx_memcmp(last_type, r->headers_out.content_type_lowcase, last_len) != 0)))
             {
                 return NGX_HTTP_BAD_REQUEST;
             }
@@ -239,7 +258,9 @@ ngx_http_concat_handler(ngx_http_request_t *r)
 
         ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 
+#if defined(nginx_version) && (nginx_version >= 8018)
         of.read_ahead = ccf->read_ahead;
+#endif
         of.directio = ccf->directio;
         of.valid = ccf->open_file_cache_valid;
         of.min_uses = ccf->open_file_cache_min_uses;
@@ -280,24 +301,33 @@ ngx_http_concat_handler(ngx_http_request_t *r)
                               "%s \"%V\" failed", of.failed, filename);
             }
 
+            if (clcf->neglection
+                && (rc == NGX_HTTP_NOT_FOUND
+                    || rc == NGX_HTTP_FORBIDDEN)) {
+                continue;
+            }
             return rc;
         }
 
         if (!of.is_file) {
             ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
                           "\"%V\" is not a regular file", filename);
-            return NGX_HTTP_NOT_FOUND;
+            continue;
+        }
+
+        if (of.size == 0) {
+            continue;
         }
 
         length += of.size;
-        if (i == 0) {
+        if (last_out == NULL) {
             last_modified = of.mtime;
         } else {
             if (of.mtime > last_modified) {
                 last_modified = of.mtime;
             }
         }
-
+        
         b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
         if (b == NULL) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -318,7 +348,7 @@ ngx_http_concat_handler(ngx_http_request_t *r)
         b->file->log = r->connection->log;
         b->file->directio = of.is_directio;
 
-        if (i == 0) {
+        if (last_out == NULL) {
             out.buf = b;
             last_out = &out.next;
             out.next = NULL;
@@ -334,11 +364,39 @@ ngx_http_concat_handler(ngx_http_request_t *r)
             last_out = &cl->next;
             cl->next = NULL;
         }
+
+        if (i + 1 == uris.nelts || clcf->delimiter.len == 0) {
+            continue;
+        }
+        
+        b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
+        if (b == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        
+        b->pos = clcf->delimiter.data;
+        b->last = b->pos + clcf->delimiter.len;
+        b->memory = 1;
+        length += clcf->delimiter.len;
+        
+        cl = ngx_alloc_chain_link(r->pool);
+        if (cl == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        
+        cl->buf = b;
+        *last_out = cl;
+        last_out = &cl->next;
+        cl->next = NULL;
     }
 
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = length;
     r->headers_out.last_modified_time = last_modified;
+
+    if (b == NULL) {
+        r->header_only = 1;
+    }
 
     rc = ngx_http_send_header(r);
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
@@ -384,7 +442,7 @@ ngx_http_concat_add_path(ngx_http_request_t *r, ngx_array_t *uris,
     if (uri->data == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
-
+            
     d = ngx_cpymem(uri->data, path->data, path->len);
     d = ngx_cpymem(d, v, p - v);
     *d = '\0';
@@ -396,10 +454,10 @@ ngx_http_concat_add_path(ngx_http_request_t *r, ngx_array_t *uris,
     if (ngx_http_parse_unsafe_uri(r, uri, &args, &flags) != NGX_OK) {
         return NGX_HTTP_BAD_REQUEST;
     }
-
+    
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http concat add file: \"%s\"", uri->data);
-
+    
     return NGX_OK;
 }
 
@@ -420,11 +478,12 @@ ngx_http_concat_create_loc_conf(ngx_conf_t *cf)
      *     conf->types = { NULL };
      *     conf->types_keys = NULL;
      */
-
+    
     conf->enable = NGX_CONF_UNSET;
+    conf->neglection = NGX_CONF_UNSET;
     conf->max_files = NGX_CONF_UNSET_UINT;
     conf->unique = NGX_CONF_UNSET;
-
+    
     return conf;
 }
 
@@ -435,18 +494,26 @@ ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_concat_loc_conf_t *prev = parent;
     ngx_http_concat_loc_conf_t *conf = child;
 
+    ngx_conf_merge_str_value(conf->delimiter, prev->delimiter, "");
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
+    ngx_conf_merge_value(conf->neglection, prev->neglection, 1);
     ngx_conf_merge_uint_value(conf->max_files, prev->max_files, 10);
     ngx_conf_merge_value(conf->unique, prev->unique, 1);
 
+#if defined(nginx_version) && (nginx_version >= 8029)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_concat_default_types)
+#else
+    if (ngx_http_merge_types(cf, conf->types_keys, &conf->types,
+                             prev->types_keys, &prev->types,
+                             ngx_http_concat_default_types)
+#endif
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
     }
-
+    
     return NGX_CONF_OK;
 }
 
