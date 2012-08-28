@@ -29,8 +29,11 @@ extern ngx_mutex_t  *ngx_event_timer_mutex;
 #endif
 
 
+#ifdef NGX_USE_MINHEAP
+extern ngx_thread_volatile ngx_minheap_t ngx_event_timer_minheap;
+#else
 extern ngx_thread_volatile ngx_rbtree_t  ngx_event_timer_rbtree;
-
+#endif
 
 static ngx_inline void
 ngx_event_del_timer(ngx_event_t *ev)
@@ -41,14 +44,20 @@ ngx_event_del_timer(ngx_event_t *ev)
 
     ngx_mutex_lock(ngx_event_timer_mutex);
 
+#ifdef NGX_USE_MINHEAP
+    ngx_minheap_delete(&ngx_event_time_minheap, &ev->timer.index);
+#else
     ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
+#endif
 
     ngx_mutex_unlock(ngx_event_timer_mutex);
 
+#ifndef NGX_USE_MINHEAP
 #if (NGX_DEBUG)
     ev->timer.left = NULL;
     ev->timer.right = NULL;
     ev->timer.parent = NULL;
+#endif
 #endif
 
     ev->timer_set = 0;
@@ -91,7 +100,11 @@ ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
 
     ngx_mutex_lock(ngx_event_timer_mutex);
 
+#ifdef NGX_USE_MINHEAP
+    ngx_minheap_insert(&ngx_event_timer_minheap, &ev->timer);
+#else
     ngx_rbtree_insert(&ngx_event_timer_rbtree, &ev->timer);
+#endif
 
     ngx_mutex_unlock(ngx_event_timer_mutex);
 

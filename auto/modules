@@ -48,6 +48,10 @@ if [ $NGX_TEST_BUILD_EPOLL = YES ]; then
     CORE_SRCS="$CORE_SRCS $EPOLL_SRCS"
 fi
 
+if [ $NGX_USE_MINHEAP = YES]; then
+    have=NGX_USE_MINHEAP . auto/hava
+fi
+
 if [ $NGX_TEST_BUILD_RTSIG = YES ]; then
     have=NGX_HAVE_RTSIG . auto/have
     have=NGX_TEST_BUILD_RTSIG . auto/have
