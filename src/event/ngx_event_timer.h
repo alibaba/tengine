@@ -45,7 +45,7 @@ ngx_event_del_timer(ngx_event_t *ev)
     ngx_mutex_lock(ngx_event_timer_mutex);
 
 #ifdef NGX_USE_MINHEAP
-    ngx_minheap_delete(&ngx_event_time_minheap, &ev->timer.index);
+    ngx_minheap_delete(&ngx_event_timer_minheap, ev->timer.index);
 #else
     ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
 #endif

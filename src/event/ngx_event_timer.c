@@ -38,12 +38,14 @@ ngx_event_timer_init(ngx_log_t *log)
     if (pool == NULL) {
         return NGX_ERROR;
     }
-    ngx_minheap_init(&ngx_event_timer_minheap, 1000, pool);
     ngx_event_timer_minheap.elts = ngx_palloc(pool,
                                               1000 * sizeof(ngx_minheap_node_t *));
     if (ngx_event_timer_minheap.elts == NULL) {
         return NGX_ERROR;
     }
+    ngx_event_timer_minheap.n = 100;
+    ngx_event_timer_minheap.pool = pool;
+    ngx_event_timer_minheap.nelts = 0;
 #else
     ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel,
                     ngx_rbtree_insert_timer_value);
@@ -122,6 +124,9 @@ ngx_event_expire_timers(void)
         ngx_mutex_lock(ngx_event_timer_mutex);
 
 #ifdef NGX_USE_MINHEAP
+        if (ngx_event_timer_minheap.nelts == 0) {
+            return;
+        }
         node = ngx_minheap_min(&ngx_event_timer_minheap);
 #else
         root = ngx_event_timer_rbtree.root;
@@ -161,7 +166,7 @@ ngx_event_expire_timers(void)
                            ngx_event_ident(ev->data), ev->timer.key);
 
 #ifdef NGX_USE_MINHEAP
-            ngx_minheap_delete(&ngx_event_timer_minheap, &ev->timer);
+            ngx_minheap_delete(&ngx_event_timer_minheap, ev->timer.index);
 #else
             ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
 #endif

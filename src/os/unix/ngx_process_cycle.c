@@ -844,8 +844,11 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                     c[i].read->handler(c[i].read);
                 }
             }
-
+#ifdef NGX_USE_MINHEAP
+            if (ngx_event_timer_minheap.nelts == 0)
+#else
             if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
+#endif
             {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 

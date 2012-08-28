@@ -33,14 +33,14 @@ struct ngx_minheap_node_s {
     ngx_minheap_key_t       key;
 };
 
-void ngx_minheap_timer_insert(ngx_minheap_t *h, ngx_minheap_node_t *node);
-void ngx_minheap_timer_delete(ngx_minheap_t *h, ngx_uint_t index);
+void ngx_minheap_insert(ngx_minheap_t *h, ngx_minheap_node_t *node);
+void ngx_minheap_delete(ngx_minheap_t *h, ngx_uint_t index);
 
 #define ngx_minheap_init(h, n, pool)                      \
-    (h)->n = n                                            \
+    (h)->n = n;                                           \
     (h)->nelts = 0;                                       \
     (h)->pool = pool
 
-#define ngx_minheap_min(h) ((h)->nelts == 0 ? NULL : *((h)->array))
+#define ngx_minheap_min(h) ((h)->elts[0])
 
 #endif
