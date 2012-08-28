@@ -220,9 +220,9 @@ END
 
     cat << END                                                >> $NGX_MAKEFILE
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_order' \
-		|| cp $NGX_MODULE_ORDER '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp $NGX_MODULE_ORDER '\$(DESTDIR)$NGX_CONF_PREFIX/module_order'
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs' \
+		|| cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX'
+	cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs'
 	chmod 0755 $NGX_DSO_COMPILE
 	cp $NGX_DSO_COMPILE '$NGX_PREFIX/sbin'
 END

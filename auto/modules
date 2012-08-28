@@ -781,7 +781,7 @@ END
 
 for mod in $NGX_ALL_MODULES
     do
-        echo "module_order $mod;"                  >> $NGX_MODULE_ORDER
+        echo "module_stub $mod;"                  >> $NGX_MODULE_STUBS
     done
 
 fi

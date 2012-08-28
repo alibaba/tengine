@@ -31,7 +31,7 @@ typedef struct {
     ngx_str_t     path;
     ngx_int_t     flag_postion;
 
-    ngx_array_t  *order;
+    ngx_array_t  *stubs;
     ngx_array_t  *modules;
 } ngx_dso_conf_ctx_t;
 
@@ -40,7 +40,7 @@ static char *ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_dso_load(ngx_conf_t *cf);
 static ngx_int_t ngx_dso_check_duplicated(ngx_cycle_t *cycle, ngx_array_t *modules,
     ngx_str_t *name, ngx_str_t *path);
-static char *ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_dso_stub(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 static ngx_int_t ngx_dso_get_position(ngx_str_t *module_entry);
 
@@ -479,7 +479,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
         return NGX_CONF_OK;
     }
 
-    if (ngx_strcmp(value[0].data, "module_order") == 0) {
+    if (ngx_strcmp(value[0].data, "module_stub") == 0) {
 
         if (cf->args->nelts != 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -487,7 +487,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
             return NGX_CONF_ERROR;
         }
 
-        return ngx_dso_order(cf, dummy, conf);
+        return ngx_dso_stub(cf, dummy, conf);
     }
 
     if (ngx_strcmp(value[0].data, "include") == 0) {
@@ -498,7 +498,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
             return NGX_CONF_ERROR;
         }
 
-        if (ctx->order->nelts != 0) {
+        if (ctx->stubs->nelts != 0) {
             return "is duplicate";
         }
 
@@ -542,8 +542,8 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ctx->order = ngx_array_create(cf->pool, 10, sizeof(ngx_str_t));
-    if (ctx->order == NULL) {
+    ctx->stubs = ngx_array_create(cf->pool, 10, sizeof(ngx_str_t));
+    if (ctx->stubs == NULL) {
         return NGX_CONF_ERROR;
     }
 
@@ -594,7 +594,7 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static char *
-ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_dso_stub(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                                *value, *module_name;
     ngx_dso_conf_ctx_t                       *ctx;
@@ -608,7 +608,7 @@ ngx_dso_order(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    module_name = ngx_array_push(ctx->order);
+    module_name = ngx_array_push(ctx->stubs);
     if (module_name == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -629,7 +629,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
 
     near = ctx->flag_postion;
 
-    if (ctx->order == NULL || ctx->order->nelts == 0) {
+    if (ctx->stubs == NULL || ctx->stubs->nelts == 0) {
 
         for (i = 1; ngx_all_module_names[i]; i++) {
             len1 = ngx_strlen(ngx_all_module_names[i]);
@@ -662,10 +662,10 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
         }
     }
 
-    name = ctx->order->elts;
+    name = ctx->stubs->elts;
     near = ctx->flag_postion;
 
-    for (i = 1; i < ctx->order->nelts; i++) {
+    for (i = 1; i < ctx->stubs->nelts; i++) {
         if (name[i].len == module_name.len
            && ngx_strncmp(name[i].data, module_name.data, name[i].len) == 0)
         {

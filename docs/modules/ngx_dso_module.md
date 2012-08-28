@@ -50,13 +50,13 @@ include
 
 **Context**: *dso*
 
-Specifies a file contain order of module(via module_order directive).
+Specifies a file contain order of module(via module_stub directive).
 
 Example:
     
-    include module_order
+    include module_stubs
 
-It will load conf/module_order file and define order of module(via module\_order directive).
+It will load conf/module_stubs file and define order of module(via module\_stub directive).
 
 load
 ------------------------
@@ -83,32 +83,32 @@ Example:
 It will load the ngx\_http\_empty\_gif\_module from ngx\_http\_empty\_gif\_module.so.
 
 
-module_order
+module_stub
 -------------
 
-**Syntax**: *module_order module_name*
+**Syntax**: *module_stub module_name*
 
 **Default**: *none*
 
 **Context**: *dso*
 
 
-This directive can insert a module into Nginx's module array in order (see conf/module_order for more details). Note it will change the module runtime order. This directive does not need to be used in most cases.
+This directive can insert a module into Nginx's module array in order (see conf/module_stubs for more details). Note it will change the module runtime order. This directive does not need to be used in most cases.
 
 Example:
 
-        module_order ngx_core_module;
-        module_order ngx_errlog_module;
-        module_order ngx_conf_module;
-        module_order ngx_events_module;
-        module_order ngx_event_core_module;
-        module_order ngx_epoll_module;
-        module_order ngx_openssl_module;
-        module_order ngx_http_module;
-        module_order ngx_http_core_module;
+        module_stub ngx_core_module;
+        module_stub ngx_errlog_module;
+        module_stub ngx_conf_module;
+        module_stub ngx_events_module;
+        module_stub ngx_event_core_module;
+        module_stub ngx_epoll_module;
+        module_stub ngx_openssl_module;
+        module_stub ngx_http_module;
+        module_stub ngx_http_core_module;
         .......................
-        module_order ngx_http_addition_filter_module;
-        module_order ngx_http_my_filter_module;
+        module_stub ngx_http_addition_filter_module;
+        module_stub ngx_http_my_filter_module;
 
 It will insert ngx\_http\_my\_filter\_module before ngx\_http\_addition\_filter\_module.
 
