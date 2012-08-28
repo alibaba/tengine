@@ -1,14 +1,12 @@
 
 /*
- * Copyright (C) 2010 Taobao Inc. <http://www.taobao.com>
- * Copyright (C) 2010 Joshua Zhu  <shudu@taobao.com>
+ * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
 
 
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
-#include <nginx.h>
 
 
 typedef struct {
@@ -500,15 +498,9 @@ ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->max_files, prev->max_files, 10);
     ngx_conf_merge_value(conf->unique, prev->unique, 1);
 
-#if defined(nginx_version) && (nginx_version >= 8029)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_concat_default_types)
-#else
-    if (ngx_http_merge_types(cf, conf->types_keys, &conf->types,
-                             prev->types_keys, &prev->types,
-                             ngx_http_concat_default_types)
-#endif
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
