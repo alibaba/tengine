@@ -10,8 +10,8 @@
 
 
 typedef struct {
-    ngx_str_t    delimiter;
     ngx_flag_t   enable;
+    ngx_str_t    delimiter;
     ngx_flag_t   neglection;
     ngx_uint_t   max_files;
     ngx_flag_t   unique;
@@ -29,7 +29,7 @@ static char *ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child);
 
 
-ngx_str_t  ngx_http_concat_default_types[] = {
+static ngx_str_t  ngx_http_concat_default_types[] = {
     ngx_string("application/x-javascript"),
     ngx_string("text/css"),
     ngx_null_string
@@ -118,10 +118,10 @@ ngx_module_t  ngx_http_concat_module = {
 static ngx_int_t
 ngx_http_concat_handler(ngx_http_request_t *r)
 {
-    u_char                     *p, *v, *e, *last, *last_type;
     size_t                      root, last_len;
     off_t                       length;
     time_t                      last_modified;
+    u_char                     *p, *v, *e, *last, *last_type;
     ngx_int_t                   rc;
     ngx_uint_t                  i, j, level;
     ngx_str_t                  *uri, *filename, path;
@@ -245,7 +245,9 @@ ngx_http_concat_handler(ngx_http_request_t *r)
                 && (last_len != r->headers_out.content_type_len
                     || (last_type != NULL
                         && r->headers_out.content_type_lowcase != NULL
-                        && ngx_memcmp(last_type, r->headers_out.content_type_lowcase, last_len) != 0)))
+                        && ngx_memcmp(last_type,
+                                      r->headers_out.content_type_lowcase,
+                                      last_len) != 0)))
             {
                 return NGX_HTTP_BAD_REQUEST;
             }
@@ -256,9 +258,7 @@ ngx_http_concat_handler(ngx_http_request_t *r)
 
         ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 
-#if defined(nginx_version) && (nginx_version >= 8018)
         of.read_ahead = ccf->read_ahead;
-#endif
         of.directio = ccf->directio;
         of.valid = ccf->open_file_cache_valid;
         of.min_uses = ccf->open_file_cache_min_uses;
@@ -492,8 +492,8 @@ ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_concat_loc_conf_t *prev = parent;
     ngx_http_concat_loc_conf_t *conf = child;
 
-    ngx_conf_merge_str_value(conf->delimiter, prev->delimiter, "");
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
+    ngx_conf_merge_str_value(conf->delimiter, prev->delimiter, "");
     ngx_conf_merge_value(conf->neglection, prev->neglection, 1);
     ngx_conf_merge_uint_value(conf->max_files, prev->max_files, 10);
     ngx_conf_merge_value(conf->unique, prev->unique, 1);
