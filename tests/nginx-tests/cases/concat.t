@@ -2087,7 +2087,7 @@ http {
         location /concatFile/ {
             concat  on;
             concat_delimiter "\n";
-            concat_neglection off;
+            concat_ignore_file_error off;
         }
     }
 }
@@ -2132,7 +2132,7 @@ http {
         location /concatFile/ {
             concat  on;
             concat_delimiter "\n";
-            concat_neglection on;
+            concat_ignore_file_error on;
         }
     }
 }
@@ -2285,13 +2285,13 @@ $t->run();
 $concat_message1 = qr/hello.jsworld.js/s;
 like(http_get('/concatFile/??hello.js,world.js,empty.js'), $concat_message1, 'concat - concat result test -- empty file');
 
-$concat_message2 = qr/hello.jsworld.js/s;
+$concat_message2 = qr/404 Not Found/s;
 like(http_get('/concatFile/??hello.js,helloworld.js,world.js'), $concat_message2, 'concat - concat result test -- no eixt file middle');
 
-$concat_message3 = qr/hello.jsworld.js/s;
+$concat_message3 = qr/404 Not Found/s;
 like(http_get('/concatFile/??helloworld.js,hello.js,world.js'), $concat_message3, 'concat - concat result test -- no eixt file front');
 
-$concat_message4 = qr/hello.jsworld.js/s;
+$concat_message4 = qr/404 Not Found/s;
 like(http_get('/concatFile/??hello.js,world.js,helloworld.js'), $concat_message4, 'concat - concat result test -- no eixt file back');
 
 $concat_message5 = qr/hello.jsworld.jsÄãºÃÂð£¿/s;
@@ -2461,7 +2461,7 @@ like($r, qr/400/, 'concat - html files (default not support)');
 $r = http_get('/cssjs/??1.js,1.css');
 like($r, qr/400/, 'concat - mixed content types');
 
-like(http_get('/??t1.html,t2.html,t100.html'), qr/onetwo/, 'concat - has not found file');
+like(http_get('/??t1.html,t2.html,t100.html'), qr/404 Not Found/, 'concat - has not found file');
 like(http_get('/??t1.html,'), qr/one/, 'concat - one file and ","');
 like(http_get('/??t1.html,t2.html,'), qr/onetwo/, 'concat - two files and ","');
 like(http_get('/??t1.html?t=20100524'), qr/one/, 'concat - timestamp');

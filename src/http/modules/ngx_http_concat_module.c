@@ -73,7 +73,7 @@ static ngx_command_t  ngx_http_concat_commands[] = {
       offsetof(ngx_http_concat_loc_conf_t, delimiter),
       NULL },
     
-    { ngx_string("concat_neglection"),
+    { ngx_string("concat_ignore_file_error"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
@@ -494,7 +494,7 @@ ngx_http_concat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_str_value(conf->delimiter, prev->delimiter, "");
-    ngx_conf_merge_value(conf->neglection, prev->neglection, 1);
+    ngx_conf_merge_value(conf->neglection, prev->neglection, 0);
     ngx_conf_merge_uint_value(conf->max_files, prev->max_files, 10);
     ngx_conf_merge_value(conf->unique, prev->unique, 1);
 
