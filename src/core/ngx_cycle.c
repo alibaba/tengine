@@ -12,6 +12,7 @@
 
 #if (NGX_DSO)
 void ngx_show_dso_modules(ngx_conf_t *cf);
+void ngx_show_dso_directives(ngx_conf_t *cf);
 #endif
 
 
@@ -32,6 +33,7 @@ static ngx_event_t     ngx_cleaner_event;
 ngx_uint_t             ngx_test_config;
 ngx_uint_t             ngx_quiet_mode;
 ngx_uint_t             ngx_show_modules;
+ngx_uint_t             ngx_show_directives;
 
 #if (NGX_THREADS)
 ngx_tls_key_t          ngx_core_tls_key;
@@ -58,6 +60,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_conf_t           conf;
     ngx_pool_t          *pool;
     ngx_cycle_t         *cycle, **old;
+    ngx_command_t       *cmd;
     ngx_shm_zone_t      *shm_zone, *oshm_zone;
     ngx_list_part_t     *part, *opart;
     ngx_open_file_t     *file;
@@ -279,6 +282,28 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
+    }
+
+    if (ngx_show_directives) {
+        ngx_log_stderr(0, "all available directives:");
+
+        for (i = 0; ngx_module_names[i]; i++) {
+            ngx_log_stderr(0, "%s:", ngx_module_names[i]);
+
+            cmd = ngx_modules[i]->commands;
+            if(cmd == NULL) {
+                continue;
+            }
+
+            for ( /* void */ ; cmd->name.len; cmd++) {
+                ngx_log_stderr(0, "    %V", &cmd->name);
+            }
+        }
+
+#if (NGX_DSO)
+        ngx_show_dso_directives(&conf);
+#endif
+        return cycle;
     }
 
     if (ngx_show_modules) {

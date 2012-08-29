@@ -191,7 +191,6 @@ ngx_uint_t          ngx_dump_config;
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
-static ngx_uint_t   ngx_show_directives;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -207,7 +206,6 @@ main(int argc, char *const *argv)
     ngx_int_t         i;
     ngx_log_t        *log;
     ngx_cycle_t      *cycle, init_cycle;
-    ngx_command_t    *cmd;
     ngx_core_conf_t  *ccf;
 
     ngx_debug_init();
@@ -270,24 +268,7 @@ main(int argc, char *const *argv)
                 "configure arguments:" NGX_CONFIGURE NGX_LINEFEED);
         }
 
-        if (ngx_show_directives) {
-            ngx_log_stderr(0, "all available directives:");
-
-            for (i = 0; ngx_modules[i]; i++) {
-               ngx_log_stderr(0, "%s:", ngx_module_names[i]);
-
-               cmd = ngx_modules[i]->commands;
-               if(cmd == NULL) {
-                  continue;
-               }
-
-               for ( /* void */ ; cmd->name.len; cmd++) {
-                  ngx_log_stderr(0, "    %V", &cmd->name);
-               }
-            }
-        }
-
-        if(!ngx_test_config && !ngx_show_modules) {
+        if(!ngx_test_config && !ngx_show_modules && !ngx_show_directives) {
             return 0;
         }
     }
@@ -374,7 +355,7 @@ main(int argc, char *const *argv)
         return 0;
     }
 
-    if (ngx_show_modules) {
+    if (ngx_show_modules || ngx_show_directives) {
         return 0;
     }
 

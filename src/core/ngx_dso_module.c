@@ -722,3 +722,44 @@ ngx_show_dso_modules(ngx_conf_t *cf)
                        &module_name, module->major_version, module->minor_version);
     }
 }
+
+
+void
+ngx_show_dso_directives(ngx_conf_t *cf)
+{
+    ngx_str_t            module_name;
+    ngx_uint_t           i;
+    ngx_module_t        *module;
+    ngx_command_t       *cmd;
+    ngx_dso_module_t    *dl_m;
+    ngx_dso_conf_ctx_t  *ctx;
+
+    ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
+                                           ngx_dso_module);
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    dl_m = ctx->modules->elts;
+
+    for (i = 0; i < ctx->modules->nelts; i++) {
+        if (dl_m[i].name.len == 0) {
+            continue;
+        }
+
+        module_name = dl_m[i].name;
+        module = dl_m[i].module;
+
+        ngx_log_stderr(0, "%V (shared):", &module_name);
+
+        cmd = module->commands;
+        if(cmd == NULL) {
+            continue;
+        }
+
+        for ( /* void */ ; cmd->name.len; cmd++) {
+            ngx_log_stderr(0, "    %V", &cmd->name);
+        }
+    }
+}
