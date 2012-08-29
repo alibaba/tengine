@@ -312,7 +312,11 @@ ngx_http_concat_handler(ngx_http_request_t *r)
         if (!of.is_file) {
             ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
                           "\"%V\" is not a regular file", filename);
-            continue;
+            if (clcf->ignore_file_error) {
+                continue;
+            }
+
+            return NGX_HTTP_NOT_FOUND;
         }
 
         if (of.size == 0) {
