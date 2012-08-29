@@ -2690,8 +2690,8 @@ like(http_get('/concatFile/hello./??js,world.js,jack.js'), $concat_message48, 'c
 my $concat_message49 = qr/400/s;
 like(http_get('/concatFile//??hello.js,world.js,jack.js,?'), $concat_message49, 'concat - in the end have a commas and question mark ,?');
 
-my $concat_message50 = qr/hello.jsworld.jsjack.js/s;
-like(http_get('/concatFile//??hello.js,world.js,jack.js,/'), $concat_message50, 'concat - in the end have a commas and / ,/');
+my $concat_message50 = qr/404 Not Found/s;
+like(http_get('/concatFile/??hello.js,world.js,jack.js,/'), $concat_message50, 'concat - in the end have a commas and / ,/');
 
 
 
