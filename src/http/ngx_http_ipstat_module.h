@@ -43,7 +43,9 @@ typedef struct {
 
 
 struct ngx_http_ipstat_vip_s {
-    ngx_http_ipstat_vip_t *next;
+    ngx_pid_t              pid;        /* pid of next cycle */
+    ngx_http_ipstat_vip_t *next;       /* vip in next cycle */
+    ngx_http_ipstat_vip_t *prev;       /* vip in last cycle */
     ngx_uint_t             conn_count;
     ngx_uint_t             conn_total;
     ngx_uint_t             req_count;
@@ -58,7 +60,8 @@ struct ngx_http_ipstat_vip_s {
 };
 
 
-extern void ngx_http_ipstat_count(void *vip, off_t offset, ngx_int_t incr);
+extern void ngx_http_ipstat_incr(void *vip, off_t offset, ngx_uint_t incr);
+extern void ngx_http_ipstat_decr(void *vip, off_t offset, ngx_uint_t decr);
 extern void ngx_http_ipstat_min(void *vip, off_t offset, ngx_uint_t val);
 extern void ngx_http_ipstat_max(void *vip, off_t offset, ngx_uint_t val);
 extern void ngx_http_ipstat_avg(void *vip, off_t offset, ngx_uint_t val);

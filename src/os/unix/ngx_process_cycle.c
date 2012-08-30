@@ -12,6 +12,7 @@
 
 
 #define NGX_CYCLE_STILL_NEEDED     2
+#define NGX_MAX_CHANNEL_DATA_LEN   1024
 
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
@@ -1149,6 +1150,7 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 static void
 ngx_channel_handler(ngx_event_t *ev)
 {
+    u_char             buf[NGX_MAX_CHANNEL_DATA_LEN];
     ngx_int_t          n;
     ngx_channel_t      ch;
     ngx_connection_t  *c;
@@ -1233,6 +1235,30 @@ ngx_channel_handler(ngx_event_t *ev)
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
+
+        default:
+            if (ch.len) {
+                n = ngx_read_channel_ex(c->fd, buf,
+                                        ch.len - sizeof(ngx_channel_t),
+                                        ev->log);
+
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                               "channel data: %i", n);
+
+                if (n == NGX_ERROR) {
+
+                    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                        ngx_del_conn(c, 0);
+                    }
+
+                    ngx_close_connection(c);
+                    return;
+                }
+
+                if (ngx_channel_top_handler) {
+                    ngx_channel_top_handler(&ch, buf, ev->log);
+                }
+            }
         }
     }
 }

@@ -1,8 +1,12 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_channel.h>
 
 #include <ngx_http_ipstat_module.h>
+
+
+#define NGX_CMD_IPSTAT     10000
 
 
 typedef struct {
@@ -19,7 +23,13 @@ typedef struct {
 
 
 typedef enum {
-    op_count, op_min, op_max, op_avg, op_rate
+    op_count = 0,          /* general op */
+    op_min,
+    op_max,
+    op_avg,
+    op_rate,
+    op_incr,               /* specific op */
+    op_decr
 } ngx_http_ipstat_op_t;
 
 
@@ -27,6 +37,28 @@ typedef struct {
     off_t                  offset;
     ngx_http_ipstat_op_t   type;
 } ngx_http_ipstat_field_t;
+
+
+typedef struct {
+    ngx_channel_t          channel;
+    uintptr_t              vip;
+    off_t                  offset;
+    ngx_uint_t             val;
+    ngx_http_ipstat_op_t   op;
+} ngx_http_ipstat_channel_t;
+
+
+typedef struct ngx_http_ipstat_zone_hdr_s ngx_http_ipstat_zone_hdr_t;
+
+
+struct ngx_http_ipstat_zone_hdr_s {
+    ngx_shmtx_sh_t              shmtx;
+    ngx_uint_t                  workers;
+    ngx_uint_t                  num;
+    size_t                      index_size;
+    size_t                      block_size;
+    ngx_http_ipstat_zone_hdr_t *prev;
+};
 
 
 #define VIP_INDEX_START(start)                                            \
@@ -40,8 +72,21 @@ typedef struct {
          ((char *) (start) + (boff) + (voff)                              \
                            + sizeof(ngx_http_ipstat_vip_t) * (off)))
 
+#define VIP_HEADER(content)                                               \
+    ((ngx_http_ipstat_zone_hdr_t *) ((char *) (content)                   \
+        - ngx_align(sizeof(ngx_http_ipstat_zone_hdr_t), 128)))
+
+#define VIP_CONTENT(header)                                               \
+    ((void *) ((char *) (header)                                          \
+        + ngx_align(sizeof(ngx_http_ipstat_zone_hdr_t), 128)))
+
+#define VIP_PID(start, boff)                                              \
+    ((ngx_pid_t *) ((char *) (start) + boff))
+
 
 static ngx_str_t vip_zn = ngx_string("vip_status_zone");
+
+static ngx_channel_handler_pt ngx_channel_next_handler;
 
 
 static ngx_http_ipstat_field_t fields[] = {
@@ -59,7 +104,23 @@ static ngx_http_ipstat_field_t fields[] = {
 };
 
 
-const ngx_uint_t field_num = sizeof(fields) / sizeof(ngx_http_ipstat_field_t);
+static void (*ngx_http_ipstat_op_handler[])
+                    (void *vip, off_t offset, ngx_uint_t val) = {
+    NULL,
+    ngx_http_ipstat_min,
+    ngx_http_ipstat_max,
+    ngx_http_ipstat_avg,
+    ngx_http_ipstat_rate,
+    ngx_http_ipstat_incr,
+    ngx_http_ipstat_decr
+};
+
+
+static const ngx_uint_t field_num = sizeof(fields)
+                                  / sizeof(ngx_http_ipstat_field_t);
+
+static const size_t channel_len = sizeof(ngx_http_ipstat_channel_t)
+                                - offsetof(ngx_http_ipstat_channel_t, vip);
 
 
 static void *ngx_http_ipstat_create_main_conf(ngx_conf_t *cf);
@@ -79,6 +140,11 @@ static ngx_http_ipstat_vip_index_t *
 static ngx_uint_t
     ngx_http_ipstat_distinguish_same_vip(ngx_http_ipstat_vip_index_t *key,
     ngx_cycle_t *old_cycle);
+
+static void ngx_http_ipstat_notify(ngx_http_ipstat_vip_t *vip, off_t offset,
+    ngx_uint_t val, ngx_http_ipstat_op_t op);
+static void ngx_http_ipstat_channel_handler(ngx_channel_t *ch, u_char *buf,
+    ngx_log_t *log);
 
 static char *ngx_http_ipstat_show(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -175,11 +241,18 @@ ngx_http_ipstat_init(ngx_conf_t *cf)
 
     smcf->workers = workers;
     smcf->num = n;
-    smcf->index_size = ngx_align(sizeof(ngx_http_ipstat_vip_index_t) * n
-                                     + sizeof(ngx_pid_t), 128);
-    smcf->block_size = ngx_align(sizeof(ngx_http_ipstat_vip_t) * n
-                                     + smcf->index_size, 128);
-    size = smcf->block_size * smcf->workers + 256;
+    smcf->index_size = sizeof(ngx_http_ipstat_vip_index_t) * n
+                     + sizeof(ngx_pid_t);          /* for init process */
+    size = sizeof(ngx_http_ipstat_vip_t) * n + smcf->index_size;
+    smcf->block_size = ngx_align(size, 128);
+    size = ngx_align(sizeof(ngx_http_ipstat_zone_hdr_t), 128)
+         + smcf->block_size * smcf->workers;
+
+    ngx_log_debug6(NGX_LOG_DEBUG_HTTP, cf->log, 0,
+                   "ipstat_init: cycle=%p, workers=%d, num=%d, "
+                   "index_size=%z, block_size=%z, size=%z",
+                   cf->cycle, smcf->workers, smcf->num,
+                   smcf->index_size, smcf->block_size, size);
 
     shm_zone = ngx_shared_memory_lc_add(cf, &vip_zn, size,
                                         &ngx_http_ipstat_module, 0);
@@ -200,6 +273,9 @@ ngx_http_ipstat_init(ngx_conf_t *cf)
     }
 
     *h = ngx_http_ipstat_log_handler;
+
+    ngx_channel_next_handler = ngx_channel_top_handler;
+    ngx_channel_top_handler = ngx_http_ipstat_channel_handler;
 
     return NGX_OK;
 }
@@ -255,7 +331,7 @@ ngx_http_ipstat_lookup_vip_index(ngx_uint_t key,
 static ngx_int_t
 ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
-    ngx_uint_t                    i, j, k, n, okey, workers, val;
+    ngx_uint_t                    i, j, n, okey;
     ngx_listening_t              *ls;
     ngx_http_port_t              *port;
     ngx_http_in_addr_t           *addr;
@@ -263,8 +339,8 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
     ngx_http_in6_addr_t          *addr6;
 #endif
     ngx_http_ipstat_vip_t        *vip, *ovip;
-    ngx_http_ipstat_rate_t       *rate, *orate;
     ngx_http_ipstat_zone_ctx_t   *ctx, *octx;
+    ngx_http_ipstat_zone_hdr_t   *hdr;
     ngx_http_ipstat_main_conf_t  *smcf, *osmcf;
     ngx_http_ipstat_vip_index_t  *idx, *oidx, key, *oidx_c;
 
@@ -274,14 +350,26 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     ngx_memzero(shm_zone->shm.addr, shm_zone->shm.size);
 
-    if (ngx_shmtx_create(&smcf->mutex, (ngx_shmtx_sh_t *) shm_zone->shm.addr,
-                         ctx->cycle->lock_file.data)
+    hdr = (ngx_http_ipstat_zone_hdr_t *) shm_zone->shm.addr;
+
+    if (ngx_shmtx_create(&smcf->mutex, &hdr->shmtx, ctx->cycle->lock_file.data)
         != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    ctx->data = ngx_align_ptr(shm_zone->shm.addr, 128) + 128;
+    hdr->workers = smcf->workers;
+    hdr->num = smcf->num;
+    hdr->index_size = smcf->index_size;
+    hdr->block_size = smcf->block_size;
+
+    ngx_log_debug5(NGX_LOG_DEBUG_HTTP, shm_zone->shm.log, 0,
+                   "ipstat_init_zone(current hdr %p): "
+                   "workers=%d, num=%d, index_size=%z, block_size=%z",
+                   hdr, hdr->workers, hdr->num,
+                   hdr->index_size, hdr->block_size);
+
+    ctx->data = VIP_CONTENT(shm_zone->shm.addr);
     ls = ctx->cycle->listening.elts;
     idx = VIP_INDEX_START(ctx->data);
     
@@ -341,18 +429,22 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
                    smcf->index_size);
     }
 
-    /* copy vip data from last cycle */
+    /* build vip chain */
 
     if (data == NULL) {
         return NGX_OK;
     }
 
     octx = data;
+    hdr->prev = VIP_HEADER(octx->data);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, shm_zone->shm.log, 0,
+                   "ipstat_init_zone_cp(current hdr %p): prev=%p",
+                   hdr, hdr->prev);
+
     oidx = VIP_INDEX_START(octx->data);
     osmcf = ngx_http_cycle_get_module_main_conf(octx->cycle,
                                                 ngx_http_ipstat_module);
-    workers = ngx_min(smcf->workers, osmcf->workers);
-
     for (i = 0; i < n; ++i, ++idx) {
         okey = ngx_http_ipstat_distinguish_same_vip(idx, octx->cycle);
         if (okey == 0) {
@@ -365,79 +457,9 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
             continue;
         }
 
-        for (j = 0; j < workers; ++j) {
-            vip = VIP_LOCATE(ctx->data, j * smcf->block_size,
-                             smcf->index_size, i);
-            ovip = VIP_LOCATE(octx->data, j * osmcf->block_size,
-                              osmcf->index_size, oidx_c - oidx);
-            ngx_memcpy(vip, ovip, sizeof(ngx_http_ipstat_vip_t));
-
-            ovip->next = vip;
-        }
-
-        if (workers >= osmcf->workers) {
-            continue;
-        }
-
-        /* reduce number of workers */
-
-        for (j = workers; j < osmcf->workers; ++j) {
-            vip = VIP_LOCATE(ctx->data, (j % workers) * smcf->block_size,
-                             smcf->index_size, i);
-            ovip = VIP_LOCATE(octx->data, j * osmcf->block_size,
-                              osmcf->index_size, oidx_c - oidx);
-            for (k = 0; k < field_num; ++k) {
-                switch (fields[k].type) {
-
-                case op_count:
-                    *VIP_FIELD(vip, fields[k].offset)
-                                       += *VIP_FIELD(ovip, fields[k].offset);
-                    break;
-
-                case op_min:
-                    val = ngx_min(*VIP_FIELD(vip, fields[k].offset),
-                                  *VIP_FIELD(ovip, fields[k].offset));
-                    if (val) {
-                        *VIP_FIELD(vip, fields[k].offset) = val;
-                    }
-                    break;
-
-                case op_max:
-                    *VIP_FIELD(vip, fields[k].offset) =
-                        ngx_max(*VIP_FIELD(vip, fields[k].offset),
-                                *VIP_FIELD(ovip, fields[k].offset));
-                    break;
-
-                case op_avg:
-                    if (*VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL)) {
-                        *VIP_FIELD(vip, fields[k].offset) +=
-                            (*VIP_FIELD(ovip, fields[k].offset)
-                                - *VIP_FIELD(vip, fields[k].offset))
-                            / *VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
-                    }
-                    break;
-
-                default:
-                    rate = (ngx_http_ipstat_rate_t *)
-                                    VIP_FIELD(vip, fields[k].offset);
-                    orate = (ngx_http_ipstat_rate_t *)
-                                    VIP_FIELD(ovip, fields[k].offset);
-                    if (rate->t == orate->t) {
-                        rate->last_rate += orate->last_rate;
-                        rate->curr_rate += orate->curr_rate;
-                    } else if (rate->t + 1 == orate->t) {
-                        rate->t = orate->t;
-                        rate->last_rate = rate->curr_rate + orate->last_rate;
-                        rate->curr_rate = orate->curr_rate;
-                    } else if (rate->t + 1 < orate->t) {
-                        *rate = *orate;
-                    } else if (rate->t == orate->t + 1) {
-                        rate->last_rate += orate->curr_rate;
-                    }
-                    break;
-                }
-            }
-        }
+        vip = VIP_LOCATE(ctx->data, 0, smcf->index_size, i);
+        ovip = VIP_LOCATE(octx->data, 0, osmcf->index_size, oidx_c - oidx);
+        vip->prev = ovip;
     }
 
     return NGX_OK;
@@ -551,10 +573,12 @@ ngx_http_ipstat_distinguish_same_vip(ngx_http_ipstat_vip_index_t *key,
 static ngx_int_t
 ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
 {
-    ngx_int_t                     j;
-    ngx_pid_t                    *ppid;
-    ngx_uint_t                    i;
+    ngx_pid_t                    *ppid, t;
+    ngx_uint_t                    i, j, k, l, workers, *field, *ofield;
+    ngx_http_ipstat_vip_t        *vip_base, *vip, *ovip;
+    ngx_http_ipstat_rate_t       *rate, *orate;
     ngx_http_ipstat_zone_ctx_t   *ctx;
+    ngx_http_ipstat_zone_hdr_t   *hdr;
     ngx_http_ipstat_main_conf_t  *smcf;
 
     ppid = NULL;
@@ -563,9 +587,11 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
 
     for (i = 0; i < smcf->workers; i++) {
 
-        ppid = (ngx_pid_t *) ((char *) ctx->data + i * smcf->block_size);
+        ppid = VIP_PID(ctx->data, i * smcf->block_size);
 
         ngx_shmtx_lock(&smcf->mutex);
+
+        /* when it is a new cycle, rewrite pid fields of last cycle */
 
         if (*ppid == 0) {
             goto found;
@@ -573,7 +599,7 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
 
         /* when a worker is down, the new one will take place its position */
 
-        for (j = 0; j < ngx_last_process; j++) {
+        for (j = 0; j < (ngx_uint_t) ngx_last_process; j++) {
             if (ngx_processes[j].pid == -1) {
                 continue;
             }
@@ -592,14 +618,161 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
 
     /* never reach this point */
 
+    ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                  "ipstat: any worker fails to attach a block is impossible");
+
     return NGX_OK;
 
 found:
 
+    t = *ppid;
     *ppid = ngx_pid;
-    smcf->data = (void *) ppid;
 
     ngx_shmtx_unlock(&smcf->mutex);
+
+    smcf->data = (void *) ppid;
+
+    /* case 1: respawn a worker for current cycle */
+
+    if (t) {
+        return NGX_OK;
+    }
+
+    /* case 2: respawn a worker for new cycle */
+
+    /* rewrite pid field in the last cycle */
+
+    hdr = VIP_HEADER(ctx->data);
+    hdr = hdr->prev;
+
+    /* set pid in last cycle */
+
+    if (hdr) {
+        for (k = i; k < hdr->workers; k += smcf->workers) {
+            for (j = 0; j < hdr->num; j++) {
+                vip = VIP_LOCATE(VIP_CONTENT(hdr), k * hdr->block_size,
+                                 hdr->index_size, j);
+                vip->pid = ngx_pid;
+            }
+        }
+    }
+
+    if (hdr == NULL) {
+        return NGX_OK;
+    }
+
+    workers = ngx_min(smcf->workers, hdr->workers);
+
+    vip_base = VIP_LOCATE(ctx->data, 0, smcf->index_size, 0);
+
+    /* set next ptr in last cycle */
+
+    for (l = 0; l < hdr->num; ++l, ++vip_base) {
+        if (!vip_base->prev) {
+            continue;
+        }
+
+        vip = VIP_LOCATE(vip_base, i * smcf->block_size, 0, 0);
+        ovip = VIP_LOCATE(vip_base->prev, i * hdr->block_size, 0, 0);
+        ovip->next = vip;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
+                       "ipstat_init_process: vip=%p, ovip=%p", vip, ovip);
+
+        if (workers >= hdr->workers) {
+            continue;
+        }
+
+        /* reduce number of workers in current cycle */
+
+        for (j = i + workers; j < hdr->workers; j += workers) {
+            vip = VIP_LOCATE(vip_base, j * smcf->block_size, 0, 0);
+            ovip = VIP_LOCATE(vip_base->prev, j * hdr->block_size, 0, 0);
+            ovip->next = vip;
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
+                           "ipstat_init_process: vip=%p, ovip=%p", vip, ovip);
+        }
+    }
+
+    /* allow last cycle notice the change, and send msg to this worker */
+
+    ngx_msleep(50);
+
+    /* copy data from last cycle */
+
+    vip_base = VIP_LOCATE(ctx->data, 0, smcf->index_size, 0);
+
+    for (l = 0; l < hdr->num; ++l, ++vip_base) {
+        if (!vip_base->prev) {
+            continue;
+        }
+
+        vip = VIP_LOCATE(vip_base, i * smcf->block_size, 0, 0);
+        ovip = VIP_LOCATE(vip_base->prev, i * hdr->block_size, 0, 0);
+        ngx_memcpy((char *) vip + NGX_HTTP_IPSTAT_CONN_CURRENT,
+                   (char *) ovip + NGX_HTTP_IPSTAT_CONN_CURRENT,
+                   sizeof(ngx_http_ipstat_vip_t)
+                                   - NGX_HTTP_IPSTAT_CONN_CURRENT);
+
+        if (workers >= hdr->workers) {
+            continue;
+        }
+
+        /* reduce number of workers in current cycle */
+
+        for (j = i + workers; j < hdr->workers; j += workers) {
+            vip = VIP_LOCATE(vip_base, j * smcf->block_size, 0, 0);
+            ovip = VIP_LOCATE(vip_base->prev, j * hdr->block_size, 0, 0);
+
+            for (k = 0; k < field_num; ++k) {
+
+                field = VIP_FIELD(vip, fields[k].offset);
+                ofield = VIP_FIELD(ovip, fields[k].offset);
+
+                switch (fields[k].type) {
+
+                case op_count:
+                    *field += *ofield;
+                    break;
+
+                case op_min:
+                    if (ngx_min(*field, *ofield)) {
+                        *field = ngx_min(*field, *ofield);
+                    }
+                    break;
+
+                case op_max:
+                    *field = ngx_max(*field, *ofield);
+                    break;
+
+                case op_avg:
+                    if (*VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL)) {
+                        *field += (*ofield - *field)
+                                / *VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
+                    }
+                    break;
+
+                default:
+                    rate = (ngx_http_ipstat_rate_t *) field;
+                    orate = (ngx_http_ipstat_rate_t *) ofield;
+                    if (rate->t == orate->t) {
+                        rate->last_rate += orate->last_rate;
+                        rate->curr_rate += orate->curr_rate;
+                    } else if (rate->t + 1 == orate->t) {
+                        rate->t = orate->t;
+                        rate->last_rate = rate->curr_rate + orate->last_rate;
+                        rate->curr_rate = orate->curr_rate;
+                    } else if (rate->t + 1 < orate->t) {
+                        *rate = *orate;
+                    } else if (rate->t == orate->t + 1) {
+                        rate->last_rate += orate->curr_rate;
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     return NGX_OK;
 }
@@ -792,7 +965,7 @@ ngx_http_ipstat_close_request(void *data)
 
     c = data;
 
-    ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_REQ_CURRENT, -1);
+    ngx_http_ipstat_decr(c->status, NGX_HTTP_IPSTAT_REQ_CURRENT, 1);
 }
 
 
@@ -828,10 +1001,10 @@ ngx_http_ipstat_log_handler(ngx_http_request_t *r)
 
     ms = ngx_max(ms, 0);
 
-    ngx_http_ipstat_count(r->connection->status, NGX_HTTP_IPSTAT_BYTES_IN,
-                          r->connection->received);
-    ngx_http_ipstat_count(r->connection->status, NGX_HTTP_IPSTAT_BYTES_OUT,
-                          r->connection->sent);
+    ngx_http_ipstat_incr(r->connection->status, NGX_HTTP_IPSTAT_BYTES_IN,
+                         r->connection->received);
+    ngx_http_ipstat_incr(r->connection->status, NGX_HTTP_IPSTAT_BYTES_OUT,
+                         r->connection->sent);
     ngx_http_ipstat_min(r->connection->status, NGX_HTTP_IPSTAT_RT_MIN,
                         (ngx_uint_t) ms);
     ngx_http_ipstat_max(r->connection->status, NGX_HTTP_IPSTAT_RT_MAX,
@@ -844,12 +1017,35 @@ ngx_http_ipstat_log_handler(ngx_http_request_t *r)
 
 
 void
-ngx_http_ipstat_count(void *data, off_t offset, ngx_int_t incr)
+ngx_http_ipstat_incr(void *data, off_t offset, ngx_uint_t incr)
 {
-    ngx_http_ipstat_vip_t        *vip;
+    ngx_http_ipstat_vip_t        *vip = data;
 
-    for (vip = data; vip; vip = vip->next) {
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_incr: %p, %p, %O, %d",
+                   data, vip->next, offset, incr);
+
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, incr, op_incr);
+    } else {
         *VIP_FIELD(vip, offset) += incr;
+    }
+}
+
+
+void
+ngx_http_ipstat_decr(void *data, off_t offset, ngx_uint_t decr)
+{
+    ngx_http_ipstat_vip_t        *vip = data;
+
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_decr: %p, %p, %O, %d",
+                   data, vip->next, offset, decr);
+
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, decr, op_decr);
+    } else {
+        *VIP_FIELD(vip, offset) -= decr;
     }
 }
 
@@ -858,9 +1054,15 @@ void
 ngx_http_ipstat_min(void *data, off_t offset, ngx_uint_t val)
 {
     ngx_uint_t                   *f, v;
-    ngx_http_ipstat_vip_t        *vip;
+    ngx_http_ipstat_vip_t        *vip = data;
 
-    for (vip = data; vip; vip = vip->next) {
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_min: %p, %p, %O, %d",
+                   data, vip->next, offset, val);
+
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, val, op_min);
+    } else {
         f = VIP_FIELD(vip, offset);
         v = ngx_min(*f, val);
         if (v) {
@@ -874,9 +1076,15 @@ void
 ngx_http_ipstat_max(void *data, off_t offset, ngx_uint_t val)
 {
     ngx_uint_t                   *f;
-    ngx_http_ipstat_vip_t        *vip;
+    ngx_http_ipstat_vip_t        *vip = data;
 
-    for (vip = data; vip; vip = vip->next) {
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_max: %p, %p, %O, %d",
+                   data, vip->next, offset, val);
+
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, val, op_max);
+    } else {
         f = VIP_FIELD(vip, offset);
         if (*f < val) {
             *f = val;
@@ -889,9 +1097,15 @@ void
 ngx_http_ipstat_avg(void *data, off_t offset, ngx_uint_t val)
 {
     ngx_uint_t                   *f, *n;
-    ngx_http_ipstat_vip_t        *vip;
+    ngx_http_ipstat_vip_t        *vip = data;
 
-    for (vip = data; vip; vip = vip->next) {
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_avg: %p, %p, %O, %d",
+                   data, vip->next, offset, val);
+
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, val, op_avg);
+    } else {
         f = VIP_FIELD(vip, offset);
         n = VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
         *f += (val - *f) / *n;
@@ -904,20 +1118,89 @@ ngx_http_ipstat_rate(void *data, off_t offset, ngx_uint_t val)
 {
     time_t                        now;
     ngx_http_ipstat_rate_t       *rate;
-    ngx_http_ipstat_vip_t        *vip;
+    ngx_http_ipstat_vip_t        *vip = data;
 
-    now = ngx_time();
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ipstat_rate: %p, %p, %O, %d",
+                    data, vip->next, offset, val);
 
-    for (vip = data; vip; vip = vip->next) {
+    if (vip->next) {
+        ngx_http_ipstat_notify(vip, offset, val, op_rate);
+    } else {
+        now = ngx_time();
+
         rate = (ngx_http_ipstat_rate_t *) VIP_FIELD(vip, offset);
 
         if (rate->t == now) {
             rate->curr_rate += val;
+        } else {
+            rate->last_rate = (now - rate->t == 1) ? rate->curr_rate : 0;
+            rate->curr_rate = val;
+            rate->t = now;
+        }
+    }
+}
+
+
+static void
+ngx_http_ipstat_notify(ngx_http_ipstat_vip_t *vip, off_t offset,
+    ngx_uint_t val, ngx_http_ipstat_op_t op)
+{
+    ngx_int_t                     i;
+    ngx_http_ipstat_channel_t     ch;
+
+    for (i = 0; i < ngx_last_process; i++) {
+        if (ngx_processes[i].pid == -1) {
             continue;
         }
 
-        rate->last_rate = (now - rate->t == 1) ? rate->curr_rate : 0;
-        rate->curr_rate = val;
-        rate->t = now;
+        if (ngx_processes[i].pid != vip->pid) {
+            continue;
+        }
+
+        ch.channel.command = NGX_CMD_IPSTAT;
+        ch.channel.pid = vip->pid;
+        ch.channel.len = sizeof(ngx_http_ipstat_channel_t);
+        ch.vip = (uintptr_t) vip->next;
+        ch.offset = offset;
+        ch.val = val;
+        ch.op = op;
+
+        (void) ngx_write_channel(ngx_processes[i].channel[0],
+                                 (ngx_channel_t *) &ch,
+                                 sizeof(ngx_http_ipstat_channel_t),
+                                 ngx_cycle->log);
+
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "ipstat_channel_notify: "
+                       "op=%d, vip=%xd, offset=%O, val=%d",
+                       ch.op, ch.vip, ch.offset, ch.val);
+        break;
     }
+}
+
+
+static void
+ngx_http_ipstat_channel_handler(ngx_channel_t *ch, u_char *buf,
+    ngx_log_t *log)
+{
+    ngx_http_ipstat_channel_t     ch_ex;
+
+    if (ch->command != NGX_CMD_IPSTAT) {
+        if (ngx_channel_next_handler) {
+            ngx_channel_next_handler(ch, buf, log);
+        }
+        return;
+    }
+
+    ngx_memcpy(&ch_ex.vip, buf, channel_len);
+
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, log, 0,
+                   "ipstat_channel_handler: "
+                   "op=%d, vip=%xd, offset=%O, val=%d",
+                   ch_ex.op, ch_ex.vip, ch_ex.offset, ch_ex.val);
+
+    ngx_http_ipstat_op_handler[ch_ex.op]((void *) ch_ex.vip,
+                                         ch_ex.offset,
+                                         ch_ex.val);
 }

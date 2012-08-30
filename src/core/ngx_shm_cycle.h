@@ -12,7 +12,7 @@
 
 
 void ngx_increase_shm_cycle_generation(void);
-ngx_shm_zone_t * ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name,
+ngx_shm_zone_t *ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name,
     size_t size, void *tag, int slab);
 ngx_int_t ngx_shm_cycle_init(ngx_cycle_t *cycle);
 void ngx_free_old_shm_cycles(void);
