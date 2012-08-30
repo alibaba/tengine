@@ -267,6 +267,9 @@ ngx_read_channel_ex(ngx_socket_t s, u_char *buf, size_t size, ngx_log_t *log)
     ssize_t             n;
     ngx_err_t           err;
 
+    ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
+                   "channel read ex: s=%d, size=%z", s, size);
+
     n = recv(s, buf, size, 0);
 
     if (n == -1) {

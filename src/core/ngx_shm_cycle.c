@@ -162,7 +162,7 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
 
     shm_zone->data = NULL;
     shm_zone->shm.addr = NULL;
-    shm_zone->shm.log = cf->cycle->log;
+    shm_zone->shm.log = cf->log;
     shm_zone->shm.size = size;
     shm_zone->shm.name = *name;
     shm_zone->shm.exists = slab ? 0 : 1;
@@ -182,6 +182,9 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
     ngx_list_part_t  *part, *opart;
     
     for (i = 0, use = last_use = -1; i < ngx_last_shm_cycle; i++) {
+
+        ngx_shm_cycles[i].pool->log = cycle->log;
+
         if (!ngx_shm_cycles[i].used) {
             continue;
         }

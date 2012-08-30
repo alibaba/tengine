@@ -72,8 +72,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_increase_pipe_generation();
     ngx_increase_shm_cycle_generation();
 
-
     log = old_cycle->log;
+
 
     pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
     if (pool == NULL) {

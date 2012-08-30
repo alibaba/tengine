@@ -697,7 +697,7 @@ found:
 
     /* allow last cycle notice the change, and send msg to this worker */
 
-    ngx_msleep(50);
+    ngx_msleep(20);
 
     /* copy data from last cycle */
 
@@ -1149,10 +1149,14 @@ ngx_http_ipstat_notify(ngx_http_ipstat_vip_t *vip, off_t offset,
     ngx_int_t                     i;
     ngx_http_ipstat_channel_t     ch;
 
-    for (i = 0; i < ngx_last_process; i++) {
+    for (i = 0; i < NGX_MAX_PROCESSES; i++) {
         if (ngx_processes[i].pid == -1) {
             continue;
         }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "ipstat_channel_notify: pid=%P, tpid=%P",
+                       ngx_processes[i].pid, vip->pid);
 
         if (ngx_processes[i].pid != vip->pid) {
             continue;
@@ -1171,10 +1175,10 @@ ngx_http_ipstat_notify(ngx_http_ipstat_vip_t *vip, off_t offset,
                                  sizeof(ngx_http_ipstat_channel_t),
                                  ngx_cycle->log);
 
-        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+        ngx_log_debug5(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                        "ipstat_channel_notify: "
-                       "op=%d, vip=%xd, offset=%O, val=%d",
-                       ch.op, ch.vip, ch.offset, ch.val);
+                       "pid=%P, op=%d, vip=%xd, offset=%O, val=%d",
+                       vip->pid, ch.op, ch.vip, ch.offset, ch.val);
         break;
     }
 }
