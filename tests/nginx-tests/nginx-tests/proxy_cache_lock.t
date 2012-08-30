@@ -22,6 +22,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http proxy cache/)
 	->write_file_expand('nginx.conf', <<'EOF');
 

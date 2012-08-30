@@ -78,13 +78,7 @@ $t->run();
 
 like(http_get('/found.html'), qr!SEE THIS!, 'found');
 like(http_get('/uri/notfound'), qr!X-URI: /fallback!, 'not found uri');
-like(http_get('/short/long'), qr!404 Not!, 'short uri in try_files');
-
-TODO: {
-local $TODO = 'fixed in 1.1.12';
-
 like(http_get('/nouri/notfound'), qr!X-URI: /fallback!, 'not found nouri');
-
-}
+like(http_get('/short/long'), qr!404 Not!, 'short uri in try_files');
 
 ###############################################################################

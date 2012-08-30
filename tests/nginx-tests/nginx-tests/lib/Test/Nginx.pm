@@ -39,6 +39,7 @@ sub new {
 		CLEANUP => not $ENV{TEST_NGINX_LEAVE}
 	)
 		or die "Can't create temp directory: $!\n";
+	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
 
         $self->{_dso_module} = ();
 	return $self;
@@ -125,6 +126,11 @@ sub has_module($) {
 sub has_daemon($) {
 	my ($self, $daemon) = @_;
 
+	if ($^O eq 'MSWin32') {
+		Test::More::plan(skip_all => "win32");
+		return $self;
+	}
+
 	Test::More::plan(skip_all => "$daemon not found")
 		unless `command -v $daemon`;
 
@@ -206,7 +212,19 @@ sub stop() {
 
 	return $self unless $self->{_started};
 
-	kill 'QUIT', `cat $self->{_testdir}/nginx.pid`;
+	if ($^O eq 'MSWin32') {
+		my $testdir = $self->{_testdir};
+		my @globals = $self->{_test_globals} ?
+			() : ('-g', "pid $testdir/nginx.pid; "
+			. "error_log $testdir/error.log debug;");
+		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'stop',
+			@globals) == 0
+			or die "system() failed: $?\n";
+
+	} else {
+		kill 'QUIT', `cat $self->{_testdir}/nginx.pid`;
+	}
+
 	wait;
 
 	$self->{_started} = 0;
@@ -219,7 +237,7 @@ sub stop_daemons() {
 
 	while ($self->{_daemons} && scalar @{$self->{_daemons}}) {
 		my $p = shift @{$self->{_daemons}};
-		kill 'TERM', $p;
+		kill $^O eq 'MSWin32' ? 9 : 'TERM', $p;
 		wait;
 	}
 

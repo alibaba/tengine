@@ -616,8 +616,16 @@ NGX_HTTP_LUA_MODULE_DEPS="src/http/modules/lua/ddebug.h \
 						  src/http/modules/lua/ngx_http_lua_pcrefix.h \
 						  src/http/modules/lua/ngx_http_lua_headerfilterby.h \
 						  src/http/modules/lua/ngx_http_lua_shdict.h \
-						  src/http/modules/lua/ngx_http_lua_socket.h \
-						  src/http/modules/lua/api/ngx_http_lua_api.h"
+						  src/http/modules/lua/ngx_http_lua_socket_tcp.h \
+						  src/http/modules/lua/api/ngx_http_lua_api.h \
+						  src/http/modules/lua/ngx_http_lua_logby.h \
+						  src/http/modules/lua/ngx_http_lua_sleep.h \
+						  src/http/modules/lua/ngx_http_lua_bodyfilterby.h \
+						  src/http/modules/lua/ngx_http_lua_initby.h \
+						  src/http/modules/lua/ngx_http_lua_socket_udp.h \
+						  src/http/modules/lua/ngx_http_lua_req_method.h \
+						  src/http/modules/lua/ngx_http_lua_phase.h \
+						  "
 NGX_HTTP_LUA_MODULE_SRCS="src/http/modules/lua/ngx_http_lua_script.c \
 						  src/http/modules/lua/ngx_http_lua_log.c \
 						  src/http/modules/lua/ngx_http_lua_subrequest.c \
@@ -652,5 +660,13 @@ NGX_HTTP_LUA_MODULE_SRCS="src/http/modules/lua/ngx_http_lua_script.c \
 						  src/http/modules/lua/ngx_http_lua_pcrefix.c \
 						  src/http/modules/lua/ngx_http_lua_headerfilterby.c \
 						  src/http/modules/lua/ngx_http_lua_shdict.c \
-						  src/http/modules/lua/ngx_http_lua_socket.c \
-						  src/http/modules/lua/ngx_http_lua_api.c"
+						  src/http/modules/lua/ngx_http_lua_socket_tcp.c \
+						  src/http/modules/lua/ngx_http_lua_api.c \
+						  src/http/modules/lua/ngx_http_lua_logby.c \
+						  src/http/modules/lua/ngx_http_lua_sleep.c \
+						  src/http/modules/lua/ngx_http_lua_bodyfilterby.c \
+						  src/http/modules/lua/ngx_http_lua_initby.c \
+						  src/http/modules/lua/ngx_http_lua_socket_udp.c \
+						  src/http/modules/lua/ngx_http_lua_req_method.c \
+						  src/http/modules/lua/ngx_http_lua_phase.c \
+						  "

@@ -1,4 +1,28 @@
 
+Changes with nginx 1.2.3                                         07 Aug 2012
+
+    *) Feature: the Clang compiler support.
+
+    *) Bugfix: extra listening sockets might be created.
+       Thanks to Roman Odaisky.
+
+    *) Bugfix: nginx/Windows might hog CPU if a worker process failed to
+       start.
+       Thanks to Ricardo Villalobos Guevara.
+
+    *) Bugfix: the "proxy_pass_header", "fastcgi_pass_header",
+       "scgi_pass_header", "uwsgi_pass_header", "proxy_hide_header",
+       "fastcgi_hide_header", "scgi_hide_header", and "uwsgi_hide_header"
+       directives might be inherited incorrectly.
+
+    *) Bugfix: trailing dot in a source value was not ignored if the "map"
+       directive was used with the "hostnames" parameter.
+
+    *) Bugfix: incorrect location might be used to process a request if a
+       URI was changed via a "rewrite" directive before an internal redirect
+       to a named location.
+
+
 Changes with nginx 1.2.2                                         03 Jul 2012
 
     *) Change: the "single" parameter of the "keepalive" directive is now
@@ -11,7 +35,7 @@ Changes with nginx 1.2.2                                         03 Jul 2012
        directives, and the "server" directive inside the "upstream" block,
        now support IPv6 addresses.
 
-    *) Feature: the "resolver" directive now support IPv6 addresses and an
+    *) Feature: the "resolver" directive now supports IPv6 addresses and an
        optional port specification.
 
     *) Feature: the "least_conn" directive inside the "upstream" block.

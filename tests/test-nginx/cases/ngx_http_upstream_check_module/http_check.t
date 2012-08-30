@@ -239,3 +239,122 @@ GET /
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
+
+=== TEST 12: the http_check test-single server, least conn
+--- http_config
+    upstream test{
+        server blog.163.com:80;
+        least_conn;
+
+        check interval=3000 rise=1 fall=5 timeout=2000 type=http;
+        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$
+
+=== TEST 13: the http_check test-multi_server, least conn
+--- http_config
+    upstream test{
+        server blog.163.com:80;
+        server blog.163.com:81;
+        least_conn;
+
+        check interval=3000 rise=1 fall=5 timeout=2000 type=http;
+        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$
+
+=== TEST 14: the http_check test, least conn
+--- http_config
+    upstream test{
+        server blog.163.com:80;
+        server blog.163.com:81;
+        least_conn;
+
+        check interval=3000 rise=1 fall=5 timeout=2000 type=http;
+        check_http_send "GET /foo HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- error_code: 502
+--- response_body_like: ^.*$
+
+=== TEST 15: the http_check without check directive, least conn
+--- http_config
+    upstream test{
+        server blog.163.com:80;
+        server blog.163.com:81;
+        least_conn;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$
+
+=== TEST 16: the http_check with port
+--- http_config
+    upstream test{
+        server blog.163.com:80;
+        check interval=2000 rise=1 fall=1 timeout=2000 type=http port=81;
+        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- error_code: 502
+--- response_body_like: ^.*$
+
+=== TEST 17: the http_check with port
+--- http_config
+    upstream test{
+        server blog.163.com:81;
+        check interval=3000 rise=1 fall=1 timeout=2000 type=http port=80;
+        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- error_code: 504
+--- response_body_like: ^.*$
+
