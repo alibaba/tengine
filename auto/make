@@ -7,7 +7,7 @@ if test -n "$NGX_SHARED_MODULES"; then
     if [ $NGX_DSO != YES ]; then
     cat << END
 
-when you use shared modules, you should enable dso module.
+you should enable the dso module, if you want to use a dynamic loaded module.
 END
         exit 1
     fi
