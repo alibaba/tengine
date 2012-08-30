@@ -233,6 +233,7 @@ HTTP_EMPTY_GIF_SHARED=NO
 HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
+HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -445,6 +446,9 @@ do
         --with-http_upstream_ip_hash_module=shared)
                                                    HTTP_UPSTREAM_IP_HASH_SHARED=YES
                                                    HTTP_UPSTREAM_IP_HASH=NO          ;;
+        --with-http_upstream_least_conn_module=shared)
+                                                   HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
+                                                   HTTP_UPSTREAM_LEAST_CONN=NO       ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
@@ -660,6 +664,8 @@ cat << END
                                      enable ngx_http_user_agent_module (shared)
   --with-http_upstream_ip_hash_module=shared
                                      enable ngx_http_upstream_ip_hash_module (shared)
+  --with-http_upstream_least_conn_module=shared
+                                     enable ngx_http_upstream_least_conn_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
