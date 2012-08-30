@@ -279,6 +279,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_procs_start(cycle, 1);
 #endif
 
+            /* allow new processes to start */
+            ngx_msleep(100);
+
             live = 1;
             rm_old_cycles = 1;
             ngx_signal_worker_processes(cycle,
