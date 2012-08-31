@@ -138,12 +138,9 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (ngx_is_init_cycle(cf->cycle->old_cycle)) {
-        ngx_memzero(ngx_static_modules, sizeof(ngx_module_t *) * ngx_max_module);
         ngx_memcpy(ngx_static_modules, ngx_modules,
                    sizeof(ngx_module_t *) * ngx_max_module);
     } else {
-        ngx_memzero(ngx_old_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
-
         ngx_memcpy(ngx_old_modules, ngx_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
         ngx_memcpy(ngx_modules, ngx_static_modules,
@@ -158,8 +155,8 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
-        *cf = pcf;
-        return NGX_CONF_ERROR;
+        rv = NGX_CONF_ERROR;
+        goto failed;
     }
 
     cln->handler = ngx_dso_cleanup;
@@ -167,19 +164,23 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     rv = ngx_conf_parse(cf, NULL);
     if (rv != NGX_CONF_OK) {
-        *cf = pcf;
-        return rv;
+        goto failed;
     }
 
     rv = ngx_dso_load(cf);
 
     if (rv == NGX_CONF_ERROR) {
-        return rv;
+        goto failed;
     }
 
     *cf = pcf;
 
     return NGX_CONF_OK;
+
+failed:
+
+    *cf = pcf;
+    return rv;
 }
 
 
@@ -234,7 +235,6 @@ ngx_dso_cleanup(void *data)
             }
         }
 
-        ngx_memzero(ngx_modules, sizeof(ngx_module_t *) * NGX_DSO_MAX);
         ngx_memcpy(ngx_modules, ngx_old_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
     }
@@ -559,7 +559,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
     }
 
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "unknown directive \"%s\"", value[0].data);
+                       "unknown directive \"%V\"", &value[0]);
     return NGX_CONF_ERROR;
 }
 
