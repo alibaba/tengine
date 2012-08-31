@@ -272,6 +272,13 @@ if [ $ngx_found != yes ]; then
 
     if [ $ngx_found = yes ]; then
         NGX_LIBDL="-ldl"
+    else
+	if [ $NGX_DSO = YES] ; then
+            cat << END
+dlopen(3) required by dso not found, please disable dso (--without-dso).
+
+END
+	fi
     fi
 fi
 
