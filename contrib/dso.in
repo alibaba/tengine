@@ -55,7 +55,7 @@ cat << END
 
   --prefix=PATH                      set module installation prefix
 
-  --add-module=PATH                  external module of will compile
+  --add-module=PATH                  external module which will be compiled
 
   --with-nginx-source=NGX_SOURCE_HOM set nginx source path
 

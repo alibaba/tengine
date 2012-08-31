@@ -588,6 +588,9 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
+#Copyright (C) 2010-2012 Alibaba Group Holding Limited
+
+
 ngx_soext='.so'
 CC=$CC
 CFLAGS='$CFLAGS -fPIC'
