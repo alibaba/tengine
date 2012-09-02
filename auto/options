@@ -99,6 +99,7 @@ HTTP_FLV=NO
 HTTP_SLICE=NO
 HTTP_MP4=NO
 HTTP_GZIP_STATIC=NO
+HTTP_SESSION_STICKY=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_USER_AGENT=YES
@@ -239,6 +240,8 @@ do
         --with-http_secure_link_module)  HTTP_SECURE_LINK=YES       ;;
         --with-http_degradation_module)  HTTP_DEGRADATION=YES       ;;
         --with-http_sysguard_module)     HTTP_SYSGUARD=YES          ;;
+        --with-http_session_sticky_module)
+                                         HTTP_SESSION_STICKY=YES    ;;
         --with-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=YES ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
