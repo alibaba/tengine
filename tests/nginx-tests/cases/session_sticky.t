@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(24);
+my $t = Test::Nginx->new()->plan(25);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -241,6 +241,10 @@ http {
             session_sticky_header upstream=insert_nocookie;
             proxy_pass http://insert_nocookie;
         }
+
+        location /test_rewrite_no_header {
+            proxy_pass http://rewrite;
+        }
     }
 }
 
@@ -317,6 +321,12 @@ unlike($r, qr/set-cookie:\W*test=\w{32}!\d*^\d*/i, 'insert--without maxidle');
 like(http_get('/test_insert_nocookie'), qr/route/i, 'insert--without cookie');
 #24
 like(http_get('/test_insert_nocookie_notfound'), qr/404 Not Found/, 'Not Found');
+#25
+$r = http_get('/test_rewrite_no_header');
+$cookie = getcookie($r);
+$res = getres($r);
+like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_header');
+
 $t->stop();
 #####################################################################################
 #####################################################################################

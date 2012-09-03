@@ -4,12 +4,12 @@
 #include <ngx_md5.h>
 
 
-#define NGX_HTTP_SESSION_STICKY_PREFIX          1
-#define NGX_HTTP_SESSION_STICKY_INDIRECT        2
-#define NGX_HTTP_SESSION_STICKY_INSERT          4
-#define NGX_HTTP_SESSION_STICKY_REWRITE         8
-#define NGX_HTTP_SESSION_STICKY_FALLBACK_ON     16
-#define NGX_HTTP_SESSION_STICKY_FALLBACK_OFF    32
+#define NGX_HTTP_SESSION_STICKY_PREFIX          0x0001
+#define NGX_HTTP_SESSION_STICKY_INDIRECT        0x0002
+#define NGX_HTTP_SESSION_STICKY_INSERT          0x0004
+#define NGX_HTTP_SESSION_STICKY_REWRITE         0x0008
+#define NGX_HTTP_SESSION_STICKY_FALLBACK_ON     0x0010
+#define NGX_HTTP_SESSION_STICKY_FALLBACK_OFF    0x0020
 
 
 typedef struct {
@@ -250,100 +250,93 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                         sizeof("cookie=") - 1) == 0) {
             ss_srv->cookie.data = value[i].data + sizeof("cookie=") - 1;
             ss_srv->cookie.len = value[i].len - sizeof("cookie=") + 1;
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "domain=",
-                             sizeof("domain=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "domain=",
+                               sizeof("domain=") - 1) == 0) {
             ss_srv->domain.data = value[i].data + sizeof("domain=") - 1;
             ss_srv->domain.len = value[i].len - sizeof("domain=") + 1;
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "path=",
-                             sizeof("path=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "path=",
+                               sizeof("path=") - 1) == 0) {
             ss_srv->path.data = value[i].data + sizeof("path=") - 1;
             ss_srv->path.len = value[i].len - sizeof("path=") + 1;
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "maxage=",
-                             sizeof("maxage=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "maxage=",
+                               sizeof("maxage=") - 1) == 0) {
             ss_srv->maxage.data = value[i].data + sizeof("maxage=") - 1;
             ss_srv->maxage.len = value[i].len - sizeof("maxage=") + 1;
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "maxidle=",
-                             sizeof("maxidle=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "maxidle=",
+                               sizeof("maxidle=") - 1) == 0) {
             ss_srv->maxidle = ngx_atotm(value[i].data + sizeof("maxidle=") - 1,
                                        value[i].len - sizeof("maxidle=") + 1);
             if (ss_srv->maxidle == NGX_ERROR) {
                 return NGX_CONF_ERROR;
             }
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "maxlife=",
-                             sizeof("maxlife=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "maxlife=",
+                               sizeof("maxlife=") - 1) == 0) {
             ss_srv->maxlife = ngx_atotm(value[i].data + sizeof("maxlife=") - 1,
                                        value[i].len - sizeof("maxlife=") + 1);
             if (ss_srv->maxlife == NGX_ERROR) {
                 return NGX_CONF_ERROR;
             }
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "mode=",
-                             sizeof("mode=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "mode=",
+                               sizeof("mode=") - 1) == 0) {
 
             value[i].data = value[i].data + sizeof("mode=") - 1;
             value[i].len = value[i].len - sizeof("mode=") + 1;
 
             if (ngx_strncmp(value[i].data, "insert", value[i].len) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_INSERT;
-            }
-            else if (ngx_strncmp(value[i].data, "prefix", value[i].len) == 0) {
+
+            } else if (ngx_strncmp(value[i].data, "prefix", value[i].len) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_PREFIX;
-            }
-            else if (ngx_strncmp(value[i].data, "rewrite", value[i].len) == 0) {
+
+            } else if (ngx_strncmp(value[i].data, "rewrite", value[i].len) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_REWRITE;
-            }
-            else {
+            
+            } else {
                 return NGX_CONF_ERROR;
             }
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "option=",
-                             sizeof("option=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "option=",
+                               sizeof("option=") - 1) == 0) {
             value[i].data = value[i].data + sizeof("option=") - 1;
             value[i].len = value[i].len - sizeof("option=") + 1;
 
             if (ngx_strncmp(value[i].data, "indirect", value[i].len) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_INDIRECT;
+
             } else {
                 return NGX_CONF_ERROR;
             }
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "fallback=",
-                             sizeof("fallback=") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "fallback=",
+                               sizeof("fallback=") - 1) == 0) {
             value[i].data = value[i].data + sizeof("fallback=") - 1;
             value[i].len = value[i].len - sizeof("fallback=") + 1;
 
             if (ngx_strncmp(value[i].data, "on", sizeof("on") - 1) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_FALLBACK_ON;
-            }
-            else if (ngx_strncmp(value[i].data, "off", sizeof("off") - 1) == 0) {
+
+            } else if (ngx_strncmp(value[i].data, "off", sizeof("off") - 1) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_FALLBACK_OFF;
-            }
-            else {
+
+            } else {
                 return NGX_CONF_ERROR;
             }
-        }
-        else {
+
+        } else {
             return NGX_CONF_ERROR;
         }
     }
@@ -380,11 +373,10 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             if (ss_lcf->uscf == NULL) {
                 return NGX_CONF_ERROR;
             }
-        }
 
-        else if (ngx_strncmp(value[i].data,
-                             "switch",
-                             sizeof("switch") - 1) == 0) {
+        } else if (ngx_strncmp(value[i].data,
+                               "switch",
+                               sizeof("switch") - 1) == 0) {
             add = sizeof("switch=") - 1;
 
             if (ngx_strncmp(value[i].data + add, "on", sizeof("on") - 1) == 0) {
@@ -392,9 +384,8 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             } else {
                 ss_lcf->flag = 0;
             }
-        }
 
-        else {
+        } else {
             return NGX_CONF_ERROR;
         }
     }
@@ -526,9 +517,10 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     }
 
     if (ss_lcf->uscf == NGX_CONF_UNSET_PTR) {
-        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
-                      "session sticky needs to configure session_sticky_header");
-        return NGX_ERROR;
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "session sticky didn't config session_sticky_header");
+
+        return NGX_DECLINED;
     }
 
     uscf = ss_lcf->uscf;
@@ -561,8 +553,8 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
         goto not_found;
     }
 
-    ngx_log_debug1(NGX_LOC_DEBUG_HTTP, r->connection->log, 0,
-                   "session sticky cookie:%V", &cookie[i]->value);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "session sticky cookie:%V", &cookies[i]->value);
     st = p;
     last = cookie->data + cookie->len;
 
@@ -605,12 +597,17 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
                 break;
             }
         }
+
     } else {
         vv = p;
     }
 
     if (ss_srv->flag & NGX_HTTP_SESSION_STICKY_INSERT
         && ss_srv->maxidle != NGX_CONF_UNSET) {
+
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "session_sticky mode [insert]");
+
         for (p = v; p < vv; p++) {
             if (*p == '!') {
                 ctx->sid.len = p - v;
@@ -620,6 +617,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
                 }
                 ngx_memcpy(ctx->sid.data, v, ctx->sid.len);
                 v = p + 1;
+
             } else if (*p == '^') {
                 ctx->s_lastseen.len = p - v;
                 ctx->s_lastseen.data = ngx_pnalloc(r->pool, ctx->s_lastseen.len);
@@ -664,6 +662,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
                 goto not_found;
             }
         }
+
     } else {
         ctx->sid.len = vv - v;
         ctx->sid.data = ngx_pnalloc(r->pool, ctx->sid.len);
@@ -726,14 +725,36 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
     ss_srv = ss_pd->ss_srv;
     r = ss_pd->r;
+    n = ss_srv->number;
+    server = ss_srv->server;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     if (ctx == NULL) {
-        return ss_pd->get_rr_peer(pc, &ss_pd->rrp);
+        if (!(ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "session sticky mode isn't rewrite");
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                      "session sticky mode isn't prefix or indriect");
+
+        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
+        if (ctx == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
+        ctx->ss_srv = ss_srv;
+
+        ngx_http_parse_multi_header_lines(&r->headers_in.cookies,
+                                          &ss_srv->cookie,
+                                          &ctx->sid);
+        if (ctx->sid.len == 0) {
+            goto failed;
+        }
     }
 
-    n = ss_srv->number;
-    server = ss_srv->server;
     if (ctx->frist == 1) {
         goto failed;
     }
@@ -864,9 +885,18 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                         rc = ngx_http_session_sticky_rewrite(r, &table[i]);
                         if (rc == NGX_AGAIN) {
                             continue;
+
                         } else if (rc == NGX_ERROR) {
+                            ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
+                                           r->connection->log,
+                                           0,
+                                           "session_sticky [rewrite]"
+                                           "set-cookie:%V",
+                                           &table[i].value);
+
                             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                                          "session_sticky [rewrite] set-cookie failed");
+                                          "session_sticky [rewrite]"
+                                          "set-cookie failed");
                         }
 
                         return ngx_http_ss_next_header_filter(r);
@@ -875,9 +905,18 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                     rc = ngx_http_session_sticky_prefix(r, &table[i]);
                     if (rc == NGX_AGAIN) {
                         continue;
+
                     } else if (rc == NGX_ERROR) {
+                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
+                                       r->connection->log,
+                                       0,
+                                       "session_sticky [prefix]"
+                                       "set-cookie:%V",
+                                       &table[i].value);
+
                         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                                      "session_sticky [prefix] set-cookie failed");
+                                      "session_sticky [prefix]"
+                                      "set-cookie failed");
                     }
 
                     return ngx_http_ss_next_header_filter(r);
@@ -885,8 +924,11 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
             }
             part = part->next;
         }
-    }
-    else if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_INSERT) {
+
+    } else if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_INSERT) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "session_sticky [mode]: insert");
+
         rc = ngx_http_session_sticky_insert(r);
         if (rc != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
