@@ -61,7 +61,7 @@ It will load conf/module_stubs file and define order of module(via module\_stub 
 load
 ------------------------
 
-**Syntax**: *load [module_name] [module_path]*
+**Syntax**: *load [module_name] \[module_path]*
 
 **Default**: *none*
 
@@ -79,8 +79,10 @@ The order in which the module is searched is as follows:
 Example:
 
     load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
+    load ngx_http_test_module;
+    load ngx_http_test2_module.so;
 
-It will load the ngx\_http\_empty\_gif\_module from ngx\_http\_empty\_gif\_module.so.
+It will load the ngx\_http\_empty\_gif\_module from ngx\_http\_empty\_gif\_module.so. and will load ngx\_http\_test_module and ngx\_http\_test2\_module form ngx\_http\_test\_module.so and ngx\_http\_test2\_module.so
 
 
 module_stub

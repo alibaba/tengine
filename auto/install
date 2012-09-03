@@ -110,6 +110,20 @@ END
 
 if test -n "$NGX_SHARED_MODULES"; then
 
+    cat << END                                                >> $NGX_MAKEFILE
+
+dso_install:	all
+END
+
+    for ngx_dso_module in $NGX_DSO_ALL_TARGETS
+    do
+        cat << END                                                >> $NGX_MAKEFILE
+
+	cp $ngx_dso_module \$(DESTDIR)$NGX_DSO_PATH
+
+END
+    done
+
 cat << END                                                    >> $NGX_MAKEFILE
 
 install:	all \
@@ -240,6 +254,9 @@ build:
 
 install:
 	\$(MAKE) -f $NGX_MAKEFILE install
+
+dso_install:
+	\$(MAKE) -f $NGX_MAKEFILE dso_install
 
 upgrade:
 	$NGX_SBIN_PATH -t

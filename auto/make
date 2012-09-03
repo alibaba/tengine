@@ -24,7 +24,7 @@ mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
          $NGX_OBJS/src/mail \
          $NGX_OBJS/src/misc \
 	 $NGX_OBJS/src/proc \
-         $NGX_OBJS/dso_modules
+         $NGX_OBJS/modules
 
 
 ngx_objs_dir=$NGX_OBJS$ngx_regex_dirsep
@@ -210,7 +210,7 @@ ngx_link=${CORE_LINK:+`echo $CORE_LINK \
 
 for ngx_shared_modules in $NGX_SHARED_MODULES
 do
-    NGX_DSO_ALL_TARGETS="$NGX_DSO_ALL_TARGETS $NGX_OBJS${ngx_dirsep}dso_modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}"
+    NGX_DSO_ALL_TARGETS="$NGX_DSO_ALL_TARGETS $NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}"
 done
 
 if test -n "$NGX_DSO_ALL_TARGETS"; then
@@ -523,8 +523,8 @@ END
 
         cat << END                                                    >> $NGX_MAKEFILE
 
-$NGX_OBJS${ngx_dirsep}dso_modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}:	$ngx_dso_deps$ngx_spacer
-	\$(LINK)${ngx_dso_link_flag} ${ngx_long_start}${ngx_binout} $NGX_OBJS/dso_modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}$ngx_long_cont$ngx_dso_objs$ngx_libs$ngx_dso_link $ngx_dso_feture_lib
+$NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}:	$ngx_dso_deps$ngx_spacer
+	\$(LINK)${ngx_dso_link_flag} ${ngx_long_start}${ngx_binout} $NGX_OBJS/modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}$ngx_long_cont$ngx_dso_objs$ngx_libs$ngx_dso_link $ngx_dso_feture_lib
 	$ngx_rcc
 ${ngx_long_end}
 END

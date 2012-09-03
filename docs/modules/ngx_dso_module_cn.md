@@ -10,6 +10,8 @@
 
 * 如果你想要编译官方模块为动态模块，你需要在configure的时候加上类似这样的指令(--with-http\_xxx_module),./configure --help可以看到更多的细节.
 
+* 如果只想要安装官方模块为动态模块(不安装Nginx)，那么就只需要configure之后，执行 make dso_install命令.
+
 * 如果需要编译第三方模块，可以使用dso\_tools工具(详细使用方法请参加dso_tools章节).
 
 * 动态加载模块的个数限制为128个.
@@ -66,13 +68,13 @@ include命令主要用于指定一个文件，这个文件里面包含了对应�
 load
 ------------------------
 
-**Syntax**: *load module_name [module_path]*
+**Syntax**: *load [module_name] \[module_path]*
 
 **Default**: *none*
 
 **Context**: *dso*
 
-load命令用于在指定的路径(module\_path),将指定的模块(module\_name)动态加载到Nginx中。其中module\_path是可选的,如果没有module\_path参数，那么默认path是 $(modulename).so.
+load命令用于在指定的路径(module\_path),将指定的模块(module\_name)动态加载到Nginx中。其中module\_path和module\_name可以只写一个,如果没有module\_path参数，那么默认path是 $(modulename).so.如果没有module\_name参数，那么默认name就是module\_path删除掉".so"后缀.
 
 对于module\_path的路径查找，这里是严格按照下面的顺序的
 
@@ -84,8 +86,9 @@ load命令用于在指定的路径(module\_path),将指定的模块(module\_name
 
     load ngx_http_empty_gif_module  ngx_http_empty_gif_module.so;
     load ngx_http_test_module;
+    load ngx_http_test2_module.so;
 
-将会从ngx\_http\_empty\_gif\_module.so.加载empty\_gif模块。以及从ngx\_http\_test\_module.so加载ngx\_http\_test\_module模块.
+将会从ngx\_http\_empty\_gif\_module.so.加载empty\_gif模块。以及从ngx\_http\_test\_module.so加载ngx\_http\_test\_module模块.第三条指令是从ngx\_http\_test2\_module.so加载ngx\_http\_test2\_module模块.
 
 module_stub
 -------------

@@ -27,7 +27,7 @@ do
 
     case "$option" in
         --help)                          help=yes                       ;;
-        --h)                             help=yes                       ;;
+        -h)                             help=yes                        ;;
 
         --prefix=)                       NGX_DSO_PREFIX="!"             ;;
         --prefix=*)                      NGX_DSO_PREFIX="$value"        ;;

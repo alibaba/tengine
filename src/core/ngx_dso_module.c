@@ -22,7 +22,7 @@ typedef struct {
 typedef struct {
     ngx_str_t     name;
     ngx_str_t     path;
-    void         *dl_handle;
+    void         *handle;
     ngx_module_t *module;
 } ngx_dso_module_t;
 
@@ -217,30 +217,37 @@ ngx_dso_cleanup(void *data)
     ngx_cycle_t       *cycle = data;
 
     ngx_uint_t           i;
+    ngx_cycle_t         *clean_cycle;
     ngx_dso_module_t    *dm;
     ngx_dso_conf_ctx_t  *ctx;
 
     if (cycle != ngx_cycle) {
 
-        if (cycle->conf_ctx) {
-            ctx = (ngx_dso_conf_ctx_t *)
-                   cycle->conf_ctx[ngx_dso_module.index];
-
-            if (ctx != NULL) {
-                dm = ctx->modules->elts;
-
-                for (i = 0; i < ctx->modules->nelts; i++) {
-                    if (dm[i].name.len == 0) {
-                        continue;
-                    }
-
-                    dlclose(dm[i].dl_handle);
-                }
-            }
-        }
-
+        clean_cycle = cycle;
         ngx_memcpy(ngx_modules, ngx_old_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
+    } else {
+        if (cycle->old_cycle == NULL) {
+            return;
+        }
+        clean_cycle = cycle->old_cycle;
+    }
+
+    if (clean_cycle->conf_ctx) {
+        ctx = (ngx_dso_conf_ctx_t *)
+               clean_cycle->conf_ctx[ngx_dso_module.index];
+
+        if (ctx != NULL) {
+            dm = ctx->modules->elts;
+
+            for (i = 0; i < ctx->modules->nelts; i++) {
+                if (dm[i].name.len == 0 || dm[i].handle == NULL) {
+                    continue;
+                }
+
+                dlclose(dm[i].handle);
+            }
+        }
     }
 }
 
@@ -345,27 +352,22 @@ ngx_dso_full_name(ngx_cycle_t *cycle, ngx_dso_conf_ctx_t *ctx,
 static ngx_int_t
 ngx_dso_open(ngx_dso_module_t *dm)
 {
-    void          *handle;
     ngx_str_t      name, path;
-    ngx_module_t  *module;
 
     name = dm->name;
     path = dm->path;
 
-    handle = dlopen((char *) path.data, RTLD_NOW | RTLD_GLOBAL);
-    if (handle == NULL) {
-        ngx_log_stderr(errno, "load module failed %s", dlerror());
+    dm->handle = dlopen((char *) path.data, RTLD_NOW | RTLD_GLOBAL);
+    if (dm->handle == NULL) {
+        ngx_log_stderr(errno, "load module \" %V \" failed (%s)", &path, dlerror());
         return NGX_ERROR;
     }
 
-    module = dlsym(handle, (const char *) name.data);
-    if (module == NULL) {
-        ngx_log_stderr(errno, "Can't locate sym in module(%V)", &name);
+    dm->module = dlsym(dm->handle, (const char *) name.data);
+    if (dm->module == NULL) {
+        ngx_log_stderr(errno, "can't locate symbol in module (%V)", &name);
         return NGX_ERROR;
     }
-
-    dm->dl_handle = handle;
-    dm->module = module;
 
     return NGX_OK;
 }
@@ -402,7 +404,7 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     u_char              *p;
     ngx_int_t            rc;
-    ngx_str_t           *value, module_path;
+    ngx_str_t           *value, module_path, module_name;
     ngx_dso_module_t    *dm;
     ngx_dso_conf_ctx_t  *ctx;
 
@@ -417,24 +419,40 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (cf->args->nelts == 3) {
-        rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
-                                      &value[1], &value[2]);
+        module_name = value[1];
         module_path = value[2];
 
     } else {
         /* cf->args->nelts == 2 */
-        module_path.len = value[1].len + sizeof(NGX_DSO_EXT);
-        module_path.data = ngx_pcalloc(cf->pool, module_path.len);
-        if (module_path.data == NULL) {
-            return NGX_CONF_ERROR;
-        }
+        if (value[1].len > 3 &&
+            value[1].data[value[1].len - 3] == '.' &&
+            value[1].data[value[1].len - 2] == 's' &&
+            value[1].data[value[1].len - 1] == 'o')
+        {
+            module_path = value[1];
+            module_name.data = ngx_pcalloc(cf->pool, value[1].len - 2);
+            if (module_path.data == NULL) {
+                return NGX_CONF_ERROR;
+            }
 
-        p = ngx_cpymem(module_path.data, value[1].data, value[1].len);
-        ngx_memcpy(p, NGX_DSO_EXT, sizeof(NGX_DSO_EXT) - 1);
-        rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
-                                      &value[1], &module_path);
+            module_name.len = value[1].len - 3;
+            ngx_memcpy(module_name.data, module_path.data, module_name.len);
+        } else {
+
+            module_path.len = value[1].len + sizeof(NGX_DSO_EXT);
+            module_path.data = ngx_pcalloc(cf->pool, module_path.len);
+            if (module_path.data == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            p = ngx_cpymem(module_path.data, value[1].data, value[1].len);
+            ngx_memcpy(p, NGX_DSO_EXT, sizeof(NGX_DSO_EXT) - 1);
+            module_name = value[1];
+        }
     }
 
+    rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
+                                  &value[1], &module_path);
     if (rc == NGX_DECLINED) {
         return NGX_CONF_OK;
     }
@@ -444,8 +462,9 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    dm->name = value[1];
+    dm->name = module_name;
     dm->path = module_path;
+    dm->handle = NULL;
 
     return NGX_CONF_OK;
 }
@@ -591,7 +610,7 @@ ngx_dso_template(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
         return NGX_CONF_ERROR;
     }
 
-    ngx_sprintf(file.data, "%V", name);
+    ngx_sprintf(file.data, "%V%Z", name);
 
     if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
         return NGX_CONF_ERROR;
