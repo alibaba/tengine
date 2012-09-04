@@ -1,4 +1,51 @@
 
+Changes with Tengine 1.4.0                                         05 Sep 2012
+
+    *) Feature: added the dynamic module loading support (a.k.a. DSO), so we
+       don't have to recompile tengine when we want to add a new module.
+       (diaoliang)
+
+    *) Feature: updated the Lua module to the latest stable version.
+       (chaoslawful, agentzh, jinglong)
+
+    *) Feature: added json and csv format output for the upstream_check
+       module. (wenjing)
+
+    *) Feature: added the 'log_empty_request' directive which could be used
+       to turn off logs from a connection without HTTP data. (shudu)
+
+    *) Feature: added the 'concat_delimiter' directive to the concat module to
+       allow adding delimiter between each file. (qingtan)
+
+    *) Feature: added the 'concat_ignore_file_error' directive to ignore file
+       errors and the syntax of concat is less strict now. (qingtan) 
+
+    *) Feature: added the 'default' option to the 'error_page' directive to set
+       all error pages to default values. (jinglong)
+
+    *) Feature: added the 'priority' directive of the procs module. (yuanzhuo)
+
+    *) Feature: added the 'delay_start' directive of the procs module.
+       (yuanzhuo)
+
+    *) Change: merged changes from nginx-1.2.3. (shudu)
+
+    *) Bugfix: fixed a segmentation fault bug of the geo module when 'range'
+       was set without default value. (yuanzhuo)
+
+    *) Bugfix: fixed a segmentation fault bug with the procs module. (yuanzhuo)
+
+    *) Bugfix: fixed a socket leak bug when upstream_check was enabled.
+       (wenjing)
+
+    *) Bugfix: fixed some bugs of the limit_req module. (diaoliang)
+
+    *) Bugfix: fixed wrong format types with error logs. (wenjing)
+
+    *) Bugfix: fixed a compile error if the perl module was used with procs.
+       (yuanzhuo)
+
+
 Changes with Tengine 1.3.0                                         25 May 2012
 
     *) Feature: added the Lua module which embeds the power of Lua into Tengine.
