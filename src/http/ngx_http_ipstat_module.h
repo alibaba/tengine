@@ -29,7 +29,6 @@ typedef struct {
     ngx_uint_t             num;
     size_t                 index_size;
     size_t                 block_size;
-    ngx_shmtx_t            mutex;
     void                  *data;
     ngx_shm_zone_t        *vip_zone;
 } ngx_http_ipstat_main_conf_t;

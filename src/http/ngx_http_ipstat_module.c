@@ -46,6 +46,7 @@ typedef struct {
 
 typedef struct {
     ngx_shmtx_sh_t         shmtx;
+    ngx_shmtx_t            mutex;
     ngx_uint_t             workers;
     ngx_uint_t             num;
     size_t                 index_size;
@@ -343,7 +344,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     hdr = (ngx_http_ipstat_zone_hdr_t *) shm_zone->shm.addr;
 
-    if (ngx_shmtx_create(&smcf->mutex, &hdr->shmtx, ctx->cycle->lock_file.data)
+    if (ngx_shmtx_create(&hdr->mutex, &hdr->shmtx, ctx->cycle->lock_file.data)
         != NGX_OK)
     {
         return NGX_ERROR;
@@ -561,17 +562,19 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
     ngx_pid_t                    *ppid;
     ngx_uint_t                    i, j;
     ngx_http_ipstat_zone_ctx_t   *ctx;
+    ngx_http_ipstat_zone_hdr_t   *hdr;
     ngx_http_ipstat_main_conf_t  *smcf;
 
     ppid = NULL;
     smcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_ipstat_module);
     ctx = (ngx_http_ipstat_zone_ctx_t *) smcf->vip_zone->data;
+    hdr = (ngx_http_ipstat_zone_hdr_t *) smcf->vip_zone->shm.addr;
 
     for (i = 0; i < smcf->workers; i++) {
 
         ppid = VIP_PID(ctx->data, i * smcf->block_size);
 
-        ngx_shmtx_lock(&smcf->mutex);
+        ngx_shmtx_lock(&hdr->mutex);
 
         /* case 1: in a new cycle, take a spare position */
 
@@ -596,7 +599,7 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
             }
         }
 
-        ngx_shmtx_unlock(&smcf->mutex);
+        ngx_shmtx_unlock(&hdr->mutex);
     }
 
     /* never reach this point */
@@ -610,7 +613,7 @@ found:
 
     *ppid = ngx_pid;
 
-    ngx_shmtx_unlock(&smcf->mutex);
+    ngx_shmtx_unlock(&hdr->mutex);
 
     smcf->data = (void *) ppid;
 
