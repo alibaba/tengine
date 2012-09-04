@@ -27,14 +27,17 @@ do
 
     case "$option" in
         --help)                          help=yes                       ;;
-        -h)                             help=yes                        ;;
+        -h)                              help=yes                       ;;
 
-        --prefix=)                       NGX_DSO_PREFIX="!"             ;;
-        --prefix=*)                      NGX_DSO_PREFIX="$value"        ;;
+        --dst=)                          NGX_DSO_PREFIX="!"             ;;
+        --dst=*)                         NGX_DSO_PREFIX="$value"        ;;
+        -d=*)                            NGX_DSO_PREFIX="$value"        ;;
 
         --add-module=*)                  NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
+        -a=*)                            NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
 
         --with-nginx-source=*)           NGX_SOURCE_HOME="$value"       ;;
+        -s=*)                            NGX_SOURCE_HOME="$value"       ;;
 
         *)
             echo "$0: error: invalid option \"$option\""
@@ -51,13 +54,10 @@ if [ $help = yes ]; then
 
 cat << END
 
-  --help                             print this message
-
-  --prefix=PATH                      set module installation prefix
-
-  --add-module=PATH                  external module which will be compiled
-
-  --with-nginx-source=NGX_SOURCE_HOM set nginx source path
+-h, --help display this help and exit
+-d, --dst=PATH set module installation prefix
+-a, --add-module=PATH external module which will be compiled
+-s, --with-nginx-source=SOURCE set nginx source root
 
 END
 

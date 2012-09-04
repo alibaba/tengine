@@ -149,7 +149,7 @@ NGX_HTTP_SCGI_TEMP_PATH=
 HTTP_CACHE=YES
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
-HTTP_SSL=NO
+HTTP_SSL=YES
 HTTP_SSI=YES
 HTTP_POSTPONE=NO
 HTTP_REALIP=NO
@@ -192,12 +192,12 @@ HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_USER_AGENT=YES
-HTTP_UPSTREAM_CHECK=NO
+HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
-HTTP_STUB_STATUS=NO
+HTTP_STUB_STATUS=YES
 
 #shared module
 HTTP_XSLT_SHARED=NO
@@ -289,7 +289,7 @@ NGX_LIBATOMIC=NO
 
 NGX_CPU_CACHE_LINE=
 
-NGX_SYSLOG=NO
+NGX_SYSLOG=YES
 
 NGX_POST_CONF_MSG=
 
@@ -338,7 +338,8 @@ do
 
         --with-file-aio)                           NGX_FILE_AIO=YES           ;;
         --with-ipv6)                               NGX_IPV6=YES               ;;
-        --with-syslog)                             NGX_SYSLOG=YES             ;;
+
+        --without-syslog)                          NGX_SYSLOG=NO              ;;
 
         --without-dso)                             NGX_DSO=NO                 ;;
 
@@ -352,7 +353,6 @@ do
         --http-uwsgi-temp-path=*)                  NGX_HTTP_UWSGI_TEMP_PATH="$value" ;;
         --http-scgi-temp-path=*)                   NGX_HTTP_SCGI_TEMP_PATH="$value" ;;
 
-        --with-http_ssl_module)                    HTTP_SSL=YES                      ;;
         --with-http_realip_module)                 HTTP_REALIP=YES                   ;;
         --with-http_addition_module)               HTTP_ADDITION=YES
                                                    HTTP_ADDITION_SHARED=NO           ;;
@@ -381,7 +381,6 @@ do
         --with-http_degradation_module)            HTTP_DEGRADATION=YES              ;;
         --with-http_sysguard_module)               HTTP_SYSGUARD=YES
                                                    HTTP_SYSGUARD_SHARED=NO           ;;
-        --with-http_upstream_check_module)         HTTP_UPSTREAM_CHECK=YES           ;;
 
         --with-http_addition_module=shared)        HTTP_ADDITION_SHARED=YES
                                                    HTTP_ADDITION=NO                  ;;
@@ -453,6 +452,7 @@ do
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
         --without-http_ssi_module)       HTTP_SSI=NO                ;;
+        --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO             ;;
         --without-http_footer_module)    HTTP_FOOTER=NO             ;;
         --without-http_access_module)    HTTP_ACCESS=NO             ;;
@@ -481,6 +481,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --without-http_browser_module)   HTTP_BROWSER=NO            ;;
         --without-http_user_agent_module) HTTP_USER_AGENT=NO        ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
+        --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO   ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
@@ -498,7 +499,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
-        --with-http_stub_status_module)         HTTP_STUB_STATUS=YES          ;;
+        --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
 
         --with-mail)                     MAIL=YES                   ;;
         --with-mail_ssl_module)          MAIL_SSL=YES               ;;
@@ -595,11 +596,11 @@ cat << END
 
   --with-file-aio                    enable file AIO support
   --with-ipv6                        enable IPv6 support
-  --with-syslog                      enable syslog logging
+
+  --without-syslog                   disable syslog logging
 
   --without-dso                      disable dso module load
 
-  --with-http_ssl_module             enable ngx_http_ssl_module
   --with-http_realip_module          enable ngx_http_realip_module
   --with-http_addition_module        enable ngx_http_addition_filter_module
   --with-http_xslt_module            enable ngx_http_xslt_filter_module
@@ -616,8 +617,6 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_sysguard_module        enable ngx_http_sysguard_module
-  --with-http_stub_status_module     enable ngx_http_stub_status_module
-  --with-http_upstream_check_module  enable ngx_http_upstream_check_module
 
   --with-http_addition_module=shared enable ngx_http_addition_filter_module (shared)
   --with-http_xslt_module=shared     enable ngx_http_xslt_filter_module (shared)
@@ -670,6 +669,7 @@ cat << END
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
   --without-http_ssi_module          disable ngx_http_ssi_module
+  --without-http_ssl_module          disable ngx_http_ssl_module
   --without-http_userid_module       disable ngx_http_userid_filter_module
   --without-http_footer_filter_module
                                      disable ngx_http_footer_filter_module
@@ -691,9 +691,12 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
+  --without-http_upstream_check_module
+                                     disable ngx_http_upstream_check_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
+  --without-http_stub_status_module  disable ngx_http_stub_status_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

@@ -12,7 +12,7 @@
 
 * 如果只想要安装官方模块为动态模块(不安装Nginx)，那么就只需要configure之后，执行 make dso_install命令.
 
-* 如果需要编译第三方模块，可以使用dso\_tools工具(详细使用方法请参加dso_tools章节).
+* 如果需要编译第三方模块，可以使用dso\_tools工具(详细使用方法请参加dso_tool章节).
 
 * 动态加载模块的个数限制为128个.
 
@@ -29,14 +29,8 @@
     worker_processes  1;
     
     dso {
-         path /home/nginx-dso/module/;
-         load ngx_http_lua_module;
-         load ngx_http_access_module          ngx_http_access_module.so;
-         load ngx_http_flv_module             ngx_http_flv_module.so;
-         load ngx_http_memcached_module       ngx_http_memcached_module.so;
-         load ngx_http_sub_filter_module      ngx_http_sub_filter_module.so;
-         load ngx_http_addition_filter_module ngx_http_addition_filter_module.so;
-         load ngx_http_footer_filter_module   ngx_http_footer_filter_module.so;
+         load ngx_http_lua_module.so;
+         load ngx_http_memcached_module.so;
     }
 
     events {
@@ -47,22 +41,22 @@
 指令
 ==========
 
-include
--------------
+path
+------------------------
 
-**Syntax**: *include file_name*
+**Syntax**: *path path*
 
 **Default**: *none*
 
 **Context**: *dso*
 
-include命令主要用于指定一个文件，这个文件里面包含了对应模块顺序(module_stub指令),有关于module\_stub指令可以看下面的module\_stubs部分.
+path 主要是设置默认的动态模块加载路径。
 
 例子:
 
-    include module_stubs
-    
-将会加载conf/module_stubs这个文件，这个文件主要是由(module_stub指令组成).
+    path /home/dso/module/;
+
+设置默认的动态模块加载路径为/home/dso/module/.
 
 
 load
@@ -120,34 +114,53 @@ module_stub
 上面这个例子将会插入my\_filter模块到addition\_filter之前执行。
 
 
-path
-------------------------
+include
+-------------
 
-**Syntax**: *path path*
+**Syntax**: *include file_name*
 
 **Default**: *none*
 
 **Context**: *dso*
 
-path 主要是设置默认的动态模块加载路径。
+include命令主要用于指定一个文件，这个文件里面包含了对应模块顺序(module_stub指令),有关于module\_stub指令可以看下面的module\_stubs部分.
 
 例子:
 
-    path /home/dso/module/;
+    include module_stubs
+    
+将会加载conf/module_stubs这个文件，这个文件主要是由(module_stub指令组成).
 
-设置默认的动态模块加载路径为/home/dso/module/.
 
-
-工具
+如何编译动态模块
 ===========
 
-dso_tools
+官方模块
 ------------------------
 
-这个工具主要是用来编译第三方模块为动态模块.
+如果你想要在安装完Tengine之后，编译官方模块为动态模块，那么你需要按照如下的步骤:
+
+* 在configure的时候打开你想要编译的模块.
+
+      $ ./configure --with-http_sub_module=shared
+      
+* 编译它.
+
+    $ make
+    
+* 安装动态模块.
+
+    $ make dso_install
+    
+它将会复制动态库文件到你的动态模块目录，或者你也可以手工拷贝动态模块文件(文件是在objs/modules)到你想要加载的目录.
+
+第三方模块
+------------------------
+
+你能够使用dso_tool(在Nginx安装目录的sbin下)这个工具来编译第三方模块.
 
 例子:
 
-    ./dso_tools --add-module=/home/dso/lua-nginx-module
+    ./dso_tool --add-module=/home/dso/lua-nginx-module
 
-将会编译ngx\_lua模块为动态库，然后安装到默认的模块路径.
+将会编译ngx\_lua模块为动态库，然后安装到默认的模块路径.如果你想要安装到指定位置，那么需要指定--dst选项(更多的选项请使用dso_tool -h查看).

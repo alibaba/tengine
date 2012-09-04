@@ -226,6 +226,7 @@ ngx_dso_cleanup(void *data)
         clean_cycle = cycle;
         ngx_memcpy(ngx_modules, ngx_old_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
+
     } else {
         if (cycle->old_cycle == NULL) {
             return;
@@ -359,7 +360,7 @@ ngx_dso_open(ngx_dso_module_t *dm)
 
     dm->handle = dlopen((char *) path.data, RTLD_NOW | RTLD_GLOBAL);
     if (dm->handle == NULL) {
-        ngx_log_stderr(errno, "load module \" %V \" failed (%s)", &path, dlerror());
+        ngx_log_stderr(errno, "load module \"%V\" failed (%s)", &path, dlerror());
         return NGX_ERROR;
     }
 
@@ -437,8 +438,8 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             module_name.len = value[1].len - 3;
             ngx_memcpy(module_name.data, module_path.data, module_name.len);
-        } else {
 
+        } else {
             module_path.len = value[1].len + sizeof(NGX_DSO_EXT);
             module_path.data = ngx_pcalloc(cf->pool, module_path.len);
             if (module_path.data == NULL) {
@@ -732,7 +733,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
 void
 ngx_show_dso_modules(ngx_conf_t *cf)
 {
-    ngx_str_t            module_name;
+    ngx_str_t            name;
     ngx_uint_t           i;
     ngx_module_t        *module;
     ngx_dso_module_t    *dm;
@@ -752,11 +753,11 @@ ngx_show_dso_modules(ngx_conf_t *cf)
             continue;
         }
 
-        module_name = dm[i].name;
+        name = dm[i].name;
         module = dm[i].module;
 
         ngx_log_stderr(0, "    %V (shared, %ui.%ui)",
-                       &module_name, module->major_version,
+                       &name, module->major_version,
                        module->minor_version);
     }
 }
@@ -765,7 +766,7 @@ ngx_show_dso_modules(ngx_conf_t *cf)
 void
 ngx_show_dso_directives(ngx_conf_t *cf)
 {
-    ngx_str_t            module_name;
+    ngx_str_t            name;
     ngx_uint_t           i;
     ngx_module_t        *module;
     ngx_command_t       *cmd;
@@ -786,10 +787,10 @@ ngx_show_dso_directives(ngx_conf_t *cf)
             continue;
         }
 
-        module_name = dm[i].name;
+        name = dm[i].name;
         module = dm[i].module;
 
-        ngx_log_stderr(0, "%V (shared):", &module_name);
+        ngx_log_stderr(0, "%V (shared):", &name);
 
         cmd = module->commands;
         if(cmd == NULL) {
