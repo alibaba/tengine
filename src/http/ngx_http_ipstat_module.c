@@ -892,7 +892,7 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
     b->pos = b->start;
     b->memory = 1;
     b->temporary = 1;
-    b->last = ngx_slprintf(b->pos, b->end, "%d\n", smcf->workers);
+    b->last = ngx_slprintf(b->pos, b->end, "%i\n", smcf->workers);
 
     if (ngx_http_output_filter(r, tl) == NGX_ERROR) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;

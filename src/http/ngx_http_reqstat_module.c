@@ -283,7 +283,7 @@ ngx_http_reqstat_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (ngx_http_script_variables_count(&value[2]) == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the value \"%V\" is a constant",
-                           &value[3]);
+                           &value[2]);
         return NGX_CONF_ERROR;
     }
 
@@ -495,7 +495,7 @@ ngx_http_reqstat_show_handler(ngx_http_request_t *r)
                                    (size_t) node->len, node->data);
 
             for (j = 0; j < sizeof(fields) / sizeof(off_t); j++) {
-                b->last = ngx_slprintf(b->last, b->end, "%ud,",
+                b->last = ngx_slprintf(b->last, b->end, "%uA,",
                                        *REQ_FIELD(node, fields[j]));
             }
 
