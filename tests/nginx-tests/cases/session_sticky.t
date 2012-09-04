@@ -15,11 +15,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(30);
+my $t = Test::Nginx->new()->plan(32);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
 $t->write_file_expand('9003', '9003');
+$t->write_file_expand('hava_cookie', 'have_cookie');
+$t->write_file_expand('no_have_cookie', 'no_have_cookie');
 
 my $d = $t->testdir();
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -131,6 +133,11 @@ http {
         server          127.0.0.1:9001;
     }
 
+    upstream nocookie {
+        session_sticky cookie=test;
+        server 127.0.0.1:9004;
+    }
+
     server {
         listen     127.0.0.1:9000;
         session_sticky_header switch=off;
@@ -162,6 +169,18 @@ http {
         session_sticky_header switch=off;
         location / {
             index       9003;
+        }
+    }
+
+    server {
+        listen    127.0.0.1:9004;
+        session_sticky_header switch=off;
+        location / {
+            if ($cookie_test != "") {
+                return 401;
+            }
+
+            return 200;
         }
     }
 
@@ -254,6 +273,11 @@ http {
 
         location /test_rewrite_no_header {
             proxy_pass http://rewrite/;
+        }
+
+        location /test_cookie {
+            session_sticky_header upstream=nocookie;
+            proxy_pass http://nocookie/;
         }
     }
 }
@@ -350,6 +374,10 @@ $cookie=getcookie($r);
 $res=getres($r);
 like($r, qr/set-cookie: test=\w{32}/i, 'no maxlife');
 like(my_http_get('/test_insert_nomalife', $cookie), qr/$res/, 'nomaxlif with cookie');
+$r = http_get('/test_cookie');
+$cookie = getcookie($r);
+like($r, qr/200/, 'no cookie in request and no cookie to upstream');
+like(my_http_get('/test_cookie', $cookie), qr/200/, 'with cookie in request and no cookie to upstream');
 
 $t->stop();
 #####################################################################################

@@ -714,6 +714,8 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
             }
         }
 
+        ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, now);
+
     } else {
         ctx->sid.len = vv - v;
         ctx->sid.data = ngx_pnalloc(r->pool, ctx->sid.len);
@@ -727,10 +729,9 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         & (NGX_HTTP_SESSION_STICKY_PREFIX
            | NGX_HTTP_SESSION_STICKY_INDIRECT)) {
 
-        cookie->len -= (p - st);
+        cookie->len -= (end - st);
         if (cookie->len == 0) {
-            cookies[i]->hash = 0;
-            return NGX_OK;
+            return ngx_list_delete(&r->headers_in.headers, cookies[i]);
         }
         while (end < last) {
             *st = *end;
@@ -738,8 +739,6 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
             end++;
         }
     }
-
-    ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, now);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "session sticky sid [%V]", &ctx->sid);
@@ -752,8 +751,8 @@ not_found:
     ctx->frist = 1;
     ctx->sid.len = 0;
     ctx->sid.data = NULL;
-    ctx->firstseen = ngx_time();
-    ctx->lastseen = ngx_time();
+    ctx->firstseen = now;
+    ctx->lastseen = now;
 
     ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, ctx->lastseen);
     ngx_http_session_sticky_tmtoa(r, &ctx->s_firstseen, ctx->firstseen);
