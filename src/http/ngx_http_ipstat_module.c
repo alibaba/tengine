@@ -231,7 +231,7 @@ ngx_http_ipstat_init(ngx_conf_t *cf)
          + smcf->block_size * smcf->workers;
 
     ngx_log_debug6(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-                   "ipstat_init: cycle=%p, workers=%d, num=%d, "
+                   "ipstat_init: cycle=%p, workers=%i, num=%i, "
                    "index_size=%z, block_size=%z, size=%z",
                    cf->cycle, smcf->workers, smcf->num,
                    smcf->index_size, smcf->block_size, size);
@@ -356,7 +356,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, shm_zone->shm.log, 0,
                    "ipstat_init_zone(current hdr %p): "
-                   "workers=%d, num=%d, index_size=%z, block_size=%z",
+                   "workers=%i, num=%i, index_size=%z, block_size=%z",
                    hdr, hdr->workers, hdr->num,
                    hdr->index_size, hdr->block_size);
 
@@ -694,7 +694,7 @@ ngx_http_ipstat_count(void *data, off_t offset, ngx_int_t incr)
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ipstat_incr: %p, %O, %d",
+                   "ipstat_incr: %p, %O, %i",
                    data, offset, incr);
 
     *VIP_FIELD(vip, offset) += incr;
@@ -708,7 +708,7 @@ ngx_http_ipstat_min(void *data, off_t offset, ngx_uint_t val)
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ipstat_min: %p, %O, %d",
+                   "ipstat_min: %p, %O, %i",
                    data, offset, val);
 
     f = VIP_FIELD(vip, offset);
@@ -726,7 +726,7 @@ ngx_http_ipstat_max(void *data, off_t offset, ngx_uint_t val)
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ipstat_max: %p, %O, %d",
+                   "ipstat_max: %p, %O, %i",
                    data, offset, val);
 
     f = VIP_FIELD(vip, offset);
@@ -743,7 +743,7 @@ ngx_http_ipstat_avg(void *data, off_t offset, ngx_uint_t val)
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ipstat_avg: %p, %O, %d",
+                   "ipstat_avg: %p, %O, %i",
                    data, offset, val);
 
     f = VIP_FIELD(vip, offset);
@@ -760,7 +760,7 @@ ngx_http_ipstat_rate(void *data, off_t offset, ngx_uint_t val)
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
-                   "ipstat_rate: %p, %O, %d",
+                   "ipstat_rate: %p, %O, %i",
                     data, offset, val);
 
     now = ngx_time();
@@ -1067,7 +1067,7 @@ ngx_http_ipstat_notify(ngx_pid_t pid, ngx_http_ipstat_vip_t *src,
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                        "ipstat_channel_notify: "
-                       "pid=%P, dst=%xd", pid, ch.dst);
+                       "pid=%P, dst=%xi", pid, ch.dst);
         break;
     }
 }

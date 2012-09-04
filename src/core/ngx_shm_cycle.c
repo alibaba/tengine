@@ -35,8 +35,6 @@ static ngx_uint_t      ngx_shm_cycle_generation;
 static ngx_uint_t      ngx_shm_cycle_latest_dead_generation;
 static ngx_shm_cycle_t ngx_shm_cycles[NGX_MAX_SHM_CYCLES];
 
-//static ngx_channel_handler_pt ngx_channel_top_handler;
-
 
 static void ngx_shm_cycle_cleanup(void *data);
 static ngx_shm_cycle_t *ngx_shm_cycle_get_last_cycle(ngx_shm_cycle_t *shcyc);
@@ -236,6 +234,12 @@ ngx_shm_cycle_init_cycle(ngx_cycle_t *cycle)
 
     shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_busy);
     last_shcyc = ngx_shm_cycle_get_last_cycle(shcyc);
+
+    /* reinit prevention */
+
+    if (shcyc->init) {
+        return NGX_OK;
+    }
 
     part = &shcyc->shared_memory.part;
     shm_zone = part->elts;
@@ -597,7 +601,7 @@ ngx_shm_cycle_notify(void)
                                  ngx_cycle->log);
 
         ngx_log_debug3(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
-                       "shm_cycle_notify: s=%d, pid=%P, latest_dead=%i",
+                       "shm_cycle_notify: fd=%d, pid=%P, latest_dead=%i",
                        ngx_processes[i].channel[0],
                        ngx_processes[i].pid,
                        ngx_shm_cycle_latest_dead_generation);
