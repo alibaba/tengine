@@ -715,9 +715,13 @@ ngx_http_ipstat_min(void *data, off_t offset, ngx_uint_t val)
                    data, offset, val);
 
     f = VIP_FIELD(vip, offset);
-    v = ngx_min(*f, val);
-    if (v) {
-        *f = v;
+    if (*f) {
+        v = ngx_min(*f, val);
+        if (v) {
+            *f = v;
+        }
+    } else {
+        *f = val;
     }
 }
 
@@ -751,7 +755,7 @@ ngx_http_ipstat_avg(void *data, off_t offset, ngx_uint_t val)
 
     f = VIP_FIELD(vip, offset);
     n = VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
-    *f += (ngx_int_t) (val - *f) / *n;
+    *f += ((ngx_int_t) (val - *f)) / *n;
 }
 
 
@@ -806,8 +810,12 @@ ngx_http_ipstat_merge_val(ngx_http_ipstat_vip_t *dst,
             break;
 
         case op_min:
-            if (ngx_min(*dst_field, *src_field)) {
-                *dst_field = ngx_min(*dst_field, *src_field);
+            if (*dst_field) {
+                if (ngx_min(*dst_field, *src_field)) {
+                    *dst_field = ngx_min(*dst_field, *src_field);
+                }
+            } else {
+                *dst_field = *src_field;
             }
             break;
 
