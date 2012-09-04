@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(25);
+my $t = Test::Nginx->new()->plan(30);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -113,8 +113,14 @@ http {
         server          127.0.0.1:9001;
     }
 
+    upstream insert_nomaxlife {
+        session_sticky cookie=test mode=insert maxidle=40 fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
     upstream insert_nomaxidle {
-        session_sticky cookie=test mode=insert fallback=on;
+        session_sticky cookie=test mode=insert maxlife=60 fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
     }
@@ -227,6 +233,10 @@ http {
             proxy_pass http://insert_nomaxage/;
         }
 
+        location /test_insert_nomalife {
+            session_sticky_header upstream=insert_nomaxlife;
+            proxy_pass http://insert_nomaxlife/;
+        }
         location /test_insert_nomaxidle {
             session_sticky_header upstream=insert_nomaxidle;
             proxy_pass http://insert_nomaxidle/;
@@ -277,12 +287,21 @@ like($r, qr/test=\w{32}!\d*\^\d*;/, 'insert with indirect');
 #5
 like($r, qr/\d{4}/, 'insert with indirect -- upstream don\'t recv cookie');
 #6
-like(http_get('/test_rewrite'), qr/set-cookie:[^\w]*test=\w{32};[^\w]*domain=/i, 'rewrite -- upstream set cookie');
+$r = http_get('/test_rewrite');
+$cookie = getcookie($r);
+$res = getcookie($r);
+like($r, qr/set-cookie:[^\w]*test=\w{32}/i, 'rewrite -- upstream set cookie');
+unlike($r, qr/set-cookie:[^\w]*test=\w{32};[^\w]*domain/i, 'rewrite -- upstream set cookie and session_sticky modify the value only');
+like(my_http_get('/test_rewrite', "$cookie"), qr/$res/, 'rewrite -- with cookie in request');
 
 #7
 unlike(http_get('/test_rewrite_no_setcookie'), qr/set-cookie:[^\w]*test=/i, 'rewrite -- upstream don\'t set cookie');
 #8
-like(http_get('/test_prefix'), qr/set-cookie:[^\w]*test=\w{32}\~\w*/i, 'prefix -- upstream set cookie');
+$r = http_get('/test_prefix');
+like($r, qr/set-cookie:[^\w]*test=\w{32}\~\w*/i, 'prefix -- upstream set cookie');
+$cookie = getcookie($r);
+$res = getres($r);
+like(my_http_get('/test_prefix', $cookie), qr/$res/, 'prefix -- with cookie in request');
 #9
 unlike(http_get('/test_prefix_no_setcookie'), qr/set-cookie:[^\w]*test=\w{32}\W*\w*/i, 'prefix -- upstream don\'t set cookie');
 
@@ -326,6 +345,11 @@ $r = http_get('/test_rewrite_no_header');
 $cookie = getcookie($r);
 $res = getres($r);
 like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_header');
+$r = http_get('/test_insert_nomalife');
+$cookie=getcookie($r);
+$res=getres($r);
+like($r, qr/set-cookie: test=\w{32}/i, 'no maxlife');
+like(my_http_get('/test_insert_nomalife', $cookie), qr/$res/, 'nomaxlif with cookie');
 
 $t->stop();
 #####################################################################################

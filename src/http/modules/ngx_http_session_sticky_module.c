@@ -159,7 +159,7 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    ss_srv->maxlife = NGX_CONF_UNSET;
+    ss_srv->maxlife = 120;
     ss_srv->maxidle = NGX_CONF_UNSET;
 
     ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT
@@ -1011,7 +1011,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
 static ngx_int_t
 ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
 {
-    u_char              *p;
+    u_char              *p, *st, *en, *last, *start;
     ngx_http_ss_ctx_t   *ctx;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
@@ -1023,15 +1023,26 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
         return NGX_AGAIN;
     }
 
-    table->value.len = ctx->ss_srv->cookie.len
-                     + sizeof("=") - 1
-                     + ctx->sid.len
-                     + sizeof(";Domain=") - 1
-                     + ctx->ss_srv->domain.len
-                     + sizeof(";Path=") - 1
-                     + ctx->ss_srv->path.len
-                     + sizeof(";Max-Age=")
-                     + ctx->ss_srv->maxlife;
+    st = p;
+    start = table->value.data;
+    last = table->value.data + table->value.len;
+
+    while (p < last && *p != '=') { p++; }
+    p += (p < last ? 1 : 0);
+
+    while (p < last && *p != ' ' && *p != '\t' && *p != '\n') { p++; }
+    p += (p < last ? 1 : 0);
+
+    while (p < last && *p != ';') { p++;}
+    p += (p < last ? 1 : 0);
+
+    en = p;
+
+    table->value.len = table->value.len
+                     - (en - st)
+                     + ctx->ss_srv->cookie.len
+                     + 1 /*for =*/
+                     + ctx->sid.len;
 
     p = ngx_pnalloc(r->pool, table->value.len);
     if (p == NULL) {
@@ -1039,23 +1050,11 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     }
 
     table->value.data = p;
+    p = ngx_cpymem(p, start, st - start);
     p = ngx_cpymem(p, ctx->ss_srv->cookie.data, ctx->ss_srv->cookie.len);
     *p++ = '=';
     p = ngx_cpymem(p, ctx->sid.data, ctx->sid.len);
-    if (ctx->ss_srv->domain.len) {
-        p = ngx_cpymem(p, ";Domain=", sizeof(";Domain=") - 1);
-        p = ngx_cpymem(p, ctx->ss_srv->domain.data, ctx->ss_srv->domain.len);
-    }
-    if (ctx->ss_srv->path.len) {
-        p = ngx_cpymem(p, ";Path=", sizeof(";Path=") - 1);
-        p = ngx_cpymem(p, ctx->ss_srv->path.data, ctx->ss_srv->path.len);
-    }
-    if (ctx->ss_srv->maxage.len) {
-        p = ngx_cpymem(p, ";Max-Age=", sizeof(";Max-Age=") - 1);
-        p = ngx_cpymem(p, ctx->ss_srv->maxage.data, ctx->ss_srv->maxage.len);
-    }
-
-    table->value.len = p - table->value.data;
+    p = ngx_cpymem(p, en, last -en);
 
     return NGX_OK;
 }
