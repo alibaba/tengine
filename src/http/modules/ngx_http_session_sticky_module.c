@@ -36,7 +36,7 @@ typedef struct {
 
 
 typedef struct {
-    ngx_flag_t                          flag;
+    ngx_flag_t                          enable;
     ngx_http_upstream_srv_conf_t       *uscf;
 } ngx_http_ss_loc_conf_t;
 
@@ -182,7 +182,7 @@ ngx_http_session_sticky_create_loc_conf(ngx_conf_t *cf)
     }
 
     ss_lcf->uscf = NGX_CONF_UNSET_PTR;
-    ss_lcf->flag = NGX_CONF_UNSET;
+    ss_lcf->enable = NGX_CONF_UNSET;
 
     return ss_lcf;
 }
@@ -195,7 +195,7 @@ ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_ss_loc_conf_t  *prev = parent;
     ngx_http_ss_loc_conf_t  *conf = child;
 
-    ngx_conf_merge_value(conf->flag, prev->flag, 1);
+    ngx_conf_merge_value(conf->enable, prev->enable, 1);
     ngx_conf_merge_ptr_value(conf->uscf, prev->uscf, NGX_CONF_UNSET_PTR);
 
     return NGX_CONF_OK;
@@ -392,9 +392,9 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                             "on",
                             sizeof("on") - 1) == 0)
             {
-                ss_lcf->flag = 1;
+                ss_lcf->enable = 1;
             } else {
-                ss_lcf->flag = 0;
+                ss_lcf->enable = 0;
             }
 
         } else {
@@ -544,7 +544,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     ngx_http_upstream_ss_srv_conf_t *ss_srv;
 
     ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_session_sticky_module);
-    if (ss_lcf->flag == 0) {
+    if (ss_lcf->enable == 0) {
         return NGX_DECLINED;
     }
 
@@ -587,6 +587,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 
     p = NULL;
     cookie = NULL;
+    now = ngx_time();
     cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
     for (i = 0; i < r->headers_in.cookies.nelts; i++) {
         cookie = &cookies[i]->value;
@@ -702,7 +703,6 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         }
 
         if (ctx->sid.len != 0) {
-            now = ngx_time();
             diff = (ngx_int_t) (now - ctx->lastseen);
             if (diff < 0 || diff > ctx->ss_srv->maxidle) {
                 goto not_found;
@@ -738,6 +738,8 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
             end++;
         }
     }
+
+    ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, now);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "session sticky sid [%V]", &ctx->sid);
@@ -781,7 +783,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
 
-    if (ctx->frist == 1) {
+    if (ctx->frist == 1 || ctx->sid.len == 0) {
         goto failed;
     }
 
@@ -805,7 +807,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
 failed:
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                  "session sticky failed,sid[%v]", &ctx->sid);
+                  "session sticky failed,sid[%V]", &ctx->sid);
     rc = ss_pd->get_rr_peer(pc, &ss_pd->rrp);
     if (rc != NGX_OK) {
         return rc;
@@ -886,7 +888,7 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     }
 
     ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_session_sticky_module);
-    if (ss_lcf->flag == 0) {
+    if (ss_lcf->enable == 0) {
         return ngx_http_ss_next_header_filter(r);
     }
 
