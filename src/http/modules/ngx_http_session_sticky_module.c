@@ -81,6 +81,7 @@ static ngx_int_t ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *
 static ngx_int_t ngx_http_upstream_session_sticky_get_peer(
     ngx_peer_connection_t *pc, void *data);
 static ngx_int_t ngx_http_session_sticky_header_handler(ngx_http_request_t *r);
+static ngx_int_t ngx_http_session_sticky_get_cookie(ngx_http_request_t *r);
 static time_t ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len);
 static void ngx_http_session_sticky_tmtoa(ngx_http_request_t *r,
     ngx_str_t *str, time_t t);
@@ -275,6 +276,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             ss_srv->maxidle = ngx_atotm(value[i].data + sizeof("maxidle=") - 1,
                                        value[i].len - sizeof("maxidle=") + 1);
             if (ss_srv->maxidle == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxidle");
                 return NGX_CONF_ERROR;
             }
 
@@ -284,6 +286,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             ss_srv->maxlife = ngx_atotm(value[i].data + sizeof("maxlife=") - 1,
                                        value[i].len - sizeof("maxlife=") + 1);
             if (ss_srv->maxlife == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxlife");
                 return NGX_CONF_ERROR;
             }
 
@@ -298,12 +301,13 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_INSERT;
 
             } else if (ngx_strncmp(value[i].data, "prefix", value[i].len) == 0) {
-                ss_srv->flag |= NGX_HTTP_SESSION_STICKY_PREFIX;
+                ss_srv->flag = NGX_HTTP_SESSION_STICKY_PREFIX;
 
             } else if (ngx_strncmp(value[i].data, "rewrite", value[i].len) == 0) {
-                ss_srv->flag |= NGX_HTTP_SESSION_STICKY_REWRITE;
+                ss_srv->flag = NGX_HTTP_SESSION_STICKY_REWRITE;
             
             } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid mode");
                 return NGX_CONF_ERROR;
             }
 
@@ -317,6 +321,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_INDIRECT;
 
             } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalide option");
                 return NGX_CONF_ERROR;
             }
 
@@ -333,10 +338,12 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_FALLBACK_OFF;
 
             } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid fallback");
                 return NGX_CONF_ERROR;
             }
 
         } else {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid directive");
             return NGX_CONF_ERROR;
         }
     }
@@ -371,6 +378,8 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             ss_lcf->uscf = ngx_http_upstream_add(cf, &u, 0);
             if (ss_lcf->uscf == NULL) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid upstream name");
                 return NGX_CONF_ERROR;
             }
 
@@ -379,13 +388,18 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                sizeof("switch") - 1) == 0) {
             add = sizeof("switch=") - 1;
 
-            if (ngx_strncmp(value[i].data + add, "on", sizeof("on") - 1) == 0) {
+            if (ngx_strncmp(value[i].data + add,
+                            "on",
+                            sizeof("on") - 1) == 0)
+            {
                 ss_lcf->flag = 1;
             } else {
                 ss_lcf->flag = 0;
             }
 
         } else {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid switch value");
             return NGX_CONF_ERROR;
         }
     }
@@ -469,6 +483,7 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us)
 {
     ngx_int_t                            rc;
+    ngx_http_ss_ctx_t                   *ctx;
     ngx_http_upstream_ss_srv_conf_t     *ss_srv;
     ngx_http_upstream_ss_peer_data_t    *ss_pd;
 
@@ -485,6 +500,29 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
 
     ss_srv = ngx_http_conf_upstream_srv_conf(us,
                                     ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    if (ctx == NULL) {
+        if (!(ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "session sticky mode isn't rewrite");
+        }
+
+        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
+        if (ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "session sticky ctx alloced failed");
+            return NGX_ERROR;
+        }
+
+        ctx->ss_srv = ss_srv;
+
+        ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
+
+        rc = ngx_http_session_sticky_get_cookie(r);
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
 
     ss_pd->r = r;
     ss_pd->ss_srv = ss_srv;
@@ -500,12 +538,6 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
 static ngx_int_t
 ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 {
-    time_t                           now;
-    u_char                          *p, *v, *vv, *st, *last, *end;
-    ngx_int_t                        diff;
-    ngx_uint_t                       i;
-    ngx_str_t                       *cookie;
-    ngx_table_elt_t                **cookies;
     ngx_http_ss_ctx_t               *ctx;
     ngx_http_ss_loc_conf_t          *ss_lcf;
     ngx_http_upstream_srv_conf_t    *uscf;
@@ -526,16 +558,33 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     uscf = ss_lcf->uscf;
     ss_srv = ngx_http_conf_upstream_srv_conf(uscf,
                                              ngx_http_session_sticky_module);
-    p = NULL;
-    cookie = NULL;
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
     }
 
     ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
-
     ctx->ss_srv = ss_srv;
+
+    return ngx_http_session_sticky_get_cookie(r);
+}
+
+
+static ngx_int_t
+ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
+{
+    time_t                           now;
+    u_char                          *p, *v, *vv, *st, *last, *end;
+    ngx_int_t                        diff;
+    ngx_str_t                       *cookie;
+    ngx_uint_t                       i;
+    ngx_table_elt_t                **cookies;
+    ngx_http_ss_ctx_t               *ctx;
+    ngx_http_upstream_ss_srv_conf_t *ss_srv;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ss_srv = ctx->ss_srv;
+
     cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
     for (i = 0; i < r->headers_in.cookies.nelts; i++) {
         cookie = &cookies[i]->value;
@@ -729,31 +778,6 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
     server = ss_srv->server;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
-    if (ctx == NULL) {
-        if (!(ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "session sticky mode isn't rewrite");
-            return NGX_HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                      "session sticky mode isn't prefix or indriect");
-
-        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
-        if (ctx == NULL) {
-            return NGX_HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
-        ctx->ss_srv = ss_srv;
-
-        ngx_http_parse_multi_header_lines(&r->headers_in.cookies,
-                                          &ss_srv->cookie,
-                                          &ctx->sid);
-        if (ctx->sid.len == 0) {
-            goto failed;
-        }
-    }
 
     if (ctx->frist == 1) {
         goto failed;

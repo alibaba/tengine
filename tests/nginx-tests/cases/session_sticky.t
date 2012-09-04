@@ -243,7 +243,7 @@ http {
         }
 
         location /test_rewrite_no_header {
-            proxy_pass http://rewrite;
+            proxy_pass http://rewrite/;
         }
     }
 }
