@@ -1,30 +1,29 @@
-/*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
- */
+# Copyright (C) 2010-2012 Alibaba Group Holding Limited
 
-
-    ngx_feature="Jemalloc Library"
-    ngx_feature_name=
-    ngx_feature_run=no
-    ngx_feature_incs=
+ngx_feature="jemalloc Library"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_test=
 
 if [ $JEMALLOC != YES -a $JEMALLOC != NO ]; then
-    ngx_feature_path=$JEMALLOC
+    ngx_feature_libs="-L$JEMALLOC -ljemalloc"
 else
-    ngx_feature_path= 
-fi    
     ngx_feature_libs="-ljemalloc"
+fi    
     . auto/feature
 
 
 if [ $ngx_found = yes ]; then
-    CORE_LIBS="$CORE_LIBS $ngx_feature_path $ngx_feature_libs"
-
+    if [ $CC = gcc ]; then
+        CFLAGS="$CFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"
+    fi
+    CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
 else
 
 cat << END
 
-$0: error: the with-jemalloc requires the jemalloc library.
+$0: error: the --with-jemalloc requires the jemalloc library.
 You can either do not enable this feature or install the library.
 If you don't install jemalloc into the standard directory, please
 specify the directory by --with-jemalloc=DIR
