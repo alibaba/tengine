@@ -746,16 +746,21 @@ ngx_http_ipstat_max(void *data, off_t offset, ngx_uint_t val)
 void
 ngx_http_ipstat_avg(void *data, off_t offset, ngx_uint_t val)
 {
-    ngx_uint_t                   *f, *n;
+    ngx_uint_t                   *n;
+    ngx_http_ipstat_avg_t        *avg;
     ngx_http_ipstat_vip_t        *vip = data;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "ipstat_avg: %p, %O, %i",
                    data, offset, val);
 
-    f = VIP_FIELD(vip, offset);
+    avg = (ngx_http_ipstat_avg_t *) VIP_FIELD(vip, offset);
     n = VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
-    *f += ((ngx_int_t) (val - *f)) / *n;
+
+    if (*n) {
+        avg->val += ((double) val - avg->val) / *n;
+        avg->int_val = (ngx_uint_t) avg->val;
+    }
 }
 
 
@@ -789,7 +794,8 @@ ngx_http_ipstat_merge_val(ngx_http_ipstat_vip_t *dst,
     ngx_http_ipstat_vip_t *src)
 {
     time_t                        now;
-    ngx_uint_t                    i, *src_field, *dst_field;
+    ngx_uint_t                    i, *src_field, *dst_field, src_req_n, dst_req_n;
+    ngx_http_ipstat_avg_t        *avg, *oavg;
     ngx_http_ipstat_rate_t       *rate, *orate;
 
     now = ngx_time();
@@ -805,8 +811,18 @@ ngx_http_ipstat_merge_val(ngx_http_ipstat_vip_t *dst,
         switch (fields[i].type) {
 
         case op_count:
-        case op_avg:
             *dst_field += *src_field;
+            break;
+
+        case op_avg:
+            avg = (ngx_http_ipstat_avg_t *) dst_field;
+            oavg = (ngx_http_ipstat_avg_t *) src_field;
+            dst_req_n = *VIP_FIELD(dst, NGX_HTTP_IPSTAT_REQ_TOTAL);
+            src_req_n = *VIP_FIELD(src, NGX_HTTP_IPSTAT_REQ_TOTAL);
+            if (src_req_n + dst_req_n > 0) {
+                avg->val += (oavg->val - avg->val) * src_req_n / (src_req_n + dst_req_n);
+                avg->int_val = (ngx_uint_t) avg->val;
+            }
             break;
 
         case op_min:

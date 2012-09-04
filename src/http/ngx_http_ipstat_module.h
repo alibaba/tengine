@@ -35,6 +35,12 @@ typedef struct {
 
 
 typedef struct {
+    ngx_uint_t             int_val;
+    double                 val;
+} ngx_http_ipstat_avg_t;
+
+
+typedef struct {
     ngx_uint_t             last_rate;
     ngx_uint_t             curr_rate;
     time_t                 t;
@@ -51,7 +57,7 @@ struct ngx_http_ipstat_vip_s {
     ngx_uint_t             bytes_out;
     ngx_uint_t             rt_min;
     ngx_uint_t             rt_max;
-    ngx_uint_t             rt_avg;
+    ngx_http_ipstat_avg_t  rt_avg;
     ngx_http_ipstat_rate_t conn_rate;
     ngx_http_ipstat_rate_t req_rate;
 };
