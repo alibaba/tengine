@@ -159,7 +159,7 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    ss_srv->maxlife = 120;
+    ss_srv->maxlife = 3600;
     ss_srv->maxidle = NGX_CONF_UNSET;
 
     ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT
