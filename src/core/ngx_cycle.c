@@ -70,10 +70,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_time_update();
 
     ngx_increase_pipe_generation();
-    ngx_increase_shm_cycle_generation();
+    ngx_shm_cycle_increase_generation();
+
 
     log = old_cycle->log;
-
 
     pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
     if (pool == NULL) {
@@ -443,7 +443,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* create shared memory cycle */
 
-    ngx_shm_cycle_init(cycle);
+    ngx_shm_cycle_init_cycle(cycle);
 
 
     /* create shared memory */

@@ -196,7 +196,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             live = ngx_reap_children(cycle);
             if (!(live & NGX_CYCLE_STILL_NEEDED) && rm_old_cycles) {
                 ngx_close_old_pipes();
-                ngx_free_old_shm_cycles();
+                ngx_shm_cycle_free_old_cycles();
                 rm_old_cycles = 0;
             }
         }

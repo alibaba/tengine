@@ -6,89 +6,125 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <ngx_channel.h>
 
 
-#define NGX_MAX_SHM_CYCLES        20
-#define NGX_SHM_CYCLE_POOL_SIZE   1024
+#define NGX_CMD_SHM_CYCLE         (NGX_CMD_CORE_MODULE + 1)
+#define NGX_MAX_SHM_CYCLES        40
+#define NGX_SHM_CYCLE_POOL_SIZE   2048
 
 
 typedef struct {
-    ngx_list_t        shared_memory;
-    ngx_uint_t        generation;
-    ngx_pool_t       *pool;
-    unsigned          used:1;
-    unsigned          ready:1;
+    ngx_queue_t        queue;
+    ngx_list_t         shared_memory;
+    ngx_uint_t         generation;
+    ngx_pool_t        *pool;
+    unsigned           init:1;
 } ngx_shm_cycle_t;
 
 
-static ngx_uint_t       ngx_shm_cycle_generation;
-static ngx_uint_t       ngx_last_shm_cycle;
-static ngx_shm_cycle_t  ngx_shm_cycles[NGX_MAX_SHM_CYCLES];
+typedef struct {
+    ngx_channel_t      channel;
+    ngx_uint_t         latest_dead;
+} ngx_shm_cycle_channel_t;
 
 
-static void ngx_close_shm_cycle(ngx_shm_cycle_t *shm_cycle);
+static ngx_queue_t     ngx_shm_cycle_free;
+static ngx_queue_t     ngx_shm_cycle_busy;
+static ngx_uint_t      ngx_shm_cycle_generation;
+static ngx_uint_t      ngx_shm_cycle_latest_dead_generation;
+static ngx_shm_cycle_t ngx_shm_cycles[NGX_MAX_SHM_CYCLES];
+
+//static ngx_channel_handler_pt ngx_channel_top_handler;
+
+
+static void ngx_shm_cycle_cleanup(void *data);
+static ngx_shm_cycle_t *ngx_shm_cycle_get_last_cycle(ngx_shm_cycle_t *shcyc);
+static void ngx_shm_cycle_notify(void);
+static void ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf,
+    ngx_log_t *log);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn);
 
 
 void
-ngx_increase_shm_cycle_generation(void)
+ngx_shm_cycle_init(void)
 {
-    ++ngx_shm_cycle_generation;
+    ngx_uint_t         i;
+
+    ngx_queue_init(&ngx_shm_cycle_free);
+    ngx_queue_init(&ngx_shm_cycle_busy);
+
+    for (i = 0; i < NGX_MAX_SHM_CYCLES; i++) {
+        ngx_queue_insert_head(&ngx_shm_cycle_free, &ngx_shm_cycles[i].queue);
+    }
+}
+
+
+void
+ngx_shm_cycle_increase_generation(void)
+{
+    ngx_shm_cycle_generation++;
+    ngx_channel_top_handler = ngx_shm_cycle_channel_handler;
 }
 
 
 ngx_shm_zone_t *
-ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
-    void *tag, int slab)
+ngx_shm_cycle_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag,
+    int slab)
 {
-    ngx_int_t         use, last_use;
-    ngx_uint_t        i, n;
-    ngx_shm_zone_t   *shm_zone;
-    ngx_list_part_t  *part;
+    ngx_uint_t         i, init_pool, n;
+    ngx_shm_zone_t     *shm_zone;
+    ngx_list_part_t    *part;
+    ngx_shm_cycle_t    *shcyc, *last_shcyc;
+    ngx_pool_cleanup_t *cln;
 
-    for (i = 0, use = -1, last_use = -1; i < ngx_last_shm_cycle; i++) {
-        if (!ngx_shm_cycles[i].used) {
-            if (use == -1) {
-                use = i;
+    init_pool = 0;
+
+    if (ngx_queue_empty(&ngx_shm_cycle_busy)) {
+        last_shcyc = NULL;
+
+        init_pool = 1;
+
+        shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_free);
+        ngx_queue_remove(&shcyc->queue);
+        ngx_queue_insert_head(&ngx_shm_cycle_busy, &shcyc->queue);
+
+    } else {
+        shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_busy);
+        if (shcyc->generation != ngx_shm_cycle_generation) {
+            if (ngx_queue_empty(&ngx_shm_cycle_free)) {
+                return NULL;
             }
 
-            continue;
+            init_pool = 1;
+
+            shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_free);
+            ngx_queue_remove(&shcyc->queue);
+            ngx_queue_insert_head(&ngx_shm_cycle_busy, &shcyc->queue);
         }
 
-        if (ngx_shm_cycles[i].generation == ngx_shm_cycle_generation) {
-            use = i;
-            continue;
-        }
-
-        if (ngx_shm_cycles[i].ready
-            && (last_use == -1 || ngx_shm_cycles[i].generation
-                                        > ngx_shm_cycles[last_use].generation))
-        {
-            last_use = i;
-        }
+        last_shcyc = ngx_shm_cycle_get_last_cycle(shcyc);
     }
 
-    if (use == -1) {
-        if (ngx_last_shm_cycle < NGX_MAX_SHM_CYCLES) {
-            use = ngx_last_shm_cycle++;
-        } else {
-            return NULL;
-        }
-    }
-
-    if (!ngx_shm_cycles[use].used) {
-        ngx_shm_cycles[use].pool = ngx_create_pool(NGX_SHM_CYCLE_POOL_SIZE,
-                                                   cf->log);
-        if (ngx_shm_cycles[use].pool == NULL) {
-            return NULL;
+    if (init_pool) {
+        shcyc->pool = ngx_create_pool(NGX_SHM_CYCLE_POOL_SIZE, cf->log);
+        if (shcyc->pool == NULL) {
+            goto error;
         }
 
-        if (last_use != -1
-            && ngx_shm_cycles[last_use].shared_memory.part.nelts)
-        {
-            n = ngx_shm_cycles[last_use].shared_memory.part.nelts;
-            for (part = ngx_shm_cycles[last_use].shared_memory.part.next;
-                 part; part = part->next)
+        cln = ngx_pool_cleanup_add(shcyc->pool, 0);
+        if (cln == NULL) {
+            goto error;
+        }
+
+        cln->handler = ngx_shm_cycle_cleanup;
+        cln->data = shcyc;
+
+        if (last_shcyc && last_shcyc->shared_memory.part.nelts) {
+            n = last_shcyc->shared_memory.part.nelts;
+            for (part = last_shcyc->shared_memory.part.next;
+                 part;
+                 part = part->next)
             {
                 n += part->nelts;
             }
@@ -97,20 +133,18 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
             n = 1;
         }
 
-        if (ngx_list_init(&ngx_shm_cycles[use].shared_memory,
-                          ngx_shm_cycles[use].pool, n,
-                          sizeof(ngx_shm_zone_t))
+        if (ngx_list_init(&shcyc->shared_memory,
+                          shcyc->pool, n, sizeof(ngx_shm_zone_t))
             != NGX_OK)
         {
-            ngx_destroy_pool(ngx_shm_cycles[use].pool);
-            return NULL;
+            ngx_destroy_pool(shcyc->pool);
+            goto error;
         }
 
-        ngx_shm_cycles[use].used = 1;
-        ngx_shm_cycles[use].generation = ngx_shm_cycle_generation;
+        shcyc->generation = ngx_shm_cycle_generation;
     }
 
-    part = &ngx_shm_cycles[use].shared_memory.part;
+    part = &shcyc->shared_memory.part;
     shm_zone = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -154,8 +188,7 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
         return &shm_zone[i];
     }
 
-    shm_zone = ngx_list_push(&ngx_shm_cycles[use].shared_memory);
-
+    shm_zone = ngx_list_push(&shcyc->shared_memory);
     if (shm_zone == NULL) {
         return NULL;
     }
@@ -170,43 +203,41 @@ ngx_shared_memory_lc_add(ngx_conf_t *cf, ngx_str_t *name, size_t size,
     shm_zone->tag = tag;
 
     return shm_zone;
+
+error:
+
+    ngx_queue_remove(&shcyc->queue);
+    ngx_queue_insert_head(&ngx_shm_cycle_free, &shcyc->queue);
+
+    return NULL;
 }
 
 
 ngx_int_t
-ngx_shm_cycle_init(ngx_cycle_t *cycle)
+ngx_shm_cycle_init_cycle(ngx_cycle_t *cycle)
 {
-    ngx_int_t         use, last_use;
-    ngx_uint_t        i, n;
-    ngx_shm_zone_t   *shm_zone, *oshm_zone;
-    ngx_list_part_t  *part, *opart;
-    
-    for (i = 0, use = last_use = -1; i < ngx_last_shm_cycle; i++) {
+    ngx_queue_t       *queue;
+    ngx_shm_cycle_t   *shcyc, *last_shcyc;
+    ngx_uint_t         i, n;
+    ngx_shm_zone_t    *shm_zone, *oshm_zone;
+    ngx_list_part_t   *part, *opart;
 
-        ngx_shm_cycles[i].pool->log = cycle->log;
-
-        if (!ngx_shm_cycles[i].used) {
-            continue;
-        }
-
-        if (ngx_shm_cycles[i].generation == ngx_shm_cycle_generation) {
-            use = i;
-            continue;
-        }
-
-        if (ngx_shm_cycles[i].ready
-            && (last_use == -1 || ngx_shm_cycles[i].generation
-                                        > ngx_shm_cycles[last_use].generation))
-        {
-            last_use = i;
-        }
-    }
-
-    if (use == -1) {
+    if (ngx_queue_empty(&ngx_shm_cycle_busy)) {
         return NGX_OK;
+    } 
+
+    for (queue = ngx_queue_head(&ngx_shm_cycle_busy);
+         queue != ngx_queue_sentinel(&ngx_shm_cycle_busy);
+         queue = ngx_queue_next(queue))
+    {
+        shcyc = (ngx_shm_cycle_t *) queue;
+        shcyc->pool->log = cycle->log;
     }
 
-    part = &ngx_shm_cycles[use].shared_memory.part;
+    shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_busy);
+    last_shcyc = ngx_shm_cycle_get_last_cycle(shcyc);
+
+    part = &shcyc->shared_memory.part;
     shm_zone = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -241,7 +272,7 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
 
         shm_zone[i].shm.exists = 0;
 
-        if (last_use == -1) {
+        if (last_shcyc == NULL) {
             if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
                 return NGX_ERROR;
             }
@@ -249,7 +280,7 @@ ngx_shm_cycle_init(ngx_cycle_t *cycle)
             continue;
         }
 
-        opart = &ngx_shm_cycles[last_use].shared_memory.part;
+        opart = &last_shcyc->shared_memory.part;
         oshm_zone = opart->elts;
 
         for (n = 0; /* void */ ; n++) {
@@ -293,41 +324,207 @@ found:
         continue;
     }
 
-    ngx_shm_cycles[use].ready = 1;
+    shcyc->init = 1;
 
     return NGX_OK;
 }
 
 
-void ngx_free_old_shm_cycles(void)
+ngx_array_t *
+ngx_shm_cycle_get_live_cycles(ngx_pool_t *pool, ngx_str_t *name)
 {
-    ngx_uint_t i, last;
+    ngx_uint_t         i, n;
+    ngx_array_t       *live_cycles;
+    ngx_queue_t       *queue;
+    ngx_shm_zone_t    *shm_zone, **store;
+    ngx_list_part_t   *part;
+    ngx_shm_cycle_t   *shcyc;
 
-    for (i = 0, last = -1; i < ngx_last_shm_cycle; i++) {
+    for (n = 0, queue = ngx_queue_head(&ngx_shm_cycle_busy);
+         queue != ngx_queue_sentinel(&ngx_shm_cycle_busy);
+         queue = ngx_queue_next(queue))
+    {
+        shcyc = (ngx_shm_cycle_t *) queue;
 
-        if (!ngx_shm_cycles[i].used) {
-            continue;
+        if (shcyc->generation <= ngx_shm_cycle_latest_dead_generation) {
+            break;
         }
 
-        if (ngx_shm_cycles[i].generation < ngx_shm_cycle_generation) {
-            ngx_close_shm_cycle(&ngx_shm_cycles[i]);
-        } else {
-            last = i;
+        if (shcyc->init) {
+            ++n;
         }
     }
 
-    ngx_last_shm_cycle = last + 1;
+    n = ngx_max(n, 1);
+    live_cycles = ngx_array_create(pool, n, sizeof(ngx_shm_zone_t *));
+
+    for (queue = ngx_queue_head(&ngx_shm_cycle_busy);
+         queue != ngx_queue_sentinel(&ngx_shm_cycle_busy);
+         queue = ngx_queue_next(queue))
+    {
+        shcyc = (ngx_shm_cycle_t *) queue;
+
+        if (shcyc->generation <= ngx_shm_cycle_latest_dead_generation) {
+            break;
+        }
+
+        if (!shcyc->init) {
+            continue;
+        }
+
+        part = &shcyc->shared_memory.part;
+        shm_zone = part->elts;
+
+        for (i = 0; /* void */ ; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+                part = part->next;
+                shm_zone = part->elts;
+                i = 0;
+            }
+
+            if (name->len != shm_zone[i].shm.name.len) {
+                continue;
+            }
+
+            if (ngx_strncmp(name->data, shm_zone[i].shm.name.data,
+                            name->len)
+                != 0)
+            {
+                continue;
+            }
+
+            store = ngx_array_push(live_cycles);
+            *store = &shm_zone[i];
+        }
+    }
+
+    return live_cycles;
+}
+
+
+void ngx_shm_cycle_free_old_cycles(void)
+{
+    ngx_queue_t             *start, *queue, *tmp;
+    ngx_shm_cycle_t         *shcyc;
+    ngx_pool_cleanup_t      *cln;
+    ngx_shm_cycle_cln_ctx_t *cln_ctx;
+
+    start = queue = ngx_queue_next(ngx_queue_head(&ngx_shm_cycle_busy));
+
+    while (queue != ngx_queue_sentinel(&ngx_shm_cycle_busy)) {
+
+        shcyc = (ngx_shm_cycle_t *) queue;
+
+        shcyc->pool->log = ngx_cycle->log;
+
+        /**
+         * set flags in context of user-custmized cleanup handler
+         * last one is add by shm_cycle and mustn't do this.
+         */
+
+        for (cln = shcyc->pool->cleanup; cln->next; cln = cln->next) {
+            cln_ctx = cln->data;
+            if (cln_ctx) {
+                cln_ctx->init = shcyc->init;
+                cln_ctx->latest = (queue == start);
+            }
+        }
+
+        ngx_destroy_pool(shcyc->pool);
+        shcyc->init = 0;
+
+        /**
+         * when frees the latest cycle,
+         * notifies all the workers the generation of this cycle
+         */
+
+        if (queue == start) {
+            ngx_shm_cycle_latest_dead_generation = shcyc->generation;
+            ngx_shm_cycle_notify();
+        }
+
+        tmp = ngx_queue_next(queue);
+        ngx_queue_remove(queue);
+        ngx_queue_insert_head(&ngx_shm_cycle_free, queue);
+        queue = tmp;
+    }
+}
+
+
+ngx_int_t
+ngx_shm_cycle_add_cleanup(ngx_str_t *zn, ngx_shm_cycle_cleanup_pt cln) {
+    ngx_uint_t               i;
+    ngx_shm_zone_t          *shm_zone;
+    ngx_list_part_t         *part;
+    ngx_shm_cycle_t         *shcyc;
+    ngx_pool_cleanup_t      *pcln;
+    ngx_shm_cycle_cln_ctx_t *pcln_ctx;
+
+    if (ngx_queue_empty(&ngx_shm_cycle_busy)) {
+        return NGX_ERROR;
+    }
+
+    shcyc = (ngx_shm_cycle_t *) ngx_queue_head(&ngx_shm_cycle_busy);
+
+    part = &shcyc->shared_memory.part;
+    shm_zone = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            shm_zone = part->elts;
+            i = 0;
+        }
+
+        if (zn->len != shm_zone[i].shm.name.len) {
+            continue;
+        }
+
+        if (ngx_strncmp(zn->data, shm_zone[i].shm.name.data, zn->len)
+            != 0)
+        {
+            continue;
+        }
+
+        pcln = ngx_pool_cleanup_add(shcyc->pool,
+                                    sizeof(ngx_shm_cycle_cln_ctx_t));
+        if (pcln == NULL) {
+            return NGX_ERROR;
+        }
+
+        pcln_ctx = pcln->data;
+        pcln_ctx->shm_zone = &shm_zone[i];
+        pcln_ctx->pool = shcyc->pool;
+        pcln->handler = cln;
+
+        return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_EMERG, shcyc->pool->log, 0,
+                  "shm zone \"%V\" is not found", zn);
+
+    return NGX_ERROR;
 }
 
 
 static void
-ngx_close_shm_cycle(ngx_shm_cycle_t *shm_cycle)
+ngx_shm_cycle_cleanup(void *data)
 {
-    ngx_uint_t        i;
-    ngx_shm_zone_t   *shm_zone;
-    ngx_list_part_t  *part;
+    ngx_uint_t         i;
+    ngx_shm_zone_t    *shm_zone;
+    ngx_list_part_t   *part;
+    ngx_shm_cycle_t   *shcyc;
 
-    part = &shm_cycle->shared_memory.part;
+    shcyc = data;
+    part = &shcyc->shared_memory.part;
     shm_zone = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -342,21 +539,88 @@ ngx_close_shm_cycle(ngx_shm_cycle_t *shm_cycle)
         }
 
         if (shm_zone[i].shm.addr != NULL) {
+            shm_zone[i].shm.log = ngx_cycle->log;
             ngx_shm_free(&shm_zone[i].shm);
         }
     }
+}
 
-    ngx_destroy_pool(shm_cycle->pool);
-    shm_cycle->ready = 0;
-    shm_cycle->used = 0;
+
+static ngx_shm_cycle_t *
+ngx_shm_cycle_get_last_cycle(ngx_shm_cycle_t *shcyc)
+{
+    ngx_queue_t       *queue;
+
+    for (queue = ngx_queue_next(&shcyc->queue);
+         queue != ngx_queue_sentinel(&ngx_shm_cycle_busy);
+         queue = ngx_queue_next(queue))
+    {
+        shcyc = (ngx_shm_cycle_t *) queue;
+        if (shcyc->init) {
+            return shcyc;
+        }
+    }
+
+    return NULL;
+}
+
+
+/**
+ * The master calls it when it has old cycles freed.
+ */ 
+
+static void
+ngx_shm_cycle_notify(void)
+{
+    ngx_int_t               i;
+    ngx_shm_cycle_channel_t ch;
+
+    ch.channel.command = NGX_CMD_SHM_CYCLE;
+    ch.channel.fd = 0;
+    ch.channel.len = sizeof(ngx_shm_cycle_channel_t);
+    ch.latest_dead = ngx_shm_cycle_latest_dead_generation;
+
+    for (i = 0; i < ngx_last_process; i++) {
+        if (ngx_processes[i].pid == -1) {
+            continue;
+        }
+
+        if (ngx_processes[i].exited) {
+            continue;
+        }
+
+        ch.channel.pid = ngx_processes[i].pid;
+
+        (void) ngx_write_channel(ngx_processes[i].channel[0],
+                                 (ngx_channel_t *) &ch,
+                                 sizeof(ngx_shm_cycle_channel_t),
+                                 ngx_cycle->log);
+
+        ngx_log_debug3(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                       "shm_cycle_notify: s=%d, pid=%P, latest_dead=%i",
+                       ngx_processes[i].channel[0],
+                       ngx_processes[i].pid,
+                       ngx_shm_cycle_latest_dead_generation);
+    }
+}
+
+
+static void
+ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf, ngx_log_t *log)
+{
+    if (ch->command != NGX_CMD_SHM_CYCLE) {
+        return;
+    }
+
+    ngx_shm_cycle_latest_dead_generation = *((ngx_uint_t *) buf);
 }
 
 
 static ngx_int_t
 ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
 {
-    u_char           *file;
-    ngx_slab_pool_t  *sp;
+    u_char            *file;
+    ngx_slab_pool_t   *sp;
 
     sp = (ngx_slab_pool_t *) zn->shm.addr;
 

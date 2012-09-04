@@ -9,8 +9,6 @@ typedef struct ngx_http_reqstat_rbnode_s ngx_http_reqstat_rbnode_t;
 struct ngx_http_reqstat_rbnode_s {
     u_char                       color;
     unsigned                     len:16;
-    unsigned                     new:1;
-    ngx_http_reqstat_rbnode_t   *next;
     ngx_queue_t                  queue;
     ngx_atomic_t                 bytes_in;
     ngx_atomic_t                 bytes_out;
@@ -30,7 +28,6 @@ typedef struct {
     ngx_rbtree_t                 rbtree;
     ngx_rbtree_node_t            sentinel;
     ngx_queue_t                  queue;
-    ngx_shm_zone_t              *next;
 } ngx_http_reqstat_shctx_t;
 
 
@@ -235,8 +232,8 @@ ngx_http_reqstat_show(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     for (i = 1; i < cf->args->nelts; i++) {
-        shm_zone = ngx_shared_memory_lc_add(cf, &value[i], 0,
-                                            &ngx_http_reqstat_module, 1);
+        shm_zone = ngx_shared_memory_add(cf, &value[i], 0,
+                                         &ngx_http_reqstat_module);
         if (shm_zone == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -302,8 +299,8 @@ ngx_http_reqstat_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ctx->val = &value[2];
 
-    shm_zone = ngx_shared_memory_lc_add(cf, &value[1], size,
-                                        &ngx_http_reqstat_module, 1);
+    shm_zone = ngx_shared_memory_add(cf, &value[1], size,
+                                     &ngx_http_reqstat_module);
     if (shm_zone == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -356,8 +353,8 @@ ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     for (i = 1; i < cf->args->nelts; i++) {
-        shm_zone = ngx_shared_memory_lc_add(cf, &value[i], 0,
-                                            &ngx_http_reqstat_module, 1);
+        shm_zone = ngx_shared_memory_add(cf, &value[i], 0,
+                                         &ngx_http_reqstat_module);
         if (shm_zone == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -384,7 +381,7 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
     ngx_shm_zone_t              **shm_zone, *z;
     ngx_http_reqstat_ctx_t       *ctx;
     ngx_http_reqstat_conf_t      *slcf;
-    ngx_http_reqstat_rbnode_t    *node, *fnode, *p;
+    ngx_http_reqstat_rbnode_t    *fnode;
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
 
@@ -409,34 +406,9 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 
         if (fnode == NULL) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "failed to alloc node in zone \"%V\":%zBytes",
-                          &z->shm.name, z->shm.size);
-        }
-
-        /* build cycle chain when insert a new node */
-
-        if (fnode == NULL || fnode->new) {
-
-            for (node = fnode; ctx->sh->next; z = ctx->sh->next, ctx = z->data) {
-
-                p = ngx_http_reqstat_rbtree_lookup(ctx->sh->next, &val);
-
-                if (p) {
-                    if (fnode == NULL) {
-                        fnode = p;
-                    }
-
-                    if (node) {
-                        node->next = p;
-                    }
-
-                    node = p;
-                } else {
-                    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                                  "fail to alloc node in zone \"%V\":%zBytes",
-                                  &z->shm.name, z->shm.size);
-                }
-            }
+                          "failed to alloc node in zone \"%V\", "
+                          "enlarge it please",
+                          &z->shm.name);
         }
 
         if (fnode) {
@@ -553,11 +525,9 @@ ngx_http_reqstat_show_handler(ngx_http_request_t *r)
 void
 ngx_http_reqstat_count(void *data, off_t offset, ngx_int_t incr)
 {
-    ngx_http_reqstat_rbnode_t    *node;
+    ngx_http_reqstat_rbnode_t    *node = data;
 
-    for (node = data; node; node = node->next) {
-        (void) ngx_atomic_fetch_add(REQ_FIELD(node, offset), incr);
-    }
+    (void) ngx_atomic_fetch_add(REQ_FIELD(node, offset), incr);
 }
 
 
@@ -599,7 +569,6 @@ ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val)
 
         if (rc == 0) {
             ngx_shmtx_unlock(&ctx->shpool->mutex);
-            rs->new = 0;
             return rs;
         }
 
@@ -630,8 +599,6 @@ ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val)
 
     ngx_shmtx_unlock(&ctx->shpool->mutex);
 
-    rs->new = 1;
-
     return rs;
 }
 
@@ -639,12 +606,25 @@ ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val)
 static ngx_int_t
 ngx_http_reqstat_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
-    ngx_str_t                     val;
-    ngx_queue_t                  *q;
     ngx_http_reqstat_ctx_t       *ctx, *octx;
-    ngx_http_reqstat_rbnode_t    *rs, *ors;
 
+    octx = data;
     ctx = shm_zone->data;
+
+    if (octx != NULL) {
+        if (ngx_strcmp(ctx->val->data, octx->val->data) != 0) {
+            ngx_log_error(NGX_LOG_EMERG, shm_zone->shm.log, 0,
+                          "reqstat \"%V\" uses the value str \"%V\" "
+                          "while previously it used \"%V\"",
+                          &shm_zone->shm.name, ctx->val, octx->val);
+            return NGX_ERROR;
+        }
+
+        ctx->shpool = octx->shpool;
+        ctx->sh = octx->sh;
+
+        return NGX_OK;
+    }
 
     ctx->shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
     
@@ -659,35 +639,6 @@ ngx_http_reqstat_init_zone(ngx_shm_zone_t *shm_zone, void *data)
                     ngx_http_reqstat_rbtree_insert_value);
 
     ngx_queue_init(&ctx->sh->queue);
-
-    if (data == NULL) {
-        return NGX_OK;
-    }
-
-    octx = data;
-
-    ngx_shmtx_lock(&octx->shpool->mutex);
-
-    for (q = ngx_queue_head(&octx->sh->queue);
-         q != ngx_queue_sentinel(&octx->sh->queue);
-         q = ngx_queue_next(q))
-    {
-        ors = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
-
-        val.len = ors->len;
-        val.data = ors->data; 
-
-        rs = ngx_http_reqstat_rbtree_lookup(shm_zone, &val);
-
-        ngx_memcpy((char *) rs + fields[0], (char *) ors + fields[0],
-                   offsetof(ngx_http_reqstat_rbnode_t, data) - fields[0]);
-
-        ors->next = rs;
-    }
-
-    octx->sh->next = shm_zone;
-
-    ngx_shmtx_unlock(&octx->shpool->mutex);
 
     return NGX_OK;
 }
