@@ -307,7 +307,7 @@ sub include_dso_modules ($) {
 
     my $dso_compile_script;
 
-    $dso_compile_script = $dso_compile_dir . "dso_tools";
+    $dso_compile_script = $dso_compile_dir . "dso_tool";
 
     for my $module (@modules) {
         my ($dir, $name) = @$module;
