@@ -585,6 +585,8 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     ss_srv = ctx->ss_srv;
 
+    p = NULL;
+    cookie = NULL;
     cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
     for (i = 0; i < r->headers_in.cookies.nelts; i++) {
         cookie = &cookies[i]->value;
