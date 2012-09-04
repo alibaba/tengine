@@ -339,6 +339,7 @@ do
         --with-file-aio)                           NGX_FILE_AIO=YES           ;;
         --with-ipv6)                               NGX_IPV6=YES               ;;
 
+        --with-syslog)                             NGX_SYSLOG=YES              ;;
         --without-syslog)                          NGX_SYSLOG=NO              ;;
 
         --without-dso)                             NGX_DSO=NO                 ;;
@@ -353,6 +354,7 @@ do
         --http-uwsgi-temp-path=*)                  NGX_HTTP_UWSGI_TEMP_PATH="$value" ;;
         --http-scgi-temp-path=*)                   NGX_HTTP_SCGI_TEMP_PATH="$value" ;;
 
+        --with-http_ssl_module)                    HTTP_SSL=YES                      ;;
         --with-http_realip_module)                 HTTP_REALIP=YES                   ;;
         --with-http_addition_module)               HTTP_ADDITION=YES
                                                    HTTP_ADDITION_SHARED=NO           ;;
@@ -381,6 +383,7 @@ do
         --with-http_degradation_module)            HTTP_DEGRADATION=YES              ;;
         --with-http_sysguard_module)               HTTP_SYSGUARD=YES
                                                    HTTP_SYSGUARD_SHARED=NO           ;;
+        --with-http_upstream_check_module)         HTTP_UPSTREAM_CHECK=YES           ;;
 
         --with-http_addition_module=shared)        HTTP_ADDITION_SHARED=YES
                                                    HTTP_ADDITION=NO                  ;;
@@ -499,6 +502,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
+        --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
 
         --with-mail)                     MAIL=YES                   ;;
