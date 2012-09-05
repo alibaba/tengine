@@ -15,8 +15,12 @@ ngx_mutex_t  *ngx_event_timer_mutex;
 #endif
 
 
+#ifdef NGX_USE_MINHEAP
+ngx_thread_volatile ngx_minheap_t ngx_event_timer_minheap;
+#else
 ngx_thread_volatile ngx_rbtree_t  ngx_event_timer_rbtree;
 static ngx_rbtree_node_t          ngx_event_timer_sentinel;
+#endif
 
 /*
  * the event timer rbtree may contain the duplicate keys, however,
@@ -27,8 +31,25 @@ static ngx_rbtree_node_t          ngx_event_timer_sentinel;
 ngx_int_t
 ngx_event_timer_init(ngx_log_t *log)
 {
+#ifdef NGX_USE_MINHEAP
+    ngx_pool_t      *pool;
+
+    pool = ngx_create_pool(4096, log);
+    if (pool == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_event_timer_minheap.elts = ngx_palloc(pool,
+                                              1000 * sizeof(ngx_minheap_node_t *));
+    if (ngx_event_timer_minheap.elts == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_event_timer_minheap.n = 100;
+    ngx_event_timer_minheap.pool = pool;
+    ngx_event_timer_minheap.nelts = 0;
+#else
     ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel,
                     ngx_rbtree_insert_timer_value);
+#endif
 
 #if (NGX_THREADS)
 
@@ -52,18 +73,31 @@ ngx_msec_t
 ngx_event_find_timer(void)
 {
     ngx_msec_int_t      timer;
+
+#ifdef NGX_USE_MINHEAP
+    ngx_minheap_node_t *node;
+
+    if (ngx_event_timer_minheap.nelts == 0) {
+        return NGX_TIMER_INFINITE;
+    }
+#else
     ngx_rbtree_node_t  *node, *root, *sentinel;
 
     if (ngx_event_timer_rbtree.root == &ngx_event_timer_sentinel) {
         return NGX_TIMER_INFINITE;
     }
+#endif
 
     ngx_mutex_lock(ngx_event_timer_mutex);
 
+#ifdef NGX_USE_MINHEAP
+    node = ngx_minheap_min(&ngx_event_timer_minheap);
+#else
     root = ngx_event_timer_rbtree.root;
     sentinel = ngx_event_timer_rbtree.sentinel;
 
     node = ngx_rbtree_min(root, sentinel);
+#endif
 
     ngx_mutex_unlock(ngx_event_timer_mutex);
 
@@ -77,14 +111,24 @@ void
 ngx_event_expire_timers(void)
 {
     ngx_event_t        *ev;
+#ifdef NGX_USE_MINHEAP
+    ngx_minheap_node_t *node;
+#else
     ngx_rbtree_node_t  *node, *root, *sentinel;
 
     sentinel = ngx_event_timer_rbtree.sentinel;
+#endif
 
     for ( ;; ) {
 
         ngx_mutex_lock(ngx_event_timer_mutex);
 
+#ifdef NGX_USE_MINHEAP
+        if (ngx_event_timer_minheap.nelts == 0) {
+            return;
+        }
+        node = ngx_minheap_min(&ngx_event_timer_minheap);
+#else
         root = ngx_event_timer_rbtree.root;
 
         if (root == sentinel) {
@@ -92,6 +136,7 @@ ngx_event_expire_timers(void)
         }
 
         node = ngx_rbtree_min(root, sentinel);
+#endif
 
         /* node->key <= ngx_current_time */
 
@@ -120,14 +165,20 @@ ngx_event_expire_timers(void)
                            "event timer del: %d: %M",
                            ngx_event_ident(ev->data), ev->timer.key);
 
+#ifdef NGX_USE_MINHEAP
+            ngx_minheap_delete(&ngx_event_timer_minheap, ev->timer.index);
+#else
             ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
+#endif
 
             ngx_mutex_unlock(ngx_event_timer_mutex);
 
+#ifndef NGX_USE_MINHEAP
 #if (NGX_DEBUG)
             ev->timer.left = NULL;
             ev->timer.right = NULL;
             ev->timer.parent = NULL;
+#endif
 #endif
 
             ev->timer_set = 0;

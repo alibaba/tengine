@@ -131,7 +131,11 @@ struct ngx_event_s {
 
     ngx_log_t       *log;
 
+#ifdef NGX_USE_MINHEAP
+    ngx_minheap_node_t timer;
+#else
     ngx_rbtree_node_t   timer;
+#endif
 
     unsigned         closed:1;
 

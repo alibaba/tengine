@@ -44,6 +44,8 @@ EVENT_AIO=NO
 
 USE_THREADS=NO
 
+NGX_USE_MINHEAP=NO
+
 NGX_FILE_AIO=NO
 NGX_IPV6=NO
 
@@ -211,6 +213,7 @@ do
         --with-file-aio)                 NGX_FILE_AIO=YES           ;;
         --with-ipv6)                     NGX_IPV6=YES               ;;
         --with-syslog)                   NGX_SYSLOG=YES             ;;
+        --with-minheap)                  NGX_USE_MINHEAP=YES        ;;
 
         --without-http)                  HTTP=NO                    ;;
         --without-http-cache)            HTTP_CACHE=NO              ;;
