@@ -77,6 +77,12 @@ REGEX_DEPS=src/core/ngx_regex.h
 REGEX_SRCS=src/core/ngx_regex.c
 
 
+DSO_MODULE=ngx_dso_module
+DSO_SRCS="src/core/ngx_dso_module.c"
+DSO_LIBS=
+DSO_INCS=
+
+
 OPENSSL_MODULE=ngx_openssl_module
 OPENSSL_DEPS=src/event/ngx_event_openssl.h
 OPENSSL_SRCS=src/event/ngx_event_openssl.c
