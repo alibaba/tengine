@@ -1214,8 +1214,8 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 
     case NGX_ERROR:
         ngx_log_error(NGX_LOG_ERR, event->log, 0,
-                      "check protocol %s error with peer: %V ",
-                      peer->conf->check_type_conf->name,
+                      "check protocol %V error with peer: %V ",
+                      &peer->conf->check_type_conf->name,
                       &peer->check_peer_addr->name);
 
         ngx_http_upstream_check_status_update(peer, 0);
