@@ -1018,6 +1018,7 @@ ngx_event_timer(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t   *value;
 
     value = cf->args->elts;
+    value++;
 
     if (value->len == 6
         && ngx_strncmp(value->data, "rbtree", 6) == 0) {
