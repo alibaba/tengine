@@ -3,6 +3,8 @@
 # Copyright (C) Nginx, Inc.
 
 
+NGX_SOEXT=".so"
+
 echo "checking for $NGX_SYSTEM specific features"
 
 case "$NGX_PLATFORM" in
