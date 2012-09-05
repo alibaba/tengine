@@ -216,14 +216,12 @@ ngx_dso_cleanup(void *data)
     ngx_dso_conf_ctx_t  *ctx;
 
     if (cycle != ngx_cycle) {
-
         ngx_memcpy(ngx_modules, ngx_old_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
     }
 
     if (cycle->conf_ctx) {
-        ctx = (ngx_dso_conf_ctx_t *)
-               cycle->conf_ctx[ngx_dso_module.index];
+        ctx = (ngx_dso_conf_ctx_t *) cycle->conf_ctx[ngx_dso_module.index];
 
         if (ctx != NULL) {
             dm = ctx->modules->elts;
