@@ -57,7 +57,7 @@ if [ $help = yes ]; then
 cat << END
 
     -h, --help                display this help and exit
-    -d, --dst=PATH            set module installation prefix
+    -d, --dst=PATH            set module installation path
     -a, --add-module=PATH     external module which will be compiled
     -s, --nginx-source=SOURCE set nginx source root
 

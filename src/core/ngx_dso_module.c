@@ -450,7 +450,7 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
-                                  &value[1], &module_path);
+                                  &module_name, &module_path);
     if (rc == NGX_DECLINED) {
         return NGX_CONF_OK;
     }
@@ -629,7 +629,7 @@ ngx_dso_template(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
 static char *
 ngx_dso_stub(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t           *value, *module_name;
+    ngx_str_t           *value, *name;
     ngx_dso_conf_ctx_t  *ctx;
 
     value = cf->args->elts;
@@ -641,12 +641,12 @@ ngx_dso_stub(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    module_name = ngx_array_push(ctx->stubs);
-    if (module_name == NULL) {
+    name = ngx_array_push(ctx->stubs);
+    if (name == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    *module_name = value[1];
+    *name = value[1];
 
     return NGX_CONF_OK;
 }
