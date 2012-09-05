@@ -10,9 +10,6 @@
 #include <dlfcn.h>
 
 
-#define NGX_DSO_EXT ".so"
-
-
 typedef struct {
     ngx_str_t     type;
     ngx_str_t     entry;
@@ -440,14 +437,14 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             ngx_memcpy(module_name.data, module_path.data, module_name.len);
 
         } else {
-            module_path.len = value[1].len + sizeof(NGX_DSO_EXT);
+            module_path.len = value[1].len + sizeof(NGX_SOEXT);
             module_path.data = ngx_pcalloc(cf->pool, module_path.len);
             if (module_path.data == NULL) {
                 return NGX_CONF_ERROR;
             }
 
             p = ngx_cpymem(module_path.data, value[1].data, value[1].len);
-            ngx_memcpy(p, NGX_DSO_EXT, sizeof(NGX_DSO_EXT) - 1);
+            ngx_memcpy(p, NGX_SOEXT, sizeof(NGX_SOEXT) - 1);
             module_name = value[1];
         }
     }

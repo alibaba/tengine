@@ -65,6 +65,7 @@ if [ $NGX_DSO = YES ] ; then
     have=NGX_DSO . auto/have
     have=NGX_DSO_MAX value="$NGX_DSO_MAX" . auto/define
     have=NGX_DSO_PATH value="\"$NGX_DSO_PATH\"" . auto/define
+    have=NGX_SOEXT value="\"$NGX_SOEXT\"" . auto/define
     CORE_MODULES="$CORE_MODULES $DSO_MODULE"
     CORE_SRCS="$CORE_SRCS $DSO_SRCS"
     CORE_LIBS="$CORE_LIBS $NGX_LIBDL"
@@ -717,7 +718,9 @@ fi
 if [ $NGX_BACKTRACE = YES ]; then
     modules="$modules $NGX_BACKTRACE_MODULE"
     NGX_MISC_SRCS="$NGX_MISC_SRCS $NGX_BACKTRACE_SRCS"
-    LINK="$LINK -rdynamic"
+    if ! [ $NGX_DSO = YES ] ; then
+        LINK="$LINK -rdynamic"
+    fi
 fi
 
 

@@ -11,7 +11,6 @@ ngx_objout="-o "
 ngx_binout="-o "
 ngx_objext="o"
 ngx_binext=
-ngx_soext=".so"
 
 ngx_long_start=
 ngx_long_end=

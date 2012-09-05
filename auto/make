@@ -210,7 +210,7 @@ ngx_link=${CORE_LINK:+`echo $CORE_LINK \
 
 for ngx_shared_modules in $NGX_SHARED_MODULES
 do
-    NGX_DSO_ALL_TARGETS="$NGX_DSO_ALL_TARGETS $NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}"
+    NGX_DSO_ALL_TARGETS="$NGX_DSO_ALL_TARGETS $NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${NGX_SOEXT}"
 done
 
 if test -n "$NGX_DSO_ALL_TARGETS"; then
@@ -464,6 +464,11 @@ if [ $NGX_DSO = YES ] ; then
     ngx_dso_link_flag=" -shared "
     ngx_dso_index=2
 
+    case "$NGX_PLATFORM" in
+        Darwin:*)
+            ngx_dso_link_flag="$ngx_dso_link_flag -undefined dynamic_lookup "
+    esac
+
     ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS) \$(HTTP_INCS)"
 
     for ngx_shared_modules in $NGX_SHARED_MODULES
@@ -523,8 +528,8 @@ END
 
         cat << END                                                    >> $NGX_MAKEFILE
 
-$NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}:	$ngx_dso_deps$ngx_spacer
-	\$(LINK)${ngx_dso_link_flag} ${ngx_long_start}${ngx_binout} $NGX_OBJS/modules${ngx_dirsep}${ngx_shared_modules}${ngx_soext}$ngx_long_cont$ngx_dso_objs$ngx_libs$ngx_dso_link $ngx_dso_feture_lib
+$NGX_OBJS${ngx_dirsep}modules${ngx_dirsep}${ngx_shared_modules}${NGX_SOEXT}:	$ngx_dso_deps$ngx_spacer
+	\$(LINK)${ngx_dso_link_flag} ${ngx_long_start}${ngx_binout} $NGX_OBJS/modules${ngx_dirsep}${ngx_shared_modules}${NGX_SOEXT}$ngx_long_cont$ngx_dso_objs$ngx_libs$ngx_dso_link $ngx_dso_feture_lib
 	$ngx_rcc
 ${ngx_long_end}
 END
@@ -591,11 +596,11 @@ END
 #Copyright (C) 2010-2012 Alibaba Group Holding Limited
 
 
-ngx_soext='.so'
+ngx_soext='$NGX_SOEXT'
 CC=$CC
 CFLAGS='$CFLAGS -fPIC'
 CPP='$CPP'
-LINK='$LINK  -fPIC -shared'
+LINK='$LINK  -fPIC $ngx_dso_link_flag'
 
 
 CORE_LIBS='$CORE_LIBS'
@@ -634,6 +639,5 @@ END
 	-e "s|%%HTTP_DEPS%%|'$http_deps_temp'|g" \
 	-e "s|%%HTTP_INCS%%|'$http_incs_temp'|g" \
 	-e "s|%%NGX_SOURCE_HOME%%|`pwd`|g" \
-	-e "s|%%ngx_soext%%|'\.so'|g" \
 	contrib/dso.in >> $NGX_DSO_COMPILE
 fi

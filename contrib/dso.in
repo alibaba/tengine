@@ -201,7 +201,6 @@ if test -n "$NGX_DSO_ADDONS"; then
     # compile nginx
     cd $NGX_SOURCE_HOME
     ./configure $NGX_CONFIGURE
-    make
     cd -
 
     echo configuring additional modules

@@ -310,7 +310,7 @@ sub test_globals() {
 sub test_globals_dso() {
         my ($self) = @_;
 
-        return unless defined $ENV{TEST_NGINX_DSO};
+        return "" unless defined $ENV{TEST_NGINX_DSO};
 
 	return $self->{_test_globals_dso}
 		if defined $self->{_test_globals_dso};
