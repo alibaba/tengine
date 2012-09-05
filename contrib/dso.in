@@ -36,7 +36,7 @@ do
         --add-module=*)                  NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
         -a=*)                            NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
 
-        --with-nginx-source=*)           NGX_SOURCE_HOME="$value"       ;;
+        --nginx-source=*)                NGX_SOURCE_HOME="$value"       ;;
         -s=*)                            NGX_SOURCE_HOME="$value"       ;;
 
         *)
@@ -47,17 +47,19 @@ do
 done
 
 
-NGX_CONFIGURE="$opt"
+if ! test -n "$option" ; then
+    help=yes
+fi
 
 
 if [ $help = yes ]; then
 
 cat << END
 
--h, --help display this help and exit
--d, --dst=PATH set module installation prefix
--a, --add-module=PATH external module which will be compiled
--s, --with-nginx-source=SOURCE set nginx source root
+    -h, --help                display this help and exit
+    -d, --dst=PATH            set module installation prefix
+    -a, --add-module=PATH     external module which will be compiled
+    -s, --nginx-source=SOURCE set nginx source root
 
 END
 
@@ -195,6 +197,12 @@ END
 
 
 if test -n "$NGX_DSO_ADDONS"; then
+
+    # compile nginx
+    cd $NGX_SOURCE_HOME
+    ./configure $NGX_CONFIGURE
+    make
+    cd -
 
     echo configuring additional modules
 

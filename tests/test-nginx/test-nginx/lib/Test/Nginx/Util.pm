@@ -316,7 +316,7 @@ sub include_dso_modules ($) {
 
         if (-d $dir) {
             $modules_dir = $DsoDir;
-            system("$dso_compile_script --prefix=$DsoDir --add-module=\"$dir\"") == 0
+            system("$dso_compile_script --dst=$DsoDir --add-module=\"$dir\"") == 0
                 or die "Can't compile dso module $dir";
         }
         else {

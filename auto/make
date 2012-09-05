@@ -620,11 +620,11 @@ ngx_spacer='$ngx_spacer'
 ngx_objext='$ngx_objext'
 ngx_regex_cont='$ngx_regex_cont'
 ngx_binout='$ngx_binout'
-ngx_binout='$ngx_binout'
 NGX_DSO_PATH=$NGX_DSO_PATH
 NGX_AUTOCONF_ERR=$NGX_AUTOCONF_ERR
 NGX_AUTOTEST=$NGX_AUTOTEST
 NGX_AUTO_CONFIG_H=$NGX_AUTO_CONFIG_H
+NGX_CONFIGURE='$NGX_CONFIGURE'
 
 END
 
