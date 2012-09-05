@@ -212,26 +212,18 @@ ngx_dso_cleanup(void *data)
     ngx_cycle_t       *cycle = data;
 
     ngx_uint_t           i;
-    ngx_cycle_t         *clean_cycle;
     ngx_dso_module_t    *dm;
     ngx_dso_conf_ctx_t  *ctx;
 
     if (cycle != ngx_cycle) {
 
-        clean_cycle = cycle;
         ngx_memcpy(ngx_modules, ngx_old_modules,
                    sizeof(ngx_module_t *) * NGX_DSO_MAX);
-
-    } else {
-        if (cycle->old_cycle == NULL) {
-            return;
-        }
-        clean_cycle = cycle->old_cycle;
     }
 
-    if (clean_cycle->conf_ctx) {
+    if (cycle->conf_ctx) {
         ctx = (ngx_dso_conf_ctx_t *)
-               clean_cycle->conf_ctx[ngx_dso_module.index];
+               cycle->conf_ctx[ngx_dso_module.index];
 
         if (ctx != NULL) {
             dm = ctx->modules->elts;
