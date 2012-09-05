@@ -7,7 +7,7 @@ if test -n "$NGX_SHARED_MODULES"; then
     if [ $NGX_DSO != YES ]; then
     cat << END
 
-you should enable the dso module, if you want to use a dynamic loaded module.
+you should enable dso, if you want to use a dynamically loaded module.
 END
         exit 1
     fi
@@ -593,7 +593,7 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
-#Copyright (C) 2010-2012 Alibaba Group Holding Limited
+# Copyright (C) 2010-2012 Alibaba Group Holding Limited
 
 
 ngx_soext='$NGX_SOEXT'

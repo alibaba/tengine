@@ -10,9 +10,9 @@ Description
 
 * If you want to enable a standard module, you can enable it via configure's option while compiling tengine, for instance, --with-http\_example_module or --with-http\_example\_module=shared. Run *./configure --help* for more details.
 
-* The maximum of dynamic loaded modules is limited to 128.
+* The maximum of dynamically loaded modules is limited to 128.
 
-* For now, only HTTP modules can be dynamic-loaded.
+* For now, only HTTP modules can be dynamically loaded.
 
 * This feature is tested only on Linux/FreeBSD/MacOS.
 
