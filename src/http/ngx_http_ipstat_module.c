@@ -958,7 +958,7 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
             break;
         }
 
-        *b->last++ = ',';
+        b->last = ngx_slprintf(b->last, b->end, ",FRONTEND,");
 
         /* gather all live data */
 
