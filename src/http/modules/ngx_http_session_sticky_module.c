@@ -162,8 +162,7 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
     ss_srv->maxlife = 3600;
     ss_srv->maxidle = NGX_CONF_UNSET;
 
-    ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT
-                 | NGX_HTTP_SESSION_STICKY_INDIRECT;
+    ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT;
     ss_srv->cookie.data = (u_char *) "route";
     ss_srv->cookie.len = sizeof("route") - 1;
 
@@ -319,6 +318,12 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 
             if (ngx_strncmp(value[i].data, "indirect", value[i].len) == 0) {
                 ss_srv->flag |= NGX_HTTP_SESSION_STICKY_INDIRECT;
+
+            } else if (ngx_strncmp(value[i].data,
+                                   "direct",
+                                   value[i].len) == 0)
+            {
+                ss_srv->flag &= !NGX_HTTP_SESSION_STICKY_INDIRECT;
 
             } else {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalide option");

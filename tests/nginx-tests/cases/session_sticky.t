@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(32);
+my $t = Test::Nginx->new()->plan(34);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -116,7 +116,7 @@ http {
     }
 
     upstream insert_nomaxlife {
-        session_sticky cookie=test mode=insert maxidle=40 fallback=on;
+        session_sticky cookie=test mode=insert option=indirect maxidle=40 fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
     }
@@ -134,6 +134,11 @@ http {
     }
 
     upstream nocookie {
+        session_sticky cookie=test option=indirect;
+        server 127.0.0.1:9004;
+    }
+
+    upstream havecookie {
         session_sticky cookie=test;
         server 127.0.0.1:9004;
     }
@@ -279,6 +284,11 @@ http {
             session_sticky_header upstream=nocookie;
             proxy_pass http://nocookie/;
         }
+
+        location /test_havecookie {
+            session_sticky_header upstream=havecookie;
+            proxy_pass http://havecookie/;
+        }
     }
 }
 
@@ -288,7 +298,7 @@ EOF
 #####################################################################################
 #####################################################################################
 $t->run();
-my $r = http_get('/test_insert');
+my $r = http_get('/test_insert_indirect');
 #1
 like($r, qr/200 OK/, 'test insert frist seen');
 my $cookie = getcookie($r);
@@ -296,7 +306,11 @@ my $res = getres($r);
 my $now = time();
 my $sid = getsid($cookie);
 #2
-like(my_http_get('/test_insert', "$sid!$now^$now"), qr/$res/, 'insert with cookie');
+like(my_http_get('/test_insert_indirect', "$sid!$now^$now"), qr/$res/, 'insert with cookie');
+$r = http_get('/test_insert');
+$cookie = getcookie($r);
+$res = getres($r);
+$sid = getsid($cookie);
 $now = $now - 1000;
 if ($res eq 9000) {
     $res = 9001;
@@ -376,8 +390,12 @@ like($r, qr/set-cookie: test=\w{32}/i, 'no maxlife');
 like(my_http_get('/test_insert_nomalife', $cookie), qr/$res/, 'nomaxlif with cookie');
 $r = http_get('/test_cookie');
 $cookie = getcookie($r);
-like($r, qr/200/, 'no cookie in request and no cookie to upstream');
-like(my_http_get('/test_cookie', $cookie), qr/200/, 'with cookie in request and no cookie to upstream');
+like($r, qr/200/, 'indirect--no cookie in request and no cookie to upstream');
+like(my_http_get('/test_cookie', $cookie), qr/200/, 'indirect--with cookie in request and cookie to upstream');
+$r = http_get('/test_havecookie');
+$cookie = getcookie($r);
+like($r, qr/200/, 'direct--no cookie in request and no cookie to upstream');
+like(my_http_get('/test_havecookie', $cookie), qr/401/, 'direct--with cookie in request and cookie to upstream');
 
 $t->stop();
 #####################################################################################
