@@ -106,7 +106,7 @@ ngx_list_delete(ngx_list_t *list, void *elt)
 }
 
 
-ngx_int_t
+static ngx_int_t
 ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
 {
     char                        *data;
