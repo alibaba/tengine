@@ -159,7 +159,7 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    ss_srv->maxlife = NGX_MAX_INT32_VALUE;
+    ss_srv->maxlife = NGX_CONF_UNSET;
     ss_srv->maxidle = NGX_CONF_UNSET;
 
     ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT;
@@ -279,6 +279,10 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                 return NGX_CONF_ERROR;
             }
 
+            if (ss_srv->maxlife == NGX_CONF_UNSET) {
+                ss_srv->maxlife = NGX_MAX_INT32_VALUE;
+            }
+
         } else if (ngx_strncmp(value[i].data,
                                "maxlife=",
                                sizeof("maxlife=") - 1) == 0) {
@@ -287,6 +291,10 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             if (ss_srv->maxlife == NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxlife");
                 return NGX_CONF_ERROR;
+            }
+
+            if (ss_srv->maxidle == NGX_CONF_UNSET) {
+                ss_srv->maxidle = NGX_MAX_INT32_VALUE;
             }
 
         } else if (ngx_strncmp(value[i].data,

@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(34);
+my $t = Test::Nginx->new()->plan(36);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -125,6 +125,12 @@ http {
         session_sticky cookie=test mode=insert maxlife=60 fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
+    }
+
+    upstream nothing {
+        session_sticky cookie=test maxidle=3600 option=indirect;
+        server         127.0.0.1:9000;
+        server         127.0.0.1:9001;
     }
 
     upstream insert_nocookie {
@@ -289,6 +295,11 @@ http {
             session_sticky_header upstream=havecookie;
             proxy_pass http://havecookie/;
         }
+
+        location /test_nothing {
+            session_sticky_header upstream=nothing;
+            proxy_pass http://nothing/;
+        }
     }
 }
 
@@ -396,7 +407,11 @@ $r = http_get('/test_havecookie');
 $cookie = getcookie($r);
 like($r, qr/200/, 'direct--no cookie in request and no cookie to upstream');
 like(my_http_get('/test_havecookie', $cookie), qr/401/, 'direct--with cookie in request and cookie to upstream');
-
+$r = http_get('/test_nothing');
+$cookie = getcookie($r);
+$res = getres($r);
+like($r, qr/200/, 'prefix--without maxidle or maxlife');
+like(my_http_get('/test_nothing', $cookie), qr/$res/, 'prefix--without maxidle or maxlife');
 $t->stop();
 #####################################################################################
 #####################################################################################
