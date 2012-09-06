@@ -7,6 +7,7 @@ typedef struct { int dummy; } ngx_module_t;
 typedef struct { int dummy; } ngx_http_module_t;
 typedef struct { int dummy; } ngx_table_elt_t;
 typedef struct { int dummy; } ngx_event_t;
+typedef struct { int dummy; } ngx_pool_t;
 typedef char unsigned u_char;
 
 
@@ -28,6 +29,7 @@ provider nginx {
     probe timer__add(ngx_event_t *ev, ngx_msec_t timer);
     probe timer__del(ngx_event_t *ev);
     probe timer__expire(ngx_event_t *ev);
+    probe create__pool__done(ngx_pool_t *pool, size_t size);
 };
 
 
