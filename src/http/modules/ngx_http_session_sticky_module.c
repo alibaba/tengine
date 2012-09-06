@@ -1061,11 +1061,10 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     while (p < last && *p != '=') { p++; }
     p += (p < last ? 1 : 0);
 
-    while (p < last && *p != ' ' && *p != '\t' && *p != '\n') { p++; }
+    while (p < last && (*p == ' ' || *p == '\t' || *p == '\n')) { p++; }
     p += (p < last ? 1 : 0);
 
     while (p < last && *p != ';') { p++;}
-    p += (p < last ? 1 : 0);
 
     en = p;
 
