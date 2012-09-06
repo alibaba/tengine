@@ -143,7 +143,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
-    { ngx_string("timer"),
+    { ngx_string("timers"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_timer,
       0,
