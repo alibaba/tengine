@@ -95,6 +95,24 @@ function ngx_buf_end(b)
 }
 
 
+function ngx_buf_last_buf(b)
+{
+    return @cast(b, "ngx_buf_t", "/home/agentzh/git/lua-nginx-module/work/nginx/sbin/nginx")->last_buf
+}
+
+
+function ngx_buf_sync(b)
+{
+    return @cast(b, "ngx_buf_t", "/home/agentzh/git/lua-nginx-module/work/nginx/sbin/nginx")->sync
+}
+
+
+function ngx_buf_flush(b)
+{
+    return @cast(b, "ngx_buf_t", "/home/agentzh/git/lua-nginx-module/work/nginx/sbin/nginx")->flush
+}
+
+
 function ngx_buf_size(b)
 {
     if (ngx_buf_in_memory(b)) {
@@ -127,7 +145,26 @@ function ngx_chain_dump:string (input)
     cl = input
     while (cl) {
         buf = ngx_chain_buf(cl)
-        out .= sprintf("[%s]", text_str(ngx_buf_data(buf)))
+
+        if (ngx_buf_in_memory(buf)) {
+            out .= sprintf("[%s]", text_str(ngx_buf_data(buf)))
+
+        } else {
+            out .= "\"\""
+        }
+
+        if (ngx_buf_last_buf(buf)) {
+            out .= "<eof>"
+        }
+
+        if (ngx_buf_sync(buf)) {
+            out .= "<sync>"
+        }
+
+        if (ngx_buf_flush(buf)) {
+            out .= "<flush>"
+        }
+
         cl = ngx_chain_next(cl)
         if (cl) {
             out .= sprintf(" ")
