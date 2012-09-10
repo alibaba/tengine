@@ -288,6 +288,8 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    ngx_shm_cycle_init();
+
     /* STUB */
 #if (NGX_OPENSSL)
     ngx_ssl_init(log);
