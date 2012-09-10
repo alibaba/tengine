@@ -53,7 +53,6 @@
 #define NGX_ANY_CONF         0x0F000000
 
 
-
 #define NGX_CONF_UNSET       -1
 #define NGX_CONF_UNSET_UINT  (ngx_uint_t) -1
 #define NGX_CONF_UNSET_PTR   (void *) -1
@@ -105,7 +104,10 @@ struct ngx_open_file_s {
 };
 
 
-#define NGX_MODULE_V1          0, 0, 0, 0, 0, 0, 1
+#define NGX_NUMBER_MAJOR  1
+#define NGX_NUMBER_MINOR  1
+
+#define NGX_MODULE_V1          0, 0, 0, 0, 0, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
 struct ngx_module_s {
@@ -115,9 +117,9 @@ struct ngx_module_s {
     ngx_uint_t            spare0;
     ngx_uint_t            spare1;
     ngx_uint_t            spare2;
-    ngx_uint_t            spare3;
 
-    ngx_uint_t            version;
+    ngx_uint_t            major_version;
+    ngx_uint_t            minor_version;
 
     void                 *ctx;
     ngx_command_t        *commands;
@@ -345,6 +347,7 @@ extern ngx_uint_t     ngx_dump_config;
 extern ngx_uint_t     ngx_max_module;
 extern ngx_module_t  *ngx_modules[];
 extern const char    *ngx_module_names[];
+extern const char    *ngx_all_module_names[];
 
 
 #endif /* _NGX_HTTP_CONF_FILE_H_INCLUDED_ */
