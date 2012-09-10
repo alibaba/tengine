@@ -129,8 +129,13 @@ END
 fi
 
 if [ $ngx_found = yes ]; then
-    CORE_INCS="$CORE_INCS $ngx_feature_path"
-    CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+   if [ $HTTP_LUA_SHARED = YES ]; then
+       DSO_INCS="$DSO_INCS|$NGX_HTTP_LUA_MODULE:$ngx_feature_path"
+       DSO_LIBS="$DSO_LIBS|$NGX_HTTP_LUA_MODULE:$ngx_feature_libs"
+   else
+       CORE_INCS="$CORE_INCS $ngx_feature_path"
+       CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+   fi
 else
  cat << END
  $0: error: ngx_http_lua_module requires the Lua library.
@@ -150,6 +155,9 @@ ngx_feature_test='printf("hello");'
 . auto/feature
 
 if [ $ngx_found = yes ]; then
-    CORE_LIBS="-Wl,-E $CORE_LIBS"
+   if [ $HTTP_LUA_SHARED = YES ]; then
+       DSO_LIBS="$DSO_LIBS $ngx_feature_libs"
+   else
+       CORE_LIBS="-Wl,-E $CORE_LIBS"
+   fi
 fi
-

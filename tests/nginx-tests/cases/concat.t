@@ -21,6 +21,11 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http/)->plan(169);
 
+$t->set_dso("ngx_http_concat_module", "ngx_http_concat_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
+
 my $d = $t->testdir();
 
 mkdir("$d/concatFile");
@@ -71,6 +76,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -115,6 +122,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -157,6 +166,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -201,6 +212,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -243,6 +256,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -288,6 +303,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -331,6 +348,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -376,6 +395,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -420,6 +441,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -462,6 +485,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -506,6 +531,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -548,6 +575,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -592,6 +621,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -634,6 +665,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -680,6 +713,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -724,6 +759,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -770,6 +807,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -814,6 +853,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -860,6 +901,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -904,6 +947,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -950,6 +995,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -994,6 +1041,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1040,6 +1089,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1085,6 +1136,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1127,6 +1180,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1171,6 +1226,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1214,6 +1271,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1256,6 +1315,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1301,6 +1362,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1344,6 +1407,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1389,6 +1454,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1432,6 +1499,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1477,6 +1546,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1520,6 +1591,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1565,6 +1638,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1608,6 +1683,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1653,6 +1730,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1697,6 +1776,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1740,6 +1821,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1796,6 +1879,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1851,6 +1936,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1894,6 +1981,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1939,6 +2028,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -1982,6 +2073,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2027,6 +2120,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process  off;
 daemon          off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -2070,6 +2165,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process  off;
 daemon          off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2116,6 +2213,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process  off;
 daemon          off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -2159,6 +2258,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2255,6 +2356,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -2312,6 +2415,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2519,6 +2624,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
