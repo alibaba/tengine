@@ -17,6 +17,10 @@ typedef struct {
     ngx_str_t                          *name;
     struct sockaddr                    *sockaddr;
     socklen_t                           socklen;
+
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    ngx_uint_t                          check_index;
+#endif
 } ngx_http_ss_server_t;
 
 
@@ -466,6 +470,11 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
         ss_scf->server[i].name = &peer->name;
         ss_scf->server[i].sockaddr = peer->sockaddr;
         ss_scf->server[i].socklen = peer->socklen;
+
+#if (NGX_HTTP_UPSTREAM_CHECK)
+        ss_scf->server[i].check_index = peer->check_index;
+#endif
+
         if (ngx_http_upstream_session_sticky_set_sid(cf,
                                     &ss_scf->server[i]) != NGX_OK) {
             return NGX_ERROR;
@@ -820,6 +829,11 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
                            server[i].sid.data,
                            ctx->sid.len) == 0)
         {
+#if (NGX_HTTP_UPSTREAM_CHECK)
+            if (!ngx_http_upstream_check_peer_down(server[i].check_index)) {
+                return NGX_BUSY;
+            }
+#endif
             pc->name = server[i].name;
             pc->socklen = server[i].socklen;
             pc->sockaddr = server[i].sockaddr;
