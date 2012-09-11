@@ -197,6 +197,7 @@ HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
+HTTP_TRAFFIC_STATUS=YES
 HTTP_STUB_STATUS=YES
 
 # shared modules
@@ -234,7 +235,6 @@ HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
-HTTP_TRAFFIC_STATUS=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -505,9 +505,10 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
+        --with-http_traffic_status_module) HTTP_TRAFFIC_STATUS=YES  ;;
+        --without-http_traffic_status_module) HTTP_TRAFFIC_STATUS=NO ;;
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
-        --with-http_traffic_status_module) HTTP_TRAFFIC_STATUS=YES  ;;
 
         --with-mail)                     MAIL=YES                   ;;
         --with-mail_ssl_module)          MAIL_SSL=YES               ;;
@@ -625,7 +626,6 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_sysguard_module        enable ngx_http_sysguard_module
-  --with-http_traffic_status_module  enable ngx_http_traffic_status_module
 
   --with-http_addition_module=shared enable ngx_http_addition_filter_module (shared)
   --with-http_xslt_module=shared     enable ngx_http_xslt_filter_module (shared)
@@ -709,6 +709,8 @@ cat << END
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_traffic_status_module
+                                     disable ngx_http_traffic_status_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

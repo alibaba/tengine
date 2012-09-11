@@ -9,7 +9,7 @@
 #include <ngx_channel.h>
 
 
-#define NGX_CMD_SHM_CYCLE         (NGX_CMD_CORE_MODULE + 1)
+#define NGX_CMD_SHM_CYCLE         (NGX_CMD_USER + 1)
 #define NGX_MAX_SHM_CYCLES        40
 #define NGX_SHM_CYCLE_POOL_SIZE   2048
 
@@ -112,6 +112,7 @@ ngx_shm_cycle_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag,
 
         cln = ngx_pool_cleanup_add(shcyc->pool, 0);
         if (cln == NULL) {
+            ngx_destroy_pool(shcyc->pool);
             goto error;
         }
 
@@ -361,6 +362,9 @@ ngx_shm_cycle_get_live_cycles(ngx_pool_t *pool, ngx_str_t *name)
 
     n = ngx_max(n, 1);
     live_cycles = ngx_array_create(pool, n, sizeof(ngx_shm_zone_t *));
+    if (live_cycles == NULL) {
+        return NULL;
+    }
 
     for (queue = ngx_queue_head(&ngx_shm_cycle_busy);
          queue != ngx_queue_sentinel(&ngx_shm_cycle_busy);
@@ -410,7 +414,8 @@ ngx_shm_cycle_get_live_cycles(ngx_pool_t *pool, ngx_str_t *name)
 }
 
 
-void ngx_shm_cycle_free_old_cycles(void)
+void
+ngx_shm_cycle_free_old_cycles(void)
 {
     ngx_queue_t             *start, *queue, *tmp;
     ngx_shm_cycle_t         *shcyc;
@@ -426,8 +431,8 @@ void ngx_shm_cycle_free_old_cycles(void)
         shcyc->pool->log = ngx_cycle->log;
 
         /**
-         * set flags in context of user-custmized cleanup handler
-         * last one is add by shm_cycle and mustn't do this.
+         * set flags in context of user-defined cleanup handlers,
+         * the last one is added by shm_cycle and mustn't do this.
          */
 
         for (cln = shcyc->pool->cleanup; cln->next; cln = cln->next) {
@@ -442,8 +447,8 @@ void ngx_shm_cycle_free_old_cycles(void)
         shcyc->init = 0;
 
         /**
-         * when frees the latest cycle,
-         * notifies all the workers the generation of this cycle
+         * when the master process frees the latest cycle,
+         * it notifies all the workers the generation of this cycle
          */
 
         if (queue == start) {
@@ -460,7 +465,8 @@ void ngx_shm_cycle_free_old_cycles(void)
 
 
 ngx_int_t
-ngx_shm_cycle_add_cleanup(ngx_str_t *zn, ngx_shm_cycle_cleanup_pt cln) {
+ngx_shm_cycle_add_cleanup(ngx_str_t *zn, ngx_shm_cycle_cleanup_pt cln)
+{
     ngx_uint_t               i;
     ngx_shm_zone_t          *shm_zone;
     ngx_list_part_t         *part;
@@ -570,7 +576,7 @@ ngx_shm_cycle_get_last_cycle(ngx_shm_cycle_t *shcyc)
 
 
 /**
- * The master calls it when it has old cycles freed.
+ * The master calls this function when it frees the old cycles.
  */ 
 
 static void
@@ -582,6 +588,7 @@ ngx_shm_cycle_notify(void)
     ch.channel.command = NGX_CMD_SHM_CYCLE;
     ch.channel.fd = 0;
     ch.channel.len = sizeof(ngx_shm_cycle_channel_t);
+    ch.channel.tag = ngx_shm_cycles;
     ch.latest_dead = ngx_shm_cycle_latest_dead_generation;
 
     for (i = 0; i < ngx_last_process; i++) {
@@ -612,6 +619,10 @@ ngx_shm_cycle_notify(void)
 static void
 ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf, ngx_log_t *log)
 {
+    if (ch->tag != ngx_shm_cycles) {
+        return;
+    }
+
     if (ch->command != NGX_CMD_SHM_CYCLE) {
         return;
     }
