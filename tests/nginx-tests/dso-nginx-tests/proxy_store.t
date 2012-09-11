@@ -89,7 +89,7 @@ ok(!-e $t->testdir() . '/store-index-nostore.html', 'result not stored');
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0, 'no temp files');
 
 http_get('/store-index-big.html', aborted => 1, sleep => 0.1);
-sleep(1);
+select(undef, undef, undef, 0.5);
 
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0,
 	'no temp files after aborted request');
@@ -98,7 +98,7 @@ TODO: {
 local $TODO = 'not fixed yet';
 
 http_get('/ssi.html', aborted => 1, sleep => 0.1);
-sleep(1);
+select(undef, undef, undef, 0.5);
 
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0,
 	'no temp files after aborted ssi');
