@@ -1,5 +1,38 @@
 /* tapset for nginx */
 
+
+function ngx_indent(n, delta)
+{
+    s = ""
+    for (i = 0; i < n; i++) {
+        s .= delta
+    }
+
+    return s
+}
+
+
+function ngx_http_subreq_depth(r)
+{
+    depth = 0
+
+    for (pr = @cast(r, "ngx_http_request_t", "NGX_SBIN_PATH")->parent;
+         pr != 0;
+         pr = @cast(pr, "ngx_http_request_t", "NGX_SBIN_PATH")->parent)
+    {
+        depth++
+    }
+
+    return depth
+}
+
+
+function ngx_http_req_parent(r)
+{
+    return @cast(r, "ngx_http_request_s", "NGX_SBIN_PATH")->parent
+}
+
+
 /* retrieve the request uri string from the ngx_http_request_t pointer */
 function ngx_http_req_uri(r)
 {
