@@ -549,7 +549,6 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
         }
 
         ctx->ss_srv = ss_srv;
-        ctx->tries = 1;
 
         ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
 
@@ -600,7 +599,6 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
     ctx->ss_srv = ss_srv;
-    ctx->tries = 1;
 
     return ngx_http_session_sticky_get_cookie(r);
 }
@@ -620,6 +618,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     ss_srv = ctx->ss_srv;
+    ctx->tries = 1;
 
     p = NULL;
     cookie = NULL;
