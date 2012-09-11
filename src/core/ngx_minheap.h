@@ -1,5 +1,6 @@
 
-/* CopyRight (C) www.taobao.com
+/*
+ * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
 
 #ifndef _NGX_MINHEAP_H_INCLUDE_
@@ -23,7 +24,8 @@ typedef struct ngx_minheap_node_s ngx_minheap_node_t;
 
 struct ngx_minheap_s {
     void                  **elts;
-    ngx_uint_t              n, nelts;
+    ngx_uint_t              nelts;
+    ngx_uint_t              nalloc;
 
     ngx_pool_t             *pool;
 };
@@ -38,11 +40,6 @@ void ngx_minheap_insert(ngx_minheap_t *h, ngx_minheap_node_t *node);
 void ngx_minheap_delete(ngx_minheap_t *h, ngx_uint_t index);
 void ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node);
 void ngx_minheap4_delete(ngx_minheap_t *h, ngx_uint_t index);
-
-#define ngx_minheap_init(h, n, pool)                      \
-    (h)->n = n;                                           \
-    (h)->nelts = 0;                                       \
-    (h)->pool = pool
 
 #define ngx_minheap_min(h) ((h)->elts[0])
 

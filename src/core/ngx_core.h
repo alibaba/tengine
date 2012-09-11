@@ -26,6 +26,7 @@ typedef struct ngx_connection_s  ngx_connection_t;
 typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
 typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 
+
 #define  NGX_OK          0
 #define  NGX_ERROR      -1
 #define  NGX_AGAIN      -2
@@ -106,12 +107,10 @@ void ngx_cpuinfo(void);
 #define NGX_DISABLE_SYMLINKS_NOTOWNER   2
 #endif
 
-typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
 typedef ngx_int_t (*ngx_event_timer_init_pt)(ngx_log_t *log);
-typedef ngx_msec_t (*ngx_event_find_timer_pt)(void);
+typedef ngx_msec_t (*ngx_event_find_min_timer_pt)(void);
 typedef void (*ngx_event_expire_timers_pt)(void);
 typedef void (*ngx_event_del_timer_pt)(ngx_event_t *ev);
 typedef void (*ngx_event_add_timer_pt)(ngx_event_t *ev, ngx_msec_t timer);
-typedef ngx_int_t (*ngx_event_timer_empty_pt)(void);
-typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
+typedef ngx_int_t (*ngx_event_timer_is_empty_pt)(void);
 #endif /* _NGX_CORE_H_INCLUDED_ */

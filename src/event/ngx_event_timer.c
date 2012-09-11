@@ -171,13 +171,14 @@ ngx_event_timer_init_minheap(ngx_log_t *log)
 
     ngx_event_timer_minheap.pool = pool;
     ngx_event_timer_minheap.elts = ngx_palloc(pool, 
-                            1000 * sizeof(ngx_minheap_node_t *));
+                                              ngx_cycle->connection_n *
+                                              sizeof(ngx_minheap_node_t *));
     if (ngx_event_timer_minheap.elts == NULL) {
         return NGX_ERROR;
     }
 
     ngx_event_timer_minheap.nelts = 0;
-    ngx_event_timer_minheap.n = 1000;
+    ngx_event_timer_minheap.nalloc = ngx_cycle->connection_n;
 
 #if (NGX_THREADS)
 

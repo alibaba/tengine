@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
@@ -12,16 +13,17 @@ ngx_minheap_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
     ngx_uint_t            parent, index;
     ngx_minheap_node_t  **p;
 
-    if (h->nelts >= h->n) {
+    if (h->nelts >= h->nalloc) {
         h->elts = ngx_prealloc(h->pool,
-                               h->elts, h->n * sizeof(ngx_minheap_node_t *),
-                               h->n * 2 * sizeof(ngx_minheap_node_t *));
+                               h->elts,
+                               h->nalloc * sizeof(ngx_minheap_node_t *),
+                               h->nalloc * 2 * sizeof(ngx_minheap_node_t *));
         if (h->elts == NULL) {
             ngx_log_error(NGX_LOG_EMERG, h->pool->log, 0,
-                          "minheap2 realloc failed %d", h->n * 2);
+                          "minheap2 realloc failed %d", h->nalloc * 2);
             return;
         }
-        h->n *= 2;
+        h->nalloc *= 2;
     }
 
     index = h->nelts++;
@@ -90,13 +92,14 @@ void ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
     ngx_uint_t            parent, index;
     ngx_minheap_node_t  **p;
 
-    if (h->nelts >= h->n) {
+    if (h->nelts >= h->nalloc) {
         h->elts = ngx_prealloc(h->pool,
-                               h->elts, h->n * sizeof(ngx_minheap_node_t*),
-                               h->n * 2 * sizeof(ngx_minheap_node_t *));
+                               h->elts,
+                               h->nalloc * sizeof(ngx_minheap_node_t*),
+                               h->nalloc * 2 * sizeof(ngx_minheap_node_t *));
         if (h->elts == NULL) {
             ngx_log_error(NGX_LOG_EMERG, h->pool->log, 0,
-                          "minheap4 realloc failed %d", h->n * 2);
+                          "minheap4 realloc failed %d", h->nalloc * 2);
         }
     }
 

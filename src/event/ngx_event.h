@@ -534,8 +534,8 @@ extern ngx_module_t           ngx_event_core_module;
 
 
 extern ngx_event_timer_init_pt ngx_event_timer_init;
-extern ngx_event_timer_empty_pt ngx_event_timer_empty;
-extern ngx_event_find_timer_pt ngx_event_find_timer;
+extern ngx_event_timer_is_empty_pt ngx_event_timer_empty;
+extern ngx_event_find_min_timer_pt ngx_event_find_timer;
 extern ngx_event_expire_timers_pt ngx_event_expire_timers;
 extern ngx_event_add_timer_pt ngx_event_add_timer;
 extern ngx_event_del_timer_pt ngx_event_del_timer;
