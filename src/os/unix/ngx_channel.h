@@ -20,12 +20,11 @@ typedef struct {
      ngx_int_t   slot;
      ngx_fd_t    fd;
      size_t      len;
+     void       *tag;
 } ngx_channel_t;
 
 
-#define NGX_CMD_CORE_MODULE           1000
-#define NGX_CMD_HTTP_MODULE           4000
-#define NGX_CMD_USER_DEFINED          40000
+#define NGX_CMD_USER          1000
 
 
 ngx_int_t ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
