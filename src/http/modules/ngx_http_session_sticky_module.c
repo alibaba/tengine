@@ -549,6 +549,7 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
         }
 
         ctx->ss_srv = ss_srv;
+        ctx->tries = 1;
 
         ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
 

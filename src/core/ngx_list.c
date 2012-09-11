@@ -118,28 +118,21 @@ ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
         cur->elts = (char *) cur->elts + list->size;
         cur->nelts--;
 
-        if (cur == list->last) {
-            if (list->nalloc > 1) {
-                list->nalloc--;
-                return NGX_OK;
-            }
-
-            part = &list->part;
-            while (part->next != cur) {
-                if (part->next == NULL) {
-                    return NGX_ERROR;
-                }
-                part = part->next;
-            }
-
-            part->next = NULL;
-            list->last = part;
-
+        if (cur == list->last && cur->nelts != 0) {
+            list->nalloc = cur->nelts;
             return NGX_OK;
         }
 
         if (cur->nelts == 0) {
             part = &list->part;
+            if (part == cur) {
+                if (part->next != NULL) {
+                    list->part = *(part->next);
+                }
+
+                return NGX_OK;
+            }
+
             while (part->next != cur) {
                 if (part->next == NULL) {
                     return NGX_ERROR;
@@ -158,10 +151,6 @@ ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
     if (i == cur->nelts - 1) {
         cur->nelts--;
 
-        if (cur == list->last) {
-            list->nalloc--;
-        }
-
         return NGX_OK;
     }
 
@@ -174,12 +163,11 @@ ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
     new->nelts = cur->nelts - i - 1;
     new->next = cur->next;
 
-    list->nalloc = new->nelts;
-
     cur->nelts = i;
     cur->next = new;
     if (cur == list->last) {
         list->last = new;
+        list->nalloc = new->nelts;
     }
 
     return NGX_OK;
