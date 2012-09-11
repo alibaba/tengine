@@ -831,7 +831,11 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
         {
 #if (NGX_HTTP_UPSTREAM_CHECK)
             if (!ngx_http_upstream_check_peer_down(server[i].check_index)) {
-                return NGX_BUSY;
+                if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_FALLBACK_OFF) {
+                    return NGX_BUSY;
+                } else {
+                    goto failed;
+                }
             }
 #endif
             pc->name = server[i].name;
