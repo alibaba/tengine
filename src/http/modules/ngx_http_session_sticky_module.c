@@ -51,6 +51,8 @@ typedef struct {
     ngx_str_t                           s_lastseen;
     ngx_str_t                           s_firstseen;
     ngx_str_t                           sid;
+
+    ngx_int_t                           tries;
     ngx_flag_t                          frist;
 
     ngx_http_upstream_ss_srv_conf_t    *ss_srv;
@@ -597,6 +599,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
     ctx->ss_srv = ss_srv;
+    ctx->tries = 1;
 
     return ngx_http_session_sticky_get_cookie(r);
 }
@@ -823,6 +826,12 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
         goto failed;
     }
 
+    if (ctx->tries == 0
+        && !(ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_FALLBACK_OFF))
+    {
+        goto failed;
+    }
+
     for (i = 0; i < n; i++) {
         if (ctx->sid.len == server[i].sid.len
             && ngx_strncmp(ctx->sid.data,
@@ -844,6 +853,10 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
             ctx->sid.len = server[i].sid.len;
             ctx->sid.data = server[i].sid.data;
+
+            ss_pd->rrp.current = i;
+            ctx->tries--;
+
             return NGX_OK;
         }
     }
