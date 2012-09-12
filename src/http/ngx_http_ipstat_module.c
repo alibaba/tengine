@@ -83,10 +83,10 @@ static ngx_channel_handler_pt ngx_channel_next_handler;
 
 
 static ngx_http_ipstat_field_t fields[] = {
-    { NGX_HTTP_IPSTAT_CONN_CURRENT, op_count },
     { NGX_HTTP_IPSTAT_CONN_TOTAL, op_count },
-    { NGX_HTTP_IPSTAT_REQ_CURRENT, op_count },
+    { NGX_HTTP_IPSTAT_CONN_CURRENT, op_count },
     { NGX_HTTP_IPSTAT_REQ_TOTAL, op_count },
+    { NGX_HTTP_IPSTAT_REQ_CURRENT, op_count },
     { NGX_HTTP_IPSTAT_BYTES_IN, op_count },
     { NGX_HTTP_IPSTAT_BYTES_OUT, op_count },
     { NGX_HTTP_IPSTAT_RT_MIN, op_min },
