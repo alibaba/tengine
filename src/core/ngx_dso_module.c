@@ -35,12 +35,12 @@ typedef struct {
 
 static char *ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf);
-static char *ngx_dso_template(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
+static char *ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
     ngx_str_t *name);
 static char *ngx_dso_load(ngx_conf_t *cf);
 static void ngx_dso_cleanup(void *data);
 
-static ngx_int_t ngx_dso_check_duplicated(ngx_cycle_t *cycle,
+static ngx_int_t ngx_dso_check_duplicated(ngx_conf_t *cf,
     ngx_array_t *modules, ngx_str_t *name, ngx_str_t *path);
 static char *ngx_dso_stub(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
@@ -239,7 +239,7 @@ ngx_dso_cleanup(void *data)
 
 
 static ngx_int_t
-ngx_dso_check_duplicated(ngx_cycle_t *cycle, ngx_array_t *modules,
+ngx_dso_check_duplicated(ngx_conf_t *cf, ngx_array_t *modules,
     ngx_str_t *name, ngx_str_t *path)
 {
     size_t             len;
@@ -252,8 +252,9 @@ ngx_dso_check_duplicated(ngx_cycle_t *cycle, ngx_array_t *modules,
         if (len == name->len
            && ngx_strncmp(ngx_module_names[i], name->data, name->len) == 0)
         {
-            ngx_log_stderr(0, "module %V is already statically loaded, "
-                           "skipping", name);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "module %V is already statically loaded, "
+                               "skipping", name);
             return NGX_DECLINED;
         }
     }
@@ -265,8 +266,9 @@ ngx_dso_check_duplicated(ngx_cycle_t *cycle, ngx_array_t *modules,
            || (m[i].path.len == path->len
               && ngx_strncmp(m[i].path.data, path->data, path->len) == 0))
         {
-            ngx_log_stderr(0, "module \"%V/%V\" is already dynamically loaded, "
-                           "skipping", path, name);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "module \"%V/%V\" is already dynamically loaded,"
+                               " skipping", path, name);
             m[i].name.len = 0;
             return NGX_DECLINED;
         }
@@ -277,11 +279,14 @@ ngx_dso_check_duplicated(ngx_cycle_t *cycle, ngx_array_t *modules,
 
 
 static ngx_int_t
-ngx_dso_full_name(ngx_cycle_t *cycle, ngx_dso_conf_ctx_t *ctx,
+ngx_dso_full_name(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
     ngx_str_t *name)
 {
-    size_t   len, size;
-    u_char  *p, *n, *prefix;
+    size_t       len, size;
+    u_char      *p, *n, *prefix;
+    ngx_cycle_t *cycle;
+
+    cycle = cf->cycle;
 
     if (name->data[0] == '/') {
         return NGX_OK;
@@ -301,8 +306,9 @@ ngx_dso_full_name(ngx_cycle_t *cycle, ngx_dso_conf_ctx_t *ctx,
 
     } else {
         if (ctx->path.data[0] != '/') {
-            ngx_log_stderr(0, "the path (\"%V\") of dso module "
-                           "should be an absolute path", &ctx->path);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the path (\"%V\") of dso module "
+                               "should be an absolute path", &ctx->path);
             return NGX_ERROR;
         }
 
@@ -336,7 +342,7 @@ ngx_dso_full_name(ngx_cycle_t *cycle, ngx_dso_conf_ctx_t *ctx,
 
 
 static ngx_int_t
-ngx_dso_open(ngx_dso_module_t *dm)
+ngx_dso_open(ngx_conf_t *cf, ngx_dso_module_t *dm)
 {
     ngx_str_t name, path;
 
@@ -345,14 +351,16 @@ ngx_dso_open(ngx_dso_module_t *dm)
 
     dm->handle = dlopen((char *) path.data, RTLD_NOW | RTLD_GLOBAL);
     if (dm->handle == NULL) {
-        ngx_log_stderr(errno, "load module \"%V\" failed (%s)",
-                       &path, dlerror());
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, errno,
+                           "load module \"%V\" failed (%s)",
+                           &path, dlerror());
         return NGX_ERROR;
     }
 
     dm->module = dlsym(dm->handle, (const char *) name.data);
     if (dm->module == NULL) {
-        ngx_log_stderr(errno, "can't locate symbol in module (%V)", &name);
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, errno,
+                           "can't locate symbol in module (%V)", &name);
         return NGX_ERROR;
     }
 
@@ -400,9 +408,10 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     if (ctx->modules->nelts >= NGX_DSO_MAX) {
-        ngx_log_stderr(0, "module \"%V\" can not be loaded, "
-                       "because the dso module limit (%ui) is reached.",
-                       &value[1], NGX_DSO_MAX);
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "module \"%V\" can not be loaded, "
+                           "because the dso module limit (%ui) is reached.",
+                           &value[1], NGX_DSO_MAX);
         return NGX_CONF_ERROR;
     }
 
@@ -439,7 +448,7 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-    rc = ngx_dso_check_duplicated(cf->cycle, ctx->modules,
+    rc = ngx_dso_check_duplicated(cf, ctx->modules,
                                   &name, &path);
     if (rc == NGX_DECLINED) {
         return NGX_CONF_OK;
@@ -471,27 +480,30 @@ ngx_dso_load(ngx_conf_t *cf)
     dm = ctx->modules->elts;
 
     for (i = 0; i < ctx->modules->nelts; i++) {
-        if (ngx_dso_full_name(cf->cycle, ctx, &dm[i].path) != NGX_OK) {
+        if (ngx_dso_full_name(cf, ctx, &dm[i].path) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
 
-        if (ngx_dso_open(&dm[i]) == NGX_ERROR) {
+        if (ngx_dso_open(cf, &dm[i]) == NGX_ERROR) {
             return NGX_CONF_ERROR;
         }
 
         if (dm[i].module->type == NGX_CORE_MODULE) {
-            ngx_log_stderr(0, "core modules can not be dynamically loaded");
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "core modules can not be dynamically loaded");
             return NGX_CONF_ERROR;
         }
 
         if (dm[i].module->major_version != NGX_NUMBER_MAJOR
            || dm[i].module->minor_version > NGX_NUMBER_MINOR)
         {
-            ngx_log_stderr(0, "module \"%V\" is not compatible with this "
-                           "version of nginx (require %ui.%ui, found %ui.%ui).",
-                           &dm[i].name, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR,
-                           dm[i].module->major_version,
-                           dm[i].module->minor_version);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "module \"%V\" is not compatible with this "
+                               "version of nginx "
+                               "(require %ui.%ui, found %ui.%ui).",
+                               &dm[i].name, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR,
+                               dm[i].module->major_version,
+                               dm[i].module->minor_version);
             return NGX_CONF_ERROR;
         }
 
@@ -502,7 +514,8 @@ ngx_dso_load(ngx_conf_t *cf)
 
         rv = ngx_dso_insert_module(dm[i].module, postion);
         if (rv == NGX_CONF_ERROR) {
-            ngx_log_stderr(0, "dso failed to find position (%i)", postion);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "dso failed to find position (%i)", postion);
             return rv;
         }
     }
@@ -570,11 +583,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
             return NGX_CONF_ERROR;
         }
 
-        if (ctx->stubs->nelts != 0) {
-            return "is duplicate";
-        }
-
-        return ngx_dso_template(cf, ctx, &value[1]);
+        return ngx_dso_include(cf, ctx, &value[1]);
     }
 
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -584,7 +593,7 @@ ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 
 
 static char *
-ngx_dso_template(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
+ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
     ngx_str_t *name)
 {
     char       *rv;
@@ -682,7 +691,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
         }
 
         if (ngx_all_module_names[i] == NULL) {
-            return ++ctx->flag_postion;
+            return ctx->flag_postion++;
         }
     }
 
@@ -713,7 +722,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
         }
     }
 
-    return ++ctx->flag_postion;
+    return ctx->flag_postion++;
 }
 
 
@@ -761,7 +770,7 @@ ngx_show_dso_directives(ngx_conf_t *cf)
     ngx_dso_conf_ctx_t  *ctx;
 
     ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
-                                           ngx_dso_module);
+                                              ngx_dso_module);
 
     if (ctx == NULL) {
         return;
