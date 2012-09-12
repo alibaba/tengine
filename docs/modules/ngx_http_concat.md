@@ -14,17 +14,15 @@
 
 ## 配置
 
-    location ^~ /static {
-        location ~* /static/css/css_[[:alnum:]]+\.css$ {
-            concat on;
-            concat_max_files 20;
-        }
-        
-        location ~* /static/js/js_[[:alnum:]]+\.js$ {
-            concat on;
-            concat_max_files 30;
-        }
-    } 
+    location /static/css/ {
+        concat on;
+        concat_max_files 20;
+    }
+    
+    location /static/js/ {
+        concat on;
+        concat_max_files 30;
+    }
 
 ## 指令
 
@@ -64,7 +62,7 @@
 <br/>
 <br/>
 
-**concat\_max\_files** `number`p
+**concat\_max\_files** `number`
 
 **默认:** `concat_max_files 10`
 
@@ -75,33 +73,30 @@
 <br/>
 <br/>
 
-**concat_delimiter** string
-**默认:**  无 
-**上下文** 'http, server, location'
+**concat_delimiter** string  
+**默认:**  无    
+**上下文** 'http, server, location'   
 定义在文件之间添加分隔符
 
 <br/>
 <br/>
 
-**concat_ignore_file_error** 'on | off'
-**默认** 'concat_ignore_file_error off'
-**上下文** 'http, server, location'
+**concat_ignore_file_error** 'on | off'  
+**默认** 'concat_ignore_file_error off'  
+**上下文** 'http, server, location'  
 
 定义模块是否忽略文件不存在（404）或者没有权限（403）错误
 
 ## 安装
 
- 1. 获取代码
-     
-        git clone git://github.com/taobao/nginx-http-concat.git
+ 1. 编译concat模块  
+    configure  [--with-http_concat_module | --with-http_concat_module=shared]  
+    --with-http_concat_module选项，concat模块将被静态编译到tengine中  
+    --with-http_concat_module=shared,concat模块将被编译成动态文件，采用动态模块的方式添加到tengie中
 
- 2. 添加configure选项
-    `--add-module=/path/to/nginx-http-concat`.
-
- 3. 编译nginx
+ 2. 编译,安装  
+    make&make install
  
- 4. 安装nginx
+ 3. 配置concat的配置项
  
- 5. 配置concat的配置项
- 
- 6. 运行
+ 4. 运行
