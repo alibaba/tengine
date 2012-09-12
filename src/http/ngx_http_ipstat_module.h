@@ -11,10 +11,10 @@
 typedef struct ngx_http_ipstat_vip_s ngx_http_ipstat_vip_t;
 
 
-#define NGX_HTTP_IPSTAT_CONN_CURRENT offsetof(ngx_http_ipstat_vip_t, conn_count)
 #define NGX_HTTP_IPSTAT_CONN_TOTAL   offsetof(ngx_http_ipstat_vip_t, conn_total)
-#define NGX_HTTP_IPSTAT_REQ_CURRENT  offsetof(ngx_http_ipstat_vip_t, req_count)
+#define NGX_HTTP_IPSTAT_CONN_CURRENT offsetof(ngx_http_ipstat_vip_t, conn_count)
 #define NGX_HTTP_IPSTAT_REQ_TOTAL    offsetof(ngx_http_ipstat_vip_t, req_total)
+#define NGX_HTTP_IPSTAT_REQ_CURRENT  offsetof(ngx_http_ipstat_vip_t, req_count)
 #define NGX_HTTP_IPSTAT_BYTES_IN     offsetof(ngx_http_ipstat_vip_t, bytes_in)
 #define NGX_HTTP_IPSTAT_BYTES_OUT    offsetof(ngx_http_ipstat_vip_t, bytes_out)
 #define NGX_HTTP_IPSTAT_RT_MIN       offsetof(ngx_http_ipstat_vip_t, rt_min)
@@ -49,10 +49,10 @@ typedef struct {
 
 struct ngx_http_ipstat_vip_s {
     ngx_http_ipstat_vip_t *prev;
-    ngx_uint_t             conn_count;
     ngx_uint_t             conn_total;
-    ngx_uint_t             req_count;
+    ngx_uint_t             conn_count;
     ngx_uint_t             req_total;
+    ngx_uint_t             req_count;
     ngx_uint_t             bytes_in;
     ngx_uint_t             bytes_out;
     ngx_uint_t             rt_min;
