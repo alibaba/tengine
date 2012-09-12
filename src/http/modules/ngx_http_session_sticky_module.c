@@ -25,7 +25,7 @@ typedef struct {
 
 
 typedef struct {
-    ngx_int_t                           flag;
+    ngx_uint_t                          flag;
 
     time_t                              maxidle;
     time_t                              maxlife;
@@ -343,10 +343,10 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                                    "direct",
                                    value[i].len) == 0)
             {
-                ss_srv->flag &= !NGX_HTTP_SESSION_STICKY_INDIRECT;
+                ss_srv->flag &= ~NGX_HTTP_SESSION_STICKY_INDIRECT;
 
             } else {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalide option");
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid option");
                 return NGX_CONF_ERROR;
             }
 
@@ -427,7 +427,7 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid switch value");
+                               "invalid argument of \"%V\"", &value[i]);
             return NGX_CONF_ERROR;
         }
     }
@@ -441,9 +441,9 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
 {
     ngx_uint_t                           number, i;
-    ngx_http_upstream_ss_srv_conf_t     *ss_scf;
     ngx_http_upstream_rr_peer_t         *peer;
     ngx_http_upstream_rr_peers_t        *peers;
+    ngx_http_upstream_ss_srv_conf_t     *ss_scf;
 
     if (ngx_http_upstream_init_round_robin(cf, us) != NGX_OK) {
         return NGX_ERROR;
@@ -536,15 +536,10 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
                                     ngx_http_session_sticky_module);
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     if (ctx == NULL) {
-        if (!(ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "session sticky mode isn't rewrite");
-        }
-
         ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
         if (ctx == NULL) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "session sticky ctx alloced failed");
+                          "session sticky ctx allocated failed");
             return NGX_ERROR;
         }
 
@@ -599,7 +594,6 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
     ctx->ss_srv = ss_srv;
-    ctx->tries = 1;
 
     return ngx_http_session_sticky_get_cookie(r);
 }
@@ -619,6 +613,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     ss_srv = ctx->ss_srv;
+    ctx->tries = 1;
 
     p = NULL;
     cookie = NULL;
@@ -839,7 +834,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
                            ctx->sid.len) == 0)
         {
 #if (NGX_HTTP_UPSTREAM_CHECK)
-            if (!ngx_http_upstream_check_peer_down(server[i].check_index)) {
+            if (ngx_http_upstream_check_peer_down(server[i].check_index)) {
                 if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_FALLBACK_OFF) {
                     return NGX_BUSY;
                 } else {
