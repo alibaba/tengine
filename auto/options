@@ -292,7 +292,8 @@ NGX_SYSLOG=YES
 
 NGX_POST_CONF_MSG=
 
-JEMALLOC=NO
+USE_JEMALLOC=NO
+JEMALLOC=NONE
 
 opt=
 
@@ -552,7 +553,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-libatomic)                NGX_LIBATOMIC=YES          ;;
         --with-libatomic=*)              NGX_LIBATOMIC="$value"     ;;
 
-        --with-jemalloc)                 JEMALLOC=YES               ;;
+        --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
                 
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
