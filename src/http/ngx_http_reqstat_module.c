@@ -297,7 +297,11 @@ ngx_http_reqstat_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ctx->val = &value[2];
+    ctx->val = ngx_palloc(cf->pool, sizeof(ngx_str_t));
+    if (ctx->val == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    *ctx->val = value[2];
 
     shm_zone = ngx_shared_memory_add(cf, &value[1], size,
                                      &ngx_http_reqstat_module);
