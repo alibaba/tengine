@@ -11,8 +11,9 @@
 
 
 #if (NGX_DSO)
-void ngx_show_dso_modules(ngx_conf_t *cf);
-void ngx_show_dso_directives(ngx_conf_t *cf);
+extern ngx_int_t ngx_is_dynamic_module(ngx_conf_t *cf, u_char *name,
+    ngx_uint_t *major_version, ngx_uint_t *minor_version);
+extern void ngx_show_dso_directives(ngx_conf_t *cf);
 #endif
 
 
@@ -310,12 +311,26 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         ngx_log_stderr(0, "loaded modules:");
 
         for (i = 0; ngx_module_names[i]; i++) {
-            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
-        }
 
 #if (NGX_DSO)
-        ngx_show_dso_modules(&conf);
+            ngx_uint_t major_version, minor_version;
+
+            if (ngx_is_dynamic_module(&conf,
+                                      ngx_module_names[i], &major_version,
+                                      &minor_version) == NGX_OK)
+            {
+                ngx_log_stderr(0, "    %s (shared, %ui.%ui)",
+                               ngx_module_names[i],
+                               major_version, minor_version);
+            } else {
 #endif
+            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
+
+#if (NGX_DSO)
+            }
+#endif
+        }
+
         ngx_destroy_cycle_pools(&conf);
         return cycle;
     }
