@@ -2,13 +2,13 @@
 
 ## 介绍
 
-该模块类似于apache中的modconcat模块，用于合并多个文件在一个响应报文中。
+该模块类似于apache中的mod_concat模块，用于合并多个文件在一个响应报文中。
 
-请求参数需要用两个问号（'?'）例如：
+请求参数需要用两个问号（'??'）例如：
 
     http://example.com/??style1.css,style2.css,foo/style3.css
     
-如果参数中包含'?'，'?'表示文件的版本，例如：
+参数中某位置只包含一个‘?’，则'?'后表示文件的版本，例如：
 
     http://example.com/??style1.css,style2.css,foo/style3.css?v=102234
 
@@ -76,7 +76,9 @@
 **concat_delimiter** string  
 **默认:**  无    
 **上下文** 'http, server, location'   
-定义在文件之间添加分隔符
+定义在文件之间添加分隔符，例如：  
+配置：concat_delimiter "\n";   
+对于请求http://example.com/??1.js,2.js,响应会在1.js和2.js两个文件之间插入一个换行符('\n');
 
 <br/>
 <br/>
