@@ -1,4 +1,4 @@
-# concat 模块
+x s d g# concat 模块
 
 ## 介绍
 
@@ -30,7 +30,7 @@
 
 **默认:** `concat off`
 
-**上下文:** `http, server, location`
+**上下文:** `http, server, location`  
 在配置的地方使模块有效（失效）
 
 <br/>
@@ -77,8 +77,8 @@
 **默认:**  无    
 **上下文** 'http, server, location'   
 定义在文件之间添加分隔符，例如：  
-配置：concat_delimiter "\n";   
-对于请求http://example.com/??1.js,2.js,响应会在1.js和2.js两个文件之间插入一个换行符('\n');
+    http://example.com/??1.js,2.js；   
+    如果配置为**concat_delimiter "\n"**响应会在1.js和2.js两个文件之间插入一个换行符('\n')；
 
 <br/>
 <br/>
