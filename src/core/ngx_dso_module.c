@@ -128,11 +128,6 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ctx->flag_postion = ngx_dso_get_position(&module_flagpole[0].entry);
-    if (ctx->flag_postion == NGX_ERROR) {
-        return NGX_CONF_ERROR;
-    }
-
     ctx->stubs = ngx_array_create(cf->pool, 50, sizeof(ngx_str_t));
     if (ctx->stubs == NULL) {
         return NGX_CONF_ERROR;
@@ -152,9 +147,17 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         ngx_memcpy(ngx_old_module_names, ngx_module_names,
                    sizeof(u_char *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_static_module_names, ngx_static_module_names,
+        ngx_memcpy(ngx_module_names, ngx_static_module_names,
                    sizeof(u_char *) * NGX_DSO_MAX);
     }
+
+    ctx->flag_postion = ngx_dso_get_position(&module_flagpole[0].entry);
+    if (ctx->flag_postion == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0,
+                   "dso flag postion (%i)", ctx->flag_postion);
 
     pcf = *cf;
     cf->ctx = ctx;
@@ -268,12 +271,12 @@ ngx_dso_check_duplicated(ngx_conf_t *cf, ngx_array_t *modules,
             if (ngx_is_dynamic_module(cf, ngx_module_names[i],
                                       &major_version, &minor_version) == NGX_OK)
             {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                                    "module \"%V/%V\" is already dynamically loaded,"
                                    " skipping", path, name);
             } else {
 
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                                    "module %V is already statically loaded, "
                                    "skipping", name);
             }
@@ -525,8 +528,8 @@ ngx_dso_load(ngx_conf_t *cf)
 
         postion = ngx_dso_find_postion(ctx, dm[i].name);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0,
-                       "dso find postion (%i)", postion);
+        ngx_log_debug2(NGX_LOG_DEBUG_CORE, cf->log, 0,
+                       "dso find postion (%i, %i)", postion, ctx->flag_postion);
 
         rv = ngx_dso_insert_module(&dm[i], postion);
         if (rv == NGX_CONF_ERROR) {
@@ -686,7 +689,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
                               module_name.data, len1) == 0)
             {
                 if (near <= ctx->flag_postion) {
-                    ++ctx->flag_postion;
+                    ctx->flag_postion++;
                 }
 
                 return near;
@@ -719,7 +722,7 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
            && ngx_strncmp(name[i].data, module_name.data, name[i].len) == 0)
         {
             if (near <= ctx->flag_postion) {
-                ++ctx->flag_postion;
+                ctx->flag_postion++;
             }
 
             return near;
@@ -728,9 +731,9 @@ ngx_dso_find_postion(ngx_dso_conf_ctx_t *ctx, ngx_str_t module_name)
         for (k = 0; ngx_module_names[k]; k++) {
             len1 = ngx_strlen(ngx_module_names[k]);
 
-            if (len1 == name[i].len
-               && ngx_strncmp(name[i].data, ngx_module_names[k],
-                              name[i].len) == 0)
+            if (len1 == name[i - 1].len
+               && ngx_strncmp(name[i - 1].data, ngx_module_names[k],
+                              name[i - 1].len) == 0)
             {
                 near = k + 1;
                 break;
