@@ -171,7 +171,7 @@ ngx_event_add_timer_minheap(ngx_event_t *ev, ngx_msec_t timer)
 
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "event timer add: %d: %M:%M",
-                    ngx_event_ident(ev->data), timer, ev->timer.key);
+                    ngx_event_ident(ev->data), timer, ev->timer.minheap.key);
 
     ngx_mutex_lock(ngx_event_timer_mutex);
 
@@ -225,7 +225,7 @@ ngx_event_add_timer_minheap4(ngx_event_t *ev, ngx_msec_t timer)
 
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "event timer add: %d: %M:%M",
-                    ngx_event_ident(ev->data), timer, ev->timer.key);
+                    ngx_event_ident(ev->data), timer, ev->timer.minheap.key);
 
     ngx_mutex_lock(ngx_event_timer_mutex);
 

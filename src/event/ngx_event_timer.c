@@ -119,16 +119,16 @@ ngx_event_expire_timers_rbtree(void)
 
             ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                            "event timer del: %d: %M",
-                           ngx_event_ident(ev->data), ev->timer.key);
+                           ngx_event_ident(ev->data), ev->timer.rbtree.key);
 
             ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer.rbtree);
 
             ngx_mutex_unlock(ngx_event_timer_mutex);
 
 #if (NGX_DEBUG)
-            ev->timer.left = NULL;
-            ev->timer.right = NULL;
-            ev->timer.parent = NULL;
+            ev->timer.rbtree.left = NULL;
+            ev->timer.rbtree.right = NULL;
+            ev->timer.rbtree.parent = NULL;
 #endif
 
             ev->timer_set = 0;
