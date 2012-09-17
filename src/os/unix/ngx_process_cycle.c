@@ -65,7 +65,7 @@ ngx_int_t              ngx_threads_n;
 #endif
 
 #if (NGX_HAVE_CPU_AFFINITY)
-CPU_SET_T             *cpu_affinity;
+CPU_SET_T             *cpu_affinity = NULL;
 #endif
 
 static u_char  master_process[] = "master process";
@@ -405,6 +405,17 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
         ngx_pass_open_channel(cycle, &ch);
     }
+
+#if (NGX_HAVE_CPU_AFFINITY)
+
+    /**
+     * Disable CPU affinity on the new respawn workers, otherwise nginx will
+     * bind them to the same CPU.
+     */
+
+    cpu_affinity = NULL;
+
+#endif
 }
 
 

@@ -1354,15 +1354,22 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t        *value;
     ngx_uint_t        i, j, n;
 
-    if (ccf->cpu_affinity) {
+    if (ccf->cpu_affinity || ccf->cpu_affinity_n) {
         return "is duplicate";
     }
 
     value = cf->args->elts;
 
-    if (ngx_strncasecmp((u_char *) "auto", value[1].data, 4) == 0) {
+    if (ngx_strcasecmp((u_char *) "auto", value[1].data) == 0) {
 
         ccf->cpu_affinity = NGX_CONF_UNSET_PTR;
+
+        return NGX_CONF_OK;
+    }
+
+    if (ngx_strcasecmp((u_char *) "off", value[1].data) == 0) {
+
+        ccf->cpu_affinity_n = 1;
 
         return NGX_CONF_OK;
     }
