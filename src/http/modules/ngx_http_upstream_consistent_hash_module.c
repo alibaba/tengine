@@ -2,6 +2,8 @@
 /*
  * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
+
+
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <ngx_config.h>
@@ -165,7 +167,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
     ucscf->d_servers = ngx_pcalloc(cf->pool,
                                   (n * ucscf->copies + 1) *
-                                  sizeof(ngx_http_upstream_chash_down_server_t));
+                            sizeof(ngx_http_upstream_chash_down_server_t));
     if (ucscf->d_servers == NULL) {
         return NGX_ERROR;
     }
@@ -329,7 +331,9 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
     index = ((uchpd->hash - 1) / ucscf->step) + 1;
     server = &ucscf->servers[index];
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0, "consistent hash [peer name]:%V", &server->peer->name);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "consistent hash [peer name]:%V %d",
+                   &server->peer->name, server->hash);
 
     if (
 #if (NGX_HTTP_UPSTREAM_CHECK)
@@ -360,8 +364,8 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
             if (index_1 == ucscf->tree->extreme) {
 
                 if (index_2 == ucscf->tree->extreme) {
-                    ngx_log_error(NGX_LOG_ALERT, pc->log, 0, "all server down!");
-                    return NGX_ERROR;
+                    ngx_log_error(NGX_LOG_ERR, pc->log, 0, "all server down!");
+                    return NGX_BUSY;
                 } else {
                     index_1 = index_2;
                     server = &ucscf->servers[index_2];
@@ -389,7 +393,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
                                      ucscf->number, index_1);
                     server->down = 1;
                     ucscf->d_servers[index_1].timeout = ngx_time()
-                                                      + server->peer->fail_timeout;
+                                                + server->peer->fail_timeout;
                     ngx_queue_insert_head(&ucscf->down_servers,
                                           &ucscf->d_servers[index_1].queue);
                 }
@@ -405,7 +409,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 
     if (server->down) {
         ngx_log_error(NGX_LOG_ERR, pc->log, 0, "all servers down");
-        return NGX_ERROR;
+        return NGX_BUSY;
     }
 
     uchpd->server = server;
@@ -455,7 +459,7 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     ucscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                            ngx_http_upstream_consistent_hash_module);
+                                ngx_http_upstream_consistent_hash_module);
     if(ucscf == NULL) {
             return NGX_CONF_ERROR;
     }
@@ -503,7 +507,7 @@ ngx_http_upstream_chash_copies(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     ucscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                            ngx_http_upstream_consistent_hash_module);
+                                    ngx_http_upstream_consistent_hash_module);
 
     if (ucscf == NULL) {
         return NGX_CONF_ERROR;
@@ -512,6 +516,9 @@ ngx_http_upstream_chash_copies(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
     ucscf->copies = ngx_atoi(value[1].data, value[1].len);
     if (ucscf->copies == NGX_ERROR) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid value \"%V\"", &value[1]);
+
         return NGX_CONF_ERROR;
     }
 
