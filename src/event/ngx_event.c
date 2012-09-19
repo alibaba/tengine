@@ -1362,6 +1362,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_event_expire_timers = ngx_event_expire_timers_rbtree;
     ngx_event_add_timer = ngx_event_add_timer_rbtree;
     ngx_event_del_timer = ngx_event_del_timer_rbtree;
+    ngx_event_timer_empty = ngx_event_timer_empty_rbtree;
 
 #if (NGX_HAVE_RTSIG)
 
