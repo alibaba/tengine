@@ -24,6 +24,7 @@ NGX_OBJS=objs
 NGX_DEBUG=NO
 NGX_CC_OPT=
 NGX_LD_OPT=
+NGX_EXTEND_LD_OPT=
 CPU=NO
 
 NGX_RPATH=NO
@@ -703,6 +704,10 @@ cat << END
   --without-http_browser_module      disable ngx_http_browser_module
   --without-http_upstream_check_module
                                      disable ngx_http_upstream_check_module
+  --without-http_upstream_least_conn_module
+                                     disable ngx_http_upstream_least_conn_module
+  --without-http_upstream_keepalive_module
+                                     disable ngx_http_upstream_keepalive_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module

@@ -346,7 +346,7 @@ char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 extern ngx_uint_t     ngx_dump_config;
 extern ngx_uint_t     ngx_max_module;
 extern ngx_module_t  *ngx_modules[];
-extern const char    *ngx_module_names[];
+extern u_char        *ngx_module_names[];
 extern const char    *ngx_all_module_names[];
 
 
