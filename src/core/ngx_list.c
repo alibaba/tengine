@@ -109,66 +109,56 @@ ngx_list_delete(ngx_list_t *list, void *elt)
 static ngx_int_t
 ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
 {
-    char                        *data;
-    ngx_list_part_t             *new, *part;
-
-    data = cur->elts;
+    ngx_list_part_t             *new, *last;
 
     if (i == 0) {
         cur->elts = (char *) cur->elts + list->size;
         cur->nelts--;
 
-        if (cur == list->last && cur->nelts != 0) {
-            list->nalloc = cur->nelts;
+        if (cur != list->last) {
             return NGX_OK;
         }
 
-        if (cur->nelts == 0) {
-            part = &list->part;
-            if (part == cur) {
-                if (part->next != NULL) {
-                    list->part = *(part->next);
-                }
-
-                return NGX_OK;
-            }
-
-            while (part->next != cur) {
-                if (part->next == NULL) {
-                    return NGX_ERROR;
-                }
-                part = part->next;
-            }
-
-            part->next = cur->next;
-
-            return NGX_OK;
-        }
-
-        return NGX_OK;
-    }
-
-    if (i == cur->nelts - 1) {
+    } else if (i == cur->nelts - 1) {
         cur->nelts--;
-
         return NGX_OK;
+
+    } else {
+        new = ngx_palloc(list->pool, sizeof(ngx_list_part_t));
+        if (new == NULL) {
+            return NGX_ERROR;
+        }
+
+        new->elts = (char *) cur->elts + (i + 1) * list->size;
+        new->nelts = cur->nelts - i - 1;
+        new->next = cur->next;
+
+        cur->nelts = i;
+        cur->next = new;
+
+        if (cur != list->last) {
+            return NGX_OK;
+
+        } else {
+            list->last = new;
+        }
     }
 
-    new = ngx_palloc(list->pool, sizeof(ngx_list_part_t));
-    if (new == NULL) {
+    last = ngx_palloc(list->pool, sizeof(ngx_list_part_t));
+    if (last == NULL) {
         return NGX_ERROR;
     }
 
-    new->elts = data + list->size * (i + 1);
-    new->nelts = cur->nelts - i - 1;
-    new->next = cur->next;
-
-    cur->nelts = i;
-    cur->next = new;
-    if (cur == list->last) {
-        list->last = new;
-        list->nalloc = new->nelts;
+    last->elts = ngx_palloc(list->pool, list->size * list->nalloc);
+    if (last->elts == NULL) {
+        return NGX_ERROR;
     }
+
+    last->nelts = 0;
+    last->next = NULL;
+
+    list->last->next = last;
+    list->last = last;
 
     return NGX_OK;
 }

@@ -200,7 +200,7 @@ ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_ss_loc_conf_t  *prev = parent;
     ngx_http_ss_loc_conf_t  *conf = child;
 
-    ngx_conf_merge_value(conf->enable, prev->enable, 1);
+    ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_ptr_value(conf->uscf, prev->uscf, NGX_CONF_UNSET_PTR);
 
     return NGX_CONF_OK;
@@ -389,6 +389,7 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_ss_loc_conf_t  *ss_lcf = conf;
 
     value = (ngx_str_t *) cf->args->elts;
+    ss_lcf->enable = 1;
 
     for (i = 1; i < cf->args->nelts; i++) {
         if (ngx_strncmp(value[i].data,
