@@ -313,15 +313,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         for (i = 0; ngx_module_names[i]; i++) {
 
 #if (NGX_DSO)
-            ngx_uint_t major_version, minor_version;
+            ngx_uint_t major, minor;
 
             if (ngx_is_dynamic_module(&conf,
-                                      ngx_module_names[i], &major_version,
-                                      &minor_version) == NGX_OK)
+                                      ngx_module_names[i], &major,
+                                      &minor) == NGX_OK)
             {
                 ngx_log_stderr(0, "    %s (shared, %ui.%ui)",
                                ngx_module_names[i],
-                               major_version, minor_version);
+                               major, minor);
             } else {
 #endif
             ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);

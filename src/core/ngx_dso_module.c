@@ -371,7 +371,7 @@ ngx_dso_open(ngx_conf_t *cf, ngx_dso_module_t *dm)
     dm->module = dlsym(dm->handle, (const char *) name.data);
     if (dm->module == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, errno,
-                           "can't locate symbol in module (%V)", &name);
+                           "can't locate symbol in module \"%V\"", &name);
         return NGX_ERROR;
     }
 
