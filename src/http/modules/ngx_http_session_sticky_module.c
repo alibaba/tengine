@@ -27,8 +27,8 @@ typedef struct {
 typedef struct {
     ngx_uint_t                          flag;
 
-    time_t                              maxidle;
-    time_t                              maxlife;
+    ngx_int_t                           maxidle;
+    ngx_int_t                           maxlife;
     ngx_str_t                           cookie;
     ngx_str_t                           domain;
     ngx_str_t                           path;
@@ -165,8 +165,8 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    ss_srv->maxlife = NGX_CONF_UNSET;
-    ss_srv->maxidle = NGX_CONF_UNSET;
+    ss_srv->maxlife = NGX_MAX_INT32_VALUE;
+    ss_srv->maxidle = NGX_MAX_INT32_VALUE;
 
     ss_srv->flag = NGX_HTTP_SESSION_STICKY_INSERT;
     ss_srv->cookie.data = (u_char *) "route";
@@ -946,12 +946,14 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     }
 
     ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_session_sticky_module);
-    if (ss_lcf->enable == 0) {
-        return ngx_http_ss_next_header_filter(r);
-    }
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     if (ctx == NULL || ctx->ss_srv == NULL || ctx->ss_srv->flag == 0) {
+        return ngx_http_ss_next_header_filter(r);
+    }
+
+    if (ss_lcf->enable == 0
+        && !(ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
         return ngx_http_ss_next_header_filter(r);
     }
 
