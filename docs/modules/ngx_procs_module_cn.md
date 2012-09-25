@@ -1,9 +1,9 @@
-# Name #
-## Proc Module ##
+# 模块名 #
+## Proc 模块 ##
 
-provides a mechanism to support standalone processes
+提供一个让Nginx可以通过写不同模块启动独立进程的机制
 
-# Examples #
+# 例子 #
 
 	processes {
 		process echo {
@@ -25,7 +25,7 @@ provides a mechanism to support standalone processes
 	}
 
 
-# Directives #
+# 指令 #
 
 ## process ##
 
@@ -44,7 +44,7 @@ Default: `1`
 
 Context: `process`
 
-Specify the number of processes which will be forked.
+指定启动这个进程的数量.
 
 
 ## priority ##
@@ -55,7 +55,7 @@ Default: `0`
 
 Context: `process`
 
-Priority is a value in the range -20 to 20. Lower priorities cause more favorable scheduling.
+指定进程的优先级(-20 到 20 之间), 越低的数值调度优先级越高.
 
 
 ## delay\_start ##
@@ -66,7 +66,7 @@ Default: `300ms`
 
 Context: `process`
 
-The directive specifies the time to wait before process starts.
+指定延迟启动的时间
 
 
 ## respawn ##
@@ -77,4 +77,4 @@ Default: `on`
 
 Context: `process`
 
-The directive specifies whether the process will be restarted by nginx when it encounters some errors and exits.
+设置为`on`时, 如果进程因为错误意外退出会被Nginx重新启动.
