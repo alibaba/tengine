@@ -116,13 +116,13 @@ http {
     }
 
     upstream insert_nomaxlife {
-        session_sticky cookie=test mode=insert option=indirect maxidle=40 fallback=on;
+        session_sticky cookie=test mode=insert option=indirect maxidle=400 fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
     }
 
     upstream insert_nomaxidle {
-        session_sticky cookie=test mode=insert maxlife=60 fallback=on;
+        session_sticky cookie=test mode=insert maxlife=600 fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
     }
@@ -420,7 +420,7 @@ $t->stop();
 sub getcookie
 {
     my ($c) = @_;
-    $c =~ m/Set-cookie: test=([^;]*)/i;
+    $c =~ m/Set-cookie: test=([^;\r\n]*)/i;
     return $1;
 }
 
