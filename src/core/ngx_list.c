@@ -100,7 +100,7 @@ ngx_list_delete(ngx_list_t *list, void *elt)
         }
 
         if ((data + i * list->size)  == (char *) elt) {
-            if (part->nelts == 1) {
+            if (&list->part != part && part->nelts == 1) {
                 pre->next = part->next;
                 if (part == list->last) {
                     list->last = pre;
