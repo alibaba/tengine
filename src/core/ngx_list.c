@@ -78,7 +78,7 @@ ngx_list_push(ngx_list_t *l)
 ngx_int_t
 ngx_list_delete(ngx_list_t *list, void *elt)
 {
-    char                         *data;
+    u_char                      *data;
     ngx_uint_t                   i;
     ngx_list_part_t             *part, *pre;
 
@@ -99,7 +99,7 @@ ngx_list_delete(ngx_list_t *list, void *elt)
             data = part->elts;
         }
 
-        if ((data + i * list->size)  == (char *) elt) {
+        if ((data + i * list->size)  == (u_char *) elt) {
             if (&list->part != part && part->nelts == 1) {
                 pre->next = part->next;
                 if (part == list->last) {
@@ -120,11 +120,11 @@ ngx_list_delete(ngx_list_t *list, void *elt)
 static ngx_int_t
 ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
 {
-    char       *s, *d, *last;
+    u_char *s, *d, *last;
 
-    s = (char *) cur->elts + i * list->size;
+    s = (u_char *) cur->elts + i * list->size;
     d = s + list->size;
-    last = (char *) cur->elts + cur->nelts * list->size;
+    last = (u_char *) cur->elts + cur->nelts * list->size;
 
     while (d < last) {
         *s = *d;
