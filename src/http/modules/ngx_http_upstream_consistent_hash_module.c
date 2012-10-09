@@ -283,7 +283,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
     ngx_segment_node_t                       node, *p;
 
     uint32_t                                 index, index_1, index_2;
-    ngx_queue_t                             *q;
+    ngx_queue_t                             *q, *temp;
     ngx_http_upstream_rr_peer_t             *peer;
     ngx_http_upstream_chash_server_t        *server;
     ngx_http_upstream_chash_srv_conf_t      *ucscf;
@@ -293,10 +293,9 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
     ucscf = uchpd->ucscf;
 
     if (!ngx_queue_empty(&ucscf->down_servers)) {
-        for (q = ngx_queue_head(&ucscf->down_servers);
-             q != ngx_queue_sentinel(&ucscf->down_servers);
-             q = ngx_queue_next(q))
-        {
+        q = ngx_queue_head(&ucscf->down_servers);
+        while (q != ngx_queue_sentinel(&ucscf->down_servers)) {
+            temp = ngx_queue_next(q);
             down_server = ngx_queue_data(q,
                                         ngx_http_upstream_chash_down_server_t,
                                         queue);
@@ -319,6 +318,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 #endif
             }
         }
+        q = temp;
     }
 
     pc->cached = 0;
