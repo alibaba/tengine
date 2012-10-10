@@ -1,5 +1,5 @@
 
-Tengine-1.4.0 [2012-09-05]
+Tengine-1.4.1 [2012-10-10]
 * Feature： 添加jemalloc库的支持 [fanjizhao]
 * Feature： 加入$dollar变量, 它的值就是美元符号 [zhuzhaoyuan]
 * Feature： 为worker_cpu_affinity指令加入off选项 [cfsego]

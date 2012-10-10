@@ -1,5 +1,5 @@
 
-Changes with Tengine 1.4.1                                         29 Sep 2012
+Changes with Tengine 1.4.1                                         10 Oct 2012
 
     *) Feature: added jemalloc library support. (fanjizhao)
 
