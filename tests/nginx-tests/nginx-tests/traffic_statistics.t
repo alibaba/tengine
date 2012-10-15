@@ -23,17 +23,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new(); #->has(qw/ipstat/,qw/reqstat/);
+my $t = Test::Nginx->new()->has(qw/ipstat/,qw/reqstat/);
 
 $t->write_file_expand('B4', '1234');
 
 my $cf_1 = <<'EOF';
 
 %%TEST_GLOBALS%%
-
-
-worker_processes 2;
-worker_rlimit_core          1024M;
 
 http {
 
