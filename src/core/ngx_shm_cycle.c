@@ -40,7 +40,7 @@ static void ngx_shm_cycle_cleanup(void *data);
 static ngx_shm_cycle_t *ngx_shm_cycle_get_last_cycle(ngx_shm_cycle_t *shcyc);
 static void ngx_shm_cycle_notify(void);
 static void ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf,
-    ngx_log_t *log);
+    size_t len, ngx_log_t *log);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn);
 
 
@@ -617,7 +617,8 @@ ngx_shm_cycle_notify(void)
 
 
 static void
-ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf, ngx_log_t *log)
+ngx_shm_cycle_channel_handler(ngx_channel_t *ch, u_char *buf, size_t len,
+    ngx_log_t *log)
 {
     if (ch->tag != ngx_shm_cycles) {
         return;

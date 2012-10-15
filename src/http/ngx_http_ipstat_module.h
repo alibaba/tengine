@@ -25,6 +25,8 @@ typedef struct ngx_http_ipstat_vip_s ngx_http_ipstat_vip_t;
 
 
 typedef struct {
+    time_t                 rt_interval;
+    time_t                 rt_unit;
     ngx_uint_t             workers;
     ngx_uint_t             num;
     size_t                 index_size;
@@ -47,6 +49,16 @@ typedef struct {
 } ngx_http_ipstat_rate_t;
 
 
+typedef struct {
+    ngx_uint_t             val;
+    ngx_uint_t             slot[60];
+    time_t                 t;
+    time_t                 unit;
+    unsigned               index:6;
+    unsigned               slice:6;
+} ngx_http_ipstat_ts_t;
+
+
 struct ngx_http_ipstat_vip_s {
     ngx_http_ipstat_vip_t *prev;
     ngx_uint_t             conn_total;
@@ -55,8 +67,8 @@ struct ngx_http_ipstat_vip_s {
     ngx_uint_t             req_count;
     ngx_uint_t             bytes_in;
     ngx_uint_t             bytes_out;
-    ngx_uint_t             rt_min;
-    ngx_uint_t             rt_max;
+    ngx_http_ipstat_ts_t   rt_min;
+    ngx_http_ipstat_ts_t   rt_max;
     ngx_http_ipstat_avg_t  rt_avg;
     ngx_http_ipstat_rate_t conn_rate;
     ngx_http_ipstat_rate_t req_rate;
@@ -66,6 +78,8 @@ struct ngx_http_ipstat_vip_s {
 extern void ngx_http_ipstat_count(void *vip, off_t offset, ngx_int_t incr);
 extern void ngx_http_ipstat_min(void *vip, off_t offset, ngx_uint_t val);
 extern void ngx_http_ipstat_max(void *vip, off_t offset, ngx_uint_t val);
+extern void ngx_http_ipstat_ts_min(void *vip, off_t offset, ngx_uint_t val);
+extern void ngx_http_ipstat_ts_max(void *vip, off_t offset, ngx_uint_t val);
 extern void ngx_http_ipstat_avg(void *vip, off_t offset, ngx_uint_t val);
 extern void ngx_http_ipstat_rate(void *vip, off_t offset, ngx_uint_t val);
 

@@ -39,7 +39,7 @@ void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
 
 
 typedef void (*ngx_channel_handler_pt)(ngx_channel_t *ch, u_char *buf,
-    ngx_log_t *log);
+    size_t len, ngx_log_t *log);
 
 
 extern ngx_channel_handler_pt ngx_channel_top_handler;

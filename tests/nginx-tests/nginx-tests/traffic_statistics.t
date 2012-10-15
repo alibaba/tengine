@@ -23,13 +23,17 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/ipstat/,qw/reqstat/);
+my $t = Test::Nginx->new(); #->has(qw/ipstat/,qw/reqstat/);
 
 $t->write_file_expand('B4', '1234');
 
 my $cf_1 = <<'EOF';
 
 %%TEST_GLOBALS%%
+
+
+worker_processes 2;
+worker_rlimit_core          1024M;
 
 http {
 
@@ -53,6 +57,10 @@ http {
         listen              127.0.0.1:3129;
         server_name         www.test_app_a.com;
         req_status          server;
+
+        location /test_proxy {
+            proxy_pass http://sports.sina.com.cn;
+        }
     }
 
     server {
@@ -106,7 +114,7 @@ EOF
 
 #################################################################################
 
-$t->plan(4);
+$t->plan(12);
 $t->write_file_expand('nginx.conf', $cf_1);
 $t->run();
 my_http_get('/B4', 'www.test_app_a.com', 3129);
@@ -137,7 +145,102 @@ foreach $i (split(/\r\n/, $r)) {
 if ($s == 1) {
     pass('duplicate output');
 }
-
+#5 different time slice
+my $j;
+my $c1;
+my $rt_min;
+my $rt_min_1;
+my $rt_max;
+my $rt_max_1;
+my $rt_avg;
+my $rt_avg_1;
+my_http_get('/test_proxy', 'www.test_app_a.com', 3129);
+sleep 2;
+my_http_get('/test_proxy', 'www.test_app_a.com', 3129);
+$r = my_http_get('/us', 'www.test_cp.com', 3128);
+foreach $i (split(/\r\n/, $r)) {
+    if ($i =~ /127.0.0.1:3129/) {
+        $c1 = 0;
+        foreach $j (split(/,/, $i)) {
+            if ($c1 == 8) {
+                $rt_min = $j;
+            } elsif ($c1 == 9) {
+                $rt_max = $j;
+            } elsif ($c1 == 10) {
+                $rt_avg = $j;
+            }
+            $c1++;
+        }
+        last;
+    }
+}
+$t->reload();
+$r = my_http_get('/us', 'www.test_cp.com', 3128);
+foreach $i (split(/\r\n/, $r)) {
+    if ($i =~ /127.0.0.1:3129/) {
+        $c1 = 0;
+        foreach $j (split(/,/, $i)) {
+            if ($c1 == 8) {
+                $rt_min_1 = $j;
+            } elsif ($c1 == 9) {
+                $rt_max_1 = $j;
+            } elsif ($c1 == 10) {
+                $rt_avg_1 = $j;
+            }
+            $c1++;
+        }
+        last;
+    }
+}
+is($rt_min, $rt_min_1, "min value should be preserved during reload");
+is($rt_max, $rt_max_1, "max value should be preserved during reload");
+is($rt_avg, $rt_avg_1, "avg value should be preserved during reload");
+cmp_ok($rt_min, "<=", $rt_max, "min value should be no bigger than max value");
+#6 the same time slice
+$t->stop();
+sleep 1;
+$t->run();
+my_http_get('/test_proxy', 'www.test_app_a.com', 3129);
+my_http_get('/test_proxy', 'www.test_app_a.com', 3129);
+$r = my_http_get('/us', 'www.test_cp.com', 3128);
+foreach $i (split(/\r\n/, $r)) {
+    if ($i =~ /127.0.0.1:3129/) {
+        $c1 = 0;
+        foreach $j (split(/,/, $i)) {
+            if ($c1 == 8) {
+                $rt_min = $j;
+            } elsif ($c1 == 9) {
+                $rt_max = $j;
+            } elsif ($c1 == 10) {
+                $rt_avg = $j;
+            }
+            $c1++;
+        }
+        last;
+    }
+}
+$t->reload();
+$r = my_http_get('/us', 'www.test_cp.com', 3128);
+foreach $i (split(/\r\n/, $r)) {
+    if ($i =~ /127.0.0.1:3129/) {
+        $c1 = 0;
+        foreach $j (split(/,/, $i)) {
+            if ($c1 == 8) {
+                $rt_min_1 = $j;
+            } elsif ($c1 == 9) {
+                $rt_max_1 = $j;
+            } elsif ($c1 == 10) {
+                $rt_avg_1 = $j;
+            }
+            $c1++;
+        }
+        last;
+    }
+}
+is($rt_min, $rt_min_1, "min value should be preserved during reload");
+is($rt_max, $rt_max_1, "max value should be preserved during reload");
+is($rt_avg, $rt_avg_1, "avg value should be preserved during reload");
+cmp_ok($rt_min, "<=", $rt_max, "min value should be no bigger than max value");
 $t->stop();
 #################################################################################
 
