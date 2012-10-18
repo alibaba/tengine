@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_http_probe.h>
 
 
 static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
@@ -41,11 +42,15 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     r->main->count++;
 
     if (r->request_body || r->discard_body) {
+        ngx_http_probe_read_body_abort(r,
+                                       r->request_body ? "body exists"
+                                                       : "body discarded");
         post_handler(r);
         return NGX_OK;
     }
 
     if (ngx_http_test_expect(r) != NGX_OK) {
+        ngx_http_probe_read_body_abort(r, "test expect failed");
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -57,6 +62,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     r->request_body = rb;
 
     if (r->headers_in.content_length_n < 0) {
+        ngx_http_probe_read_body_abort(r, "no content length");
         post_handler(r);
         return NGX_OK;
     }
@@ -90,9 +96,12 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
                                      tf->persistent, tf->clean, tf->access)
                 != NGX_OK)
             {
+                ngx_http_probe_read_body_abort(r, "create temp file failed");
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
         }
+
+        ngx_http_probe_read_body_done(r);
 
         post_handler(r);
 
@@ -161,9 +170,12 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
             if (r->request_body_in_file_only) {
                 if (ngx_http_write_request_body(r, rb->bufs) != NGX_OK) {
+                    ngx_http_probe_read_body_abort(r, "write temp file failed");
                     return NGX_HTTP_INTERNAL_SERVER_ERROR;
                 }
             }
+
+            ngx_http_probe_read_body_done(r);
 
             post_handler(r);
 
@@ -258,6 +270,7 @@ ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
     ngx_int_t  rc;
 
     if (r->connection->read->timedout) {
+        ngx_http_probe_read_body_abort(r, "timed out");
         r->connection->timedout = 1;
         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
         return;
@@ -293,6 +306,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             if (rb->buf->last == rb->buf->end) {
 
                 if (ngx_http_write_request_body(r, rb->to_write) != NGX_OK) {
+                    ngx_http_probe_read_body_abort(r, "write temp file failed");
                     return NGX_HTTP_INTERNAL_SERVER_ERROR;
                 }
 
@@ -316,6 +330,9 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             }
 
             if (n == 0) {
+
+                ngx_http_probe_read_body_abort(r, "connection closed");
+
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client prematurely closed connection");
             }
@@ -376,6 +393,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
         /* save the last part */
 
         if (ngx_http_write_request_body(r, rb->to_write) != NGX_OK) {
+            ngx_http_probe_read_body_abort(r, "write temp file failed");
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -404,6 +422,8 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     }
 
     r->read_event_handler = ngx_http_block_reading;
+
+    ngx_http_probe_read_body_done(r);
 
     rb->post_handler(r);
 

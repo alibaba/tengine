@@ -7,6 +7,7 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <ngx_core_probe.h>
 
 
 static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
@@ -36,6 +37,8 @@ ngx_create_pool(size_t size, ngx_log_t *log)
     p->large = NULL;
     p->cleanup = NULL;
     p->log = log;
+
+    ngx_core_probe_create_pool_done(p, size);
 
     return p;
 }

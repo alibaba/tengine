@@ -1,0 +1,6 @@
+#!/bin/sh
+
+PATH="NGX_SBIN_DIR:$PATH"
+export PATH
+exec stap -d "NGX_SBIN_PATH" -I "NGX_TAPSET_PREFIX" "$@"
+

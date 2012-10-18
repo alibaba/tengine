@@ -27,6 +27,10 @@ if [ $NGX_SYSLOG = YES ]; then
     have=NGX_SYSLOG . auto/have
 fi
 
+if [ $NGX_DTRACE = YES ]; then
+    have=NGX_DTRACE . auto/have
+fi
+
 if test -z "$NGX_PLATFORM"; then
     echo "checking for OS"
 

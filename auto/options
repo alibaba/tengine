@@ -15,6 +15,9 @@ NGX_LOCK_PATH=
 NGX_USER=
 NGX_GROUP=
 
+NGX_TAPSET_PREFIX=
+NGX_STAP_NGX_PATH=
+
 NGX_DSO_PATH=
 
 CC=${CC:-gcc}
@@ -22,9 +25,16 @@ CPP=
 NGX_OBJS=objs
 
 NGX_DEBUG=NO
+
+NGX_EXTEND_LD_OPT=
+NGX_DTRACE=NO
+DTRACE=dtrace
+
+DTRACE_PROBE_OBJ=YES
+DTRACE_FROM_SYSTEMTAP=NO
+
 NGX_CC_OPT=
 NGX_LD_OPT=
-NGX_EXTEND_LD_OPT=
 CPU=NO
 
 NGX_RPATH=NO
@@ -319,6 +329,8 @@ do
         --error-log-path=*)                        NGX_ERROR_LOG_PATH="$value";;
         --pid-path=*)                              NGX_PID_PATH="$value"      ;;
         --lock-path=*)                             NGX_LOCK_PATH="$value"     ;;
+        --tapset-prefix=*)                         NGX_TAPSET_PREFIX="$value" ;;
+        --stap-nginx-path=*)                       NGX_STAP_NGX_PATH="$value" ;;
         --user=*)                                  NGX_USER="$value"          ;;
         --group=*)                                 NGX_GROUP="$value"         ;;
 
@@ -532,6 +544,8 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-cpu-opt=*)                CPU="$value"               ;;
         --with-debug)                    NGX_DEBUG=YES              ;;
 
+        --with-dtrace=*)                 DTRACE="$value"            ;;
+        --with-dtrace-probes)            NGX_DTRACE=YES             ;;
         --without-pcre)                  USE_PCRE=DISABLED          ;;
         --with-pcre)                     USE_PCRE=YES               ;;
         --with-pcre=*)                   PCRE="$value"              ;;
@@ -587,6 +601,8 @@ cat << END
   --error-log-path=PATH              set error log pathname
   --pid-path=PATH                    set nginx.pid pathname
   --lock-path=PATH                   set nginx.lock pathname
+  --tapset-prefix=PATH               set systemtap tapset directory prefix
+  --stap-nginx-path=PATH             set stap-nginx pathname
 
   --user=USER                        set non-privileged user for
                                      worker processes
@@ -788,6 +804,8 @@ cat << END
   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
 
   --with-debug                       enable debug logging
+  --with-dtrace-probes               enable dtrace USDT probes
+  --with-dtrace=PATH                 set dtrace utility pathname
 
 END
 
@@ -817,6 +835,7 @@ NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
 NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
 NGX_PID_PATH=${NGX_PID_PATH:-logs/nginx.pid}
 NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/nginx.lock}
+NGX_TAPSET_PREFIX=${NGX_TAPSET_PREFIX:-tapset}
 
 if [ ".$NGX_ERROR_LOG_PATH" = ".stderr" ]; then
     NGX_ERROR_LOG_PATH=

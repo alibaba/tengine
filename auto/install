@@ -16,6 +16,20 @@ END
 fi
 
 
+case ".$NGX_STAP_NGX_PATH" in
+    ./*)
+    ;;
+
+    .)
+        NGX_STAP_NGX_PATH=$NGX_PREFIX/sbin/stap-nginx
+    ;;
+
+    *)
+        NGX_STAP_NGX_PATH=$NGX_PREFIX/$NGX_STAP_NGX_PATH
+    ;;
+esac
+
+
 case ".$NGX_SBIN_PATH" in
     ./*)
     ;;
@@ -49,6 +63,16 @@ case ".$NGX_PID_PATH" in
 
     *)
         NGX_PID_PATH=$NGX_PREFIX/$NGX_PID_PATH
+    ;;
+esac
+
+
+case ".$NGX_TAPSET_PREFIX" in
+    ./* | .)
+    ;;
+
+    *)
+        NGX_TAPSET_PREFIX=$NGX_PREFIX/$NGX_TAPSET_PREFIX
     ;;
 esac
 
@@ -206,11 +230,56 @@ END
 fi
 
 
+if [ $NGX_DTRACE = YES -a $DTRACE_FROM_SYSTEMTAP = YES ]; then
+
+    ngx_tapset_srcs="$NGX_TAPSET_SRCS"
+
+        cat << END                                            >> $NGX_MAKEFILE
+	test -d '\$(DESTDIR)$NGX_TAPSET_PREFIX' || \
+		mkdir -p '\$(DESTDIR)$NGX_TAPSET_PREFIX'
+END
+
+    for ngx_tapset_src in $ngx_tapset_srcs
+    do
+        ngx_tapset_file=`basename $ngx_tapset_src`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+	sed -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
+                $ngx_tapset_src > '\$(DESTDIR)$NGX_TAPSET_PREFIX/$ngx_tapset_file'
+END
+
+    done
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -d '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`' || \
+		mkdir -p '\$(DESTDIR)`dirname "$NGX_STAP_NGX_PATH"`'
+	cp $NGX_OBJS/stap-nginx '\$(DESTDIR)$NGX_STAP_NGX_PATH'
+	chmod 0755 '\$(DESTDIR)$NGX_STAP_NGX_PATH'
+END
+
+fi
+
+
 if test -n "$NGX_ERROR_LOG_PATH"; then
     cat << END                                                >> $NGX_MAKEFILE
 
 	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
+END
+
+fi
+
+
+if [ $NGX_DTRACE = YES ]; then
+    cat << END                                                >> $NGX_MAKEFILE
+
+$NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
+	sed -e "s|NGX_TAPSET_PREFIX|$NGX_TAPSET_PREFIX|g" $ngx_long_cont \
+            -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont \
+            -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
+            src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
 END
 
 fi
