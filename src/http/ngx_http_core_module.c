@@ -379,6 +379,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_buffer_size),
       NULL },
 
+    { ngx_string("client_body_postpone_sending"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_core_loc_conf_t, client_body_postpone_sending),
+      NULL },
+
     { ngx_string("client_body_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -3506,6 +3513,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->error_pages = NGX_CONF_UNSET_PTR;
     clcf->client_max_body_size = NGX_CONF_UNSET;
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
+    clcf->client_body_postpone_sending = NGX_CONF_UNSET_SIZE;
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
     clcf->satisfy = NGX_CONF_UNSET_UINT;
     clcf->if_modified_since = NGX_CONF_UNSET_UINT;
@@ -3770,6 +3778,18 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->client_body_buffer_size,
                               prev->client_body_buffer_size,
                               (size_t) 2 * ngx_pagesize);
+    ngx_conf_merge_size_value(conf->client_body_postpone_sending,
+                              prev->client_body_postpone_sending,
+                              64 * 1024);
+
+    if (conf->client_body_postpone_sending < conf->client_body_buffer_size) {
+        conf->buffer_number = 1;
+        conf->client_body_postpone_sending = conf->client_body_buffer_size;
+    } else {
+        conf->buffer_number = conf->client_body_postpone_sending
+                               / conf->client_body_buffer_size;
+    }
+
     ngx_conf_merge_msec_value(conf->client_body_timeout,
                               prev->client_body_timeout, 60000);
 

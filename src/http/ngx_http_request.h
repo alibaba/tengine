@@ -283,6 +283,14 @@ typedef struct {
     off_t                             rest;
     ngx_chain_t                      *to_write;
     ngx_http_client_body_handler_pt   post_handler;
+
+    /* For non buffered request body */
+    ngx_chain_t                      *out;
+    ngx_chain_t                      *busy;
+    ngx_chain_t                      *free;
+    ngx_chain_t                     **last_out;
+    ngx_uint_t                        num;
+    unsigned                          buffered;
 } ngx_http_request_body_t;
 
 
@@ -461,6 +469,7 @@ struct ngx_http_request_s {
     unsigned                          uri_changed:1;
     unsigned                          uri_changes:4;
 
+    unsigned                          request_buffering:1;
     unsigned                          request_body_in_single_buf:1;
     unsigned                          request_body_in_file_only:1;
     unsigned                          request_body_in_persistent_file:1;
