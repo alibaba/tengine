@@ -43,8 +43,8 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
     if (r->request_body || r->discard_body) {
         ngx_http_probe_read_body_abort(r,
-                                       r->request_body ? "body exists"
-                                                       : "body discarded");
+                                       (r->request_body ? "body exists"
+                                                        : "body discarded"));
         post_handler(r);
         return NGX_OK;
     }

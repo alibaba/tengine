@@ -132,6 +132,21 @@ $NGX_OBJS/nginx.8:	$NGX_MAN $NGX_AUTO_CONFIG_H
 
 END
 
+
+if [ $NGX_DTRACE = YES ]; then
+    cat << END                                                >> $NGX_MAKEFILE
+
+$NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx $NGX_AUTO_CONFIG_H
+	sed -e "s|NGX_TAPSET_PREFIX|$NGX_TAPSET_PREFIX|g" $ngx_long_cont \
+            -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont \
+            -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
+            src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
+
+END
+
+fi
+
+
 if test -n "$NGX_SHARED_MODULES"; then
 
     cat << END                                                >> $NGX_MAKEFILE
@@ -267,19 +282,6 @@ if test -n "$NGX_ERROR_LOG_PATH"; then
 
 	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' || \
 		mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
-END
-
-fi
-
-
-if [ $NGX_DTRACE = YES ]; then
-    cat << END                                                >> $NGX_MAKEFILE
-
-$NGX_OBJS${ngx_dirsep}stap-nginx: src/dtrace/stap-nginx
-	sed -e "s|NGX_TAPSET_PREFIX|$NGX_TAPSET_PREFIX|g" $ngx_long_cont \
-            -e "s|NGX_SBIN_DIR|`dirname $NGX_SBIN_PATH`|g" $ngx_long_cont \
-            -e "s|NGX_SBIN_PATH|$NGX_SBIN_PATH|g" $ngx_long_cont \
-            src/dtrace/stap-nginx > $NGX_OBJS${ngx_dirsep}stap-nginx
 END
 
 fi
