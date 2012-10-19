@@ -235,7 +235,7 @@ static ngx_command_t  ngx_http_log_commands[] = {
 
     { ngx_string("access_log"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
-                        |NGX_HTTP_LMT_CONF|NGX_CONF_TAKE1234,
+                        |NGX_HTTP_LMT_CONF|NGX_CONF_1MORE,
       ngx_http_log_set_log,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -1124,6 +1124,7 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_log_t            *log;
     ngx_http_log_fmt_t        *fmt;
     ngx_http_log_main_conf_t  *lmcf;
+    ngx_http_logf_condition_t *condition;
 
     ngx_conf_merge_uint_value(conf->escape, prev->escape,
                               NGX_HTTP_LOG_ESCAPE_ON);
@@ -1142,6 +1143,15 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->filter == NULL) {
         conf->filter = prev->filter;
+    } else {
+        if (conf->filter->conditions) {
+            condition = conf->filter->conditions->elts;
+            if (condition[conf->filter->conditions->nelts - 1].is_and) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                              "can not use \"and\" flag on the last condition");
+                return NGX_CONF_ERROR;
+            }
+        }
     }
 
     if (conf->logs || conf->off) {
@@ -1854,6 +1864,7 @@ ngx_http_log_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_conf_t                    pcf;
     ngx_uint_t                    i;
     ngx_http_conf_ctx_t          *ctx, *pctx;
+    ngx_http_logf_condition_t    *condition;
     ngx_http_log_named_filter_t  *nf;
 
     ngx_http_log_main_conf_t     *lmcf = conf;
@@ -1897,7 +1908,20 @@ ngx_http_log_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     rv = ngx_conf_parse(cf, NULL);
     *cf = pcf;
 
-    return rv;
+    if (rv != NGX_CONF_OK) {
+        return rv;
+    }
+
+    if (nf->filter.conditions) {
+        condition = nf->filter.conditions->elts;
+        if (condition[nf->filter.conditions->nelts - 1].is_and) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                              "can not use \"and\" flag on the last condition");
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
 }
 
 
