@@ -187,11 +187,10 @@ ngx_module_t  ngx_core_module = {
 ngx_uint_t          ngx_max_module;
 ngx_uint_t          ngx_dump_config;
 
+
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
-static ngx_uint_t   ngx_show_modules;
 static ngx_uint_t   ngx_show_configure;
-static ngx_uint_t   ngx_show_directives;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -207,7 +206,6 @@ main(int argc, char *const *argv)
     ngx_int_t         i;
     ngx_log_t        *log;
     ngx_cycle_t      *cycle, init_cycle;
-    ngx_command_t    *cmd;
     ngx_core_conf_t  *ccf;
 
     ngx_debug_init();
@@ -270,32 +268,7 @@ main(int argc, char *const *argv)
                 "configure arguments:" NGX_CONFIGURE NGX_LINEFEED);
         }
 
-        if (ngx_show_modules) {
-            ngx_log_stderr(0, "compiled in modules:");
-
-            for (i = 0; ngx_module_names[i]; i++) {
-                ngx_log_stderr(0, "    %s", ngx_module_names[i]);
-            }
-        }
-
-        if (ngx_show_directives) {
-            ngx_log_stderr(0, "all available directives:");
-
-            for (i = 0; ngx_modules[i]; i++) {
-               ngx_log_stderr(0, "%s:", ngx_module_names[i]);
-
-               cmd = ngx_modules[i]->commands;
-               if(cmd == NULL) {
-                  continue;
-               }
-
-               for ( /* void */ ; cmd->name.len; cmd++) {
-                  ngx_log_stderr(0, "    %V", &cmd->name);
-               }
-            }
-        }
-
-        if(!ngx_test_config) {
+        if(!ngx_test_config && !ngx_show_modules && !ngx_show_directives) {
             return 0;
         }
     }
@@ -379,6 +352,10 @@ main(int argc, char *const *argv)
                            cycle->conf_file.data);
         }
 
+        return 0;
+    }
+
+    if (ngx_show_modules || ngx_show_directives) {
         return 0;
     }
 
@@ -1377,15 +1354,22 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t        *value;
     ngx_uint_t        i, j, n;
 
-    if (ccf->cpu_affinity) {
+    if (ccf->cpu_affinity || ccf->cpu_affinity_n) {
         return "is duplicate";
     }
 
     value = cf->args->elts;
 
-    if (ngx_strncasecmp((u_char *) "auto", value[1].data, 4) == 0) {
+    if (ngx_strcasecmp((u_char *) "auto", value[1].data) == 0) {
 
         ccf->cpu_affinity = NGX_CONF_UNSET_PTR;
+
+        return NGX_CONF_OK;
+    }
+
+    if (ngx_strcasecmp((u_char *) "off", value[1].data) == 0) {
+
+        ccf->cpu_affinity_n = 1;
 
         return NGX_CONF_OK;
     }

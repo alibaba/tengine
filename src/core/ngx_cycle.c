@@ -10,6 +10,13 @@
 #include <ngx_event.h>
 
 
+#if (NGX_DSO)
+extern ngx_int_t ngx_is_dynamic_module(ngx_conf_t *cf, u_char *name,
+    ngx_uint_t *major_version, ngx_uint_t *minor_version);
+extern void ngx_show_dso_directives(ngx_conf_t *cf);
+#endif
+
+
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
 static ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, struct sockaddr *sa2);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
@@ -26,6 +33,8 @@ static ngx_event_t     ngx_cleaner_event;
 
 ngx_uint_t             ngx_test_config;
 ngx_uint_t             ngx_quiet_mode;
+ngx_uint_t             ngx_show_modules;
+ngx_uint_t             ngx_show_directives;
 
 #if (NGX_THREADS)
 ngx_tls_key_t          ngx_core_tls_key;
@@ -52,6 +61,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_conf_t           conf;
     ngx_pool_t          *pool;
     ngx_cycle_t         *cycle, **old;
+    ngx_command_t       *cmd;
     ngx_shm_zone_t      *shm_zone, *oshm_zone;
     ngx_list_part_t     *part, *opart;
     ngx_open_file_t     *file;
@@ -273,6 +283,56 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
+    }
+
+    if (ngx_show_directives) {
+        ngx_log_stderr(0, "all available directives:");
+
+        for (i = 0; ngx_module_names[i]; i++) {
+            ngx_log_stderr(0, "%s:", ngx_module_names[i]);
+
+            cmd = ngx_modules[i]->commands;
+            if(cmd == NULL) {
+                continue;
+            }
+
+            for ( /* void */ ; cmd->name.len; cmd++) {
+                ngx_log_stderr(0, "    %V", &cmd->name);
+            }
+        }
+
+#if (NGX_DSO)
+        ngx_show_dso_directives(&conf);
+#endif
+        return cycle;
+    }
+
+    if (ngx_show_modules) {
+        ngx_log_stderr(0, "loaded modules:");
+
+        for (i = 0; ngx_module_names[i]; i++) {
+
+#if (NGX_DSO)
+            ngx_uint_t major, minor;
+
+            if (ngx_is_dynamic_module(&conf,
+                                      ngx_module_names[i], &major,
+                                      &minor) == NGX_OK)
+            {
+                ngx_log_stderr(0, "    %s (shared, %ui.%ui)",
+                               ngx_module_names[i],
+                               major, minor);
+            } else {
+#endif
+            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
+
+#if (NGX_DSO)
+            }
+#endif
+        }
+
+        ngx_destroy_cycle_pools(&conf);
+        return cycle;
     }
 
     if (ngx_test_config && !ngx_quiet_mode) {
