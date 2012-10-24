@@ -329,7 +329,7 @@ static char *
 ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                    *value;
-    ngx_uint_t                    i;
+    ngx_uint_t                    i, j;
     ngx_shm_zone_t               *shm_zone, **z;
     ngx_http_reqstat_conf_t      *smcf;
 
@@ -366,11 +366,20 @@ ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         z = ngx_array_push(slcf->monitor);
         *z = shm_zone;
 
-        z = ngx_array_push(smcf->monitor);
-        if (z == NULL) {
-            return NGX_CONF_ERROR;
+        z = smcf->monitor->elts;
+        for (j = 0; j < smcf->monitor->nelts; j++) {
+            if (!ngx_strcmp(value[i].data, z[j]->shm.name.data)) {
+                break;
+            }
         }
-        *z = shm_zone;
+
+        if (j == smcf->monitor->nelts) {
+            z = ngx_array_push(smcf->monitor);
+            if (z == NULL) {
+                return NGX_CONF_ERROR;
+            }
+            *z = shm_zone;
+        }
     }
 
     return NGX_CONF_OK;
