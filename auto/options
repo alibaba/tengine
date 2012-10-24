@@ -195,7 +195,8 @@ HTTP_USER_AGENT=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
-HTTP_UPSTREAM_CONSISTENT_HASH=NO
+HTTP_UPSTREAM_CONSISTENT_HASH=YES
+HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
 
 # STUB
 HTTP_STUB_STATUS=YES
@@ -390,6 +391,8 @@ do
         --with-http_sysguard_module)               HTTP_SYSGUARD=YES
                                                    HTTP_SYSGUARD_SHARED=NO           ;;
         --with-http_upstream_check_module)         HTTP_UPSTREAM_CHECK=YES           ;;
+        --with-http_upstream_consistent_hash_module)
+                                                   HTTP_UPSTREAM_CONSISTENT_HASH=YES ;;
 
         --with-http_addition_module=shared)        HTTP_ADDITION_SHARED=YES
                                                    HTTP_ADDITION=NO                  ;;
@@ -457,6 +460,9 @@ do
         --with-http_upstream_least_conn_module=shared)
                                                    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
                                                    HTTP_UPSTREAM_LEAST_CONN=NO       ;;
+        --with-http_upstream_consistent_hash_module=shared)
+                                                   HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=YES
+                                                   HTTP_UPSTREAM_CONSISTENT_HASH=NO  ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
@@ -711,6 +717,8 @@ cat << END
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
+  --without-http_upstream_consistent_hash_module
+                                     disable ngx_http_upstream_consistent_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
 
