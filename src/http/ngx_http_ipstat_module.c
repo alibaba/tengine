@@ -422,7 +422,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
             addr = port->addrs;
             off = offsetof(struct sockaddr_un, sun_path);
             len = sizeof(saun->sun_path);
-            key.sun_path = (char *) ls[i].sockaddr + off;
+            up = key.sun_path = (char *) ls[i].sockaddr + off;
             break;
         }
 #endif
@@ -542,7 +542,11 @@ ngx_http_ipstat_distinguish_same_vip(ngx_http_ipstat_vip_index_t *key,
 
         po = NULL;
         up = NULL;
-        
+        oaddr = NULL;
+#if (NGX_HAVE_INET6)
+        oaddr6 = NULL;
+#endif
+
         port = ls[i].servers;
 
         switch (ls[i].sockaddr->sa_family) {
@@ -923,6 +927,9 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
     ngx_chain_t                  *tl, *free, *busy;
     ngx_shm_zone_t              **shm_zone;
     struct sockaddr_in            sin;
+#if (NGX_HAVE_UNIX_DOMAIN)
+    struct sockaddr_un            sun;
+#endif
     ngx_http_in_addr_t           *addr;
 #if (NGX_HAVE_INET6)
     struct sockaddr_in6           sin6;
@@ -997,25 +1004,32 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
         b->memory = 1;
         b->temporary = 1;
 
-        switch (idx->ipv6) {
+        if (idx->sun_path) {
+            sun.sun_family = AF_UNIX;
+            memcpy(sun.sun_path, idx->sun_path, sizeof(sun.sun_path));
+            b->last += ngx_sock_ntop((struct sockaddr *) &sun,
+                                     b->last, 512, 1);
+        } else {
+            switch (idx->ipv6) {
 #if (NGX_HAVE_INET6)
-        case 1:
-            addr6 = (ngx_http_in6_addr_t *) idx->key;
-            sin6.sin6_family = AF_INET6;
-            ngx_memcpy(&sin6.sin6_addr.s6_addr, &addr6->addr6, 16);
-            sin6.sin6_port = idx->port;
-            b->last += ngx_sock_ntop((struct sockaddr *) &sin6,
-                                     b->last, 512, 1);
-            break;
+            case 1:
+                addr6 = (ngx_http_in6_addr_t *) idx->key;
+                sin6.sin6_family = AF_INET6;
+                ngx_memcpy(&sin6.sin6_addr.s6_addr, &addr6->addr6, 16);
+                sin6.sin6_port = idx->port;
+                b->last += ngx_sock_ntop((struct sockaddr *) &sin6,
+                                         b->last, 512, 1);
+                break;
 #endif
-        default:
-            addr = (ngx_http_in_addr_t *) idx->key;
-            sin.sin_family = AF_INET;
-            sin.sin_addr.s_addr = addr->addr;
-            sin.sin_port = idx->port;
-            b->last += ngx_sock_ntop((struct sockaddr *) &sin,
-                                     b->last, 512, 1);
-            break;
+            default:
+                addr = (ngx_http_in_addr_t *) idx->key;
+                sin.sin_family = AF_INET;
+                sin.sin_addr.s_addr = addr->addr;
+                sin.sin_port = idx->port;
+                b->last += ngx_sock_ntop((struct sockaddr *) &sin,
+                                         b->last, 512, 1);
+                break;
+            }
         }
 
         b->last = ngx_slprintf(b->last, b->end, ",FRONTEND,");
