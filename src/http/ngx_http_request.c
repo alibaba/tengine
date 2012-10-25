@@ -349,7 +349,7 @@ ngx_http_init_request(ngx_event_t *rev)
 
             /* the last address is "*" */
 
-            for (i = 0; i + 1 < port->naddrs; i++) {
+            for (i = 0; i < port->naddrs - 1; i++) {
                 if (ngx_memcmp(&addr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
                     break;
                 }
@@ -370,7 +370,7 @@ ngx_http_init_request(ngx_event_t *rev)
 
             /* the last address is "*" */
 
-            for (i = 0; i + 1 < port->naddrs; i++) {
+            for (i = 0; i < port->naddrs - 1; i++) {
                 if (addr[i].addr == sin->sin_addr.s_addr) {
                     break;
                 }
