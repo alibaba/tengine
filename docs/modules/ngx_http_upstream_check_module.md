@@ -40,7 +40,7 @@ This module is not built by default, it should be enabled with the `--with-http_
 
 ## check ##
 
-Syntax: **check** `interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|ssl_hello|mysql|ajp] [port=check_port]`
+Syntax: **check** `interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|http|ssl_hello|mysql|ajp] [port=check_port]`
 
 Default: If the parameters are omitted, default values are: `interval=30000 fall=5 rise=2 timeout=1000 default_down=true type=tcp`
 
@@ -96,9 +96,9 @@ Default size is one megabytes. If you want to check thousands of servers, the sh
 
 ## check\_status ##
 
-Syntax: **check\_status [html|csv|json] **
+Syntax: **check\_status** `[html|csv|json]`
 
-Default: `check\_status html`
+Default: `check_status html`
 
 Context: `location`
 

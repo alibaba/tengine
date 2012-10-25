@@ -195,7 +195,7 @@ cat << END                                                    >> $NGX_MAKEFILE
 END
 
 
-if [ $HTTP_USER_AGENT = YES ]; then
+if [ $HTTP_USER_AGENT = YES ] || [ $HTTP_USER_AGENT_SHARED = YES ]; then
     cat << END                                                >> $NGX_MAKEFILE
 
 	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/browsers' \
@@ -238,7 +238,7 @@ END
 		|| cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs'
 	chmod 0755 $NGX_DSO_COMPILE
-	cp $NGX_DSO_COMPILE '$NGX_PREFIX/sbin'
+	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_PREFIX/sbin'
 END
 
 fi

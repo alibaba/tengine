@@ -1,4 +1,24 @@
 
+Changes with Tengine 1.4.1                                         10 Oct 2012
+
+    *) Feature: added jemalloc library support. (fanjizhao)
+
+    *) Feature: added a new variable '$dollar', whose value is the dollar
+       sign ('$'). (zhuzhaoyuan)
+
+    *) Feature: added the option 'off' to 'worker_cpu_affinity' directive.
+       (cfsego)
+
+    *) Change: disable CPU affinity when a new worker process is forked as
+       an old one exits abnormally. (cfsego)
+
+    *) Bugfix: fixed compile error with shared Lua module when using LuaJIT
+       in Mac OS. (monadbobo)
+
+    *) Bugfix: fixed the wrong module execution order with the third party
+       shared filter module. (monadbobo)
+
+
 Changes with Tengine 1.4.0                                         05 Sep 2012
 
     *) Feature: added the dynamic module loading support (a.k.a. DSO), so we

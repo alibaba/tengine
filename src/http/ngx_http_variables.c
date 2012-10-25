@@ -101,6 +101,8 @@ static ngx_int_t ngx_http_variable_hostname(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_pid(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_dollar(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_host_comment(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
@@ -289,6 +291,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
       0, 0, 0 },
 
     { ngx_string("pid"), NULL, ngx_http_variable_pid,
+      0, 0, 0 },
+
+    { ngx_string("dollar"), NULL, ngx_http_variable_dollar,
       0, 0, 0 },
 
     { ngx_string("host_comment"), NULL, ngx_http_variable_host_comment,
@@ -1880,6 +1885,20 @@ ngx_http_variable_pid(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_dollar(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    v->len = 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = (u_char *) "$";
 
     return NGX_OK;
 }
