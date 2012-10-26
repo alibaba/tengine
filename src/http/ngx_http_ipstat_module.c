@@ -331,7 +331,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
     char                         *up, *p;
     size_t                        len, off;
-    ngx_uint_t                    i, j, k, l, n, okey;
+    ngx_uint_t                    i, j, k, l, n, okey, cportn, caddrn;
     ngx_listening_t              *ls;
     ngx_http_port_t              *port;
     ngx_http_in_addr_t           *addr;
@@ -384,8 +384,9 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
     idx = VIP_INDEX_START(ctx->data);
 
     cport = cmcf->ports ? cmcf->ports->elts : NULL;
+    cportn = cmcf->ports ? cmcf->ports->nelts : 0;
 
-    for (i = k = 0, n = 0; i < ctx->cycle->listening.nelts; i++) {
+    for (i = k = n = 0; i < ctx->cycle->listening.nelts && k < cportn; i++) {
         port = ls[i].servers;
         ngx_memzero(&key, sizeof(key));
         up = p = NULL;
@@ -432,7 +433,8 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 #endif
 
         caddr = cport[k].addrs.elts;
-        for (j = l = 0; j < port->naddrs; j++) {
+        caddrn = cport[k].addrs.nelts;
+        for (j = l = 0; l < caddrn && j < port->naddrs; j++) {
 
             if (key.ipv6) {
 #if (NGX_HAVE_INET6)
