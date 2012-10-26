@@ -212,9 +212,12 @@ ngx_http_ipstat_init(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
-    port = cmcf->ports->elts;
-    for (i = 0, n = 0; i < cmcf->ports->nelts; i++) {
-        n += port[i].addrs.nelts;
+    n = 0;
+    if (cmcf->ports) {
+        port = cmcf->ports->elts;
+        for (i = 0; i < cmcf->ports->nelts; i++) {
+            n += port[i].addrs.nelts;
+        }
     }
 
     /* comparible to cpu affinity */
