@@ -60,10 +60,6 @@ http {
         server_name         www.test_app_a1.com;
         req_status          server;
     }
-
-    server {
-        listen              unix:/var/run/nginx.sock;
-    }
 }
 
 events {

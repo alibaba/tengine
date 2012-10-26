@@ -382,7 +382,8 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
     ctx->data = VIP_CONTENT(shm_zone->shm.addr);
     ls = ctx->cycle->listening.elts;
     idx = VIP_INDEX_START(ctx->data);
-    cport = cmcf->ports->elts;
+
+    cport = cmcf->ports ? cmcf->ports->elts : NULL;
 
     for (i = k = 0, n = 0; i < ctx->cycle->listening.nelts; i++) {
         port = ls[i].servers;
@@ -593,8 +594,7 @@ ngx_http_ipstat_distinguish_same_vip(ngx_http_ipstat_vip_index_t *key,
 #endif
         }
 
-        for (j = 0; j < port->naddrs; j++) {
-
+        for (rc = (uintptr_t) NULL, j = 0; j < port->naddrs; j++) {
             if (key->ipv6) {
 #if (NGX_HAVE_INET6)
                 po = (char *) &oaddr6[j].addr6;
