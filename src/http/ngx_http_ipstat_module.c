@@ -672,7 +672,7 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
 
     ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
                   "ipstat: some process marks itself the \"worker process\" "
-                  "by mistake, and it causes this module fails to work right";
+                  "by mistake, and it causes this module fails to work right");
 
     return NGX_OK;
 
