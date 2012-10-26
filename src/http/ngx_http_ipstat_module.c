@@ -629,6 +629,10 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
     ngx_http_ipstat_zone_hdr_t   *hdr;
     ngx_http_ipstat_main_conf_t  *smcf;
 
+    if (ngx_process != NGX_PROCESS_WORKER) {
+        return NGX_OK;
+    }
+
     ppid = NULL;
     smcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_ipstat_module);
     ctx = (ngx_http_ipstat_zone_ctx_t *) smcf->vip_zone->data;
@@ -666,10 +670,9 @@ ngx_http_ipstat_init_process(ngx_cycle_t *cycle)
         ngx_shmtx_unlock(&hdr->mutex);
     }
 
-    /* never reach this point */
-
-    ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
-                  "ipstat: any worker fails to attach a block is impossible");
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
+                  "ipstat: some process marks itself the \"worker process\" "
+                  "by mistake, and it causes this module fails to work right";
 
     return NGX_OK;
 
@@ -716,6 +719,10 @@ ngx_http_ipstat_find_vip(ngx_uint_t key)
     
     smcf = ngx_http_cycle_get_module_main_conf(ngx_cycle,
                                                ngx_http_ipstat_module);
+
+    if (smcf->data == NULL) {
+        return NULL;
+    }
 
     idx = VIP_INDEX_START(smcf->data);
     idx_c = ngx_http_ipstat_lookup_vip_index(key, idx, idx + smcf->num);
@@ -764,6 +771,10 @@ ngx_http_ipstat_count(void *data, off_t offset, ngx_int_t incr)
                    "ipstat_incr: %p, %O, %i",
                    data, offset, incr);
 
+    if (data == NULL) {
+        return;
+    }
+
     *VIP_FIELD(vip, offset) += incr;
 }
 
@@ -777,6 +788,10 @@ ngx_http_ipstat_min(void *data, off_t offset, ngx_uint_t val)
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "ipstat_min: %p, %O, %ui",
                    data, offset, val);
+
+    if (data == NULL) {
+        return;
+    }
 
     f = VIP_FIELD(vip, offset);
     if (*f) {
@@ -800,6 +815,10 @@ ngx_http_ipstat_max(void *data, off_t offset, ngx_uint_t val)
                    "ipstat_max: %p, %O, %ui",
                    data, offset, val);
 
+    if (data == NULL) {
+        return;
+    }
+
     f = VIP_FIELD(vip, offset);
     if (*f < val) {
         *f = val;
@@ -817,6 +836,10 @@ ngx_http_ipstat_avg(void *data, off_t offset, ngx_uint_t val)
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "ipstat_avg: %p, %O, %ui",
                    data, offset, val);
+
+    if (data == NULL) {
+        return;
+    }
 
     avg = (ngx_http_ipstat_avg_t *) VIP_FIELD(vip, offset);
     n = VIP_FIELD(vip, NGX_HTTP_IPSTAT_REQ_TOTAL);
@@ -838,6 +861,10 @@ ngx_http_ipstat_rate(void *data, off_t offset, ngx_uint_t val)
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "ipstat_rate: %p, %O, %ui",
                     data, offset, val);
+
+    if (data == NULL) {
+        return;
+    }
 
     now = ngx_time();
 
