@@ -9,6 +9,10 @@
 #include <ngx_core.h>
 
 
+static ngx_int_t ngx_list_delete_elt(ngx_list_t *l, ngx_list_part_t *cur,
+    ngx_uint_t i);
+
+
 ngx_list_t *
 ngx_list_create(ngx_pool_t *pool, ngx_uint_t n, size_t size)
 {
@@ -68,4 +72,67 @@ ngx_list_push(ngx_list_t *l)
     last->nelts++;
 
     return elt;
+}
+
+
+ngx_int_t
+ngx_list_delete(ngx_list_t *list, void *elt)
+{
+    u_char                      *data;
+    ngx_uint_t                   i;
+    ngx_list_part_t             *part, *pre;
+
+    part = &list->part;
+    pre = part;
+    data = part->elts;
+
+    for (i = 0; /* void */; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            i = 0;
+            pre = part;
+            part = part->next;
+            data = part->elts;
+        }
+
+        if ((data + i * list->size)  == (u_char *) elt) {
+            if (&list->part != part && part->nelts == 1) {
+                pre->next = part->next;
+                if (part == list->last) {
+                    list->last = pre;
+                }
+
+                return NGX_OK;
+            }
+
+            return ngx_list_delete_elt(list, part, i);
+        }
+    }
+
+    return NGX_ERROR;
+}
+
+
+static ngx_int_t
+ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
+{
+    u_char *s, *d, *last;
+
+    s = (u_char *) cur->elts + i * list->size;
+    d = s + list->size;
+    last = (u_char *) cur->elts + cur->nelts * list->size;
+
+    while (d < last) {
+        *s = *d;
+        s++;
+        d++;
+    }
+
+    cur->nelts--;
+
+    return NGX_OK;
 }
