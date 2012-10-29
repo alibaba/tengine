@@ -237,6 +237,8 @@ END
 	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs' \
 		|| cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs'
+    test -d '\$(DESTDIR)$NGX_PREFIX/sbin' \
+        || mkdir -p '\$(DESTDIR)$NGX_PREFIX/sbin'
 	chmod 0755 $NGX_DSO_COMPILE
 	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_PREFIX/sbin'
 END
