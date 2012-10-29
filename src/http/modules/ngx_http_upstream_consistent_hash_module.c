@@ -281,6 +281,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 
     time_t                                   now;
     uint32_t                                 index, index_1, index_2;
+    uint32_t                                 diff_1, diff_2;
     ngx_queue_t                             *q, *temp;
     ngx_segment_node_t                       node, *p;
     ngx_http_upstream_rr_peer_t             *peer;
@@ -375,9 +376,22 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
                 server = &ucscf->servers[index_1];
 
             } else {
-                index_1 = ucscf->servers[index_1].hash - uchpd->hash
-                          > uchpd->hash - ucscf->servers[index_2].hash
-                          ? index_2 : index_1;
+                if (ucscf->servers[index_1].hash > uchpd->hash) {
+                    diff_1 = ucscf->servers[index_1].hash - uchpd->hash;
+
+                } else {
+                    diff_1 = uchpd->hash - ucscf->servers[index_1].hash;
+                }
+
+                if (uchpd->hash > ucscf->servers[index_2].hash) {
+                    diff_2 = uchpd->hash - ucscf->servers[index_2].hash;
+
+                } else {
+                    diff_2 = ucscf->servers[index_2].hash - uchpd->hash;
+                }
+
+                index_1 = diff_1 > diff_2 ? index_2 : index_1;
+
                 server = &ucscf->servers[index_1];
             }
 
