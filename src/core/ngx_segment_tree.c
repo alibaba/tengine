@@ -21,7 +21,7 @@ ngx_segment_tree_init(ngx_segment_tree_t *tree, ngx_uint_t num, ngx_pool_t *pool
         return NGX_ERROR;
     }
 
-    tree->extreme = NGX_MAX_INT32_VALUE;
+    tree->extreme = NGX_MAX_UINT32_VALUE;
     tree->pool = pool;
     tree->num = num;
 
