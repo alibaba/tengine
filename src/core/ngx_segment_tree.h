@@ -33,7 +33,7 @@ struct ngx_segment_node_s {
 
 
 struct ngx_segment_tree_s {
-    ngx_int_t             extreme;
+    uint32_t              extreme;
     ngx_pool_t           *pool;
     ngx_uint_t            num;
     ngx_segment_node_t   *segments;
