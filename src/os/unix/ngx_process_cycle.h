@@ -12,6 +12,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+#define NGX_MAX_CHANNEL_DATA_LEN   1024
 
 #define NGX_CMD_OPEN_CHANNEL   1
 #define NGX_CMD_CLOSE_CHANNEL  2
