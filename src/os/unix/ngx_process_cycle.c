@@ -12,7 +12,6 @@
 
 
 #define NGX_CYCLE_STILL_NEEDED     2
-#define NGX_MAX_CHANNEL_DATA_LEN   1024
 
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
