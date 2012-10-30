@@ -8,7 +8,6 @@
 #include <ngx_http.h>
 #include <ngx_config.h>
 #include <ngx_md5.h>
-#include "ngx_segment_tree.h"
 
 
 typedef struct {
