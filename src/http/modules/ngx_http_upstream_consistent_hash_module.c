@@ -324,11 +324,14 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
     pc->cached = 0;
     pc->connection = NULL;
 
-    if (uchpd->hash < ucscf->step) {
-        uchpd->hash = ucscf->step;
+    index = uchpd->hash / ucscf->step;
+    if (index < 1) {
+        index = 1;
+
+    } else if (index > ucscf->number) {
+        index = ucscf->number;
     }
 
-    index = uchpd->hash / ucscf->step;
     server = &ucscf->servers[index];
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
