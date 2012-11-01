@@ -75,6 +75,8 @@ typedef struct {
         ((ngx_proc_conf_ctx_t *) (ngx_get_conf(conf_ctx,   \
               ngx_procs_module)))->proc_conf[module.ctx_index] : NULL)
 
+#define ngx_proc_type(module) ((ngx_uint_t) &((module).name))
+
 
 ngx_int_t ngx_procs_start(ngx_cycle_t *cycle, ngx_int_t type);
 
