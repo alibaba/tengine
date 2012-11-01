@@ -263,7 +263,8 @@ static ngx_command_t  ngx_http_log_commands[] = {
       NULL },
 
     { ngx_string("log_env"),
-      NGX_HTTP_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_BLOCK
+                        |NGX_CONF_TAKE1,
       ngx_http_log_env_block,
       0,
       0,
