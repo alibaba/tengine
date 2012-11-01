@@ -608,10 +608,10 @@ ngx_http_upstream_chash_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     value = cf->args->elts;
-    if (ngx_strncmp(value[1].data,"normal", 6) == 0) {
+    if (ngx_strncmp(value[1].data,"quick", 5) == 0) {
         ucscf->steady = 0;
 
-    } else if (ngx_strncmp(value[1].data, "steady", 6) == 0) {
+    } else if (ngx_strncmp(value[1].data, "native", 6) == 0) {
         ucscf->steady = 1;
 
     }
