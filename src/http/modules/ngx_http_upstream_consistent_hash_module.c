@@ -26,7 +26,7 @@ typedef struct {
     uint32_t                                step;
     ngx_int_t                               copies;
     ngx_uint_t                              number;
-    ngx_flag_t                              steady;
+    ngx_flag_t                              native;
     ngx_queue_t                             down_servers;
     ngx_array_t                            *values;
     ngx_array_t                            *lengths;
@@ -134,7 +134,7 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
     }
 
     ucscf->copies = 160;
-    ucscf->steady = 0;
+    ucscf->native = 0;
 
     return ucscf;
 }
@@ -337,7 +337,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
     pc->cached = 0;
     pc->connection = NULL;
 
-    if (ucscf->steady) {
+    if (ucscf->native) {
         index = ngx_http_upstream_chash_get_server_index(ucscf->servers,
                                                          ucscf->number,
                                                          uchpd->hash);
@@ -609,10 +609,10 @@ ngx_http_upstream_chash_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
     if (ngx_strncmp(value[1].data,"quick", 5) == 0) {
-        ucscf->steady = 0;
+        ucscf->native = 0;
 
     } else if (ngx_strncmp(value[1].data, "native", 6) == 0) {
-        ucscf->steady = 1;
+        ucscf->native = 1;
 
     }
 
