@@ -138,7 +138,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
         rc = ngx_http_top_input_body_filter(r, &buf);
         if (rc != NGX_OK) {
-            return rc;
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
         rb->bufs = ngx_alloc_chain_link(r->pool);
@@ -332,7 +332,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
             rc = ngx_http_top_input_body_filter(r, &buf);
             if (rc != NGX_OK) {
-                return rc;
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
             rb->buf->last += n;
