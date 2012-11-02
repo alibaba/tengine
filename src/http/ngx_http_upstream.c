@@ -1556,10 +1556,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 return;
             }
 
-            if (rc == NGX_OK && rest == rb->rest) {
-                break;
-            }
-
             if (rc == NGX_AGAIN && rb->busy == NULL && rest == rb->rest) {
 
                 r->read_event_handler =

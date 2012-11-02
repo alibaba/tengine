@@ -3786,7 +3786,8 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->buffer_number = 1;
         conf->client_body_postpone_sending = conf->client_body_buffer_size;
     } else {
-        conf->buffer_number = conf->client_body_postpone_sending
+        conf->buffer_number = (conf->client_body_postpone_sending +
+                                   conf->client_body_buffer_size - 1)
                                / conf->client_body_buffer_size;
     }
 

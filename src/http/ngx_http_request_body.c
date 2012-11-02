@@ -710,8 +710,6 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
             if (rb->buffered &&
                 r->request_length >= (off_t) clcf->client_body_postpone_sending) {
 
-                ngx_http_request_body_chomp_buf(rb);
-
                 rb->buffered = 0;
 
                 return NGX_OK;
@@ -768,7 +766,7 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
 
     } else {
 
-        if (!rb->buffered && (rb->num > clcf->buffer_number)) {
+        if (rb->num > clcf->buffer_number) {
             return NGX_AGAIN;
         }
 
