@@ -14,16 +14,25 @@ __DATA__
 === TEST 1: the http_check interface, default type
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -44,17 +53,27 @@ Content-Type: text/html
 === TEST 2: the http_check interface, html
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
 }
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
+}
+
 
 --- config
     location / {
@@ -74,17 +93,27 @@ Content-Type: text/html
 === TEST 3: the http_check interface, csv 
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
 }
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
+}
+
 
 --- config
     location / {
@@ -104,16 +133,25 @@ Content-Type: text/plain
 === TEST 4: the http_check interface, json 
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -134,16 +172,25 @@ Content-Type: application/json
 === TEST 5: the http_check interface, default html, request csv
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -164,16 +211,25 @@ Content-Type: text/plain
 === TEST 6: the http_check interface, default csv, request json
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -194,16 +250,25 @@ Content-Type: application/json
 === TEST 7: the http_check interface, default json, request html 
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -224,16 +289,25 @@ Content-Type: text/html
 === TEST 8: the http_check interface, default json, request htm, bad format
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -254,16 +328,25 @@ Content-Type: application/json
 === TEST 9: the http_check interface, default html, request csv and up
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -284,16 +367,25 @@ Content-Type: text/plain
 === TEST 10: the http_check interface, default csv, request json and down
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -314,16 +406,25 @@ Content-Type: application/json
 === TEST 11: the http_check interface, default json, request html and up
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=2000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
@@ -344,16 +445,25 @@ Content-Type: text/html
 === TEST 12: the http_check interface, default json, request html, bad status
 --- http_config
 upstream backend {
-    server 106.187.48.116:81;
-    server 106.187.48.116:82;
-    server 106.187.48.116:83;
-    server 106.187.48.116;
-    server 106.187.48.116:84;
-    server 106.187.48.116:85;
+    server 127.0.0.1:81;
+    server 127.0.0.1:82;
+    server 127.0.0.1:83;
+    server 127.0.0.1:1970;
+    server 127.0.0.1:84;
+    server 127.0.0.1:85;
 
     check interval=3000 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
+}
+
+server {
+    listen 1970;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+    }
 }
 
 --- config
