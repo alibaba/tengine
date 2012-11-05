@@ -83,6 +83,16 @@ case ".$NGX_DSO_PATH" in
 esac
 
 
+case ".$NGX_DSO_TOOL_PATH" in
+    ./*)
+    ;;
+
+    *)
+        NGX_DSO_TOOL_PATH=$NGX_PREFIX/$NGX_DSO_TOOL_PATH
+    ;;
+esac
+
+
 if test -f man/nginx.8 ; then
     NGX_MAN=man/nginx.8
 else
@@ -113,6 +123,12 @@ if test -n "$NGX_SHARED_MODULES"; then
     cat << END                                                >> $NGX_MAKEFILE
 
 dso_install:	all
+END
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
+		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
 
     for ngx_dso_module in $NGX_DSO_ALL_TARGETS
@@ -219,6 +235,7 @@ fi
 if [ $NGX_DSO = YES ] ; then
 
     cat << END                                                >> $NGX_MAKEFILE
+
 	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
 		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
@@ -240,7 +257,9 @@ END
 	test -d '\$(DESTDIR)$NGX_PREFIX/sbin' \
 		|| mkdir -p '\$(DESTDIR)$NGX_PREFIX/sbin'
 	chmod 0755 $NGX_DSO_COMPILE
-	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_PREFIX/sbin'
+	test -d '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`' || \
+		mkdir -p '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`'
+	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
 END
 
 fi
