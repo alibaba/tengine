@@ -18,6 +18,20 @@
 #define NGX_HTTP_LOG_CONF           0x80000001
 
 
+#define ngx_http_log_basic_codition(script_code)                \
+    if (ngx_http_log_condition_value(cf, lc, &value[last])      \
+        != NGX_CONF_OK)                                         \
+    {                                                           \
+        return NGX_CONF_ERROR;                                  \
+    }                                                           \
+    code = ngx_http_script_start_code(cf->pool, &lc->codes,     \
+                                      sizeof(uintptr_t));       \
+    if (code == NULL) {                                         \
+        return NGX_CONF_ERROR;                                  \
+    }                                                           \
+    *code = script_code;
+
+
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
 
 typedef u_char *(*ngx_http_log_op_run_pt) (ngx_http_request_t *r, u_char *buf,
@@ -186,6 +200,11 @@ static char *ngx_http_log_sample_rate(ngx_conf_t *cf, ngx_str_t *value,
     ngx_http_log_sample_t **sample);
 static ngx_http_variable_t *ngx_http_log_copy_var(ngx_conf_t *cf,
     ngx_http_variable_t *var, ngx_uint_t seq);
+
+static void ngx_http_script_more_than_code(ngx_http_script_engine_t *e);
+static void ngx_http_script_less_than_code(ngx_http_script_engine_t *e);
+static void ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e);
+static void ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e);
 
 static ngx_int_t ngx_http_log_variable_value(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -2071,39 +2090,32 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc)
         p = value[cur].data;
 
         if (len == 1 && p[0] == '=') {
-
-            if (ngx_http_log_condition_value(cf, lc, &value[last])
-                != NGX_CONF_OK)
-            {
-                return NGX_CONF_ERROR;
-            }
-
-            code = ngx_http_script_start_code(cf->pool, &lc->codes,
-                                              sizeof(uintptr_t));
-            if (code == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *code = ngx_http_script_equal_code;
-
+            ngx_http_log_basic_codition(ngx_http_script_equal_code);
             return NGX_CONF_OK;
         }
 
         if (len == 2 && p[0] == '!' && p[1] == '=') {
+            ngx_http_log_basic_codition(ngx_http_script_not_equal_code);
+            return NGX_CONF_OK;
+        }
 
-            if (ngx_http_log_condition_value(cf, lc, &value[last])
-                != NGX_CONF_OK)
-            {
-                return NGX_CONF_ERROR;
-            }
+        if (len == 1 && p[0] == '>') {
+            ngx_http_log_basic_codition(ngx_http_script_more_than_code);
+            return NGX_CONF_OK;
+        }
 
-            code = ngx_http_script_start_code(cf->pool, &lc->codes,
-                                              sizeof(uintptr_t));
-            if (code == NULL) {
-                return NGX_CONF_ERROR;
-            }
+        if (len == 1 && p[0] == '<') {
+            ngx_http_log_basic_codition(ngx_http_script_less_than_code);
+            return NGX_CONF_OK;
+        }
 
-            *code = ngx_http_script_not_equal_code;
+        if (len == 2 && p[0] == '>' && p[1] == '=') {
+            ngx_http_log_basic_codition(ngx_http_script_no_less_than_code);
+            return NGX_CONF_OK;
+        }
+
+        if (len == 2 && p[0] == '<' && p[1] == '=') {
+            ngx_http_log_basic_codition(ngx_http_script_no_more_than_code);
             return NGX_CONF_OK;
         }
 
@@ -2464,4 +2476,144 @@ ngx_http_log_do_sample(ngx_http_log_sample_t *sample)
     }
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_script_more_than_code(ngx_http_script_engine_t *e)
+{
+    ngx_int_t                   i1, i2;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script more than");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    i1 = ngx_atoi(res->data, res->len);
+    i2 = ngx_atoi(val->data, res->len);
+
+    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
+        if (i1 > i2) {
+            *res = ngx_http_variable_true_value;
+            return;
+        }
+    } else {
+        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
+                      "http script more than: value must be integer");
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script more than: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+static void
+ngx_http_script_less_than_code(ngx_http_script_engine_t *e)
+{
+    ngx_int_t                   i1, i2;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less than");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    i1 = ngx_atoi(res->data, res->len);
+    i2 = ngx_atoi(val->data, res->len);
+
+    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
+        if (i1 < i2) {
+            *res = ngx_http_variable_true_value;
+            return;
+        }
+    } else {
+        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
+                      "http script less than: value must be integer");
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less than: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+static void
+ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e)
+{
+    ngx_int_t                   i1, i2;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no more than");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    i1 = ngx_atoi(res->data, res->len);
+    i2 = ngx_atoi(val->data, res->len);
+
+    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
+        if (i1 <= i2) {
+            *res = ngx_http_variable_true_value;
+            return;
+        }
+    } else {
+        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
+                      "http script no more than: value must be integer");
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no more than: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+static void
+ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e)
+{
+    ngx_int_t                   i1, i2;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no less than");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    i1 = ngx_atoi(res->data, res->len);
+    i2 = ngx_atoi(val->data, res->len);
+
+    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
+        if (i1 >= i2) {
+            *res = ngx_http_variable_true_value;
+            return;
+        }
+    } else {
+        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
+                      "http script no less than: value must be integer");
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no less than: no");
+
+    *res = ngx_http_variable_null_value;
 }
