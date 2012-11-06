@@ -19,7 +19,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http/)->plan(23);
+my $t = Test::Nginx->new()->has(qw/http slice/)->plan(23);
 
 $t->set_dso("ngx_http_slice_module", "ngx_http_slice_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");

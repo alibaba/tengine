@@ -19,7 +19,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http/)->plan(169);
+my $t = Test::Nginx->new()->has(qw/http concat/)->plan(169);
 
 $t->set_dso("ngx_http_concat_module", "ngx_http_concat_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
