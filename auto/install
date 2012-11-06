@@ -118,6 +118,24 @@ $NGX_OBJS/nginx.8:	$NGX_MAN $NGX_AUTO_CONFIG_H
 
 END
 
+case ".$NGX_OBJS" in
+    ./*)
+        NGX_TEST_BINARY=$NGX_OBJS/nginx
+    ;;
+
+    *)
+        NGX_TEST_BINARY=`pwd`/$NGX_OBJS/nginx
+    ;;
+esac
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+test:	$NGX_OBJS/nginx
+	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove tests/nginx-tests/nginx-tests
+	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove tests/nginx-tests/cases
+
+END
+
 if test -n "$NGX_SHARED_MODULES"; then
 
     cat << END                                                >> $NGX_MAKEFILE
@@ -270,6 +288,9 @@ cat << END >> Makefile
 build:
 	\$(MAKE) -f $NGX_MAKEFILE
 	\$(MAKE) -f $NGX_MAKEFILE manpage
+
+test:
+	\$(MAKE) -f $NGX_MAKEFILE test
 
 install:
 	\$(MAKE) -f $NGX_MAKEFILE install
