@@ -106,6 +106,8 @@ static ngx_int_t ngx_http_variable_dollar(ngx_http_request_t *r,
 static ngx_int_t ngx_http_variable_host_comment(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
+static ngx_int_t ngx_http_variable_unix_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_year(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_year2(ngx_http_request_t *r,
@@ -298,6 +300,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
 
     { ngx_string("host_comment"), NULL, ngx_http_variable_host_comment,
       0, 0, 0 },
+
+    { ngx_string("unix_time"), NULL, ngx_http_variable_unix_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_string("year"), NULL, ngx_http_variable_year,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
@@ -1940,6 +1945,27 @@ ngx_http_variable_host_comment(ngx_http_request_t *r,
     p += ngx_cached_http_time.len;
 
     ngx_memcpy(p, " -->" CRLF, sizeof(" -->" CRLF) - 1);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_unix_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char *p;
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%T", ngx_time()) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
 
     return NGX_OK;
 }
