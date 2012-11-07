@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(19);
+my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(21);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -123,6 +123,16 @@ http {
 
         location /directory {
         }
+
+        location /capture {
+            rewrite ^(.*) $1?c=d;
+            return 200 "uri:$uri args:$args";
+        }
+
+        location /capturedup {
+            rewrite ^(.*) $1?c=$1;
+            return 200 "uri:$uri args:$args";
+        }
     }
 }
 
@@ -208,5 +218,21 @@ like(http_get('/error405rewrite'),
 like(http_get('/error405directory'),
 	qr!HTTP/1.1 301.*Location: http://!ms,
 	'error 405 directory redirect');
+
+# escaping of uri if there are args added in rewrite, and length
+# is actually calculated (ticket #162)
+
+like(http_get('/capture/%25?a=b'),
+	qr!^uri:/capture/% args:c=d&a=b$!ms,
+	'escape with added args');
+
+TODO: {
+local $TODO = 'patch pending';
+
+like(http_get('/capturedup/%25?a=b'),
+	qr!^uri:/capturedup/% args:c=/capturedup/%25&a=b$!ms,
+	'escape with added args');
+
+}
 
 ###############################################################################
