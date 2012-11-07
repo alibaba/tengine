@@ -2208,26 +2208,30 @@ static ngx_int_t
 ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
     ngx_int_t cur, ngx_int_t *count)
 {
+    off_t                        *poff;
     ngx_str_t                    *value;
     ngx_int_t                     rb, ret;
     ngx_uint_t                   *p, op, i;
-    ngx_array_t                   stack;
+    ngx_array_t                   nstack, fstack;
     ngx_http_script_code_pt      *code;
+    ngx_http_script_if_code_t    *fastcode;
 
     struct {
         ngx_http_script_code_pt   code;
+        ngx_http_script_code_pt   fastcode;
         ngx_uint_t                prior;
     } op_arr[3] = {
-        { NULL, 0 },
-        { ngx_http_script_and_code, 5 },
-        { ngx_http_script_or_code, 4 }
+        { NULL, NULL, 0 },
+        { ngx_http_script_and_code, ngx_http_script_test_code, 5 },
+        { ngx_http_script_or_code, ngx_http_script_test_not_code, 4 }
     };
 
     value = cf->args->elts;
     rb = -1;
     ret = -1;
     i = 0;
-    ngx_array_init(&stack, cf->pool, 10, sizeof(ngx_uint_t));
+    ngx_array_init(&nstack, cf->pool, 10, sizeof(ngx_uint_t));
+    ngx_array_init(&fstack, cf->pool, 10, sizeof(off_t));
 
     while (cur < (ngx_int_t) cf->args->nelts && (rb == -1 || cur <= rb)) {
 
@@ -2304,7 +2308,7 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
             && value[cur].data[1] == '|')
         {
             op = NGX_HTTP_SCRIPT_ROP_OR;
-
+            
         } else if (value[cur].len == 2 && value[cur].data[0] == '&'
                    && value[cur].data[1] == '&')
         {
@@ -2317,18 +2321,52 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
             }
         }
 
+        /*
+         * a && b && c ==> a if b if c if && && NULL
+         *                    Y    Y    Y         A
+         *                    |    |    |         |
+         *                    \-------------------/
+         *
+         * a && b || c ==> a if b && ifn c || NULL
+         *                    Y       Y  A      A
+         *                    |       |  |      |
+         *                    \-------+--/      |
+         *                            \---------/
+         *
+         * a || b && c ==> a ifn b if c && || NULL
+         *                    Y     Y           A
+         *                    |     |           |
+         *                    \-----------------/
+         *
+         * a || b || c ==> a ifn b ifn c ifn || || NULL
+         *                    Y     Y     Y         A
+         *                    |     |     |         |
+         *                    \---------------------/
+         *
+         * Conclusion:
+         *     Whenever a logical operator is buffered in stack, add a
+         * 'if' or 'if_not' operator next to the operand in the op list,
+         * otherwise, add a 'if' or 'if_not' operator next to the logical
+         * operator in the op list. Update the 'next' field of all the
+         * 'if' or 'if_not' operators to point to the current position
+         * in the op list, after a logical operator is put into the op
+         * list or at the end of the whole process.
+         */
+
         if (op) {
-            if (stack.nelts == 0) {
-                p = (ngx_uint_t *) ngx_array_push(&stack);
+
+            if (nstack.nelts == 0) {
+                p = (ngx_uint_t *) ngx_array_push(&nstack);
                 if (p == NULL) {
                     return NGX_ERROR;
                 }
 
             } else {
-                p = ((ngx_uint_t *) stack.elts) + stack.nelts - 1;
+                p = ((ngx_uint_t *) nstack.elts) + nstack.nelts - 1;
 
-                if (op_arr[*p].prior >= op_arr[op].prior) {
-                    code = ngx_http_script_start_code(cf->pool, &lc->codes,
+                if (op_arr[*p].prior > op_arr[op].prior) {
+                    code = ngx_http_script_start_code(cf->pool,
+                                                      &lc->codes,
                                                       sizeof(uintptr_t));
                     if (code == NULL) {
                         return NGX_ERROR;
@@ -2336,8 +2374,19 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
 
                     *code = op_arr[*p].code;
 
+                    while (fstack.nelts) {
+                        poff = (off_t *) fstack.elts + fstack.nelts - 1;
+                        fastcode = (ngx_http_script_if_code_t *)
+                                      (*poff + (u_char *) lc->codes->elts);
+                        fastcode->next = (u_char *) code + sizeof(uintptr_t)
+                                       + sizeof(ngx_http_script_if_code_t)
+                                       - (u_char *) lc->codes->elts
+                                       - *poff;
+                        fstack.nelts--;
+                    }
+
                 } else {
-                    p = (ngx_uint_t *) ngx_array_push(&stack);
+                    p = (ngx_uint_t *) ngx_array_push(&nstack);
                     if (p == NULL) {
                         return NGX_ERROR;
                     }
@@ -2345,13 +2394,28 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
                 }
             }
 
+            fastcode = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                            sizeof(ngx_http_script_if_code_t));
+            if (fastcode == NULL) {
+                return NGX_ERROR;
+            }
+
+            fastcode->code = op_arr[op].fastcode;
+            fastcode->loc_conf = NULL;
+
+            poff = (off_t *) ngx_array_push(&fstack);
+            if (poff == NULL) {
+                return NGX_ERROR;
+            }
+
             *p = op;
+            *poff = (u_char *) fastcode - (u_char *) lc->codes->elts;
             cur++;
         }
     }
 
-    while (stack.nelts) {
-        p = ((ngx_uint_t *) stack.elts) + stack.nelts - 1;
+    while (nstack.nelts) {
+        p = ((ngx_uint_t *) nstack.elts) + nstack.nelts - 1;
         code = ngx_http_script_start_code(cf->pool, &lc->codes,
                                           sizeof(uintptr_t));
         if (code == NULL) {
@@ -2359,7 +2423,17 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
         }
 
         *code = op_arr[*p].code;
-        stack.nelts--;
+        nstack.nelts--;
+    }
+
+    while (fstack.nelts) {
+        poff = (off_t *) fstack.elts + fstack.nelts - 1;
+        fastcode = (ngx_http_script_if_code_t *)
+                             (*poff + (u_char *) lc->codes->elts);
+        fastcode->next = (u_char *) code + sizeof(uintptr_t)
+                       - (u_char *) lc->codes->elts
+                       - *poff;
+        fstack.nelts--;
     }
 
     if (i > 1) {

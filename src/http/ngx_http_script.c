@@ -1397,7 +1397,7 @@ ngx_http_script_if_code(ngx_http_script_engine_t *e)
 
     e->sp--;
 
-    if (e->sp->len && (e->sp->len !=1 || e->sp->data[0] != '0')) {
+    if (e->sp->len && (e->sp->len != 1 || e->sp->data[0] != '0')) {
         if (code->loc_conf) {
             e->request->loc_conf = code->loc_conf;
             ngx_http_update_location_config(e->request);
@@ -1988,4 +1988,74 @@ void ngx_http_script_or_code(ngx_http_script_engine_t *e)
                    "http script or: no");
 
     *res = ngx_http_variable_null_value;
+}
+
+
+void
+ngx_http_script_test_code(ngx_http_script_engine_t *e)
+{
+    ngx_http_script_if_code_t  *code;
+
+    code = (ngx_http_script_if_code_t *) e->ip;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test");
+
+    e->sp--;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test: s=%*s",
+                   (size_t) e->sp->len, e->sp->data);
+
+    if (e->sp->len && (e->sp->len != 1 || e->sp->data[0] != '0')) {
+        if (code->loc_conf) {
+            e->request->loc_conf = code->loc_conf;
+            ngx_http_update_location_config(e->request);
+        }
+
+        e->sp++;
+        e->ip += sizeof(ngx_http_script_if_code_t);
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test: false");
+
+    e->sp++;
+    e->ip += code->next;
+}
+
+
+void
+ngx_http_script_test_not_code(ngx_http_script_engine_t *e)
+{
+    ngx_http_script_if_code_t  *code;
+
+    code = (ngx_http_script_if_code_t *) e->ip;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test not");
+
+    e->sp--;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test not: s=%*s",
+                   (size_t) e->sp->len, e->sp->data);
+
+    if (e->sp->len == 0 || (e->sp->len == 1 && e->sp->data[0] == '0')) {
+        if (code->loc_conf) {
+            e->request->loc_conf = code->loc_conf;
+            ngx_http_update_location_config(e->request);
+        }
+
+        e->sp++;
+        e->ip += sizeof(ngx_http_script_if_code_t);
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test not: false");
+
+    e->sp++;
+    e->ip += code->next;
 }
