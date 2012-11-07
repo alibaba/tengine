@@ -131,8 +131,7 @@ esac
 cat << END                                                    >> $NGX_MAKEFILE
 
 test:	$NGX_OBJS/nginx
-	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove -I `pwd`/tests/nginx-tests/nginx-tests/lib tests/nginx-tests/nginx-tests
-	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove -I `pwd`/tests/nginx-tests/nginx-tests/lib tests/nginx-tests/cases
+	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove -v -I `pwd`/tests/nginx-tests/nginx-tests/lib tests/nginx-tests/nginx-tests tests/nginx-tests/cases
 
 END
 
