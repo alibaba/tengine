@@ -17,19 +17,8 @@
 
 #define NGX_HTTP_LOG_CONF           0x80000001
 
-
-#define ngx_http_log_basic_codition(script_code)                \
-    if (ngx_http_log_condition_value(cf, lc, &value[last])      \
-        != NGX_CONF_OK)                                         \
-    {                                                           \
-        return NGX_CONF_ERROR;                                  \
-    }                                                           \
-    code = ngx_http_script_start_code(cf->pool, &lc->codes,     \
-                                      sizeof(uintptr_t));       \
-    if (code == NULL) {                                         \
-        return NGX_CONF_ERROR;                                  \
-    }                                                           \
-    *code = script_code;
+#define NGX_HTTP_SCRIPT_ROP_AND     1
+#define NGX_HTTP_SCRIPT_ROP_OR      2
 
 
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
@@ -194,19 +183,16 @@ static char *ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_log_block_sample(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-static char *ngx_http_log_condition_value(ngx_conf_t *cf,
+static ngx_int_t ngx_http_log_condition_value(ngx_conf_t *cf,
     ngx_http_log_condition_t *lc, ngx_str_t *value);
-static char *ngx_http_log_condition(ngx_conf_t *cf,
-    ngx_http_log_condition_t *lc);
+static ngx_int_t ngx_http_log_condition_element(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_int_t cur);
+static ngx_int_t ngx_http_log_condition(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_int_t cur, ngx_int_t *count);
 static char *ngx_http_log_sample_rate(ngx_conf_t *cf, ngx_str_t *value,
     ngx_http_log_sample_t **sample);
 static ngx_http_variable_t *ngx_http_log_copy_var(ngx_conf_t *cf,
     ngx_http_variable_t *var, ngx_uint_t seq);
-
-static void ngx_http_script_more_than_code(ngx_http_script_engine_t *e);
-static void ngx_http_script_less_than_code(ngx_http_script_engine_t *e);
-static void ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e);
-static void ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e);
 
 static ngx_int_t ngx_http_log_variable_value(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -1922,6 +1908,8 @@ static char *
 ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     uintptr_t                     *code;
+    ngx_int_t                      rc;
+    ngx_int_t                      count;
     ngx_str_t                     *value;
     ngx_http_log_condition_t      *lc;
 
@@ -1947,7 +1935,15 @@ ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         lc->is_and = 1;
     }
 
-    if (ngx_http_log_condition(cf, lc) != NGX_CONF_OK) {
+    count = 0;
+    rc = ngx_http_log_condition(cf, lc, 1, &count);
+    if (rc == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (count > 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "the parentheses are not enclosed");
         return NGX_CONF_ERROR;
     }
 
@@ -1974,7 +1970,7 @@ ngx_http_log_block_sample(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-static char *
+static ngx_int_t
 ngx_http_log_condition_value(ngx_conf_t *cf,
     ngx_http_log_condition_t *lc, ngx_str_t *value)
 {
@@ -1989,7 +1985,7 @@ ngx_http_log_condition_value(ngx_conf_t *cf,
         val = ngx_http_script_start_code(cf->pool, &lc->codes,
                                          sizeof(ngx_http_script_value_code_t));
         if (val == NULL) {
-            return NGX_CONF_ERROR;
+            return NGX_ERROR;
         }
 
         n = ngx_atoi(value->data, value->len);
@@ -2003,13 +1999,13 @@ ngx_http_log_condition_value(ngx_conf_t *cf,
         val->text_len = (uintptr_t) value->len;
         val->text_data = (uintptr_t) value->data;
 
-        return NGX_CONF_OK;
+        return NGX_OK;
     }
 
     complex = ngx_http_script_start_code(cf->pool, &lc->codes,
                                  sizeof(ngx_http_script_complex_value_code_t));
     if (complex == NULL) {
-        return NGX_CONF_ERROR;
+        return NGX_ERROR;
     }
 
     complex->code = ngx_http_script_complex_value_code;
@@ -2025,115 +2021,62 @@ ngx_http_log_condition_value(ngx_conf_t *cf,
     sc.complete_lengths = 1;
 
     if (ngx_http_script_compile(&sc) != NGX_OK) {
-        return NGX_CONF_ERROR;
+        return NGX_ERROR;
     }
 
-    return NGX_CONF_OK;
+    return NGX_OK;
 }
 
 
-static char *
-ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc)
+static ngx_int_t
+ngx_http_log_condition_element(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
+    ngx_int_t cur)
 {
     u_char                        *p;
     size_t                         len;
     ngx_str_t                     *value;
-    ngx_uint_t                     cur, last;
     ngx_regex_compile_t            rc;
-    ngx_http_script_code_pt       *code;
+    ngx_http_script_code_pt       *pcode, code;
     ngx_http_script_file_code_t   *fop;
     ngx_http_script_regex_code_t  *regex;
     u_char                         errstr[NGX_MAX_CONF_ERRSTR];
 
     value = cf->args->elts;
-    last = cf->args->nelts - 1;
-
-    if (value[1].len < 1 || value[1].data[0] != '(') {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid condition \"%V\"", &value[1]);
-        return NGX_CONF_ERROR;
-    }
-
-    if (value[1].len == 1) {
-        cur = 2;
-
-    } else {
-        cur = 1;
-        value[1].len--;
-        value[1].data++;
-    }
-
-    if (value[last].len < 1 || value[last].data[value[last].len - 1] != ')') {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid condition \"%V\"", &value[last]);
-        return NGX_CONF_ERROR;
-    }
-
-    if (value[last].len == 1) {
-        last--;
-
-    } else {
-        value[last].len--;
-        value[last].data[value[last].len] = '\0';
-    }
 
     len = value[cur].len;
     p = value[cur].data;
 
     if (len > 1 && p[0] == '$') {
 
-        if (cur != last && cur + 2 != last) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid condition \"%V\"", &value[cur]);
-            return NGX_CONF_ERROR;
-        }
-
-        if (ngx_http_log_condition_value(cf, lc, &value[cur])
-            != NGX_CONF_OK)
-        {
-            return NGX_CONF_ERROR;
-        }
-
-        if (cur == last) {
-            return NGX_CONF_OK;
+        if (ngx_http_log_condition_value(cf, lc, &value[cur]) != NGX_OK) {
+            return NGX_ERROR;
         }
 
         cur++;
+        code = NULL;
 
         len = value[cur].len;
         p = value[cur].data;
 
         if (len == 1 && p[0] == '=') {
-            ngx_http_log_basic_codition(ngx_http_script_equal_code);
-            return NGX_CONF_OK;
-        }
+            code = ngx_http_script_equal_code;
 
-        if (len == 2 && p[0] == '!' && p[1] == '=') {
-            ngx_http_log_basic_codition(ngx_http_script_not_equal_code);
-            return NGX_CONF_OK;
-        }
+        } else if (len == 2 && p[0] == '!' && p[1] == '=') {
+            code = ngx_http_script_not_equal_code;
 
-        if (len == 1 && p[0] == '>') {
-            ngx_http_log_basic_codition(ngx_http_script_more_than_code);
-            return NGX_CONF_OK;
-        }
+        } else if (len == 1 && p[0] == '>') {
+            code = ngx_http_script_more_than_code;
 
-        if (len == 1 && p[0] == '<') {
-            ngx_http_log_basic_codition(ngx_http_script_less_than_code);
-            return NGX_CONF_OK;
-        }
+        } else if (len == 1 && p[0] == '<') {
+            code = ngx_http_script_less_than_code;
 
-        if (len == 2 && p[0] == '>' && p[1] == '=') {
-            ngx_http_log_basic_codition(ngx_http_script_no_less_than_code);
-            return NGX_CONF_OK;
-        }
+        } else if (len == 2 && p[0] == '>' && p[1] == '=') {
+            code = ngx_http_script_no_less_than_code;
 
-        if (len == 2 && p[0] == '<' && p[1] == '=') {
-            ngx_http_log_basic_codition(ngx_http_script_no_more_than_code);
-            return NGX_CONF_OK;
-        }
+        } else if (len == 2 && p[0] == '<' && p[1] == '=') {
+            code = ngx_http_script_no_more_than_code;
 
-        if ((len == 1 && p[0] == '~')
+        } else if ((len == 1 && p[0] == '~')
             || (len == 2 && p[0] == '~' && p[1] == '*')
             || (len == 2 && p[0] == '!' && p[1] == '~')
             || (len == 3 && p[0] == '!' && p[1] == '~' && p[2] == '*'))
@@ -2141,21 +2084,22 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc)
             regex = ngx_http_script_start_code(cf->pool, &lc->codes,
                                          sizeof(ngx_http_script_regex_code_t));
             if (regex == NULL) {
-                return NGX_CONF_ERROR;
+                return NGX_ERROR;
             }
 
             ngx_memzero(regex, sizeof(ngx_http_script_regex_code_t));
 
             ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
-            rc.pattern = value[last];
+            cur++;
+            rc.pattern = value[cur];
             rc.options = (p[len - 1] == '*') ? NGX_REGEX_CASELESS : 0;
             rc.err.len = NGX_MAX_CONF_ERRSTR;
             rc.err.data = errstr;
 
             regex->regex = ngx_http_regex_compile(cf, &rc);
             if (regex->regex == NULL) {
-                return NGX_CONF_ERROR;
+                return NGX_ERROR;
             }
 
             regex->code = ngx_http_script_regex_start_code;
@@ -2164,92 +2108,267 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc)
             if (p[0] == '!') {
                 regex->negative_test = 1;
             }
-            regex->name = value[last];
+            regex->name = value[cur];
 
-            return NGX_CONF_OK;
+            return cur + 1;
         }
 
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "unexpected \"%V\" in condition", &value[cur]);
-        return NGX_CONF_ERROR;
+        if (code) {
+            cur++;
+
+            if (ngx_http_log_condition_value(cf, lc, &value[cur])
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+
+            pcode = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                               sizeof(uintptr_t));
+            if (pcode == NULL) {
+                return NGX_ERROR;
+            }
+
+            *pcode = code;
+
+            return cur + 1;
+        }
+
+        return cur;
 
     } else if ((len == 2 && p[0] == '-')
                || (len == 3 && p[0] == '!' && p[1] == '-'))
     {
-        if (cur + 1 != last) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid condition \"%V\"", &value[cur]);
-            return NGX_CONF_ERROR;
-        }
+        cur++;
 
-        value[last].data[value[last].len] = '\0';
-        value[last].len++;
-
-        if (ngx_http_log_condition_value(cf, lc, &value[last])
-            != NGX_CONF_OK)
+        if (ngx_http_log_condition_value(cf, lc, &value[cur])
+            != NGX_OK)
         {
-            return NGX_CONF_ERROR;
+            return NGX_ERROR;
         }
 
         fop = ngx_http_script_start_code(cf->pool, &lc->codes,
                                          sizeof(ngx_http_script_file_code_t));
         if (fop == NULL) {
-            return NGX_CONF_ERROR;
+            return NGX_ERROR;
         }
 
         fop->code = ngx_http_script_file_code;
 
         if (p[1] == 'f') {
             fop->op = ngx_http_script_file_plain;
-            return NGX_CONF_OK;
+            return cur + 1;
         }
 
         if (p[1] == 'd') {
             fop->op = ngx_http_script_file_dir;
-            return NGX_CONF_OK;
+            return cur + 1;
         }
 
         if (p[1] == 'e') {
             fop->op = ngx_http_script_file_exists;
-            return NGX_CONF_OK;
+            return cur + 1;
         }
 
         if (p[1] == 'x') {
             fop->op = ngx_http_script_file_exec;
-            return NGX_CONF_OK;
+            return cur + 1;
         }
 
         if (p[0] == '!') {
             if (p[2] == 'f') {
                 fop->op = ngx_http_script_file_not_plain;
-                return NGX_CONF_OK;
+                return cur + 1;
             }
 
             if (p[2] == 'd') {
                 fop->op = ngx_http_script_file_not_dir;
-                return NGX_CONF_OK;
+                return cur + 1;
             }
 
             if (p[2] == 'e') {
                 fop->op = ngx_http_script_file_not_exists;
-                return NGX_CONF_OK;
+                return cur + 1;
             }
 
             if (p[2] == 'x') {
                 fop->op = ngx_http_script_file_not_exec;
-                return NGX_CONF_OK;
+                return cur + 1;
             }
         }
-
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid condition \"%V\"", &value[cur]);
-        return NGX_CONF_ERROR;
     }
 
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "invalid condition \"%V\"", &value[cur]);
+                       "invalid condition element \"%V\"", &value[cur]);
 
-    return NGX_CONF_ERROR;
+    return NGX_ERROR;
+}
+
+
+static ngx_int_t
+ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
+    ngx_int_t cur, ngx_int_t *count)
+{
+    ngx_str_t                    *value;
+    ngx_int_t                     rb, ret;
+    ngx_uint_t                   *p, op, i;
+    ngx_array_t                   stack;
+    ngx_http_script_code_pt      *code;
+
+    struct {
+        ngx_http_script_code_pt   code;
+        ngx_uint_t                prior;
+    } op_arr[3] = {
+        { NULL, 0 },
+        { ngx_http_script_and_code, 5 },
+        { ngx_http_script_or_code, 4 }
+    };
+
+    value = cf->args->elts;
+    rb = -1;
+    ret = -1;
+    i = 0;
+    ngx_array_init(&stack, cf->pool, 10, sizeof(ngx_uint_t));
+
+    while (cur < (ngx_int_t) cf->args->nelts && (rb == -1 || cur <= rb)) {
+
+        if (value[cur].data[0] == '(') {
+
+            if (value[cur].len == 1) {
+                cur++;
+
+            } else {
+                value[cur].len--;
+                value[cur].data++;
+            }
+
+            (*count)++;
+            cur = ngx_http_log_condition(cf, lc, cur, count);
+
+            if (cur == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            if (cur >= (ngx_int_t) cf->args->nelts) {
+                return cur;
+            }
+        }
+
+        if (ret < 0) {
+            if (value[cur].data[value[cur].len - 1] == ')') {
+                rb = cur;
+
+            } else if (cur + 1 < (ngx_int_t) cf->args->nelts
+                && value[cur + 1].data[value[cur + 1].len - 1] == ')')
+            {
+                rb = cur + 1;
+
+            } else if (cur + 2 < (ngx_int_t) cf->args->nelts
+                && value[cur + 2].data[value[cur + 2].len - 1] == ')')
+            {
+                rb = cur + 2;
+            }
+
+            if (rb >= 0) {
+
+                (*count)--;
+                if (*count < 0) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "unexpected end of parentheses");
+                    return NGX_ERROR;
+                }
+
+                for (i = 0;
+                     value[rb].len > 0
+                         && value[rb].data[value[rb].len - 1] == ')';
+                     i++)
+                {
+                    value[rb].len--;
+                    value[rb].data[value[rb].len] = '\0';
+                }
+
+                ret = i > 1 ? rb : rb + 1;
+
+                if (value[rb].len == 0) {
+                    if (rb == cur) {
+                        break;
+                    }
+
+                    rb--;
+                }
+            }
+        }
+
+        op = 0;
+
+        if (value[cur].len == 2 && value[cur].data[0] == '|'
+            && value[cur].data[1] == '|')
+        {
+            op = NGX_HTTP_SCRIPT_ROP_OR;
+
+        } else if (value[cur].len == 2 && value[cur].data[0] == '&'
+                   && value[cur].data[1] == '&')
+        {
+            op = NGX_HTTP_SCRIPT_ROP_AND;
+
+        } else {
+            cur = ngx_http_log_condition_element(cf, lc, cur);
+            if (cur == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+        }
+
+        if (op) {
+            if (stack.nelts == 0) {
+                p = (ngx_uint_t *) ngx_array_push(&stack);
+                if (p == NULL) {
+                    return NGX_ERROR;
+                }
+
+            } else {
+                p = ((ngx_uint_t *) stack.elts) + stack.nelts - 1;
+
+                if (op_arr[*p].prior >= op_arr[op].prior) {
+                    code = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                                      sizeof(uintptr_t));
+                    if (code == NULL) {
+                        return NGX_ERROR;
+                    }
+
+                    *code = op_arr[*p].code;
+
+                } else {
+                    p = (ngx_uint_t *) ngx_array_push(&stack);
+                    if (p == NULL) {
+                        return NGX_ERROR;
+                    }
+
+                }
+            }
+
+            *p = op;
+            cur++;
+        }
+    }
+
+    while (stack.nelts) {
+        p = ((ngx_uint_t *) stack.elts) + stack.nelts - 1;
+        code = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                          sizeof(uintptr_t));
+        if (code == NULL) {
+            return NGX_ERROR;
+        }
+
+        *code = op_arr[*p].code;
+        stack.nelts--;
+    }
+
+    if (i > 1) {
+        value[ret].data += value[ret].len;
+        value[ret].len = i - 1;
+        ngx_memset(value[ret].data, ')', i - 1);
+    }
+
+    return ret;
 }
 
 
@@ -2490,144 +2609,4 @@ ngx_http_log_do_sample(ngx_http_log_sample_t *sample)
     }
 
     return NGX_OK;
-}
-
-
-static void
-ngx_http_script_more_than_code(ngx_http_script_engine_t *e)
-{
-    ngx_int_t                   i1, i2;
-    ngx_http_variable_value_t  *val, *res;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script more than");
-
-    e->sp--;
-    val = e->sp;
-    res = e->sp - 1;
-
-    e->ip += sizeof(uintptr_t);
-
-    i1 = ngx_atoi(res->data, res->len);
-    i2 = ngx_atoi(val->data, res->len);
-
-    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
-        if (i1 > i2) {
-            *res = ngx_http_variable_true_value;
-            return;
-        }
-    } else {
-        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
-                      "http script more than: value must be integer");
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script more than: no");
-
-    *res = ngx_http_variable_null_value;
-}
-
-
-static void
-ngx_http_script_less_than_code(ngx_http_script_engine_t *e)
-{
-    ngx_int_t                   i1, i2;
-    ngx_http_variable_value_t  *val, *res;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script less than");
-
-    e->sp--;
-    val = e->sp;
-    res = e->sp - 1;
-
-    e->ip += sizeof(uintptr_t);
-
-    i1 = ngx_atoi(res->data, res->len);
-    i2 = ngx_atoi(val->data, res->len);
-
-    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
-        if (i1 < i2) {
-            *res = ngx_http_variable_true_value;
-            return;
-        }
-    } else {
-        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
-                      "http script less than: value must be integer");
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script less than: no");
-
-    *res = ngx_http_variable_null_value;
-}
-
-
-static void
-ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e)
-{
-    ngx_int_t                   i1, i2;
-    ngx_http_variable_value_t  *val, *res;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no more than");
-
-    e->sp--;
-    val = e->sp;
-    res = e->sp - 1;
-
-    e->ip += sizeof(uintptr_t);
-
-    i1 = ngx_atoi(res->data, res->len);
-    i2 = ngx_atoi(val->data, res->len);
-
-    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
-        if (i1 <= i2) {
-            *res = ngx_http_variable_true_value;
-            return;
-        }
-    } else {
-        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
-                      "http script no more than: value must be integer");
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no more than: no");
-
-    *res = ngx_http_variable_null_value;
-}
-
-
-static void
-ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e)
-{
-    ngx_int_t                   i1, i2;
-    ngx_http_variable_value_t  *val, *res;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no less than");
-
-    e->sp--;
-    val = e->sp;
-    res = e->sp - 1;
-
-    e->ip += sizeof(uintptr_t);
-
-    i1 = ngx_atoi(res->data, res->len);
-    i2 = ngx_atoi(val->data, res->len);
-
-    if (i1 != NGX_ERROR && i2 != NGX_ERROR) {
-        if (i1 >= i2) {
-            *res = ngx_http_variable_true_value;
-            return;
-        }
-    } else {
-        ngx_log_error(NGX_LOG_WARN, e->request->connection->log, 0,
-                      "http script no less than: value must be integer");
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no less than: no");
-
-    *res = ngx_http_variable_null_value;
 }
