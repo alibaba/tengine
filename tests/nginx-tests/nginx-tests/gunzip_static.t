@@ -25,7 +25,7 @@ select STDOUT; $| = 1;
 eval { require IO::Compress::Gzip; };
 Test::More::plan(skip_all => "IO::Compress::Gzip not found") if $@;
 
-my $t = Test::Nginx->new()->has(qw/http gunzip proxy gzip_static/);
+my $t = Test::Nginx->new()->has(qw/http gunzip proxy gzip_static rewrite/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -45,6 +45,15 @@ http {
         location / {
             gunzip on;
             gzip_vary on;
+            gzip_static always;
+        }
+        location = /double {
+            error_page 404 @double;
+            gzip_static on;
+        }
+        location @double {
+            rewrite ^ /t1 break;
+            gunzip on;
             gzip_static always;
         }
         location /error {
@@ -78,13 +87,15 @@ $t->plan(12);
 
 pass('runs');
 
-my $r = http_get('/t1');
-unlike($r, qr/Content-Encoding/, 'no content encoding');
-like($r, qr/^(X\d\d\dXXXXXX){100}$/m, 'correct gunzipped response');
+like(http_get('/t1'), qr/(?!Content-Encoding).*^(X\d\d\dXXXXXX){100}$/m,
+	'correct gunzipped response');
+like(http_gzip_request('/t1'), qr/Content-Encoding: gzip.*\Q$out\E/ms,
+	'gzip still works');
 
-$r = http_gzip_request('/t1');
-like($r, qr/Content-Encoding: gzip/, 'gzip still works - encoding');
-like($r, qr/\Q$out\E/, 'gzip still works - content');
+like(http_get('/double'), qr/(?!Content-Encoding).^(X\d\d\dXXXXXX){100}$/ms,
+	'gunzip with gzip_tested');
+like(http_gzip_request('/double'), qr/Content-Encoding: gzip.*\Q$out\E/ms,
+	'gzip still works with gzip_tested');
 
 like(http_get('/t2'), qr/^(X\d\d\dXXXXXX){200}$/m, 'multiple gzip members');
 

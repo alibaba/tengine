@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(11);
+my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(15);
 
 #$t->set_dso("ngx_http_auth_basic_module", "ngx_http_auth_basic_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -65,9 +65,13 @@ $t->write_file(
 	'htpasswd',
 	'crypt:' . crypt('password', 'salt') . "\n" .
 	'crypt1:' . crypt('password', '$1$salt$') . "\n" .
+	'crypt2:' . '$1$' . "\n" .
 	'apr1:' . '$apr1$salt$Xxd1irWT9ycqoYxGFn4cb.' . "\n" .
+	'apr12:' . '$apr1$' . "\n" .
 	'plain:' . '{PLAIN}password' . "\n" .
-	'ssha:' . '{SSHA}yI6cZwQadOA1e+/f+T+H3eCQQhRzYWx0' . "\n"
+	'ssha:' . '{SSHA}yI6cZwQadOA1e+/f+T+H3eCQQhRzYWx0' . "\n" .
+	'ssha2:' . '{SSHA}_____wQadOA1e+/f+T+H3eCQQhRzYWx0' . "\n" .
+	'ssha3:' . '{SSHA}Zm9vCg==' . "\n"
 );
 
 $t->run();
@@ -76,11 +80,20 @@ $t->run();
 
 like(http_get('/'), qr!401 Unauthorized!ms, 'rejects unathorized');
 
+SKIP: {
+
+skip 'no crypt on win32', 5 if $^O eq 'MSWin32';
+
 like(http_get_auth('/', 'crypt', 'password'), qr!SEETHIS!, 'normal crypt');
 unlike(http_get_auth('/', 'crypt', '123'), qr!SEETHIS!, 'normal wrong');
 
 like(http_get_auth('/', 'crypt1', 'password'), qr!SEETHIS!, 'crypt $1$ (md5)');
 unlike(http_get_auth('/', 'crypt1', '123'), qr!SEETHIS!, 'crypt $1$ wrong');
+
+like(http_get_auth('/', 'crypt2', '1'), qr!401 Unauthorized!,
+	'crypt $1$ broken');
+
+}
 
 like(http_get_auth('/', 'apr1', 'password'), qr!SEETHIS!, 'apr1 md5');
 like(http_get_auth('/', 'plain', 'password'), qr!SEETHIS!, 'plain password');
@@ -98,6 +111,17 @@ SKIP: {
 unlike(http_get_auth('/', 'apr1', '123'), qr!SEETHIS!, 'apr1 md5 wrong');
 unlike(http_get_auth('/', 'plain', '123'), qr!SEETHIS!, 'plain wrong');
 unlike(http_get_auth('/', 'ssha', '123'), qr!SEETHIS!, 'ssha wrong');
+
+like(http_get_auth('/', 'apr12', '1'), qr!401 Unauthorized!, 'apr1 md5 broken');
+
+SKIP: {
+skip 'unsafe', 2 unless $ENV{TEST_NGINX_UNSAFE};
+local $TODO = 'not yet';
+
+like(http_get_auth('/', 'ssha2', '1'), qr!401 Unauthorized!, 'ssha broken 1');
+like(http_get_auth('/', 'ssha3', '1'), qr!401 Unauthorized!, 'ssha broken 2');
+
+}
 
 ###############################################################################
 
