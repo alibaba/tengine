@@ -41,7 +41,6 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -98,10 +97,6 @@ $t->write_file('hnf/demo.txt', 'ZJQW');
 $d = $t->testdir();
 mkdir("$d/fnl");
 $t->write_file('fnl/demo.txt', 'ZJQW');
-
-my $m;
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 
