@@ -98,6 +98,7 @@ NGX_ALL_MODULES="
     ngx_http_degradation_module
     ngx_http_flv_module
     ngx_http_mp4_module
+    ngx_http_session_sticky_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
