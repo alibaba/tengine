@@ -1,0 +1,73 @@
+# session_sticky 模块
+
+## 介绍
+
+session_sticky的功能是实现客户端与后端服务器的映射。由于HTTP没有状态，
+session sticky的功能都是通过cookie实现的，现在主要有三种方案：
+
+1.   负载均衡软件插入cookie，在给client的回复中加入标识后端服务器名字的一个新cookie。
+2.   负载均衡软件修改cookie，在已有的cookie头部或者尾部加入服务器的标识。
+3.   负载均衡软件查看cookie，在cookie头部或者尾部查看已经加入服务器的标识。
+一般Java应用服务器采用的都是这种方式，它自己会在cookie头或尾中加入服务器的标识。
+
+针对上述的方案，负载均衡软件一般的处理过程如下：
+IF 请求过来没有带cookie,就用其他负载均衡方法，任意传给一台后端服务器。
+在处理回复时：方案1，加入Set-Cookie头；方案2，修改相应Set-Cookie头；方案3，不作修改。
+ELSE IF 请求过来已经带了cookie查找标识符，传给某台特定的后端服务器。
+
+## 指令
+
+### session_sticky
+
+语法：session_sticky [cookie=name] [domain=your_domain] [path=your_path] [maxage=time] [mode=insert|rewrite|prefix] [option=indirect] [maxidle=time] [maxlife=time] [fallback=on|off] 
+
+默认值：session_sticky cookie=route mode=insert fallback=on
+
+上下文：upstream
+
+说明：
+
++   cookie参数设置的cookie名称
++   domain设置cookie作用的域名，默认不设置
++   path设置cookie作用的URL，默认不设置
++   maxage设置cookie的生存期，默认不设置，为session cookie，浏览器关闭即失效。
++   mode设置cookie的模式
+
+    **insert**: 回复中插入相应名字cookie 
+
+    **prefix**:不会发出新的cookie，它会在已有的Set-Cookie的值前面插入服务器标识符。
+    当请求带着这个修改过的cookie来请求时，它会删除前面的标识符，然后再传给后端服务器，
+    所以服务器还能用原来的cookie。它修改过的cookie形式如："Cookie: NAME=SRV~VALUE" 
+
+    **rewrite**:这个选项表明cookie是由后端服务器提供的，在回复中看到该cookie，
+    它可以把这个cookie完全用服务器标识符修改掉。这样做的好处是，
+    服务器可以控制哪些请求可以session sticky，如果后端没有发出set-cookie头，
+    就说明这些请求都不需要session sticky。
+
++   option设置cookie的一些选项，indirect选项，请求过来时，插入的cookie会被haproxy删除，
+这个cookie对于后端的应用完全是透明的。现在只实现该选项。
++   maxidle设置session cookie的最长空闲的超时时间
++   maxlinfe设置session cookie的最长生存期
++   fallback设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器？
+
+### session_sticky_header
+
+语法: session_sticky_header upstream=name [switch=[on|off]];
+
+默认值: none
+
+上下文： server, location
+
+说明：
+
+在insert+indirect模式和prefix模式下，必须跟proxy_pass指令结合使用这个指令。rewrite模式可以不配置这个指令。upstream是需要处理cookie的upsteam名称switch是关闭或者开启对于cookie的处理出现这个指令的原因是，在upstream块内的函数，都不能删除或者修改cookie，不得已我们加了这个重复的指令。
+
+## 编译测试
+###下载源代码：
+    git clone git://github.com/taobao/tengine.git
+    git checkout -b jushita origin/jst'
+    
+###模块添加编译（session sticky默认已经添加进去了）
+    /configure
+    make
+    make install
