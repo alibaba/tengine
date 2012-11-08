@@ -1426,10 +1426,9 @@ ngx_http_script_equal_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script equal: s1=%*s, s2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script equal: s1=%v, s2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1459,10 +1458,9 @@ ngx_http_script_not_equal_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script not equal: s1=%*s, s2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script not equal: s1=%v, s2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1780,10 +1778,9 @@ ngx_http_script_more_than_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script more than: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script more than: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1820,10 +1817,9 @@ ngx_http_script_less_than_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script less than: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less than: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1860,10 +1856,9 @@ ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no more than: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no more than: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1900,10 +1895,9 @@ ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script no less than: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script no less than: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1938,10 +1932,9 @@ void ngx_http_script_and_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script and: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script and: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -1970,10 +1963,9 @@ void ngx_http_script_or_code(ngx_http_script_engine_t *e)
     val = e->sp;
     res = e->sp - 1;
 
-    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script or: n1=%*s, n2=%*s",
-                   (size_t) res->len, res->data,
-                   (size_t) val->len, val->data);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script or: n1=%v, n2=%v",
+                   res, val);
 
     e->ip += sizeof(uintptr_t);
 
@@ -2004,9 +1996,8 @@ ngx_http_script_test_code(ngx_http_script_engine_t *e)
 
     vv = e->sp - 1;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script test: s=%*s",
-                   (size_t) vv->len, vv->data);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test: s=%v", vv);
 
     if (vv->len && (vv->len != 1 || vv->data[0] != '0')) {
         if (code->loc_conf) {
@@ -2038,9 +2029,8 @@ ngx_http_script_test_not_code(ngx_http_script_engine_t *e)
 
     vv = e->sp - 1;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
-                   "http script test not: s=%*s",
-                   (size_t) vv->len, vv->data);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script test not: s=%v", vv);
 
     if (vv->len == 0 || (vv->len == 1 && vv->data[0] == '0')) {
         if (code->loc_conf) {

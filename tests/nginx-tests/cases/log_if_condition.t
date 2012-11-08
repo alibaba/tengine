@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 
-# (C) Maxim Dounin
+# (C) cfsego
 
-# Tests for nginx gzip filter module.
+# Tests for logical operator and group operator in "if".
 
 ###############################################################################
 
