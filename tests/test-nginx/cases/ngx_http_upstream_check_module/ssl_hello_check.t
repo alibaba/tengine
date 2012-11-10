@@ -24,6 +24,7 @@ __DATA__
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
    
@@ -44,6 +45,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -64,6 +66,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -84,6 +87,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -103,6 +107,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -120,6 +125,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -137,6 +143,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 

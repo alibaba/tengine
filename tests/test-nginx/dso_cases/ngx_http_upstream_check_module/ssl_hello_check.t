@@ -24,6 +24,7 @@ __DATA__
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
    
@@ -47,6 +48,7 @@ ngx_http_upstream_ip_hash_module ngx_http_upstream_ip_hash_module
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -67,6 +69,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -90,6 +93,7 @@ ngx_http_upstream_least_conn_module ngx_http_upstream_least_conn_module
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -109,6 +113,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -126,6 +131,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
@@ -143,6 +149,7 @@ GET /
 
 --- config
     location / {
+        proxy_ssl_session_reuse off;
         proxy_pass https://test;
     }
 
