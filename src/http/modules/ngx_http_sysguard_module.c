@@ -18,6 +18,7 @@ typedef struct {
     time_t      interval;
 
     ngx_uint_t  log_level;
+    ngx_flag_t  log_all;
 } ngx_http_sysguard_conf_t;
 
 
@@ -27,6 +28,8 @@ static char *ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent,
 static char *ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_sysguard_mem(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_sysguard_log(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_sysguard_init(ngx_conf_t *cf);
 
@@ -43,37 +46,37 @@ static ngx_conf_enum_t  ngx_http_sysguard_log_levels[] = {
 static ngx_command_t  ngx_http_sysguard_commands[] = {
 
     { ngx_string("sysguard"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, enable),
       NULL },
 
     { ngx_string("sysguard_load"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_load,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("sysguard_mem"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_mem,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("sysguard_interval"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_sec_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, interval),
       NULL },
 
     { ngx_string("sysguard_log_level"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_enum_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
+      ngx_http_sysguard_log,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, log_level),
       &ngx_http_sysguard_log_levels },
 
@@ -88,11 +91,11 @@ static ngx_http_module_t  ngx_http_sysguard_module_ctx = {
     NULL,                                   /* create main configuration */
     NULL,                                   /* init main configuration */
 
-    ngx_http_sysguard_create_conf,          /* create server configuration */
-    ngx_http_sysguard_merge_conf,           /* merge server configuration */
+    NULL,                                   /* create server configuration */
+    NULL,                                   /* merge server configuration */
 
-    NULL,                                   /* create location configuration */
-    NULL                                    /* merge location configuration */
+    ngx_http_sysguard_create_conf,          /* create location configuration */
+    ngx_http_sysguard_merge_conf            /* merge location configuration */
 };
 
 
@@ -179,7 +182,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
-    glcf = ngx_http_get_module_srv_conf(r, ngx_http_sysguard_module);
+    glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
 
     if (!glcf->enable) {
         return NGX_DECLINED;
@@ -206,7 +209,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     if (glcf->load >= 0
         && ngx_http_sysguard_cached_load > glcf->load)
     {
-        if (updated) {
+        if (updated || glcf->log_all) {
             ngx_log_error(glcf->log_level, r->connection->log, 0,
                           "sysguard load limited, current:%d conf:%d",
                           ngx_http_sysguard_cached_load,
@@ -255,6 +258,7 @@ ngx_http_sysguard_create_conf(ngx_conf_t *cf)
     conf->swap = NGX_CONF_UNSET;
     conf->interval = NGX_CONF_UNSET;
     conf->log_level = NGX_CONF_UNSET_UINT;
+    conf->log_all = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -273,6 +277,7 @@ ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->swap, prev->swap, -1);
     ngx_conf_merge_value(conf->interval, prev->interval, 1);
     ngx_conf_merge_uint_value(conf->log_level, prev->log_level, NGX_LOG_ERR);
+    ngx_conf_merge_value(conf->log_all, prev->log_all, 0);
 
     return NGX_CONF_OK;
 }
@@ -392,6 +397,37 @@ invalid:
                        "invalid parameter \"%V\"", &value[i]);
 
     return NGX_CONF_ERROR;
+}
+
+
+static char *
+ngx_http_sysguard_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_sysguard_conf_t *glcf = conf;
+
+    char        *ret;
+    ngx_str_t   *value;
+
+    value = cf->args->elts;
+    ret = ngx_conf_set_enum_slot(cf, cmd, conf);
+    if ( ret != NGX_CONF_OK) {
+        return ret;
+    }
+
+    if (cf->args->nelts == 3) {
+        if (ngx_strncmp(value[2].data, "all", 3) == 0) {
+            glcf->log_all = 1;
+        } else if(ngx_strncmp(value[2].data, "once", 4) == 0) {
+            glcf->log_all = 0;
+        } else {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "invalid value \"%s\"", value[2].data);
+
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
 }
 
 
