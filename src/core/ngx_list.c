@@ -78,9 +78,9 @@ ngx_list_push(ngx_list_t *l)
 ngx_int_t
 ngx_list_delete(ngx_list_t *list, void *elt)
 {
-    u_char                      *data;
-    ngx_uint_t                   i;
-    ngx_list_part_t             *part, *pre;
+    u_char          *data;
+    ngx_uint_t       i;
+    ngx_list_part_t *part, *pre;
 
     part = &list->part;
     pre = part;
