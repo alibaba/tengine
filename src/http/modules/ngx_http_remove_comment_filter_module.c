@@ -272,7 +272,6 @@ ngx_http_remove_comment_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ctx->last_out = &cl->next;
         }
 
-
         if (ctx->buf->last_buf || ngx_buf_in_memory(ctx->buf)) {
             if (b == NULL) {
                 cl = ngx_chain_get_free_buf(r->pool, &ctx->free);
@@ -351,7 +350,7 @@ ngx_http_remove_comment_output(ngx_http_request_t *r,
         }
     }
 
-  return rc;
+    return rc;
 }
 
 
