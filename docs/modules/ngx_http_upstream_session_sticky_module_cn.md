@@ -3,14 +3,29 @@
 
 该模块的功能是通过cookie实现客户端与后端服务器的映射。
 
-# Examples #
+# Example 1#
+    默认配置：cookie=route mode=insert fallback=on
+    upstream foo {
+       server 192.168.0.1;
+       server 192.168.0.2;
+       session_sticky;
+    }
+    server {
+        location / {
+            #在insert 或者rewrite 模式不需要配置session_sticky_header
+            proxy_pass http://test;
+        }
+    }
+# Example 2#
 
+    #insert + indirect 模式：
     upstream test {
       session_sticky session_sticky cookie=uid domain=www.xxx.com fallback=on path=/ mode=insert option=indirect;
       server  127.0.0.1:8080;
     }
-    http {
+    server {
       location / {
+        #在insert + indirect模式或者 prefix模式下需要配置session_sticku_header
         session_sticky_header upstream=test switch=on;
         proxy_pass http://test;
       }

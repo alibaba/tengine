@@ -75,6 +75,13 @@ ngx_list_push(ngx_list_t *l)
 }
 
 
+/*
+ * Nginx doesn't supply such delete interface. We have tried to avoid to copy
+ * the memory. But there are too many obscure bugs with that solution. You
+ * shouldn't use this function too heavily while it may hurt your performance.
+ */
+
+
 ngx_int_t
 ngx_list_delete(ngx_list_t *list, void *elt)
 {
