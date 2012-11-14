@@ -7,6 +7,10 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+#if (NGX_HAVE_SYSINFO)
+#include <sys/sysinfo.h>
+#endif
+
 
 ngx_int_t
 ngx_getloadavg(ngx_int_t avg[], ngx_int_t nelem, ngx_log_t *log)
