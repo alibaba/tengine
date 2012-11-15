@@ -1,4 +1,3 @@
-
 /*
  *  lieyuan@taobao.com
  *  remove comment   <!--  any words  -->
@@ -426,7 +425,7 @@ static ngx_int_t ngx_http_remove_comment_parse(ngx_http_request_t *r,
             }
 
             state = sw_start;
-            ctx->copy_end = p;
+            ctx->copy_end = p + 1;
             break;
 
         /* <!-- */
