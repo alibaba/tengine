@@ -194,7 +194,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     }
 
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http sysguard handler %d %d %d %d %V %V %V",
+                   "http sysguard handler %i %i %i %i %V %V %V",
                    ngx_http_sysguard_cached_load,
                    glcf->load,
                    ngx_http_sysguard_cached_swapstat,
@@ -207,7 +207,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
         && ngx_http_sysguard_cached_load > glcf->load)
     {
         ngx_log_error(glcf->log_level, r->connection->log, 0,
-                      "sysguard load limited, current:%d conf:%d",
+                      "sysguard load limited, current:%i conf:%i",
                       ngx_http_sysguard_cached_load,
                       glcf->load);
 
@@ -218,7 +218,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
         && ngx_http_sysguard_cached_swapstat > glcf->swap)
     {
         ngx_log_error(glcf->log_level, r->connection->log, 0,
-                      "sysguard swap limited, current:%d conf:%d",
+                      "sysguard swap limited, current:%i conf:%i",
                       ngx_http_sysguard_cached_swapstat,
                       glcf->swap);
 
