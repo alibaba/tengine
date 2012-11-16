@@ -43,37 +43,37 @@ static ngx_conf_enum_t  ngx_http_sysguard_log_levels[] = {
 static ngx_command_t  ngx_http_sysguard_commands[] = {
 
     { ngx_string("sysguard"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, enable),
       NULL },
 
     { ngx_string("sysguard_load"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_load,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("sysguard_mem"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_mem,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("sysguard_interval"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_sec_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, interval),
       NULL },
 
     { ngx_string("sysguard_log_level"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_enum_slot,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_sysguard_conf_t, log_level),
       &ngx_http_sysguard_log_levels },
 
@@ -88,11 +88,11 @@ static ngx_http_module_t  ngx_http_sysguard_module_ctx = {
     NULL,                                   /* create main configuration */
     NULL,                                   /* init main configuration */
 
-    ngx_http_sysguard_create_conf,          /* create server configuration */
-    ngx_http_sysguard_merge_conf,           /* merge server configuration */
+    NULL,                                   /* create server configuration */
+    NULL,                                   /* merge server configuration */
 
-    NULL,                                   /* create location configuration */
-    NULL                                    /* merge location configuration */
+    ngx_http_sysguard_create_conf,          /* create location configuration */
+    ngx_http_sysguard_merge_conf            /* merge location configuration */
 };
 
 
@@ -179,7 +179,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
-    glcf = ngx_http_get_module_srv_conf(r, ngx_http_sysguard_module);
+    glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
 
     if (!glcf->enable) {
         return NGX_DECLINED;
@@ -194,7 +194,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     }
 
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http sysguard handler %d %d %d %d %V %V %V",
+                   "http sysguard handler %i %i %i %i %V %V %V",
                    ngx_http_sysguard_cached_load,
                    glcf->load,
                    ngx_http_sysguard_cached_swapstat,
@@ -206,12 +206,10 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     if (glcf->load >= 0
         && ngx_http_sysguard_cached_load > glcf->load)
     {
-        if (updated) {
-            ngx_log_error(glcf->log_level, r->connection->log, 0,
-                          "sysguard load limited, current:%d conf:%d",
-                          ngx_http_sysguard_cached_load,
-                          glcf->load);
-        }
+        ngx_log_error(glcf->log_level, r->connection->log, 0,
+                      "sysguard load limited, current:%i conf:%i",
+                      ngx_http_sysguard_cached_load,
+                      glcf->load);
 
         return ngx_http_sysguard_do_redirect(r, &glcf->load_action);
     }
@@ -219,12 +217,10 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     if (glcf->swap >= 0
         && ngx_http_sysguard_cached_swapstat > glcf->swap)
     {
-        if (updated) {
-            ngx_log_error(glcf->log_level, r->connection->log, 0,
-                          "sysguard swap limited, current:%d conf:%d",
-                          ngx_http_sysguard_cached_swapstat,
-                          glcf->swap);
-        }
+        ngx_log_error(glcf->log_level, r->connection->log, 0,
+                      "sysguard swap limited, current:%i conf:%i",
+                      ngx_http_sysguard_cached_swapstat,
+                      glcf->swap);
 
         return ngx_http_sysguard_do_redirect(r, &glcf->swap_action);
     }
