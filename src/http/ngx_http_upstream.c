@@ -4246,7 +4246,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     weight = 1;
     max_fails = 1;
     fail_timeout = 10;
-    id = value[1];
+    ngx_str_null(&id);
 
     for (i = 2; i < cf->args->nelts; i++) {
 
