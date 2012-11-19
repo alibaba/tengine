@@ -50,6 +50,8 @@ static ngx_int_t ngx_http_upstream_init_chash(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
 #ifndef NGX_HTTP_UPSTREAM_ID
 static uint32_t ngx_http_upstream_chash_md5(u_char *str, size_t len);
+#else
+static uint32_t ngx_murmur_hash(u_char *data, size_t len, uint32_t seed);
 #endif
 static ngx_int_t ngx_http_upstream_chash_cmp(const void *one, const void *two);
 static ngx_int_t ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
@@ -149,7 +151,7 @@ static ngx_int_t
 ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 {
 #ifdef NGX_HTTP_UPSTREAM_ID
-    ngx_uint_t                               sid;
+    ngx_uint_t                               sid, id;
 #else
     u_char                                   hash_buf[256];
     ngx_uint_t                               hash_len;
@@ -204,14 +206,15 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
             sid = i;
         }
 
-        sid = sid << 16;
 #endif
         for (j = 0; j < ucscf->copies; j++) {
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
 #ifdef NGX_HTTP_UPSTREAM_ID
-            sid = (sid & 0xffff0000) | (0xffff & j);
-            server->hash = ngx_murmur_hash2((u_char *) (&sid), sizeof(ngx_uint_t));
+            id = sid * 256 * 16 + j;
+            server->hash = ngx_murmur_hash((u_char *) (&id),
+                                           sizeof(ngx_uint_t),
+                                           0x9e3779b9);
 #else
             ngx_snprintf(hash_buf, 256, "%V#%i%Z", &peer->name, j);
             hash_len = ngx_strlen(hash_buf);
@@ -257,6 +260,48 @@ ngx_http_upstream_chash_md5(u_char *str, size_t len)
     ngx_md5_final(md5_buf, &md5);
 
     return ngx_crc32_long(md5_buf, 16);
+}
+
+#else
+static uint32_t
+ngx_murmur_hash(u_char *data, size_t len, uint32_t seed)
+{
+    uint32_t  h, k;
+
+    h = seed ^ len;
+
+    while (len >= 4) {
+        k  = data[0];
+        k |= data[1] << 8;
+        k |= data[2] << 16;
+        k |= data[3] << 24;
+
+        k *= 0x5bd1e995;
+        k ^= k >> 24;
+        k *= 0x5bd1e995;
+
+        h *= 0x5bd1e995;
+        h ^= k;
+
+        data += 4;
+        len -= 4;
+    }
+
+    switch (len) {
+    case 3:
+        h ^= data[2] << 16;
+    case 2:
+        h ^= data[1] << 8;
+    case 1:
+        h ^= data[0];
+        h *= 0x5bd1e995;
+    }
+
+    h ^= h >> 13;
+    h *= 0x5bd1e995;
+    h ^= h >> 15;
+
+    return h;
 }
 #endif
 
@@ -304,7 +349,7 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 #ifdef NGX_HTTP_UPSTREAM_ID
-    uchpd->hash = ngx_murmur_hash2(hash_value.data, hash_value.len);
+    uchpd->hash = ngx_murmur_hash(hash_value.data, hash_value.len, 0x9e3779b9);
 #else
     uchpd->hash = ngx_crc32_long(hash_value.data, hash_value.len);
 #endif
