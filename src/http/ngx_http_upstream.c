@@ -4320,13 +4320,14 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        if (ngx_strncmp(value[i].data, "id", 2) == 0) {
+        if (ngx_strncmp(value[i].data, "id=", 3) == 0) {
 
             if (!(uscf->flags & NGX_HTTP_UPSTREAM_ID)) {
                 goto invalid;
             }
 
-            id = value[i];
+            id.data = value[i].data + 3;
+            id.len = value[i].len - 3;
 
             continue;
         }

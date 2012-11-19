@@ -213,7 +213,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 #ifdef NGX_HTTP_UPSTREAM_ID
             id = sid * 256 * 16 + j;
             server->hash = ngx_murmur_hash((u_char *) (&id),
-                                           sizeof(ngx_uint_t),
+                                           4,
                                            0x9e3779b9);
 #else
             ngx_snprintf(hash_buf, 256, "%V#%i%Z", &peer->name, j);
@@ -544,15 +544,15 @@ ngx_http_upstream_chash_get_server_index(
     hight = n;
 
     while (low < hight) {
-        mid = (low + hight + 1) >> 1;
+        mid = (low + hight) >> 1;
         if (servers[mid].hash == hash) {
             return mid;
 
-        } else if (servers[mid].hash > hash) {
-            hight = mid - 1;
+        } else if (servers[mid].hash < hash) {
+            low = mid + 1;
 
         } else {
-            low = mid;
+            hight = mid;
         }
     }
 
