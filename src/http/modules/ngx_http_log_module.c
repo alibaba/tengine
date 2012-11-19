@@ -2230,6 +2230,7 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
     rb = -1;
     ret = -1;
     i = 0;
+    code = NULL;
     ngx_array_init(&nstack, cf->pool, 10, sizeof(ngx_uint_t));
     ngx_array_init(&fstack, cf->pool, 10, sizeof(off_t));
 
