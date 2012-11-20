@@ -2,7 +2,7 @@
 
 # (C) Maxim Dounin
 
-# Tests for random index module.
+# Tests for map module.
 
 ###############################################################################
 
@@ -21,11 +21,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'no symlinks on win32') if $^O eq 'MSWin32';
+my $t = Test::Nginx->new()->has(qw/http map/)->plan(5);
 
-my $t = Test::Nginx->new()->has(qw/http random_index/)->plan(1);
-
-$t->set_dso("ngx_http_random_index_module", "ngx_http_random_index_module.so");
+$t->set_dso("ngx_http_map_module", "ngx_http_map_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
 $t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
@@ -44,31 +42,45 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    map $args $x {
+        default      0;
+        foo          bar;
+    }
+
+    map $args $y {
+        hostnames;
+        default      0;
+        example.com  foo;
+        example.*    wildcard;
+    }
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
 
         location / {
-            random_index on;
+            add_header X-Foo "x:$x y:$y\n";
         }
     }
 }
 
 EOF
 
-my $d = $t->testdir();
-
-mkdir("$d/x");
-mkdir("$d/x/test-dir");
-symlink("$d/x/test-dir", "$d/x/test-dir-link");
-
-$t->write_file('test-file', 'RIGHT');
-symlink("$d/test-file", "$d/x/test-file-link");
-
+$t->write_file('index.html', '');
 $t->run();
 
 ###############################################################################
 
-like(http_get('/x/'), qr/RIGHT/s, 'file');
+like(http_get('/?1'), qr/x:0 y:0/, 'map default');
+like(http_get('/?foo'), qr/x:bar y:0/, 'map foo bar');
+like(http_get('/?example.com'), qr/x:0 y:foo/, 'map example.com foo');
+like(http_get('/?example.org'), qr/x:0 y:wild/, 'map example.org wildcard');
+
+TODO: {
+local $TODO = 'not yet';
+
+like(http_get('/?example.com.'), qr/x:0 y:foo/, 'map example.com. foo');
+
+}
 
 ###############################################################################
