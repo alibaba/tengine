@@ -1,4 +1,24 @@
 
+Changes with nginx 1.2.5                                         13 Nov 2012
+
+    *) Feature: the "optional_no_ca" parameter of the "ssl_verify_client"
+       directive.
+       Thanks to Mike Kazantsev and Eric O'Connor.
+
+    *) Feature: the $bytes_sent, $connection, and $connection_requests
+       variables can now be used not only in the "log_format" directive.
+       Thanks to Benjamin Grössing.
+
+    *) Feature: resolver now randomly rotates addresses returned from cache.
+       Thanks to Anton Jouline.
+
+    *) Feature: the "auto" parameter of the "worker_processes" directive.
+
+    *) Bugfix: "cache file ... has md5 collision" alert.
+
+    *) Bugfix: OpenSSL 0.9.7 compatibility.
+
+
 Changes with nginx 1.2.4                                         25 Sep 2012
 
     *) Bugfix: in the "limit_req" directive; the bug had appeared in 1.1.14.
