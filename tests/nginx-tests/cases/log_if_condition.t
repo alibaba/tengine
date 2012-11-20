@@ -21,7 +21,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(50);
+my $t = Test::Nginx->new()->plan(58);
 
 unlink('/tmp/access.log');
 unlink('/tmp/error.log');
@@ -473,6 +473,270 @@ $line = <aclog>;
 
 is($line, undef, '($a && $b && $c)');
 
+############################################################################
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+
+    log_format wd "write";
+
+    error_log /tmp/error.log debug_http;
+    access_log /tmp/access.log wd;
+
+    %%TEST_GLOBALS_HTTP%%
+
+    # equivalent $a && $b && $c
+    log_env $t1 {
+        if ($a) and;
+        if ($b) and;
+        if ($c);
+    }
+
+    # equivalent $a && $b || $c
+    log_env $t2 {
+        if ($a && $b);
+        if ($c);
+        sample 0.2;
+    }
+
+    server {
+        listen       127.0.0.1:8080;
+        server_name  test1.com;
+
+        location /t1 {
+            set $a 1;
+            set $b 0;
+            set $c 1;
+            # equivalent $a && $b || $c
+            log_condition {
+                if ($a) and;
+                if ($b);
+                if ($c);
+            }
+        }
+
+        location /t2 {
+            set $a 1;
+            set $b 0;
+            set $c 1;
+            log_condition {
+                if ($a) and;
+                if ($b);
+                if ($c);
+            }
+            access_log /tmp/access.log wd env=$t1;
+        }
+
+        location /t3 {
+            set $a 1;
+            set $b 1;
+            set $c 1;
+
+            access_log /tmp/access.log wd env=$t1 ratio=.1;
+        }
+
+        location /t4 {
+            set $a 0;
+            set $b 1;
+            set $c 1;
+
+            access_log /tmp/access.log wd env=$t2;
+        }
+
+        location /t5 {
+            set $a 0;
+            set $b 1;
+            set $c 1;
+
+            access_log /tmp/access.log wd env=$t2 ratio=0.1;
+        }
+
+        location /t6 {
+            set $a 1;
+            set $b 0;
+            set $c 1;
+            log_condition {
+                if ($a) and;
+                if ($b);
+                if ($c);
+                sample 0.5;
+            }
+        }
+
+        location /t7 {
+            set $a 1;
+            set $b 0;
+            set $c 1;
+            log_condition {
+                if ($a) and;
+                if ($b);
+                if ($c);
+                sample 0.5;
+            }
+            access_log /tmp/access.log wd env=$t2;
+        }
+
+        location /t8 {
+            set $a 1;
+            set $b 0;
+            set $c 1;
+            log_condition {
+                if ($a) and;
+                if ($b);
+                if ($c);
+                sample 0.5;
+            }
+            access_log /tmp/access.log wd env=$t2 ratio=0.1;
+        }
+    }
+}
+EOF
+
+close(aclog);
+unlink('/tmp/access.log');
+
+$t->stop();
+$t->run();
+
+my_http_get('/t1', 'test.com', 8080);
+
+open("aclog", "/tmp/access.log");
+
+$line = <aclog>;
+$line =~ s/\s+$//;
+
+is($line, 'write', 'log condition is available');
+
+my_http_get('/t2', 'test.com', 8080);
+
+$line = <aclog>;
+
+is($line, undef, 'log env overrides log condition');
+
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+my_http_get('/t3', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 1, "log env plus sample");
+
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+my_http_get('/t4', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 2, "sample in log env");
+
+close(aclog);
+unlink('/tmp/access.log');
+unlink('/tmp/error.log');
+
+$t->stop();
+$t->run();
+
+open("aclog", "/tmp/access.log");
+
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+my_http_get('/t5', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 1, "override sample in log env");
+
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+my_http_get('/t6', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 5, "sample in log condition");
+
+close(aclog);
+unlink('/tmp/access.log');
+unlink('/tmp/error.log');
+
+$t->stop();
+$t->run();
+
+open("aclog", "/tmp/access.log");
+
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+my_http_get('/t7', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 2, "override sample in log condition");
+
+close(aclog);
+unlink('/tmp/access.log');
+unlink('/tmp/error.log');
+
+$t->stop();
+$t->run();
+
+open("aclog", "/tmp/access.log");
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+my_http_get('/t8', 'test.com', 8080);
+
+@lines = <aclog>;
+$num = @lines;
+is ($num, 1, "override sample in log condition and log env");
+
 ###############################################################################
 
 sub my_http($;%) {
@@ -502,7 +766,6 @@ sub my_http($;%) {
     log_in($reply);
     return $reply;
 }
-
 
 sub my_http_get {
     my ($url, $host, $port) = @_;
