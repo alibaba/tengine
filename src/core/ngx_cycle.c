@@ -80,6 +80,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_time_update();
 
     ngx_increase_pipe_generation();
+    ngx_shm_cycle_increase_generation();
 
 
     log = old_cycle->log;
@@ -676,6 +677,12 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     if (ngx_open_listening_sockets(cycle) != NGX_OK) {
         goto failed;
     }
+
+
+    /* create shared memory cycle */
+
+    ngx_shm_cycle_init_cycle(cycle);
+
 
     if (!ngx_test_config) {
         ngx_configure_listening_sockets(cycle);

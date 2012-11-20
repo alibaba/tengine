@@ -336,6 +336,10 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             buf.last = buf.start + n;
             buf.end = buf.last;
 
+#if (NGX_TRAFFIC_STATUS)
+            c->received += n;
+#endif
+
             rc = ngx_http_top_input_body_filter(r, &buf);
             if (rc != NGX_OK) {
                 if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
