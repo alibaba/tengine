@@ -556,6 +556,10 @@ ngx_http_upstream_chash_get_server_index(
         }
     }
 
+    if (low == n && servers[low].hash != hash) {
+      return 1;
+    }
+
     return low;
 }
 
