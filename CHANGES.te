@@ -18,13 +18,17 @@ Changes with Tengine 1.4.2                                         21 Nov 2012
     *) Change: added more error check with the return value for input
        filter module to avoid socket leak. (cfsego)
 
-    *) Bugfix: fixed the problem with directive limit_req can't use 4
+    *) Bugfix: fixed the problem with directive limit_req can't handle 4
        arguments. (monadbobo)
        Thanks to LazyZhu.
 
     *) Bugfix: fixed a compile error with the file of sysinfo in Cygwin.
-       (monadbobo)
+       (lifeibo)
        Thanks to Cao Peiran.
+
+    *) Bugfix: fixed a warning with the link option -rdynamic in Cygwin.
+       (monadbobo)
+       Thanks to huachen.
 
     *) Bugfix: fixed the installation script which don't copy the
        user_agent module's browsers configure. (monadbobo)
