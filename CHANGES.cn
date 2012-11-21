@@ -2,7 +2,7 @@
 Tengine-1.4.2 [2012-11-21]
 * Feature：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
 * Feature：增加$unix_time变量，表示当前的时间戳秒数 [yaoweibin]
-* Feature：Makefile中增加test命令 [yaoweibin]
+* Feature：Makefile中增加test命令以便运行测试用例 [yaoweibin]
 * Feature：sysguard模块可在location里面配置 [lifeibo]
 * Change：合并Nginx-1.2.4和Nginx-1.2.5的更新 [zhuzhaoyuan]
 * Change：增加对input_filter函数返回值的检查，防止第三方模块调用出错 [cfsego]
