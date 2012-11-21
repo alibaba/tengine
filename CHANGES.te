@@ -26,10 +26,6 @@ Changes with Tengine 1.4.2                                         21 Nov 2012
        (lifeibo)
        Thanks to Cao Peiran.
 
-    *) Bugfix: fixed a warning with the link option '-rdynamic' in Cygwin.
-       (monadbobo)
-       Thanks to huachen.
-
     *) Bugfix: now the installation script will copy the user_agent module's
        configuration. (monadbobo)
        Thanks to Jianbin Xiao.
