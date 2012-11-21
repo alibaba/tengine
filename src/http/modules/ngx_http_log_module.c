@@ -2578,6 +2578,10 @@ ngx_http_log_variable_value(ngx_http_request_t *r,
 {
     ngx_http_log_env_t *env = (ngx_http_log_env_t *) data;
 
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                  "env->sample=%p, env->conditions=%p",
+                  env->sample, env->conditions);
+
     if (env->conditions
         && ngx_http_log_do_if(r, env->conditions) == NGX_DECLINED)
     {
@@ -2637,6 +2641,10 @@ ngx_http_log_do_if(ngx_http_request_t *r, ngx_array_t *conditions)
         e.sp--;
         if (e.sp->len && (e.sp->len != 1 || e.sp->data[0] != '0')) {
             if (!condition[i].is_and) {
+
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                               "ngx http log condition: true");
+
                 return NGX_OK;
             }
         } else {
@@ -2645,6 +2653,9 @@ ngx_http_log_do_if(ngx_http_request_t *r, ngx_array_t *conditions)
             }
         }
     }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "ngx http log condition: false");
 
     return NGX_DECLINED;
 }
