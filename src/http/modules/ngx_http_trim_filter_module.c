@@ -45,6 +45,7 @@ typedef enum {
     trim_state_pre,
     trim_state_comment,
     trim_state_textarea,
+    trim_state_comment_whitespace,
 } ngx_http_trim_state_e;
 
 
@@ -399,8 +400,20 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     ctx->look_comment++;
                 }
 
-            } else if (ch != '-') {
-                ctx->look_comment = 0;
+            } else {
+                switch(ch) {
+                case '\r':
+                case '\n':
+                case '\t':
+                case ' ':
+                    ctx->state = trim_state_comment_whitespace;
+                    break;
+                case '-':
+                    break;
+                default:
+                    ctx->look_comment = 0;
+                    break;
+                }
             }
 
             if (conf->comment_enable) {
@@ -451,6 +464,27 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             default:
                 ctx->state = trim_state_text;
                 break;
+            }
+            break;
+
+        case trim_state_comment_whitespace:
+            switch(ch) {
+            case '\r':
+            case '\n':
+            case '\t':
+            case ' ':
+                continue;
+            case '-':
+                ctx->state = trim_state_comment;
+                ctx->look_comment = 1;
+                break;
+            default:
+                ctx->state = trim_state_comment;
+                break;
+            }
+
+            if (conf->comment_enable) {
+                continue;
             }
             break;
         }
