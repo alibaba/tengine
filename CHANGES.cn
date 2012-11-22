@@ -1,5 +1,5 @@
 
-Tengine-1.4.2 [2012-11-21]
+Tengine-1.4.2 [2012-11-22]
 * Feature：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
 * Feature：增加$unix_time变量，表示当前的时间戳秒数 [yaoweibin]
 * Feature：Makefile中增加test命令以便运行测试用例 [yaoweibin]

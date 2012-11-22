@@ -1,5 +1,5 @@
 
-Changes with Tengine 1.4.2                                         21 Nov 2012
+Changes with Tengine 1.4.2                                         22 Nov 2012
 
     *) Feature: added the option '--dso-tool-path' to configure script, which
        can specify the installation path for the dso_tool script. (monadbobo)
