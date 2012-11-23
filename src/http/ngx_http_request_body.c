@@ -197,7 +197,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     size_t                     size;
     ssize_t                    n;
     ngx_int_t                  rc;
-    ngx_buf_t                 *b, buf;
+    ngx_buf_t                 *b;
     ngx_chain_t               *cl, out;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
@@ -270,23 +270,6 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             if (n == 0 || n == NGX_ERROR) {
                 c->error = 1;
                 return NGX_HTTP_BAD_REQUEST;
-            }
-
-            buf.start = rb->buf->last;
-            buf.pos = rb->buf->last;
-            buf.last = buf.start + n;
-            buf.end = buf.last;
-
-            rc = ngx_http_top_input_body_filter(r, &buf);
-            if (rc != NGX_OK) {
-                if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
-                    ngx_log_error(NGX_LOG_ALERT, c->log, 0,
-                              "input filter: return code 1xx or 2xx "
-                              "will cause trouble and is converted to 500");
-                }
-
-                return rc < NGX_HTTP_SPECIAL_RESPONSE
-                           ? NGX_HTTP_INTERNAL_SERVER_ERROR : rc;
             }
 
             rb->buf->last += n;
@@ -992,6 +975,7 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 static ngx_int_t
 ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
+    ngx_int_t                  rc;
     ngx_chain_t               *cl;
     ngx_http_request_body_t   *rb;
 
@@ -1022,6 +1006,20 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
 #endif
+
+    for (cl = in; cl; cl = cl->next) {
+        rc = ngx_http_top_input_body_filter(r, cl->buf);
+        if (rc != NGX_OK) {
+            if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
+                ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                              "input filter: return code 1xx or 2xx "
+                              "will cause trouble and is converted to 500");
+            }
+
+            return rc < NGX_HTTP_SPECIAL_RESPONSE
+                       ? NGX_HTTP_INTERNAL_SERVER_ERROR : rc;
+        }
+    }
 
     /* TODO: coalesce neighbouring buffers */
 
