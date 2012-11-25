@@ -172,7 +172,6 @@ ngx_http_sysguard_do_redirect(ngx_http_request_t *r, ngx_str_t *path)
 static ngx_int_t
 ngx_http_sysguard_handler(ngx_http_request_t *r)
 {
-    ngx_uint_t                updated;
     ngx_http_sysguard_conf_t *glcf;
 
     if (r->main->sysguard_set) {
@@ -186,11 +185,9 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
     }
 
     r->main->sysguard_set = 1;
-    updated = 0;
 
     if (ngx_http_sysguard_cached_exptime < ngx_time()) {
         ngx_http_sysguard_update(r, glcf->interval);
-        updated = 1;
     }
 
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
