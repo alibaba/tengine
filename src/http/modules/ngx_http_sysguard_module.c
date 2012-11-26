@@ -120,25 +120,32 @@ static ngx_int_t ngx_http_sysguard_cached_swapstat;
 static ngx_int_t
 ngx_http_sysguard_update(ngx_http_request_t *r, time_t exptime)
 {
-    ngx_int_t       load, rc;
-    ngx_meminfo_t   m;
+    ngx_int_t                 load, rc;
+    ngx_meminfo_t             m;
+    ngx_http_sysguard_conf_t *glcf;
+
+    glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
 
     ngx_http_sysguard_cached_exptime = ngx_time() + exptime;
 
-    rc = ngx_getloadavg(&load, 1, r->connection->log);
-    if (rc == NGX_ERROR) {
-        goto error;
+    if (glcf->load >= 0) {
+        rc = ngx_getloadavg(&load, 1, r->connection->log);
+        if (rc == NGX_ERROR) {
+            goto error;
+        }
+
+        ngx_http_sysguard_cached_load = load;
     }
 
-    rc = ngx_getmeminfo(&m, r->connection->log);
-    if (rc == NGX_ERROR) {
-        goto error;
+    if (glcf->swap >= 0) {
+        rc = ngx_getmeminfo(&m, r->connection->log);
+        if (rc == NGX_ERROR) {
+            goto error;
+        }
+
+        ngx_http_sysguard_cached_swapstat = m.totalswap == 0
+            ? 0 : (m.totalswap - m.freeswap) * 100 / m.totalswap;
     }
-
-    ngx_http_sysguard_cached_load = load;
-
-    ngx_http_sysguard_cached_swapstat = m.totalswap == 0
-        ? 0 : (m.totalswap- m.freeswap) * 100 / m.totalswap;
 
     return NGX_OK;
 
