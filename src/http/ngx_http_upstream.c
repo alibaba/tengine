@@ -4111,7 +4111,6 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     u.no_resolve = 1;
 
     uscf = ngx_http_upstream_add(cf, &u, NGX_HTTP_UPSTREAM_CREATE
-                                         |NGX_HTTP_UPSTREAM_ID
                                          |NGX_HTTP_UPSTREAM_WEIGHT
                                          |NGX_HTTP_UPSTREAM_MAX_FAILS
                                          |NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
@@ -4321,10 +4320,6 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (ngx_strncmp(value[i].data, "id=", 3) == 0) {
-
-            if (!(uscf->flags & NGX_HTTP_UPSTREAM_ID)) {
-                goto invalid;
-            }
 
             id.len = value[i].len - 3;
             id.data = &value[i].data[3];
