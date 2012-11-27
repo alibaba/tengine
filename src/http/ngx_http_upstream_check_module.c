@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
@@ -880,9 +879,9 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
     ngx_add_timer(event, ucscf->check_interval / 2);
 
     /* This process is processing this peer now. */
-    if ((peer->shm->owner == ngx_pid) ||
-        (peer->pc.connection != NULL) ||
-        (peer->check_timeout_ev.timer_set)) {
+    if (peer->shm->owner == ngx_pid ||
+        peer->pc.connection != NULL ||
+        peer->check_timeout_ev.timer_set) {
 
         return;
     }
