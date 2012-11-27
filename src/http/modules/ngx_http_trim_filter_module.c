@@ -1,9 +1,7 @@
 
 /*
- *  lieyuan@taobao.com
- *  remove whitespace and comment.
+ *  Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
-
 
 
 #include <ngx_config.h>
@@ -133,8 +131,8 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
     conf = ngx_http_get_module_loc_conf(r, ngx_http_trim_filter_module);
 
     if (r->headers_out.status != NGX_HTTP_OK
-        || r != r->main
         || (r->method & NGX_HTTP_HEAD)
+        || r->headers_out.content_length_n == 0
         || !conf->trim_enable
         || ngx_http_test_content_type(r, &conf->types) == NULL)
     {
