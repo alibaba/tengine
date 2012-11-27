@@ -879,8 +879,11 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     ngx_add_timer(event, ucscf->check_interval / 2);
 
-    /* This process is processing the events now. */
-    if (peer->shm->owner == ngx_pid) {
+    /* This process is processing this peer now. */
+    if ((peer->shm->owner == ngx_pid) ||
+        (peer->pc.connection != NULL) ||
+        (peer->check_timeout_ev.timer_set)) {
+
         return;
     }
 
@@ -1766,11 +1769,14 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
 
     c = peer->pc.connection;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check clean event: index:%i, fd: %d",
-                   peer->index, c->fd);
+    if (c) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "http check clean event: index:%i, fd: %d",
+                       peer->index, c->fd);
 
-    ngx_close_connection(c);
+        ngx_close_connection(c);
+        peer->pc.connection = NULL;
+    }
 
     if (peer->check_timeout_ev.timer_set) {
         ngx_del_timer(&peer->check_timeout_ev);
@@ -1857,7 +1863,10 @@ ngx_http_upstream_check_clear_all_events()
 
         if (peer[i].check_timeout_ev.timer_set) {
             c = peer[i].pc.connection;
-            ngx_close_connection(c);
+            if (c) {
+                ngx_close_connection(c);
+                peer[i].pc.connection = NULL;
+            }
             ngx_del_timer(&peer[i].check_timeout_ev);
         }
 
