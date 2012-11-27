@@ -2501,14 +2501,17 @@ ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
 static int
 ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
 {
+    int         k, len;
     FILE       *fp;
     char        c, b[NGX_MAX_PATH];
     u_char     *p;
     ngx_str_t   file;
-    ngx_int_t   k, len = -1;
+
     static int  first_in = 1;
 
     ngx_http_ssl_pphrase_dialog_conf_t  *dialog = conf;
+
+    len = -1;
 
     if (ngx_strcmp(dialog->type->data, (u_char *) "builtin") == 0) {
         if (first_in) {
