@@ -112,50 +112,53 @@ ngx_module_t  ngx_http_sysguard_module = {
 };
 
 
-static time_t    ngx_http_sysguard_cached_exptime;
+static time_t    ngx_http_sysguard_cached_load_exptime;
+static time_t    ngx_http_sysguard_cached_swap_exptime;
 static ngx_int_t ngx_http_sysguard_cached_load;
 static ngx_int_t ngx_http_sysguard_cached_swapstat;
 
 
 static ngx_int_t
-ngx_http_sysguard_update(ngx_http_request_t *r, time_t exptime)
+ngx_http_sysguard_update_load(ngx_http_request_t *r, time_t exptime)
 {
     ngx_int_t                 load, rc;
-    ngx_meminfo_t             m;
-    ngx_http_sysguard_conf_t *glcf;
 
-    glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
+    ngx_http_sysguard_cached_load_exptime = ngx_time() + exptime;
 
-    ngx_http_sysguard_cached_exptime = ngx_time() + exptime;
+    rc = ngx_getloadavg(&load, 1, r->connection->log);
+    if (rc == NGX_ERROR) {
 
-    if (glcf->load >= 0) {
-        rc = ngx_getloadavg(&load, 1, r->connection->log);
-        if (rc == NGX_ERROR) {
-            goto error;
-        }
+        ngx_http_sysguard_cached_load = 0;
 
-        ngx_http_sysguard_cached_load = load;
+        return NGX_ERROR;
     }
 
-    if (glcf->swap >= 0) {
-        rc = ngx_getmeminfo(&m, r->connection->log);
-        if (rc == NGX_ERROR) {
-            goto error;
-        }
-
-        ngx_http_sysguard_cached_swapstat = m.totalswap == 0
-            ? 0 : (m.totalswap - m.freeswap) * 100 / m.totalswap;
-    }
+    ngx_http_sysguard_cached_load = load;
 
     return NGX_OK;
+}
 
-error:
 
-    ngx_http_sysguard_cached_load = 0;
-    ngx_http_sysguard_cached_swapstat = 0;
+static ngx_int_t
+ngx_http_sysguard_update_swap(ngx_http_request_t *r, time_t exptime)
+{
+    ngx_int_t                 rc;
+    ngx_meminfo_t             m;
 
-    return NGX_ERROR;
+    ngx_http_sysguard_cached_swap_exptime = ngx_time() + exptime;
 
+    rc = ngx_getmeminfo(&m, r->connection->log);
+    if (rc == NGX_ERROR) {
+
+        ngx_http_sysguard_cached_swapstat = 0;
+
+        return NGX_ERROR;
+    }
+
+    ngx_http_sysguard_cached_swapstat = m.totalswap == 0
+        ? 0 : (m.totalswap - m.freeswap) * 100 / m.totalswap;
+
+    return NGX_OK;
 }
 
 
@@ -193,40 +196,56 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
 
     r->main->sysguard_set = 1;
 
-    if (ngx_http_sysguard_cached_exptime < ngx_time()) {
-        ngx_http_sysguard_update(r, glcf->interval);
+    /* load */
+
+    if (glcf->load >= 0) {
+
+        if (ngx_http_sysguard_cached_load_exptime < ngx_time()) {
+            ngx_http_sysguard_update_load(r, glcf->interval);
+        }
+
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http sysguard handler load: %i %i %V %V",
+                       ngx_http_sysguard_cached_load,
+                       glcf->load,
+                       &r->uri,
+                       &glcf->load_action);
+
+        if (ngx_http_sysguard_cached_load > glcf->load) {
+
+            ngx_log_error(glcf->log_level, r->connection->log, 0,
+                          "sysguard load limited, current:%i conf:%i",
+                          ngx_http_sysguard_cached_load,
+                          glcf->load);
+
+            return ngx_http_sysguard_do_redirect(r, &glcf->load_action);
+        }
     }
 
-    ngx_log_debug7(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http sysguard handler %i %i %i %i %V %V %V",
-                   ngx_http_sysguard_cached_load,
-                   glcf->load,
-                   ngx_http_sysguard_cached_swapstat,
-                   glcf->swap,
-                   &r->uri,
-                   &glcf->load_action,
-                   &glcf->swap_action);
+    /* swap */
 
-    if (glcf->load >= 0
-        && ngx_http_sysguard_cached_load > glcf->load)
-    {
-        ngx_log_error(glcf->log_level, r->connection->log, 0,
-                      "sysguard load limited, current:%i conf:%i",
-                      ngx_http_sysguard_cached_load,
-                      glcf->load);
+    if (glcf->swap >= 0) {
 
-        return ngx_http_sysguard_do_redirect(r, &glcf->load_action);
-    }
+        if (ngx_http_sysguard_cached_swap_exptime < ngx_time()) {
+            ngx_http_sysguard_update_swap(r, glcf->interval);
+        }
 
-    if (glcf->swap >= 0
-        && ngx_http_sysguard_cached_swapstat > glcf->swap)
-    {
-        ngx_log_error(glcf->log_level, r->connection->log, 0,
-                      "sysguard swap limited, current:%i conf:%i",
-                      ngx_http_sysguard_cached_swapstat,
-                      glcf->swap);
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http sysguard handler swap: %i %i %V %V",
+                       ngx_http_sysguard_cached_swapstat,
+                       glcf->swap,
+                       &r->uri,
+                       &glcf->swap_action);
 
-        return ngx_http_sysguard_do_redirect(r, &glcf->swap_action);
+        if (ngx_http_sysguard_cached_swapstat > glcf->swap) {
+
+            ngx_log_error(glcf->log_level, r->connection->log, 0,
+                          "sysguard swap limited, current:%i conf:%i",
+                          ngx_http_sysguard_cached_swapstat,
+                          glcf->swap);
+
+            return ngx_http_sysguard_do_redirect(r, &glcf->swap_action);
+        }
     }
 
     return NGX_DECLINED;
