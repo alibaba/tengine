@@ -121,7 +121,7 @@ static ngx_int_t ngx_http_sysguard_cached_swapstat;
 static ngx_int_t
 ngx_http_sysguard_update_load(ngx_http_request_t *r, time_t exptime)
 {
-    ngx_int_t                 load, rc;
+    ngx_int_t  load, rc;
 
     ngx_http_sysguard_cached_load_exptime = ngx_time() + exptime;
 
@@ -142,8 +142,8 @@ ngx_http_sysguard_update_load(ngx_http_request_t *r, time_t exptime)
 static ngx_int_t
 ngx_http_sysguard_update_swap(ngx_http_request_t *r, time_t exptime)
 {
-    ngx_int_t                 rc;
-    ngx_meminfo_t             m;
+    ngx_int_t      rc;
+    ngx_meminfo_t  m;
 
     ngx_http_sysguard_cached_swap_exptime = ngx_time() + exptime;
 
@@ -182,7 +182,7 @@ ngx_http_sysguard_do_redirect(ngx_http_request_t *r, ngx_str_t *path)
 static ngx_int_t
 ngx_http_sysguard_handler(ngx_http_request_t *r)
 {
-    ngx_http_sysguard_conf_t *glcf;
+    ngx_http_sysguard_conf_t  *glcf;
 
     if (r->main->sysguard_set) {
         return NGX_DECLINED;
@@ -282,8 +282,8 @@ ngx_http_sysguard_create_conf(ngx_conf_t *cf)
 static char *
 ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-    ngx_http_sysguard_conf_t *prev = parent;
-    ngx_http_sysguard_conf_t *conf = child;
+    ngx_http_sysguard_conf_t  *prev = parent;
+    ngx_http_sysguard_conf_t  *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_str_value(conf->load_action, prev->load_action, "");
@@ -299,7 +299,7 @@ ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 static char *
 ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_sysguard_conf_t *glcf = conf;
+    ngx_http_sysguard_conf_t  *glcf = conf;
 
     ngx_str_t  *value;
     ngx_uint_t  i;
@@ -358,7 +358,7 @@ invalid:
 static char *
 ngx_http_sysguard_mem(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_sysguard_conf_t *glcf = conf;
+    ngx_http_sysguard_conf_t  *glcf = conf;
 
     ngx_str_t  *value;
     ngx_uint_t  i;
