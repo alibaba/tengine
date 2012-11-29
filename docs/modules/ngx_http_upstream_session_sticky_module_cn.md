@@ -4,7 +4,7 @@
 该模块的功能是通过cookie实现客户端与后端服务器的映射。
 
 # Example 1#
-    默认配置：cookie=route mode=insert fallback=on
+    # 默认配置：cookie=route mode=insert fallback=on
     upstream foo {
        server 192.168.0.1;
        server 192.168.0.2;
@@ -25,7 +25,7 @@
     }
     server {
       location / {
-        #在insert + indirect模式或者 prefix模式下需要配置session_sticku_header
+        #在insert + indirect模式或者 prefix模式下需要配置session_sticky_header
         session_sticky_header upstream=test switch=on;
         proxy_pass http://test;
       }
