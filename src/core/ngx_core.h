@@ -113,4 +113,5 @@ typedef void (*ngx_event_expire_timers_pt)(void);
 typedef void (*ngx_event_del_timer_pt)(ngx_event_t *ev);
 typedef void (*ngx_event_add_timer_pt)(ngx_event_t *ev, ngx_msec_t timer);
 typedef ngx_int_t (*ngx_event_timer_is_empty_pt)(void);
+
 #endif /* _NGX_CORE_H_INCLUDED_ */
