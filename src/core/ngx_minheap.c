@@ -3,6 +3,7 @@
  * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  */
 
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 
@@ -87,7 +88,8 @@ ngx_minheap_delete(ngx_minheap_t *h, ngx_uint_t index)
 }
 
 
-void ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
+void
+ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
 {
     ngx_uint_t            parent, index;
     ngx_minheap_node_t  **p;
@@ -119,7 +121,8 @@ void ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
 }
 
 
-void ngx_minheap4_delete(ngx_minheap_t *h, ngx_uint_t index)
+void
+ngx_minheap4_delete(ngx_minheap_t *h, ngx_uint_t index)
 {
     ngx_uint_t           child, parent, minpos;
     ngx_minheap_node_t **p, *node;
