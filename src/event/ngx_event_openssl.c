@@ -2501,7 +2501,7 @@ ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
 static int
 ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
 {
-    int         k, len;
+    int         k, len, ci;
     FILE       *fp;
     char        c, b[NGX_MAX_PATH];
     u_char     *p;
@@ -2555,7 +2555,10 @@ ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
             return -1;
         }
 
-        for (k = 0; (c = fgetc(fp)) != EOF && k < size; /* void */) {
+        for (k = 0; (ci = fgetc(fp)) != EOF && k < size; /* void */) {
+
+            c = (char) ci;
+
             if (c == '\n' || c == '\r') {
                 break;
             }
