@@ -39,6 +39,8 @@ static ngx_int_t ngx_http_variable_tcpinfo(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #endif
 
+static ngx_int_t ngx_http_variable_content_length(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_host(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_binary_remote_addr(ngx_http_request_t *r,
@@ -175,8 +177,8 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("http_cookie"), NULL, ngx_http_variable_headers,
       offsetof(ngx_http_request_t, headers_in.cookies), 0, 0 },
 
-    { ngx_string("content_length"), NULL, ngx_http_variable_header,
-      offsetof(ngx_http_request_t, headers_in.content_length), 0, 0 },
+    { ngx_string("content_length"), NULL, ngx_http_variable_content_length,
+      0, 0, 0 },
 
     { ngx_string("content_type"), NULL, ngx_http_variable_header,
       offsetof(ngx_http_request_t, headers_in.content_type), 0, 0 },
@@ -1039,6 +1041,39 @@ ngx_http_variable_tcpinfo(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
 
 static ngx_int_t
+ngx_http_variable_content_length(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char  *p;
+
+    if (r->headers_in.content_length) {
+        v->len = r->headers_in.content_length->value.len;
+        v->data = r->headers_in.content_length->value.data;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+    } else if (r->headers_in.content_length_n >= 0) {
+        p = ngx_pnalloc(r->pool, NGX_OFF_T_LEN);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_sprintf(p, "%O", r->headers_in.content_length_n) - p;
+        v->data = p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+    } else {
+        v->not_found = 1;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_variable_host(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     uintptr_t data)
 {
@@ -1816,7 +1851,7 @@ ngx_http_variable_request_body(ngx_http_request_t *r,
 {
     u_char       *p;
     size_t        len;
-    ngx_buf_t    *buf, *next;
+    ngx_buf_t    *buf;
     ngx_chain_t  *cl;
 
     if (r->request_body == NULL
@@ -1841,8 +1876,13 @@ ngx_http_variable_request_body(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    next = cl->next->buf;
-    len = (buf->last - buf->pos) + (next->last - next->pos);
+    len = buf->last - buf->pos;
+    cl = cl->next;
+
+    for ( /* void */ ; cl; cl = cl->next) {
+        buf = cl->buf;
+        len += buf->last - buf->pos;
+    }
 
     p = ngx_pnalloc(r->pool, len);
     if (p == NULL) {
@@ -1850,9 +1890,12 @@ ngx_http_variable_request_body(ngx_http_request_t *r,
     }
 
     v->data = p;
+    cl = r->request_body->bufs;
 
-    p = ngx_cpymem(p, buf->pos, buf->last - buf->pos);
-    ngx_memcpy(p, next->pos, next->last - next->pos);
+    for ( /* void */ ; cl; cl = cl->next) {
+        buf = cl->buf;
+        p = ngx_cpymem(p, buf->pos, buf->last - buf->pos);
+    }
 
     v->len = len;
     v->valid = 1;
