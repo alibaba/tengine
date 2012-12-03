@@ -423,6 +423,10 @@ ngx_http_user_agent_variable(ngx_http_request_t *r,
     uacf = (ngx_http_user_agent_ctx_t *) data;
     trie = uacf->trie;
 
+    if (r->headers_in.user_agent == NULL) {
+      goto end;
+    }
+
     user_agent = &(r->headers_in.user_agent->value);
 
     value = trie->query(trie, user_agent, &pos, NGX_TRIE_REVERSE);
