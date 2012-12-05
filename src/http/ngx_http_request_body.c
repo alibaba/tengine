@@ -161,8 +161,11 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
              * NGX_AGAIN: not ready and retry later.
              */
 
-            return rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN
-                      ? NGX_HTTP_INTERNAL_SERVER_ERROR : rc;
+            if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
+                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            return rc;
         }
 
         if ((off_t) preread >= r->headers_in.content_length_n) {
@@ -358,8 +361,11 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                               "will cause trouble and is converted to 500");
                 }
 
-                return rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN
-                           ? NGX_HTTP_INTERNAL_SERVER_ERROR : rc;
+                if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
+                    rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+                }
+
+                return rc;
             }
 
             if (rb->rest == 0) {
