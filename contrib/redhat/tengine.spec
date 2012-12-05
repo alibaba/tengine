@@ -1,16 +1,9 @@
-%{!?myprefix: %{expand: %%global myprefix /usr/local}}
-%{!?mylogdir: %{expand: %%global mylogdir /data/logs}}
-
-%{!?mywebuser: %{expand: %%global mywebuser www}}
-%{!?mywebgroup: %{expand: %%global mywebgroup www}}
-%{!?mywebroot: %{expand: %%global mywebroot /data/wwwroot/html}}
-
 %define software tengine
-%define nginx_user %{mywebuser}
-%define nginx_group %{mywebgroup}
-%define nginx_home %{myprefix}/nginx
-%define nginx_logdir %mylogdir/nginx
-%define nginx_home_tmp  %{nginx_home}/tmp
+%define nginx_user nobody
+%define nginx_group nobody
+%define nginx_home /usr/local/nginx
+%define nginx_logdir /data/log/nginx
+%define nginx_home_tmp  /usr/local/nginx/tmp
 
 Name: %{software}
 Version: 1.4.2
@@ -186,16 +179,9 @@ server {
     root /data/wwwroot/html;
     index   index.html index.htm index.php;
 
-    #charset koi8-r;
     access_log       /data/logs/nginx/localhost_access.log main;
     error_log        /data/logs/nginx/localhost_error.log        warn;
 
-    if ($http_user_agent ~* 'Windows 5.1') {
-        return 503;
-    }
-    if ($http_user_agent ~ must-revalidate) {
-        return 503;
-    }
     if ($fastcgi_script_name ~ \..*/.*php ) {
         return 403;
     }
