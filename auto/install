@@ -8,7 +8,7 @@ if [ $USE_PERL = YES ]; then
     cat << END                                                >> $NGX_MAKEFILE
 
 install_perl_modules:
-	cd $NGX_OBJS/src/http/modules/perl && \${MAKE} install
+	cd $NGX_OBJS/src/http/modules/perl && \$(MAKE) install
 END
 
     NGX_INSTALL_PERL_MODULES=install_perl_modules
@@ -83,6 +83,16 @@ case ".$NGX_DSO_PATH" in
 esac
 
 
+case ".$NGX_DSO_TOOL_PATH" in
+    ./*)
+    ;;
+
+    *)
+        NGX_DSO_TOOL_PATH=$NGX_PREFIX/$NGX_DSO_TOOL_PATH
+    ;;
+esac
+
+
 if test -f man/nginx.8 ; then
     NGX_MAN=man/nginx.8
 else
@@ -108,11 +118,34 @@ $NGX_OBJS/nginx.8:	$NGX_MAN $NGX_AUTO_CONFIG_H
 
 END
 
+case ".$NGX_OBJS" in
+    ./*)
+        NGX_TEST_BINARY=$NGX_OBJS/nginx
+    ;;
+
+    *)
+        NGX_TEST_BINARY=`pwd`/$NGX_OBJS/nginx
+    ;;
+esac
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+test:	$NGX_OBJS/nginx
+	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove -v -I `pwd`/tests/nginx-tests/nginx-tests/lib tests/nginx-tests/nginx-tests tests/nginx-tests/cases
+
+END
+
 if test -n "$NGX_SHARED_MODULES"; then
 
     cat << END                                                >> $NGX_MAKEFILE
 
 dso_install:	all
+END
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
+		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
 
     for ngx_dso_module in $NGX_DSO_ALL_TARGETS
@@ -219,6 +252,7 @@ fi
 if [ $NGX_DSO = YES ] ; then
 
     cat << END                                                >> $NGX_MAKEFILE
+
 	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
 		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
@@ -237,8 +271,10 @@ END
 	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs' \
 		|| cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs'
-	chmod 0755 $NGX_DSO_COMPILE
-	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_PREFIX/sbin'
+	test -d '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`' || \
+		mkdir -p '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`'
+	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
+	chmod 0755 '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
 END
 
 fi
@@ -251,6 +287,9 @@ cat << END >> Makefile
 build:
 	\$(MAKE) -f $NGX_MAKEFILE
 	\$(MAKE) -f $NGX_MAKEFILE manpage
+
+test:
+	\$(MAKE) -f $NGX_MAKEFILE test
 
 install:
 	\$(MAKE) -f $NGX_MAKEFILE install

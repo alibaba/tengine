@@ -65,7 +65,7 @@ dso_all_incs=$ngx_include_opt$ngx_incs
 ngx_all_srcs="$CORE_SRCS"
 
 
-# the core dependences and include pathes
+# the core dependences and include paths
 
 ngx_deps=`echo $CORE_DEPS $NGX_AUTO_CONFIG_H $NGX_PCH \
     | sed -e "s/  *\([^ ][^ ]*\)/$ngx_regex_cont\1/g" \
@@ -88,7 +88,7 @@ dso_core_deps=$ngx_deps
 dso_core_incs=$ngx_include_opt$ngx_incs
 
 
-# the http dependences and include pathes
+# the http dependences and include paths
 
 if [ $HTTP = YES ]; then
 
@@ -117,7 +117,7 @@ dso_http_incs=$ngx_include_opt$ngx_incs
 fi
 
 
-# the mail dependences and include pathes
+# the mail dependences and include paths
 
 if [ $MAIL = YES ]; then
 
@@ -634,7 +634,7 @@ NGX_DSO_PATH=$NGX_DSO_PATH
 NGX_AUTOCONF_ERR=$NGX_AUTOCONF_ERR
 NGX_AUTOTEST=$NGX_AUTOTEST
 NGX_AUTO_CONFIG_H=$NGX_AUTO_CONFIG_H
-NGX_CONFIGURE='$NGX_CONFIGURE'
+NGX_CONFIGURE="$NGX_CONFIGURE"
 
 END
 

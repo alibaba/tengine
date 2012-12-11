@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2010-2012 Alibaba Group Holding Limited
  * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
@@ -879,8 +878,11 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     ngx_add_timer(event, ucscf->check_interval / 2);
 
-    /* This process is processing the events now. */
-    if (peer->shm->owner == ngx_pid) {
+    /* This process is processing this peer now. */
+    if (peer->shm->owner == ngx_pid ||
+        peer->pc.connection != NULL ||
+        peer->check_timeout_ev.timer_set) {
+
         return;
     }
 
@@ -907,7 +909,7 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
     } else if (interval >= (ucscf->check_interval << 4)) {
 
         /*
-         * If the check peer has been untouched for 4 times of
+         * If the check peer has been untouched for 2^4 times of
          * the check interval, activate the current timer.
          * Sometimes, the checking process may disappear
          * in some circumstances, and the clean event will never
@@ -1185,7 +1187,7 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 
         err = (size >= 0) ? 0 : ngx_socket_errno;
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
-                       "http check recv size: %z, peer: %V",
+                       "http check recv size: %z, peer: %V ",
                        size, &peer->check_peer_addr->name);
         }
 #endif
@@ -1204,7 +1206,7 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
     rc = peer->parse(peer);
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check parse rc: %i, peer: %V",
+                   "http check parse rc: %i, peer: %V ",
                    rc, &peer->check_peer_addr->name);
 
     switch (rc) {
@@ -1284,8 +1286,8 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 
         if (rc == NGX_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                          "http parse error with peer: %V, recv data: %s",
-                          &peer->check_peer_addr->name, ctx->recv.start);
+                          "http parse status line error with peer: %V ",
+                          &peer->check_peer_addr->name);
             return rc;
         }
 
@@ -1766,11 +1768,14 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
 
     c = peer->pc.connection;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check clean event: index:%i, fd: %d",
-                   peer->index, c->fd);
+    if (c) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "http check clean event: index:%i, fd: %d",
+                       peer->index, c->fd);
 
-    ngx_close_connection(c);
+        ngx_close_connection(c);
+        peer->pc.connection = NULL;
+    }
 
     if (peer->check_timeout_ev.timer_set) {
         ngx_del_timer(&peer->check_timeout_ev);
@@ -1857,7 +1862,10 @@ ngx_http_upstream_check_clear_all_events()
 
         if (peer[i].check_timeout_ev.timer_set) {
             c = peer[i].pc.connection;
-            ngx_close_connection(c);
+            if (c) {
+                ngx_close_connection(c);
+                peer[i].pc.connection = NULL;
+            }
             ngx_del_timer(&peer[i].check_timeout_ev);
         }
 
@@ -1918,8 +1926,8 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
     peers = check_peers_ctx;
     if (peers == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http upstream check can not find the check servers, "
-                      "make sure you've added the check servers");
+                      "http upstream check module can not find any check "
+                      "server, make sure you've added the check servers");
 
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2753,7 +2761,7 @@ ngx_http_upstream_check_init_shm(ngx_conf_t *cf, void *conf)
                                          &ngx_http_upstream_check_module);
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-                       "http upstream check: upsteam:%V, shm_zone size:%ui",
+                       "http upstream check, upsteam:%V, shm_zone size:%ui",
                        shm_name, shm_size);
 
         shm_zone->data = cf->pool;
@@ -2907,7 +2915,7 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
                                                              peer[i].peer_addr);
             if (opeer_shm) {
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, shm_zone->shm.log, 0,
-                               "http upstream check: inherit opeer:%V",
+                               "http upstream check, inherit opeer: %V ",
                                &peer[i].peer_addr->name);
 
                 rc = ngx_http_upstream_check_init_shm_peer(peer_shm, opeer_shm,
