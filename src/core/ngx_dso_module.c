@@ -33,6 +33,7 @@ typedef struct {
 } ngx_dso_conf_ctx_t;
 
 
+static ngx_int_t ngx_dso_module_init(ngx_cycle_t *cycle);
 static char *ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf);
 static char *ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
@@ -79,7 +80,7 @@ ngx_module_t  ngx_dso_module = {
     ngx_dso_module_commands,               /* module directives */
     NGX_CORE_MODULE,                       /* module type */
     NULL,                                  /* init master */
-    NULL,                                  /* init module */
+    ngx_dso_module_init,                   /* init module */
     NULL,                                  /* init process */
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
@@ -100,6 +101,31 @@ static ngx_dso_flagpole_t module_flagpole[] = {
     { ngx_string("filter"), ngx_string("ngx_http_copy_filter_module")},
     { ngx_null_string, ngx_null_string}
 };
+
+
+static ngx_int_t
+ngx_dso_module_init(ngx_cycle_t *cycle)
+{
+    if (ngx_is_init_cycle(cycle->old_cycle)) {
+        ngx_memcpy(ngx_static_modules, ngx_modules,
+                   sizeof(ngx_module_t *) * ngx_max_module);
+        ngx_memcpy(ngx_static_module_names, ngx_module_names,
+                   sizeof(u_char *) * ngx_max_module);
+
+    } else {
+        ngx_memcpy(ngx_old_modules, ngx_modules,
+                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
+        ngx_memcpy(ngx_modules, ngx_static_modules,
+                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
+
+        ngx_memcpy(ngx_old_module_names, ngx_module_names,
+                   sizeof(u_char *) * NGX_DSO_MAX);
+        ngx_memcpy(ngx_module_names, ngx_static_module_names,
+                   sizeof(u_char *) * NGX_DSO_MAX);
+    }
+
+    return NGX_OK;
+}
 
 
 static char *
@@ -131,24 +157,6 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ctx->stubs = ngx_array_create(cf->pool, 50, sizeof(ngx_str_t));
     if (ctx->stubs == NULL) {
         return NGX_CONF_ERROR;
-    }
-
-    if (ngx_is_init_cycle(cf->cycle->old_cycle)) {
-        ngx_memcpy(ngx_static_modules, ngx_modules,
-                   sizeof(ngx_module_t *) * ngx_max_module);
-        ngx_memcpy(ngx_static_module_names, ngx_module_names,
-                   sizeof(u_char *) * ngx_max_module);
-
-    } else {
-        ngx_memcpy(ngx_old_modules, ngx_modules,
-                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_modules, ngx_static_modules,
-                   sizeof(ngx_module_t *) * NGX_DSO_MAX);
-
-        ngx_memcpy(ngx_old_module_names, ngx_module_names,
-                   sizeof(u_char *) * NGX_DSO_MAX);
-        ngx_memcpy(ngx_module_names, ngx_static_module_names,
-                   sizeof(u_char *) * NGX_DSO_MAX);
     }
 
     ctx->flag_postion = ngx_dso_get_position(&module_flagpole[0].entry);
