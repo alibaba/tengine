@@ -423,17 +423,17 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_upstream_check_module_ctx = {
-    NULL,                                     /* preconfiguration */
-    NULL,                                     /* postconfiguration */
+    NULL,                                    /* preconfiguration */
+    NULL,                                    /* postconfiguration */
 
-    ngx_http_upstream_check_create_main_conf, /* create main configuration */
-    ngx_http_upstream_check_init_main_conf,   /* init main configuration */
+    ngx_http_upstream_check_create_main_conf,/* create main configuration */
+    ngx_http_upstream_check_init_main_conf,  /* init main configuration */
 
-    ngx_http_upstream_check_create_srv_conf,  /* create server configuration */
-    NULL,                                     /* merge server configuration */
+    ngx_http_upstream_check_create_srv_conf, /* create server configuration */
+    NULL,                                    /* merge server configuration */
 
-    ngx_http_upstream_check_create_loc_conf,  /* create location configuration */
-    ngx_http_upstream_check_merge_loc_conf    /* merge location configuration */
+    ngx_http_upstream_check_create_loc_conf, /* create location configuration */
+    ngx_http_upstream_check_merge_loc_conf   /* merge location configuration */
 };
 
 
@@ -1990,7 +1990,8 @@ ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
 
            if (command->handler(ctx, &value) != NGX_OK) {
                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                             "http upstream check, bad argument: \"%V\"", &value);
+                             "http upstream check, bad argument: \"%V\"",
+                             &value);
            }
         }
     }
@@ -2141,7 +2142,6 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     ngx_http_upstream_check_peer_t  *peer;
 
     peer = peers->peers.elts;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {
@@ -2209,7 +2209,6 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
             ngx_http_upstream_check_shm_generation);
 
     last = peers->peers.nelts - 1;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {
