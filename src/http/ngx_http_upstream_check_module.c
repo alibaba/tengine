@@ -1985,7 +1985,7 @@ ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
             break;
         }
 
-        if (ngx_http_arg(r, command->name.data, command->name.len, &value) 
+        if (ngx_http_arg(r, command->name.data, command->name.len, &value)
             == NGX_OK) {
 
            if (command->handler(ctx, &value) != NGX_OK) {
