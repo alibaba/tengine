@@ -81,6 +81,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peers->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peers->peer[n].socklen = server[i].addrs[j].socklen;
                 peers->peer[n].name = server[i].addrs[j].name;
+                peers->peer[n].id = server[i].id;
                 peers->peer[n].max_fails = server[i].max_fails;
                 peers->peer[n].fail_timeout = server[i].fail_timeout;
                 peers->peer[n].down = server[i].down;
@@ -150,6 +151,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 backup->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 backup->peer[n].socklen = server[i].addrs[j].socklen;
                 backup->peer[n].name = server[i].addrs[j].name;
+                backup->peer[n].id = server[i].id;
                 backup->peer[n].weight = server[i].weight;
                 backup->peer[n].effective_weight = server[i].weight;
                 backup->peer[n].current_weight = 0;
@@ -223,6 +225,8 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peers->peer[i].sockaddr = u.addrs[i].sockaddr;
         peers->peer[i].socklen = u.addrs[i].socklen;
         peers->peer[i].name = u.addrs[i].name;
+        peers->peer[i].id.len = 0;
+        peers->peer[i].id.data = NULL;
         peers->peer[i].weight = 1;
         peers->peer[i].effective_weight = 1;
         peers->peer[i].current_weight = 0;
@@ -343,6 +347,8 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
         peers->peer[0].sockaddr = ur->sockaddr;
         peers->peer[0].socklen = ur->socklen;
         peers->peer[0].name = ur->host;
+        peers->peer[0].id.len = 0;
+        peers->peer[0].id.data = NULL;
         peers->peer[0].weight = 1;
         peers->peer[0].effective_weight = 1;
         peers->peer[0].current_weight = 0;
@@ -379,6 +385,8 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
             peers->peer[i].socklen = sizeof(struct sockaddr_in);
             peers->peer[i].name.len = len;
             peers->peer[i].name.data = p;
+            peers->peer[i].id.len = 0;
+            peers->peer[i].id.data = NULL;
             peers->peer[i].weight = 1;
             peers->peer[i].effective_weight = 1;
             peers->peer[i].current_weight = 0;
