@@ -12,11 +12,12 @@
 #include <ngx_core.h>
 
 
+/* in bytes */
 typedef struct {
     size_t totalram;
     size_t freeram;
-    size_t sharedram;
     size_t bufferram;
+    size_t cachedram;
     size_t totalswap;
     size_t freeswap;
 } ngx_meminfo_t;
