@@ -390,6 +390,17 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+    if (ecf->reuse_port) {    
+        ngx_close_listening_sockets(cycle);
+    }
+
+#endif    
+
     for (i = 0; i < n; i++) {
 
 #if (NGX_HAVE_CPU_AFFINITY)
@@ -1029,6 +1040,18 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_uint_t priority)
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "sigprocmask() failed");
     }
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+    if (ecf->reuse_port) {
+        ngx_open_listening_sockets(cycle);
+        ngx_configure_listening_sockets(cycle);
+    }
+
+#endif
 
     /*
      * disable deleting previous events for the listening sockets because

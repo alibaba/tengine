@@ -472,6 +472,8 @@ typedef struct {
     ngx_flag_t    multi_accept;
     ngx_flag_t    accept_mutex;
 
+    ngx_flag_t    reuse_port;
+
     ngx_msec_t    accept_mutex_delay;
 
     u_char       *name;

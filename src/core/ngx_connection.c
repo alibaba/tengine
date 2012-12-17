@@ -268,14 +268,14 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
-    int               reuseaddr;
+    int               reuse;
     ngx_uint_t        i, tries, failed;
     ngx_err_t         err;
     ngx_log_t        *log;
     ngx_socket_t      s;
     ngx_listening_t  *ls;
 
-    reuseaddr = 1;
+    reuse = 1;
 #if (NGX_SUPPRESS_WARN)
     failed = 0;
 #endif
@@ -318,7 +318,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 
             if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-                           (const void *) &reuseaddr, sizeof(int))
+                           (const void *) &reuse, sizeof(int))
                 == -1)
             {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -333,6 +333,26 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                           (const void *) &reuse, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                              "setsockopt(SO_REUSEPORT) %V failed",
+                              &ls[i].addr_text);
+
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                return NGX_ERROR;
+            }
+#endif
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 
