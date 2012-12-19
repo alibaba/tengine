@@ -19,7 +19,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http/)->plan(169);
+my $t = Test::Nginx->new()->has(qw/http concat/)->plan(169);
 
 $t->set_dso("ngx_http_concat_module", "ngx_http_concat_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -83,8 +83,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -98,11 +104,6 @@ http {
 }
 
 EOF
-
-###########################################################
-my $m;
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -129,8 +130,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
-    
-    include mime.types;
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -144,10 +151,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -174,8 +177,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
-    
-    include mime.types;
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -189,10 +198,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -219,8 +224,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -234,10 +245,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -264,8 +271,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -280,10 +293,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -310,8 +319,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -326,10 +341,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -356,8 +367,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -372,10 +389,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -402,8 +415,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -418,10 +437,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -448,8 +463,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -463,10 +484,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -493,8 +510,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -508,10 +531,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -538,8 +557,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -553,10 +578,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -583,8 +604,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -598,10 +625,6 @@ http {
 }
 
 EOF
-
-##########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -628,8 +651,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -643,10 +672,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -673,8 +698,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -690,10 +721,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -720,8 +747,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -737,10 +770,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -767,8 +796,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -784,10 +819,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -814,8 +845,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -831,10 +868,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -861,8 +894,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -878,10 +917,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -908,8 +943,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -925,10 +966,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -955,8 +992,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -972,10 +1015,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1002,8 +1041,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1019,10 +1064,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1049,8 +1090,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1066,10 +1113,6 @@ http {
 }
 
 EOF
-
-##########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1096,8 +1139,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1113,10 +1162,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1143,8 +1188,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        text/xml                              xml;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1158,10 +1209,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1188,8 +1235,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1203,10 +1256,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1233,8 +1282,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1248,10 +1303,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1279,8 +1330,14 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
     
-    include mime.types;
     default_type application/octet-stream;
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
 
     server {
         listen      127.0.0.1:8080;
@@ -1293,10 +1350,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1323,8 +1376,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1339,10 +1398,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1369,8 +1424,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1385,10 +1446,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1415,8 +1472,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1431,10 +1494,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1461,8 +1520,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1477,10 +1542,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1507,8 +1568,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1523,10 +1590,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1553,8 +1616,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1569,10 +1638,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1599,8 +1664,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1615,10 +1686,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1645,8 +1712,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1661,10 +1734,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1691,8 +1760,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1707,10 +1782,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1737,8 +1808,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1753,10 +1830,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1783,8 +1856,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1799,10 +1878,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1829,8 +1904,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1845,10 +1926,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1886,8 +1963,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1902,10 +1985,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1928,7 +2007,6 @@ $t->stop();
 ###############################################################################
 ###############################################################################
 #Test41
-#concat_types not inside the mime.types 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -1943,8 +2021,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -1958,10 +2042,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -1989,8 +2069,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2004,10 +2090,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -2035,8 +2117,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2050,10 +2138,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -2081,8 +2165,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2096,10 +2186,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -2128,7 +2214,13 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include mime.types;
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -2143,10 +2235,6 @@ http {
 }
 
 EOF
-
-############################################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###########################################################################
@@ -2174,7 +2262,13 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include mime.types;
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -2190,10 +2284,6 @@ http {
 }
 
 EOF
-
-############################################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###########################################################################
@@ -2221,7 +2311,13 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include mime.types;
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -2237,10 +2333,6 @@ http {
 }
 
 EOF
-
-############################################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###########################################################################
@@ -2267,7 +2359,13 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include      mime.types;
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+
     default_type application/octet-stream;
 
     server {
@@ -2312,9 +2410,6 @@ $t->write_file('unique/1.css', '1');
 $t->write_file('unique/2.css', '2');
 $t->write_file('unique/1.js', '1');
 $t->write_file('unique/2.js', '2');
-
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################
@@ -2363,8 +2458,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2378,10 +2479,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################
@@ -2423,8 +2520,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2506,9 +2609,6 @@ $t->write_file('unique/1.css', 'css1');
 $t->write_file('unique/2.css', 'css2');
 $t->write_file('unique/1.js', 'js1');
 $t->write_file('unique/2.js', 'js2');
-
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 
@@ -2632,8 +2732,14 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
     
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -2647,10 +2753,6 @@ http {
 }
 
 EOF
-
-###########################################################
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 ###############################################################################

@@ -429,8 +429,8 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
     manager = 0;
     loader = 0;
 
-    path = ngx_cycle->pathes.elts;
-    for (i = 0; i < ngx_cycle->pathes.nelts; i++) {
+    path = ngx_cycle->paths.elts;
+    for (i = 0; i < ngx_cycle->paths.nelts; i++) {
 
         if (path[i]->manager) {
             manager = 1;
@@ -1434,8 +1434,8 @@ ngx_cache_manager_process_handler(ngx_event_t *ev)
 
     next = 60 * 60;
 
-    path = ngx_cycle->pathes.elts;
-    for (i = 0; i < ngx_cycle->pathes.nelts; i++) {
+    path = ngx_cycle->paths.elts;
+    for (i = 0; i < ngx_cycle->paths.nelts; i++) {
 
         if (path[i]->manager) {
             n = path[i]->manager(path[i]->data);
@@ -1463,8 +1463,8 @@ ngx_cache_loader_process_handler(ngx_event_t *ev)
 
     cycle = (ngx_cycle_t *) ngx_cycle;
 
-    path = cycle->pathes.elts;
-    for (i = 0; i < cycle->pathes.nelts; i++) {
+    path = cycle->paths.elts;
+    for (i = 0; i < cycle->paths.nelts; i++) {
 
         if (ngx_terminate || ngx_quit) {
             break;

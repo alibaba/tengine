@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -129,17 +128,14 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         b->last = r->header_in->last;
         b->end = r->header_in->end;
 
+        ngx_memzero(&buf, sizeof(ngx_buf_t));
+        buf.memory = 1;
         buf.start = r->header_in->pos;
         buf.pos = r->header_in->pos;
         buf.last = (off_t) preread >= r->headers_in.content_length_n
                  ? r->header_in->pos + (size_t) r->headers_in.content_length_n
                  : r->header_in->last;
         buf.end = r->header_in->end;
-
-        rc = ngx_http_top_input_body_filter(r, &buf);
-        if (rc != NGX_OK) {
-            return rc;
-        }
 
         rb->bufs = ngx_alloc_chain_link(r->pool);
         if (rb->bufs == NULL) {
@@ -150,6 +146,27 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         rb->bufs->next = NULL;
 
         rb->buf = b;
+
+        rc = ngx_http_top_input_body_filter(r, &buf);
+        if (rc != NGX_OK) {
+            if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "input filter: return code 1xx or 2xx "
+                              "will cause trouble and is converted to 500");
+            }
+
+            /**
+             * NGX_OK: success and continue;
+             * NGX_ERROR: failed and exit;
+             * NGX_AGAIN: not ready and retry later.
+             */
+
+            if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
+                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            return rc;
+        }
 
         if ((off_t) preread >= r->headers_in.content_length_n) {
 
@@ -325,19 +342,31 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 return NGX_HTTP_BAD_REQUEST;
             }
 
+            ngx_memzero(&buf, sizeof(ngx_buf_t));
+            buf.memory = 1;
             buf.start = rb->buf->last;
             buf.pos = rb->buf->last;
             buf.last = buf.start + n;
             buf.end = buf.last;
 
-            rc = ngx_http_top_input_body_filter(r, &buf);
-            if (rc != NGX_OK) {
-                return rc;
-            }
-
             rb->buf->last += n;
             rb->rest -= n;
             r->request_length += n;
+
+            rc = ngx_http_top_input_body_filter(r, &buf);
+            if (rc != NGX_OK) {
+                if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
+                    ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                              "input filter: return code 1xx or 2xx "
+                              "will cause trouble and is converted to 500");
+                }
+
+                if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
+                    rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+                }
+
+                return rc;
+            }
 
             if (rb->rest == 0) {
                 break;

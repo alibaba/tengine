@@ -21,7 +21,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache rewrite/)->plan(3);
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
+my $t = Test::Nginx->new()->has(qw/http proxy cache rewrite/)->plan(7);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -45,6 +47,7 @@ http {
                        keys_zone=NAME:10m;
 
     proxy_set_header X-Blah "blah";
+    proxy_hide_header X-Hidden;
 
     server {
         listen       127.0.0.1:8080;
@@ -54,6 +57,11 @@ http {
 
         location / {
             proxy_pass    http://127.0.0.1:8081;
+
+            location /nested/ {
+                proxy_pass   http://127.0.0.1:8081;
+                proxy_pass_header X-Pad;
+            }
         }
 
         location /no/ {
@@ -72,6 +80,8 @@ http {
         server_name  localhost;
 
         location / {
+            add_header X-Hidden "hidden";
+            add_header X-Pad "passed";
             return 200 "ims=$http_if_modified_since;blah=$http_x_blah;";
         }
     }
@@ -91,6 +101,16 @@ like(http_get_ims('/no/'), qr/ims=blah;blah=blah;/,
 
 like(http_get_ims('/setbody/'), qr/blah=blah;/,
 	'proxy_set_header inherited with proxy_set_body');
+
+unlike(http_get('/'), qr/X-Pad/, 'proxy_pass_header default');
+like(http_get('/nested/'), qr/X-Pad/, 'proxy_pass_header nested');
+unlike(http_get('/'), qr/X-Hidden/, 'proxy_hide_header inherited');
+
+TODO: {
+local $TODO = 'not yet';
+
+unlike(http_get('/nested/'), qr/X-Hidden/, 'proxy_hide_header nested');
+}
 
 ###############################################################################
 

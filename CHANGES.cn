@@ -1,4 +1,16 @@
 
+Tengine-1.4.2 [2012-11-22]
+* Feature：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
+* Feature：增加$unix_time变量，表示当前的时间戳秒数 [yaoweibin]
+* Feature：Makefile中增加test命令以便运行测试用例 [yaoweibin]
+* Feature：sysguard模块可在location里面配置 [lifeibo]
+* Change：合并Nginx-1.2.4和Nginx-1.2.5的更新 [zhuzhaoyuan]
+* Change：增加对input_filter函数返回值的检查，防止第三方模块调用出错 [cfsego]
+* Bugfix：修复limit_req指令不能使用4个参数的问题，感谢LazyZhu的报告 [monadbobo]
+* Bugfix：修复在cygwin下面编译sysinfo文件出错的问题，感谢Cao Peiran的报告 [lifeibo]
+* Bugfix：修复user-agent模块安装时需要拷贝browsers配置文件的问题，感谢Jianbin Xiao的报告 [monadbobo]
+* Bugfix：修复DSO模块RPM打包安装目录出错的问题，感谢Jianbin Xiao和Ren Xiaolei的报告 [monadbobo]
+
 Tengine-1.4.1 [2012-10-10]
 * Feature： 添加jemalloc库的支持 [fanjizhao]
 * Feature： 加入$dollar变量, 它的值就是美元符号 [zhuzhaoyuan]
