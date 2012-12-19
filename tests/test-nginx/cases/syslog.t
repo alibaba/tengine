@@ -185,3 +185,12 @@ location /p {
 GET /p
 --- error_code: 200
 
+=== Test 20: hostname and domain support, besides ip ===
+--- config
+location /p {
+    access_log syslog:user:info:localhost::test.taobao.com;
+    empty_gif;
+}
+--- request
+GET /p
+--- error_code: 200
