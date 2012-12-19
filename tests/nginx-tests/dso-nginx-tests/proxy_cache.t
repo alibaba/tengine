@@ -21,6 +21,8 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http proxy cache gzip/)->plan(12);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -117,12 +119,8 @@ like(http_gzip_request('/empty.html'),
 	qr/HTTP.*14\x0d\x0a.{20}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
 	'empty get stale');
 
-{
-local $TODO = 'patch pending';
-
 http_get('/fake/unfinished');
 like(http_get('/fake/unfinished'), qr/unfinished 2/, 'unfinished not cached');
-}
 
 ###############################################################################
 

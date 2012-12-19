@@ -272,8 +272,8 @@ ngx_dso_check_duplicated(ngx_conf_t *cf, ngx_array_t *modules,
                                       &major_version, &minor_version) == NGX_OK)
             {
                 ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                                   "module \"%V/%V\" is already dynamically loaded,"
-                                   " skipping", path, name);
+                                   "module \"%V/%V\" is already dynamically "
+                                   "loaded, skipping", path, name);
             } else {
 
                 ngx_conf_log_error(NGX_LOG_WARN, cf, 0,

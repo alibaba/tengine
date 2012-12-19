@@ -1,4 +1,52 @@
 
+Changes with nginx 1.2.5                                         13 Nov 2012
+
+    *) Feature: the "optional_no_ca" parameter of the "ssl_verify_client"
+       directive.
+       Thanks to Mike Kazantsev and Eric O'Connor.
+
+    *) Feature: the $bytes_sent, $connection, and $connection_requests
+       variables can now be used not only in the "log_format" directive.
+       Thanks to Benjamin Grössing.
+
+    *) Feature: resolver now randomly rotates addresses returned from cache.
+       Thanks to Anton Jouline.
+
+    *) Feature: the "auto" parameter of the "worker_processes" directive.
+
+    *) Bugfix: "cache file ... has md5 collision" alert.
+
+    *) Bugfix: OpenSSL 0.9.7 compatibility.
+
+
+Changes with nginx 1.2.4                                         25 Sep 2012
+
+    *) Bugfix: in the "limit_req" directive; the bug had appeared in 1.1.14.
+       Thanks to Charles Chen.
+
+    *) Bugfix: nginx could not be built by gcc 4.7 with -O2 optimization if
+       the --with-ipv6 option was used.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "map" directive was used with variables as values.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "geo" directive was used with the "ranges" parameter but without the
+       "default" parameter; the bug had appeared in 0.8.43.
+       Thanks to Zhen Chen and Weibin Yao.
+
+    *) Bugfix: in the -p command-line parameter handling.
+
+    *) Bugfix: in the mail proxy server.
+
+    *) Bugfix: of minor potential bugs.
+       Thanks to Coverity.
+
+    *) Bugfix: nginx/Windows could not be built with Visual Studio 2005
+       Express.
+       Thanks to HAYASHI Kentaro.
+
+
 Changes with nginx 1.2.3                                         07 Aug 2012
 
     *) Feature: the Clang compiler support.
