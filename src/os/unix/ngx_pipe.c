@@ -471,7 +471,7 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             exit(2);
         }
 
-        execv((const char *) argv[0], (char ** const) op->argv->elts);
+        execv((const char *) argv[0], (char *const *) op->argv->elts);
         exit(0);
     }
 

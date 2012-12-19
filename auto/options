@@ -16,6 +16,7 @@ NGX_USER=
 NGX_GROUP=
 
 NGX_DSO_PATH=
+NGX_DSO_TOOL_PATH=
 
 CC=${CC:-gcc}
 CPP=
@@ -326,6 +327,7 @@ do
         --group=*)                                 NGX_GROUP="$value"         ;;
 
         --dso-path=*)                              NGX_DSO_PATH="$value"      ;;
+        --dso-tool-path=*)                         NGX_DSO_TOOL_PATH="$value" ;;
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
@@ -604,6 +606,7 @@ cat << END
   --builddir=DIR                     set build directory
 
   --dso-path=*)                      set dso default load path
+  --dso-tool-path=*)                 set dso_tool pathname
 
   --with-rtsig_module                enable rtsig module
   --with-select_module               enable select module
@@ -837,7 +840,8 @@ else
 fi
 
 
-NGX_DSO_PATH=${NGX_MODULE_PATH:-modules}
+NGX_DSO_PATH=${NGX_DSO_PATH:-modules/}
+NGX_DSO_TOOL_PATH=${NGX_DSO_TOOL_PATH:-sbin/dso_tool}
 
 
 NGX_HTTP_LOG_PATH=${NGX_HTTP_LOG_PATH:-logs/access.log}
