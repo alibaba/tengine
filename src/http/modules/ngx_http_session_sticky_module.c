@@ -110,7 +110,7 @@ static ngx_http_output_header_filter_pt ngx_http_ss_next_header_filter;
 
 static ngx_command_t ngx_http_session_sticky_commands[] = {
     { ngx_string("session_sticky"),
-      NGX_HTTP_UPS_CONF | NGX_CONF_ANY | NGX_CONF_1MORE,
+      NGX_HTTP_UPS_CONF|NGX_CONF_ANY|NGX_CONF_1MORE,
       ngx_http_upstream_session_sticky,
       NGX_HTTP_SRV_CONF_OFFSET,
       0,
@@ -244,7 +244,6 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
     ngx_http_upstream_srv_conf_t    *uscf;
     ngx_http_upstream_ss_srv_conf_t *ss_srv = conf;
 
-
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
 
     uscf->peer.init_upstream = ngx_http_upstream_session_sticky_init_upstream;
@@ -377,7 +376,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             }
 
         } else {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid directive");
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument");
             return NGX_CONF_ERROR;
         }
     }
@@ -495,6 +494,10 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     return NGX_OK;
 }
 
+/*
+ *TODO: now the ID could be fetched from the server argument.
+ *This session ID could be equal to the server ID.
+ */
 
 static ngx_int_t
 ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
@@ -557,6 +560,11 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
         rc = ngx_http_session_sticky_get_cookie(r);
         if (rc != NGX_OK) {
             return rc;
+        }
+    } else {
+        if (ctx->ss_srv != ss_srv) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "different ss_srv with header_handler");
         }
     }
 
