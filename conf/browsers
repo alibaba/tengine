@@ -69,7 +69,7 @@ user_agent $browser {
     Safari                  533.19.4~533.19.9           safari503;
     Safari                  533.20.0~533.20.27          safari504;
     Safari                  533.21~533.22               safari505;
-    Safari                  7534.48~-7534.48.9          safari51;
+    Safari                  7534.48~7534.48.9          safari51;
     Safari                  534.53~534.57               safari51;
     Safari                  8536.25~8536.9999           safari6;
 
