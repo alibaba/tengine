@@ -30,7 +30,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 worker_processes  1;
 
 events {
-    use     epoll;
 }
 
 http {
