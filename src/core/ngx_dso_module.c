@@ -770,7 +770,7 @@ ngx_is_dynamic_module(ngx_conf_t *cf, u_char *name,
     ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                               ngx_dso_module);
 
-    if (ctx == NULL) {
+    if (ctx == NULL || ctx->modules) {
         return NGX_DECLINED;
     }
 
@@ -808,7 +808,7 @@ ngx_show_dso_directives(ngx_conf_t *cf)
     ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                               ngx_dso_module);
 
-    if (ctx == NULL) {
+    if (ctx == NULL || ctx->modules == NULL) {
         return;
     }
 
