@@ -679,6 +679,9 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                     return NGX_HTTP_INTERNAL_SERVER_ERROR;
 
                 } else if (rc == NGX_AGAIN) {
+
+                    ngx_add_timer(c->read, clcf->client_body_timeout);
+
                     if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                         return NGX_HTTP_INTERNAL_SERVER_ERROR;
                     }
@@ -739,9 +742,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
             if (rb->buffered &&
                 r->request_length >= (off_t) clcf->client_body_postpone_sending) {
 
-                rb->buffered = 0;
-
-                return NGX_OK;
+                goto read_ok;
             }
 
             if (rb->buf->last < rb->buf->end) {
@@ -765,6 +766,8 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
             return NGX_AGAIN;
         }
     }
+
+read_ok:
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
