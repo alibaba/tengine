@@ -879,7 +879,7 @@ ngx_process_options(ngx_cycle_t *cycle)
         len = ngx_strlen(ngx_prefix);
         p = ngx_prefix;
 
-        if (!ngx_path_separator(*p)) {
+        if (len && !ngx_path_separator(p[len - 1])) {
             p = ngx_pnalloc(cycle->pool, len + 1);
             if (p == NULL) {
                 return NGX_ERROR;
@@ -1356,15 +1356,22 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t        *value;
     ngx_uint_t        i, j, n;
 
-    if (ccf->cpu_affinity) {
+    if (ccf->cpu_affinity || ccf->cpu_affinity_n) {
         return "is duplicate";
     }
 
     value = cf->args->elts;
 
-    if (ngx_strncasecmp((u_char *) "auto", value[1].data, 4) == 0) {
+    if (ngx_strcasecmp((u_char *) "auto", value[1].data) == 0) {
 
         ccf->cpu_affinity = NGX_CONF_UNSET_PTR;
+
+        return NGX_CONF_OK;
+    }
+
+    if (ngx_strcasecmp((u_char *) "off", value[1].data) == 0) {
+
+        ccf->cpu_affinity_n = 1;
 
         return NGX_CONF_OK;
     }

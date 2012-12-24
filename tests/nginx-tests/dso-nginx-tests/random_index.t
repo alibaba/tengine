@@ -21,6 +21,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'no symlinks on win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http random_index/)->plan(1);
 
 $t->set_dso("ngx_http_random_index_module", "ngx_http_random_index_module.so");

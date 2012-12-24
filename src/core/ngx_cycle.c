@@ -11,8 +11,9 @@
 
 
 #if (NGX_DSO)
-void ngx_show_dso_modules(ngx_conf_t *cf);
-void ngx_show_dso_directives(ngx_conf_t *cf);
+extern ngx_int_t ngx_is_dynamic_module(ngx_conf_t *cf, u_char *name,
+    ngx_uint_t *major_version, ngx_uint_t *minor_version);
+extern void ngx_show_dso_directives(ngx_conf_t *cf);
 #endif
 
 
@@ -132,18 +133,18 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
 
-    n = old_cycle->pathes.nelts ? old_cycle->pathes.nelts : 10;
+    n = old_cycle->paths.nelts ? old_cycle->paths.nelts : 10;
 
-    cycle->pathes.elts = ngx_pcalloc(pool, n * sizeof(ngx_path_t *));
-    if (cycle->pathes.elts == NULL) {
+    cycle->paths.elts = ngx_pcalloc(pool, n * sizeof(ngx_path_t *));
+    if (cycle->paths.elts == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
-    cycle->pathes.nelts = 0;
-    cycle->pathes.size = sizeof(ngx_path_t *);
-    cycle->pathes.nalloc = n;
-    cycle->pathes.pool = pool;
+    cycle->paths.nelts = 0;
+    cycle->paths.size = sizeof(ngx_path_t *);
+    cycle->paths.nalloc = n;
+    cycle->paths.pool = pool;
 
 
     if (old_cycle->open_files.part.nelts) {
@@ -311,12 +312,26 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         ngx_log_stderr(0, "loaded modules:");
 
         for (i = 0; ngx_module_names[i]; i++) {
-            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
-        }
 
 #if (NGX_DSO)
-        ngx_show_dso_modules(&conf);
+            ngx_uint_t major, minor;
+
+            if (ngx_is_dynamic_module(&conf,
+                                      ngx_module_names[i], &major,
+                                      &minor) == NGX_OK)
+            {
+                ngx_log_stderr(0, "    %s (shared, %ui.%ui)",
+                               ngx_module_names[i],
+                               major, minor);
+            } else {
 #endif
+            ngx_log_stderr(0, "    %s (static)", ngx_module_names[i]);
+
+#if (NGX_DSO)
+            }
+#endif
+        }
+
         ngx_destroy_cycle_pools(&conf);
         return cycle;
     }
@@ -384,7 +399,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
 
-    if (ngx_create_pathes(cycle, ccf->user) != NGX_OK) {
+    if (ngx_create_paths(cycle, ccf->user) != NGX_OK) {
         goto failed;
     }
 
@@ -1136,6 +1151,8 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    ngx_memzero(&file, sizeof(ngx_file_t));
+
     file.name = ccf->pid;
     file.log = cycle->log;
 
@@ -1383,19 +1400,19 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
             continue;
         }
 
-        if (size && size != shm_zone[i].shm.size) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                            "the size %uz of shared memory zone \"%V\" "
-                            "conflicts with already declared size %uz",
-                            size, &shm_zone[i].shm.name, shm_zone[i].shm.size);
-            return NULL;
-        }
-
         if (tag != shm_zone[i].tag) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                             "the shared memory zone \"%V\" is "
                             "already declared for a different use",
                             &shm_zone[i].shm.name);
+            return NULL;
+        }
+
+        if (size && size != shm_zone[i].shm.size) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                            "the size %uz of shared memory zone \"%V\" "
+                            "conflicts with already declared size %uz",
+                            size, &shm_zone[i].shm.name, shm_zone[i].shm.size);
             return NULL;
         }
 
