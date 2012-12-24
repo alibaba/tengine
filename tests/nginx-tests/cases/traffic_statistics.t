@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/ipstat/,qw/reqstat/);
+my $t = Test::Nginx->new();#->has(qw/ipstat/,qw/reqstat/);
 
 $t->write_file_expand('B4', '1234');
 
@@ -111,6 +111,8 @@ $t->write_file_expand('nginx.conf', $cf_1);
 $t->run();
 my_http_get('/B4', 'www.test_app_a.com', 3129);
 my $r = my_http_get('/usr', 'www.test_cp.com', 3128);
+$r = my_http_get('/us', 'www.test_cp.com', 3128);
+warn $r;
 #1
 like($r, qr/753/, 'length check');
 #2
