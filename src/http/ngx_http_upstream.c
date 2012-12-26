@@ -1561,7 +1561,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 r->read_event_handler =
                     ngx_http_upstream_read_non_buffered_request;
 
-                if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
                     ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
                 }
@@ -1718,13 +1718,16 @@ send_done:
 static void
 ngx_http_upstream_read_non_buffered_request(ngx_http_request_t *r)
 {
+    ngx_connection_t     *c;
     ngx_http_upstream_t  *u;
 
+    c = r->connection;
     u = r->upstream;
 
-    if (r->connection->read->timedout) {
-        r->connection->timedout = 1;
-        ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+    if (c->read->timedout) {
+        c->timedout = 1;
+        ngx_connection_error(c, NGX_ETIMEDOUT, "client timed out");
+        ngx_http_upstream_finalize_request(r, u, NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
 
