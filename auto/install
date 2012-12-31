@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -215,7 +214,7 @@ cat << END                                                    >> $NGX_MAKEFILE
 
 	test -f '\$(DESTDIR)$NGX_CONF_PATH' \
 		|| cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PATH'
-	cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PREFIX/nginx.conf.default'
+	cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PATH.default'
 
 	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \
 		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_PID_PATH"`'
