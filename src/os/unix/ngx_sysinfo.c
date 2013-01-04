@@ -47,7 +47,7 @@ ngx_getloadavg(ngx_int_t avg[], ngx_int_t nelem, ngx_log_t *log)
 #else
 
     ngx_log_error(NGX_LOG_EMERG, log, 0,
-                  "getloadavg is unsurpported under current os");
+                  "getloadavg is unsupported under current os");
 
     return NGX_ERROR;
 #endif
@@ -162,7 +162,7 @@ ngx_int_t
 ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 {
     ngx_log_error(NGX_LOG_EMERG, log, 0,
-                  "getmeminfo is unsurpported under current os");
+                  "getmeminfo is unsupported under current os");
 
     return NGX_ERROR;
 }
