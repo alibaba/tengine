@@ -27,7 +27,6 @@ typedef struct {
 
 typedef struct {
     uint32_t                                step;
-    ngx_int_t                               copies;
     ngx_uint_t                              number;
     ngx_flag_t                              native;
     ngx_queue_t                             down_servers;
@@ -140,7 +139,6 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    ucscf->copies = 160;
     ucscf->native = 0;
 
     return ucscf;
@@ -156,7 +154,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     u_char                                   hash_buf[256];
     ngx_uint_t                               hash_len;
 #endif
-    ngx_int_t                                j;
+    ngx_int_t                                j, weight;
     ngx_uint_t                               i, n;
     ngx_http_upstream_rr_peer_t             *peer;
     ngx_http_upstream_rr_peers_t            *peers;
@@ -182,21 +180,25 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
     n = peers->number;
     ucscf->number = 0;
+    for (i = 0; i < n; i++) {
+        ucscf->number += peers->peer[i].weight * 16;
+    }
 
     ucscf->servers = ngx_pcalloc(cf->pool,
-                                 (n * ucscf->copies + 1) *
+                                 (ucscf->number + 1) *
                                  sizeof(ngx_http_upstream_chash_server_t));
     if (ucscf->servers == NULL) {
         return NGX_ERROR;
     }
 
     ucscf->d_servers = ngx_pcalloc(cf->pool,
-                                  (n * ucscf->copies + 1) *
+                                  (ucscf->number + 1) *
                             sizeof(ngx_http_upstream_chash_down_server_t));
     if (ucscf->d_servers == NULL) {
         return NGX_ERROR;
     }
 
+    ucscf->number = 0;
     for (i = 0; i < n ; i++) {
         peer = &peers->peer[i];
 #ifdef NGX_HTTP_UPSTREAM_ID
@@ -207,7 +209,8 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         }
 
 #endif
-        for (j = 0; j < ucscf->copies; j++) {
+        weight = peer->weight * 16;
+        for (j = 0; j < weight; j++) {
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
 #ifdef NGX_HTTP_UPSTREAM_ID
@@ -357,6 +360,7 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
     r->upstream->peer.data = uchpd;
+    r->upstream->peer.tries = ucscf->number;
 
     return NGX_OK;
 }
@@ -569,6 +573,8 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state)
 {
     ngx_http_upstream_chash_peer_data_t *uchpd = data;
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "consistent hash free  peer %ui %ui", pc->tries, state);
 
     if (uchpd->server == NULL) {
         return;
@@ -580,6 +586,10 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
 
     if (uchpd->server->peer->fails > uchpd->server->peer->max_fails) {
         uchpd->server->peer->down = 1;
+    }
+
+    if (pc->tries) {
+        pc->tries--;
     }
 
     return;
@@ -641,30 +651,30 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_http_upstream_chash_copies(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                           *value;
-    ngx_http_upstream_srv_conf_t        *uscf;
-    ngx_http_upstream_chash_srv_conf_t  *ucscf;
+   // ngx_str_t                           *value;
+   // ngx_http_upstream_srv_conf_t        *uscf;
+   // ngx_http_upstream_chash_srv_conf_t  *ucscf;
 
-    uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
-    if (uscf == NULL) {
-        return NGX_CONF_ERROR;
-    }
+   // uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+   // if (uscf == NULL) {
+   //     return NGX_CONF_ERROR;
+   // }
 
-    ucscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                    ngx_http_upstream_consistent_hash_module);
+   // ucscf = ngx_http_conf_upstream_srv_conf(uscf,
+   //                                 ngx_http_upstream_consistent_hash_module);
 
-    if (ucscf == NULL) {
-        return NGX_CONF_ERROR;
-    }
+   // if (ucscf == NULL) {
+   //     return NGX_CONF_ERROR;
+   // }
 
-    value = cf->args->elts;
-    ucscf->copies = ngx_atoi(value[1].data, value[1].len);
-    if (ucscf->copies == NGX_ERROR) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid value \"%V\"", &value[1]);
+   // value = cf->args->elts;
+   // ucscf->copies = ngx_atoi(value[1].data, value[1].len);
+   // if (ucscf->copies == NGX_ERROR) {
+   //     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+   //                        "invalid value \"%V\"", &value[1]);
 
-        return NGX_CONF_ERROR;
-    }
+   //     return NGX_CONF_ERROR;
+   // }
 
     return NGX_CONF_OK;
 }
