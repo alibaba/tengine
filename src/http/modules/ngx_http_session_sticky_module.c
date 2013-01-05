@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -164,7 +164,7 @@ ngx_module_t ngx_http_session_sticky_module = {
 static void *
 ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
 {
-    ngx_http_upstream_ss_srv_conf_t     *ss_srv;
+    ngx_http_upstream_ss_srv_conf_t  *ss_srv;
 
     ss_srv = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_ss_srv_conf_t));
     if (ss_srv == NULL) {
@@ -284,7 +284,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                                "maxidle=",
                                sizeof("maxidle=") - 1) == 0) {
             ss_srv->maxidle = ngx_atotm(value[i].data + sizeof("maxidle=") - 1,
-                                       value[i].len - sizeof("maxidle=") + 1);
+                                        value[i].len - sizeof("maxidle=") + 1);
             if (ss_srv->maxidle == NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxidle");
                 return NGX_CONF_ERROR;
@@ -298,7 +298,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                                "maxlife=",
                                sizeof("maxlife=") - 1) == 0) {
             ss_srv->maxlife = ngx_atotm(value[i].data + sizeof("maxlife=") - 1,
-                                       value[i].len - sizeof("maxlife=") + 1);
+                                        value[i].len - sizeof("maxlife=") + 1);
             if (ss_srv->maxlife == NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxlife");
                 return NGX_CONF_ERROR;
@@ -446,10 +446,10 @@ static ngx_int_t
 ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
 {
-    ngx_uint_t                           number, i;
-    ngx_http_upstream_rr_peer_t         *peer;
-    ngx_http_upstream_rr_peers_t        *peers;
-    ngx_http_upstream_ss_srv_conf_t     *ss_scf;
+    ngx_uint_t                        number, i;
+    ngx_http_upstream_rr_peer_t      *peer;
+    ngx_http_upstream_rr_peers_t     *peers;
+    ngx_http_upstream_ss_srv_conf_t  *ss_scf;
 
     if (ngx_http_upstream_init_round_robin(cf, us) != NGX_OK) {
         return NGX_ERROR;
@@ -495,16 +495,15 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 }
 
 /*
- *TODO: now the ID could be fetched from the server argument.
- *This session ID could be equal to the server ID.
+ * TODO: now the ID could be fetched from the server argument.
+ * This session ID could be equal to the server ID.
  */
-
 static ngx_int_t
 ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
     ngx_http_ss_server_t *s)
 {
-    u_char          buf[16];
-    ngx_md5_t       md5;
+    u_char     buf[16];
+    ngx_md5_t  md5;
 
     s->sid.len = 32;
     s->sid.data = ngx_pnalloc(cf->pool, 32);
@@ -526,10 +525,10 @@ static ngx_int_t
 ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us)
 {
-    ngx_int_t                            rc;
-    ngx_http_ss_ctx_t                   *ctx;
-    ngx_http_upstream_ss_srv_conf_t     *ss_srv;
-    ngx_http_upstream_ss_peer_data_t    *ss_pd;
+    ngx_int_t                          rc;
+    ngx_http_ss_ctx_t                 *ctx;
+    ngx_http_upstream_ss_srv_conf_t   *ss_srv;
+    ngx_http_upstream_ss_peer_data_t  *ss_pd;
 
     ss_pd = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_ss_peer_data_t));
     if (ss_pd == NULL) {
@@ -594,7 +593,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     if (ss_lcf->uscf == NGX_CONF_UNSET_PTR) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "session sticky didn't config session_sticky_header");
+                       "session sticky didn't configure session_sticky_header");
 
         return NGX_DECLINED;
     }
@@ -655,10 +654,11 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "session sticky cookie:%V", &cookies[i]->value);
+                   "session sticky cookie: \"%V\"", &cookies[i]->value);
     st = p;
     last = cookie->data + cookie->len;
 
+    /* TODO: need fix */
     while (p < last) {
         if (*p == '=') {
             p++;
@@ -673,7 +673,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         goto not_found;
     }
 
-    while ((*p == ' ' || *p == '"') && p < last) { p++;}
+    while ((*p == ' ' || *p == '"') && p < last){ p++;}
     if (p >= last) {
         goto not_found;
     }
@@ -817,13 +817,13 @@ not_found:
 static ngx_int_t
 ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 {
-    ngx_int_t                            rc;
-    ngx_uint_t                           i, n;
-    ngx_http_ss_ctx_t                   *ctx;
-    ngx_http_request_t                  *r;
-    ngx_http_ss_server_t                *server;
-    ngx_http_upstream_ss_srv_conf_t     *ss_srv;
-    ngx_http_upstream_ss_peer_data_t    *ss_pd = data;
+    ngx_int_t                          rc;
+    ngx_uint_t                         i, n;
+    ngx_http_ss_ctx_t                 *ctx;
+    ngx_http_request_t                *r;
+    ngx_http_ss_server_t              *server;
+    ngx_http_upstream_ss_srv_conf_t   *ss_srv;
+    ngx_http_upstream_ss_peer_data_t  *ss_pd = data;
 
     ss_srv = ss_pd->ss_srv;
     r = ss_pd->r;
@@ -876,8 +876,10 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
     }
 
 failed:
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                  "session sticky failed,sid[%V]", &ctx->sid);
+                   "session sticky failed, sid[%V]", &ctx->sid);
+
     rc = ss_pd->get_rr_peer(pc, &ss_pd->rrp);
     if (rc != NGX_OK) {
         return rc;
@@ -902,8 +904,8 @@ failed:
 static time_t
 ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len)
 {
-    time_t      value;
-    ngx_int_t   i;
+    time_t     value;
+    ngx_int_t  i;
 
     value = 0;
 
@@ -922,8 +924,8 @@ ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len)
 static void
 ngx_http_session_sticky_tmtoa(ngx_http_request_t *r, ngx_str_t *str, time_t t)
 {
-    time_t          temp;
-    ngx_uint_t      len;
+    time_t      temp;
+    ngx_uint_t  len;
 
     len = 0;
     temp = t;
@@ -984,22 +986,23 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                                         table[i].key.len) == 0)
                 {
                     if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_REWRITE) {
+
                         rc = ngx_http_session_sticky_rewrite(r, &table[i]);
                         if (rc == NGX_AGAIN) {
                             continue;
 
                         } else if (rc == NGX_ERROR) {
-                            ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
-                                           r->connection->log,
-                                           0,
-                                           "session_sticky [rewrite]"
-                                           "set-cookie:%V",
-                                           &table[i].value);
-
                             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                                           "session_sticky [rewrite]"
                                           "set-cookie failed");
                         }
+
+                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
+                                       r->connection->log,
+                                       0,
+                                       "session_sticky [rewrite]"
+                                       "set-cookie: %V",
+                                       &table[i].value);
 
                         return ngx_http_ss_next_header_filter(r);
                     }
@@ -1009,17 +1012,17 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                         continue;
 
                     } else if (rc == NGX_ERROR) {
-                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
-                                       r->connection->log,
-                                       0,
-                                       "session_sticky [prefix]"
-                                       "set-cookie:%V",
-                                       &table[i].value);
-
                         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                                       "session_sticky [prefix]"
                                       "set-cookie failed");
                     }
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
+                                   r->connection->log,
+                                   0,
+                                   "session_sticky [prefix]"
+                                   "set-cookie: %V",
+                                   &table[i].value);
 
                     return ngx_http_ss_next_header_filter(r);
                 }
@@ -1029,7 +1032,7 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
 
     } else if (ctx->ss_srv->flag & NGX_HTTP_SESSION_STICKY_INSERT) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "session_sticky [mode]: insert");
+                       "session_sticky [insert]");
 
         rc = ngx_http_session_sticky_insert(r);
         if (rc != NGX_OK) {
@@ -1045,8 +1048,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
 {
-    u_char                  *p, *s, *t, *last;
-    ngx_http_ss_ctx_t       *ctx;
+    u_char             *p, *s, *t, *last;
+    ngx_http_ss_ctx_t  *ctx;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     p = ngx_strlcasestrn(table->value.data,
@@ -1066,6 +1069,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     }
 
     p += ctx->ss_srv->cookie.len;
+    /* TODO: need fix */
     while(*p != '=' && p < last) { p++;}
     if (p < last) { p++;}
     while (*p == ' ' && p < last) { p++;}
@@ -1101,6 +1105,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     start = table->value.data;
     last = table->value.data + table->value.len;
 
+    /* TODO: need fix */
     while (p < last && *p != '=') { p++; }
     p += (p < last ? 1 : 0);
 
@@ -1114,7 +1119,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     table->value.len = table->value.len
                      - (en - st)
                      + ctx->ss_srv->cookie.len
-                     + 1 /*for =*/
+                     + 1 /* '=' */
                      + ctx->sid.len;
 
     p = ngx_pnalloc(r->pool, table->value.len);
@@ -1127,7 +1132,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     p = ngx_cpymem(p, ctx->ss_srv->cookie.data, ctx->ss_srv->cookie.len);
     *p++ = '=';
     p = ngx_cpymem(p, ctx->sid.data, ctx->sid.len);
-    p = ngx_cpymem(p, en, last -en);
+    p = ngx_cpymem(p, en, last - en);
 
     return NGX_OK;
 }
@@ -1136,11 +1141,11 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
 static ngx_int_t
 ngx_http_session_sticky_insert(ngx_http_request_t *r)
 {
-    u_char                  *p;
-    ngx_uint_t               i;
-    ngx_list_part_t         *part;
-    ngx_table_elt_t         *set_cookie, *table;
-    ngx_http_ss_ctx_t       *ctx;
+    u_char             *p;
+    ngx_uint_t          i;
+    ngx_list_part_t    *part;
+    ngx_table_elt_t    *set_cookie, *table;
+    ngx_http_ss_ctx_t  *ctx;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
     if (ctx->frist != 1 && ctx->ss_srv->maxidle == NGX_CONF_UNSET) {
@@ -1195,7 +1200,7 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
         set_cookie->value.len = set_cookie->value.len
                               + ctx->s_lastseen.len
                               + ctx->s_firstseen.len
-                              + 2; /*for ! ^*/
+                              + 2; /* '!' and '^' */
     } else {
         set_cookie->value.len = set_cookie->value.len
                               + sizeof(";Max-Age=") - 1
