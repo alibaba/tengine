@@ -70,11 +70,19 @@ static ngx_file_t                   ngx_meminfo_file;
 ngx_int_t
 ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 {
-    int                 i;
-    u_char              buf[2048], *head, *tail;
+    u_char              buf[2048];
+    u_char             *p, *start, *last;
     ssize_t             n, len;
     ngx_fd_t            fd;
-    ngx_mem_table_t    *found;
+    ngx_int_t           i;
+    ngx_mem_table_t    *found = NULL;
+    enum {
+        sw_name = 0,
+        sw_value_start,
+        sw_value,
+        sw_skipline,
+        sw_newline,
+    } state;
 
     ngx_mem_table_t mem_table[] = {
          {"Buffers",      &meminfo->bufferram},
@@ -84,7 +92,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
          {"SwapFree",     &meminfo->freeswap},
          {"SwapTotal",    &meminfo->totalswap},
     };
-    const int mem_table_count = sizeof(mem_table)/sizeof(ngx_mem_table_t);
+    const ngx_int_t mem_table_count = sizeof(mem_table)/sizeof(ngx_mem_table_t);
 
     if (ngx_meminfo_file.fd == 0) {
 
@@ -116,41 +124,79 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    buf[n] = '\0';
+    p = buf;
+    start = buf;
+    last = buf + n;
+    state = sw_name;
 
-    head = buf;
-    for (;;) {
+    for (; p < last; p++) {
 
-        tail = (u_char *) ngx_strchr(head, ':');
-        if (!tail) break;
-        *tail = '\0';
-        len = tail - head;
-
-        if (len >= NGX_MEMINFO_MAX_NAME_LEN) {
-            head = tail + 1;
-            goto nextline;
+        if (*p == '\n') {
+            state = sw_newline;
         }
 
-        found = NULL;
+        switch (state) {
 
-        for (i = 0; i < mem_table_count; i++) {
-            if (ngx_strcmp(head, mem_table[i].name) == 0) {
-               found = &mem_table[i];
+        case sw_name:
+            if (*p != ':') {
+                continue;
             }
+
+            len = p - start;
+
+            if (len >= NGX_MEMINFO_MAX_NAME_LEN) {
+                state = sw_skipline;
+                continue;
+            }
+
+            found = NULL;
+
+            for (i = 0; i < mem_table_count; i++) {
+                if (ngx_strncmp(start, mem_table[i].name, len) == 0) {
+                    found = &mem_table[i];
+                }
+            }
+
+            if (!found) {
+                state = sw_skipline;
+                continue;
+            }
+
+            state = sw_value_start;
+
+            continue;
+
+        case sw_value_start:
+
+            if (*p == ' ') {
+                continue;
+            }
+            start = p;
+            state = sw_value;
+            continue;
+
+        case sw_value:
+
+            if (*p >= '0' && *p <= '9') {
+                continue;
+            }
+
+            *(found->slot) =  ngx_atoi(start, p - start) * 1024;
+
+            state = sw_skipline;
+
+            continue;
+
+        case sw_skipline:
+            continue;
+
+        case sw_newline:
+
+            state = sw_name;
+            start = p + 1;
+
+            continue;
         }
-
-        head = tail + 1;
-
-        if (!found) {
-            goto nextline;
-        }
-
-        *(found->slot) = strtoul((char *) head, (char **) &tail, 10) * 1024;
-
-nextline:
-        tail = (u_char *)ngx_strchr(head, '\n');
-        if(!tail) break;
-        head = tail+1;
     }
 
     return NGX_OK;
