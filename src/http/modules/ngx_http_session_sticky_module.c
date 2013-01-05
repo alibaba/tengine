@@ -658,6 +658,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     st = p;
     last = cookie->data + cookie->len;
 
+    /* TODO: need fix */
     while (p < last) {
         if (*p == '=') {
             p++;
@@ -1068,6 +1069,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     }
 
     p += ctx->ss_srv->cookie.len;
+    /* TODO: need fix */
     while(*p != '=' && p < last) { p++;}
     if (p < last) { p++;}
     while (*p == ' ' && p < last) { p++;}
@@ -1103,6 +1105,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     start = table->value.data;
     last = table->value.data + table->value.len;
 
+    /* TODO: need fix */
     while (p < last && *p != '=') { p++; }
     p += (p < last ? 1 : 0);
 
@@ -1129,7 +1132,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     p = ngx_cpymem(p, ctx->ss_srv->cookie.data, ctx->ss_srv->cookie.len);
     *p++ = '=';
     p = ngx_cpymem(p, ctx->sid.data, ctx->sid.len);
-    p = ngx_cpymem(p, en, last -en);
+    p = ngx_cpymem(p, en, last - en);
 
     return NGX_OK;
 }
