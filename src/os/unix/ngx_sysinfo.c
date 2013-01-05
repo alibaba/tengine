@@ -171,8 +171,10 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
             if (*p == ' ') {
                 continue;
             }
+
             start = p;
             state = sw_value;
+
             continue;
 
         case sw_value:
@@ -188,6 +190,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
             continue;
 
         case sw_skipline:
+
             continue;
 
         case sw_newline:
