@@ -650,6 +650,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "session sticky cookie: \"%V\"", &cookies[i]->value);
     st = p;
+    v = p + ss_srv->cookie.len + 1;
     last = cookie->data + cookie->len;
 
     state = 0;
