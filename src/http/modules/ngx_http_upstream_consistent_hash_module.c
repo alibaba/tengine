@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -19,6 +19,8 @@ typedef struct {
 typedef struct {
     u_char                                  down;
     uint32_t                                hash;
+    ngx_uint_t                              index;
+    ngx_uint_t                              rnindex; // real node index
 #ifdef NGX_HTTP_UPSTREAM_ID
     ngx_int_t                               sid;
 #endif
@@ -27,12 +29,14 @@ typedef struct {
 
 typedef struct {
     uint32_t                                step;
+    ngx_uint_t                              tries;
     ngx_uint_t                              number;
     ngx_flag_t                              native;
     ngx_queue_t                             down_servers;
     ngx_array_t                            *values;
     ngx_array_t                            *lengths;
     ngx_segment_tree_t                     *tree;
+    ngx_http_upstream_chash_server_t     ***real_node;
     ngx_http_upstream_chash_server_t       *servers;
     ngx_http_upstream_chash_down_server_t  *d_servers;
 } ngx_http_upstream_chash_srv_conf_t;
@@ -65,6 +69,9 @@ static char *ngx_http_upstream_chash_mode(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static uint32_t ngx_http_upstream_chash_get_server_index(
     ngx_http_upstream_chash_server_t *servers, uint32_t n, uint32_t hash);
+static void ngx_http_upstream_chash_delete_node(
+    ngx_http_upstream_chash_srv_conf_t *ucscf,
+    ngx_http_upstream_chash_server_t *server);
 
 
 static ngx_command_t ngx_http_upstream_chash_commands[] = {
@@ -170,9 +177,21 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     n = peers->number;
+    ucscf->tries = n;
     ucscf->number = 0;
+    ucscf->real_node = ngx_pcalloc(cf->pool, n *
+                                   sizeof(ngx_http_upstream_chash_server_t**));
+    if (ucscf->real_node == NULL) {
+        return NGX_ERROR;
+    }
     for (i = 0; i < n; i++) {
         ucscf->number += peers->peer[i].weight * 16;
+        ucscf->real_node[i] = ngx_pcalloc(cf->pool,
+                                          (peers->peer[i].weight * 16 + 1) *
+                                          sizeof(ngx_http_upstream_chash_server_t*));
+        if (ucscf->real_node[i] == NULL) {
+            return NGX_ERROR;
+        }
     }
 
     ucscf->servers = ngx_pcalloc(cf->pool,
@@ -204,6 +223,8 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         for (j = 0; j < weight; j++) {
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
+            server->rnindex = i;
+            ucscf->real_node[i][j] = server;
 #ifdef NGX_HTTP_UPSTREAM_ID
             id = sid * 256 * 16 + j;
             server->hash = ngx_murmur_hash((u_char *) (&id),
@@ -222,6 +243,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
               (const void *)ngx_http_upstream_chash_cmp);
 
     for (i = 1; i <= ucscf->number; i++) {
+        ucscf->servers[i].index = i;
         ucscf->d_servers[i].id = i;
     }
 
@@ -351,7 +373,7 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
     r->upstream->peer.data = uchpd;
-    r->upstream->peer.tries = ucscf->number;
+    r->upstream->peer.tries = ucscf->tries;
 
     return NGX_OK;
 }
@@ -435,14 +457,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
             || server->peer->down
         ) {
 
-        if (!server->down) {
-            ucscf->tree->del(ucscf->tree, 1, 1, ucscf->number, index);
-            server->down = 1;
-            ucscf->d_servers[index].timeout = ngx_time()
-                                            + server->peer->fail_timeout;
-            ngx_queue_insert_head(&ucscf->down_servers,
-                                  &ucscf->d_servers[index].queue);
-        }
+        ngx_http_upstream_chash_delete_node(ucscf, server);
 
         while (1) {
 
@@ -495,15 +510,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
                 || server->peer->down
                 )
             {
-                if (!server->down) {
-                    ucscf->tree->del(ucscf->tree, 1, 1,
-                                     ucscf->number, index_1);
-                    server->down = 1;
-                    ucscf->d_servers[index_1].timeout = ngx_time()
-                                                + server->peer->fail_timeout;
-                    ngx_queue_insert_head(&ucscf->down_servers,
-                                          &ucscf->d_servers[index_1].queue);
-                }
+                ngx_http_upstream_chash_delete_node(ucscf, server);
 
             } else {
                 break;
@@ -529,6 +536,24 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 }
 
 
+static void
+ngx_http_upstream_chash_delete_node(ngx_http_upstream_chash_srv_conf_t *ucscf,
+    ngx_http_upstream_chash_server_t *server)
+{
+    ngx_http_upstream_chash_server_t **servers, *p;
+    servers = ucscf->real_node[server->rnindex];
+    for (; *servers; servers++) {
+        p = *servers;
+        if (!p->down) {
+            ucscf->tree->del(ucscf->tree, 1, 1, ucscf->number, p->index);
+            p->down = 1;
+            ucscf->d_servers[p->index].timeout = ngx_time() 
+                                               + p->peer->fail_timeout;
+            ngx_queue_insert_head(&ucscf->down_servers,
+                                  &ucscf->d_servers[p->index].queue);
+        }
+    }
+}
 static uint32_t
 ngx_http_upstream_chash_get_server_index(
     ngx_http_upstream_chash_server_t *servers, uint32_t n, uint32_t hash)
@@ -573,10 +598,6 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
 
     if (state & NGX_PEER_FAILED) {
         uchpd->server->peer->fails++;
-    }
-
-    if (uchpd->server->peer->fails > uchpd->server->peer->max_fails) {
-        uchpd->server->peer->down = 1;
     }
 
     if (pc->tries) {
