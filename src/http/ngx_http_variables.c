@@ -34,8 +34,6 @@ static ngx_int_t ngx_http_variable_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_variable_unknown_cookie(ngx_http_variable_value_t *v,
-    ngx_str_t *name, ngx_list_part_t *part);
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #if (NGX_HAVE_TCP_INFO)
@@ -622,6 +620,15 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    if (ngx_strncmp(name->data, "sent_cookie_", 12) == 0) {
+
+        if (ngx_http_variable_sent_cookie(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
     if (ngx_strncmp(name->data, "arg_", 4) == 0) {
 
         if (ngx_http_variable_argument(r, vv, (uintptr_t) name) == NGX_OK) {
@@ -963,26 +970,16 @@ static ngx_int_t
 ngx_http_variable_sent_cookie(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     uintptr_t data)
 {
-    ngx_str_t *name = (ngx_str_t *) data;
-
-    ngx_str_t s;
-
-    s.len = name->len - (sizeof("sent_cookie_") - 1);
-    s.data = name->data + sizeof("sent_cookie_") - 1;
-
-    return ngx_http_variable_unknown_cookie(v, &s, &r->headers_out.headers.part);
-}
-
-
-ngx_int_t
-ngx_http_variable_unknown_cookie(ngx_http_variable_value_t *v, ngx_str_t *name,
-    ngx_list_part_t *part)
-{
-    ngx_str_t set_cookie = ngx_string("Set-Cookie");
-
     u_char           *p, *last;
+    ngx_str_t         name;
     ngx_uint_t        i;
     ngx_table_elt_t  *header;
+    ngx_list_part_t  *part;
+
+    part = &r->headers_out.headers.part;
+
+    name.len = ((ngx_str_t *) data)->len - (sizeof("sent_cookie_") - 1);
+    name.data = ((ngx_str_t *) data)->data + sizeof("sent_cookie_") - 1;
 
     header = part->elts;
 
@@ -1002,37 +999,37 @@ ngx_http_variable_unknown_cookie(ngx_http_variable_value_t *v, ngx_str_t *name,
             continue;
         }
 
-        if (set_cookie.len == header[i].key.len
-            && ngx_strncasecmp(set_cookie.data, header[i].key.data,
+        if (header[i].key.len == (sizeof("Set-Cookie") - 1)
+            && ngx_strncasecmp((u_char *) "Set-Cookie", header[i].key.data,
                                header[i].key.len) == 0)
         {
-            if (name->len > header[i].value.len) {
+            if (name.len > header[i].value.len) {
                 continue;
             }
 
-            if (ngx_strncasecmp(header[i].value.data, name->data, name->len)) {
+            if (ngx_strncasecmp(header[i].value.data, name.data, name.len)) {
                 continue;
             }
 
-            p = header[i].value.data + name->len;
+            p = header[i].value.data + name.len;
             last = header[i].value.data + header[i].value.len;
 
             if (*p != '=') {
                 continue;
             }
 
-            v->data = p + 1;
-
-            for (p = p + 1; p < last; p++) {
+            for (v->data = ++p; p < last; p++) {
                 if (*p == ';') {
-                    v->len = p - v->data;
-                    v->valid = 1;
-                    v->no_cacheable = 0;
-                    v->not_found = 0;
-
-                    return NGX_OK;
+                    break;
                 }
             }
+
+            v->len = p - v->data;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+
+            return NGX_OK;
         }
     }
 
