@@ -183,7 +183,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
                 continue;
             }
 
-            *(found->slot) =  ngx_atoi(start, p - start) * 1024;
+            *(found->slot) =  ngx_atosz(start, p - start) * 1024;
 
             state = sw_skipline;
 
