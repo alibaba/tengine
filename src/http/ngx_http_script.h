@@ -252,6 +252,14 @@ void ngx_http_script_set_var_code(ngx_http_script_engine_t *e);
 void ngx_http_script_var_set_handler_code(ngx_http_script_engine_t *e);
 void ngx_http_script_var_code(ngx_http_script_engine_t *e);
 void ngx_http_script_nop_code(ngx_http_script_engine_t *e);
+void ngx_http_script_more_than_code(ngx_http_script_engine_t *e);
+void ngx_http_script_less_than_code(ngx_http_script_engine_t *e);
+void ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e);
+void ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e);
+void ngx_http_script_and_code(ngx_http_script_engine_t *e);
+void ngx_http_script_or_code(ngx_http_script_engine_t *e);
+void ngx_http_script_test_code(ngx_http_script_engine_t *e);
+void ngx_http_script_test_not_code(ngx_http_script_engine_t *e);
 
 
 #endif /* _NGX_HTTP_SCRIPT_H_INCLUDED_ */

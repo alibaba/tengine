@@ -15,6 +15,12 @@
 #define NGX_HTTP_LOG_ESCAPE_ASCII   3
 
 
+#define NGX_HTTP_LOG_CONF           0x00800000
+
+#define NGX_HTTP_SCRIPT_ROP_AND     1
+#define NGX_HTTP_SCRIPT_ROP_OR      2
+
+
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
 
 typedef u_char *(*ngx_http_log_op_run_pt) (ngx_http_request_t *r, u_char *buf,
@@ -42,6 +48,7 @@ typedef struct {
 typedef struct {
     ngx_array_t                 formats;    /* array of ngx_http_log_fmt_t */
     ngx_uint_t                  combined_used; /* unsigned  combined_used:1 */
+    ngx_uint_t                  seq;        /* conditional log sequence */
 } ngx_http_log_main_conf_t;
 
 
@@ -49,6 +56,42 @@ typedef struct {
     ngx_array_t                *lengths;
     ngx_array_t                *values;
 } ngx_http_log_script_t;
+
+
+typedef struct {
+    ngx_array_t                *codes;
+    ngx_flag_t                  log;
+    ngx_flag_t                  is_and;
+} ngx_http_log_condition_t;
+
+
+/*
+ * variables for sampled_log
+ * ratio = sample/scope, 10's multiple
+ * scatter = ceil(scope/sample)
+ * (inflexion-1)*scatter + (sample-inflxion)*(scatter-1) - scope < 0
+ * scope - (inflexion-1)*scatter - (sample-inflxion)*(scatter-1) <= scatter - 1
+ *
+ * for example:
+ * ratio = 0.3, then scope = 10, sample = 3, scatter = 4, inflexion = 2
+ * ratio = 0.35, then scope = 100, sample = 35, scatter = 3, inflexion = 31
+ */
+
+typedef struct {
+    ngx_uint_t                  scope;
+    ngx_uint_t                  sample;
+    ngx_uint_t                  scatter;
+    ngx_uint_t                  inflexion;
+    ngx_uint_t                  scope_count;
+    ngx_uint_t                  sample_count;
+    ngx_uint_t                  scatter_count;
+} ngx_http_log_sample_t;
+
+
+typedef struct {
+    ngx_array_t                *conditions;
+    ngx_http_log_sample_t      *sample;
+} ngx_http_log_env_t;
 
 
 typedef struct {
@@ -60,31 +103,14 @@ typedef struct {
     time_t                      disk_full_time;
     time_t                      error_log_time;
     ngx_http_log_fmt_t         *format;
-
-    /*
-     * variables for sampled_log
-     * ratio = sample/scope, 10's multiple
-     * scatter = ceil(scope/sample)
-     * (inflexion-1)*scatter + (sample-inflxion)*(scatter-1) - scope < 0
-     * scope - (inflexion-1)*scatter - (sample-inflxion)*(scatter-1)
-     *     <= scatter - 1
-     *
-     * for example:
-     * ratio = 0.3, then scope = 10, sample = 3, scatter = 4, inflexion = 2
-     * ratio = 0.35, then scope = 100, sample = 35, scatter = 3, inflexion = 31
-     */
-    ngx_uint_t                  scope;
-    ngx_uint_t                  sample;
-    ngx_uint_t                  scatter;
-    ngx_uint_t                  inflexion;
-    ngx_uint_t                  scope_count;
-    ngx_uint_t                  sample_count;
-    ngx_uint_t                  scatter_count;
+    ngx_http_log_sample_t      *sample;
+    ngx_int_t                   var_index;  /* for conditional log */
 } ngx_http_log_t;
 
 
 typedef struct {
     ngx_array_t                *logs;       /* array of ngx_http_log_t */
+    ngx_http_log_env_t         *env;
 
     ngx_open_file_cache_t      *open_file_cache;
     time_t                      open_file_cache_valid;
@@ -142,6 +168,31 @@ static u_char *ngx_http_log_variable(ngx_http_request_t *r, u_char *buf,
 static uintptr_t ngx_http_log_escape(u_char *dst, u_char *src, size_t size,
     ngx_uint_t flag);
 
+static char *ngx_http_log_condition_block(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_log_env_block(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_log_block_sample(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
+static ngx_int_t ngx_http_log_condition_value(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_str_t *value);
+static ngx_int_t ngx_http_log_condition_element(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_int_t cur);
+static ngx_int_t ngx_http_log_condition(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_int_t cur, ngx_int_t *count);
+static char *ngx_http_log_sample_rate(ngx_conf_t *cf, ngx_str_t *value,
+    ngx_http_log_sample_t **sample);
+static ngx_http_variable_t *ngx_http_log_copy_var(ngx_conf_t *cf,
+    ngx_http_variable_t *var, ngx_uint_t seq);
+
+static ngx_int_t ngx_http_log_variable_value(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_log_do_if(ngx_http_request_t *r,
+    ngx_array_t *conditions);
+static ngx_int_t ngx_http_log_do_sample(ngx_http_log_sample_t *sample);
 
 static void *ngx_http_log_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_log_create_loc_conf(ngx_conf_t *cf);
@@ -151,8 +202,6 @@ static char *ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_log_set_format(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static ngx_int_t ngx_http_log_set_ratio(ngx_conf_t *cf, ngx_str_t *value,
-    ngx_http_log_t *log);
 static char *ngx_http_log_compile_format(ngx_conf_t *cf,
     ngx_array_t *flushes, ngx_array_t *ops, ngx_array_t *args, ngx_uint_t s);
 static char *ngx_http_log_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -179,7 +228,7 @@ static ngx_command_t  ngx_http_log_commands[] = {
 
     { ngx_string("access_log"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
-                        |NGX_HTTP_LMT_CONF|NGX_CONF_TAKE1234,
+                        |NGX_HTTP_LMT_CONF|NGX_CONF_1MORE,
       ngx_http_log_set_log,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -204,6 +253,36 @@ static ngx_command_t  ngx_http_log_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_log_loc_conf_t, log_empty_request),
+      NULL },
+
+    { ngx_string("log_condition"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_BLOCK
+                        |NGX_CONF_NOARGS,
+      ngx_http_log_condition_block,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("log_env"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_BLOCK
+                        |NGX_CONF_TAKE1,
+      ngx_http_log_env_block,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("if"),
+      NGX_HTTP_LOG_CONF|NGX_CONF_1MORE,
+      ngx_http_log_block_if,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("sample"),
+      NGX_HTTP_LOG_CONF|NGX_CONF_1MORE,
+      ngx_http_log_block_sample,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
       NULL },
 
       ngx_null_command
@@ -277,13 +356,14 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
 static ngx_int_t
 ngx_http_log_handler(ngx_http_request_t *r)
 {
-    u_char                   *line, *p;
-    size_t                    len;
-    ngx_uint_t                i, l, bypass, threshold;
-    ngx_http_log_t           *log;
-    ngx_open_file_t          *file;
-    ngx_http_log_op_t        *op;
-    ngx_http_log_loc_conf_t  *lcf;
+    u_char                    *line, *p;
+    size_t                     len;
+    ngx_uint_t                 i, l, bypass;
+    ngx_http_log_t            *log;
+    ngx_open_file_t           *file;
+    ngx_http_log_op_t         *op;
+    ngx_http_log_loc_conf_t   *lcf;
+    ngx_http_variable_value_t *vv;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http log handler");
@@ -294,6 +374,20 @@ ngx_http_log_handler(ngx_http_request_t *r)
         return NGX_OK;
     }
 
+    bypass = 0;
+
+    if (lcf->env && lcf->env->conditions
+        && ngx_http_log_do_if(r, lcf->env->conditions) == NGX_DECLINED)
+    {
+        bypass = 1;
+    }
+
+    if (bypass == 0 && lcf->env && lcf->env->sample
+        && ngx_http_log_do_sample(lcf->env->sample) == NGX_DECLINED)
+    {
+        bypass = 1;
+    }
+
     if (r->headers_out.status == NGX_HTTP_BAD_REQUEST && !lcf->log_empty_request
         && (r->header_in && r->header_in->last == r->header_in->start))
     {
@@ -302,36 +396,23 @@ ngx_http_log_handler(ngx_http_request_t *r)
 
     log = lcf->logs->elts;
     for (l = 0; l < lcf->logs->nelts; l++) {
+        if (log[l].var_index == NGX_ERROR && log[l].sample == NULL && bypass) {
+            continue;
+        }
 
-        if (log[l].scope != 0) {
-
-            bypass = 1;
-
-            if (log[l].sample_count < log[l].sample) {
-                if (log[l].scatter_count++ == 0) {
-                    bypass = 0;
-                    ++log[l].sample_count;
-                }
-
-                threshold = log[l].scatter;
-                if (log[l].sample_count >= log[l].inflexion) {
-                    --threshold;
-                }
-
-                if (log[l].scatter_count == threshold) {
-                    log[l].scatter_count = 0;
-                }
-            }
-
-            if (++log[l].scope_count == log[l].scope) {
-                log[l].scope_count = 0;
-                log[l].sample_count = 0;
-                log[l].scatter_count = 0;
-            }
-
-            if (bypass == 1) {
+        if (log[l].var_index != NGX_ERROR) {
+            vv = ngx_http_get_indexed_variable(r, log[l].var_index);
+            if (vv != NULL && !vv->not_found
+                && (vv->len == 0 || (vv->len == 1 && vv->data[0] == '0')))
+            {
                 continue;
             }
+        }
+
+        if (log[l].sample
+            && ngx_http_log_do_sample(log[l].sample) == NGX_DECLINED)
+        {
+            continue;
         }
 
         if (ngx_time() == log[l].disk_full_time) {
@@ -1019,6 +1100,10 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+    if (conf->env == NULL) {
+        conf->env = prev->env;
+    }
+
     if (conf->logs || conf->off) {
         return NGX_CONF_OK;
     }
@@ -1048,7 +1133,8 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     log->script = NULL;
     log->disk_full_time = 0;
     log->error_log_time = 0;
-    log->scope = 0;
+    log->sample = NULL;
+    log->var_index = NGX_ERROR;
 #if NGX_SYSLOG
     log->syslog = NULL;
 #endif
@@ -1075,6 +1161,8 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                  i, n;
     ngx_http_log_t             *log;
     ngx_http_log_fmt_t         *fmt;
+    ngx_http_variable_t        *var;
+    ngx_http_log_sample_t      *sample;
     ngx_http_log_main_conf_t   *lmcf;
     ngx_http_script_compile_t   sc;
     ngx_uint_t                  skip_file = 0;
@@ -1107,6 +1195,7 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     ngx_memzero(log, sizeof(ngx_http_log_t));
+    log->var_index = NGX_ERROR;
 
     rc = ngx_log_target(cf->cycle, &value[1], (ngx_log_t *) log);
 
@@ -1192,11 +1281,20 @@ rest:
         return NGX_CONF_OK;
     }
 
+    sample = NULL;
+    var = NULL;
+
     for (i = 3; i < cf->args->nelts; i++) {
         if (ngx_strncmp(value[i].data, "ratio=", 6) == 0) {
-            if (ngx_http_log_set_ratio(cf, &value[i], log) != NGX_OK) {
+            value[i].data += 6;
+            value[i].len -= 6;
+
+            if (ngx_http_log_sample_rate(cf, &value[i], &sample)
+                != NGX_CONF_OK)
+            {
                 return NGX_CONF_ERROR;
             }
+
         } else if (ngx_strncmp(value[i].data, "buffer=", 7) == 0) {
             if (skip_file == 0) {
                 continue;
@@ -1234,6 +1332,15 @@ rest:
             log->file->pos = log->file->buffer;
             log->file->last = log->file->buffer + buf;
 
+        } else if (ngx_strncmp(value[i].data, "env=", 4) == 0) {
+            value[i].data += 5;
+            value[i].len -= 5;
+
+            var = ngx_http_add_variable(cf, &value[i], NGX_HTTP_VAR_CHANGEABLE);
+            if (var == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid buffer value \"%V\"", &name);
@@ -1241,77 +1348,34 @@ rest:
         }
     }
 
+    if (var == NULL) {
+        log->sample = sample;
+        return NGX_CONF_OK;
+    }
+
+    if (var->get_handler == NULL && var->set_handler == NULL) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "variable for log env is not defined");
+        return NGX_CONF_ERROR;
+    }
+
+    if (var->get_handler != ngx_http_log_variable_value) {
+        log->sample = sample;
+    } else if (sample) {
+        var = ngx_http_log_copy_var(cf, var, ++lmcf->seq);
+        if (var == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        ((ngx_http_log_env_t *) var->data)->sample = sample;
+    }
+
+    log->var_index = ngx_http_get_variable_index(cf, &var->name);
+    if (log->var_index == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+
     return NGX_CONF_OK;
-}
-
-
-static ngx_int_t
-ngx_http_log_set_ratio(ngx_conf_t *cf, ngx_str_t *value, ngx_http_log_t *log)
-{
-    u_char     *p, *last;
-    uint64_t    scope;
-    ngx_uint_t  rp;
-
-    rp = 0;
-    scope = 0;
-
-    for (last = value->data + value->len - 1;
-         last >= value->data + 6 && *last == '0';
-         last--) /* void */ ;
-
-    if (last == value->data + 6 && *last == '1') {
-        return NGX_OK;
-    }
-
-    for (p = value->data + 6; p <= last; p++) {
-        if (*p == '.') {
-            if (rp == 0) {
-                rp = 1;
-                scope = 1;
-                continue;
-            } else {
-                goto invalid;
-            }
-        }
-
-        if (*p < '0' && *p > '9') {
-            goto invalid;
-        }
-
-        if (rp == 0 && *p != '0') {
-            goto invalid;
-        }
-
-        log->sample *= 10;
-        log->sample += *p - '0';
-
-        scope *= 10;
-
-        if (scope > NGX_MAX_UINT32_VALUE) {
-            goto invalid;
-        }
-    }
-
-    if (log->sample == 0) {
-        goto invalid;
-    }
-
-    log->scope = scope;
-
-    log->scatter = log->scope / log->sample;
-    if (log->scatter * log->sample != log->scope) {
-        ++log->scatter;
-    }
-
-    log->inflexion = log->scope - log->sample * log->scatter + log->sample + 1;
-
-    return NGX_OK;
-
-invalid:
-
-    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "invalid parameter \"%V\"", value);
-    return NGX_ERROR;
 }
 
 
@@ -1665,6 +1729,925 @@ ngx_http_log_init(ngx_conf_t *cf)
     }
 
     *h = ngx_http_log_handler;
+
+    return NGX_OK;
+}
+
+
+static char *
+ngx_http_log_condition_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                         *rv;
+    ngx_conf_t                    pcf;
+    ngx_http_conf_ctx_t          *ctx, *pctx;
+    ngx_http_log_condition_t     *condition;
+
+    ngx_http_log_loc_conf_t      *llcf = conf;
+
+    llcf->env = ngx_pcalloc(cf->pool, sizeof(ngx_http_log_env_t));
+    if (llcf->env == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    pctx = cf->ctx;
+    ctx->main_conf = pctx->main_conf;
+    ctx->srv_conf = pctx->srv_conf;
+    ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
+    if (ctx->loc_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ctx->loc_conf[ngx_http_log_module.ctx_index] = llcf->env;
+
+    pcf = *cf;
+    cf->cmd_type = NGX_HTTP_LOG_CONF;
+    cf->ctx = ctx;
+    rv = ngx_conf_parse(cf, NULL);
+    *cf = pcf;
+
+    if (rv != NGX_CONF_OK) {
+        return rv;
+    }
+
+    if (llcf->env->conditions) {
+        condition = llcf->env->conditions->elts;
+        if (condition[llcf->env->conditions->nelts - 1].is_and) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                              "can not use \"and\" flag on the last condition");
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_http_log_env_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                         *rv;
+    ngx_str_t                    *value;
+    ngx_conf_t                    pcf;
+    ngx_http_log_env_t           *env;
+    ngx_http_conf_ctx_t          *ctx, *pctx;
+    ngx_http_variable_t          *var;
+    ngx_http_log_condition_t     *condition;
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    pctx = cf->ctx;
+    ctx->main_conf = pctx->main_conf;
+    ctx->srv_conf = pctx->srv_conf;
+    ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
+    if (ctx->loc_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    value = cf->args->elts;
+    value[1].len--;
+    value[1].data++;
+
+    var = ngx_http_add_variable(cf, &value[1], NGX_HTTP_VAR_CHANGEABLE);
+    if (var == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (var->data) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "duplicate access log var: \"%V\"",
+                           &value[1]);
+        return NGX_CONF_ERROR;
+    }
+
+    env = ngx_pcalloc(cf->pool, sizeof(ngx_http_log_env_t));
+    if (env == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ctx->loc_conf[ngx_http_log_module.ctx_index] = env;
+
+    var->get_handler = ngx_http_log_variable_value;
+    var->data = (uintptr_t) env;
+
+    pcf = *cf;
+    cf->cmd_type = NGX_HTTP_LOG_CONF;
+    cf->ctx = ctx;
+    rv = ngx_conf_parse(cf, NULL);
+    *cf = pcf;
+
+    if (rv != NGX_CONF_OK) {
+        return rv;
+    }
+
+    if (env->conditions) {
+        condition = env->conditions->elts;
+        if (condition[env->conditions->nelts - 1].is_and) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                              "can not use \"and\" flag on the last condition");
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    uintptr_t                     *code;
+    ngx_int_t                      rc;
+    ngx_int_t                      count;
+    ngx_str_t                     *value;
+    ngx_http_log_condition_t      *lc;
+
+    ngx_http_log_env_t            *env = conf;
+
+    if (env->conditions == NULL) {
+        env->conditions = ngx_array_create(cf->pool, 7,
+                                           sizeof(ngx_http_log_condition_t));
+        if (env->conditions == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    lc = ngx_array_push(env->conditions);
+    if (lc == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    ngx_memzero(lc, sizeof(ngx_http_log_condition_t));
+
+    value = cf->args->elts;
+    if (ngx_strcmp(value[cf->args->nelts - 1].data, "and") == 0) {
+        cf->args->nelts--;
+        lc->is_and = 1;
+    }
+
+    count = 0;
+    rc = ngx_http_log_condition(cf, lc, 1, &count);
+    if (rc == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (count > 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "the parentheses are not enclosed");
+        return NGX_CONF_ERROR;
+    }
+
+    code = ngx_array_push_n(lc->codes, sizeof(uintptr_t));
+    if (code == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    *code = (uintptr_t) NULL;
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_log_block_sample(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_str_t                  *value;
+    ngx_http_log_env_t         *env = conf;
+
+    value = cf->args->elts;
+
+    return ngx_http_log_sample_rate(cf, &value[1], &env->sample);
+}
+
+
+static ngx_int_t
+ngx_http_log_condition_value(ngx_conf_t *cf,
+    ngx_http_log_condition_t *lc, ngx_str_t *value)
+{
+    ngx_int_t                              n;
+    ngx_http_script_compile_t              sc;
+    ngx_http_script_value_code_t          *val;
+    ngx_http_script_complex_value_code_t  *complex;
+
+    n = ngx_http_script_variables_count(value);
+
+    if (n == 0) {
+        val = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                         sizeof(ngx_http_script_value_code_t));
+        if (val == NULL) {
+            return NGX_ERROR;
+        }
+
+        n = ngx_atoi(value->data, value->len);
+
+        if (n == NGX_ERROR) {
+            n = 0;
+        }
+
+        val->code = ngx_http_script_value_code;
+        val->value = (uintptr_t) n;
+        val->text_len = (uintptr_t) value->len;
+        val->text_data = (uintptr_t) value->data;
+
+        return NGX_OK;
+    }
+
+    complex = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                 sizeof(ngx_http_script_complex_value_code_t));
+    if (complex == NULL) {
+        return NGX_ERROR;
+    }
+
+    complex->code = ngx_http_script_complex_value_code;
+    complex->lengths = NULL;
+
+    ngx_memzero(&sc, sizeof(ngx_http_script_compile_t));
+
+    sc.cf = cf;
+    sc.source = value;
+    sc.lengths = &complex->lengths;
+    sc.values = &lc->codes;
+    sc.variables = n;
+    sc.complete_lengths = 1;
+
+    if (ngx_http_script_compile(&sc) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_log_condition_element(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
+    ngx_int_t cur)
+{
+    u_char                        *p;
+    size_t                         len;
+    ngx_str_t                     *value;
+    ngx_regex_compile_t            rc;
+    ngx_http_script_code_pt       *pcode, code;
+    ngx_http_script_file_code_t   *fop;
+    ngx_http_script_regex_code_t  *regex;
+    u_char                         errstr[NGX_MAX_CONF_ERRSTR];
+
+    value = cf->args->elts;
+
+    len = value[cur].len;
+    p = value[cur].data;
+
+    if (len > 1 && p[0] == '$') {
+
+        if (ngx_http_log_condition_value(cf, lc, &value[cur]) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        cur++;
+        code = NULL;
+
+        len = value[cur].len;
+        p = value[cur].data;
+
+        if (len == 1 && p[0] == '=') {
+            code = ngx_http_script_equal_code;
+
+        } else if (len == 2 && p[0] == '!' && p[1] == '=') {
+            code = ngx_http_script_not_equal_code;
+
+        } else if (len == 1 && p[0] == '>') {
+            code = ngx_http_script_more_than_code;
+
+        } else if (len == 1 && p[0] == '<') {
+            code = ngx_http_script_less_than_code;
+
+        } else if (len == 2 && p[0] == '>' && p[1] == '=') {
+            code = ngx_http_script_no_less_than_code;
+
+        } else if (len == 2 && p[0] == '<' && p[1] == '=') {
+            code = ngx_http_script_no_more_than_code;
+
+        } else if ((len == 1 && p[0] == '~')
+            || (len == 2 && p[0] == '~' && p[1] == '*')
+            || (len == 2 && p[0] == '!' && p[1] == '~')
+            || (len == 3 && p[0] == '!' && p[1] == '~' && p[2] == '*'))
+        {
+            regex = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                         sizeof(ngx_http_script_regex_code_t));
+            if (regex == NULL) {
+                return NGX_ERROR;
+            }
+
+            ngx_memzero(regex, sizeof(ngx_http_script_regex_code_t));
+
+            ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
+
+            cur++;
+            rc.pattern = value[cur];
+            rc.options = (p[len - 1] == '*') ? NGX_REGEX_CASELESS : 0;
+            rc.err.len = NGX_MAX_CONF_ERRSTR;
+            rc.err.data = errstr;
+
+            regex->regex = ngx_http_regex_compile(cf, &rc);
+            if (regex->regex == NULL) {
+                return NGX_ERROR;
+            }
+
+            regex->code = ngx_http_script_regex_start_code;
+            regex->next = sizeof(ngx_http_script_regex_code_t);
+            regex->test = 1;
+            if (p[0] == '!') {
+                regex->negative_test = 1;
+            }
+            regex->name = value[cur];
+
+            return cur + 1;
+        }
+
+        if (code) {
+            cur++;
+
+            if (ngx_http_log_condition_value(cf, lc, &value[cur])
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+
+            pcode = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                               sizeof(uintptr_t));
+            if (pcode == NULL) {
+                return NGX_ERROR;
+            }
+
+            *pcode = code;
+
+            return cur + 1;
+        }
+
+        return cur;
+
+    } else if ((len == 2 && p[0] == '-')
+               || (len == 3 && p[0] == '!' && p[1] == '-'))
+    {
+        cur++;
+
+        if (ngx_http_log_condition_value(cf, lc, &value[cur])
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        fop = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                         sizeof(ngx_http_script_file_code_t));
+        if (fop == NULL) {
+            return NGX_ERROR;
+        }
+
+        fop->code = ngx_http_script_file_code;
+
+        if (p[1] == 'f') {
+            fop->op = ngx_http_script_file_plain;
+            return cur + 1;
+        }
+
+        if (p[1] == 'd') {
+            fop->op = ngx_http_script_file_dir;
+            return cur + 1;
+        }
+
+        if (p[1] == 'e') {
+            fop->op = ngx_http_script_file_exists;
+            return cur + 1;
+        }
+
+        if (p[1] == 'x') {
+            fop->op = ngx_http_script_file_exec;
+            return cur + 1;
+        }
+
+        if (p[0] == '!') {
+            if (p[2] == 'f') {
+                fop->op = ngx_http_script_file_not_plain;
+                return cur + 1;
+            }
+
+            if (p[2] == 'd') {
+                fop->op = ngx_http_script_file_not_dir;
+                return cur + 1;
+            }
+
+            if (p[2] == 'e') {
+                fop->op = ngx_http_script_file_not_exists;
+                return cur + 1;
+            }
+
+            if (p[2] == 'x') {
+                fop->op = ngx_http_script_file_not_exec;
+                return cur + 1;
+            }
+        }
+    }
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid condition element \"%V\"", &value[cur]);
+
+    return NGX_ERROR;
+}
+
+
+static ngx_int_t
+ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
+    ngx_int_t cur, ngx_int_t *count)
+{
+    off_t                        *poff;
+    ngx_str_t                    *value;
+    ngx_int_t                     rb, ret;
+    ngx_uint_t                   *p, op, i;
+    ngx_array_t                   nstack, fstack;
+    ngx_http_script_code_pt      *code;
+    ngx_http_script_if_code_t    *fastcode;
+
+    struct {
+        ngx_http_script_code_pt   code;
+        ngx_http_script_code_pt   fastcode;
+        ngx_uint_t                prior;
+    } op_arr[3] = {
+        { NULL, NULL, 0 },
+        { ngx_http_script_and_code, ngx_http_script_test_code, 5 },
+        { ngx_http_script_or_code, ngx_http_script_test_not_code, 4 }
+    };
+
+    value = cf->args->elts;
+    rb = -1;
+    ret = -1;
+    i = 0;
+    code = NULL;
+    ngx_array_init(&nstack, cf->pool, 10, sizeof(ngx_uint_t));
+    ngx_array_init(&fstack, cf->pool, 10, sizeof(off_t));
+
+    while (cur < (ngx_int_t) cf->args->nelts && (rb == -1 || cur <= rb)) {
+
+        if (value[cur].data[0] == '(') {
+
+            if (value[cur].len == 1) {
+                cur++;
+
+            } else {
+                value[cur].len--;
+                value[cur].data++;
+            }
+
+            (*count)++;
+            cur = ngx_http_log_condition(cf, lc, cur, count);
+
+            if (cur == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            if (cur >= (ngx_int_t) cf->args->nelts) {
+                return cur;
+            }
+        }
+
+        if (ret < 0) {
+            if (value[cur].data[value[cur].len - 1] == ')') {
+                rb = cur;
+
+            } else if (cur + 1 < (ngx_int_t) cf->args->nelts
+                && value[cur + 1].data[value[cur + 1].len - 1] == ')')
+            {
+                rb = cur + 1;
+
+            } else if (cur + 2 < (ngx_int_t) cf->args->nelts
+                && value[cur + 2].data[value[cur + 2].len - 1] == ')')
+            {
+                rb = cur + 2;
+            }
+
+            if (rb >= 0) {
+
+                (*count)--;
+                if (*count < 0) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "unexpected end of parentheses");
+                    return NGX_ERROR;
+                }
+
+                for (i = 0;
+                     value[rb].len > 0
+                         && value[rb].data[value[rb].len - 1] == ')';
+                     i++)
+                {
+                    value[rb].len--;
+                    value[rb].data[value[rb].len] = '\0';
+                }
+
+                ret = i > 1 ? rb : rb + 1;
+
+                if (value[rb].len == 0) {
+                    if (rb == cur) {
+                        break;
+                    }
+
+                    rb--;
+                }
+            }
+        }
+
+        op = 0;
+
+        if (value[cur].len == 2 && value[cur].data[0] == '|'
+            && value[cur].data[1] == '|')
+        {
+            op = NGX_HTTP_SCRIPT_ROP_OR;
+            
+        } else if (value[cur].len == 2 && value[cur].data[0] == '&'
+                   && value[cur].data[1] == '&')
+        {
+            op = NGX_HTTP_SCRIPT_ROP_AND;
+
+        } else {
+            cur = ngx_http_log_condition_element(cf, lc, cur);
+            if (cur == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+        }
+
+        /*
+         * a && b && c ==> a if b if c if && && NULL
+         *                    Y    Y    Y         A
+         *                    |    |    |         |
+         *                    \-------------------/
+         *
+         * a && b || c ==> a if b && ifn c || NULL
+         *                    Y       Y  A      A
+         *                    |       |  |      |
+         *                    \-------+--/      |
+         *                            \---------/
+         *
+         * a || b && c ==> a ifn b if c && || NULL
+         *                    Y     Y           A
+         *                    |     |           |
+         *                    \-----------------/
+         *
+         * a || b || c ==> a ifn b ifn c ifn || || NULL
+         *                    Y     Y     Y         A
+         *                    |     |     |         |
+         *                    \---------------------/
+         *
+         * Conclusion:
+         *     Whenever a logical operator is buffered in stack, add a
+         * 'if' or 'if_not' operator next to the operand in the op list,
+         * otherwise, add a 'if' or 'if_not' operator next to the logical
+         * operator in the op list. Update the 'next' field of all the
+         * 'if' or 'if_not' operators to point to the current position
+         * in the op list, after a logical operator is put into the op
+         * list or at the end of the whole process.
+         */
+
+        if (op) {
+
+            if (nstack.nelts == 0) {
+                p = (ngx_uint_t *) ngx_array_push(&nstack);
+                if (p == NULL) {
+                    return NGX_ERROR;
+                }
+
+            } else {
+                p = ((ngx_uint_t *) nstack.elts) + nstack.nelts - 1;
+
+                if (op_arr[*p].prior > op_arr[op].prior) {
+                    code = ngx_http_script_start_code(cf->pool,
+                                                      &lc->codes,
+                                                      sizeof(uintptr_t));
+                    if (code == NULL) {
+                        return NGX_ERROR;
+                    }
+
+                    *code = op_arr[*p].code;
+
+                    while (fstack.nelts) {
+                        poff = (off_t *) fstack.elts + fstack.nelts - 1;
+                        fastcode = (ngx_http_script_if_code_t *)
+                                      (*poff + (u_char *) lc->codes->elts);
+                        fastcode->next = (u_char *) code + sizeof(uintptr_t)
+                                       + sizeof(ngx_http_script_if_code_t)
+                                       - (u_char *) lc->codes->elts
+                                       - *poff;
+                        fstack.nelts--;
+                    }
+
+                } else {
+                    p = (ngx_uint_t *) ngx_array_push(&nstack);
+                    if (p == NULL) {
+                        return NGX_ERROR;
+                    }
+
+                }
+            }
+
+            fastcode = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                            sizeof(ngx_http_script_if_code_t));
+            if (fastcode == NULL) {
+                return NGX_ERROR;
+            }
+
+            fastcode->code = op_arr[op].fastcode;
+            fastcode->loc_conf = NULL;
+
+            poff = (off_t *) ngx_array_push(&fstack);
+            if (poff == NULL) {
+                return NGX_ERROR;
+            }
+
+            *p = op;
+            *poff = (u_char *) fastcode - (u_char *) lc->codes->elts;
+            cur++;
+        }
+    }
+
+    while (nstack.nelts) {
+        p = ((ngx_uint_t *) nstack.elts) + nstack.nelts - 1;
+        code = ngx_http_script_start_code(cf->pool, &lc->codes,
+                                          sizeof(uintptr_t));
+        if (code == NULL) {
+            return NGX_ERROR;
+        }
+
+        *code = op_arr[*p].code;
+        nstack.nelts--;
+    }
+
+    while (fstack.nelts) {
+        poff = (off_t *) fstack.elts + fstack.nelts - 1;
+        fastcode = (ngx_http_script_if_code_t *)
+                             (*poff + (u_char *) lc->codes->elts);
+        fastcode->next = (u_char *) code + sizeof(uintptr_t)
+                       - (u_char *) lc->codes->elts
+                       - *poff;
+        fstack.nelts--;
+    }
+
+    if (i > 1) {
+        value[ret].data += value[ret].len;
+        value[ret].len = i - 1;
+        ngx_memset(value[ret].data, ')', i - 1);
+    }
+
+    return ret;
+}
+
+
+static char *
+ngx_http_log_sample_rate(ngx_conf_t *cf, ngx_str_t *value,
+    ngx_http_log_sample_t **sample)
+{
+    u_char                 *p, *last;
+    uint64_t                scope;
+    ngx_uint_t              rp;
+
+    if (*sample) {
+        return "is duplicate";
+    }
+
+    rp = 0;
+    scope = 0;
+
+    for (last = value->data + value->len - 1;
+         last >= value->data && *last == '0';
+         last--) /* void */ ;
+
+    if (last == value->data && *last == '1') {
+        return NGX_CONF_OK;
+    }
+
+    *sample = ngx_pcalloc(cf->pool, sizeof(ngx_http_log_sample_t));
+    if (*sample == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    for (p = value->data; p <= last; p++) {
+        if (*p == '.') {
+            if (rp == 0) {
+                rp = 1;
+                scope = 1;
+                continue;
+            } else {
+                goto invalid;
+            }
+        }
+
+        if (*p < '0' && *p > '9') {
+            goto invalid;
+        }
+
+        if (rp == 0 && *p != '0') {
+            goto invalid;
+        }
+
+        (*sample)->sample *= 10;
+        (*sample)->sample += *p - '0';
+
+        scope *= 10;
+
+        if (scope > NGX_MAX_UINT32_VALUE) {
+            goto invalid;
+        }
+    }
+
+    if ((*sample)->sample == 0) {
+        goto invalid;
+    }
+
+    (*sample)->scope = scope;
+
+    (*sample)->scatter = (*sample)->scope / (*sample)->sample;
+    if ((*sample)->scatter * (*sample)->sample != (*sample)->scope) {
+        (*sample)->scatter++;
+    }
+
+    (*sample)->inflexion = (*sample)->scope
+                         - (*sample)->sample * (*sample)->scatter
+                         + (*sample)->sample + 1;
+
+    return NGX_CONF_OK;
+
+invalid:
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid parameter \"%V\"", value);
+
+    return NGX_CONF_ERROR;
+}
+
+
+static ngx_http_variable_t *
+ngx_http_log_copy_var(ngx_conf_t *cf, ngx_http_variable_t *var, ngx_uint_t seq)
+{
+    ngx_str_t             *var_name;
+    ngx_uint_t             i, n;
+    ngx_http_log_env_t    *env;
+    ngx_http_variable_t   *new_var;
+
+    for (i = 1, n = seq / 10; n; n /= 10, i++) /* void */;
+
+    var_name = ngx_palloc(cf->pool, sizeof(ngx_str_t));
+    if (var_name == NULL) {
+        return NULL;
+    }
+
+    var_name->len = var->name.len + i + sizeof("anonymous");
+    var_name->data = ngx_palloc(cf->pool, var_name->len + 1);
+    if (var_name->data == NULL) {
+        return NULL;
+    }
+
+    ngx_sprintf(var_name->data, "anonymous_%V%d%Z", &var->name, seq);
+
+    new_var = ngx_http_add_variable(cf, var_name, NGX_HTTP_VAR_CHANGEABLE);
+    if (new_var == NULL) {
+        return NULL;
+    }
+
+    env = ngx_palloc(cf->pool, sizeof(ngx_http_log_env_t));
+    if (env == NULL) {
+        return NULL;
+    }
+
+    ngx_memcpy(env, (char *) var->data, sizeof(ngx_http_log_env_t));
+
+    new_var->get_handler = ngx_http_log_variable_value;
+    new_var->data = (uintptr_t) env;
+
+    return new_var;
+}
+
+
+static ngx_int_t
+ngx_http_log_variable_value(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_log_env_t *env = (ngx_http_log_env_t *) data;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                  "env->sample=%p, env->conditions=%p",
+                  env->sample, env->conditions);
+
+    if (env->conditions
+        && ngx_http_log_do_if(r, env->conditions) == NGX_DECLINED)
+    {
+        goto bypass;
+    }
+
+    if (env->sample
+        && ngx_http_log_do_sample(env->sample) == NGX_DECLINED)
+    {
+        goto bypass;
+    }
+
+    v->len = 1;
+    v->data = (u_char *) "1";
+    v->valid = 1;
+    v->no_cacheable = 1;
+    v->not_found = 0;
+
+    return NGX_OK;
+
+bypass:
+
+    v->len = 0;
+    v->valid = 1;
+    v->no_cacheable = 1;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_log_do_if(ngx_http_request_t *r, ngx_array_t *conditions)
+{
+    ngx_uint_t                 i;
+    ngx_http_script_code_pt    code;
+    ngx_http_log_condition_t  *condition;
+    ngx_http_script_engine_t   e;
+    ngx_http_variable_value_t  stack[10];
+
+    condition = conditions->elts;
+    for (i = 0; i < conditions->nelts; i++) {
+        ngx_memzero(&e, sizeof(ngx_http_script_engine_t));
+        ngx_memzero(&stack, sizeof(stack));
+        e.ip = condition[i].codes->elts;
+        e.request = r;
+        e.quote = 1;
+        e.log = condition[i].log;
+        e.status = NGX_DECLINED;
+        e.sp = stack;
+
+        while (*(uintptr_t *) e.ip) {
+            code = *(ngx_http_script_code_pt *) e.ip;
+            code(&e);
+        }
+
+        e.sp--;
+        if (e.sp->len && (e.sp->len != 1 || e.sp->data[0] != '0')) {
+            if (!condition[i].is_and) {
+
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                               "ngx http log condition: true");
+
+                return NGX_OK;
+            }
+        } else {
+            while (condition[i].is_and) {
+                i++;
+            }
+        }
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "ngx http log condition: false");
+
+    return NGX_DECLINED;
+}
+
+
+static ngx_int_t
+ngx_http_log_do_sample(ngx_http_log_sample_t *sample)
+{
+    ngx_uint_t    bypass, threshold;
+
+    bypass = 1;
+
+    if (sample->sample_count < sample->sample) {
+        if (sample->scatter_count++ == 0) {
+            bypass = 0;
+            sample->sample_count++;
+        }
+
+        threshold = sample->scatter;
+        if (sample->sample_count >= sample->inflexion) {
+            threshold--;
+        }
+
+        if (sample->scatter_count == threshold) {
+            sample->scatter_count = 0;
+        }
+    }
+
+    if (++sample->scope_count == sample->scope) {
+        sample->scope_count = 0;
+        sample->sample_count = 0;
+        sample->scatter_count = 0;
+    }
+
+    if (bypass) {
+        return NGX_DECLINED;
+    }
 
     return NGX_OK;
 }
