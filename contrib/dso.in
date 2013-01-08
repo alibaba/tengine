@@ -13,6 +13,9 @@ HTTP_DEPS=
 
 NGX_SOURCE_HOME=%%NGX_SOURCE_HOME%%
 
+NGX_DSO_CC_OPT=
+NGX_DSO_LD_OPT=
+
 opt=
 help=no
 
@@ -39,6 +42,9 @@ do
         --nginx-source=*)                NGX_SOURCE_HOME="$value"       ;;
         -s=*)                            NGX_SOURCE_HOME="$value"       ;;
 
+        --with-cc-opt=*)                 NGX_DSO_CC_OPT="$value"        ;;
+        --with-ld-opt=*)                 NGX_DSO_LD_OPT="$value"        ;;
+
         *)
             echo "$0: error: invalid option \"$option\""
             exit 1
@@ -60,6 +66,9 @@ cat << END
     -d, --dst=PATH            set module installation path
     -a, --add-module=PATH     external module which will be compiled
     -s, --nginx-source=SOURCE set nginx source root
+
+    --with-cc-opt=OPTIONS     set additional C compiler options
+    --with-ld-opt=OPTIONS     set additional linker options
 
 END
 
@@ -119,9 +128,15 @@ ADDON_DEPS = \$(CORE_DEPS) $NGX_ADDON_DEPS
 END
 
 
-    if test -n "$NGX_LD_OPT$CORE_LIBS"; then
-        ngx_libs=`echo $NGX_LD_OPT $CORE_LIBS \
+    if test -n "$NGX_LD_OPT$NGX_DSO_LD_OPT$CORE_LIBS"; then
+        ngx_libs=`echo $NGX_LD_OPT $CORE_LIBS $NGX_DSO_LD_OPT \
             | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`
+    fi
+
+    if test -n "$NGX_DSO_CC_OPT"; then
+        ngx_dso_cc_opt=`echo $NGX_DSO_CC_OPT \
+           | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`
+        ngx_cc="$ngx_cc $ngx_dso_cc_opt"
     fi
 
     for ngx_src in $NGX_ADDON_SRCS
@@ -189,10 +204,14 @@ END
 
     make -f $NGX_DSO_MAKEFILE
     if test -n "$NGX_DSO_PREFIX"; then
+        test -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
+            && unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
         echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_PREFIX
         cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
     else
-        echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX/$NGX_DSO_PATH
+        test -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
+            && unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
+        echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
         cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
     fi
 }

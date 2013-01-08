@@ -148,6 +148,15 @@ END
 		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
 
+    for ngx_shared_modules in $NGX_SHARED_MODULES
+    do
+        cat << END                                                >> $NGX_MAKEFILE
+
+	test -f '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}' \
+		&& unlink '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}'
+END
+    done
+
     for ngx_dso_module in $NGX_DSO_ALL_TARGETS
     do
         cat << END                                                >> $NGX_MAKEFILE
@@ -256,6 +265,16 @@ if [ $NGX_DSO = YES ] ; then
 	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
 		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
 END
+
+    for ngx_shared_modules in $NGX_SHARED_MODULES
+    do
+        cat << END                                                >> $NGX_MAKEFILE
+
+	test -f '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}' \
+		&& unlink '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}'
+
+END
+    done
 
     for ngx_dso_module in $NGX_DSO_ALL_TARGETS
     do
