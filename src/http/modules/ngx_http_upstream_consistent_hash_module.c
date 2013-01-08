@@ -9,6 +9,8 @@
 #include <ngx_config.h>
 #include <ngx_md5.h>
 
+#define NGX_CHASH_VIRTUAL_NODE_NUMBER       160
+
 
 typedef struct {
     time_t                                  timeout;
@@ -153,7 +155,8 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     ngx_uint_t                               hash_len;
 #endif
     ngx_int_t                                j, weight;
-    ngx_uint_t                               i, n;
+    ngx_uint_t                               i, n, *number, rnindex, max_fails;
+    ngx_pool_t                              *temp_pool;
     ngx_http_upstream_rr_peer_t             *peer;
     ngx_http_upstream_rr_peers_t            *peers;
     ngx_http_upstream_chash_server_t        *server;
@@ -177,7 +180,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     n = peers->number;
-    ucscf->tries = n;
+    max_fails = 1;
     ucscf->number = 0;
     ucscf->real_node = ngx_pcalloc(cf->pool, n *
                                    sizeof(ngx_http_upstream_chash_server_t**));
@@ -185,14 +188,19 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         return NGX_ERROR;
     }
     for (i = 0; i < n; i++) {
-        ucscf->number += peers->peer[i].weight * 16;
+        ucscf->number += peers->peer[i].weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
+        max_fails = max_fails < peers->peer[i].max_fails ?
+                    max_fails : peers->peer[i].max_fails;
         ucscf->real_node[i] = ngx_pcalloc(cf->pool,
-                                          (peers->peer[i].weight * 16 + 1) *
+                                          (peers->peer[i].weight
+                                           * NGX_CHASH_VIRTUAL_NODE_NUMBER + 1) *
                                           sizeof(ngx_http_upstream_chash_server_t*));
         if (ucscf->real_node[i] == NULL) {
             return NGX_ERROR;
         }
     }
+
+    ucscf->tries = n * max_fails + n;
 
     ucscf->servers = ngx_pcalloc(cf->pool,
                                  (ucscf->number + 1) *
@@ -219,12 +227,11 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         }
 
 #endif
-        weight = peer->weight * 16;
+        weight = peer->weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
         for (j = 0; j < weight; j++) {
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
             server->rnindex = i;
-            ucscf->real_node[i][j] = server;
 #ifdef NGX_HTTP_UPSTREAM_ID
             id = sid * 256 * 16 + j;
             server->hash = ngx_murmur_hash((u_char *) (&id),
@@ -242,9 +249,22 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
               sizeof(ngx_http_upstream_chash_server_t),
               (const void *)ngx_http_upstream_chash_cmp);
 
+    temp_pool = ngx_create_pool(4096, cf->log);
+    if (temp_pool == NULL) {
+        return NGX_ERROR;
+    }
+
+    number = ngx_pcalloc(temp_pool, n * sizeof(ngx_uint_t));
+    if (number == NULL) {
+        return NGX_ERROR;
+    }
+
     for (i = 1; i <= ucscf->number; i++) {
         ucscf->servers[i].index = i;
         ucscf->d_servers[i].id = i;
+        rnindex = ucscf->servers[i].rnindex;
+        ucscf->real_node[rnindex][number[rnindex]] = &ucscf->servers[i];
+        number[rnindex]++;
     }
 
     ucscf->tree = ngx_pcalloc(cf->pool, sizeof(ngx_segment_tree_t));

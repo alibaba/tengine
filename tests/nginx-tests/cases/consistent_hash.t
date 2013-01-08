@@ -155,10 +155,10 @@ http {
     upstream consistent_hash {
         consistent_hash $args;
         consistent_mode native;
-        server 127.0.0.1:9000 id=9000 weight=1;
-        server 127.0.0.1:9001 id=9001 weight=1;
-        server 127.0.0.1:9002 id=9002 weight=1;
-        server 127.0.0.1:9003 id=9003 weight=1;
+        server 127.0.0.1:9000 id=9000 weight=16;
+        server 127.0.0.1:9001 id=9001 weight=16;
+        server 127.0.0.1:9002 id=9002 weight=16;
+        server 127.0.0.1:9003 id=9003 weight=16;
     }
 
     server {
@@ -211,7 +211,7 @@ for (my $count = 1; $count <= 10000; $count++) {
 }
 print "9000 weight=1  9001 weight=1  9002 weight=1  9003 weight=1\n";
 foreach $res (keys(%result)) {
-    print ("$res: $result{$res}\n");
+    print ("server $res: $result{$res}\n");
 }
 $t->stop();
 sleep(1);
@@ -274,9 +274,9 @@ EOF
 sleep(1);
 print "blance test 2\n\n";
 $t->run();
-my @cset = (0..9, 'a'..'z', 'A'..'Z');
-my $arg;
-my %result;
+foreach $res (keys(%result)) {
+    $result{$res} = 0;
+}
 for (my $count = 1; $count <= 10000; $count++) {
     $arg = join '', map { $cset[int rand @cset] } 0..1000;
     $r = http_get("/?$arg");
@@ -286,7 +286,7 @@ for (my $count = 1; $count <= 10000; $count++) {
 
 print "9000 weight=1  9001 weight=10  9002 weight=100  9003 weight=1000\n";
 foreach $res (keys(%result)) {
-    print ("$res: $result{$res}\n");
+    print ("server $res: $result{$res}\n");
 }
 print"\n";
 $t->stop();
