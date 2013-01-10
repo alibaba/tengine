@@ -690,13 +690,13 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
             case value:
                 if (*p == ';') {
                     end = p + 1;
-                    goto sucess;
+                    goto success;
                 }
 
                 if (p + 1 == last) {
                     end = last;
                     p++;
-                    goto sucess;
+                    goto success;
                 }
                 break;
 
@@ -707,7 +707,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     }
     goto not_found;
 
-sucess:
+success:
     if (ss_srv->flag & NGX_HTTP_SESSION_STICKY_PREFIX) {
         st = v;
         for (vv = v; vv < p; vv++) {
@@ -1104,7 +1104,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
                 if (*p == ';') {
                     return NGX_AGAIN;
                 } else if (!(*p == ' ' || *p == '\t' || *p == '\n')) {
-                    goto sucess;
+                    goto success;
                 }
                 break;
 
@@ -1115,7 +1115,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     }
     return NGX_AGAIN;
 
-sucess:
+success:
     t = s;
     t = ngx_cpymem(t, table->value.data, p - table->value.data);
     t = ngx_cpymem(t, ctx->sid.data, ctx->sid.len);
@@ -1159,7 +1159,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
                 if (*p == '=') {
                     state = pre_value;
                 } else if (*p == ';') {
-                    goto sucess;
+                    goto success;
                 }
                 break;
 
@@ -1171,7 +1171,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
 
             case value:
                 if (*p == ';') {
-                    goto sucess;
+                    goto success;
                 }
                 break;
 
@@ -1181,11 +1181,11 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
         p++;
     }
     if (p >= last && (state == value || state == pre_equal)) {
-        goto sucess;
+        goto success;
     }
     return NGX_AGAIN;
 
-sucess:
+success:
     en = p;
     table->value.len = table->value.len
                      - (en - st)
