@@ -102,6 +102,7 @@ NGX_ALL_MODULES="
     ngx_http_flv_module
     ngx_http_mp4_module
     ngx_http_slice_module
+    ngx_http_concat_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
@@ -119,7 +120,6 @@ NGX_ALL_MODULES="
     ngx_http_sub_filter_module
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
-    ngx_http_concat_filter_module
     ngx_http_footer_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
