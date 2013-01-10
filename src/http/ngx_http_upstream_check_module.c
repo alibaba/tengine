@@ -1,7 +1,6 @@
-
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
- * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Weibin Yao (yaoweibin@gmail.com)
  */
 
 
@@ -424,17 +423,17 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_upstream_check_module_ctx = {
-    NULL,                                     /* preconfiguration */
-    NULL,                                     /* postconfiguration */
+    NULL,                                    /* preconfiguration */
+    NULL,                                    /* postconfiguration */
 
-    ngx_http_upstream_check_create_main_conf, /* create main configuration */
-    ngx_http_upstream_check_init_main_conf,   /* init main configuration */
+    ngx_http_upstream_check_create_main_conf,/* create main configuration */
+    ngx_http_upstream_check_init_main_conf,  /* init main configuration */
 
-    ngx_http_upstream_check_create_srv_conf,  /* create server configuration */
-    NULL,                                     /* merge server configuration */
+    ngx_http_upstream_check_create_srv_conf, /* create server configuration */
+    NULL,                                    /* merge server configuration */
 
-    ngx_http_upstream_check_create_loc_conf,  /* create location configuration */
-    ngx_http_upstream_check_merge_loc_conf    /* merge location configuration */
+    ngx_http_upstream_check_create_loc_conf, /* create location configuration */
+    ngx_http_upstream_check_merge_loc_conf   /* merge location configuration */
 };
 
 
@@ -879,8 +878,11 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     ngx_add_timer(event, ucscf->check_interval / 2);
 
-    /* This process is processing the events now. */
-    if (peer->shm->owner == ngx_pid) {
+    /* This process is processing this peer now. */
+    if (peer->shm->owner == ngx_pid ||
+        peer->pc.connection != NULL ||
+        peer->check_timeout_ev.timer_set) {
+
         return;
     }
 
@@ -1766,11 +1768,14 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
 
     c = peer->pc.connection;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http check clean event: index:%i, fd: %d",
-                   peer->index, c->fd);
+    if (c) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "http check clean event: index:%i, fd: %d",
+                       peer->index, c->fd);
 
-    ngx_close_connection(c);
+        ngx_close_connection(c);
+        peer->pc.connection = NULL;
+    }
 
     if (peer->check_timeout_ev.timer_set) {
         ngx_del_timer(&peer->check_timeout_ev);
@@ -1857,7 +1862,10 @@ ngx_http_upstream_check_clear_all_events()
 
         if (peer[i].check_timeout_ev.timer_set) {
             c = peer[i].pc.connection;
-            ngx_close_connection(c);
+            if (c) {
+                ngx_close_connection(c);
+                peer[i].pc.connection = NULL;
+            }
             ngx_del_timer(&peer[i].check_timeout_ev);
         }
 
@@ -1977,12 +1985,13 @@ ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
             break;
         }
 
-        if (ngx_http_arg(r, command->name.data, command->name.len, &value) 
+        if (ngx_http_arg(r, command->name.data, command->name.len, &value)
             == NGX_OK) {
 
            if (command->handler(ctx, &value) != NGX_OK) {
                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                             "http upstream check, bad argument: \"%V\"", &value);
+                             "http upstream check, bad argument: \"%V\"",
+                             &value);
            }
         }
     }
@@ -2133,7 +2142,6 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     ngx_http_upstream_check_peer_t  *peer;
 
     peer = peers->peers.elts;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {
@@ -2201,7 +2209,6 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
             ngx_http_upstream_check_shm_generation);
 
     last = peers->peers.nelts - 1;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {

@@ -1,4 +1,40 @@
 
+Changes with Tengine 1.4.2                                         22 Nov 2012
+
+    *) Feature: added the option '--dso-tool-path' to configure script, which
+       can specify the installation path for the dso_tool script. (monadbobo)
+
+    *) Feature: added a new variable '$unix_time', whose value is the current
+       number of seconds since unix epoch time. (yaoweibin)
+
+    *) Feature: added the 'make test' target to run test cases. (yaoweibin)
+
+    *) Feature: now the sysguard module can be used in a location block.
+       (lifeibo)
+
+    *) Change: merged the changes from Nginx-1.2.4 and Nginx-1.2.5.
+       (zhuzhaoyuan)
+
+    *) Change: now checks the error codes of input body filters more carefully
+       to avoid socket leaks. (cfsego)
+
+    *) Bugfix: fixed the problem with directive limit_req can't handle 4
+       arguments. (monadbobo)
+       Thanks to LazyZhu.
+
+    *) Bugfix: fixed a compilation error with the file of sysinfo in Cygwin.
+       (lifeibo)
+       Thanks to Cao Peiran.
+
+    *) Bugfix: now the installation script will copy the user_agent module's
+       configuration. (monadbobo)
+       Thanks to Jianbin Xiao.
+
+    *) Bugfix: fixed the installation directory error with the DSO module
+       when creating the RPM package. (monadbobo)
+       Thanks to Jianbin Xiao and Ren Xiaolei.
+      
+
 Changes with Tengine 1.4.1                                         10 Oct 2012
 
     *) Feature: added jemalloc library support. (fanjizhao)

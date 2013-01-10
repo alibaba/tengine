@@ -470,7 +470,7 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
         peer = &rrp->peers->peer[0];
 #if (NGX_HTTP_UPSTREAM_CHECK)
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
-            return NGX_BUSY;
+            goto failed;
         }
 #endif
 
