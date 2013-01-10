@@ -349,6 +349,9 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
             buf.last = buf.start + n;
             buf.end = buf.last;
 
+#if (NGX_TRAFFIC_STATUS)
+            c->received += n;
+#endif
             rb->buf->last += n;
             rb->rest -= n;
             r->request_length += n;

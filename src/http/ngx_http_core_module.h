@@ -245,7 +245,17 @@ typedef struct {
 typedef struct {
     /* ngx_http_in_addr_t or ngx_http_in6_addr_t */
     void                      *addrs;
+#if (NGX_TRAFFIC_STATUS && NGX_HAVE_INET6)
+    unsigned                   naddrs:31;
+    unsigned                   ipv6:1;
+#else
     ngx_uint_t                 naddrs;
+#endif
+
+#if (NGX_TRAFFIC_STATUS)
+    in_port_t                  port;
+#endif
+
 } ngx_http_port_t;
 
 

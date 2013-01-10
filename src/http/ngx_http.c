@@ -1701,6 +1701,10 @@ ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
             return NGX_ERROR;
         }
 
+#if (NGX_TRAFFIC_STATUS)
+        hport->port = port->port;
+#endif
+
         ls->servers = hport;
 
         if (i == last - 1) {
@@ -1718,6 +1722,9 @@ ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
             if (ngx_http_add_addrs6(cf, hport, addr) != NGX_OK) {
                 return NGX_ERROR;
             }
+#if (NGX_TRAFFIC_STATUS)
+            hport->ipv6 = 1;
+#endif
             break;
 #endif
         default: /* AF_INET */

@@ -37,7 +37,8 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_conf_file.h \
            src/core/ngx_resolver.h \
            src/core/ngx_open_file_cache.h \
-           src/core/ngx_crypt.h"
+           src/core/ngx_crypt.h \
+           src/core/ngx_shm_cycle.h"
 
 
 CORE_SRCS="src/core/nginx.c \
@@ -69,7 +70,8 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_conf_file.c \
            src/core/ngx_resolver.c \
            src/core/ngx_open_file_cache.c \
-           src/core/ngx_crypt.c"
+           src/core/ngx_crypt.c \
+           src/core/ngx_shm_cycle.c"
 
 
 REGEX_MODULE=ngx_regex_module
@@ -410,8 +412,8 @@ HTTP_RANDOM_INDEX_MODULE=ngx_http_random_index_module
 HTTP_RANDOM_INDEX_SRCS=src/http/modules/ngx_http_random_index_module.c
 
 
-HTTP_STATUS_MODULE=ngx_http_status_module
-HTTP_STATUS_SRCS=src/http/modules/ngx_http_status_module.c
+HTTP_STATUS_MODULE=ngx_http_ipstat_module
+HTTP_STATUS_SRCS=src/http/modules/ngx_http_ipstat_module.c
 
 
 HTTP_GEO_MODULE=ngx_http_geo_module
@@ -670,3 +672,6 @@ NGX_HTTP_LUA_MODULE_SRCS="src/http/modules/lua/ngx_http_lua_script.c \
 						  src/http/modules/lua/ngx_http_lua_req_method.c \
 						  src/http/modules/lua/ngx_http_lua_phase.c \
 						  "
+HTTP_TRAFFIC_STATUS_MODULE="ngx_http_ipstat_module ngx_http_reqstat_module"
+HTTP_TRAFFIC_STATUS_SRCS="src/http/ngx_http_ipstat_module.c src/http/ngx_http_reqstat_module.c"
+HTTP_TRAFFIC_STATUS_DEPS=src/http/ngx_http_ipstat_module.h

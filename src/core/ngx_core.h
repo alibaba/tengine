@@ -84,6 +84,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_syslog.h>
 #endif
 #include <ngx_pipe.h>
+#include <ngx_shm_cycle.h>
 
 #if (NGX_PROCS)
 #include <ngx_proc.h>

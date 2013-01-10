@@ -10,6 +10,9 @@
 #include <ngx_channel.h>
 
 
+ngx_channel_handler_pt ngx_channel_top_handler = NULL;
+
+
 ngx_int_t
 ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
     ngx_log_t *log)
@@ -255,4 +258,36 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
     if (close(fd[1]) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "close() channel failed");
     }
+}
+
+
+ngx_int_t
+ngx_read_channel_ex(ngx_socket_t s, u_char *buf, size_t size, ngx_log_t *log)
+{
+    ssize_t             n;
+    ngx_err_t           err;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
+                   "channel read ex: s=%d, size=%z", s, size);
+
+    n = recv(s, buf, size, 0);
+
+    if (n == -1) {
+        err = ngx_errno;
+        ngx_log_error(NGX_LOG_ALERT, log, err, "recv() failed");
+        return NGX_ERROR;
+    }
+
+    if (n == 0) {
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "recv() returned zero");
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n < size) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0,
+                      "recv() returned not enough data: %uz", n);
+        return NGX_ERROR;
+    }
+
+    return n;
 }

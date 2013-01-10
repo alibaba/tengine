@@ -9,6 +9,10 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_TRAFFIC_STATUS)
+#include <ngx_http_ipstat_module.h>
+#endif
+
 
 static void ngx_http_init_request(ngx_event_t *ev);
 static void ngx_http_process_request_line(ngx_event_t *rev);
@@ -256,6 +260,11 @@ ngx_http_init_request(ngx_event_t *rev)
     ngx_http_in6_addr_t        *addr6;
 #endif
 
+#if (NGX_TRAFFIC_STATUS)
+    ngx_uint_t                  vip_key;
+    ngx_pool_cleanup_t         *cln;
+#endif
+
 #if (NGX_STAT_STUB)
     (void) ngx_atomic_fetch_add(ngx_stat_reading, -1);
 #endif
@@ -306,6 +315,9 @@ ngx_http_init_request(ngx_event_t *rev)
     r->http_connection = hc;
 
     c->sent = 0;
+#if (NGX_TRAFFIC_STATUS)
+    c->received = c->buffer ? c->buffer->last - c->buffer->pos : 0;
+#endif
     r->signature = NGX_HTTP_MODULE;
 
     /* find the server configuration for the address:port */
@@ -337,12 +349,15 @@ ngx_http_init_request(ngx_event_t *rev)
 
             /* the last address is "*" */
 
-            for (i = 0; i < port->naddrs - 1; i++) {
+            for (i = 0; i + 1 < port->naddrs; i++) {
                 if (ngx_memcmp(&addr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
                     break;
                 }
             }
 
+#if (NGX_TRAFFIC_STATUS)
+            vip_key = (uintptr_t) &addr6[i];
+#endif
             addr_conf = &addr6[i].conf;
 
             break;
@@ -355,12 +370,15 @@ ngx_http_init_request(ngx_event_t *rev)
 
             /* the last address is "*" */
 
-            for (i = 0; i < port->naddrs - 1; i++) {
+            for (i = 0; i + 1 < port->naddrs; i++) {
                 if (addr[i].addr == sin->sin_addr.s_addr) {
                     break;
                 }
             }
 
+#if (NGX_TRAFFIC_STATUS)
+            vip_key = (uintptr_t) &addr[i];
+#endif
             addr_conf = &addr[i].conf;
 
             break;
@@ -373,16 +391,32 @@ ngx_http_init_request(ngx_event_t *rev)
 #if (NGX_HAVE_INET6)
         case AF_INET6:
             addr6 = port->addrs;
+#if (NGX_TRAFFIC_STATUS)
+            vip_key = (uintptr_t) addr6;
+#endif
             addr_conf = &addr6[0].conf;
             break;
 #endif
 
         default: /* AF_INET */
             addr = port->addrs;
+#if (NGX_TRAFFIC_STATUS)
+            vip_key = (uintptr_t) addr;
+#endif
             addr_conf = &addr[0].conf;
             break;
         }
     }
+
+#if (NGX_TRAFFIC_STATUS)
+    c->status = ngx_http_ipstat_find_vip(vip_key);
+
+    if (c->requests == 1) {
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_CURRENT, 1);
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_TOTAL, 1);
+        ngx_http_ipstat_rate(c->status, NGX_HTTP_IPSTAT_CONN_RATE, 1);
+    }
+#endif
 
     r->virtual_names = addr_conf->virtual_names;
 
@@ -459,6 +493,21 @@ ngx_http_init_request(ngx_event_t *rev)
         ngx_http_close_connection(c);
         return;
     }
+
+#if (NGX_TRAFFIC_STATUS)    
+    cln = ngx_pool_cleanup_add(r->pool, 0);
+    if (cln == NULL) {
+        ngx_http_close_connection(c);
+        return;
+    }
+
+    cln->handler = ngx_http_ipstat_close_request;
+    cln->data = c;
+
+    ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_REQ_CURRENT, 1);
+    ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_REQ_TOTAL, 1);
+    ngx_http_ipstat_rate(c->status, NGX_HTTP_IPSTAT_REQ_RATE, 1);
+#endif
 
 
     if (ngx_list_init(&r->headers_out.headers, r->pool, 20,
@@ -1220,6 +1269,9 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
+#if (NGX_TRAFFIC_STATUS)
+    c->received += n;
+#endif
 
     return n;
 }
@@ -3140,6 +3192,12 @@ ngx_http_close_connection(ngx_connection_t *c)
 
 #if (NGX_STAT_STUB)
     (void) ngx_atomic_fetch_add(ngx_stat_active, -1);
+#endif
+
+#if (NGX_TRAFFIC_STATUS)
+    if (c->status) {
+        ngx_http_ipstat_count(c->status, NGX_HTTP_IPSTAT_CONN_CURRENT, -1);
+    }
 #endif
 
     c->destroyed = 1;

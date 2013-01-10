@@ -198,6 +198,7 @@ HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
+HTTP_TRAFFIC_STATUS=YES
 HTTP_STUB_STATUS=YES
 
 # shared modules
@@ -509,6 +510,8 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
+        --with-http_traffic_status_module) HTTP_TRAFFIC_STATUS=YES  ;;
+        --without-http_traffic_status_module) HTTP_TRAFFIC_STATUS=NO ;;
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
 
@@ -715,6 +718,8 @@ cat << END
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_traffic_status_module
+                                     disable ngx_http_traffic_status_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

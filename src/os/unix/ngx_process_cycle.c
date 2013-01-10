@@ -11,7 +11,8 @@
 #include <ngx_channel.h>
 
 
-#define NGX_PIPE_STILL_NEEDED     2
+#define NGX_CYCLE_STILL_NEEDED     2
+#define NGX_CHANNEL_BUFFER_LEN     1024
 
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
@@ -96,7 +97,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     u_char            *p;
     size_t             size;
     ngx_int_t          i;
-    ngx_uint_t         n, sigio, close_old_pipe;
+    ngx_uint_t         n, sigio, rm_old_cycles;
     sigset_t           set;
     struct itimerval   itv;
     ngx_uint_t         live;
@@ -152,7 +153,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 #endif
 
     ngx_new_binary = 0;
-    close_old_pipe = 0;
+    rm_old_cycles = 0;
     delay = 0;
     sigio = 0;
     live = 1;
@@ -193,9 +194,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
             live = ngx_reap_children(cycle);
-            if (!(live & NGX_PIPE_STILL_NEEDED) && close_old_pipe) {
+            if (!(live & NGX_CYCLE_STILL_NEEDED) && rm_old_cycles) {
                 ngx_close_old_pipes();
-                close_old_pipe = 0;
+                ngx_shm_cycle_free_old_cycles();
+                rm_old_cycles = 0;
             }
         }
 
@@ -281,7 +283,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_msleep(100);
 
             live = 1;
-            close_old_pipe = 1;
+            rm_old_cycles = 1;
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
@@ -721,7 +723,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
             live |= 1;
 
             if (ngx_processes[i].exiting) {
-                live |= NGX_PIPE_STILL_NEEDED;
+                live |= NGX_CYCLE_STILL_NEEDED;
             }
         }
     }
@@ -1162,6 +1164,8 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 static void
 ngx_channel_handler(ngx_event_t *ev)
 {
+    u_char             buf[NGX_CHANNEL_BUFFER_LEN];
+    size_t             left;
     ngx_int_t          n;
     ngx_channel_t      ch;
     ngx_connection_t  *c;
@@ -1246,6 +1250,35 @@ ngx_channel_handler(ngx_event_t *ev)
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
+
+        default:
+            if (ch.len) {
+                left = ch.len - sizeof(ngx_channel_t);
+
+                while (left) { 
+                    n = ngx_min(left, NGX_CHANNEL_BUFFER_LEN);
+                    n = ngx_read_channel_ex(c->fd, buf, n, ev->log);
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                                   "channel data: %i", n);
+
+                    if (n == NGX_ERROR) {
+
+                        if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                            ngx_del_conn(c, 0);
+                        }
+
+                        ngx_close_connection(c);
+                        return;
+                    }
+
+                    if (ngx_channel_top_handler) {
+                        ngx_channel_top_handler(&ch, buf, n, ev->log);
+                    }
+
+                    left -= n;
+                }
+            }
         }
     }
 }
