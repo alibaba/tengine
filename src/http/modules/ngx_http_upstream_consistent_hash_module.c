@@ -186,7 +186,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
     for (i = 0; i < n; i++) {
         ucscf->number += peers->peer[i].weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
-        max_fails = max_fails < peers->peer[i].max_fails ?
+        max_fails = max_fails > peers->peer[i].max_fails ?
                     max_fails : peers->peer[i].max_fails;
         ucscf->real_node[i] = ngx_pcalloc(cf->pool,
                                           (peers->peer[i].weight
