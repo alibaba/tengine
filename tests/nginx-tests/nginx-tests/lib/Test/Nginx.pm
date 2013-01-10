@@ -40,9 +40,9 @@ sub new {
 	)
 		or die "Can't create temp directory: $!\n";
 
-        $self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
-        $self->{_dso_module} = ();
-    	mkdir("$self->{_testdir}/logs");
+	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
+	$self->{_dso_module} = ();
+	mkdir("$self->{_testdir}/logs");
 
 	return $self;
 }
