@@ -766,12 +766,21 @@ echo '    NULL'                               >> $NGX_MODULES_C
 echo '};'                                     >> $NGX_MODULES_C
 
 echo                                          >> $NGX_MODULES_C
-echo 'const char *ngx_module_names[] = {'     >> $NGX_MODULES_C
+echo 'u_char *ngx_module_names[] = {'         >> $NGX_MODULES_C
 
 for mod in $modules
 do
-    echo "    \"$mod\","                      >> $NGX_MODULES_C
+    echo "    (u_char *) \"$mod\","           >> $NGX_MODULES_C
 done
+
+if [ $NGX_DSO = YES ] ; then
+
+    for i in `seq 1 $NGX_DSO_MAX`
+    do
+        echo '    NULL,'                          >> $NGX_MODULES_C
+    done
+
+fi
 
 cat << END                                    >> $NGX_MODULES_C
     NULL

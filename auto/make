@@ -65,7 +65,7 @@ dso_all_incs=$ngx_include_opt$ngx_incs
 ngx_all_srcs="$CORE_SRCS"
 
 
-# the core dependences and include pathes
+# the core dependences and include paths
 
 ngx_deps=`echo $CORE_DEPS $NGX_AUTO_CONFIG_H $NGX_PCH \
     | sed -e "s/  *\([^ ][^ ]*\)/$ngx_regex_cont\1/g" \
@@ -88,7 +88,7 @@ dso_core_deps=$ngx_deps
 dso_core_incs=$ngx_include_opt$ngx_incs
 
 
-# the http dependences and include pathes
+# the http dependences and include paths
 
 if [ $HTTP = YES ]; then
 
@@ -117,7 +117,7 @@ dso_http_incs=$ngx_include_opt$ngx_incs
 fi
 
 
-# the mail dependences and include pathes
+# the mail dependences and include paths
 
 if [ $MAIL = YES ]; then
 
@@ -230,7 +230,7 @@ fi
 cat << END                                                    >> $NGX_MAKEFILE
 
 $NGX_OBJS${ngx_dirsep}nginx${ngx_binext}:	$ngx_deps$ngx_spacer
-	\$(LINK) ${ngx_long_start}${ngx_binout}$NGX_OBJS${ngx_dirsep}nginx$ngx_long_cont$ngx_objs$ngx_libs$ngx_link
+	\$(LINK) ${ngx_long_start}${ngx_binout}$NGX_OBJS${ngx_dirsep}nginx$ngx_long_cont$ngx_objs$ngx_libs$ngx_link$NGX_EXTEND_LD_OPT
 	$ngx_rcc
 ${ngx_long_end}
 END
@@ -494,6 +494,10 @@ if [ $NGX_DSO = YES ] ; then
             {for (i=1; i<=NF; i++) print $i}' | awk -v module_name=$ngx_shared_modules \
             'BEGIN { FS=":"} {if ($1 == module_name) print $2}'`
 
+        ngx_dso_incs=`echo $ngx_dso_feture_path \
+            | sed -e "s/ *\([^ ][^ ]*\)/$ngx_include_opt\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
         for ngx_source in $ngx_dso_srcs
         do
             ngx_src=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
@@ -506,7 +510,7 @@ if [ $NGX_DSO = YES ] ; then
             cat << END                                            >> $NGX_MAKEFILE
 
 $ngx_obj:	\$(CORE_DEPS) \$(HTTP_DEPS)$ngx_cont$ngx_src
-	$ngx_cc$ngx_dso_cflag $ngx_dso_feture_path$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+	$ngx_cc$ngx_dso_cflag $ngx_dso_incs$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
 
 END
 
@@ -593,7 +597,7 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
-# Copyright (C) 2010-2012 Alibaba Group Holding Limited
+# Copyright (C) 2010-2013 Alibaba Group Holding Limited
 
 
 ngx_soext='$NGX_SOEXT'
@@ -624,12 +628,13 @@ ngx_rcc='$ngx_rcc'
 ngx_spacer='$ngx_spacer'
 ngx_objext='$ngx_objext'
 ngx_regex_cont='$ngx_regex_cont'
+ngx_include_opt='$ngx_include_opt'
 ngx_binout='$ngx_binout'
 NGX_DSO_PATH=$NGX_DSO_PATH
 NGX_AUTOCONF_ERR=$NGX_AUTOCONF_ERR
 NGX_AUTOTEST=$NGX_AUTOTEST
 NGX_AUTO_CONFIG_H=$NGX_AUTO_CONFIG_H
-NGX_CONFIGURE='$NGX_CONFIGURE'
+NGX_CONFIGURE="$NGX_CONFIGURE"
 
 END
 
@@ -638,6 +643,6 @@ END
 	-e "s|%%CORE_INCS%%|'$core_incs_temp'|g" \
 	-e "s|%%HTTP_DEPS%%|'$http_deps_temp'|g" \
 	-e "s|%%HTTP_INCS%%|'$http_incs_temp'|g" \
-	-e "s|%%NGX_SOURCE_HOME%%|`pwd`|g" \
+	-e "s|%%NGX_SOURCE_HOME%%|'$(cd ${0%/*} && pwd)'|g" \
 	contrib/dso.in >> $NGX_DSO_COMPILE
 fi

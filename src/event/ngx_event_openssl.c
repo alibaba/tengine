@@ -105,22 +105,24 @@ ngx_ssl_init(ngx_log_t *log)
 
     OpenSSL_add_all_algorithms();
 
+#if OPENSSL_VERSION_NUMBER >= 0x0090800fL
 #ifndef SSL_OP_NO_COMPRESSION
     {
     /*
      * Disable gzip compression in OpenSSL prior to 1.0.0 version,
      * this saves about 522K per connection.
      */
-    int                 i, n;
+    int                  n;
     STACK_OF(SSL_COMP)  *ssl_comp_methods;
 
     ssl_comp_methods = SSL_COMP_get_compression_methods();
     n = sk_SSL_COMP_num(ssl_comp_methods);
 
-    for (i = 0; i < n; i++) {
-        (void) sk_SSL_COMP_delete(ssl_comp_methods, i);
+    while (n--) {
+        (void) sk_SSL_COMP_pop(ssl_comp_methods);
     }
     }
+#endif
 #endif
 
     ngx_ssl_connection_index = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
@@ -2499,14 +2501,17 @@ ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
 static int
 ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
 {
+    int         k, len, ci;
     FILE       *fp;
     char        c, b[NGX_MAX_PATH];
     u_char     *p;
     ngx_str_t   file;
-    ngx_int_t   k, len = -1;
+
     static int  first_in = 1;
 
     ngx_http_ssl_pphrase_dialog_conf_t  *dialog = conf;
+
+    len = -1;
 
     if (ngx_strcmp(dialog->type->data, (u_char *) "builtin") == 0) {
         if (first_in) {
@@ -2550,7 +2555,10 @@ ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
             return -1;
         }
 
-        for (k = 0; (c = fgetc(fp)) != EOF && k < size; /* void */) {
+        for (k = 0; (ci = fgetc(fp)) != EOF && k < size; /* void */) {
+
+            c = (char) ci;
+
             if (c == '\n' || c == '\r') {
                 break;
             }

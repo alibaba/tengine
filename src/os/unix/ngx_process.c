@@ -384,6 +384,7 @@ ngx_signal_handler(int signo)
 
     case NGX_PROCESS_WORKER:
     case NGX_PROCESS_HELPER:
+    case NGX_PROCESS_PROC:
         switch (signo) {
 
         case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
@@ -465,8 +466,6 @@ ngx_process_get_status(void)
                 return;
             }
 
-#if (NGX_SOLARIS || NGX_FREEBSD)
-
             /*
              * Solaris always calls the signal handler for each exited process
              * despite waitpid() may be already called for this process.
@@ -481,8 +480,6 @@ ngx_process_get_status(void)
                               "waitpid() failed");
                 return;
             }
-
-#endif
 
             ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, err,
                           "waitpid() failed");

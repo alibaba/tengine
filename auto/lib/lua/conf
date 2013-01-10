@@ -30,7 +30,11 @@ END
             case "$NGX_MACHINE" in
                 amd64 | x86_64 | i386)
                     echo "adding extra linking options needed by LuaJIT"
-                    ngx_feature_libs="$ngx_feature_libs -pagezero_size 10000 -image_base 100000000"
+                    if [ $HTTP_LUA_SHARED = YES ]; then
+                        NGX_EXTEND_LD_OPT="$NGX_EXTEND_LD_OPT -pagezero_size 10000 -image_base 100000000"
+                    else
+                        ngx_feature_libs="$ngx_feature_libs -pagezero_size 10000 -image_base 100000000"
+                    fi
                 ;;
 
                 *)

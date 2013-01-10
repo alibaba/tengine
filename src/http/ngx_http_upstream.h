@@ -90,6 +90,7 @@ typedef struct {
     ngx_uint_t                       weight;
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
+    ngx_str_t                        id;
 
     unsigned                         down:1;
     unsigned                         backup:1;
@@ -102,6 +103,7 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_FAIL_TIMEOUT  0x0008
 #define NGX_HTTP_UPSTREAM_DOWN          0x0010
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
+#define NGX_HTTP_UPSTREAM_ID            0x0040
 
 
 struct ngx_http_upstream_srv_conf_s {

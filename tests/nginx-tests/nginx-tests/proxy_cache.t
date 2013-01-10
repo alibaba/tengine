@@ -101,7 +101,7 @@ like(http_get_range('/t.html', 'Range: bytes=0-2,4-'), qr/^SEE.*^THIS/ms,
 like(http_get('/empty.html'), qr/HTTP/, 'empty get first');
 like(http_get('/empty.html'), qr/HTTP/, 'empty get second');
 
-sleep(2);
+select(undef, undef, undef, 1.1);
 unlink $t->testdir() . '/t.html';
 like(http_gzip_request('/t.html'),
 	qr/HTTP.*1c\x0d\x0a.{28}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,

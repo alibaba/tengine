@@ -22,6 +22,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http proxy cache/);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -61,7 +63,7 @@ http {
             proxy_cache   NAME;
 
             proxy_cache_lock on;
-            proxy_cache_lock_timeout 300ms;
+            proxy_cache_lock_timeout 200ms;
         }
 
         location /nolock {
@@ -142,7 +144,7 @@ sub http_start {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(3);
 		$s = IO::Socket::INET->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1:8080'
@@ -166,7 +168,7 @@ sub http_end {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(3);
 		local $/;
 		$reply = $s->getline();
 		log_in($reply);
@@ -209,7 +211,7 @@ sub http_fake_daemon {
 
 		next unless $uri;
 
-		sleep(1);
+		select(undef, undef, undef, 0.5);
 
 		$num++;
 		print $client <<"EOF";

@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -383,7 +383,7 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
     module = args->module;
     cpcf = args->proc_conf;
     ctx = module->ctx;
-    ngx_process = NGX_PROCESS_WORKER;
+    ngx_process = NGX_PROCESS_PROC;
 
     ngx_setproctitle((char *) ctx->name.data);
     ngx_msleep(cpcf->delay_start);
