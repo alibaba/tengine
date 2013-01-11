@@ -9,10 +9,6 @@
 #include <ngx_core.h>
 
 
-static ngx_int_t ngx_list_delete_elt(ngx_list_t *l, ngx_list_part_t *cur,
-    ngx_uint_t i);
-
-
 ngx_list_t *
 ngx_list_create(ngx_pool_t *pool, ngx_uint_t n, size_t size)
 {
@@ -75,13 +71,32 @@ ngx_list_push(ngx_list_t *l)
 }
 
 
+static ngx_int_t
+ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
+{
+    u_char *s, *d, *last;
+
+    s = (u_char *) cur->elts + i * list->size;
+    d = s + list->size;
+    last = (u_char *) cur->elts + cur->nelts * list->size;
+
+    while (d < last) {
+        *s = *d;
+        s++;
+        d++;
+    }
+
+    cur->nelts--;
+
+    return NGX_OK;
+}
+
+
 /*
  * Nginx doesn't supply such delete interface. We have tried to avoid to copy
  * the memory. But there are too many obscure bugs with that solution. You
  * shouldn't use this function too heavily while it may hurt your performance.
  */
-
-
 ngx_int_t
 ngx_list_delete(ngx_list_t *list, void *elt)
 {
@@ -121,25 +136,4 @@ ngx_list_delete(ngx_list_t *list, void *elt)
     }
 
     return NGX_ERROR;
-}
-
-
-static ngx_int_t
-ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
-{
-    u_char *s, *d, *last;
-
-    s = (u_char *) cur->elts + i * list->size;
-    d = s + list->size;
-    last = (u_char *) cur->elts + cur->nelts * list->size;
-
-    while (d < last) {
-        *s = *d;
-        s++;
-        d++;
-    }
-
-    cur->nelts--;
-
-    return NGX_OK;
 }
