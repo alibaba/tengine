@@ -80,10 +80,12 @@ NGX_ALL_MODULES="
     ngx_http_limit_conn_module
     ngx_http_limit_req_module
     ngx_http_realip_module
+    ngx_http_sysguard_module
     ngx_http_geo_module
     ngx_http_geoip_module
     ngx_http_map_module
     ngx_http_split_clients_module
+    ngx_http_user_agent_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -99,6 +101,8 @@ NGX_ALL_MODULES="
     ngx_http_degradation_module
     ngx_http_flv_module
     ngx_http_mp4_module
+    ngx_http_slice_module
+    ngx_http_concat_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
@@ -116,6 +120,7 @@ NGX_ALL_MODULES="
     ngx_http_sub_filter_module
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
+    ngx_http_footer_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -128,7 +133,8 @@ NGX_ALL_MODULES="
     ngx_mail_smtp_module
     ngx_mail_auth_http_module
     ngx_mail_proxy_module
-    ngx_google_perftools_module"
+    ngx_google_perftools_module
+    ngx_backtrace_module"
 
 # dso shared
 NGX_SHARED_MODULES=
