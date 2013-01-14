@@ -68,6 +68,8 @@ static char *ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_upstream_chash_mode(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_upstream_chash_tries(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static uint32_t ngx_http_upstream_chash_get_server_index(
     ngx_http_upstream_chash_server_t *servers, uint32_t n, uint32_t hash);
 static void ngx_http_upstream_chash_delete_node(
@@ -87,6 +89,13 @@ static ngx_command_t ngx_http_upstream_chash_commands[] = {
     { ngx_string("consistent_mode"),
       NGX_HTTP_UPS_CONF | NGX_CONF_TAKE1,
       ngx_http_upstream_chash_mode,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("consistent_tries"),
+      NGX_HTTP_UPS_CONF | NGX_CONF_TAKE1,
+      ngx_http_upstream_chash_tries,
       0,
       0,
       NULL },
@@ -139,6 +148,7 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
     }
 
     ucscf->native = 0;
+    ucscf->tries = NGX_CONF_UNSET_UINT;
 
     return ucscf;
 }
@@ -153,7 +163,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     u_char                                   hash_buf[256];
     ngx_uint_t                               hash_len;
     ngx_int_t                                j, weight;
-    ngx_uint_t                               i, n, *number, rnindex, max_fails;
+    ngx_uint_t                               i, n, *number, rnindex;
     ngx_http_upstream_rr_peer_t             *peer;
     ngx_http_upstream_rr_peers_t            *peers;
     ngx_http_upstream_chash_server_t        *server;
@@ -177,7 +187,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     n = peers->number;
-    max_fails = 1;
     ucscf->number = 0;
     ucscf->real_node = ngx_pcalloc(cf->pool, n *
                                    sizeof(ngx_http_upstream_chash_server_t**));
@@ -186,8 +195,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
     for (i = 0; i < n; i++) {
         ucscf->number += peers->peer[i].weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
-        max_fails = max_fails < peers->peer[i].max_fails ?
-                    max_fails : peers->peer[i].max_fails;
         ucscf->real_node[i] = ngx_pcalloc(cf->pool,
                                           (peers->peer[i].weight
                                            * NGX_CHASH_VIRTUAL_NODE_NUMBER + 1) *
@@ -197,7 +204,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         }
     }
 
-    ucscf->tries = n * max_fails + n;
+    ucscf->tries = ucscf->tries == NGX_CONF_UNSET_UINT ? n : ucscf->tries;
 
     ucscf->servers = ngx_pcalloc(cf->pool,
                                  (ucscf->number + 1) *
@@ -227,6 +234,12 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
 #endif
         weight = peer->weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
+#ifdef NGX_HTTP_UPSTREAM_ID
+        if (weight >= 1<<14) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "weigth[%d] is too large", weight);
+            weight = 1<<14;
+        }
+#endif
         for (j = 0; j < weight; j++) {
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
@@ -701,6 +714,35 @@ ngx_http_upstream_chash_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     } else if (ngx_strncmp(value[1].data, "native", 6) == 0) {
         ucscf->native = 1;
 
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_upstream_chash_tries(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_int_t                            tries;
+    ngx_str_t                           *value;
+    ngx_http_upstream_srv_conf_t        *uscf;
+    ngx_http_upstream_chash_srv_conf_t  *ucscf;
+
+    uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+    if (uscf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ucscf = ngx_http_conf_upstream_srv_conf(uscf,
+                            ngx_http_upstream_consistent_hash_module);
+    if (ucscf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    value = cf->args->elts;
+    tries = ngx_atoi(value->data, value->len);
+    if (tries != NGX_ERROR) {
+        ucscf->tries = (ngx_uint_t) tries;
     }
 
     return NGX_CONF_OK;
