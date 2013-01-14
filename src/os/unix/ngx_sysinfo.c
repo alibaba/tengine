@@ -74,7 +74,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
     u_char             *p, *start, *last;
     ssize_t             n, len;
     ngx_fd_t            fd;
-    ngx_int_t           i;
+    ngx_uint_t          i;
     ngx_mem_table_t    *found = NULL;
     enum {
         sw_name = 0,
@@ -85,14 +85,13 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
     } state;
 
     ngx_mem_table_t mem_table[] = {
-         {"Buffers",      &meminfo->bufferram},
-         {"Cached",       &meminfo->cachedram},
-         {"MemFree",      &meminfo->freeram},
-         {"MemTotal",     &meminfo->totalram},
-         {"SwapFree",     &meminfo->freeswap},
-         {"SwapTotal",    &meminfo->totalswap},
+         { "Buffers",      &meminfo->bufferram },
+         { "Cached",       &meminfo->cachedram },
+         { "MemFree",      &meminfo->freeram },
+         { "MemTotal",     &meminfo->totalram },
+         { "SwapFree",     &meminfo->freeswap },
+         { "SwapTotal",    &meminfo->totalswap },
     };
-    const ngx_int_t mem_table_count = sizeof(mem_table)/sizeof(ngx_mem_table_t);
 
     if (ngx_meminfo_file.fd == 0) {
 
@@ -151,7 +150,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 
             found = NULL;
 
-            for (i = 0; i < mem_table_count; i++) {
+            for (i = 0; i < sizeof(mem_table)/sizeof(ngx_mem_table_t); i++) {
                 if (ngx_strncmp(start, mem_table[i].name, len) == 0) {
                     found = &mem_table[i];
                 }
