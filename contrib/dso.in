@@ -189,13 +189,13 @@ END
 
     make -f $NGX_DSO_MAKEFILE
     if test -n "$NGX_DSO_PREFIX"; then
-        test -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
-            && unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
+        [ ! -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} ] \
+            || unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
         echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_PREFIX
         cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
     else
-        test -f $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext} \
-            && unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
+        [ ! -f $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext} ] \
+            || unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
         echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
         cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
     fi
