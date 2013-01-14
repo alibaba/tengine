@@ -232,7 +232,6 @@ http {
         server 127.0.0.1:9000 id=9000 weight=1;
         server 127.0.0.1:9001 id=9001 weight=10;
         server 127.0.0.1:9002 id=9002 weight=100;
-        server 127.0.0.1:9003 id=9003 weight=1000;
     }
 
     server {
@@ -284,7 +283,8 @@ for (my $count = 1; $count <= 10000; $count++) {
     $result{$res} += 1;
 }
 
-print "9000 weight=1  9001 weight=10  9002 weight=100  9003 weight=1000\n";
+print "9000 weight=1  9001 weight=10  9002 weight=100\n";
+delete($result{"9003"});
 foreach $res (keys(%result)) {
     print ("server $res: $result{$res}\n");
 }
