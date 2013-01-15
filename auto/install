@@ -152,8 +152,8 @@ END
     do
         cat << END                                                >> $NGX_MAKEFILE
 
-	test -f '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}' \
-		&& unlink '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}'
+	test ! -f '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}' \
+		|| unlink '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}'
 END
     done
 
@@ -270,8 +270,8 @@ END
     do
         cat << END                                                >> $NGX_MAKEFILE
 
-	test -f '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}' \
-		&& unlink '\$(DESTDIR)$NGX_DSO_PATH/$ngx_shared_modules${NGX_SOEXT}'
+	test ! -f '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}' \
+		|| unlink '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}'
 END
     done
 
