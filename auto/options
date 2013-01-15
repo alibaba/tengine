@@ -184,6 +184,7 @@ HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_PERL=NO
 HTTP_LUA=NO
+HTTP_TFS=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
@@ -215,6 +216,7 @@ HTTP_CONCAT_SHARED=NO
 HTTP_RANDOM_INDEX_SHARED=NO
 HTTP_GEOIP_SHARED=NO
 HTTP_LUA_SHARED=NO
+HTTP_TFS_SHARED=NO
 HTTP_SECURE_LINK_SHARED=NO
 HTTP_SYSGUARD_SHARED=NO
 HTTP_FLV_SHARED=NO
@@ -284,6 +286,9 @@ LUAJIT_INC=
 LUAJIT_LIB=
 LUA_INC=
 LUA_LIB=
+
+LIBYAJL_INC=
+LIBYAJL_LIB=
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -514,6 +519,12 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-inc=*)                LUA_INC="$value"           ;;
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
+        --with-http_tfs_module)          HTTP_TFS=YES               ;;
+        --with-http_tfs_module=shared)   HTTP_TFS_SHARED=YES
+                                         HTTP_TFS=NO                ;;
+        --with-libyajl-inc=*)            LIBYAJL_INC="$value"       ;;
+        --with-libyajl-lib=*)            LIBYAJL_LIB="$value"       ;;
+
         # STUB
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
@@ -731,6 +742,10 @@ cat << END
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
+
+  --with-http_tfs_module             enable ngx_http_tfs_module (will also enable --with-md5 and --with-sha1)
+  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h are located)
+  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} are located)
 
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
