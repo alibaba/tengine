@@ -743,9 +743,10 @@ cat << END
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
 
-  --with-http_tfs_module             enable ngx_http_tfs_module (will also enable --with-md5 and --with-sha1)
-  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h are located)
-  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} are located)
+  --with-http_tfs_module             enable ngx_http_tfs_module (will also enable --with-md5)
+  --with-http_tfs_module=shared      enable ngx_http_tfs_module (shared) (will also enable --with-md5)
+  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h is located)
+  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} is located)
 
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
