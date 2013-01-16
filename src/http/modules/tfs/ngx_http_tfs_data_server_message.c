@@ -1387,7 +1387,7 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
     size_t                        data_size, buf_size, size;
     int64_t                       offset;
     uint32_t                      left_size;
-    ngx_int_t                     seg_count, i;
+    ngx_uint_t                    seg_count, i;
     ngx_buf_t                    *b;
     ngx_chain_t                  *body, *cl, **ll;
 
@@ -1505,7 +1505,7 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_get_segment_for_delete(ngx_http_tfs_t *t)
 {
-    ngx_int_t                     seg_count, i;
+    ngx_uint_t                    seg_count, i;
     ngx_buf_t                    *b;
     ngx_http_tfs_segment_info_t  *seg_info;
 

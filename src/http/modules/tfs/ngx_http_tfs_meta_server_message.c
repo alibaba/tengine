@@ -506,7 +506,8 @@ ngx_http_tfs_parse_read_meta_message(ngx_http_tfs_t *t)
     uint16_t                             type;
     uint32_t                             count;
     uint64_t                             end_offset;
-    ngx_int_t                            i, rc;
+    ngx_int_t                            rc;
+    ngx_uint_t                           i;
     ngx_str_t                            action;
     ngx_http_tfs_header_t               *header;
     ngx_http_tfs_segment_data_t         *first_segment, *last_segment,
