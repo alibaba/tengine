@@ -7,7 +7,11 @@
 #include <ngx_tfs_common.h>
 #include <ngx_http_tfs_protocol.h>
 #include <ngx_http_tfs_errno.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <net/if.h>
+#include <netinet/in.h>
+#include <net/if_arp.h>
 #include <ngx_md5.h>
 #include <ngx_http_tfs_peer_connection.h>
 
