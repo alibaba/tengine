@@ -613,6 +613,8 @@ CORE_LINK='$ngx_link'
 NGX_LD_OPT='$NGX_LD_OPT'
 NGX_PREFIX=$NGX_PREFIX
 
+NGX_RPATH=$NGX_RPATH
+
 ngx_regex_dirsep='$ngx_regex_dirsep'
 ngx_cont='$ngx_cont'
 ngx_cc='$ngx_cc'
