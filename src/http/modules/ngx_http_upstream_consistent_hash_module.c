@@ -740,10 +740,11 @@ ngx_http_upstream_chash_tries(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     value = cf->args->elts;
-    tries = ngx_atoi(value->data, value->len);
-    if (tries != NGX_ERROR) {
-        ucscf->tries = (ngx_uint_t) tries;
+    tries = ngx_atoi(value[1].data, value[1].len);
+    if (tries == NGX_ERROR) {
+        return NGX_CONF_ERROR;
     }
 
+    ucscf->tries = (ngx_uint_t) tries;
     return NGX_CONF_OK;
 }
