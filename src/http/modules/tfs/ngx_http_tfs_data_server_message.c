@@ -1251,8 +1251,9 @@ ngx_http_tfs_parse_meta_segment(ngx_http_tfs_t *t, ngx_chain_t *data)
 }
 
 
-/* use binary search to find the segment we need */
-/* if found, return index, or return index to insert */
+/* use binary search to find the segment we need
+ * if found, return index, or return index to insert */
+
 ngx_int_t
 ngx_http_tfs_find_segment(ngx_int_t seg_count,
     ngx_http_tfs_segment_info_t *seg_info, int64_t offset)

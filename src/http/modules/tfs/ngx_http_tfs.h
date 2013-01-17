@@ -84,10 +84,11 @@ struct ngx_http_tfs_segment_data_s {
 
 
 typedef struct {
-    uint8_t                                still_have;  // for custom file
+
+    uint8_t                                still_have; /* for custom file */
     uint32_t                               cluster_id;
     uint32_t                               open_mode;
-    // not for large_file's data
+    /* not for large_file's data */
     int64_t                                file_offset;
     uint64_t                               left_length;
     uint64_t                               file_hole_size;

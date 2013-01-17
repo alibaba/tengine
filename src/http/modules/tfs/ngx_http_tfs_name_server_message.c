@@ -802,7 +802,8 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
                 {
                     continue;
                 }
-                //TODO: check this
+
+                /* TODO: check this */
                 segment_data[i].block_info = segment_data[j].block_info;
                 segment_data[i].block_info_src = NGX_HTTP_TFS_FROM_NS;
                 segment_data[i].ds_retry = 0;

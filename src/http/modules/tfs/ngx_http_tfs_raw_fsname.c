@@ -89,7 +89,8 @@ ngx_http_tfs_raw_fsname_get_name(ngx_http_tfs_raw_fsname_t* fsname,
     unsigned large_flag, ngx_int_t simple_name)
 {
     if (fsname != NULL) {
-        if (simple_name) {  // zero suffix
+        if (simple_name) {
+            /* zero suffix */
             fsname->file.suffix = 0;
         }
 

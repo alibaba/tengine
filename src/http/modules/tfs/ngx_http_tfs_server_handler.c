@@ -510,10 +510,8 @@ ngx_http_tfs_process_rcs(ngx_http_tfs_t *t)
         return NGX_DONE;
     }
 
-    // TODO: use fine granularity mutex(per rc_info_node mutex)
-    //ngx_shmtx_lock(&rc_ctx->shpool->mutex);
+    /* TODO: use fine granularity mutex(per rc_info_node mutex) */
     rc = ngx_http_tfs_misc_ctx_init(t, rc_info);
-    //ngx_shmtx_unlock(&rc_ctx->shpool->mutex);
 
     return rc;
 }
@@ -1194,7 +1192,8 @@ ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
             if (t->is_large_file && t->is_process_meta_seg) {
                 return NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND;
             }
-            // TODO: dedup
+
+            /* TODO: dedup */
             return NGX_ERROR;
         case NGX_HTTP_TFS_ACTION_WRITE_FILE:
             /* stat retry_ds failed, do not dedup,

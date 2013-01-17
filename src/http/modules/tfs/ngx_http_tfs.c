@@ -186,7 +186,6 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
                 } else {
                     /* set oper size && offset,
                      * large file must read the whole meta segment */
-
                     if (t->is_large_file) {
                         t->is_process_meta_seg = NGX_HTTP_TFS_YES;
                         t->file.file_offset = 0;
@@ -225,9 +224,7 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
                     return NGX_OK;
                 }
 
-                /* TODO: use fine granularity mutex(per rc_info_node mutex)
-                 * ngx_shmtx_lock(&rc_ctx->shpool->mutex); */
-
+                /* TODO: use fine granularity mutex(per rc_info_node mutex) */
                 rc = ngx_http_tfs_misc_ctx_init(t, rc_info);
                 /* wait for tair callback */
                 if (rc == NGX_DECLINED) {
