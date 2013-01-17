@@ -2,7 +2,6 @@
 %define nginx_user nobody
 %define nginx_group nobody
 %define nginx_home /usr/local/nginx
-%define nginx_logdir /data/log/nginx
 %define nginx_home_tmp  /usr/local/nginx/tmp
 
 Name: %{software}
@@ -11,7 +10,7 @@ Release: 1%{?dist}
 Vendor: SmartWell Inc.
 Packager: Fountain Hsiao
 URL: http://tengine.taobao.org/
-Summary: high performance web server
+Summary: A distribution of Nginx with some advanced features
 License: 2-clause BSD-like license
 Group: System Environment/Daemons
 
@@ -36,8 +35,9 @@ Requires: libxslt
 Provides: webserver
 
 %description
-nginx [engine x] is a HTTP and reverse proxy server, as well as
-a mail proxy server
+Tengine is a web server originated by Taobao, the largest e-commerce website in Asia. It is based on Nginx HTTP server and has many advanced features. Tengine has been proven very stable and efficient on the top 100 global websites, including taobao.com and tmall.com.
+
+Tengine has been an open source project since December 2011. It is now developed and maintained by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies.
 
 %prep
 %setup -q -n %{software}-%{version}
@@ -46,8 +46,6 @@ a mail proxy server
 ./configure \
     --prefix=%{nginx_home} \
     --conf-path=%{nginx_home}/conf/nginx.conf \
-    --error-log-path=%{nginx_logdir}/error.log \
-    --http-log-path=%{nginx_logdir}/access.log \
     --user=%{nginx_user} \
     --group=%{nginx_group} \
     --http-client-body-temp-path=%{nginx_home_tmp}/client_body \
@@ -99,7 +97,6 @@ make %{?_smp_mflags}
 %{__rm} -rf $RPM_BUILD_ROOT
 %{__make} DESTDIR=$RPM_BUILD_ROOT install
 
-%{__mkdir} -p $RPM_BUILD_ROOT%{nginx_logdir}
 %{__mkdir} -p $RPM_BUILD_ROOT%{nginx_home}/var
 %{__mkdir} -p $RPM_BUILD_ROOT%{nginx_home_tmp}
 
@@ -107,136 +104,6 @@ make %{?_smp_mflags}
 %{__rm} -f $RPM_BUILD_ROOT%{nginx_home}/conf/fastcgi.conf
 %{__rm} -f $RPM_BUILD_ROOT%{nginx_home}/conf/scgi_params
 %{__rm} -f $RPM_BUILD_ROOT%{nginx_home}/conf/uwsgi_params
-
-%{__mkdir} -p $RPM_BUILD_ROOT%{nginx_home}/conf/vhosts
-%{__rm} $RPM_BUILD_ROOT%{nginx_home}/conf/nginx.conf
-
-%{__cat} > $RPM_BUILD_ROOT%{nginx_home}/conf/nginx.conf <<EOF
-user  www;
-worker_processes  8;
-
-error_log  /data/logs/nginx/error.log warn;
-pid        var/nginx.pid;
-lock_file       var/nginx.lock;
-worker_rlimit_nofile 51200;
-
-dso {
-    include module_stubs;
-}
-
-events {
-    worker_connections  51200;
-    use epoll;
-    multi_accept on;
-}
-
-
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-
-#   set_real_ip_from 0.0.0.0/0;
-#   real_ip_header X-Forwarded-For;
-
-
-    sendfile        on;
-    tcp_nopush     off;
-    tcp_nodelay     on;
-    #keepalive_timeout  0;
-    keepalive_timeout  6;
-    client_header_timeout 30;
-    client_body_timeout 1000;
-    send_timeout   30;
-    client_max_body_size 500M;
-    fastcgi_connect_timeout     600;
-    fastcgi_send_timeout        600;
-    fastcgi_read_timeout        600;
-
-    client_header_buffer_size   8k;
-    large_client_header_buffers 16 16k;
-    gzip  on;
-    gzip_min_length             1000;
-    gzip_buffers                4 8k;
-    gzip_http_version           1.1;
-    gzip_comp_level             1;
-    gzip_types                  text/plain text/css application/x-javascript text/xml application/xml application/xml+rss text/javascript;
-    log_format main '$remote_addr $server_name -  $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent"';
-
-    access_log  /data/logs/nginx/access.log  main;
-
-    include vhosts/*.conf;
-}
-EOF
-
-%{__sed} -i -e 's#/data/logs/nginx#%{nginx_logdir}#g' $RPM_BUILD_ROOT%{nginx_home}/conf/nginx.conf
-
-%{__cat} > $RPM_BUILD_ROOT%{nginx_home}/conf/vhosts/default.conf <<EOF
-server {
-    listen       80;
-    server_name  localhost;
-    root /data/wwwroot/html;
-    index   index.html index.htm index.php;
-
-    access_log       /data/logs/nginx/localhost_access.log main;
-    error_log        /data/logs/nginx/localhost_error.log        warn;
-
-    if ($fastcgi_script_name ~ \..*/.*php ) {
-        return 403;
-    }
-    if ($request ~  wwwroot ) {
-        return 403;
-    }
-
-    location ~ \.php$ {
-        fastcgi_pass   unix:/tmp/php-fpm.sock;
-        fastcgi_index  index.php;
-        fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
-        include        fastcgi_params;
-    }
-
-    #location /fpm_status.php {
-    #    fastcgi_pass   unix:/tmp/php-fpm.sock;
-    #    fastcgi_index  index.php;
-    #    fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
-    #    include        fastcgi_params;
-    #    allow 127.0.0.1;
-    #    deny all;
-    #}
-
-    location ~ /\.ht {
-        deny  all;
-    }
-    location ~ /\.svn {
-        deny all;
-    }
-}
-EOF
-%{__sed} -i -e 's#/data/logs/nginx#%{nginx_logdir}#g' $RPM_BUILD_ROOT%{nginx_home}/conf/vhosts/default.conf
-%{__cat} > $RPM_BUILD_ROOT%{nginx_home}/conf/vhosts/example_ssl.conf <<EOF
-# HTTPS server
-#
-#server {
-#    listen       443;
-#    server_name  localhost;
-
-#    ssl                  on;
-#    ssl_certificate      /etc/nginx/cert.pem;
-#    ssl_certificate_key  /etc/nginx/cert.key;
-
-#    ssl_session_timeout  5m;
-
-#    ssl_protocols  SSLv2 SSLv3 TLSv1;
-#    ssl_ciphers  HIGH:!aNULL:!MD5;
-#    ssl_prefer_server_ciphers   on;
-
-#    location / {
-#        root   /usr/share/nginx/html;
-#        index  index.html index.htm;
-#    }
-#}
-EOF
 
 # install SYSV init stuff
 %{__mkdir} -p $RPM_BUILD_ROOT%{_initrddir}
@@ -372,28 +239,6 @@ exit $RETVAL
 
 EOF
 
-# install log rotation stuff
-%{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-
-%{__cat} > $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name} <<EOF
-/data/logs/nginx/*.log {
-        daily
-        missingok
-        rotate 52
-        compress
-        delaycompress
-        notifempty
-        create 640 www adm
-        sharedscripts
-        postrotate
-                [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
-        endscript
-}
-
-EOF
-%{__sed} -i -e 's#/data/logs/nginx#%{nginx_logdir}#g' $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
-%{__sed} -i -e 's#/var/run#%{nginx_home}/var#g' $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
-
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__cat} > $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name} <<EOF
 NGINX=%{nginx_home}/sbin/nginx
@@ -420,25 +265,20 @@ EOF
 %{_initrddir}/nginx
 
 %dir %{nginx_home}/conf
-%dir %{nginx_home}/conf/vhosts
 
 %config(noreplace) %{nginx_home}/conf/browsers
 %config(noreplace) %{nginx_home}/conf/module_stubs
 %config(noreplace) %{nginx_home}/conf/nginx.conf
-%config(noreplace) %{nginx_home}/conf/vhosts/default.conf
-%config(noreplace) %{nginx_home}/conf/vhosts/example_ssl.conf
 %config(noreplace) %{nginx_home}/conf/mime.types
 %config(noreplace) %{nginx_home}/conf/fastcgi_params
 %config(noreplace) %{nginx_home}/conf/koi-utf
 %config(noreplace) %{nginx_home}/conf/koi-win
 %config(noreplace) %{nginx_home}/conf/win-utf
 
-%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 
 %attr(0755,root,root) %dir %{nginx_home}/var
 
-%attr(0755,root,root) %dir %{nginx_logdir}
 %{mywebroot}
 %attr(0755,root,root) %dir %{mywebroot}
 %attr(-,%{nginx_user},%{nginx_group}) %dir %{nginx_home_tmp}
