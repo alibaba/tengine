@@ -18,7 +18,7 @@
 ngx_int_t
 ngx_http_tfs_create_rs_request(ngx_http_tfs_t *t)
 {
-    ngx_chain_t                              *cl;
+    ngx_chain_t  *cl;
 
     cl = ngx_http_tfs_root_server_create_message(t->pool);
     if (cl == NULL) {
@@ -34,11 +34,11 @@ ngx_http_tfs_create_rs_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_rs(ngx_http_tfs_t *t)
 {
-    ngx_int_t                                 rc;
-    ngx_buf_t                                *b;
-    ngx_http_tfs_inet_t                      *addr;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_peer_connection_t           *tp;
+    ngx_int_t                        rc;
+    ngx_buf_t                       *b;
+    ngx_http_tfs_inet_t             *addr;
+    ngx_http_tfs_header_t           *header;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -85,13 +85,13 @@ ngx_http_tfs_create_ms_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ms(ngx_http_tfs_t *t)
 {
-    ngx_buf_t                                *b;
-    ngx_int_t                                 rc, dir_levels, parent_dir_len;
-    ngx_chain_t                              *cl, **ll;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
-    ngx_http_tfs_physical_cluster_t          *physical_cluster;
+    ngx_buf_t                        *b;
+    ngx_int_t                         rc, dir_levels, parent_dir_len;
+    ngx_chain_t                      *cl, **ll;
+    ngx_http_tfs_header_t            *header;
+    ngx_http_tfs_peer_connection_t   *tp;
+    ngx_http_tfs_logical_cluster_t   *logical_cluster;
+    ngx_http_tfs_physical_cluster_t  *physical_cluster;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -360,13 +360,13 @@ ngx_http_tfs_process_ms(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ms_ls_dir(ngx_http_tfs_t *t)
 {
-    ngx_buf_t                                *b;
-    ngx_int_t                                 rc;
-    ngx_chain_t                              *cl, **ll;
-    ngx_http_tfs_ms_ls_response_t            *fake_rsp;
-    ngx_http_tfs_peer_connection_t           *tps;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_custom_meta_info_t          *meta_info;
+    ngx_buf_t                        *b;
+    ngx_int_t                         rc;
+    ngx_chain_t                      *cl, **ll;
+    ngx_http_tfs_ms_ls_response_t    *fake_rsp;
+    ngx_http_tfs_peer_connection_t   *tps;
+    ngx_http_tfs_peer_connection_t   *tp;
+    ngx_http_tfs_custom_meta_info_t  *meta_info;
 
     tp = t->tfs_peer;
     b = &tp->body_buffer;
@@ -458,7 +458,7 @@ ngx_http_tfs_process_ms_ls_dir(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_create_rcs_request(ngx_http_tfs_t *t)
 {
-    ngx_chain_t                              *cl;
+    ngx_chain_t  *cl;
 
     cl = ngx_http_tfs_rc_server_create_message(t);
     if (cl == NULL) {
@@ -474,11 +474,11 @@ ngx_http_tfs_create_rcs_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_rcs(ngx_http_tfs_t *t)
 {
-    ngx_buf_t                               *b;
-    ngx_int_t                                rc;
-    ngx_http_tfs_rc_ctx_t                   *rc_ctx;
-    ngx_http_tfs_rcs_info_t                 *rc_info;
-    ngx_http_tfs_peer_connection_t          *tp;
+    ngx_buf_t                       *b;
+    ngx_int_t                        rc;
+    ngx_http_tfs_rc_ctx_t           *rc_ctx;
+    ngx_http_tfs_rcs_info_t         *rc_info;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     tp = t->tfs_peer;
     b = &tp->body_buffer;
@@ -537,16 +537,16 @@ ngx_http_tfs_create_ns_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
 {
-    uint32_t                                  curr_block_id, cluster_id;
-    ngx_buf_t                                *b;
-    ngx_int_t                                 rc;
-    ngx_str_t                                *cluster_id_text;
-    ngx_http_tfs_inet_t                      *addr;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_rcs_info_t                  *rc_info;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
-    ngx_http_tfs_physical_cluster_t          *physical_cluster;
+    uint32_t                          curr_block_id, cluster_id;
+    ngx_buf_t                        *b;
+    ngx_int_t                         rc;
+    ngx_str_t                        *cluster_id_text;
+    ngx_http_tfs_inet_t              *addr;
+    ngx_http_tfs_header_t            *header;
+    ngx_http_tfs_rcs_info_t          *rc_info;
+    ngx_http_tfs_peer_connection_t   *tp;
+    ngx_http_tfs_logical_cluster_t   *logical_cluster;
+    ngx_http_tfs_physical_cluster_t  *physical_cluster;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -764,8 +764,8 @@ ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
 void
 ngx_http_tfs_reset_segment_data(ngx_http_tfs_t *t)
 {
-    uint32_t                        block_count, i;
-    ngx_http_tfs_segment_data_t    *segment_data;
+    uint32_t                      block_count, i;
+    ngx_http_tfs_segment_data_t  *segment_data;
 
     /* reset current lookup cache */
     t->block_cache_ctx.curr_lookup_cache = NGX_HTTP_TFS_LOCAL_BLOCK_CACHE;
@@ -789,8 +789,8 @@ ngx_http_tfs_reset_segment_data(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_retry_ns(ngx_http_tfs_t *t)
 {
-    ngx_int_t                                 rc;
-    ngx_http_tfs_peer_connection_t           *tp;
+    ngx_int_t                        rc;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     if (!t->retry_curr_ns) {
         t->rw_cluster_index++;
@@ -888,7 +888,7 @@ ngx_http_tfs_retry_ns(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_create_ds_request(ngx_http_tfs_t *t)
 {
-    ngx_chain_t                              *cl;
+    ngx_chain_t  *cl;
 
     cl = ngx_http_tfs_data_server_create_message(t);
     if (cl == NULL) {
@@ -904,15 +904,15 @@ ngx_http_tfs_create_ds_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
 {
-    size_t                                    b_size;
-    uint32_t                                  body_len, len_to_update;
-    ngx_int_t                                 rc;
-    ngx_buf_t                                *b, *body_buffer;
-    ngx_chain_t                              *cl, **ll;
-    ngx_http_request_t                       *r;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_segment_data_t              *segment_data;
-    ngx_http_tfs_peer_connection_t           *tp;
+    size_t                           b_size;
+    uint32_t                         body_len, len_to_update;
+    ngx_int_t                        rc;
+    ngx_buf_t                       *b, *body_buffer;
+    ngx_chain_t                     *cl, **ll;
+    ngx_http_request_t              *r;
+    ngx_http_tfs_header_t           *header;
+    ngx_http_tfs_segment_data_t     *segment_data;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -1175,9 +1175,9 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
 {
-    ngx_http_tfs_inet_t                 *addr;
-    ngx_http_tfs_segment_data_t         *segment_data;
-    ngx_http_tfs_peer_connection_t      *tp;
+    ngx_http_tfs_inet_t             *addr;
+    ngx_http_tfs_segment_data_t     *segment_data;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     tp = t->tfs_peer;
     tp->peer.free(&tp->peer, tp->peer.data, 0);
@@ -1251,12 +1251,12 @@ ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
 {
-    size_t                                    size;
-    ngx_int_t                                 rc;
-    ngx_buf_t                                *b;
-    ngx_http_tfs_segment_data_t              *segment_data;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
+    size_t                           size;
+    ngx_int_t                        rc;
+    ngx_buf_t                       *b;
+    ngx_http_tfs_segment_data_t     *segment_data;
+    ngx_http_tfs_peer_connection_t  *tp;
+    ngx_http_tfs_logical_cluster_t  *logical_cluster;
 
     tp = t->tfs_peer;
     b = &tp->body_buffer;
@@ -1421,10 +1421,10 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
 {
-    uint32_t                                  body_len;
-    ngx_http_tfs_segment_data_t              *segment_data;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_ds_read_response_t          *msg;
+    uint32_t                          body_len;
+    ngx_http_tfs_segment_data_t      *segment_data;
+    ngx_http_tfs_peer_connection_t   *tp;
+    ngx_http_tfs_ds_read_response_t  *msg;
 
     tp = t->tfs_peer;
     msg = (ngx_http_tfs_ds_read_response_t *) t->header;
@@ -1482,7 +1482,7 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ms_input_filter(ngx_http_tfs_t *t)
 {
-    ngx_http_tfs_header_t                    *header;
+    ngx_http_tfs_header_t  *header;
 
     header = (ngx_http_tfs_header_t *) t->header;
     t->length = header->len;

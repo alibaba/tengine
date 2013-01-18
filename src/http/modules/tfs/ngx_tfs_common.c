@@ -194,8 +194,8 @@ ngx_int_t
 ngx_http_tfs_compute_buf_crc(ngx_http_tfs_crc_t *t_crc, ngx_buf_t *b,
     size_t size, ngx_log_t *log)
 {
-    u_char              *dst;
-    ssize_t              n;
+    u_char  *dst;
+    ssize_t  n;
 
     if (ngx_buf_in_memory(b)) {
         t_crc->crc = ngx_http_tfs_crc(t_crc->crc,
@@ -241,8 +241,8 @@ ngx_int_t
 ngx_http_tfs_peer_set_addr(ngx_pool_t *pool, ngx_http_tfs_peer_connection_t *p,
     ngx_http_tfs_inet_t *addr)
 {
-    ngx_peer_connection_t         *peer;
-    struct sockaddr_in            *in;
+    struct sockaddr_in     *in;
+    ngx_peer_connection_t  *peer;
 
     if (addr == NULL) {
         return NGX_ERROR;
@@ -314,9 +314,9 @@ ngx_http_tfs_murmur_hash(u_char *data, size_t len)
 ngx_int_t
 ngx_http_tfs_parse_inet(ngx_str_t *u, ngx_http_tfs_inet_t *addr)
 {
-    u_char              *port, *last;
-    size_t               len;
-    ngx_int_t            n;
+    u_char    *port, *last;
+    size_t     len;
+    ngx_int_t  n;
 
     last = u->data + u->len;
 
@@ -355,7 +355,7 @@ ngx_http_tfs_parse_inet(ngx_str_t *u, ngx_http_tfs_inet_t *addr)
 int32_t
 ngx_http_tfs_raw_fsname_hash(const u_char *str, const int32_t len)
 {
-    int32_t h, i;
+    int32_t  h, i;
 
     h = 0;
 
@@ -375,8 +375,8 @@ ngx_http_tfs_raw_fsname_hash(const u_char *str, const int32_t len)
 ngx_int_t
 ngx_http_tfs_get_local_ip(ngx_str_t device, struct sockaddr_in *addr)
 {
-    int                 sock;
-    struct ifreq        ifr;
+    int           sock;
+    struct ifreq  ifr;
 
     if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         return NGX_ERROR;
@@ -403,7 +403,6 @@ ngx_http_tfs_copy_buf_chain(ngx_pool_t *pool, ngx_chain_t *in)
     ngx_int_t    len;
     ngx_buf_t   *buf;
     ngx_chain_t *cl;
-
 
     if (in->next == NULL) {
         return in->buf;
@@ -432,9 +431,9 @@ ngx_int_t
 ngx_http_tfs_sum_md5(ngx_chain_t *data, u_char *md5_final,
     ssize_t *data_len, ngx_log_t *log)
 {
-    u_char                       *buf;
-    ssize_t                       n, buf_size;
-    ngx_md5_t                     md5;
+    u_char    *buf;
+    ssize_t    n, buf_size;
+    ngx_md5_t  md5;
 
     ngx_md5_init(&md5);
 
@@ -501,9 +500,9 @@ ngx_http_tfs_time(u_char *buf, time_t t)
 ngx_int_t
 ngx_http_tfs_status_message(ngx_buf_t *b, ngx_str_t *action, ngx_log_t *log)
 {
-    int32_t                                   code, err_len;
-    ngx_str_t                                 err;
-    ngx_http_tfs_status_msg_t                *res;
+    int32_t                     code, err_len;
+    ngx_str_t                   err;
+    ngx_http_tfs_status_msg_t  *res;
 
     res = (ngx_http_tfs_status_msg_t *) b->pos;
     err.len = 0;
@@ -534,7 +533,7 @@ ngx_http_tfs_status_message(ngx_buf_t *b, ngx_str_t *action, ngx_log_t *log)
 ngx_int_t
 ngx_http_tfs_get_parent_dir(ngx_str_t *file_path, ngx_int_t *dir_level)
 {
-    ngx_uint_t         i, last_slash_pos;
+    ngx_uint_t  i, last_slash_pos;
 
     last_slash_pos = 0;
 
@@ -560,7 +559,7 @@ ngx_http_tfs_get_parent_dir(ngx_str_t *file_path, ngx_int_t *dir_level)
 ngx_int_t
 ngx_http_tfs_set_output_file_name(ngx_http_tfs_t *t)
 {
-    ngx_chain_t                 *cl, **ll;
+    ngx_chain_t  *cl, **ll;
 
     if (t->json_output == NULL) {
         t->json_output = ngx_http_tfs_json_init(t->log, t->pool);
@@ -722,8 +721,8 @@ ngx_http_tfs_prealloc(ngx_pool_t *pool, void *p,
 uint64_t
 ngx_http_tfs_get_chain_buf_size(ngx_chain_t *data)
 {
-    uint64_t                       size;
-    ngx_chain_t                   *cl;
+    uint64_t      size;
+    ngx_chain_t  *cl;
 
     size = 0;
     cl = data;
@@ -758,8 +757,8 @@ ngx_http_tfs_dump_segment_data(ngx_http_tfs_segment_data_t *segment,
 ngx_http_tfs_t *
 ngx_http_tfs_alloc_st(ngx_http_tfs_t *t)
 {
-    ngx_buf_t                        *b;
-    ngx_http_tfs_t                   *st;
+    ngx_buf_t       *b;
+    ngx_http_tfs_t  *st;
 
     st = t->free_sts;
 

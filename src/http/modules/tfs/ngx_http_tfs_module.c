@@ -207,11 +207,11 @@ ngx_module_t  ngx_http_tfs_module = {
 static ngx_int_t
 ngx_http_tfs_handler(ngx_http_request_t *r)
 {
-    ngx_int_t                       rc;
-    ngx_http_tfs_t                 *t;
-    ngx_http_tfs_loc_conf_t        *tlcf;
-    ngx_http_tfs_srv_conf_t        *tscf;
-    ngx_http_tfs_main_conf_t       *tmcf;
+    ngx_int_t                  rc;
+    ngx_http_tfs_t            *t;
+    ngx_http_tfs_loc_conf_t   *tlcf;
+    ngx_http_tfs_srv_conf_t   *tscf;
+    ngx_http_tfs_main_conf_t  *tmcf;
 
     tlcf = ngx_http_get_module_loc_conf(r, ngx_http_tfs_module);
     tscf = ngx_http_get_module_srv_conf(r, ngx_http_tfs_module);
@@ -300,9 +300,9 @@ ngx_http_tfs_handler(ngx_http_request_t *r)
 ngx_http_tfs_upstream_t *
 ngx_http_tfs_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 {
-    ngx_uint_t                      i;
-    ngx_http_tfs_upstream_t        *tu, **tup;
-    ngx_http_tfs_main_conf_t       *tmcf;
+    ngx_uint_t                 i;
+    ngx_http_tfs_upstream_t   *tu, **tup;
+    ngx_http_tfs_main_conf_t  *tmcf;
 
     if (!(flags & NGX_HTTP_TFS_UPSTREAM_CREATE)) {
 
@@ -369,11 +369,11 @@ ngx_http_tfs_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 static char *
 ngx_http_tfs_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    char                           *rv;
-    ngx_url_t                       u;
-    ngx_str_t                      *value;
-    ngx_conf_t                      pcf;
-    ngx_http_tfs_upstream_t        *tu;
+    char                     *rv;
+    ngx_url_t                 u;
+    ngx_str_t                *value;
+    ngx_conf_t                pcf;
+    ngx_http_tfs_upstream_t  *tu;
 
     ngx_memzero(&u, sizeof(ngx_url_t));
 
@@ -437,9 +437,9 @@ ngx_http_tfs_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_http_tfs_upstream_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 {
-    ngx_url_t                       u;
-    ngx_str_t                      *value, *server_addr;
-    ngx_http_tfs_upstream_t        *tu;
+    ngx_url_t                 u;
+    ngx_str_t                *value, *server_addr;
+    ngx_http_tfs_upstream_t  *tu;
 
     tu = cf->ctx;
 
@@ -523,10 +523,10 @@ ngx_http_tfs_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_tfs_main_conf_t  *tmcf = conf;
 
-    ngx_int_t                       max_cached, bucket_count;
-    ngx_str_t                      *value, s;
-    ngx_uint_t                      i;
-    ngx_http_connection_pool_t     *p;
+    ngx_int_t                    max_cached, bucket_count;
+    ngx_str_t                   *value, s;
+    ngx_uint_t                   i;
+    ngx_http_connection_pool_t  *p;
 
     value = cf->args->elts;
     max_cached = 0;
@@ -583,9 +583,9 @@ invalid:
 static char *
 ngx_http_tfs_rcs_heartbeat(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu)
 {
-    ngx_msec_t               interval;
-    ngx_str_t               *value, s;
-    ngx_uint_t               i;
+    ngx_str_t  *value, s;
+    ngx_msec_t  interval;
+    ngx_uint_t  i;
 
     value = cf->args->elts;
 
@@ -645,8 +645,8 @@ rcs_timers_error:
 static char *
 ngx_http_tfs_rcs_interface(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu)
 {
-    ngx_int_t                       rc;
-    ngx_str_t                      *value;
+    ngx_int_t   rc;
+    ngx_str_t  *value;
 
     if (cf->args->nelts != 2) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -672,8 +672,9 @@ ngx_http_tfs_rcs_interface(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu)
 static char *
 ngx_http_tfs_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_tfs_srv_conf_t                *tscf = conf;
-    ngx_str_t                              *value;
+    ngx_http_tfs_srv_conf_t  *tscf = conf;
+
+    ngx_str_t  *value;
 
     if (tscf->log != NULL) {
         return "is duplicate";
@@ -718,7 +719,7 @@ ngx_http_tfs_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 static void *
 ngx_http_tfs_create_main_conf(ngx_conf_t *cf)
 {
-    ngx_http_tfs_main_conf_t           *conf;
+    ngx_http_tfs_main_conf_t  *conf;
 
     conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_tfs_main_conf_t));
     if (conf == NULL) {
@@ -811,12 +812,12 @@ static char *ngx_http_tfs_merge_loc_conf(ngx_conf_t *cf,
 static char *
 ngx_http_tfs_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_int_t                       add;
-    ngx_str_t                      *value, s;
-    ngx_url_t                       u;
-    ngx_http_tfs_main_conf_t       *tmcf;
-    ngx_http_tfs_loc_conf_t        *tlcf;
-    ngx_http_core_loc_conf_t       *clcf;
+    ngx_int_t                  add;
+    ngx_str_t                 *value, s;
+    ngx_url_t                  u;
+    ngx_http_tfs_loc_conf_t   *tlcf;
+    ngx_http_tfs_main_conf_t  *tmcf;
+    ngx_http_core_loc_conf_t  *clcf;
 
     value = cf->args->elts;
 
@@ -923,11 +924,11 @@ ngx_http_tfs_lowat_check(ngx_conf_t *cf, void *post, void *data)
 static char *
 ngx_http_tfs_rcs_zone(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu)
 {
-    ssize_t                          size;
-    ngx_str_t                       *value, s, name;
-    ngx_uint_t                       i;
-    ngx_shm_zone_t                  *shm_zone;
-    ngx_http_tfs_rc_ctx_t           *ctx;
+    ssize_t                 size;
+    ngx_str_t              *value, s, name;
+    ngx_uint_t              i;
+    ngx_shm_zone_t         *shm_zone;
+    ngx_http_tfs_rc_ctx_t  *ctx;
 
     value = cf->args->elts;
     size = 0;
@@ -1012,12 +1013,12 @@ ngx_http_tfs_rcs_zone(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu)
 static char *
 ngx_http_tfs_block_cache_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    size_t                                  size;
-    ngx_str_t                              *value, s, name;
-    ngx_uint_t                              i;
-    ngx_shm_zone_t                         *shm_zone;
-    ngx_http_tfs_main_conf_t               *tmcf = conf;
-    ngx_http_tfs_local_block_cache_ctx_t   *ctx;
+    size_t                                 size;
+    ngx_str_t                             *value, s, name;
+    ngx_uint_t                             i;
+    ngx_shm_zone_t                        *shm_zone;
+    ngx_http_tfs_main_conf_t              *tmcf = conf;
+    ngx_http_tfs_local_block_cache_ctx_t  *ctx;
 
     value = cf->args->elts;
     size = 0;
@@ -1073,9 +1074,9 @@ ngx_http_tfs_block_cache_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static void
 ngx_http_tfs_read_body_handler(ngx_http_request_t *r)
 {
-    ngx_int_t             rc;
-    ngx_http_tfs_t       *t;
-    ngx_connection_t     *c;
+    ngx_int_t          rc;
+    ngx_http_tfs_t    *t;
+    ngx_connection_t  *c;
 
     c = r->connection;
     t = ngx_http_get_module_ctx(r, ngx_http_tfs_module);
@@ -1141,10 +1142,10 @@ ngx_http_tfs_read_body_handler(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_tfs_module_init(ngx_cycle_t *cycle)
 {
-    ngx_uint_t                      i;
-    ngx_http_tfs_upstream_t       **tup;
-    ngx_http_tfs_main_conf_t       *tmcf;
-    ngx_http_tfs_timers_data_t     *data;
+    ngx_uint_t                   i;
+    ngx_http_tfs_upstream_t    **tup;
+    ngx_http_tfs_main_conf_t    *tmcf;
+    ngx_http_tfs_timers_data_t  *data;
 
     tmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_tfs_module);
     if (tmcf == NULL) {
@@ -1184,9 +1185,9 @@ ngx_http_tfs_module_init(ngx_cycle_t *cycle)
 static ngx_int_t
 ngx_http_tfs_check_init_worker(ngx_cycle_t *cycle)
 {
-    ngx_uint_t                      i;
-    ngx_http_tfs_upstream_t       **tup;
-    ngx_http_tfs_main_conf_t       *tmcf;
+    ngx_uint_t                 i;
+    ngx_http_tfs_upstream_t  **tup;
+    ngx_http_tfs_main_conf_t  *tmcf;
 
     /* rc keepalive */
     tmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_tfs_module);
@@ -1218,9 +1219,9 @@ ngx_http_tfs_check_init_worker(ngx_cycle_t *cycle)
 static void
 ngx_http_tfs_check_exit_worker(ngx_cycle_t *cycle)
 {
-    ngx_int_t                           i;
-    ngx_http_tfs_main_conf_t           *tmcf;
-    ngx_http_tfs_tair_instance_t       *dup_instance;
+    ngx_int_t                      i;
+    ngx_http_tfs_main_conf_t      *tmcf;
+    ngx_http_tfs_tair_instance_t  *dup_instance;
 
     tmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_tfs_module);
     if (tmcf == NULL) {

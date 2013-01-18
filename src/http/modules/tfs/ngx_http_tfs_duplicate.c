@@ -9,6 +9,7 @@
 #include <ngx_http_tfs_data_server_message.h>
 #include <ngx_http_tfs_remote_block_cache.h>
 
+
 static void ngx_http_tfs_duplicate_get_handler(ngx_http_tair_key_value_t *kv,
     ngx_int_t rc, void *data);
 static void ngx_http_tfs_duplicate_put_handler(ngx_int_t rc, void *data);
@@ -26,10 +27,10 @@ ngx_int_t
 ngx_http_tfs_get_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t * log, ngx_chain_t *data)
 {
-    u_char                                   *p;
-    ssize_t                                   data_len;
-    ngx_int_t                                 rc;
-    ngx_http_tair_data_t                      tair_key;
+    u_char               *p;
+    ssize_t               data_len;
+    ngx_int_t             rc;
+    ngx_http_tair_data_t  tair_key;
 
     data_len = 0;
 
@@ -62,9 +63,9 @@ static void
 ngx_http_tfs_duplicate_get_handler(ngx_http_tair_key_value_t *kv, ngx_int_t rc,
     void *data)
 {
-    u_char                     *p;
-    ngx_http_tfs_t             *t;
-    ngx_http_tfs_dedup_ctx_t   *ctx;
+    u_char                    *p;
+    ngx_http_tfs_t            *t;
+    ngx_http_tfs_dedup_ctx_t  *ctx;
 
     ctx = data;
     t = ctx->data;
@@ -110,11 +111,10 @@ ngx_int_t
 ngx_http_tfs_set_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t * log, ngx_chain_t *data)
 {
-    u_char                       *p;
-    ssize_t                       data_len;
-    ngx_int_t                     rc;
-    ngx_http_tair_data_t          tair_key;
-    ngx_http_tair_data_t          tair_value;
+    u_char               *p;
+    ssize_t               data_len;
+    ngx_int_t             rc;
+    ngx_http_tair_data_t  tair_key, tair_value;
 
     data_len = 0;
 
@@ -165,7 +165,7 @@ ngx_http_tfs_set_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
 static void
 ngx_http_tfs_duplicate_put_handler(ngx_int_t rc, void *data)
 {
-    ngx_http_tfs_dedup_ctx_t   *ctx;
+    ngx_http_tfs_dedup_ctx_t  *ctx;
 
     ctx = data;
 
@@ -183,11 +183,11 @@ ngx_int_t
 ngx_http_tfs_delete_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t * log, ngx_chain_t *data)
 {
-    u_char                                   *p;
-    ssize_t                                   data_len;
-    ngx_int_t                                 rc;
-    ngx_array_t                               tair_keys;
-    ngx_http_tair_data_t                     *tair_key;
+    u_char                *p;
+    ssize_t                data_len;
+    ngx_int_t              rc;
+    ngx_array_t            tair_keys;
+    ngx_http_tair_data_t  *tair_key;
 
     data_len = 0;
 
@@ -226,7 +226,7 @@ ngx_http_tfs_delete_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
 static void
 ngx_http_tfs_duplicate_delete_handler(ngx_int_t rc, void *data)
 {
-    ngx_http_tfs_dedup_ctx_t   *ctx;
+    ngx_http_tfs_dedup_ctx_t  *ctx;
 
     ctx = data;
 
@@ -236,6 +236,7 @@ ngx_http_tfs_duplicate_delete_handler(ngx_int_t rc, void *data)
     } else {
         rc = NGX_ERROR;
     }
+
     ngx_http_tfs_duplicate_callback(ctx, rc);
 }
 
@@ -243,7 +244,7 @@ ngx_http_tfs_duplicate_delete_handler(ngx_int_t rc, void *data)
 ngx_int_t
 ngx_http_tfs_duplicate_check_suffix(ngx_str_t *tfs_name, ngx_str_t *suffix)
 {
-    ngx_int_t               rc;
+    ngx_int_t  rc;
 
     rc = NGX_ERROR;
     if ((tfs_name->len == NGX_HTTP_TFS_FILE_NAME_LEN && suffix->len == 0)
@@ -264,9 +265,9 @@ ngx_int_t
 ngx_http_tfs_duplicate_check_filename(ngx_str_t *dup_file_name,
     ngx_http_tfs_raw_fsname_t* fsname)
 {
-    ngx_int_t                    rc;
-    ngx_str_t                    dup_file_suffix = ngx_null_string;
-    ngx_http_tfs_raw_fsname_t    dup_fsname;
+    ngx_int_t                  rc;
+    ngx_str_t                  dup_file_suffix = ngx_null_string;
+    ngx_http_tfs_raw_fsname_t  dup_fsname;
 
     rc = ngx_http_tfs_raw_fsname_parse(dup_file_name, &dup_file_suffix,
                                        &dup_fsname);
@@ -287,8 +288,8 @@ ngx_http_tfs_duplicate_check_filename(ngx_str_t *dup_file_name,
 static void
 ngx_http_tfs_duplicate_callback(ngx_http_tfs_dedup_ctx_t *ctx, ngx_int_t rc)
 {
-    ngx_http_tfs_t                  *t;
-    ngx_http_tfs_rcs_info_t         *rc_info;
+    ngx_http_tfs_t           *t;
+    ngx_http_tfs_rcs_info_t  *rc_info;
 
     t = ctx->data;
     rc_info = t->rc_info_node;
@@ -472,12 +473,12 @@ ngx_http_tfs_get_dedup_instance(ngx_http_tfs_dedup_ctx_t *ctx,
     ngx_http_tfs_tair_server_addr_info_t *server_addr_info,
     uint32_t server_addr_hash)
 {
-    ngx_str_t                             *st;
-    ngx_int_t                              rc, i;
-    ngx_array_t                            config_server;
-    ngx_http_tfs_t                        *t;
-    ngx_http_etair_server_conf_t          *server;
-    ngx_http_tfs_tair_instance_t          *instance;
+    ngx_str_t                     *st;
+    ngx_int_t                      rc, i;
+    ngx_array_t                    config_server;
+    ngx_http_tfs_t                *t;
+    ngx_http_etair_server_conf_t  *server;
+    ngx_http_tfs_tair_instance_t  *instance;
 
     t = ctx->data;
 
@@ -529,6 +530,7 @@ ngx_http_tfs_get_dedup_instance(ngx_http_tfs_dedup_ctx_t *ctx,
     if (server == NULL) {
         return NGX_ERROR;
     }
+
     instance->server = server;
     instance->server_addr_hash = server_addr_hash;
     instance->area = server_addr_info->area;

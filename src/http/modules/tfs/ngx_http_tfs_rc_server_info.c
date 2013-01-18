@@ -15,10 +15,10 @@ ngx_http_tfs_rcs_info_t *
 ngx_http_tfs_rcs_lookup(ngx_http_request_t *r, ngx_http_tfs_rc_ctx_t *ctx,
     ngx_str_t appkey)
 {
-    ngx_int_t                        rc;
-    ngx_uint_t                       hash;
-    ngx_rbtree_node_t               *node, *sentinel;
-    ngx_http_tfs_rcs_info_t         *tr;
+    ngx_int_t                 rc;
+    ngx_uint_t                hash;
+    ngx_rbtree_node_t        *node, *sentinel;
+    ngx_http_tfs_rcs_info_t  *tr;
 
     node = ctx->sh->rbtree.root;
     sentinel = ctx->sh->rbtree.sentinel;
@@ -61,14 +61,14 @@ void
 ngx_http_tfs_rc_server_destroy_node(ngx_http_tfs_rc_ctx_t *rc_ctx,
     ngx_http_tfs_rcs_info_t *rc_info_node)
 {
-    ngx_str_t                                *block_cache_info;
-    ngx_uint_t                                i, j;
-    ngx_rbtree_node_t                        *node;
-    ngx_http_tfs_group_info_t                *group_info;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
-    ngx_http_tfs_physical_cluster_t          *physical_cluster;
-    ngx_http_tfs_cluster_group_info_t        *cluster_group_info;
-    ngx_http_tfs_tair_server_addr_info_t     *dup_server_info;
+    ngx_str_t                            *block_cache_info;
+    ngx_uint_t                            i, j;
+    ngx_rbtree_node_t                    *node;
+    ngx_http_tfs_group_info_t            *group_info;
+    ngx_http_tfs_logical_cluster_t       *logical_cluster;
+    ngx_http_tfs_physical_cluster_t      *physical_cluster;
+    ngx_http_tfs_cluster_group_info_t    *cluster_group_info;
+    ngx_http_tfs_tair_server_addr_info_t *dup_server_info;
 
     if (rc_info_node == NULL) {
         return;
@@ -165,9 +165,9 @@ last_free:
 void
 ngx_http_tfs_rc_server_expire(ngx_http_tfs_rc_ctx_t *ctx)
 {
-    ngx_queue_t                *q, *kp_q;
-    ngx_rbtree_node_t          *node;
-    ngx_http_tfs_rcs_info_t    *rc_info_node;
+    ngx_queue_t             *q, *kp_q;
+    ngx_rbtree_node_t       *node;
+    ngx_http_tfs_rcs_info_t *rc_info_node;
 
     if (ngx_queue_empty(&ctx->sh->queue)) {
         return;
@@ -193,10 +193,10 @@ ngx_http_tfs_rc_server_expire(ngx_http_tfs_rc_ctx_t *ctx)
 ngx_int_t
 ngx_http_tfs_rc_server_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
-    ngx_http_tfs_rc_ctx_t            *octx = data;
+    ngx_http_tfs_rc_ctx_t  *octx = data;
 
-    size_t                            len;
-    ngx_http_tfs_rc_ctx_t            *ctx;
+    size_t                 len;
+    ngx_http_tfs_rc_ctx_t *ctx;
 
     ctx = shm_zone->data;
 
@@ -246,9 +246,9 @@ static void
 ngx_http_tfs_rcs_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel)
 {
-    ngx_int_t                    rc;
-    ngx_rbtree_node_t          **p;
-    ngx_http_tfs_rcs_info_t     *trn, *trnt;
+    ngx_int_t                 rc;
+    ngx_rbtree_node_t       **p;
+    ngx_http_tfs_rcs_info_t  *trn, *trnt;
 
     for ( ;; ) {
 
@@ -297,9 +297,9 @@ void
 ngx_http_tfs_rcs_set_group_info_by_addr(ngx_http_tfs_rcs_info_t *rc_info,
     ngx_int_t group_count, ngx_int_t group_seq, ngx_http_tfs_inet_t addr)
 {
-    ngx_uint_t                            i, j;
-    ngx_http_tfs_group_info_t            *group_info;
-    ngx_http_tfs_cluster_group_info_t    *cluster_group_info;
+    ngx_uint_t                          i, j;
+    ngx_http_tfs_group_info_t          *group_info;
+    ngx_http_tfs_cluster_group_info_t  *cluster_group_info;
 
     cluster_group_info = rc_info->unlink_clusters;
 

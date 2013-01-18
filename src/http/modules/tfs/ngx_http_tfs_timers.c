@@ -15,10 +15,10 @@ ngx_http_tfs_timers_lock_t *
 ngx_http_tfs_timers_init(ngx_cycle_t *cycle,
     u_char *lock_file)
 {
-    u_char                       *shared;
-    size_t                        size;
-    ngx_shm_t                     shm;
-    ngx_http_tfs_timers_lock_t   *lock;
+    u_char                     *shared;
+    size_t                      size;
+    ngx_shm_t                   shm;
+    ngx_http_tfs_timers_lock_t *lock;
 
     /* cl should be equal or bigger than cache line size */
 
@@ -69,7 +69,7 @@ ngx_int_t
 ngx_http_tfs_add_rcs_timers(ngx_cycle_t *cycle,
     ngx_http_tfs_timers_data_t *data)
 {
-    ngx_event_t                      *ev;
+    ngx_event_t  *ev;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
                    "http check tfs rc servers");
@@ -93,8 +93,8 @@ ngx_http_tfs_add_rcs_timers(ngx_cycle_t *cycle,
 ngx_int_t
 ngx_http_tfs_timers_finalize_request_handler(ngx_http_tfs_t *t)
 {
-    ngx_event_t                   *event;
-    ngx_http_tfs_timers_data_t    *data;
+    ngx_event_t                 *event;
+    ngx_http_tfs_timers_data_t  *data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0, "http tfs timers finalize");
 
@@ -111,11 +111,11 @@ ngx_http_tfs_timers_finalize_request_handler(ngx_http_tfs_t *t)
 static void
 ngx_http_tfs_timeout_handler(ngx_event_t *event)
 {
-    ngx_int_t                         rc;
-    ngx_pool_t                       *pool;
-    ngx_http_tfs_t                   *t;
-    ngx_http_request_t               *r;
-    ngx_http_tfs_timers_data_t       *data;
+    ngx_int_t                   rc;
+    ngx_pool_t                  *pool;
+    ngx_http_tfs_t              *t;
+    ngx_http_request_t          *r;
+    ngx_http_tfs_timers_data_t  *data;
 
     data = event->data;
     if (ngx_shmtx_trylock(&data->lock->ngx_http_tfs_kp_mutex)) {
