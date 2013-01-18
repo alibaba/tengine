@@ -67,7 +67,7 @@ ngx_http_tfs_tair_put_helper(ngx_http_tfs_tair_instance_t *instance,
     }
 
     rc = ngx_http_tair_put(instance->server, pool, log, *key,
-                           *value, instance->area, 0/*nx*/, expire,
+                           *value, instance->area, 0 /*nx*/, expire,
                            version, callback, data);
 
     if (rc != NGX_OK) {

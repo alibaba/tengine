@@ -675,7 +675,8 @@ ngx_http_tfs_process_header(ngx_http_tfs_t *t, ngx_int_t n)
     body_size = n - t->header_size;
     if (t->input_filter != NULL) {
         rc = t->input_filter(t);
-        if (rc != NGX_OK) { /* error or NGX_DONE */
+        if (rc != NGX_OK) {
+            /* error or NGX_DONE */
             return rc;
         }
     }
@@ -1680,7 +1681,8 @@ ngx_http_tfs_handle_connection_failure(ngx_http_tfs_t *t,
     c = p->connection;
 #if (NGX_DEBUG)
     /* failure connection can not be freed,
-     so make sure get&free op pairs are right */
+     * so make sure get&free op pairs are right
+     */
     pool = p->data;
     pool->count++;
 #endif
@@ -1800,7 +1802,8 @@ ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t, ngx_http_tfs_rcs_info_t *rc_info)
             t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
             if (!t->is_large_file && rc_info->need_duplicate) {
                 /* undelete, conceal and reveal
-                 * do not go through de-duplicating */
+                 * do not go through de-duplicating
+                 */
                 if (t->r_ctx.unlink_type == NGX_HTTP_TFS_UNLINK_DELETE) {
                     t->is_stat_dup_file = NGX_HTTP_TFS_YES;
                     t->r_ctx.read_stat_type = NGX_HTTP_TFS_READ_STAT_FORCE;
@@ -1862,7 +1865,8 @@ ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t, ngx_http_tfs_rcs_info_t *rc_info)
 
             } else {
                 /* set oper size && offset,
-                 large file must read the whole meta segment */
+                 * large file must read the whole meta segment
+                 */
                 if (t->is_large_file) {
                     t->is_process_meta_seg = NGX_HTTP_TFS_YES;
                     t->file.file_offset = 0;
@@ -1921,9 +1925,10 @@ ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t, ngx_http_tfs_rcs_info_t *rc_info)
         }
     }
 
-    /* prepare:
-       read: remote block cache instance
-       write(large file and custom file): each segment's data */
+    /* prepare:read:
+     * remote block cache instance write(large file and custom file):
+     * each segment's data
+     */
     switch (t->r_ctx.action.code) {
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
         t->group_seq = -1;

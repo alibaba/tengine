@@ -163,7 +163,8 @@ ngx_http_tfs_select_name_server(ngx_http_tfs_t *t,
                 /* no master */
                 if (j == cluster_group_info[i].info_count) {
                     /* sth wrong in TFS cluster configure,
-                     * select the first cluster */
+                     * select the first cluster
+                     */
                     (*addr) = group_info[0].ns_vip;
                     (*addr_text) = group_info[0].ns_vip_text;
                     t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
@@ -208,7 +209,8 @@ ngx_http_tfs_select_name_server(ngx_http_tfs_t *t,
 find_logical_cluster_index:
 
         /* find out which logical cluster this addr belongs to
-           so that we can use the right de-dup addr */
+         * so that we can use the right de-dup addr
+         */
         t->logical_cluster_index = 0;
         for ( ;
               t->logical_cluster_index < rc_info->logical_cluster_count;

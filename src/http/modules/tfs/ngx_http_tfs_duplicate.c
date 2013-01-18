@@ -307,7 +307,8 @@ ngx_http_tfs_duplicate_callback(ngx_http_tfs_dedup_ctx_t *ctx, ngx_int_t rc)
                     if (t->r_ctx.unlink_type == NGX_HTTP_TFS_UNLINK_DELETE) {
                         if (--ctx->file_ref_count <= 0) {
                             /* if ref count is 0,
-                             * remove key from tair then unlink file */
+                             * remove key from tair then unlink file
+                             */
                             t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
                             t->is_stat_dup_file = NGX_HTTP_TFS_NO;
                             t->tfs_peer->body_buffer = ctx->save_body_buffer;
@@ -316,7 +317,8 @@ ngx_http_tfs_duplicate_callback(ngx_http_tfs_dedup_ctx_t *ctx, ngx_int_t rc)
                                                                     t->log,
                                                           t->meta_segment_data);
                             /* do not care delete tair fail,
-                             * go on unlinking file */
+                             * go on unlinking file
+                             */
                             if (rc == NGX_ERROR) {
                                 ngx_http_tfs_finalize_state(t, NGX_OK);
                             }
@@ -384,7 +386,8 @@ ngx_http_tfs_duplicate_callback(ngx_http_tfs_dedup_ctx_t *ctx, ngx_int_t rc)
 
                 } else {
                     /* suffix not match, need save new tfs file,
-                     * do not save tair */
+                     * do not save tair
+                     */
                     t->use_dedup = NGX_HTTP_TFS_NO;
                 }
             } /* not exist in tair need save new tfs file and tair */
@@ -440,7 +443,8 @@ ngx_http_tfs_duplicate_callback(ngx_http_tfs_dedup_ctx_t *ctx, ngx_int_t rc)
 
             } else {
                 /* save tair(add ref count) failed,
-                 * need save new tfs file, do not save tair */
+                 * need save new tfs file, do not save tair
+                 */
                 t->state = NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS;
                 t->is_stat_dup_file = NGX_HTTP_TFS_NO;
                 t->use_dedup = NGX_HTTP_TFS_NO;

@@ -162,7 +162,8 @@ ngx_http_tfs_remote_block_cache_insert(
     tair_value.type = NGX_HTTP_TAIR_INT;
 
     /* since we do not care returns,
-     * we make a tmp pool and destroy it in callback */
+     * we make a tmp pool and destroy it in callback
+     */
     tmp_pool = ngx_create_pool(4096, log);
     if (tmp_pool == NULL) {
         return NGX_ERROR;
@@ -215,7 +216,8 @@ ngx_http_tfs_remote_block_cache_remove(
     tair_key->len = NGX_HTTP_TFS_BLOCK_CACHE_KEY_SIZE;
 
     /* since we do not care returns,
-     * we make a tmp pool and destroy it in callback */
+     * we make a tmp pool and destroy it in callback
+     */
     tmp_pool = ngx_create_pool(4096, log);
     if (tmp_pool == NULL) {
         return;

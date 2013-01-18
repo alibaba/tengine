@@ -185,7 +185,8 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
                     t->file.left_length = t->file_info.size;
                 }
                 /* if is large file, for files smaller than 140GB,
-                 * 2MB is fairly enough */
+                 * 2MB is fairly enough
+                 */
                 if (t->is_large_file) {
                     meta_segment_size = NGX_HTTP_TFS_MAX_FRAGMENT_SIZE;
                     t->file.left_length = NGX_HTTP_TFS_MAX_SIZE;
@@ -397,7 +398,8 @@ ngx_http_tfs_create_write_message(ngx_http_tfs_t *t,
     t_crc.data_crc = segment_data->segment_info.crc;
 
     /* body buf is one or two bufs,
-     * please see ngx_http_read_client_request_body */
+     * please see ngx_http_read_client_request_body
+     */
     while (body) {
         b_size = ngx_buf_size(body->buf);
         body_size += b_size;
@@ -1252,7 +1254,8 @@ ngx_http_tfs_parse_meta_segment(ngx_http_tfs_t *t, ngx_chain_t *data)
 
 
 /* use binary search to find the segment we need
- * if found, return index, or return index to insert */
+ * if found, return index, or return index to insert
+ */
 
 ngx_int_t
 ngx_http_tfs_find_segment(ngx_int_t seg_count,
@@ -1362,7 +1365,8 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
         first_segment->segment_info.size - first_segment->oper_offset;
 
     /* last segment's oper_size is special,
-     * notice that last_segment maybe the same as first_semgnt */
+     * notice that last_segment maybe the same as first_semgnt
+     */
     last_segment = &t->file.segment_data[seg_count - 1];
     last_segment->oper_size = ngx_min((end_offset
                                        - (last_segment->segment_info.offset
@@ -1400,7 +1404,8 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
     offset = 0;
 
     /* body buf is one or two bufs ,
-     * please see ngx_http_read_client_request_body */
+     * please see ngx_http_read_client_request_body
+     */
     data_size = ngx_http_tfs_get_chain_buf_size(body);
     t->file.left_length = data_size;
 

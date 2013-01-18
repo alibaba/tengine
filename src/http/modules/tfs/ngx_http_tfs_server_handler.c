@@ -158,7 +158,8 @@ ngx_http_tfs_process_ms(ngx_http_tfs_t *t)
     }
 
     /* parent dir may be created by others
-     * during the recursive creating process */
+     * during the recursive creating process
+     */
     if (rc == NGX_HTTP_TFS_EXIT_TARGET_EXIST_ERROR && t->last_dir_level > 0) {
         rc = NGX_OK;
     }
@@ -685,7 +686,8 @@ ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
                                &t->name_server_addr_text);
                 t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
                 /* find out which logical cluster this addr belongs to
-                   so that we can use the right de-dup addr */
+                 * so that we can use the right de-dup addr
+                 */
                 t->logical_cluster_index = 0;
                 for ( ;
                      t->logical_cluster_index < rc_info->logical_cluster_count;
@@ -980,7 +982,8 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
                                                          r->request_body->bufs);
                     /* stat success and file status normal,
                      * but save tair failed need save new tfs file,
-                     * but do not save tair */
+                     * but do not save tair
+                     */
                     if (rc == NGX_ERROR) {
                         t->state = NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS;
                         t->is_stat_dup_file = NGX_HTTP_TFS_NO;
@@ -1083,7 +1086,8 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
                     return NGX_ERROR;
                 }
                 /* when new tfs file is saved,
-                 * do not care saving tair is success or not */
+                 * do not care saving tair is success or not
+                 */
                 if (t->use_dedup) {
                     t->dedup_ctx.file_ref_count += 1;
                     r = t->data;
@@ -1197,7 +1201,8 @@ ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
             return NGX_ERROR;
         case NGX_HTTP_TFS_ACTION_WRITE_FILE:
             /* stat retry_ds failed, do not dedup,
-             * save new tfs file and do not save tair */
+             * save new tfs file and do not save tair
+             */
             if (t->is_stat_dup_file) {
                 t->is_stat_dup_file = NGX_HTTP_TFS_NO;
                 t->use_dedup = NGX_HTTP_TFS_NO;
@@ -1369,7 +1374,8 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
                         ngx_log_error(NGX_LOG_ERR, t->log, 0,
                                       "get dedup instance failed.");
                         /* get dedup instance fail, do not unlink file,
-                         * return success */
+                         * return success
+                         */
                         t->state = NGX_HTTP_TFS_STATE_REMOVE_DONE;
                         return NGX_DONE;
                     }
@@ -1429,7 +1435,8 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
 
         } else if (msg->data_len == -22) {
             /* for compatibility,
-             * old dataserver will return this instead of -1007 */
+             * old dataserver will return this instead of -1007
+             */
             msg->data_len = NGX_HTTP_TFS_EXIT_INVALID_ARGU_ERROR;
         }
 

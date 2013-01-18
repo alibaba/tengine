@@ -81,7 +81,8 @@ ngx_http_tfs_local_block_cache_rbtree_insert_value(ngx_rbtree_node_t *temp,
         } else if (node->key > temp->key) {
             p = &temp->right;
 
-        } else { /* node->key == temp->key */
+        } else {
+            /* node->key == temp->key */
             tbn = (ngx_http_tfs_block_cache_node_t *) &node->color;
             tbnt = (ngx_http_tfs_block_cache_node_t *) &temp->color;
 
