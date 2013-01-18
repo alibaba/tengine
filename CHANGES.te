@@ -1,3 +1,28 @@
+Changes with Tengine 1.4.3                                        18 Jan 2013
+
+*) Feature: added the TFS module which could use restful API to communicate
+   with TFS(Taobao File System). (Zheng Cen, monadbobo)
+
+*) Feature：added $sent_cookie_XXX series variables which could fetch the 
+   cookie value from Set-Cookie Headers. (skoo87)
+
+*) Feature：now the syslog directive could use hostname as its destination
+   address. (cfsego)
+
+*) Change: added an attribute 'id' for server directive in the upstream block,
+   and the module major version is updated to be 2. (yaoweibin) 
+
+*) Bugfix: fixed the bug with DSO module which may cause Tengine can't reload.
+   (monadbobo)
+
+*) Bugfix: fixed a segment fault with upstream check module when the check
+   timeout is larger than the check interval.  (yaoweibin)
+
+*) Bugfix: fixed a segment fault with user agent module while the request
+   misses the 'User-Agent' header. (dinic)
+
+*) Bugfix: fixed sysguard module can't work on Mac os. (lizi)
+
 
 Changes with Tengine 1.4.2                                         22 Nov 2012
 
