@@ -1,5 +1,5 @@
 Tengine-1.4.3 [2013-1-18]
-* Feature: 增加TFS模块，可以通过restful接口与TFS分布式文件系统通信 [Zheng Cen, monadbobo]
+* Feature: 增加TFS模块，可以通过restful接口与TFS分布式文件系统通信 [zhcn381, monadbobo]
 * Feature：增加$sent_cookie_XXX系列变量，可以获取响应中Set-Cookie头的cookie值 [skoo87]
 * Feature：syslog指令的发送地址支持域名 [cfsego]
 * Change: upstream块中的server指令增加id属性, 模块主版本号升级到2 [yaoweibin]
