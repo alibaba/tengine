@@ -20,7 +20,7 @@ static ngx_int_t
 ngx_http_restful_parse_raw(ngx_http_request_t *r,
     ngx_http_tfs_restful_ctx_t *ctx, u_char *data)
 {
-    u_char         *p, ch, *start, *last, *meta_data;
+    u_char  *p, ch, *start, *last, *meta_data;
 
     enum {
         sw_appkey = 0,
@@ -113,8 +113,8 @@ static ngx_int_t
 ngx_http_restful_parse_custom_name(ngx_http_request_t *r,
     ngx_http_tfs_restful_ctx_t *ctx, u_char *data)
 {
-    u_char         *p, ch, *start, *last, *appid, *meta_data;
-    ngx_int_t       rc;
+    u_char    *p, ch, *start, *last, *appid, *meta_data;
+    ngx_int_t  rc;
 
     enum {
         sw_appkey = 0,
@@ -263,7 +263,7 @@ static ngx_int_t
 ngx_http_restful_parse_uri(ngx_http_request_t *r,
     ngx_http_tfs_restful_ctx_t *ctx)
 {
-    u_char         *p, ch, *last;
+    u_char  *p, ch, *last;
 
     enum {
         sw_start = 0,
@@ -329,8 +329,8 @@ static ngx_int_t
 ngx_http_restful_parse_action(ngx_http_request_t *r,
     ngx_http_tfs_restful_ctx_t *ctx)
 {
-    ngx_int_t       rc;
-    ngx_str_t       arg_value, file_path_d, file_temp_path;
+    ngx_int_t  rc;
+    ngx_str_t  arg_value, file_path_d, file_temp_path;
 
     switch(r->method) {
     case NGX_HTTP_GET:
@@ -497,8 +497,8 @@ static ngx_int_t
 ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
     ngx_http_tfs_restful_ctx_t *ctx)
 {
-    ngx_int_t       rc;
-    ngx_str_t       arg_value;
+    ngx_int_t  rc;
+    ngx_str_t  arg_value;
 
     switch(r->method) {
     case NGX_HTTP_GET:
@@ -734,7 +734,7 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
 ngx_int_t
 ngx_http_restful_parse(ngx_http_request_t *r, ngx_http_tfs_restful_ctx_t *ctx)
 {
-    ngx_int_t            rc;
+    ngx_int_t  rc;
 
     rc = ngx_http_restful_parse_uri(r, ctx);
     if (rc == NGX_ERROR) {

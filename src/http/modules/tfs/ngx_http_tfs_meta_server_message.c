@@ -27,8 +27,8 @@ static ngx_int_t ngx_http_tfs_parse_ls_message(ngx_http_tfs_t *t);
 ngx_http_tfs_inet_t *
 ngx_http_tfs_select_meta_server(ngx_http_tfs_t *t)
 {
-    uint32_t                        hash, index;
-    ngx_http_tfs_meta_hh_t          h;
+    uint32_t                hash, index;
+    ngx_http_tfs_meta_hh_t  h;
 
     h.app_id = ngx_hton64(t->r_ctx.app_id);
     h.user_id = ngx_hton64(t->r_ctx.user_id);
@@ -45,8 +45,8 @@ ngx_http_tfs_select_meta_server(ngx_http_tfs_t *t)
 ngx_chain_t *
 ngx_http_tfs_meta_server_create_message(ngx_http_tfs_t *t)
 {
-    uint16_t             msg_type;
-    ngx_chain_t         *cl;
+    uint16_t      msg_type;
+    ngx_chain_t  *cl;
 
     cl = NULL;
     msg_type = t->r_ctx.action.code;
@@ -63,18 +63,22 @@ ngx_http_tfs_meta_server_create_message(ngx_http_tfs_t *t)
                       &t->last_file_path);
         cl = ngx_http_tfs_create_action_message(t, &t->last_file_path, NULL);
         break;
+
     case NGX_HTTP_TFS_ACTION_MOVE_DIR:
     case NGX_HTTP_TFS_ACTION_MOVE_FILE:
         cl = ngx_http_tfs_create_action_message(t, &t->r_ctx.file_path_s,
                                                 &t->last_file_path);
         break;
+
     case NGX_HTTP_TFS_ACTION_REMOVE_DIR:
         cl = ngx_http_tfs_create_action_message(t, &t->r_ctx.file_path_s, NULL);
         break;
+
     case NGX_HTTP_TFS_ACTION_READ_FILE:
         cl = ngx_http_tfs_create_read_meta_message(t, t->file.file_offset,
                                                    t->file.left_length);
         break;
+
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
         switch (t->state) {
         case NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_MS:
@@ -85,6 +89,7 @@ ngx_http_tfs_meta_server_create_message(ngx_http_tfs_t *t)
             break;
         }
         break;
+
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
         switch (t->state) {
         case NGX_HTTP_TFS_STATE_REMOVE_GET_FRAG_INFO:
@@ -97,6 +102,7 @@ ngx_http_tfs_meta_server_create_message(ngx_http_tfs_t *t)
             break;
         }
         break;
+
     case NGX_HTTP_TFS_ACTION_LS_DIR:
     case NGX_HTTP_TFS_ACTION_LS_FILE:
         t->json_output = ngx_http_tfs_json_init(t->log, t->pool);
@@ -114,7 +120,7 @@ ngx_http_tfs_meta_server_create_message(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_meta_server_parse_message(ngx_http_tfs_t *t)
 {
-    uint16_t                               action;
+    uint16_t  action;
 
     action = t->r_ctx.action.code;
 
@@ -683,10 +689,10 @@ ngx_http_tfs_parse_read_meta_message(ngx_http_tfs_t *t)
 static ngx_int_t
 ngx_http_tfs_parse_action_message(ngx_http_tfs_t *t)
 {
-    uint16_t                                  type;
-    ngx_str_t                                 action;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_peer_connection_t           *tp;
+    uint16_t                         type;
+    ngx_str_t                        action;
+    ngx_http_tfs_header_t           *header;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     tp = t->tfs_peer;
     header = (ngx_http_tfs_header_t *) t->header;

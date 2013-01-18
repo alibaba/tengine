@@ -11,9 +11,9 @@
 ngx_chain_t *
 ngx_http_tfs_root_server_create_message(ngx_pool_t *pool)
 {
-    ngx_buf_t                                 *b;
-    ngx_chain_t                               *cl;
-    ngx_http_tfs_rs_request_t                 *req;
+    ngx_buf_t                  *b;
+    ngx_chain_t                *cl;
+    ngx_http_tfs_rs_request_t  *req;
 
     b = ngx_create_temp_buf(pool, sizeof(ngx_http_tfs_rs_request_t));
     if (b == NULL) {
@@ -47,10 +47,10 @@ ngx_http_tfs_root_server_create_message(ngx_pool_t *pool)
 ngx_int_t
 ngx_http_tfs_root_server_parse_message(ngx_http_tfs_t *t)
 {
-    ngx_int_t                                 rc;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_rs_response_t               *resp;
-    uLongf                                    table_length;
+    uLongf                           table_length;
+    ngx_int_t                        rc;
+    ngx_http_tfs_rs_response_t      *resp;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     tp = t->tfs_peer;
     resp = (ngx_http_tfs_rs_response_t *) (tp->body_buffer.pos);

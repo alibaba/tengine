@@ -44,7 +44,7 @@ ngx_http_tfs_inet_t *
 ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    ngx_http_tfs_block_info_t     *block_info;
+    ngx_http_tfs_block_info_t  *block_info;
 
     block_info = &segment_data->block_info;
 
@@ -59,6 +59,7 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
             }
         }
         break;
+
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
         if (t->is_stat_dup_file) {
@@ -92,12 +93,12 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
 ngx_chain_t *
 ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
 {
-    int32_t                           meta_segment_size;
-    uint16_t                          action;
-    ngx_int_t                         rc;
-    ngx_buf_t                        *b;
-    ngx_chain_t                      *cl;
-    ngx_http_tfs_segment_data_t      *segment_data;
+    int32_t                       meta_segment_size;
+    uint16_t                      action;
+    ngx_int_t                     rc;
+    ngx_buf_t                    *b;
+    ngx_chain_t                  *cl;
+    ngx_http_tfs_segment_data_t  *segment_data;
 
     cl = NULL;
     meta_segment_size = 0;
@@ -172,6 +173,7 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
         default:
             return NULL;
         }
+
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
         switch(t->state) {
         case NGX_HTTP_TFS_STATE_REMOVE_STAT_FILE:
@@ -220,6 +222,7 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
                                      t->read_ver, NGX_HTTP_TFS_READ_STAT_FORCE);
         case NGX_HTTP_TFS_STATE_REMOVE_DELETE_DATA:
             return ngx_http_tfs_create_unlink_message(t, segment_data);
+
         default:
             return NULL;
         }
@@ -232,15 +235,17 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_data_server_parse_message(ngx_http_tfs_t *t)
 {
-    ngx_http_tfs_segment_data_t      *segment_data;
+    ngx_http_tfs_segment_data_t  *segment_data;
 
     segment_data = &t->file.segment_data[t->file.segment_index];
 
     switch (t->r_ctx.action.code) {
     case NGX_HTTP_TFS_ACTION_READ_FILE:
         return ngx_http_tfs_parse_read_message(t);
+
     case NGX_HTTP_TFS_ACTION_STAT_FILE:
         return ngx_http_tfs_parse_statfile_message(t, segment_data);
+
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
         switch(t->state) {
         case NGX_HTTP_TFS_STATE_WRITE_STAT_DUP_FILE:
@@ -254,6 +259,7 @@ ngx_http_tfs_data_server_parse_message(ngx_http_tfs_t *t)
         default:
             return NGX_ERROR;
         }
+
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
         switch(t->state) {
         case NGX_HTTP_TFS_STATE_REMOVE_STAT_FILE:
@@ -275,10 +281,10 @@ static ngx_chain_t *
 ngx_http_tfs_create_createfile_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    size_t                                     size;
-    ngx_buf_t                                 *b;
-    ngx_chain_t                               *cl;
-    ngx_http_tfs_ds_msg_header_t              *req;
+    size_t                         size;
+    ngx_buf_t                     *b;
+    ngx_chain_t                   *cl;
+    ngx_http_tfs_ds_msg_header_t  *req;
 
     size = sizeof(ngx_http_tfs_ds_msg_header_t);
 
@@ -318,16 +324,16 @@ static ngx_chain_t *
 ngx_http_tfs_create_write_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    u_char                                    *p, exit;
-    size_t                                     size, body_size, b_size;
-    uint32_t                                   crc;
-    ngx_int_t                                  rc;
-    ngx_buf_t                                 *b;
-    ngx_uint_t                                 i;
-    ngx_chain_t                               *cl, *body, *ch;
-    ngx_http_tfs_crc_t                         t_crc;
-    ngx_http_tfs_block_info_t                 *block_info;
-    ngx_http_tfs_ds_write_request_t           *req;
+    u_char                           *p, exit;
+    size_t                            size, body_size, b_size;
+    uint32_t                          crc;
+    ngx_int_t                         rc;
+    ngx_buf_t                        *b;
+    ngx_uint_t                        i;
+    ngx_chain_t                      *cl, *body, *ch;
+    ngx_http_tfs_crc_t                t_crc;
+    ngx_http_tfs_block_info_t        *block_info;
+    ngx_http_tfs_ds_write_request_t  *req;
 
     exit = 0;
 
@@ -460,13 +466,13 @@ static ngx_chain_t *
 ngx_http_tfs_create_closefile_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    u_char                                    *p;
-    size_t                                     size;
-    ngx_buf_t                                 *b;
-    ngx_uint_t                                 i;
-    ngx_chain_t                               *cl;
-    ngx_http_tfs_block_info_t                 *block_info;
-    ngx_http_tfs_ds_close_request_t           *req;
+    u_char                           *p;
+    size_t                            size;
+    ngx_buf_t                        *b;
+    ngx_uint_t                        i;
+    ngx_chain_t                      *cl;
+    ngx_http_tfs_block_info_t        *block_info;
+    ngx_http_tfs_ds_close_request_t  *req;
 
     block_info = &segment_data->block_info;
     size = sizeof(ngx_http_tfs_ds_close_request_t) +
@@ -550,10 +556,10 @@ ngx_http_tfs_create_read_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data, uint8_t read_ver,
     uint8_t read_flag)
 {
-    size_t                                     size;
-    ngx_buf_t                                 *b;
-    ngx_chain_t                               *cl;
-    ngx_http_tfs_ds_read_request_t            *req;
+    size_t                           size;
+    ngx_buf_t                       *b;
+    ngx_chain_t                     *cl;
+    ngx_http_tfs_ds_read_request_t  *req;
 
     size = sizeof(ngx_http_tfs_ds_read_request_t);
 
@@ -608,13 +614,13 @@ static ngx_chain_t *
 ngx_http_tfs_create_unlink_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    u_char                                    *p;
-    size_t                                     size;
-    ngx_buf_t                                 *b;
-    ngx_uint_t                                 i;
-    ngx_chain_t                               *cl;
-    ngx_http_tfs_block_info_t                 *block_info;
-    ngx_http_tfs_ds_unlink_request_t          *req;
+    u_char                            *p;
+    size_t                             size;
+    ngx_buf_t                         *b;
+    ngx_uint_t                         i;
+    ngx_chain_t                       *cl;
+    ngx_http_tfs_block_info_t         *block_info;
+    ngx_http_tfs_ds_unlink_request_t  *req;
 
     block_info = &segment_data->block_info;
     size = sizeof(ngx_http_tfs_ds_unlink_request_t) +
@@ -784,9 +790,9 @@ ngx_http_tfs_parse_createfile_message(ngx_http_tfs_t *t,
 static ngx_int_t
 ngx_http_tfs_parse_write_message(ngx_http_tfs_t *t)
 {
-    uint16_t                                  type;
-    ngx_str_t                                 action;
-    ngx_http_tfs_header_t                    *header;
+    uint16_t                type;
+    ngx_str_t               action;
+    ngx_http_tfs_header_t  *header;
 
     header = (ngx_http_tfs_header_t *) t->header;
     type = header->type;
@@ -809,9 +815,9 @@ ngx_http_tfs_parse_write_message(ngx_http_tfs_t *t)
 static ngx_int_t
 ngx_http_tfs_parse_closefile_message(ngx_http_tfs_t *t)
 {
-    uint16_t                                  type;
-    ngx_str_t                                 action;
-    ngx_http_tfs_header_t                    *header;
+    uint16_t                type;
+    ngx_str_t               action;
+    ngx_http_tfs_header_t  *header;
 
     header = (ngx_http_tfs_header_t *) t->header;
     type = header->type;
@@ -835,14 +841,14 @@ ngx_http_tfs_parse_closefile_message(ngx_http_tfs_t *t)
 static ngx_int_t
 ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
 {
-    size_t                                    size, left_len, tail_len;
-    uint16_t                                  type;
-    ngx_int_t                                 rc;
-    ngx_str_t                                 err_msg;
-    ngx_buf_t                                *b;
-    ngx_http_tfs_peer_connection_t           *tp;
-    ngx_http_tfs_ds_read_response_t          *resp;
-    ngx_http_tfs_ds_readv2_response_tail_t   *readv2_rsp_tail;
+    size_t                                   size, left_len, tail_len;
+    uint16_t                                 type;
+    ngx_int_t                                rc;
+    ngx_str_t                                err_msg;
+    ngx_buf_t                               *b;
+    ngx_http_tfs_peer_connection_t          *tp;
+    ngx_http_tfs_ds_read_response_t         *resp;
+    ngx_http_tfs_ds_readv2_response_tail_t  *readv2_rsp_tail;
 
     resp = (ngx_http_tfs_ds_read_response_t *) t->header;
     tp = t->tfs_peer;
@@ -1012,13 +1018,13 @@ static ngx_int_t
 ngx_http_tfs_parse_statfile_message(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data)
 {
-    uint16_t                                type;
-    ngx_int_t                               rc;
-    ngx_str_t                               action;
-    ngx_http_tfs_header_t                  *header;
-    ngx_http_tfs_peer_connection_t         *tp;
-    ngx_http_tfs_ds_stat_response_t        *resp;
-    ngx_http_tfs_ds_sp_readv2_response_t   *resp2;
+    uint16_t                               type;
+    ngx_int_t                              rc;
+    ngx_str_t                              action;
+    ngx_http_tfs_header_t                 *header;
+    ngx_http_tfs_peer_connection_t        *tp;
+    ngx_http_tfs_ds_stat_response_t       *resp;
+    ngx_http_tfs_ds_sp_readv2_response_t  *resp2;
 
 
     header = (ngx_http_tfs_header_t *) t->header;
@@ -1152,17 +1158,17 @@ ngx_http_tfs_set_meta_segment_data(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_parse_meta_segment(ngx_http_tfs_t *t, ngx_chain_t *data)
 {
-    ssize_t                              n;
-    uint64_t                             data_size;
-    uint32_t                             i, segment_count;
-    ngx_buf_t                           *b, *tmp_b;
-    ngx_int_t                            rc;
-    ngx_str_t                            tfs_name;
-    ngx_chain_t                         *body, *cl;
-    ngx_http_tfs_raw_fsname_t            fsname;
-    ngx_http_tfs_segment_head_t         *seg_head;
-    ngx_http_tfs_segment_info_t         *seg_info;
-    ngx_http_tfs_tmp_segment_info_t     *tmp_seg_info;
+    ssize_t                           n;
+    uint64_t                          data_size;
+    uint32_t                          i, segment_count;
+    ngx_buf_t                        *b, *tmp_b;
+    ngx_int_t                         rc;
+    ngx_str_t                         tfs_name;
+    ngx_chain_t                      *body, *cl;
+    ngx_http_tfs_raw_fsname_t         fsname;
+    ngx_http_tfs_segment_head_t      *seg_head;
+    ngx_http_tfs_segment_info_t      *seg_info;
+    ngx_http_tfs_tmp_segment_info_t  *tmp_seg_info;
 
     if (data == NULL || t->meta_segment_data != NULL) {
         return NGX_ERROR;
@@ -1253,15 +1259,16 @@ ngx_http_tfs_parse_meta_segment(ngx_http_tfs_t *t, ngx_chain_t *data)
 }
 
 
-/* use binary search to find the segment we need
- * if found, return index, or return index to insert
+/*
+ * We use binary search to find the segment we need
+ * if found, return index, or return index to insert.
  */
 
 ngx_int_t
 ngx_http_tfs_find_segment(ngx_int_t seg_count,
     ngx_http_tfs_segment_info_t *seg_info, int64_t offset)
 {
-    ngx_int_t         start, end, middle;
+    ngx_int_t  start, end, middle;
 
     start = 0;
     end = seg_count - 1;
@@ -1364,7 +1371,8 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
     first_segment->oper_size =
         first_segment->segment_info.size - first_segment->oper_offset;
 
-    /* last segment's oper_size is special,
+    /*
+     * last segment's oper_size is special,
      * notice that last_segment maybe the same as first_semgnt
      */
     last_segment = &t->file.segment_data[seg_count - 1];
@@ -1389,12 +1397,12 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
 {
-    size_t                        data_size, buf_size, size;
-    int64_t                       offset;
-    uint32_t                      left_size;
-    ngx_uint_t                    seg_count, i;
-    ngx_buf_t                    *b;
-    ngx_chain_t                  *body, *cl, **ll;
+    size_t        data_size, buf_size, size;
+    int64_t       offset;
+    uint32_t      left_size;
+    ngx_uint_t    seg_count, i;
+    ngx_buf_t    *b;
+    ngx_chain_t  *body, *cl, **ll;
 
     if (t->send_body == NULL) {
         return NGX_ERROR;
@@ -1403,7 +1411,8 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
     body = t->send_body;
     offset = 0;
 
-    /* body buf is one or two bufs ,
+    /*
+     * body buf is one or two bufs ,
      * please see ngx_http_read_client_request_body
      */
     data_size = ngx_http_tfs_get_chain_buf_size(body);
@@ -1450,6 +1459,7 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
         ll = &t->file.segment_data[i].data;
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
                       "prepare segment[%i]'s data", i);
+
         while (left_size > 0) {
             while (body && ngx_buf_size(body->buf) == 0) {
                 ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0,
@@ -1550,7 +1560,7 @@ ngx_http_tfs_copy_body_buffer(ngx_http_tfs_t *t, ssize_t bytes, u_char *body)
 {
     ngx_http_request_t  *r = t->data;
 
-    ngx_chain_t          *cl, **ll;
+    ngx_chain_t  *cl, **ll;
 
     for (cl = t->out_bufs, ll = &t->out_bufs; cl; cl = cl->next) {
         ll = &cl->next;
@@ -1577,10 +1587,9 @@ ngx_http_tfs_copy_body_buffer(ngx_http_tfs_t *t, ssize_t bytes, u_char *body)
 ngx_int_t
 ngx_http_tfs_fill_file_hole(ngx_http_tfs_t *t, size_t file_hole_size)
 {
-    size_t                                    size;
-    ngx_int_t                                 rc;
-    ngx_buf_t                                *b;
-    ngx_buf_t                                *zero_buf;
+    size_t     size;
+    ngx_int_t  rc;
+    ngx_buf_t  *b, *zero_buf;
 
     b = &t->tfs_peer_servers[NGX_HTTP_TFS_DATA_SERVER].body_buffer;
     if (b->start == NULL) {

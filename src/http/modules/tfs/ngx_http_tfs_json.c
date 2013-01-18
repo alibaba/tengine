@@ -11,8 +11,8 @@
 ngx_http_tfs_json_gen_t *
 ngx_http_tfs_json_init(ngx_log_t *log, ngx_pool_t *pool)
 {
-    yajl_gen                          g;
-    ngx_http_tfs_json_gen_t          *tj_gen;
+    yajl_gen                  g;
+    ngx_http_tfs_json_gen_t  *tj_gen;
 
     g = yajl_gen_alloc(NULL);
     if (g == NULL) {
@@ -48,15 +48,15 @@ ngx_chain_t *
 ngx_http_tfs_json_custom_file_info(ngx_http_tfs_json_gen_t *tj_gen,
     ngx_http_tfs_custom_meta_info_t *meta_info, uint8_t file_type)
 {
-    size_t                           size;
-    u_char                           time_buf[NGX_HTTP_TFS_GMT_TIME_SIZE];
-    yajl_gen                         g;
-    uint32_t                         count;
-    ngx_buf_t                       *b;
-    ngx_int_t                        is_file;
-    ngx_uint_t                       i;
-    ngx_chain_t                     *cl;
-    ngx_http_tfs_custom_file_t      *file;
+    size_t                       size;
+    u_char                       time_buf[NGX_HTTP_TFS_GMT_TIME_SIZE];
+    yajl_gen                     g;
+    uint32_t                     count;
+    ngx_buf_t                   *b;
+    ngx_int_t                    is_file;
+    ngx_uint_t                   i;
+    ngx_chain_t                 *cl;
+    ngx_http_tfs_custom_file_t  *file;
 
     g = tj_gen->gen;
     size = 0;
@@ -139,10 +139,10 @@ ngx_chain_t *
 ngx_http_tfs_json_file_name(ngx_http_tfs_json_gen_t *tj_gen,
     ngx_str_t *file_name)
 {
-    size_t                      size;
-    yajl_gen                    g;
-    ngx_buf_t                  *b;
-    ngx_chain_t                *cl;
+    size_t        size;
+    yajl_gen      g;
+    ngx_buf_t    *b;
+    ngx_chain_t  *cl;
 
     g = tj_gen->gen;
     size = 0;
@@ -178,11 +178,11 @@ ngx_http_tfs_json_raw_file_info(ngx_http_tfs_json_gen_t *tj_gen,
     u_char* file_name, uint32_t block_id,
     ngx_http_tfs_raw_file_info_t *file_info)
 {
-    size_t                      size;
-    u_char                      time_buf[NGX_HTTP_TFS_GMT_TIME_SIZE];
-    yajl_gen                    g;
-    ngx_buf_t                  *b;
-    ngx_chain_t                *cl;
+    size_t        size;
+    u_char        time_buf[NGX_HTTP_TFS_GMT_TIME_SIZE];
+    yajl_gen      g;
+    ngx_buf_t    *b;
+    ngx_chain_t  *cl;
 
     g = tj_gen->gen;
     size = 0;
@@ -253,10 +253,10 @@ ngx_chain_t *
 ngx_http_tfs_json_appid(ngx_http_tfs_json_gen_t *tj_gen,
     uint64_t app_id)
 {
-    size_t                      size;
-    yajl_gen                    g;
-    ngx_buf_t                  *b;
-    ngx_chain_t                *cl;
+    size_t        size;
+    yajl_gen      g;
+    ngx_buf_t    *b;
+    ngx_chain_t  *cl;
 
     g = tj_gen->gen;
     size = 0;
@@ -296,12 +296,12 @@ ngx_chain_t *
 ngx_http_tfs_json_file_hole_info(ngx_http_tfs_json_gen_t *tj_gen,
     ngx_array_t *file_holes)
 {
-    size_t                           size;
-    yajl_gen                         g;
-    ngx_buf_t                       *b;
-    ngx_uint_t                       i;
-    ngx_chain_t                     *cl;
-    ngx_http_tfs_file_hole_info_t   *file_hole_info;
+    size_t                          size;
+    yajl_gen                        g;
+    ngx_buf_t                      *b;
+    ngx_uint_t                      i;
+    ngx_chain_t                    *cl;
+    ngx_http_tfs_file_hole_info_t  *file_hole_info;
 
     g = tj_gen->gen;
     size = 0;

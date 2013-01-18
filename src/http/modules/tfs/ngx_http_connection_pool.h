@@ -33,12 +33,13 @@ struct ngx_http_connection_pool_s {
 
     ngx_uint_t               failed;       /* unsigned:1 */
     ngx_pool_t              *pool;
+
 #if (NGX_DEBUG)
     ngx_int_t                count;        /* check get&free op pairs */
 #endif
 
-    ngx_event_get_peer_pt              get_peer;
-    ngx_event_free_peer_pt             free_peer;
+    ngx_event_get_peer_pt    get_peer;
+    ngx_event_free_peer_pt   free_peer;
 };
 
 
@@ -49,5 +50,6 @@ ngx_http_connection_pool_t *ngx_http_connection_pool_init(ngx_pool_t *pool,
 void ngx_http_connection_pool_check(ngx_http_connection_pool_t *coon_pool,
     ngx_log_t *log);
 #endif
+
 
 #endif  /* _NGX_HTTP_CONNECTION_POOL_H_INCLUDED_ */

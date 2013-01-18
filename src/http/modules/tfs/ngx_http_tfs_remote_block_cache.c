@@ -23,8 +23,8 @@ ngx_http_tfs_remote_block_cache_lookup(
     ngx_http_tfs_remote_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_http_tfs_block_cache_key_t* key)
 {
-    ngx_int_t                         rc;
-    ngx_http_tair_data_t              tair_key;
+    ngx_int_t             rc;
+    ngx_http_tair_data_t  tair_key;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
                    "lookup remote block cache, ns addr: %uL, block id: %uD",
@@ -49,14 +49,14 @@ static void
 ngx_http_tfs_remote_block_cache_get_handler(ngx_http_tair_key_value_t *kv,
     ngx_int_t rc, void *data)
 {
-    u_char                                  *p, *q;
+    u_char                                 *p, *q;
     uint32_t                                ds_count;
-    ngx_http_tfs_t                          *t;
-    ngx_http_tfs_inet_t                     *addr;
-    ngx_http_tfs_segment_data_t             *segment_data;
-    ngx_http_tfs_block_cache_key_t           key;
-    ngx_http_tfs_block_cache_value_t         value;
-    ngx_http_tfs_remote_block_cache_ctx_t   *ctx = data;
+    ngx_http_tfs_t                         *t;
+    ngx_http_tfs_inet_t                    *addr;
+    ngx_http_tfs_segment_data_t            *segment_data;
+    ngx_http_tfs_block_cache_key_t          key;
+    ngx_http_tfs_block_cache_value_t        value;
+    ngx_http_tfs_remote_block_cache_ctx_t  *ctx = data;
 
     t = ctx->data;
     segment_data = &t->file.segment_data[t->file.segment_index];
@@ -136,10 +136,9 @@ ngx_http_tfs_remote_block_cache_insert(
     ngx_http_tfs_block_cache_key_t *key,
     ngx_http_tfs_block_cache_value_t *value)
 {
-    ngx_int_t                         rc;
-    ngx_pool_t                       *tmp_pool;
-    ngx_http_tair_data_t              tair_key;
-    ngx_http_tair_data_t              tair_value;
+    ngx_int_t             rc;
+    ngx_pool_t           *tmp_pool;
+    ngx_http_tair_data_t  tair_key, tair_value;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
                    "insert remote block cache, "
@@ -184,9 +183,8 @@ ngx_http_tfs_remote_block_cache_insert(
 static void
 ngx_http_tfs_remote_block_cache_dummy_handler(ngx_int_t rc, void *data)
 {
-    ngx_pool_t          *pool = (ngx_pool_t *)data;
+    ngx_pool_t  *pool = (ngx_pool_t *)data;
     ngx_destroy_pool(pool);
-
     return;
 }
 
@@ -196,10 +194,10 @@ ngx_http_tfs_remote_block_cache_remove(
     ngx_http_tfs_remote_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_http_tfs_block_cache_key_t* key)
 {
-    ngx_int_t                         rc;
-    ngx_pool_t                       *tmp_pool;
-    ngx_array_t                       tair_keys;
-    ngx_http_tair_data_t             *tair_key;
+    ngx_int_t              rc;
+    ngx_pool_t            *tmp_pool;
+    ngx_array_t            tair_keys;
+    ngx_http_tair_data_t  *tair_key;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
                    "remove remote block cache, ns addr: %uL, block id: %uD",
@@ -238,11 +236,11 @@ ngx_http_tfs_remote_block_cache_batch_lookup(
     ngx_http_tfs_remote_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_array_t* keys)
 {
-    ngx_int_t                         rc;
-    ngx_uint_t                        i;
-    ngx_array_t                      *tair_kvs;
-    ngx_http_tair_key_value_t        *tair_kv;
-    ngx_http_tfs_block_cache_key_t   *key;
+    ngx_int_t                        rc;
+    ngx_uint_t                       i;
+    ngx_array_t                     *tair_kvs;
+    ngx_http_tair_key_value_t       *tair_kv;
+    ngx_http_tfs_block_cache_key_t  *key;
 
     tair_kvs = ngx_array_create(pool, keys->nelts,
                                 sizeof(ngx_http_tair_key_value_t));
@@ -281,15 +279,15 @@ static void
 ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
     void *data)
 {
-    u_char                                   *p, *q;
-    uint32_t                                  ds_count, block_count;
-    ngx_uint_t                                i, j, hit_count;
-    ngx_http_tfs_t                           *t;
-    ngx_http_tair_key_value_t                *kv;
-    ngx_http_tfs_segment_data_t              *segment_data;
-    ngx_http_tfs_block_cache_key_t            key;
-    ngx_http_tfs_block_cache_value_t          value;
-    ngx_http_tfs_remote_block_cache_ctx_t    *ctx = data;
+    u_char                                 *p, *q;
+    uint32_t                                ds_count, block_count;
+    ngx_uint_t                              i, j, hit_count;
+    ngx_http_tfs_t                         *t;
+    ngx_http_tair_key_value_t              *kv;
+    ngx_http_tfs_segment_data_t            *segment_data;
+    ngx_http_tfs_block_cache_key_t          key;
+    ngx_http_tfs_block_cache_value_t        value;
+    ngx_http_tfs_remote_block_cache_ctx_t  *ctx = data;
 
     t = ctx->data;
 
@@ -404,15 +402,15 @@ ngx_http_tfs_get_remote_block_cache_instance(
     ngx_http_tfs_remote_block_cache_ctx_t *ctx,
     ngx_str_t *server_addr)
 {
-    size_t                                 server_addr_len;
-    uint32_t                               server_addr_hash;
-    ngx_int_t                              rc, i;
-    ngx_str_t                             *st;
-    ngx_array_t                            config_server;
-    ngx_http_tfs_t                        *t;
-    ngx_http_tfs_tair_instance_t          *instance;
-    ngx_http_etair_server_conf_t          *server;
-    ngx_http_tfs_tair_server_addr_info_t   server_addr_info;
+    size_t                                server_addr_len;
+    uint32_t                              server_addr_hash;
+    ngx_int_t                             rc, i;
+    ngx_str_t                            *st;
+    ngx_array_t                           config_server;
+    ngx_http_tfs_t                       *t;
+    ngx_http_tfs_tair_instance_t         *instance;
+    ngx_http_etair_server_conf_t         *server;
+    ngx_http_tfs_tair_server_addr_info_t  server_addr_info;
 
     if (server_addr->len == 0
         || server_addr->data == NULL)

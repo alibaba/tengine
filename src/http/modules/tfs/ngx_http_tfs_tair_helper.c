@@ -15,7 +15,7 @@ ngx_http_tfs_tair_get_helper(ngx_http_tfs_tair_instance_t *instance,
     ngx_http_tair_data_t *key, ngx_http_tair_get_handler_pt callback,
     void *data)
 {
-    ngx_int_t                  rc;
+    ngx_int_t  rc;
 
     if (instance == NULL || key == NULL) {
         return NGX_ERROR;
@@ -33,10 +33,10 @@ ngx_http_tfs_tair_get_helper(ngx_http_tfs_tair_instance_t *instance,
 
 
 ngx_int_t ngx_http_tfs_tair_mget_helper(ngx_http_tfs_tair_instance_t *instance,
-    ngx_pool_t *pool, ngx_log_t *log,
-    ngx_array_t *kvs, ngx_http_tair_mget_handler_pt callback, void *data)
+    ngx_pool_t *pool, ngx_log_t *log, ngx_array_t *kvs,
+    ngx_http_tair_mget_handler_pt callback, void *data)
 {
-    ngx_int_t                                 rc;
+    ngx_int_t  rc;
 
     if (instance == NULL || kvs == NULL) {
         return NGX_ERROR;
@@ -60,7 +60,7 @@ ngx_http_tfs_tair_put_helper(ngx_http_tfs_tair_instance_t *instance,
     ngx_int_t expire, ngx_int_t version,
     ngx_http_tair_handler_pt callback, void *data)
 {
-    ngx_int_t                     rc;
+    ngx_int_t  rc;
 
     if (instance == NULL || key == NULL || value == NULL) {
         return NGX_ERROR;
@@ -80,10 +80,10 @@ ngx_http_tfs_tair_put_helper(ngx_http_tfs_tair_instance_t *instance,
 
 ngx_int_t
 ngx_http_tfs_tair_delete_helper(ngx_http_tfs_tair_instance_t *instance,
-    ngx_pool_t *pool, ngx_log_t *log,
-    ngx_array_t *keys, ngx_http_tair_handler_pt callback, void *data)
+    ngx_pool_t *pool, ngx_log_t *log, ngx_array_t *keys,
+    ngx_http_tair_handler_pt callback, void *data)
 {
-    ngx_int_t                                 rc;
+    ngx_int_t  rc;
 
     if (instance == NULL || keys == NULL) {
         return NGX_ERROR;
@@ -146,9 +146,9 @@ ngx_http_tfs_parse_tair_server_addr_info(
     ngx_http_tfs_tair_server_addr_info_t *info,
     u_char *addr, uint32_t len, void *pool, uint8_t shared_memory)
 {
-    u_char           *temp, *p;
-    ssize_t           info_size;
-    ngx_int_t         i;
+    u_char    *temp, *p;
+    ssize_t    info_size;
+    ngx_int_t  i;
 
     p = addr;
 

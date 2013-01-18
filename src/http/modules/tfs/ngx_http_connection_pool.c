@@ -21,9 +21,9 @@ ngx_http_connection_pool_t *
 ngx_http_connection_pool_init(ngx_pool_t *pool, ngx_uint_t max_cached,
     ngx_uint_t bucket_count)
 {
-    ngx_uint_t                                      j, k;
-    ngx_http_connection_pool_t                     *conn_pool;
-    ngx_http_connection_pool_elt_t                 *cached;
+    ngx_uint_t                      j, k;
+    ngx_http_connection_pool_t     *conn_pool;
+    ngx_http_connection_pool_elt_t *cached;
 
     conn_pool = ngx_pcalloc(pool, sizeof(ngx_http_connection_pool_t));
     if (conn_pool == NULL) {
@@ -66,12 +66,12 @@ ngx_http_connection_pool_init(ngx_pool_t *pool, ngx_uint_t max_cached,
 ngx_int_t
 ngx_http_connection_pool_get(ngx_peer_connection_t *pc, void *data)
 {
-    u_char                            pc_addr[32] = {'\0'};
-    ngx_uint_t                        bucket_id, hash;
-    ngx_queue_t                      *q, *cache, *free;
-    ngx_connection_t                 *c;
-    ngx_http_connection_pool_t       *p;
-    ngx_http_connection_pool_elt_t   *item;
+    u_char                         pc_addr[32] = {'\0'};
+    ngx_uint_t                     bucket_id, hash;
+    ngx_queue_t                    *q, *cache, *free;
+    ngx_connection_t               *c;
+    ngx_http_connection_pool_t     *p;
+    ngx_http_connection_pool_elt_t *item;
 
     p = data;
 
@@ -79,8 +79,7 @@ ngx_http_connection_pool_get(ngx_peer_connection_t *pc, void *data)
     p->count--;
 #endif
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "get keepalive peer");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0, "get keepalive peer");
 
     p->failed = 0;
 
@@ -133,15 +132,14 @@ void
 ngx_http_connection_pool_free(ngx_peer_connection_t *pc,
     void *data, ngx_uint_t state)
 {
-    ngx_http_connection_pool_t        *p = data;
-    ngx_http_connection_pool_elt_t    *item;
+    ngx_http_connection_pool_t     *p = data;
+    ngx_http_connection_pool_elt_t *item;
 
-    ngx_uint_t                         hash, bucket_id;
-    ngx_queue_t                       *q, *cache, *free;
-    ngx_connection_t                  *c;
+    ngx_uint_t         hash, bucket_id;
+    ngx_queue_t       *q, *cache, *free;
+    ngx_connection_t  *c;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "free keepalive peer");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0, "free keepalive peer");
 
     /* remember failed state - peer.free() may be called more than once */
 
@@ -171,6 +169,7 @@ ngx_http_connection_pool_free(ngx_peer_connection_t *pc,
 #if (NGX_DEBUG)
     p->count++;
 #endif
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "free keepalive peer: saving connection %p", c);
 
@@ -231,14 +230,13 @@ ngx_http_connection_pool_free(ngx_peer_connection_t *pc,
 static void
 ngx_http_connection_pool_close_handler(ngx_event_t *ev)
 {
-    ngx_http_connection_pool_elt_t     *item;
+    ngx_http_connection_pool_elt_t  *item;
 
     int                n;
     char               buf[1];
     ngx_connection_t  *c;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0,
-                   "keepalive close handler");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0, "keepalive close handler");
 
     c = ev->data;
 
@@ -276,7 +274,6 @@ close:
 static void
 ngx_http_connection_pool_close(ngx_connection_t *c)
 {
-
 #if (NGX_HTTP_SSL)
 
     if (c->ssl) {
@@ -299,8 +296,7 @@ ngx_http_connection_pool_close(ngx_connection_t *c)
 static void
 ngx_http_connection_pool_dummy_handler(ngx_event_t *ev)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0,
-                   "keepalive dummy handler");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0, "keepalive dummy handler");
 }
 
 #if (NGX_DEBUG)

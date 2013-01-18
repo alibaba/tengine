@@ -15,10 +15,11 @@
 
 
 typedef struct {
-    uint32_t                               server_addr_hash;
-    ngx_int_t                              area;
+    uint32_t                          server_addr_hash;
+    ngx_int_t                         area;
+
 #ifdef NGX_HTTP_TFS_USE_TAIR
-    ngx_http_etair_server_conf_t          *server;
+    ngx_http_etair_server_conf_t     *server;
 #endif
 } ngx_http_tfs_tair_instance_t;
 
@@ -28,28 +29,30 @@ typedef struct {
     ngx_int_t  area;
 } ngx_http_tfs_tair_server_addr_info_t;
 
+
 #ifndef NGX_HTTP_TFS_USE_TAIR
 
 #define NGX_HTTP_TAIR_BYTEARRAY       9
 #define NGX_HTTP_TAIR_INT             1
 #define NGX_HTTP_ETAIR_SUCCESS        0
 
+
 typedef struct {
 
-    size_t          len;
-    u_char         *data;
+    size_t                            len;
+    u_char                           *data;
 
-    ngx_uint_t      type;
+    ngx_uint_t                        type;
 } ngx_http_tair_data_t;
 
 typedef struct {
-    ngx_http_tair_data_t    key;
-    ngx_http_tair_data_t   *value;
+    ngx_http_tair_data_t              key;
+    ngx_http_tair_data_t             *value;
 
-    ngx_int_t               version;
-    ngx_int_t               exptime;
+    ngx_int_t                         version;
+    ngx_int_t                         exptime;
 
-    ngx_int_t               rc;
+    ngx_int_t                         rc;
 } ngx_http_tair_key_value_t;
 
 typedef void (*ngx_http_tair_handler_pt)(ngx_int_t rc, void *data);
