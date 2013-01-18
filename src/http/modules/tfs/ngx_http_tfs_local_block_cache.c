@@ -8,15 +8,16 @@
 
 
 static void ngx_http_tfs_local_block_cache_rbtree_insert_value(
-    ngx_rbtree_node_t *temp,
-    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+    ngx_rbtree_node_t *temp, ngx_rbtree_node_t *node,
+    ngx_rbtree_node_t *sentinel);
+
 
 ngx_int_t
 ngx_http_tfs_local_block_cache_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
-    size_t                                   len;
-    ngx_http_tfs_local_block_cache_ctx_t    *ctx;
-    ngx_http_tfs_local_block_cache_ctx_t    *octx = data;
+    size_t                                 len;
+    ngx_http_tfs_local_block_cache_ctx_t  *ctx;
+    ngx_http_tfs_local_block_cache_ctx_t  *octx = data;
 
     ctx = shm_zone->data;
 
@@ -107,8 +108,7 @@ ngx_http_tfs_local_block_cache_rbtree_insert_value(ngx_rbtree_node_t *temp,
 
 ngx_int_t
 ngx_http_tfs_local_block_cache_lookup(ngx_http_tfs_local_block_cache_ctx_t *ctx,
-    ngx_pool_t *pool, ngx_log_t *log,
-    ngx_http_tfs_block_cache_key_t* key,
+    ngx_pool_t *pool, ngx_log_t *log, ngx_http_tfs_block_cache_key_t* key,
     ngx_http_tfs_block_cache_value_t *value)
 {
     double                            hit_ratio;
@@ -187,8 +187,7 @@ ngx_http_tfs_local_block_cache_lookup(ngx_http_tfs_local_block_cache_ctx_t *ctx,
 
 ngx_int_t
 ngx_http_tfs_local_block_cache_insert(ngx_http_tfs_local_block_cache_ctx_t *ctx,
-    ngx_log_t *log,
-    ngx_http_tfs_block_cache_key_t *key,
+    ngx_log_t *log, ngx_http_tfs_block_cache_key_t *key,
     ngx_http_tfs_block_cache_value_t *value)
 {
     size_t                            n;
@@ -299,10 +298,10 @@ void
 ngx_http_tfs_local_block_cache_discard(
     ngx_http_tfs_local_block_cache_ctx_t *ctx)
 {
-    ngx_uint_t                          i;
-    ngx_queue_t                        *q, *h, *p;
-    ngx_rbtree_node_t                  *node;
-    ngx_http_tfs_block_cache_node_t    *bcn;
+    ngx_uint_t                        i;
+    ngx_queue_t                      *q, *h, *p;
+    ngx_rbtree_node_t                *node;
+    ngx_http_tfs_block_cache_node_t  *bcn;
 
     h = &ctx->sh->queue;
     if (ngx_queue_empty(h)) {
@@ -340,15 +339,15 @@ ngx_http_tfs_local_block_cache_batch_lookup(
     ngx_http_tfs_local_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_array_t *keys, ngx_array_t *kvs)
 {
-    double                                hit_ratio; 
-    ngx_int_t                             rc;
-    ngx_uint_t                            i, hash, hit_count;
-    ngx_slab_pool_t                      *shpool;
-    ngx_rbtree_node_t                    *node, *sentinel;
-    ngx_http_tfs_block_cache_kv_t        *kv;
-    ngx_http_tfs_block_cache_key_t       *key;
-    ngx_http_tfs_block_cache_node_t      *bcn;
-    ngx_http_tfs_block_cache_value_t     *value;
+    double                           hit_ratio;
+    ngx_int_t                        rc;
+    ngx_uint_t                       i, hash, hit_count;
+    ngx_slab_pool_t                  *shpool;
+    ngx_rbtree_node_t                *node, *sentinel;
+    ngx_http_tfs_block_cache_kv_t    *kv;
+    ngx_http_tfs_block_cache_key_t   *key;
+    ngx_http_tfs_block_cache_node_t  *bcn;
+    ngx_http_tfs_block_cache_value_t *value;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
                    "batch lookup local block cache, block count: %ui",

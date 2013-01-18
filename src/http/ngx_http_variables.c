@@ -967,8 +967,8 @@ ngx_http_variable_cookie(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
 
 static ngx_int_t
-ngx_http_variable_sent_cookie(ngx_http_request_t *r, ngx_http_variable_value_t *v,
-    uintptr_t data)
+ngx_http_variable_sent_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
 {
     u_char           *p, *last;
     ngx_str_t         name;

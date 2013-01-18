@@ -14,6 +14,7 @@
         }                                               \
     } while(0)
 
+
 static ngx_chain_t *ngx_http_tfs_create_login_message(ngx_http_tfs_t *t);
 static ngx_chain_t * ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t);
 
@@ -39,7 +40,7 @@ static ngx_int_t ngx_http_tfs_parse_session_id(ngx_str_t *session_id,
 ngx_chain_t *
 ngx_http_tfs_rc_server_create_message(ngx_http_tfs_t *t)
 {
-    uint16_t                                   msg_type;
+    uint16_t  msg_type;
 
     msg_type = t->r_ctx.action.code;
 
@@ -58,6 +59,7 @@ ngx_http_tfs_rc_server_parse_message(ngx_http_tfs_t *t)
     if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_KEEPALIVE) {
         return ngx_http_tfs_parse_keepalive_message(t);
     }
+
     return ngx_http_tfs_parse_login_message(t);
 }
 
@@ -65,10 +67,10 @@ ngx_http_tfs_rc_server_parse_message(ngx_http_tfs_t *t)
 ngx_chain_t *
 ngx_http_tfs_create_login_message(ngx_http_tfs_t *t)
 {
-    ngx_buf_t                                 *b;
-    ngx_chain_t                               *cl;
-    struct sockaddr_in                        *addr;
-    ngx_http_tfs_rcs_login_msg_header_t       *req;
+    ngx_buf_t                            *b;
+    ngx_chain_t                          *cl;
+    struct sockaddr_in                   *addr;
+    ngx_http_tfs_rcs_login_msg_header_t  *req;
 
     b = ngx_create_temp_buf(t->pool,
                             sizeof(ngx_http_tfs_rcs_login_msg_header_t)
@@ -119,14 +121,14 @@ ngx_http_tfs_create_login_message(ngx_http_tfs_t *t)
 ngx_chain_t *
 ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
 {
-    u_char                         *p;
-    ssize_t                         size, base_size;
-    ngx_buf_t                      *b;
-    ngx_queue_t                    *q, *queue;
-    ngx_chain_t                    *cl, **ll;
-    ngx_http_tfs_rc_ctx_t          *rc_ctx;
-    ngx_http_tfs_header_t          *header;
-    ngx_http_tfs_rcs_info_t        *rc_info;
+    u_char                   *p;
+    ssize_t                   size, base_size;
+    ngx_buf_t                *b;
+    ngx_queue_t              *q, *queue;
+    ngx_chain_t              *cl, **ll;
+    ngx_http_tfs_rc_ctx_t    *rc_ctx;
+    ngx_http_tfs_header_t    *header;
+    ngx_http_tfs_rcs_info_t  *rc_info;
 
     rc_ctx = t->loc_conf->upstream->rc_ctx;
     ll = NULL;
@@ -234,13 +236,13 @@ keepalive_create_error:
 ngx_int_t
 ngx_http_tfs_parse_login_message(ngx_http_tfs_t *t)
 {
-    uint16_t                                  type;
-    ngx_str_t                                 err_msg;
-    ngx_int_t                                 rc;
-    ngx_http_tfs_header_t                    *header;
-    ngx_http_tfs_rc_ctx_t                    *rc_ctx;
-    ngx_http_tfs_rcs_info_t                  *rc_info;
-    ngx_http_tfs_peer_connection_t           *tp;
+    uint16_t                         type;
+    ngx_str_t                        err_msg;
+    ngx_int_t                        rc;
+    ngx_http_tfs_header_t           *header;
+    ngx_http_tfs_rc_ctx_t           *rc_ctx;
+    ngx_http_tfs_rcs_info_t         *rc_info;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -283,16 +285,16 @@ ngx_http_tfs_parse_login_message(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_parse_keepalive_message(ngx_http_tfs_t *t)
 {
-    u_char                             *p, update;
-    uint16_t                            type;
-    ngx_str_t                           err_msg;
-    ngx_int_t                           rc;
-    ngx_queue_t                        *q, *queue;
-    ngx_rbtree_node_t                  *node;
-    ngx_http_tfs_header_t              *header;
-    ngx_http_tfs_rc_ctx_t              *rc_ctx;
-    ngx_http_tfs_rcs_info_t            *rc_info;
-    ngx_http_tfs_peer_connection_t     *tp;
+    u_char                          *p, update;
+    uint16_t                         type;
+    ngx_str_t                        err_msg;
+    ngx_int_t                        rc;
+    ngx_queue_t                     *q, *queue;
+    ngx_rbtree_node_t               *node;
+    ngx_http_tfs_header_t           *header;
+    ngx_http_tfs_rc_ctx_t           *rc_ctx;
+    ngx_http_tfs_rcs_info_t         *rc_info;
+    ngx_http_tfs_peer_connection_t  *tp;
 
     header = (ngx_http_tfs_header_t *) t->header;
     tp = t->tfs_peer;
@@ -365,17 +367,17 @@ static ngx_int_t
 ngx_http_tfs_parse_rc_info(ngx_http_tfs_rcs_info_t *rc_info_node,
     ngx_http_tfs_rc_ctx_t *rc_ctx,  u_char *data)
 {
-    u_char                                   *p;
-    uint8_t                                   is_master;
-    uint32_t                                  cluster_id, cluster_id_len, len;
-    ngx_int_t                                 dup_info_size, rc;
-    ngx_uint_t                                i, j;
-    ngx_http_tfs_group_info_t                *group_info;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
-    ngx_http_tfs_physical_cluster_t          *physical_cluster;
-    ngx_http_tfs_cluster_group_info_t        *cluster_group_info;
-    ngx_http_tfs_cluster_group_info_t        *cluster_group_info2;
-    ngx_http_tfs_tair_server_addr_info_t     *dup_server_info;
+    u_char                                *p;
+    uint8_t                                is_master;
+    uint32_t                               cluster_id, cluster_id_len, len;
+    ngx_int_t                              dup_info_size, rc;
+    ngx_uint_t                             i, j;
+    ngx_http_tfs_group_info_t             *group_info;
+    ngx_http_tfs_logical_cluster_t        *logical_cluster;
+    ngx_http_tfs_physical_cluster_t       *physical_cluster;
+    ngx_http_tfs_cluster_group_info_t     *cluster_group_info;
+    ngx_http_tfs_cluster_group_info_t     *cluster_group_info2;
+    ngx_http_tfs_tair_server_addr_info_t  *dup_server_info;
 
     p = data;
 
@@ -610,14 +612,14 @@ static ngx_int_t
 ngx_http_tfs_update_info_node(ngx_http_tfs_t *t, ngx_http_tfs_rc_ctx_t *rc_ctx,
     ngx_http_tfs_rcs_info_t *rc_info_node, u_char *base_info)
 {
-    u_char                                   *p;
-    ngx_int_t                                 rc;
-    ngx_uint_t                                i, j;
-    ngx_http_tfs_group_info_t                *group_info;
-    ngx_http_tfs_logical_cluster_t           *logical_cluster;
-    ngx_http_tfs_physical_cluster_t          *physical_cluster;
-    ngx_http_tfs_cluster_group_info_t        *cluster_group_info;
-    ngx_http_tfs_tair_server_addr_info_t     *dup_server_info;
+    u_char                                *p;
+    ngx_int_t                              rc;
+    ngx_uint_t                             i, j;
+    ngx_http_tfs_group_info_t             *group_info;
+    ngx_http_tfs_logical_cluster_t        *logical_cluster;
+    ngx_http_tfs_physical_cluster_t       *physical_cluster;
+    ngx_http_tfs_cluster_group_info_t     *cluster_group_info;
+    ngx_http_tfs_tair_server_addr_info_t  *dup_server_info;
 
     p = base_info;
 
@@ -721,12 +723,12 @@ ngx_http_tfs_create_info_node(ngx_http_tfs_t *t,
     ngx_http_tfs_rc_ctx_t *rc_ctx,
     u_char *data, ngx_str_t appkey)
 {
-    u_char                                   *p;
-    size_t                                    n;
-    uint32_t                                  len;
-    ngx_int_t                                 rc;
-    ngx_rbtree_node_t                        *node;
-    ngx_http_tfs_rcs_info_t                  *rc_info_node;
+    u_char                   *p;
+    size_t                    n;
+    uint32_t                  len;
+    ngx_int_t                 rc;
+    ngx_rbtree_node_t        *node;
+    ngx_http_tfs_rcs_info_t  *rc_info_node;
 
     rc_info_node = NULL;
 

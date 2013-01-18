@@ -13,8 +13,7 @@
 #include <ngx_tfs_common.h>
 
 
-typedef enum
-{
+typedef enum {
     NGX_HTTP_TFS_INVALID_FILE_TYPE = 0,
     NGX_HTTP_TFS_SMALL_FILE_TYPE,
     NGX_HTTP_TFS_LARGE_FILE_TYPE
@@ -29,22 +28,22 @@ typedef struct {
 
 
 typedef struct {
-    u_char                           file_name[NGX_HTTP_TFS_FILE_NAME_BUFF_LEN];
+    u_char                         file_name[NGX_HTTP_TFS_FILE_NAME_BUFF_LEN];
 
     ngx_http_tfs_raw_fsname_filebits_t  file;
 
-    uint32_t                            cluster_id;
-    ngx_http_tfs_raw_file_type_e        file_type;
+    uint32_t                       cluster_id;
+    ngx_http_tfs_raw_file_type_e   file_type;
 } ngx_http_tfs_raw_fsname_t;
 
 
-#define ngx_http_tfs_raw_fsname_set_suffix(fsname, fs_suffix) do {         \
+#define ngx_http_tfs_raw_fsname_set_suffix(fsname, fs_suffix) do {      \
         if ((fs_suffix != NULL)                                         \
              && (fs_suffix->data != NULL)                               \
              && (fs_suffix->len != 0))                                  \
         {                                                               \
-            fsname->file.suffix = ngx_http_tfs_raw_fsname_hash(fs_suffix->data, \
-                                                               fs_suffix->len); \
+            fsname->file.suffix = ngx_http_tfs_raw_fsname_hash(         \
+                fs_suffix->data, fs_suffix->len);                       \
         }                                                               \
     } while(0)
 
@@ -58,7 +57,7 @@ typedef struct {
     ((((uint64_t)(fsname.file.suffix)) << 32) | fsname.file.seq_id)
 
 
-#define ngx_http_tfs_group_seq_match(block_id, group_count, group_seq)    \
+#define ngx_http_tfs_group_seq_match(block_id, group_count, group_seq)  \
     ((block_id % group_count) == (ngx_uint_t) group_seq)
 
 

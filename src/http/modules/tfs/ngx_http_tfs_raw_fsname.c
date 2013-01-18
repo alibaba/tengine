@@ -8,7 +8,7 @@
 
 #define NGX_HTTP_TFS_KEY_MASK_LEN  10     /* strlen(NGX_HTTP_TFS_KEY_MASK) */
 
-static const u_char* NGX_HTTP_TFS_KEY_MASK = (u_char *)"Taobao-inc";
+static const u_char* NGX_HTTP_TFS_KEY_MASK = (u_char *) "Taobao-inc";
 
 static const u_char enc_table[] = "0JoU8EaN3xf19hIS2d.6p"
     "ZRFBYurMDGw7K5m4CyXsbQjg_vTOAkcHVtzqWilnLPe";
@@ -40,7 +40,7 @@ ngx_int_t
 ngx_http_tfs_raw_fsname_parse(ngx_str_t *tfs_name, ngx_str_t *suffix,
     ngx_http_tfs_raw_fsname_t* fsname)
 {
-    ngx_uint_t            suffix_len;
+    ngx_uint_t  suffix_len;
 
     if (fsname != NULL && tfs_name->data != NULL && tfs_name->data[0] != '\0') {
         ngx_memzero(fsname, sizeof(ngx_http_tfs_raw_fsname_t));
@@ -136,9 +136,9 @@ ngx_http_tfs_raw_fsname_check_file_type(ngx_str_t *tfs_name)
 void
 ngx_http_tfs_raw_fsname_encode(u_char *input, u_char *output)
 {
-    u_char               buffer[NGX_HTTP_TFS_FILE_NAME_EXCEPT_SUFFIX_LEN];
-    uint32_t             value;
-    ngx_uint_t           i, k;
+    u_char      buffer[NGX_HTTP_TFS_FILE_NAME_EXCEPT_SUFFIX_LEN];
+    uint32_t    value;
+    ngx_uint_t  i, k;
 
     k = 0;
 
@@ -159,9 +159,9 @@ ngx_http_tfs_raw_fsname_encode(u_char *input, u_char *output)
 void
 ngx_http_tfs_raw_fsname_decode(u_char *input, u_char *output)
 {
-    u_char               buffer[NGX_HTTP_TFS_FILE_NAME_EXCEPT_SUFFIX_LEN];
-    uint32_t             value;
-    ngx_uint_t           i, k;
+    u_char      buffer[NGX_HTTP_TFS_FILE_NAME_EXCEPT_SUFFIX_LEN];
+    uint32_t    value;
+    ngx_uint_t  i, k;
 
     k = 0;
 

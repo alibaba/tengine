@@ -15,7 +15,7 @@ ngx_http_tfs_block_cache_lookup(ngx_http_tfs_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_http_tfs_block_cache_key_t *key,
     ngx_http_tfs_block_cache_value_t *value)
 {
-    ngx_int_t   rc = NGX_DECLINED;
+    ngx_int_t  rc = NGX_DECLINED;
 
     if (ctx->curr_lookup_cache == NGX_HTTP_TFS_LOCAL_BLOCK_CACHE) {
 
@@ -84,13 +84,13 @@ ngx_http_tfs_block_cache_batch_lookup(ngx_http_tfs_block_cache_ctx_t *ctx,
     ngx_pool_t *pool, ngx_log_t *log, ngx_array_t *keys,
     ngx_array_t *kvs)
 {
-    uint32_t                           i;
-    ngx_int_t                          rc;
-    ngx_uint_t                         local_miss_count;
-    ngx_array_t                        local_miss_keys;
-    ngx_http_tfs_t                    *t;
-    ngx_http_tfs_segment_data_t       *segment_data;
-    ngx_http_tfs_block_cache_key_t    *key;
+    uint32_t                        i;
+    ngx_int_t                       rc;
+    ngx_uint_t                      local_miss_count;
+    ngx_array_t                     local_miss_keys;
+    ngx_http_tfs_t                 *t;
+    ngx_http_tfs_segment_data_t    *segment_data;
+    ngx_http_tfs_block_cache_key_t *key;
 
     rc = NGX_DECLINED;
 
@@ -139,6 +139,7 @@ ngx_http_tfs_block_cache_batch_lookup(ngx_http_tfs_block_cache_ctx_t *ctx,
                                                               &local_miss_keys);
         }
     }
+
     return rc;
 }
 
@@ -148,16 +149,21 @@ ngx_http_tfs_block_cache_cmp(ngx_http_tfs_block_cache_key_t *left,
     ngx_http_tfs_block_cache_key_t *right)
 {
     if (left->ns_addr == right->ns_addr) {
+
         if (left->block_id == right->block_id) {
             return 0;
         }
+
         if (left->block_id < right->block_id) {
             return -1;
         }
+
         return 1;
     }
+
     if (left->ns_addr < right->ns_addr) {
         return -1;
     }
+
     return 1;
 }
