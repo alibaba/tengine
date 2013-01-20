@@ -21,16 +21,17 @@ typedef struct {
     ngx_buf_t                         save_body_buffer;
     ngx_http_tfs_t                   *data;
     ngx_http_tfs_tair_instance_t     *tair_instance;
+    ngx_chain_t                      *file_data;
     unsigned                          md5_sumed:1;
 } ngx_http_tfs_dedup_ctx_t;
 
 
-ngx_int_t ngx_http_tfs_get_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
-    ngx_pool_t *pool, ngx_log_t *log, ngx_chain_t *data);
-ngx_int_t ngx_http_tfs_set_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
-    ngx_pool_t *pool, ngx_log_t *log, ngx_chain_t *data);
-ngx_int_t ngx_http_tfs_delete_duplicate_info(ngx_http_tfs_dedup_ctx_t *ctx,
-    ngx_pool_t *pool, ngx_log_t *log, ngx_chain_t *data);
+ngx_int_t ngx_http_tfs_dedup_get(ngx_http_tfs_dedup_ctx_t *ctx,
+    ngx_pool_t *pool, ngx_log_t *log);
+ngx_int_t ngx_http_tfs_dedup_set(ngx_http_tfs_dedup_ctx_t *ctx,
+    ngx_pool_t *pool, ngx_log_t *log);
+ngx_int_t ngx_http_tfs_dedup_remove(ngx_http_tfs_dedup_ctx_t *ctx,
+    ngx_pool_t *pool, ngx_log_t *log);
 
 ngx_int_t ngx_http_tfs_get_dedup_instance(ngx_http_tfs_dedup_ctx_t *ctx,
     ngx_http_tfs_tair_server_addr_info_t *server_addr_info,
