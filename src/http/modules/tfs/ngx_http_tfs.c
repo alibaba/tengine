@@ -226,8 +226,13 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
 
                 /* TODO: use fine granularity mutex(per rc_info_node mutex) */
                 rc = ngx_http_tfs_misc_ctx_init(t, rc_info);
-                /* wait for tair callback */
                 if (rc == NGX_DECLINED) {
+                    if (t->decline_handler) {
+                        rc = t->decline_handler(t);
+                        if (rc == NGX_ERROR) {
+                            return rc;
+                        }
+                    }
                     return NGX_OK;
                 }
 
@@ -255,20 +260,30 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
 
 
 ngx_int_t
-ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t,
-    ngx_http_tfs_segment_data_t *segment_data)
+ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t)
 {
     ngx_int_t                         rc;
     ngx_http_tfs_inet_t              *addr;
+    ngx_http_tfs_segment_data_t      *segment_data;
     ngx_http_tfs_block_cache_key_t    key;
     ngx_http_tfs_block_cache_value_t  value;
 
+    segment_data = &t->file.segment_data[t->file.segment_index];
     key.ns_addr = *((uint64_t*)(&t->name_server_addr));
     key.block_id = segment_data->segment_info.block_id;
 
     rc = ngx_http_tfs_block_cache_lookup(&t->block_cache_ctx, t->pool, t->log,
                                          &key, &value);
-    if (rc == NGX_OK) {
+
+    switch (rc) {
+    case NGX_DECLINED:
+        /* remote cache handler will deal */
+        if (t->block_cache_ctx.use_cache & NGX_HTTP_TFS_REMOTE_BLOCK_CACHE) {
+            return NGX_DECLINED;
+        }
+        break;
+    case NGX_OK:
+        /* local cache hit */
         segment_data->cache_hit = NGX_HTTP_TFS_LOCAL_BLOCK_CACHE;
         segment_data->block_info_src = NGX_HTTP_TFS_FROM_CACHE;
 
@@ -276,19 +291,27 @@ ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t,
         segment_data->block_info.ds_addrs = (ngx_http_tfs_inet_t *)
                                              value.ds_addrs;
 
-        /* skip GET_BLK_INFO state */
-        t->state += 1;
-
         addr = ngx_http_tfs_select_data_server(t, segment_data);
         if (addr == NULL) {
-            t->state -= 1;
             ngx_http_tfs_remove_block_cache(t, segment_data);
-            return NGX_OK;
+
+        } else {
+            /* skip GET_BLK_INFO state */
+            t->state += 1;
         }
 
         ngx_http_tfs_peer_set_addr(t->pool,
                           &t->tfs_peer_servers[NGX_HTTP_TFS_DATA_SERVER], addr);
+        break;
+    case NGX_ERROR:
+        /* block cache should not affect, go for ns */
+        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                      "lookup block cache failed.");
+        break;
     }
+    rc = NGX_OK;
+
+    ngx_http_tfs_finalize_state(t, rc);
 
     return rc;
 }
@@ -372,6 +395,28 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
             segment_data[j].block_info_src = NGX_HTTP_TFS_FROM_CACHE;
         }
     }
+
+    switch (rc) {
+    case NGX_DECLINED:
+        /* remote cache handler will deal */
+        if (t->block_cache_ctx.use_cache & NGX_HTTP_TFS_REMOTE_BLOCK_CACHE) {
+            return NGX_DECLINED;
+        }
+        rc = NGX_OK;
+        break;
+    case NGX_OK:
+        /* local cache all hit */
+        t->decline_handler = ngx_http_tfs_batch_process_start;
+        rc = NGX_DECLINED;
+        break;
+    case NGX_ERROR:
+        /* block cache should not affect, go for ns */
+        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                      "batch lookup block cache failed.");
+        rc = NGX_OK;
+    }
+
+    ngx_http_tfs_finalize_state(t, rc);
 
     return rc;
 }
@@ -738,7 +783,7 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
     }
 
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE
-       || rc <= NGX_HTTP_TFS_EXIT_GENERAL_ERROR)
+        || rc <= NGX_HTTP_TFS_EXIT_GENERAL_ERROR)
     {
         t->tfs_status = rc;
         ngx_http_tfs_send_response(r, t);
@@ -758,7 +803,6 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
                 ngx_http_tfs_finalize_request(r, t, NGX_HTTP_NOT_FOUND);
                 return;
             }
-
         }
 
         t->tfs_status = NGX_ERROR;
@@ -789,11 +833,17 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         return;
     }
 
-    if (p) {
+    if (p && p->free) {
         p->free(p, p->data, 0);
     }
 
     if (rc == NGX_DECLINED) {
+        if (t->decline_handler) {
+            rc = t->decline_handler(t);
+            if (rc == NGX_ERROR) {
+                ngx_http_tfs_finalize_request(r, t, NGX_ERROR);
+            }
+        }
         return;
     }
 
@@ -977,12 +1027,10 @@ ngx_http_tfs_send_response(ngx_http_request_t *r, ngx_http_tfs_t *t)
         }
     }
 
-    if (!t->header_sent) {
+    if (!r->header_sent) {
         ngx_http_tfs_set_header_line(t);
 
         rc = ngx_http_send_header(r);
-
-        t->header_sent = 1;
 
         if (rc == NGX_ERROR || rc > NGX_OK || r->post_action) {
             ngx_http_tfs_finalize_state(t, rc);
@@ -1328,7 +1376,7 @@ ngx_http_tfs_process_non_buffered_downstream(ngx_http_request_t *r)
     t = ngx_http_get_module_ctx(r, ngx_http_tfs_module);
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http tfs upstream process  downstream");
+                   "http tfs upstream process downstream");
 
     c->log->action = "sending to client";
 
@@ -1402,6 +1450,7 @@ ngx_http_tfs_process_non_buffered_request(ngx_http_tfs_t *t,
                     if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_READ_FILE
                         && t->state == NGX_HTTP_TFS_STATE_READ_DONE)
                     {
+                        ngx_http_tfs_clear_buf(b);
                         ngx_http_tfs_finalize_request(r, t, NGX_DONE);
                         return;
                     }
@@ -1421,7 +1470,7 @@ ngx_http_tfs_process_non_buffered_request(ngx_http_tfs_t *t,
                 {
                     /* need log size */
                     ngx_log_error(NGX_LOG_INFO, t->log, 0,
-                                  "%V , output %uL byte",
+                                  "%V, output %uL byte",
                                   &t->r_ctx.action.msg, t->output_size);
                     ngx_http_tfs_finalize_request(r, t, 0);
                     return;
@@ -1497,6 +1546,7 @@ ngx_http_tfs_process_non_buffered_request(ngx_http_tfs_t *t,
     }
 }
 
+
 static void
 ngx_http_tfs_process_buf_overflow(ngx_http_request_t *r, ngx_http_tfs_t *t)
 {
@@ -1516,6 +1566,7 @@ ngx_http_tfs_process_buf_overflow(ngx_http_request_t *r, ngx_http_tfs_t *t)
                               "process request body failed");
                 ngx_http_tfs_finalize_request(t->data, t,
                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+
             } else {
                 ngx_http_tfs_finalize_state(t, rc);
             }
@@ -1591,6 +1642,8 @@ ngx_http_tfs_finalize_request(ngx_http_request_t *r, ngx_http_tfs_t *t,
         next_st = t->next;
         ngx_http_tfs_free_st(t);
 
+        r->write_event_handler = ngx_http_request_empty_handler;
+
         if (rc == NGX_DONE) {
             t->parent->sp_succ_count++;
             t->parent->stat_info.size += t->stat_info.size;
@@ -1612,7 +1665,7 @@ ngx_http_tfs_finalize_request(ngx_http_request_t *r, ngx_http_tfs_t *t,
             if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_READ_FILE) {
                 /* wake up next sub process */
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                               "segment [%uD] output complete, call next...",
+                               "segment[%uD] output complete, call next...",
                                t->sp_curr);
                 if (next_st) {
                     next_st->sp_callback(next_st);
@@ -1992,20 +2045,8 @@ ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t, ngx_http_tfs_rcs_info_t *rc_info)
 
         /* lookup block cache */
         if (t->r_ctx.version == 1) {
-            rc = ngx_http_tfs_lookup_block_cache(t,
-                                  &t->file.segment_data[t->file.segment_index]);
-            if (rc == NGX_ERROR) {
-                ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                              "lookup block cache failed");
-                return NGX_OK;
-            }
-
-            if (rc == NGX_DECLINED
-                && (t->block_cache_ctx.use_cache
-                    & NGX_HTTP_TFS_REMOTE_BLOCK_CACHE))
-            {
-                return NGX_DECLINED;
-            }
+            t->decline_handler = ngx_http_tfs_lookup_block_cache;
+            return NGX_DECLINED;
         }
         break;
 
@@ -2042,20 +2083,77 @@ ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t, ngx_http_tfs_rcs_info_t *rc_info)
             return NGX_OK;
         }
 
-        r = t->data;
-        rc = ngx_http_tfs_get_duplicate_info(&t->dedup_ctx, t->pool,
-                                             t->log, r->request_body->bufs);
-        if (rc == NGX_ERROR) {
-            /* no dedup */
-            return NGX_OK;
-        }
-
         t->use_dedup = NGX_HTTP_TFS_YES;
         /* dedup do not allow retry other ns */
         t->retry_curr_ns = NGX_HTTP_TFS_YES;
 
-        /* NGX_DECLINED */
-        return rc;
+        r = t->data;
+        t->dedup_ctx.file_data = r->request_body->bufs;
+        t->decline_handler = ngx_http_tfs_get_duplicate_info;
+
+        return NGX_DECLINED;
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_http_tfs_get_duplicate_info(ngx_http_tfs_t *t)
+{
+    ngx_int_t  rc;
+
+    rc = ngx_http_tfs_dedup_get(&t->dedup_ctx, t->pool, t->log);
+    if (rc == NGX_ERROR) {
+        if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_REMOVE_FILE
+            && t->state == NGX_HTTP_TFS_STATE_REMOVE_READ_META_SEGMENT)
+        {
+            /* get dup info from tair failed, do not unlink file */
+            t->state = NGX_HTTP_TFS_STATE_REMOVE_DONE;
+            rc = NGX_DONE;
+
+        } else {
+            /* no dedup */
+            rc = NGX_OK;
+        }
+
+        ngx_http_tfs_finalize_state(t, rc);
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_http_tfs_set_duplicate_info(ngx_http_tfs_t *t)
+{
+    ngx_int_t  rc;
+
+    rc = ngx_http_tfs_dedup_set(&t->dedup_ctx, t->pool,
+                                t->log);
+    /* save tair failed */
+    if (rc == NGX_ERROR) {
+        if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
+            switch (t->state) {
+            case NGX_HTTP_TFS_STATE_WRITE_STAT_DUP_FILE:
+                /* stat success and file status normal */
+                /* need save new tfs file, no more dedup */
+                t->state = NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS;
+                t->is_stat_dup_file = NGX_HTTP_TFS_NO;
+                t->use_dedup = NGX_HTTP_TFS_NO;
+                /* need reset output buf */
+                t->out_bufs = NULL;
+                /* need reset block id and file id */
+                t->file.segment_data[0].segment_info.block_id = 0;
+                t->file.segment_data[0].segment_info.file_id = 0;
+                rc = NGX_OK;
+                break;
+            case NGX_HTTP_TFS_STATE_WRITE_DONE:
+                rc = NGX_DONE;
+            }
+        }
+
+        ngx_http_tfs_finalize_state(t, rc);
     }
 
     return NGX_OK;
@@ -2085,6 +2183,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
     t->sp_callback = ngx_http_tfs_batch_process_end;
     tt = &t->next;
 
+    /* create sub process */
     for (i = 0; i < block_count; i++) {
         st = ngx_http_tfs_alloc_st(t);
         if (st == NULL) {
@@ -2104,7 +2203,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         st->file.segment_index = 0;
         st->file.segment_data = &segment_data[i];
         st->sp_curr = t->file.segment_index + i;
-        st->sp_ready = 0;
+        st->sp_ready = NGX_HTTP_TFS_NO;
 
         if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
             st->file.left_length = st->file.segment_data->segment_info.size;
@@ -2165,8 +2264,6 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         *tt = st;
         tt = &st->next;
 
-        ngx_http_tfs_connect(st);
-
         t->sp_count++;
 
         if (t->file.left_length == 0) {
@@ -2174,6 +2271,13 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         }
     }
     *tt = NULL;
+
+    /* start sub process */
+    for (st = t->next; st; st = t->next) {
+        /* st->next may be modified after recycled to free_st */
+        t->next = st->next;
+        ngx_http_tfs_connect(st);
+    }
 
     return NGX_OK;
 }
@@ -2197,6 +2301,10 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
     }
 
     t->file.segment_index += t->sp_count;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
+                   "batch process segment count: %uD, rest segment count: %D ",
+                   t->sp_count, t->file.segment_count - t->file.segment_index);
 
     if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
         /* large_file data segment && custom file */
@@ -2236,60 +2344,32 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
             /* batch lookup block cache */
             t->block_cache_ctx.curr_lookup_cache =
                                                NGX_HTTP_TFS_LOCAL_BLOCK_CACHE;
-            rc = ngx_http_tfs_batch_lookup_block_cache(t);
-            if (rc == NGX_OK) {
-                /* local cache all hit */
-                rc = ngx_http_tfs_batch_process_start(t);
-                if (rc == NGX_ERROR) {
-                    return NGX_ERROR;
-                }
-                rc = NGX_DECLINED;
+            return ngx_http_tfs_batch_lookup_block_cache(t);
+        }
 
-            } else if (rc == NGX_DECLINED) {
-                /* local cache has miss, go for ns */
-                if (!(t->block_cache_ctx.use_cache
-                      & NGX_HTTP_TFS_REMOTE_BLOCK_CACHE))
-                {
-                    rc = NGX_OK;
-                }
+        /* read over, restore request's ctx */
+        r = t->data;
+        ngx_http_set_ctx(r, t, ngx_http_tfs_module);
+        rc = NGX_DONE;
 
-            } else if (rc == NGX_ERROR) {
-                /* block cache should not affect, go for ns */
-                ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                              "batch lookup block cache failed.");
+        if (t->is_large_file) {
+            t->state = NGX_HTTP_TFS_STATE_READ_DONE;
+            t->file_name = t->r_ctx.file_path_s;
+        }
+
+        if (t->r_ctx.version == 2) {
+            if (t->file.still_have) {
+                t->state = NGX_HTTP_TFS_STATE_READ_GET_FRAG_INFO;
+                body_buffer =
+                 &t->tfs_peer_servers[NGX_HTTP_TFS_META_SERVER].body_buffer;
+                ngx_http_tfs_clear_buf(body_buffer);
                 rc = NGX_OK;
-            }
 
-        /* read over */
-        } else {
-            /* restore request's ctx */
-            r = t->data;
-            ngx_http_set_ctx(r, t, ngx_http_tfs_module);
-            rc = NGX_DONE;
-
-            if (t->is_large_file) {
+            } else {
                 t->state = NGX_HTTP_TFS_STATE_READ_DONE;
-                t->file_name = t->r_ctx.file_path_s;
-            }
-
-            if (t->r_ctx.version == 2) {
-                if (t->file.still_have) {
-                    t->state = NGX_HTTP_TFS_STATE_READ_GET_FRAG_INFO;
-                    body_buffer =
-                     &t->tfs_peer_servers[NGX_HTTP_TFS_META_SERVER].body_buffer;
-                    ngx_http_tfs_clear_buf(body_buffer);
-                    rc = NGX_OK;
-
-                } else {
-                    t->state = NGX_HTTP_TFS_STATE_READ_DONE;
-                }
             }
         }
     }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                   "batch process segment count: %uD, rest segment count: %D ",
-                   t->sp_count, t->file.segment_count - t->file.segment_index);
 
     ngx_http_tfs_finalize_state(t, rc);
 
@@ -2302,7 +2382,7 @@ ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
 {
     if (t->sp_ready) {
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                       "segment [%uD] wake up, will output...",
+                       "segment[%uD] wake up, will output...",
                        t->sp_curr);
         ngx_http_tfs_send_response(t->data, t);
     }
