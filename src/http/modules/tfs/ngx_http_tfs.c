@@ -298,11 +298,11 @@ ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t)
         } else {
             /* skip GET_BLK_INFO state */
             t->state += 1;
+            ngx_http_tfs_peer_set_addr(t->pool,
+                          &t->tfs_peer_servers[NGX_HTTP_TFS_DATA_SERVER], addr);
         }
 
-        ngx_http_tfs_peer_set_addr(t->pool,
-                          &t->tfs_peer_servers[NGX_HTTP_TFS_DATA_SERVER], addr);
-        break;
+       break;
     case NGX_ERROR:
         /* block cache should not affect, go for ns */
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
