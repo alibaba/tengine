@@ -183,9 +183,7 @@ ngx_http_tfs_remote_block_cache_insert(
 static void
 ngx_http_tfs_remote_block_cache_dummy_handler(ngx_int_t rc, void *data)
 {
-    ngx_pool_t  *pool = (ngx_pool_t *)data;
-    ngx_destroy_pool(pool);
-    return;
+    ngx_destroy_pool((ngx_pool_t *)data);
 }
 
 
@@ -377,22 +375,18 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
 
             if (hit_count == kvs->nelts) {
                 /* all cache hit, start batch process */
-                rc = ngx_http_tfs_batch_process_start(t);
-                if (rc == NGX_ERROR) {
-                    ngx_http_tfs_finalize_request(t->data, t,
-                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
-                    return;
-                }
-                return;
+                t->decline_handler = ngx_http_tfs_batch_process_start;
+                rc = NGX_DECLINED;
             }
         }
 
     } else {
+        rc = NGX_OK;
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0,
                        "remote block cache miss");
     }
 
-    ngx_http_tfs_finalize_state(t, NGX_OK);
+    ngx_http_tfs_finalize_state(t, rc);
 }
 
 

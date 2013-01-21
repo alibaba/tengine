@@ -453,7 +453,8 @@ ngx_http_tfs_create_write_message(ngx_http_tfs_t *t,
                   segment_data->segment_info.file_id, req->offset,
                   req->length, t_crc.data_crc);
 
-    segment_data->segment_info.crc = t_crc.data_crc;
+    /* save here to update segment_info->crc after write success */
+    segment_data->curr_crc = t_crc.data_crc;
     req->header.base_header.len = size - sizeof(ngx_http_tfs_header_t)
                                    + req->length;
     req->header.base_header.crc = t_crc.crc;

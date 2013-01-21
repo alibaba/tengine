@@ -74,6 +74,8 @@ struct ngx_http_tfs_segment_data_s {
     uint32_t                       oper_offset;
     /* read/write size inside this segment */
     uint32_t                       oper_size;
+    /* current writing data's crc */
+    uint32_t                       curr_crc;
     union {
         uint64_t                   write_file_number;
     };
@@ -259,6 +261,7 @@ struct ngx_http_tfs_s {
     tfs_peer_handler_pt            retry_handler;
     tfs_peer_handler_pt            process_request_body;
     tfs_peer_handler_pt            finalize_request;
+    tfs_peer_handler_pt            decline_handler;
 
     void                          *finalize_data;
     void                          *data;
@@ -334,7 +337,6 @@ struct ngx_http_tfs_s {
     unsigned                       sp_ready:1;
 
     unsigned                       header_only:1;
-    unsigned                       header_sent:1;
     unsigned                       has_split_frag:1;
     /* for custrom file read */
     unsigned                       is_first_segment:1;
@@ -353,19 +355,25 @@ void ngx_http_tfs_finalize_request(ngx_http_request_t *r,
 void ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc);
 ngx_int_t ngx_http_tfs_reinit(ngx_http_request_t *r, ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_connect(ngx_http_tfs_t *t);
-ngx_int_t ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t,
-    ngx_http_tfs_segment_data_t *segment_data);
+/* block cache related */
+ngx_int_t ngx_http_tfs_lookup_block_cache(ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t);
 void ngx_http_tfs_remove_block_cache(ngx_http_tfs_t *t,
     ngx_http_tfs_segment_data_t *segment_data);
+
 ngx_int_t ngx_http_tfs_set_output_appid(ngx_http_tfs_t *t, uint64_t app_id);
 void ngx_http_tfs_set_custom_initial_parameters(ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_misc_ctx_init(ngx_http_tfs_t *t,
     ngx_http_tfs_rcs_info_t *rc_node);
+
+/* dedup related */
+ngx_int_t ngx_http_tfs_get_duplicate_info(ngx_http_tfs_t *t);
+ngx_int_t ngx_http_tfs_set_duplicate_info(ngx_http_tfs_t *t);
+
+/* sub process related */
 ngx_int_t ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t);
 
 
 #endif /* _NGX_TFS_H_INCLUDED_ */
-
