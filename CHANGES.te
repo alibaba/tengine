@@ -1,27 +1,27 @@
-Changes with Tengine 1.4.3                                        18 Jan 2013
+Changes with Tengine 1.4.3                                       21 Jan 2013
 
-    *) Feature: added the TFS module which could use restful API to communicate
-       with TFS(Taobao File System). (zhcn381, monadbobo)
+    *) Feature: added the TFS module which provides a RESTful API to Taobao
+       File System. (zhcn381, monadbobo)
 
-    *) Feature：added $sent_cookie_XXX series variables which could fetch the 
-       cookie value from Set-Cookie Headers. (skoo87)
+    *) Feature: added a $sent_cookie_XXX variable which could be used to get
+       the value of cookie XXX from the Set-Cookie headers. (skoo87) 
 
-    *) Feature：now the syslog directive could use hostname as its destination
-       address. (cfsego)
+    *) Feature: now the syslog logging supports host name and domain name as
+       its destination address. (cfsego)
 
-    *) Change: added an attribute 'id' for server directive in the upstream block,
-       and the module major version is updated to be 2. (yaoweibin) 
+    *) Change: added an attribute 'id' for the server directive in the upstream
+       block. (yaoweibin)
 
-    *) Bugfix: fixed the bug with DSO module which may cause Tengine can't reload.
-       (monadbobo)
+    *) Bugfix: fixed a bug of DSO module which might stop Tengine from
+       reloading. (monadbobo)
 
-    *) Bugfix: fixed a segment fault with upstream check module when the check
-       timeout is larger than the check interval.  (yaoweibin)
+    *) Bugfix: fixed a segmentation fault bug of upstream_check module when
+       the check timeout was larger than the check interval. (yaoweibin)
 
-    *) Bugfix: fixed a segment fault with user agent module while the request
-       misses the 'User-Agent' header. (dinic)
+    *) Bugfix: fixed a segmentation fault bug of user_agent module when there's
+       no User-Agent header existed in a request. (dinic)
 
-    *) Bugfix: fixed sysguard module can't work on Mac os. (lizi)
+    *) Bugfix: fixed the bug that sysguard module can't work on Mac OS. (lizi)
 
 
 Changes with Tengine 1.4.2                                         22 Nov 2012
