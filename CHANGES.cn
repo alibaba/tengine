@@ -1,3 +1,12 @@
+Tengine-1.4.3 [2013-1-21]
+* Feature：增加TFS模块，可以通过RESTful接口与TFS分布式文件系统通信 [zhcn381, monadbobo]
+* Feature：增加$sent_cookie_XXX系列变量，可以获取响应中Set-Cookie头的cookie值 [skoo87]
+* Feature：syslog指令的发送地址支持域名 [cfsego]
+* Change：upstream块中的server指令增加id属性 [yaoweibin]
+* Bugfix：DSO模块修正reload时可能失败的问题 [monadbobo]
+* Bugfix：修复upstream_check模块当超时时间长于检查时间可能导致段错误的问题 [yaoweibin]
+* Bugfix：修复user_agent模块在请求缺少User-Agent头会段错误的问题 [dinic]
+* Bugfix：修复sysguard模块在Mac OS下面不能工作的问题 [lizi]
 
 Tengine-1.4.2 [2012-11-22]
 * Feature：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
