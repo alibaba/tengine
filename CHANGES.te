@@ -18,12 +18,12 @@ Changes with Tengine 1.4.3                                       21 Jan 2013
     *) Bugfix: fixed a segmentation fault bug of upstream_check module when
        the check timeout was larger than the check interval. (yaoweibin)
 
-    *) Bugfix: fixed a segmentation fault bug of user_agent module when there's
-       no User-Agent header existed in a request. (dinic)
+    *) Bugfix: fixed a segmentation fault bug of user_agent module when there
+       was no User-Agent header existed in a request. (dinic)
 
-    *) Bugfix: fixed the bug that sysguard module can't work on Mac OS. (lizi)
+    *) Bugfix: fixed the bug that sysguard module didn't work on Mac OS. (lizi)
 
-
+ 
 Changes with Tengine 1.4.2                                         22 Nov 2012
 
     *) Feature: added the option '--dso-tool-path' to configure script, which
