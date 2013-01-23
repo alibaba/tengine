@@ -1,4 +1,29 @@
+Changes with Tengine 1.4.3                                       21 Jan 2013
 
+    *) Feature: added the TFS module which provides a RESTful API to Taobao
+       File System. (zhcn381, monadbobo)
+
+    *) Feature: added a $sent_cookie_XXX variable which could be used to get
+       the value of cookie XXX from the Set-Cookie headers. (skoo87) 
+
+    *) Feature: now the syslog logging supports host name and domain name as
+       its destination address. (cfsego)
+
+    *) Change: added an attribute 'id' for the server directive in the upstream
+       block. (yaoweibin)
+
+    *) Bugfix: fixed a bug of DSO module which might stop Tengine from
+       reloading. (monadbobo)
+
+    *) Bugfix: fixed a segmentation fault bug of upstream_check module when
+       the check timeout was larger than the check interval. (yaoweibin)
+
+    *) Bugfix: fixed a segmentation fault bug of user_agent module when there
+       was no User-Agent header existed in a request. (dinic)
+
+    *) Bugfix: fixed the bug that sysguard module didn't work on Mac OS. (lizi)
+
+ 
 Changes with Tengine 1.4.2                                         22 Nov 2012
 
     *) Feature: added the option '--dso-tool-path' to configure script, which

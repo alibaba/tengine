@@ -349,6 +349,9 @@ sub test_globals_dso() {
         my $s = '';
         
         $s .= "dso {\n";
+        if (defined $ENV{NGINX_DSO_PATH}) {
+            $s .= "path $ENV{NGINX_DSO_PATH};\n";
+        }
         while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
           $s .= "load $key $value;\n";
         }
