@@ -621,6 +621,7 @@ ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
 static void
 ngx_procs_channel_handler(ngx_event_t *ev)
 {
+    u_char             buf[NGX_MAX_CHANNEL_DATA_LEN];
     ngx_int_t          n;
     ngx_channel_t      ch;
     ngx_connection_t  *c;
@@ -632,14 +633,13 @@ ngx_procs_channel_handler(ngx_event_t *ev)
 
     c = ev->data;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "process channel handler");
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel handler");
 
     for ( ;; ) {
 
         n = ngx_read_channel(c->fd, &ch, sizeof(ngx_channel_t), ev->log);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                       "process channel: %i", n);
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel: %i", n);
 
         if (n == NGX_ERROR) {
 
@@ -662,7 +662,7 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                       "process channel command: %ui", ch.command);
+                       "channel command: %d", ch.command);
 
         switch (ch.command) {
 
@@ -681,7 +681,7 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         case NGX_CMD_OPEN_CHANNEL:
 
             ngx_log_debug3(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                           "process got channel s:%i pid:%P fd:%d",
+                           "get channel s:%i pid:%P fd:%d",
                            ch.slot, ch.pid, ch.fd);
 
             ngx_processes[ch.slot].pid = ch.pid;
@@ -691,13 +691,13 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         case NGX_CMD_CLOSE_CHANNEL:
 
             ngx_log_debug4(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                           "process closed channel s:%i pid:%P our:%P fd:%d",
+                           "close channel s:%i pid:%P our:%P fd:%d",
                            ch.slot, ch.pid, ngx_processes[ch.slot].pid,
                            ngx_processes[ch.slot].channel[0]);
 
             if (close(ngx_processes[ch.slot].channel[0]) == -1) {
                 ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
-                              "process close() channel failed");
+                              "close() channel failed");
             }
 
             ngx_processes[ch.slot].channel[0] = -1;
@@ -706,6 +706,30 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
+
+        default:
+            if (ch.len) {
+                n = ngx_read_channel_ex(c->fd, buf,
+                                        ch.len - sizeof(ngx_channel_t),
+                                        ev->log);
+
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                               "channel data: %i", n);
+
+                if (n == NGX_ERROR) {
+
+                    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                        ngx_del_conn(c, 0);
+                    }
+
+                    ngx_close_connection(c);
+                    return;
+                }
+
+                if (ngx_channel_top_handler) {
+                    ngx_channel_top_handler(&ch, buf, ev->log);
+                }
+            }
         }
     }
 }
