@@ -1384,7 +1384,7 @@ ngx_http_tfs_process_non_buffered_downstream(ngx_http_request_t *r)
         c->timedout = 1;
         ngx_connection_error(c, NGX_ETIMEDOUT, "client timed out");
         ngx_http_tfs_finalize_request(t->data, t,
-                                      NGX_HTTP_INTERNAL_SERVER_ERROR);
+                                      NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
 
@@ -1654,6 +1654,9 @@ ngx_http_tfs_finalize_request(ngx_http_request_t *r, ngx_http_tfs_t *t,
 
         } else {
             t->parent->sp_fail_count++;
+            if (rc == NGX_HTTP_REQUEST_TIME_OUT) {
+                t->parent->request_timeout = NGX_HTTP_TFS_YES;
+            }
         }
         t->parent->sp_done_count++;
         t->parent->sp_curr++;
@@ -2296,7 +2299,12 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
                       "sub process error, rest segment count: %D ",
                       t->file.segment_count - t->file.segment_index);
 
-        ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        if (t->request_timeout) {
+            ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_REQUEST_TIME_OUT);
+
+        } else {
+            ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        }
         return NGX_ERROR;
     }
 
