@@ -1695,6 +1695,10 @@ send_done:
 
     /* send all the request body */
 
+    if (!u->store && !r->post_action && !u->conf->ignore_client_abort) {
+        r->read_event_handler = ngx_http_upstream_rd_check_broken_connection;
+    }
+
     if (c->tcp_nopush == NGX_TCP_NOPUSH_SET) {
         if (ngx_tcp_push(c->fd) == NGX_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, c->log, ngx_socket_errno,
