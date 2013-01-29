@@ -348,8 +348,8 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
     ngx_http_tfs_block_cache_key_t  *key;
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     rc = ngx_array_init(&keys, t->pool, block_count,
@@ -1252,6 +1252,11 @@ ngx_http_tfs_set_header_line(ngx_http_tfs_t *t)
             if (t->r_ctx.chk_file_hole && t->json_output) {
                 r->headers_out.content_type_len = sizeof("application/json")- 1;
                 ngx_str_set(&r->headers_out.content_type, "application/json");
+            }
+
+            /* set last-modified if have */
+            if (t->file_info.modify_time > 0) {
+                r->headers_out.last_modified_time = t->file_info.modify_time;
             }
 
             r->headers_out.status = NGX_HTTP_OK;
@@ -2174,8 +2179,8 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
 
     segment_data = &t->file.segment_data[t->file.segment_index];
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     t->sp_count = 0;

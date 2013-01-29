@@ -744,8 +744,8 @@ ngx_http_tfs_reset_segment_data(ngx_http_tfs_t *t)
     t->block_cache_ctx.curr_lookup_cache = NGX_HTTP_TFS_LOCAL_BLOCK_CACHE;
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     segment_data = &t->file.segment_data[t->file.segment_index];
@@ -1189,7 +1189,8 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
     }
 
     rc = ngx_http_tfs_data_server_parse_message(t);
-    if (rc == NGX_ERROR) {
+    if (rc == NGX_ERROR || rc == NGX_HTTP_TFS_AGAIN) {
+        ngx_http_tfs_clear_buf(b);
         return NGX_ERROR;
     }
 
@@ -1312,59 +1313,66 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
 {
+    int16_t                           msg_type;
     uint32_t                          body_len;
     ngx_http_tfs_segment_data_t      *segment_data;
     ngx_http_tfs_peer_connection_t   *tp;
-    ngx_http_tfs_ds_read_response_t  *msg;
+    ngx_http_tfs_ds_read_response_t  *resp;
 
     tp = t->tfs_peer;
-    msg = (ngx_http_tfs_ds_read_response_t *) t->header;
+    resp = (ngx_http_tfs_ds_read_response_t *) t->header;
+    msg_type = resp->header.type;
+    if (msg_type == NGX_HTTP_TFS_STATUS_MESSAGE) {
+        t->length = resp->header.len - sizeof(uint32_t);
+        return NGX_OK;
+    }
+
     segment_data = &t->file.segment_data[t->file.segment_index];
-    if (msg->data_len < 0) {
-        if (msg->data_len == NGX_HTTP_TFS_EXIT_NO_LOGICBLOCK_ERROR) {
+    if (resp->data_len < 0) {
+        if (resp->data_len == NGX_HTTP_TFS_EXIT_NO_LOGICBLOCK_ERROR) {
             ngx_http_tfs_remove_block_cache(t, segment_data);
 
-        } else if (msg->data_len == -22) {
+        } else if (resp->data_len == -22) {
             /* for compatibility,
              * old dataserver will return this instead of -1007
              */
-            msg->data_len = NGX_HTTP_TFS_EXIT_INVALID_ARGU_ERROR;
+            resp->data_len = NGX_HTTP_TFS_EXIT_INVALID_ARGU_ERROR;
         }
 
         /* must be bad request, do not retry */
-        if (msg->data_len == NGX_HTTP_TFS_EXIT_READ_OFFSET_ERROR
-            || msg->data_len == NGX_HTTP_TFS_EXIT_INVALID_ARGU_ERROR
-            || msg->data_len == NGX_HTTP_TFS_EXIT_PHYSIC_BLOCK_OFFSET_ERROR)
+        if (resp->data_len == NGX_HTTP_TFS_EXIT_READ_OFFSET_ERROR
+            || resp->data_len == NGX_HTTP_TFS_EXIT_INVALID_ARGU_ERROR
+            || resp->data_len == NGX_HTTP_TFS_EXIT_PHYSIC_BLOCK_OFFSET_ERROR)
         {
-            return msg->data_len;
+            return resp->data_len;
         }
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
                       "read file(block id: %uD, file id: %uL) "
                       "from (%s) fail, error code: %D, will retry",
                       segment_data->segment_info.block_id,
                       segment_data->segment_info.file_id,
-                      tp->peer_addr_text, msg->data_len);
+                      tp->peer_addr_text, resp->data_len);
         return NGX_HTTP_TFS_AGAIN;
     }
 
-    if (msg->data_len == 0) {
+    if (resp->data_len == 0) {
         t->state = NGX_HTTP_TFS_STATE_READ_DONE;
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0, "read len is 0");
         return NGX_DONE;
     }
 
-    body_len = msg->header.len - sizeof(uint32_t);
+    body_len = resp->header.len - sizeof(uint32_t);
     t->length = body_len;
-    /* in readv2, body_len = msg->data_len + 40 */
-    segment_data->oper_size = msg->data_len;
+    /* in readv2, body_len = resp->data_len + 40 */
+    segment_data->oper_size = resp->data_len;
     /* sub process only read once */
     if (t->parent) {
-        t->file.left_length = msg->data_len;
+        t->file.left_length = resp->data_len;
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
                    "read len is %O, data len is %D",
-                   t->length, msg->data_len);
+                   t->length, resp->data_len);
 
     return NGX_OK;
 }

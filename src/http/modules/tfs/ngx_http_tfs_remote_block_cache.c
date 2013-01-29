@@ -291,8 +291,8 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
 
     segment_data = &t->file.segment_data[t->file.segment_index];
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     if (rc == NGX_OK) {

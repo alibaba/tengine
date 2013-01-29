@@ -39,11 +39,11 @@ typedef struct {
     ngx_int_t                    write_meta_segment;
     ngx_int_t                    no_dedup;
     ngx_int_t                    chk_file_hole;
+    ngx_int_t                    recursive;
 
     unsigned                     meta:1;
     unsigned                     get_appid:1;
     unsigned                     chk_exist:1;
-    unsigned                     recursive:1;
 } ngx_http_tfs_restful_ctx_t;
 
 
