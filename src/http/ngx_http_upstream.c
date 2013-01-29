@@ -1516,10 +1516,12 @@ static void
 ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u)
 {
+    int                        tcp_nodelay;
     off_t                      rest;
     ngx_int_t                  rc;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
+    ngx_http_core_loc_conf_t  *clcf;
 
     c = u->peer.connection;
 
@@ -1529,6 +1531,25 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     if (!u->request_sent && ngx_http_upstream_test_connect(c) != NGX_OK) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
+    }
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->tcp_nodelay && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "upstream tcp_nodelay");
+
+        tcp_nodelay = 1;
+
+        if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
+                           (const void *) &tcp_nodelay, sizeof(int)) == -1)
+        {
+            ngx_connection_error(c, ngx_socket_errno,
+                                 "setsockopt(TCP_NODELAY) failed");
+            ngx_http_upstream_finalize_request(r, u, 0);
+            return;
+        }
+
+        c->tcp_nodelay = NGX_TCP_NODELAY_SET;
     }
 
     rb = r->request_body;
