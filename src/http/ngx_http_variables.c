@@ -32,6 +32,8 @@ static ngx_int_t ngx_http_variable_request_line(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #if (NGX_HAVE_TCP_INFO)
@@ -627,6 +629,15 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    if (ngx_strncmp(name->data, "sent_cookie_", 12) == 0) {
+
+        if (ngx_http_variable_sent_cookie(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
     vv->not_found = 1;
 
     return vv;
@@ -950,6 +961,79 @@ ngx_http_variable_cookie(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     v->no_cacheable = 0;
     v->not_found = 0;
     v->data = cookie.data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_sent_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char           *p, *last;
+    ngx_str_t         name;
+    ngx_uint_t        i;
+    ngx_table_elt_t  *header;
+    ngx_list_part_t  *part;
+
+    part = &r->headers_out.headers.part;
+
+    name.len = ((ngx_str_t *) data)->len - (sizeof("sent_cookie_") - 1);
+    name.data = ((ngx_str_t *) data)->data + sizeof("sent_cookie_") - 1;
+
+    header = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            header = part->elts;
+            i = 0;
+        }
+
+        if (header[i].hash == 0) {
+            continue;
+        }
+
+        if (header[i].key.len == (sizeof("Set-Cookie") - 1)
+            && ngx_strncasecmp((u_char *) "Set-Cookie", header[i].key.data,
+                               header[i].key.len) == 0)
+        {
+            if (name.len > header[i].value.len) {
+                continue;
+            }
+
+            if (ngx_strncasecmp(header[i].value.data, name.data, name.len)) {
+                continue;
+            }
+
+            p = header[i].value.data + name.len;
+            last = header[i].value.data + header[i].value.len;
+
+            if (*p != '=') {
+                continue;
+            }
+
+            for (v->data = ++p; p < last; p++) {
+                if (*p == ';') {
+                    break;
+                }
+            }
+
+            v->len = p - v->data;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+
+            return NGX_OK;
+        }
+    }
+
+    v->not_found = 1;
 
     return NGX_OK;
 }
@@ -2484,6 +2568,13 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
             v[i].get_handler = ngx_http_variable_argument;
             v[i].data = (uintptr_t) &v[i].name;
             v[i].flags = NGX_HTTP_VAR_NOCACHEABLE;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "sent_cookie_", 12) == 0) {
+            v[i].get_handler = ngx_http_variable_sent_cookie;
+            v[i].data = (uintptr_t) &v[i].name;
 
             continue;
         }
