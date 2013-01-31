@@ -55,12 +55,6 @@ ngx_getloadavg(ngx_int_t avg[], ngx_int_t nelem, ngx_log_t *log)
 
 #if (NGX_HAVE_PROC_MEMINFO)
 
-typedef struct {
-    char    *name;
-    size_t  *slot;
-} ngx_mem_table_t;
-
-
 static ngx_file_t                   ngx_meminfo_file;
 
 #define NGX_MEMINFO_FILE            "/proc/meminfo"
@@ -72,10 +66,9 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 {
     u_char              buf[2048];
     u_char             *p, *start, *last;
+    size_t             *sz;
     ssize_t             n, len;
     ngx_fd_t            fd;
-    ngx_uint_t          i;
-    ngx_mem_table_t    *found = NULL;
     enum {
         sw_name = 0,
         sw_value_start,
@@ -84,14 +77,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
         sw_newline,
     } state;
 
-    ngx_mem_table_t mem_table[] = {
-         { "Buffers",      &meminfo->bufferram },
-         { "Cached",       &meminfo->cachedram },
-         { "MemFree",      &meminfo->freeram },
-         { "MemTotal",     &meminfo->totalram },
-         { "SwapFree",     &meminfo->freeswap },
-         { "SwapTotal",    &meminfo->totalswap },
-    };
+    ngx_memzero(meminfo, sizeof(ngx_meminfo_t));
 
     if (ngx_meminfo_file.fd == 0) {
 
@@ -142,21 +128,52 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
             }
 
             len = p - start;
+            sz = NULL;
 
-            if (len >= NGX_MEMINFO_MAX_NAME_LEN) {
-                state = sw_skipline;
-                continue;
-            }
-
-            found = NULL;
-
-            for (i = 0; i < sizeof(mem_table)/sizeof(ngx_mem_table_t); i++) {
-                if (ngx_strncmp(start, mem_table[i].name, len) == 0) {
-                    found = &mem_table[i];
+            switch (len) {
+            case 6:
+                /* Cached */
+                if (meminfo->cachedram == 0 &&
+                    ngx_strncmp(start, "Cached", len) == 0)
+                {
+                    sz = &meminfo->cachedram;
                 }
+                break;
+            case 7:
+                /* Buffers MemFree */
+                if (meminfo->bufferram == 0 &&
+                    ngx_strncmp(start, "Buffers", len) == 0)
+                {
+                    sz = &meminfo->bufferram;
+                } else if (meminfo->freeram == 0 &&
+                           ngx_strncmp(start, "MemFree", len) == 0)
+                {
+                    sz = &meminfo->freeram;
+                }
+                break;
+            case 8:
+                /* MemTotal SwapFree */
+                if (meminfo->totalram == 0 &&
+                    ngx_strncmp(start, "MemTotal", len) == 0)
+                {
+                    sz = &meminfo->totalram;
+                } else if (meminfo->freeswap == 0 &&
+                           ngx_strncmp(start, "SwapFree", len) == 0)
+                {
+                    sz = &meminfo->freeswap;
+                }
+                break;
+            case 9:
+                /* SwapTotal */
+                if (meminfo->totalswap == 0 &&
+                    ngx_strncmp(start, "SwapTotal", len) == 0)
+                {
+                    sz = &meminfo->totalswap;
+                }
+                break;
             }
 
-            if (!found) {
+            if (sz == NULL) {
                 state = sw_skipline;
                 continue;
             }
@@ -182,7 +199,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
                 continue;
             }
 
-            *(found->slot) =  ngx_atosz(start, p - start) * 1024;
+            *(sz) =  ngx_atosz(start, p - start) * 1024;
 
             state = sw_skipline;
 
