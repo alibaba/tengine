@@ -14,9 +14,6 @@
 #define NGX_HTTP_LOG_ESCAPE_OFF     2
 #define NGX_HTTP_LOG_ESCAPE_ASCII   3
 
-
-#define NGX_HTTP_LOG_CONF           0x00800000
-
 #define NGX_HTTP_SCRIPT_ROP_AND     1
 #define NGX_HTTP_SCRIPT_ROP_OR      2
 
