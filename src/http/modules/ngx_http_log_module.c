@@ -2320,26 +2320,26 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
         }
 
         /*
-         * a && b && c ==> a if b if c if && && NULL
-         *                    Y    Y    Y         A
-         *                    |    |    |         |
-         *                    \-------------------/
+         * a && b && c ==> a ifn b ifn c ifn && && NULL
+         *                    Y     Y     Y         A
+         *                    |     |     |         |
+         *                    \---------------------/
          *
-         * a && b || c ==> a if b && ifn c || NULL
+         * a && b || c ==> a ifn b && if c || NULL
          *                    Y       Y  A      A
          *                    |       |  |      |
          *                    \-------+--/      |
          *                            \---------/
          *
-         * a || b && c ==> a ifn b if c && || NULL
-         *                    Y     Y           A
-         *                    |     |           |
+         * a || b && c ==> a if b ifn c && || NULL
+         *                    Y    Y            A
+         *                    |    |            |
          *                    \-----------------/
          *
-         * a || b || c ==> a ifn b ifn c ifn || || NULL
-         *                    Y     Y     Y         A
-         *                    |     |     |         |
-         *                    \---------------------/
+         * a || b || c ==> a if b if c if || || NULL
+         *                    Y    Y    Y         A
+         *                    |    |    |         |
+         *                    \-------------------/
          *
          * Conclusion:
          *     Whenever a logical operator is buffered in stack, add a
