@@ -468,6 +468,11 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
 
     if (rrp->peers->single) {
         peer = &rrp->peers->peer[0];
+
+        if (peer->down) {
+            goto failed;
+        }
+
 #if (NGX_HTTP_UPSTREAM_CHECK)
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
             goto failed;
