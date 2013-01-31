@@ -66,7 +66,7 @@
 #define NGX_HTTP_TFS_CMD_GET_GROUP_SEQ                 23
 
 #define NGX_HTTP_TFS_GMT_TIME_SIZE                  \
-    (sizeof("Mon, 28 Sep 1970 06:00:00 UTC+0800") - 1)
+    (sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1)
 
 #define NGX_HTTP_TFS_MAX_FRAGMENT_SIZE                 (2 * 1024 * 1024)
 #define NGX_HTTP_TFS_MAX_BATCH_COUNT                   8
