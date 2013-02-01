@@ -25,6 +25,8 @@ use threads;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
+
 my $t = Test::Nginx->new()->plan(8);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -109,16 +111,16 @@ EOF
 runload();
 my $load = getload($t);
 
-my $load_less = $load - 3.0;
+my $load_less = $load - 4.0;
 if ($load_less lt 2) {
     $load_less = 0;
 }
 
-my $load_up= $load + 3.0;
+my $load_up= $load + 4.0;
 
 my $free = getfree($t);
-my $free_less = $free - 1000;
-my $free_up = $free + 1000;
+my $free_less = $free - 100000;
+my $free_up = $free + 100000;
 
 $content =~ s/%%load1%%/$load_less/gmse;
 $content =~ s/%%load2%%/$load_up/gmse;
@@ -145,34 +147,30 @@ like(http_get("/mem_load_limit3"), qr/404/, 'mem_load_limit3');
 sub getload
 {
     my($t) = @_;
-    if (-e "/usr/bin/uptime") {
-        system("/usr/bin/uptime | awk  '{print \$10}' | awk -F ',' '{print \$1}' > $t->{_testdir}/uptime");
-        open(FD, "$t->{_testdir}/uptime")||die("Can not open the file!$!n");
-        my @uptime=<FD>;
-        close(FD);
+    system("/usr/bin/uptime | awk  '{print \$11}' | awk -F ',' '{print \$1}' > $t->{_testdir}/uptime");
+    open(FD, "$t->{_testdir}/uptime")||die("Can not open the file!$!n");
+    my @uptime=<FD>;
+    close(FD);
 
-        return $uptime[0];
-    }
+    return $uptime[0];
 }
 
 sub getfree
 {
     my($t) = @_;
-    if (-e "/usr/bin/free") {
-        system("/usr/bin/free | grep Mem | awk '{print \$4 + \$6 + \$7}' > $t->{_testdir}/free");
-        open(FD, "$t->{_testdir}/free")||die("Can not open the file!$!n");
-        my @free=<FD>;
-        close(FD);
+    system("/usr/bin/free | grep Mem | awk '{print \$4 + \$6 + \$7}' > $t->{_testdir}/free");
+    open(FD, "$t->{_testdir}/free")||die("Can not open the file!$!n");
+    my @free=<FD>;
+    close(FD);
 
-        return $free[0];
-    }
+    return $free[0];
 }
 
 sub while_thread
 {
     my $j = 0;
     my $i = 0;
-    for ($i = 0; $i<=1000000; $i++) {
+    for ($i = 0; $i<=10000000; $i++) {
         $j = $j + 1;
     }
 }
@@ -180,8 +178,11 @@ sub while_thread
 sub runload
 {
     my $i = 0;
-    for ($i = 0; $i<=4; $i++) {
+    for ($i = 0; $i<=8; $i++) {
         threads->create( \&while_thread);
     }
-    sleep(10)
+    my $j = 0;
+    for ($i = 0; $i<=50000000; $i++) {
+        $j = $j + 1;
+    }
 }
