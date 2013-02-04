@@ -224,6 +224,7 @@ typedef struct {
 
 struct ngx_http_upstream_check_srv_conf_s {
     ngx_uint_t                               port;
+    ngx_uint_t                               max_busy;
     ngx_uint_t                               fall_count;
     ngx_uint_t                               rise_count;
     ngx_msec_t                               check_interval;
@@ -634,6 +635,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->conf = ucscf;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
+    peer->max_busy = ucscf->max_busy;
 
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
@@ -727,7 +729,17 @@ ngx_http_upstream_check_peer_down(ngx_uint_t index)
 
     peer = check_peers_ctx->peers.elts;
 
-    return (peer[index].shm->down);
+    if (peer[index].shm->down) {
+        return 1;
+    }
+
+    if (peer[index].max_busy
+        && peer[index].shm->busyness >= peer[index].max_busy) {
+
+        return 1;
+    }
+
+    return 0;
 }
 
 
@@ -2296,12 +2308,14 @@ static char *
 ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                           *value, s;
+    ngx_uint_t                           max_busy;
     ngx_uint_t                           i, port, rise, fall, default_down;
     ngx_msec_t                           interval, timeout;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     /* default values */
     port = 0;
+    max_busy = 0;
     rise = 2;
     fall = 5;
     interval = 30000;
@@ -2373,6 +2387,20 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "max_busy=", 9) == 0) {
+            s.len = value[i].len - 9;
+            s.data = value[i].data + 9;
+
+            max_busy = ngx_atoi(s.data, s.len);
+            if (max_busy == (ngx_uint_t) NGX_ERROR) {
+                goto invalid_check_parameter;
+            } else if (max_busy == 0) {
+                goto invalid_check_parameter;
+            }
+
+            continue;
+        }
+
         if (ngx_strncmp(value[i].data, "rise=", 5) == 0) {
             s.len = value[i].len - 5;
             s.data = value[i].data + 5;
@@ -2426,6 +2454,7 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ucscf->port = port;
     ucscf->check_interval = interval;
     ucscf->check_timeout = timeout;
+    ucscf->max_busy = max_busy;
     ucscf->fall_count = fall;
     ucscf->rise_count = rise;
     ucscf->default_down = default_down;
