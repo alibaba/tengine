@@ -180,3 +180,37 @@ GET /
 --- error_code: 502
 --- response_body_like: ^.*$
 
+=== TEST 6: the tcp_check test with max_busy
+--- http_config
+    upstream test{
+        server 127.0.0.1:1971;
+
+        check interval=2000 rise=1 fall=1 timeout=1000 type=tcp max_busy=1;
+    }
+
+    server {
+        listen 1971;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / { 
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^.*$
