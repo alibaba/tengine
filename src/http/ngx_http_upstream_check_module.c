@@ -2088,6 +2088,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
             "    <th>Upstream</th>\n"
             "    <th>Name</th>\n"
             "    <th>Status</th>\n"
+            "    <th>Busyness</th>\n"
             "    <th>Rise counts</th>\n"
             "    <th>Fall counts</th>\n"
             "    <th>Check type</th>\n"
@@ -2118,6 +2119,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
                 "    <td>%s</td>\n"
                 "    <td>%ui</td>\n"
                 "    <td>%ui</td>\n"
+                "    <td>%ui</td>\n"
                 "    <td>%V</td>\n"
                 "    <td>%ui</td>\n"
                 "  </tr>\n",
@@ -2126,6 +2128,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -2164,11 +2167,12 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
         }
 
         b->last = ngx_snprintf(b->last, b->end - b->last,
-                "%ui,%V,%V,%s,%ui,%ui,%V,%ui\n",
+                "%ui,%V,%V,%s,%ui,%ui,%ui,%V,%ui\n",
                 i,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -2236,6 +2240,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
                 "\"upstream\": \"%V\", "
                 "\"name\": \"%V\", "
                 "\"status\": \"%s\", "
+                "\"busyness\": %ui, "
                 "\"rise\": %ui, "
                 "\"fall\": %ui, "
                 "\"type\": \"%V\", "
@@ -2245,6 +2250,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -3036,20 +3042,20 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 
         psh->fall_count   = opsh->fall_count;
         psh->rise_count   = opsh->rise_count;
-        psh->busyness     = opsh->busyness;
 
         psh->down         = opsh->down;
 
-    } else{
+    } else {
         psh->access_time  = 0;
         psh->access_count = 0;
 
         psh->fall_count   = 0;
         psh->rise_count   = 0;
-        psh->busyness     = 0;
 
         psh->down         = init_down;
     }
+
+    psh->busyness = 0;
 
 #if (NGX_HAVE_ATOMIC_OPS)
 
