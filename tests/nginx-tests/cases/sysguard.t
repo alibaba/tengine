@@ -168,9 +168,10 @@ sub getfree
 
 sub while_thread
 {
+    $SIG{'KILL'} = sub { threads->exit(); };
     my $j = 0;
     my $i = 0;
-    for ($i = 0; $i<=10000000; $i++) {
+    for ($i = 0; $i<=1000000000; $i++) {
         $j = $j + 1;
     }
 }
@@ -178,11 +179,13 @@ sub while_thread
 sub runload
 {
     my $i = 0;
+    my @ths;
     for ($i = 0; $i<=8; $i++) {
-        threads->create( \&while_thread);
+        $ths[$i] = threads->create( \&while_thread);
     }
-    my $j = 0;
-    for ($i = 0; $i<=50000000; $i++) {
-        $j = $j + 1;
+
+    sleep(10);
+    for ($i = 0; $i<=8; $i++) {
+        $ths[$i]->kill('KILL')->detach();
     }
 }
