@@ -26,8 +26,30 @@ Features
 * Error pages can be reset to 'default'.
 * ...
 
-Mail list
-=========
+Installation
+============
 
-* Chinese: [http://code.taobao.org/mailman/listinfo/tengine-cn](http://code.taobao.org/mailman/listinfo/tengine-cn)
-* English: [http://code.taobao.org/mailman/listinfo/tengine](http://code.taobao.org/mailman/listinfo/tengine)
+Tengine can be downloaded at [http://tengine.taobao.org/download/tengine.tar.gz](http://tengine.taobao.org/download/tengine.tar.gz). You can also checkout the latest source code from GitHub at [https://github.com/taobao/tengine](https://github.com/taobao/tengine)
+
+To install Tengine, just follow these three steps:
+
+    $ ./configure
+    $ make
+    # make install
+
+By default, it will be installed to _/usr/local/nginx_. You can use the __'--prefix'__ option to specify the root directory.
+If you want to know all the _'configure'_ options, you should run __'./configure --help'__ for help.
+
+Documentation
+=============
+
+The homepage of Tengine is at [http://tengine.taobao.org/](http://tengine.taobao.org/)
+You can access [http://tengine.taobao.org/documentation.html](http://tengine.taobao.org/documentation.html) for more information.
+
+Mailing lists
+=============
+
+Mailing lists are usually good places to ask questions. We highly recommend you subscribe Tengine's mailing lists below:
+* [http://code.taobao.org/mailman/listinfo/tengine](http://code.taobao.org/mailman/listinfo/tengine) (English)
+* [http://code.taobao.org/mailman/listinfo/tengine-cn](http://code.taobao.org/mailman/listinfo/tengine-cn) (Chinese)
+

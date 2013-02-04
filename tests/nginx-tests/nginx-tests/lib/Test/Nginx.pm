@@ -39,9 +39,11 @@ sub new {
 		CLEANUP => not $ENV{TEST_NGINX_LEAVE}
 	)
 		or die "Can't create temp directory: $!\n";
-	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
 
-        $self->{_dso_module} = ();
+	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
+	$self->{_dso_module} = ();
+	mkdir("$self->{_testdir}/logs");
+
 	return $self;
 }
 
@@ -168,8 +170,8 @@ sub run(;$) {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		exec($NGINX, '-c', "$testdir/nginx.conf", @globals)
-			or die "Unable to exec(): $!\n";
+		exec($NGINX, '-c', "$testdir/nginx.conf", '-p', "$testdir",
+		     @globals) or die "Unable to exec(): $!\n";
 	}
 
 	# wait for nginx to start
@@ -324,6 +326,9 @@ sub test_globals_dso() {
         my $s = '';
         
         $s .= "dso {\n";
+        if (defined $ENV{NGINX_DSO_PATH}) {
+            $s .= "path $ENV{NGINX_DSO_PATH};\n";
+        }
         while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
           $s .= "load $key $value;\n";
         }

@@ -1815,9 +1815,16 @@ ngx_http_upstream_test_connect(ngx_connection_t *c)
 #if (NGX_HAVE_KQUEUE)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT)  {
-        if (c->write->pending_eof) {
+        if (c->write->pending_eof || c->read->pending_eof) {
+            if (c->write->pending_eof) {
+                err = c->write->kq_errno;
+
+            } else {
+                err = c->read->kq_errno;
+            }
+
             c->log->action = "connecting to upstream";
-            (void) ngx_connection_error(c, c->write->kq_errno,
+            (void) ngx_connection_error(c, err,
                                     "kevent() reported that connect() failed");
             return NGX_ERROR;
         }
@@ -4226,7 +4233,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_upstream_srv_conf_t  *uscf = conf;
 
     time_t                       fail_timeout;
-    ngx_str_t                   *value, s;
+    ngx_str_t                   *value, s, id;
     ngx_url_t                    u;
     ngx_int_t                    weight, max_fails;
     ngx_uint_t                   i;
@@ -4266,6 +4273,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     weight = 1;
     max_fails = 1;
     fail_timeout = 10;
+    ngx_str_null(&id);
 
     for (i = 2; i < cf->args->nelts; i++) {
 
@@ -4339,6 +4347,14 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "id=", 3) == 0) {
+
+            id.len = value[i].len - 3;
+            id.data = &value[i].data[3];
+
+            continue;
+        }
+
         goto invalid;
     }
 
@@ -4347,6 +4363,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->weight = weight;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;
+    us->id = id;
 
     return NGX_CONF_OK;
 

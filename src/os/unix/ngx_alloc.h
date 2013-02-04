@@ -23,7 +23,7 @@ void *ngx_realloc(void *p, size_t size, ngx_log_t *log);
 
 #define NGX_HAVE_POSIX_MEMALIGN 1
 #define NGX_HAVE_MEMALIGN 1
- 
+
 #endif /* (NGX_JEMALLOC) */
 
 /*

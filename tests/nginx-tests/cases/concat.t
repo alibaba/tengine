@@ -2671,7 +2671,7 @@ like(http_get('/??t1.html,'), qr/one/, 'concat - one file and ","');
 like(http_get('/??t1.html,t2.html,'), qr/onetwo/, 'concat - two files and ","');
 like(http_get('/??t1.html?t=20100524'), qr/one/, 'concat - timestamp');
 like(http_get('/??t1.html,t2.html?t=20100524'), qr/onetwo/, 'concat - timestamp 2');
-like(http_get('/??t1.html?t=1234,t2.html?tt=234234'), qr/12/, 'concat - timestamp 3');
+like(http_get('/??t1.html?t=1234,t2.html?tt=234234'), qr/onetwo/, 'concat - timestamp 3');
 like(http_get('/??t1.html?t=1234,t2.html'), qr/onetwo/, 'concat - timestamp 4');
 like(http_get('/??t1.html,t2.html?t=123'), qr/onetwo/, 'concat - timestamp 5');
 like(http_get('/??t1.html,t2.html?t=123'), qr/onetwo/, 'concat -timestamp 6');
