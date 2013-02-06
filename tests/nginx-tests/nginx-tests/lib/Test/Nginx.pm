@@ -79,7 +79,6 @@ sub has_module($) {
 	my %regex = (
 		mail	=> '--with-mail(?!\S)',
 		flv	=> '--with-http_flv_module',
-		sysguard => '--with-http_sysguard_module',
 		perl	=> '--with-http_perl_module',
 		charset	=> '(?s)^(?!.*--without-http_charset_module)',
 		gzip	=> '(?s)^(?!.*--without-http_gzip_module)',
