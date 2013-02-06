@@ -500,7 +500,6 @@ ngx_http_mp4_handler(ngx_http_request_t *r)
     r->root_tested = !r->error_page;
     r->allow_ranges = 1;
 
-    start = -1;
     r->headers_out.content_length_n = of.size;
     mp4 = NULL;
     b = NULL;

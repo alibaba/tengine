@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
- * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Weibin Yao (yaoweibin@gmail.com)
  */
 
 
@@ -16,6 +16,8 @@ typedef struct ngx_http_upstream_check_srv_conf_s
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(push, 1)
+#elif (NGX_SOLARIS)
+#pragma pack(1)
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
@@ -60,6 +62,8 @@ typedef struct {
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(pop)
+#elif (NGX_SOLARIS)
+#pragma pack()
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
@@ -423,17 +427,17 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_upstream_check_module_ctx = {
-    NULL,                                     /* preconfiguration */
-    NULL,                                     /* postconfiguration */
+    NULL,                                    /* preconfiguration */
+    NULL,                                    /* postconfiguration */
 
-    ngx_http_upstream_check_create_main_conf, /* create main configuration */
-    ngx_http_upstream_check_init_main_conf,   /* init main configuration */
+    ngx_http_upstream_check_create_main_conf,/* create main configuration */
+    ngx_http_upstream_check_init_main_conf,  /* init main configuration */
 
-    ngx_http_upstream_check_create_srv_conf,  /* create server configuration */
-    NULL,                                     /* merge server configuration */
+    ngx_http_upstream_check_create_srv_conf, /* create server configuration */
+    NULL,                                    /* merge server configuration */
 
-    ngx_http_upstream_check_create_loc_conf,  /* create location configuration */
-    ngx_http_upstream_check_merge_loc_conf    /* merge location configuration */
+    ngx_http_upstream_check_create_loc_conf, /* create location configuration */
+    ngx_http_upstream_check_merge_loc_conf   /* merge location configuration */
 };
 
 
@@ -1985,12 +1989,13 @@ ngx_http_upstream_check_status_parse_args(ngx_http_request_t *r,
             break;
         }
 
-        if (ngx_http_arg(r, command->name.data, command->name.len, &value) 
+        if (ngx_http_arg(r, command->name.data, command->name.len, &value)
             == NGX_OK) {
 
            if (command->handler(ctx, &value) != NGX_OK) {
                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                             "http upstream check, bad argument: \"%V\"", &value);
+                             "http upstream check, bad argument: \"%V\"",
+                             &value);
            }
         }
     }
@@ -2141,7 +2146,6 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     ngx_http_upstream_check_peer_t  *peer;
 
     peer = peers->peers.elts;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {
@@ -2209,7 +2213,6 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
             ngx_http_upstream_check_shm_generation);
 
     last = peers->peers.nelts - 1;
-            
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (flag & NGX_CHECK_STATUS_DOWN) {
