@@ -66,7 +66,7 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 {
     u_char              buf[2048];
     u_char             *p, *start, *last;
-    size_t             *sz;
+    size_t             *sz = NULL;
     ssize_t             n, len;
     ngx_fd_t            fd;
     enum {

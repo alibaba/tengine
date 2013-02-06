@@ -1,9 +1,5 @@
 #!/usr/bin/perl
 
-# (C) Maxim Dounin
-
-# Test for fastcgi backend.
-
 ###############################################################################
 
 use warnings;
@@ -17,14 +13,15 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 use lib 'lib';
 use Test::Nginx;
 use Time::Parse;
-use threads;
 
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
+my $can_use_threads = eval 'use threads; 1';
 
+plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
 my $t = Test::Nginx->new()->plan(8);
