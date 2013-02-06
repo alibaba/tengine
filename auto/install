@@ -182,7 +182,6 @@ END
 fi
 
 cat << END                                                    >> $NGX_MAKEFILE
-
 	test -d '\$(DESTDIR)$NGX_PREFIX' || mkdir -p '\$(DESTDIR)$NGX_PREFIX'
 
 	test -d '\$(DESTDIR)`dirname "$NGX_SBIN_PATH"`' \
