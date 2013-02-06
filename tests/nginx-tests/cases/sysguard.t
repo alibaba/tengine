@@ -24,7 +24,7 @@ my $can_use_threads = eval 'use threads; 1';
 plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
-my $t = Test::Nginx->new()->plan(8);
+my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(8);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
