@@ -899,6 +899,10 @@ ngx_http_geoip_cleanup(void *data)
     if (gcf->country) {
         GeoIP_delete(gcf->country);
     }
+    
+	if (gcf->region) {
+        GeoIP_delete(gcf->region);
+    }
 
     if (gcf->org) {
         GeoIP_delete(gcf->org);
