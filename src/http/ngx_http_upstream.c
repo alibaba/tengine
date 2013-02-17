@@ -1579,6 +1579,16 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
             if (rc == NGX_AGAIN && rb->busy == NULL && rest == rb->rest) {
 
+                if (c->write->timer_set) {
+                    ngx_del_timer(c->write);
+                }
+
+                /* 
+                 * the read timer has been added in the above
+                 * ngx_http_do_read_non_buffered_client_request_body()
+                 * function
+                 */
+
                 r->read_event_handler =
                     ngx_http_upstream_read_non_buffered_request;
 
@@ -1667,6 +1677,10 @@ send_done:
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
 
             return;
+        }
+
+        if (r->connection->read->timer_set) {
+            ngx_del_timer(r->connection->read);
         }
 
         if (c->write->timer_set) {
