@@ -289,7 +289,7 @@ typedef struct {
     ngx_chain_t                      *busy;
     ngx_chain_t                      *free;
     ngx_chain_t                     **last_out;
-    ngx_uint_t                        num;
+    ngx_int_t                         num;
     unsigned                          buffered;
 } ngx_http_request_body_t;
 
