@@ -516,7 +516,7 @@ ngx_http_tfs_create_ns_request(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
 {
-    uint32_t                          curr_block_id, cluster_id;
+    uint32_t                          cluster_id;
     ngx_buf_t                        *b;
     ngx_int_t                         rc;
     ngx_str_t                        *cluster_id_text;
@@ -610,99 +610,30 @@ ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
         switch (t->state) {
         case NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_COUNT:
             /* maybe able to make choice */
-            if (t->group_count == 1) {
-                rc_info = t->rc_info_node;
-
-                ngx_http_tfs_rcs_set_group_info_by_addr(rc_info,
-                                                        t->group_count, 0,
-                                                        t->name_server_addr);
-
-                rc = ngx_http_tfs_select_name_server(t, rc_info,
-                                                     &t->name_server_addr,
-                                                     &t->name_server_addr_text);
-                if (rc == NGX_ERROR) {
-                    /* in order to return 404 */
-                    return NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND;
-                }
-
-                tp->peer.free(&tp->peer, tp->peer.data, 0);
-
-                ngx_http_tfs_peer_set_addr(t->pool,
-                                 &t->tfs_peer_servers[NGX_HTTP_TFS_NAME_SERVER],
-                                 &t->name_server_addr);
-
-            } else {
+            if (t->group_count != 1) {
                 t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_SEQ;
             }
-
-            return rc;
+            /* group_count == 1, maybe able to make choice */
+            t->group_seq = 0;
         case NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_SEQ:
             rc_info = t->rc_info_node;
-
             ngx_http_tfs_rcs_set_group_info_by_addr(rc_info,
                                                     t->group_count,
                                                     t->group_seq,
                                                     t->name_server_addr);
-
-            if (t->r_ctx.version == 1) {
-                curr_block_id = t->r_ctx.fsname.file.block_id;
-
-            } else {
-                curr_block_id = t->file.segment_data[0].segment_info.block_id;
+            rc = ngx_http_tfs_select_name_server(t, rc_info,
+                                                 &t->name_server_addr,
+                                                 &t->name_server_addr_text);
+            if (rc == NGX_ERROR) {
+                /* in order to return 404 */
+                return NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND;
             }
 
-            if (ngx_http_tfs_group_seq_match(curr_block_id,
-                                             t->group_count, t->group_seq))
-            {
-                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                               "unlink, select nameserver: %V",
-                               &t->name_server_addr_text);
-                t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
-                /* find out which logical cluster this addr belongs to
-                 * so that we can use the right de-dup addr
-                 */
-                t->logical_cluster_index = 0;
-                for ( ;
-                     t->logical_cluster_index < rc_info->logical_cluster_count;
-                     t->logical_cluster_index++)
-                {
-                    logical_cluster =
-                        &rc_info->logical_clusters[t->logical_cluster_index];
-                    t->rw_cluster_index = 0;
-                    for ( ;
-                         t->rw_cluster_index
-                              < logical_cluster->rw_cluster_count;
-                         t->rw_cluster_index++)
-                    {
-                        physical_cluster =
-                            &logical_cluster->rw_clusters[t->rw_cluster_index];
-                        if (*(uint64_t*)(&physical_cluster->ns_vip)
-                            == *(uint64_t*)(&t->name_server_addr))
-                        {
-                            return rc;
-                        }
-                    }
-                }
-                ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                              "can not find logical cluster index of ns: %V",
-                              &t->name_server_addr_text);
-                return NGX_ERROR;
+            tp->peer.free(&tp->peer, tp->peer.data, 0);
 
-            } else {
-                rc = ngx_http_tfs_select_name_server(t, rc_info,
-                                                     &t->name_server_addr,
-                                                     &t->name_server_addr_text);
-                if (rc == NGX_ERROR) {
-                    /* in order to return 404 */
-                    return NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND;
-                }
-
-                tp->peer.free(&tp->peer, tp->peer.data, 0);
-
-                ngx_http_tfs_peer_set_addr(t->pool,
-                                 &t->tfs_peer_servers[NGX_HTTP_TFS_NAME_SERVER],
-                                 &t->name_server_addr);
-            }
+            ngx_http_tfs_peer_set_addr(t->pool,
+                             &t->tfs_peer_servers[NGX_HTTP_TFS_NAME_SERVER],
+                             &t->name_server_addr);
             return rc;
         case NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO:
             if (t->is_large_file

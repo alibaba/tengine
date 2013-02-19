@@ -399,11 +399,10 @@ ngx_http_tfs_get_remote_block_cache_instance(
     size_t                                server_addr_len;
     uint32_t                              server_addr_hash;
     ngx_int_t                             rc, i;
-    ngx_str_t                            *st;
+    ngx_str_t                            *st, *group_name;
     ngx_array_t                           config_server;
     ngx_http_tfs_t                       *t;
     ngx_http_tfs_tair_instance_t         *instance;
-    ngx_http_etair_server_conf_t         *server;
     ngx_http_tfs_tair_server_addr_info_t  server_addr_info;
 
     if (server_addr->len == 0
@@ -449,8 +448,8 @@ ngx_http_tfs_get_remote_block_cache_instance(
         }
     }
 
-    server = &server_addr_info.server[NGX_HTTP_TFS_TAIR_CONFIG_SERVER_COUNT];
-    instance->server = ngx_http_etair_create_server(server,
+    group_name = &server_addr_info.server[NGX_HTTP_TFS_TAIR_CONFIG_SERVER_COUNT];
+    instance->server = ngx_http_etair_create_server(group_name,
                                                     &config_server,
                                                     t->main_conf->tair_timeout,
                                                     (ngx_cycle_t *) ngx_cycle);

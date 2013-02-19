@@ -2394,6 +2394,14 @@ ngx_int_t
 ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
 {
     if (t->sp_ready) {
+        if (t->parent->sp_fail_count > 0) {
+            ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                          "other sub process failed, will fail myself");
+
+            ngx_http_tfs_finalize_request(t->data, t, NGX_ERROR);
+            return NGX_OK;;
+        }
+
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
                        "segment[%uD] wake up, will output...",
                        t->sp_curr);
