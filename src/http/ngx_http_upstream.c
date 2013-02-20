@@ -1577,7 +1577,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 return;
             }
 
-            /*if (rc == NGX_AGAIN && rb->busy == NULL && rest == rb->rest) {*/
             if (!(rb->busy || rb->flush || rb->nomem || rb->rest == 0)) {
 
                 if (c->write->timer_set) {
