@@ -114,7 +114,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 128k;
+        client_body_postpone_size 128k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -135,7 +135,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 128k;
+        client_body_postpone_size 128k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -156,7 +156,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 128k;
+        client_body_postpone_size 128k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -177,7 +177,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 128k;
+        client_body_postpone_size 128k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -198,7 +198,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 128k;
+        client_body_postpone_size 128k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -219,7 +219,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 8k;
+        client_body_postpone_size 8k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -240,7 +240,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 8k;
+        client_body_postpone_size 8k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -261,7 +261,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 8k;
+        client_body_postpone_size 8k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -282,7 +282,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 8k;
+        client_body_postpone_size 8k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -303,7 +303,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 8k;
+        client_body_postpone_size 8k;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -324,7 +324,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -345,7 +345,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -366,7 +366,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -387,7 +387,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -408,7 +408,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- config
     location / {
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }

@@ -134,7 +134,7 @@ http {
         server_name  localhost;
 
         client_max_body_size 200M;
-        client_body_postpone_sending 4k;
+        client_body_postpone_size 4k;
 
         location / {
             fastcgi_request_buffering off;
@@ -198,7 +198,7 @@ http {
         server_name  localhost;
 
         client_max_body_size 200M;
-        client_body_postpone_sending 16k;
+        client_body_postpone_size 16k;
 
         location / {
             fastcgi_request_buffering off;
@@ -263,7 +263,7 @@ http {
         server_name  localhost;
 
         client_max_body_size 200M;
-        client_body_postpone_sending 2M;
+        client_body_postpone_size 2M;
 
         location / {
             fastcgi_request_buffering off;

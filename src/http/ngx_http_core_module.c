@@ -3804,11 +3804,8 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     if (conf->client_body_postpone_size >
         (conf->client_body_buffers.num * conf->client_body_buffers.size)) {
 
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "\"client_body_postpone_size\" must be less than "
-                           "the buffers size of \"client_body_buffers\"");
-
-        return NGX_CONF_ERROR;
+        conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
+                                             conf->client_body_buffers.size);
     }
 
     ngx_conf_merge_msec_value(conf->client_body_timeout,

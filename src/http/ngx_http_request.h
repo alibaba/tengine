@@ -289,8 +289,11 @@ typedef struct {
     ngx_chain_t                      *busy;
     ngx_chain_t                      *free;
     ngx_chain_t                     **last_out;
+    off_t                             postpone_size;
     ngx_int_t                         num;
-    unsigned                          buffered;
+    unsigned                          buffered:1;
+    unsigned                          flush:1;
+    unsigned                          nomem:1;
 } ngx_http_request_body_t;
 
 
