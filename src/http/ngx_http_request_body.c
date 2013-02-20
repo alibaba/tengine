@@ -19,7 +19,6 @@ static ngx_int_t ngx_http_read_non_buffered_client_request_body(
 static void ngx_http_read_non_buffered_client_request_body_handler(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_request_body_get_buf(ngx_http_request_t *r);
-static void ngx_http_request_body_chomp_buf(ngx_http_request_body_t *rb);
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 
@@ -683,16 +682,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
                 } else if (rc == NGX_DECLINED) {
 
-                    /*
-                    ngx_add_timer(c->read, clcf->client_body_timeout);
-
-                    if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-                        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-                    }
-                    */
-
                     /* The buffers are full */
-
                     return NGX_DECLINED;
                 }
             }
@@ -723,6 +713,12 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                 return NGX_HTTP_BAD_REQUEST;
             }
 
+            if (rb->last) {
+                *rb->last_out = rb->last;
+                rb->last_out = &rb->last->next;
+                rb->last = NULL;
+            }
+
             buf.start = rb->buf->last;
             buf.pos = rb->buf->last;
             buf.last = buf.start + n;
@@ -744,7 +740,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                            r->request_length, rb->rest, rb->postpone_size);
 
             if (rb->rest == 0) {
-                break;
+                goto read_ok;
             }
 
             if (rb->postpone_size >= (off_t) clcf->client_body_postpone_size) {
@@ -755,16 +751,6 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                     goto read_ok;
                 }
             }
-
-            if (rb->buf->last < rb->buf->end) {
-                break;
-            }
-        }
-
-        ngx_http_request_body_chomp_buf(rb);
-
-        if (rb->rest == 0) {
-            break;
         }
 
         if (!c->read->ready) {
@@ -779,6 +765,12 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
     }
 
 read_ok:
+
+    /*
+     * All the request body is read or the postpone_size is larger than the
+     * client_body_postpone_size, we should call the post_handler if this
+     * request is still buffered.
+     */
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
@@ -833,44 +825,9 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
     cl->next = NULL;
 
     rb->buf = cl->buf;
-    *rb->last_out = cl;
-    rb->last_out = &cl->next;
+    rb->last = cl;
 
     return NGX_OK;
-}
-
-
-/* chomp the last zero buffer when possible */
-static void
-ngx_http_request_body_chomp_buf(ngx_http_request_body_t *rb)
-{
-
-    ngx_chain_t  *cl, **pre;
-
-    cl = rb->bufs;
-    pre = &rb->bufs;
-
-    if (cl == NULL) {
-        return;
-    }
-
-    while (cl->next) {
-        pre = &cl->next;
-        cl = cl->next;
-    }
-
-    if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
-
-        rb->buf = NULL;
-        *pre = NULL;
-
-        rb->last_out = pre;
-
-        if (cl->buf->tag == (ngx_buf_tag_t) &ngx_http_core_module) {
-            cl->next = rb->free;
-            rb->free = cl;
-        }
-    }
 }
 
 

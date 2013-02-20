@@ -288,6 +288,7 @@ typedef struct {
     ngx_chain_t                      *out;
     ngx_chain_t                      *busy;
     ngx_chain_t                      *free;
+    ngx_chain_t                      *last;
     ngx_chain_t                     **last_out;
     off_t                             postpone_size;
     ngx_int_t                         num;
