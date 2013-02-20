@@ -23,7 +23,7 @@ eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(37);
+my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(53);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -88,6 +88,134 @@ EOF
 my $k1 = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
 my $body;
+
+$body= $k1;
+like(http_post('/upload', $body), qr/1024/, 'post 1k file');
+
+$body = $k1 x 10;
+like(http_post('/upload', $body), qr/10240/, 'post 10k file');
+
+$body = $k1 x 100;
+like(http_post('/upload', $body), qr/102400/, 'post 100k file');
+
+$body = $k1 x 1000;
+like(http_post('/upload', $body), qr/1024000/, 'post 1M file');
+
+$body = $k1;
+like(http_post('/buffer', $body), qr/1024/, 'post 1k file buffered');
+
+$body = $k1 x 10;
+like(http_post('/buffer', $body), qr/10240/, 'post 10k file buffered');
+
+$body = $k1 x 100;
+like(http_post('/buffer', $body), qr/102400/, 'post 100k file buffered');
+
+$body = $k1 x 1000;
+like(http_post('/buffer', $body), qr/1024000/, 'post 1M file buffered');
+
+###############################################################################
+
+$t->stop();
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    server {
+        listen       127.0.0.1:8080;
+        server_name  localhost;
+
+        client_max_body_size 200M;
+        client_body_buffers 32 4k;
+
+        location / {
+            fastcgi_request_buffering off;
+            fastcgi_pass 127.0.0.1:8081;
+            fastcgi_param REQUEST_URI $request_uri;
+        }
+
+        location /buffer {
+            fastcgi_pass 127.0.0.1:8081;
+            fastcgi_param REQUEST_URI $request_uri;
+        }
+    }
+}
+
+EOF
+
+$t->run();
+
+$body= $k1;
+like(http_post('/upload', $body), qr/1024/, 'post 1k file');
+
+$body = $k1 x 10;
+like(http_post('/upload', $body), qr/10240/, 'post 10k file');
+
+$body = $k1 x 100;
+like(http_post('/upload', $body), qr/102400/, 'post 100k file');
+
+$body = $k1 x 1000;
+like(http_post('/upload', $body), qr/1024000/, 'post 1M file');
+
+$body = $k1;
+like(http_post('/buffer', $body), qr/1024/, 'post 1k file buffered');
+
+$body = $k1 x 10;
+like(http_post('/buffer', $body), qr/10240/, 'post 10k file buffered');
+
+$body = $k1 x 100;
+like(http_post('/buffer', $body), qr/102400/, 'post 100k file buffered');
+
+$body = $k1 x 1000;
+like(http_post('/buffer', $body), qr/1024000/, 'post 1M file buffered');
+
+###############################################################################
+
+$t->stop();
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    server {
+        listen       127.0.0.1:8080;
+        server_name  localhost;
+
+        client_max_body_size 200M;
+        client_body_postpone_size 1;
+
+        location / {
+            fastcgi_request_buffering off;
+            fastcgi_pass 127.0.0.1:8081;
+            fastcgi_param REQUEST_URI $request_uri;
+        }
+
+        location /buffer {
+            fastcgi_pass 127.0.0.1:8081;
+            fastcgi_param REQUEST_URI $request_uri;
+        }
+    }
+}
+
+EOF
+
+$t->run();
 
 $body= $k1;
 like(http_post('/upload', $body), qr/1024/, 'post 1k file');
