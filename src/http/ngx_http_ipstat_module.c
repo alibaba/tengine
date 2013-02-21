@@ -1042,6 +1042,11 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
             b->last += ngx_sock_ntop((struct sockaddr *) &sun,
                                      b->last, 512, 1);
         } else {
+
+            if (idx->key == (uintptr_t) NULL) {
+                continue;
+            }
+
             switch (idx->ipv6) {
 #if (NGX_HAVE_INET6)
             case 1:
