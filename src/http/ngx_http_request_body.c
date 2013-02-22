@@ -610,7 +610,7 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r,
 read_body:
 
     rb->buffered = 1;
-    rb->postpone_size = r->request_length;
+    rb->postpone_size = preread;
 
     rc = ngx_http_do_read_non_buffered_client_request_body(r);
 
