@@ -587,13 +587,6 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r,
 
         rb->rest = r->headers_in.content_length_n - preread;
 
-        if (r->request_length >= (off_t) clcf->client_body_postpone_size) {
-
-            post_handler(r);
-
-            return NGX_OK;
-        }
-
         if (rb->rest <= (off_t) (b->end - b->last)) {
 
             /* the whole request body could be placed in r->header_in */
@@ -750,6 +743,8 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                 if (rb->buffered) {
                     goto read_ok;
                 }
+
+                return NGX_DECLINED;
             }
         }
 
