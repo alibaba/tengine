@@ -23,9 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new();#->has(qw/ipstat/,qw/reqstat/);
-
-$t->write_file_expand('B4', '1234');
+my $t = Test::Nginx->new()->has(qw/traffic_status/);
 
 my $cf_1 = <<'EOF';
 
@@ -53,6 +51,8 @@ http {
         listen              127.0.0.1:3129;
         server_name         www.test_app_a.com;
         req_status          server;
+
+        rewrite             /B4    http://baidu.com;
     }
 
     server {
@@ -187,7 +187,7 @@ $r = my_http_get('/us', 'www.test_cp.com', 3128);
 warn $r;
 
 #1
-like($r, qr/753/, 'length check');
+like($r, qr/441/, 'length check');
 
 #2
 $t->write_file_expand('nginx.conf', $cf_2);
@@ -199,12 +199,12 @@ $t->write_file_expand('nginx.conf', $cf_1);
 $t->reload();
 sleep 2;
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/753/, 'reload length check');
+like($r, qr/441/, 'reload length check');
 my_http_get('/B4', 'www.test_app_a.com', 3129);
 
 #3
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/1506/, 'length check again');
+like($r, qr/882/, 'length check again');
 
 #4
 my %c = ();
