@@ -114,6 +114,8 @@ sub has_module($) {
 		imap	=> '(?s)^(?!.*--without-mail_imap_module)',
 		smtp	=> '(?s)^(?!.*--without-mail_smtp_module)',
 		pcre	=> '(?s)^(?!.*--without-pcre)',
+		traffic_status
+            => '(?s)^(?!.*--without-http_traffic_status_module)'
 	);
 
 	my $re = $regex{$feature};
