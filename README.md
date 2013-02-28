@@ -1,4 +1,4 @@
 tengine
 =======
 
-A distribution of Nginx with some advanced features
+This project has been transfered to https://github.com/alibaba/tengine
