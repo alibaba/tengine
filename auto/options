@@ -51,6 +51,9 @@ USE_THREADS=NO
 NGX_FILE_AIO=NO
 NGX_IPV6=NO
 
+NGX_SHARED_ALL_MODULES=NO
+NGX_STATIC_ALL_MODULES=NO
+
 NGX_DSO=YES
 NGX_DSO_MAX=128
 NGX_ALL_MODULES="
@@ -336,6 +339,9 @@ do
 
         --builddir=*)                              NGX_OBJS="$value"          ;;
 
+        --enable-mods-shared=all)                  NGX_SHARED_ALL_MODULES=YES ;;
+        --enable-mods-static=all)                  NGX_STATIC_ALL_MODULES=YES ;;
+
         --with-rtsig_module)                       EVENT_RTSIG=YES            ;;
         --with-select_module)                      EVENT_SELECT=YES           ;;
         --without-select_module)                   EVENT_SELECT=NONE          ;;
@@ -465,41 +471,62 @@ do
                                                    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
                                                    HTTP_UPSTREAM_LEAST_CONN=NO       ;;
 
-        --without-http_charset_module)   HTTP_CHARSET=NO            ;;
+        --without-http_charset_module)   HTTP_CHARSET=NO
+                                         HTTP_CHARSET_SHARED=NO     ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
         --without-http_ssi_module)       HTTP_SSI=NO                ;;
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
-        --without-http_userid_module)    HTTP_USERID=NO             ;;
-        --without-http_footer_module)    HTTP_FOOTER=NO             ;;
-        --without-http_access_module)    HTTP_ACCESS=NO             ;;
+        --without-http_userid_module)    HTTP_USERID=NO
+                                         HTTP_USERID_SHARED=NO      ;;
+        --without-http_footer_module)    HTTP_FOOTER=NO
+                                         HTTP_FOOTER_SHARED=NO      ;;
+        --without-http_access_module)    HTTP_ACCESS=NO
+                                         HTTP_ACCESS_SHARED=NO      ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
-        --without-http_autoindex_module) HTTP_AUTOINDEX=NO          ;;
-        --without-http_status_module)    HTTP_STATUS=NO             ;;
+        --without-http_autoindex_module) HTTP_AUTOINDEX=NO
+                                         HTTP_AUTOINDEX_SHARED=NO   ;;
+        --without-http_status_module)    HTTP_STATUS=NO
+                                         HTTP_STATUS_SHARED=NO      ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
-        --without-http_map_module)       HTTP_MAP=NO                ;;
-        --without-http_split_clients_module) HTTP_SPLIT_CLIENTS=NO  ;;
-        --without-http_referer_module)   HTTP_REFERER=NO            ;;
+        --without-http_map_module)       HTTP_MAP=NO
+                                         HTTP_MAP_SHARED=NO         ;;
+        --without-http_split_clients_module) HTTP_SPLIT_CLIENTS=NO
+                                             HTTP_SPLIT_CLIENTS_SHARED=NO ;;
+        --without-http_referer_module)   HTTP_REFERER=NO
+                                         HTTP_REFERER_SHARED=NO     ;;
         --without-http_rewrite_module)   HTTP_REWRITE=NO            ;;
         --without-http_proxy_module)     HTTP_PROXY=NO              ;;
-        --without-http_fastcgi_module)   HTTP_FASTCGI=NO            ;;
-        --without-http_uwsgi_module)     HTTP_UWSGI=NO              ;;
-        --without-http_scgi_module)      HTTP_SCGI=NO               ;;
-        --without-http_memcached_module) HTTP_MEMCACHED=NO          ;;
+        --without-http_fastcgi_module)   HTTP_FASTCGI=NO
+                                         HTTP_FASTCGI_SHARED=NO     ;;
+        --without-http_uwsgi_module)     HTTP_UWSGI=NO
+                                         HTTP_UWSGI_SHARED=NO       ;;
+        --without-http_scgi_module)      HTTP_SCGI=NO
+                                         HTTP_SCGI_SHARED=NO        ;;
+        --without-http_memcached_module) HTTP_MEMCACHED=NO
+                                         HTTP_MEMCACHED_SHARED=NO   ;;
         --without-http_limit_zone_module)
             HTTP_LIMIT_CONN=NO
+            HTTP_LIMIT_CONN_SHARED=NO
             NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
 $0: warning: the \"--without-http_limit_zone_module\" option is deprecated, \
 use the \"--without-http_limit_conn_module\" option instead"
         ;;
-        --without-http_limit_conn_module) HTTP_LIMIT_CONN=NO        ;;
-        --without-http_limit_req_module) HTTP_LIMIT_REQ=NO         ;;
-        --without-http_empty_gif_module) HTTP_EMPTY_GIF=NO          ;;
-        --without-http_browser_module)   HTTP_BROWSER=NO            ;;
-        --without-http_user_agent_module) HTTP_USER_AGENT=NO        ;;
-        --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
-        --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO   ;;
+        --without-http_limit_conn_module) HTTP_LIMIT_CONN=NO
+                                          HTTP_LIMIT_CONN_SHARED=NO ;;
+        --without-http_limit_req_module) HTTP_LIMIT_REQ=NO
+                                         HTTP_LIMIT_REQ_SHARED=NO   ;;
+        --without-http_empty_gif_module) HTTP_EMPTY_GIF=NO
+                                         HTTP_EMPTY_GIF_SHARED=NO   ;;
+        --without-http_browser_module)   HTTP_BROWSER=NO
+                                         HTTP_BROWSER_SHARED=NO     ;;
+        --without-http_user_agent_module) HTTP_USER_AGENT=NO
+                                          HTTP_USER_AGENT_SHARED=NO ;;
+        --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO
+                                                HTTP_UPSTREAM_IP_HASH_SHARED=NO ;;
+        --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO ;;
         --without-http_upstream_least_conn_module)
-                                         HTTP_UPSTREAM_LEAST_CONN=NO ;;
+                                         HTTP_UPSTREAM_LEAST_CONN=NO
+                                         HTTP_UPSTREAM_LEAST_CONN_SHARED=NO  ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
@@ -602,6 +629,9 @@ cat << END
                                      worker processes
 
   --builddir=DIR                     set build directory
+
+  --enable-mods-shared=all           enable all the modules to be shared
+  --enable-mods-static=all           enable all the modules to be static
 
   --dso-path=*)                      set dso default load path
   --dso-tool-path=*)                 set dso_tool pathname
@@ -804,16 +834,177 @@ END
 fi
 
 
+if [ $NGX_SHARED_ALL_MODULES = YES ]; then
+    HTTP_XSLT_SHARED=YES
+    HTTP_IMAGE_FILTER_SHARED=YES
+    HTTP_SUB_SHARED=YES
+    HTTP_ADDITION_SHARED=YES
+    HTTP_CONCAT_SHARED=YES
+    HTTP_RANDOM_INDEX_SHARED=YES
+    HTTP_GEOIP_SHARED=YES
+    HTTP_LUA_SHARED=YES
+    HTTP_SECURE_LINK_SHARED=YES
+    HTTP_SYSGUARD_SHARED=YES
+    HTTP_FLV_SHARED=YES
+    HTTP_SLICE_SHARED=YES
+    HTTP_MP4_SHARED=YES
+    HTTP_CHARSET_SHARED=YES
+    HTTP_USERID_SHARED=YES
+    HTTP_FOOTER_SHARED=YES
+    HTTP_ACCESS_SHARED=YES
+    HTTP_AUTOINDEX_SHARED=YES
+    HTTP_MAP_SHARED=YES
+    HTTP_SPLIT_CLIENTS_SHARED=YES
+    HTTP_REFERER_SHARED=YES
+    HTTP_REWRITE_SHARED=YES
+    HTTP_FASTCGI_SHARED=YES
+    HTTP_UWSGI_SHARED=YES
+    HTTP_SCGI_SHARED=YES
+    HTTP_MEMCACHED_SHARED=YES
+    HTTP_LIMIT_CONN_SHARED=YES
+    HTTP_LIMIT_REQ_SHARED=YES
+    HTTP_EMPTY_GIF_SHARED=YES
+    HTTP_BROWSER_SHARED=YES
+    HTTP_USER_AGENT_SHARED=YES
+    HTTP_UPSTREAM_IP_HASH_SHARED=YES
+    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
+
+    HTTP_XSLT=NO
+    HTTP_IMAGE_FILTER=NO
+    HTTP_SUB=NO
+    HTTP_ADDITION=NO
+    HTTP_CONCAT=NO
+    HTTP_RANDOM_INDEX=NO
+    HTTP_GEOIP=NO
+    HTTP_LUA=NO
+    HTTP_SECURE_LINK=NO
+    HTTP_SYSGUARD=NO
+    HTTP_FLV=NO
+    HTTP_SLICE=NO
+    HTTP_MP4=NO
+    HTTP_CHARSET=NO
+    HTTP_USERID=NO
+    HTTP_FOOTER=NO
+    HTTP_ACCESS=NO
+    HTTP_AUTOINDEX=NO
+    HTTP_MAP=NO
+    HTTP_SPLIT_CLIENTS=NO
+    HTTP_REFERER=NO
+    HTTP_REWRITE=NO
+    HTTP_FASTCGI=NO
+    HTTP_UWSGI=NO
+    HTTP_SCGI=NO
+    HTTP_MEMCACHED=NO
+    HTTP_LIMIT_CONN=NO
+    HTTP_LIMIT_REQ=NO
+    HTTP_EMPTY_GIF=NO
+    HTTP_BROWSER=NO
+    HTTP_USER_AGENT=NO
+    HTTP_UPSTREAM_IP_HASH=NO
+    HTTP_UPSTREAM_LEAST_CONN=NO
+
+elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
+    HTTP_CACHE=YES
+    HTTP_CHARSET=YES
+    HTTP_GZIP=YES
+    HTTP_SSL=YES
+    HTTP_SSI=YES
+    HTTP_POSTPONE=YES
+    HTTP_REALIP=YES
+    HTTP_XSLT=YES
+    HTTP_IMAGE_FILTER=YES
+    HTTP_SUB=YES
+    HTTP_ADDITION=YES
+    HTTP_DAV=YES
+    HTTP_ACCESS=YES
+    HTTP_AUTH_BASIC=YES
+    HTTP_USERID=YES
+    HTTP_CONCAT=YES
+    HTTP_AUTOINDEX=YES
+    HTTP_RANDOM_INDEX=YES
+    # HTTP_STATUS=YES
+    HTTP_GEO=YES
+    HTTP_GEOIP=YES
+    HTTP_MAP=YES
+    HTTP_SPLIT_CLIENTS=YES
+    HTTP_REFERER=YES
+    HTTP_REWRITE=YES
+    HTTP_PROXY=YES
+    HTTP_FASTCGI=YES
+    HTTP_UWSGI=YES
+    HTTP_SCGI=YES
+    HTTP_PERL=YES
+    HTTP_LUA=YES
+    HTTP_MEMCACHED=YES
+    HTTP_LIMIT_CONN=YES
+    HTTP_LIMIT_REQ=YES
+    HTTP_EMPTY_GIF=YES
+    HTTP_BROWSER=YES
+    HTTP_SECURE_LINK=YES
+    HTTP_DEGRADATION=YES
+    HTTP_SYSGUARD=YES
+    HTTP_FLV=YES
+    HTTP_SLICE=YES
+    HTTP_MP4=YES
+    HTTP_GZIP_STATIC=YES
+    HTTP_UPSTREAM_IP_HASH=YES
+    HTTP_FOOTER=YES
+    HTTP_USER_AGENT=YES
+    HTTP_UPSTREAM_CHECK=YES
+    HTTP_UPSTREAM_LEAST_CONN=YES
+    HTTP_UPSTREAM_KEEPALIVE=YES
+
+    HTTP_XSLT_SHARED=NO
+    HTTP_IMAGE_FILTER_SHARED=NO
+    HTTP_SUB_SHARED=NO
+    HTTP_ADDITION_SHARED=NO
+    HTTP_CONCAT_SHARED=NO
+    HTTP_RANDOM_INDEX_SHARED=NO
+    HTTP_GEOIP_SHARED=NO
+    HTTP_LUA_SHARED=NO
+    HTTP_SECURE_LINK_SHARED=NO
+    HTTP_SYSGUARD_SHARED=NO
+    HTTP_FLV_SHARED=NO
+    HTTP_SLICE_SHARED=NO
+    HTTP_MP4_SHARED=NO
+    HTTP_CHARSET_SHARED=NO
+    HTTP_USERID_SHARED=NO
+    HTTP_FOOTER_SHARED=NO
+    HTTP_ACCESS_SHARED=NO
+    HTTP_AUTOINDEX_SHARED=NO
+    HTTP_STATUS_SHARED=NO
+    HTTP_MAP_SHARED=NO
+    HTTP_SPLIT_CLIENTS_SHARED=NO
+    HTTP_REFERER_SHARED=NO
+    HTTP_REWRITE_SHARED=NO
+    HTTP_FASTCGI_SHARED=NO
+    HTTP_UWSGI_SHARED=NO
+    HTTP_SCGI_SHARED=NO
+    HTTP_MEMCACHED_SHARED=NO
+    HTTP_LIMIT_CONN_SHARED=NO
+    HTTP_LIMIT_REQ_SHARED=NO
+    HTTP_EMPTY_GIF_SHARED=NO
+    HTTP_BROWSER_SHARED=NO
+    HTTP_USER_AGENT_SHARED=NO
+    HTTP_UPSTREAM_IP_HASH_SHARED=NO
+    HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
+fi
+
+
 if [ $HTTP = NO ]; then
     HTTP_CHARSET=NO
+    HTTP_CHARSET_SHARED=NO
     HTTP_GZIP=NO
     HTTP_SSI=NO
     HTTP_USERID=NO
+    HTTP_USERID_SHARED=NO
     HTTP_ACCESS=NO
+    HTTP_ACCESS_SHARED=NO
     HTTP_STATUS=NO
     HTTP_REWRITE=NO
     HTTP_PROXY=NO
     HTTP_FASTCGI=NO
+    HTTP_FASTCGI_SHARED=NO
 fi
 
 
