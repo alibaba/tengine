@@ -348,8 +348,8 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
     ngx_http_tfs_block_cache_key_t  *key;
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     rc = ngx_array_init(&keys, t->pool, block_count,
@@ -1254,6 +1254,11 @@ ngx_http_tfs_set_header_line(ngx_http_tfs_t *t)
                 ngx_str_set(&r->headers_out.content_type, "application/json");
             }
 
+            /* set last-modified if have */
+            if (t->file_info.modify_time > 0) {
+                r->headers_out.last_modified_time = t->file_info.modify_time;
+            }
+
             r->headers_out.status = NGX_HTTP_OK;
             break;
 
@@ -1384,7 +1389,7 @@ ngx_http_tfs_process_non_buffered_downstream(ngx_http_request_t *r)
         c->timedout = 1;
         ngx_connection_error(c, NGX_ETIMEDOUT, "client timed out");
         ngx_http_tfs_finalize_request(t->data, t,
-                                      NGX_HTTP_INTERNAL_SERVER_ERROR);
+                                      NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
 
@@ -1654,6 +1659,9 @@ ngx_http_tfs_finalize_request(ngx_http_request_t *r, ngx_http_tfs_t *t,
 
         } else {
             t->parent->sp_fail_count++;
+            if (rc == NGX_HTTP_REQUEST_TIME_OUT) {
+                t->parent->request_timeout = NGX_HTTP_TFS_YES;
+            }
         }
         t->parent->sp_done_count++;
         t->parent->sp_curr++;
@@ -2171,8 +2179,8 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
 
     segment_data = &t->file.segment_data[t->file.segment_index];
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     t->sp_count = 0;
@@ -2296,7 +2304,12 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
                       "sub process error, rest segment count: %D ",
                       t->file.segment_count - t->file.segment_index);
 
-        ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        if (t->request_timeout) {
+            ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_REQUEST_TIME_OUT);
+
+        } else {
+            ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        }
         return NGX_ERROR;
     }
 
@@ -2381,6 +2394,14 @@ ngx_int_t
 ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
 {
     if (t->sp_ready) {
+        if (t->parent->sp_fail_count > 0) {
+            ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                          "other sub process failed, will fail myself");
+
+            ngx_http_tfs_finalize_request(t->data, t, NGX_ERROR);
+            return NGX_OK;;
+        }
+
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
                        "segment[%uD] wake up, will output...",
                        t->sp_curr);
