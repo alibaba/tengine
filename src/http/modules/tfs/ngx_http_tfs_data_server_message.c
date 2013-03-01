@@ -141,7 +141,8 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
             }
         }
 
-        /* use readv2 to get file size if we do not know that */
+        /* use readv2 to get file size if we do not know
+         * readv2 require read offset is 0 */
         if (t->r_ctx.version == 1
             && t->file.left_length == NGX_HTTP_TFS_MAX_SIZE
             && t->file.file_offset == 0)
@@ -843,6 +844,7 @@ static ngx_int_t
 ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
 {
     size_t                                   size, left_len, tail_len;
+    int32_t                                  code, err_len;
     uint16_t                                 type;
     ngx_int_t                                rc;
     ngx_str_t                                err_msg;
@@ -858,8 +860,22 @@ ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
 
     switch (type) {
     case NGX_HTTP_TFS_STATUS_MESSAGE:
-        ngx_str_set(&err_msg, "read data (data server)");
-        return ngx_http_tfs_status_message(&tp->body_buffer, &err_msg, t->log);
+        /* weird status message, err_code is in resp->data_len */
+        code = resp->data_len;
+        if (code != NGX_HTTP_TFS_STATUS_MESSAGE_OK) {
+            err_len = *(uint32_t*) (b->pos);
+            if (err_len > 0) {
+                err_msg.data = b->pos + sizeof(uint32_t);
+                err_msg.len = err_len;
+            }
+
+            ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                          "read data (data server: %s) failed, "
+                          "error code (%d) err_msg(%V)",
+                          tp->peer_addr_text, code, &err_msg);
+        }
+
+        return NGX_HTTP_TFS_AGAIN;
     }
 
     size = ngx_buf_size(b);

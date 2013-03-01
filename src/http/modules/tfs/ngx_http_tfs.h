@@ -346,6 +346,7 @@ struct ngx_http_tfs_s {
     unsigned                       is_large_file:1;
     unsigned                       is_process_meta_seg:1;
     unsigned                       retry_curr_ns:1;
+    unsigned                       request_timeout:1;
 };
 
 
