@@ -914,8 +914,7 @@ ngx_http_ipstat_merge_val(ngx_http_ipstat_vip_t *dst,
             dst_req_n = *VIP_FIELD(dst, NGX_HTTP_IPSTAT_REQ_TOTAL);
             src_req_n = *VIP_FIELD(src, NGX_HTTP_IPSTAT_REQ_TOTAL);
             if (src_req_n + dst_req_n > 0) {
-                avg->val += (oavg->val - avg->val) * src_req_n
-                                                   / (src_req_n + dst_req_n);
+                avg->val += (oavg->val - avg->val) * src_req_n / dst_req_n;
                 avg->int_val = (ngx_uint_t) avg->val;
             }
             break;
