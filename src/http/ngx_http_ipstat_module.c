@@ -386,7 +386,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
     cport = cmcf->ports ? cmcf->ports->elts : NULL;
     cportn = cmcf->ports ? cmcf->ports->nelts : 0;
 
-    for (i = k = n = 0; i < ctx->cycle->listening.nelts && k < cportn; i++) {
+    for (i = k = l = n = 0; i < ctx->cycle->listening.nelts && k < cportn; i++) {
         port = ls[i].servers;
         ngx_memzero(&key, sizeof(key));
         up = p = NULL;
@@ -434,7 +434,7 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
 
         caddr = cport[k].addrs.elts;
         caddrn = cport[k].addrs.nelts;
-        for (j = l = 0; l < caddrn && j < port->naddrs; j++) {
+        for (j = 0; l < caddrn && j < port->naddrs; j++) {
 
             if (key.ipv6) {
 #if (NGX_HAVE_INET6)
@@ -457,7 +457,10 @@ ngx_http_ipstat_init_vip_zone(ngx_shm_zone_t *shm_zone, void *data)
             l++;
         }
 
-        k++;
+        if (l == caddrn) {
+            l = 0;
+            k++;
+        }
     }
 
     for (i = 1; i < (ngx_uint_t) smcf->workers; i++) {
@@ -603,7 +606,7 @@ ngx_http_ipstat_distinguish_same_vip(ngx_http_ipstat_vip_index_t *key,
                 rc = (uintptr_t) &oaddr6[j];
 #endif
             } else if (up == NULL) {
-                po = (char *) &addr[j].addr;
+                po = (char *) &oaddr[j].addr;
                 rc = (uintptr_t) &oaddr[j];
             } else {
                 po = up;
@@ -910,9 +913,8 @@ ngx_http_ipstat_merge_val(ngx_http_ipstat_vip_t *dst,
             oavg = (ngx_http_ipstat_avg_t *) src_field;
             dst_req_n = *VIP_FIELD(dst, NGX_HTTP_IPSTAT_REQ_TOTAL);
             src_req_n = *VIP_FIELD(src, NGX_HTTP_IPSTAT_REQ_TOTAL);
-            if (src_req_n + dst_req_n > 0) {
-                avg->val += (oavg->val - avg->val) * src_req_n
-                                                   / (src_req_n + dst_req_n);
+            if (dst_req_n > 0) {
+                avg->val += (oavg->val - avg->val) * src_req_n / dst_req_n;
                 avg->int_val = (ngx_uint_t) avg->val;
             }
             break;
@@ -1042,6 +1044,11 @@ ngx_http_ipstat_show_handler(ngx_http_request_t *r)
             b->last += ngx_sock_ntop((struct sockaddr *) &sun,
                                      b->last, 512, 1);
         } else {
+
+            if (idx->key == (uintptr_t) NULL) {
+                continue;
+            }
+
             switch (idx->ipv6) {
 #if (NGX_HAVE_INET6)
             case 1:
