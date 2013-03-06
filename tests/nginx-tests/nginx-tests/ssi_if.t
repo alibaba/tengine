@@ -95,19 +95,28 @@ like(http_get('/if_neq.html?v=notequal'), qr/^xOKx$/m, 'if text != var');
 like(http_get('/if_neq.html?v=equal'), qr/^xx$/m, 'if text != var (false)');
 
 
-$t->write_file('if_eq_re.html',
-	'x<!--#if expr="$arg_v = /re+gexp?/" -->OK<!--#endif -->x');
+SKIP: {
+	# PCRE may not be available unless we have rewrite module
 
-like(http_get('/if_eq_re.html?v=XreeeegexX'), qr/^xOKx$/m, 'if var = /regex/');
-like(http_get('/if_eq_re.html?v=XrgxX'), qr/^xx$/m, 'if var = /regex/ (false)');
+	skip 'no PCRE', 4 unless $t->has_module('rewrite');
+
+	$t->write_file('if_eq_re.html',
+		'x<!--#if expr="$arg_v = /re+gexp?/" -->OK<!--#endif -->x');
+
+	like(http_get('/if_eq_re.html?v=XreeeegexX'), qr/^xOKx$/m,
+		'if var = /regex/');
+	like(http_get('/if_eq_re.html?v=XrgxX'), qr/^xx$/m,
+		'if var = /regex/ (false)');
 
 
-$t->write_file('if_neq_re.html',
-	'x<!--#if expr="$arg_v != /re+gexp?/" -->OK<!--#endif -->x');
+	$t->write_file('if_neq_re.html',
+		'x<!--#if expr="$arg_v != /re+gexp?/" -->OK<!--#endif -->x');
 
-like(http_get('/if_neq_re.html?v=XrgxX'), qr/^xOKx$/m, 'if var != /regex/');
-like(http_get('/if_neq_re.html?v=XreeeegexX'), qr/^xx$/m,
-	'if var != /regex/ (false)');
+	like(http_get('/if_neq_re.html?v=XrgxX'), qr/^xOKx$/m,
+		'if var != /regex/');
+	like(http_get('/if_neq_re.html?v=XreeeegexX'), qr/^xx$/m,
+		'if var != /regex/ (false)');
+}
 
 
 $t->write_file('if_varvar.html',
@@ -117,22 +126,28 @@ like(http_get('/if_varvar.html?v=varHERE&v2=HERE'), qr/^xOKx$/m,
 	'if var = complex');
 
 
-$t->write_file('if_cap_re.html',
-	'x<!--#if expr="$arg_v = /(CAP\d).*(CAP\d)/" -->'
-		. '<!--#echo var="1" -->x<!--#echo var="2" -->'
-	. '<!--#endif -->x');
+SKIP: {
+	# PCRE may not be available unless we have rewrite module
 
-like(http_get('/if_cap_re.html?v=hereCAP1andCAP2'), qr/^xCAP1xCAP2x$/m,
-	'if regex with captures');
+	skip 'no PCRE', 2 unless $t->has_module('rewrite');
+
+	$t->write_file('if_cap_re.html',
+		'x<!--#if expr="$arg_v = /(CAP\d).*(CAP\d)/" -->'
+			. '<!--#echo var="1" -->x<!--#echo var="2" -->'
+		. '<!--#endif -->x');
+
+	like(http_get('/if_cap_re.html?v=hereCAP1andCAP2'), qr/^xCAP1xCAP2x$/m,
+		'if regex with captures');
 
 
-$t->write_file('if_ncap_re.html',
-	'x<!--#if expr="$arg_v = /(?P<ncap>HERE)/" -->'
-		. '<!--#echo var="ncap" -->'
-	. '<!--#endif -->x');
+	$t->write_file('if_ncap_re.html',
+		'x<!--#if expr="$arg_v = /(?P<ncap>HERE)/" -->'
+			. '<!--#echo var="ncap" -->'
+		. '<!--#endif -->x');
 
-like(http_get('/if_ncap_re.html?v=captureHEREeee'), qr/^xHEREx$/m,
-	'if regex with named capture');
+	like(http_get('/if_ncap_re.html?v=captureHEREeee'), qr/^xHEREx$/m,
+		'if regex with named capture');
+}
 
 
 $t->write_file('if.html', 'x' . $if_elif_else . 'x');

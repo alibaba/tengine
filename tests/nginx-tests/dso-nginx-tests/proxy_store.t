@@ -81,7 +81,7 @@ like(http_get('/store-index-nostore.html'), qr/SEE-THIS/,
 	'proxy request with x-accel-expires');
 
 TODO: {
-local $TODO = 'patch under review';
+local $TODO = 'patch rejected';
 
 ok(!-e $t->testdir() . '/store-index-nostore.html', 'result not stored');
 }
@@ -89,20 +89,21 @@ ok(!-e $t->testdir() . '/store-index-nostore.html', 'result not stored');
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0, 'no temp files');
 
 http_get('/store-index-big.html', aborted => 1, sleep => 0.1);
+
 select(undef, undef, undef, 0.5);
+select(undef, undef, undef, 2.5)
+	if scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]};
 
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0,
 	'no temp files after aborted request');
 
-TODO: {
-local $TODO = 'not fixed yet';
-
 http_get('/ssi.html', aborted => 1, sleep => 0.1);
+
 select(undef, undef, undef, 0.5);
+select(undef, undef, undef, 2.5)
+	if scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]};
 
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0,
 	'no temp files after aborted ssi');
-
-}
 
 ###############################################################################

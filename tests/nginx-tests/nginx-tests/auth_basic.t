@@ -74,7 +74,7 @@ like(http_get('/'), qr!401 Unauthorized!ms, 'rejects unathorized');
 
 SKIP: {
 
-skip 'no crypt on win32', 4 if $^O eq 'MSWin32';
+skip 'no crypt on win32', 5 if $^O eq 'MSWin32';
 
 like(http_get_auth('/', 'crypt', 'password'), qr!SEETHIS!, 'normal crypt');
 unlike(http_get_auth('/', 'crypt', '123'), qr!SEETHIS!, 'normal wrong');

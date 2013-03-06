@@ -227,8 +227,8 @@ my_http_get('/t10', 'test1.com', 8080);
 my_http_get('/t11', 'test1.com', 8080);
 my_http_get('/t12', 'test1.com', 8080);
 
-open("aclog", "/tmp/access.log");
-my @lines = <aclog>;
+open("access_log", "/tmp/access.log");
+my @lines = <access_log>;
 my $num = @lines;
 
 is($num, 0, "all false will not deduce true");
@@ -246,7 +246,7 @@ my_http_get('/t10', 'test2.com', 8080);
 my_http_get('/t11', 'test2.com', 8080);
 my_http_get('/t12', 'test2.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 
 is($num, 12, "all true will not deduce false");
@@ -264,53 +264,53 @@ my_http_get('/t10', 'test3.com', 8080);
 my_http_get('/t11', 'test3.com', 8080);
 my_http_get('/t12', 'test3.com', 8080);
 
-my $line = <aclog>;
+my $line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't1', '$a && $b && $c');
 
 is($line, 't2', '$a && $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't3', '$a || $b && $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't4', '$a || $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't5', '($a || $b) && $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't6', '$a && ($b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't7', '$a && ($b && $c)');
 
 is($line, 't8', '$a || ($b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't9', '($a && $b) && $c');
 
 is($line, 't10', '($a || $b) || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't11', '($a || $b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 
 is($line, undef, '($a && $b && $c)');
 
@@ -327,7 +327,7 @@ my_http_get('/t10', 'test4.com', 8080);
 my_http_get('/t11', 'test4.com', 8080);
 my_http_get('/t12', 'test4.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't1', '$a && $b && $c');
@@ -338,7 +338,7 @@ isnt($line, 't3', '$a || $b && $c');
 
 is($line, 't4', '$a || $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't5', '($a || $b) && $c');
@@ -349,19 +349,19 @@ isnt($line, 't7', '$a && ($b && $c)');
 
 is($line, 't8', '$a || ($b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't9', '($a && $b) && $c');
 
 is($line, 't10', '($a || $b) || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't11', '($a || $b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 
 is($line, undef, '($a && $b && $c)');
 
@@ -378,7 +378,7 @@ my_http_get('/t10', 'test5.com', 8080);
 my_http_get('/t11', 'test5.com', 8080);
 my_http_get('/t12', 'test5.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't1', '$a && $b && $c');
@@ -387,12 +387,12 @@ isnt($line, 't2', '$a && $b || $c');
 
 is($line, 't3', '$a || $b && $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't4', '$a || $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't5', '($a || $b) && $c');
@@ -403,19 +403,19 @@ isnt($line, 't7', '$a && ($b && $c)');
 
 is($line, 't8', '$a || ($b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't9', '($a && $b) && $c');
 
 is($line, 't10', '($a || $b) || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't11', '($a || $b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 
 is($line, undef, '($a && $b && $c)');
 
@@ -432,21 +432,21 @@ my_http_get('/t10', 'test6.com', 8080);
 my_http_get('/t11', 'test6.com', 8080);
 my_http_get('/t12', 'test6.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't1', '$a && $b && $c');
 
 is($line, 't2', '$a && $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't3', '$a || $b && $c');
 
 is($line, 't4', '$a || $b || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't5', '($a || $b) && $c');
@@ -457,19 +457,19 @@ isnt($line, 't7', '$a && ($b && $c)');
 
 is($line, 't8', '$a || ($b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 isnt($line, 't9', '($a && $b) && $c');
 
 is($line, 't10', '($a || $b) || $c');
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 't11', '($a || $b || $c)');
 
-$line = <aclog>;
+$line = <access_log>;
 
 is($line, undef, '($a && $b && $c)');
 
@@ -622,7 +622,7 @@ http {
 }
 EOF
 
-close(aclog);
+close(access_log);
 unlink('/tmp/access.log');
 
 $t->stop();
@@ -630,16 +630,16 @@ $t->run();
 
 my_http_get('/t1', 'test.com', 8080);
 
-open("aclog", "/tmp/access.log");
+open("access_log", "/tmp/access.log");
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is($line, 'write', 'log condition is available');
 
 my_http_get('/t2', 'test.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 
 is($line, undef, 'log env overrides log condition');
 
@@ -654,7 +654,7 @@ my_http_get('/t3', 'test.com', 8080);
 my_http_get('/t3', 'test.com', 8080);
 my_http_get('/t3', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 1, "log env plus sample");
 
@@ -669,7 +669,7 @@ my_http_get('/t4', 'test.com', 8080);
 my_http_get('/t4', 'test.com', 8080);
 my_http_get('/t4', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 2, "sample in log env");
 
@@ -684,7 +684,7 @@ my_http_get('/t5', 'test.com', 8080);
 my_http_get('/t5', 'test.com', 8080);
 my_http_get('/t5', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 1, "override sample in log env");
 
@@ -699,7 +699,7 @@ my_http_get('/t6', 'test.com', 8080);
 my_http_get('/t6', 'test.com', 8080);
 my_http_get('/t6', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 5, "sample in log condition");
 
@@ -714,7 +714,7 @@ my_http_get('/t7', 'test.com', 8080);
 my_http_get('/t7', 'test.com', 8080);
 my_http_get('/t7', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 2, "override sample in log condition");
 
@@ -729,18 +729,18 @@ my_http_get('/t8', 'test.com', 8080);
 my_http_get('/t8', 'test.com', 8080);
 my_http_get('/t8', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 1, "override sample in log condition and log env");
 
 my_http_get('/t9', 'test.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 is ($line, undef, "ordinary variable: set");
 
 my_http_get('/t10', 'test.com', 8080);
 
-$line = <aclog>;
+$line = <access_log>;
 $line =~ s/\s+$//;
 
 is ($line, "write", "ordinary variable: map");
@@ -756,7 +756,7 @@ my_http_get('/t11', 'test.com', 8080);
 my_http_get('/t11', 'test.com', 8080);
 my_http_get('/t11', 'test.com', 8080);
 
-@lines = <aclog>;
+@lines = <access_log>;
 $num = @lines;
 is ($num, 1, "ordinary variable plus sample");
 

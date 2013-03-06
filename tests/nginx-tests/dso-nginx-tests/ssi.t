@@ -21,6 +21,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)->plan(18);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -107,12 +109,7 @@ like(http_get('/test3.html'), qr/^XtestX$/m, 'set');
 # args should be in subrequest even if original request has no args and that
 # was queried somehow (e.g. by server rewrites)
 
-TODO: {
-local $TODO = 'patch under review';
-
 like(http_get('/test-args-rewrite.html'), qr/^XX$/m, 'args only subrequest');
-
-}
 
 like(http_get('/test-args-rewrite.html?wasargs'), qr/^XX$/m,
 	'args was in main request');

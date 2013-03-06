@@ -33,6 +33,13 @@ def check_file(file):
                 file_name_printed = True
             print (GREEN + '    [>80]:' + BLUE + ' #%d(%d)' + WHITE + ':%s') % (i, len(line), line) + ENDC
 
+        # check the last space in the end of line
+        if re.match(r'.*\s$', line):
+            if not file_name_printed:
+                print RED + file + ':' + ENDC
+                file_name_printed = True
+            print (GREEN + '    [SPACE]:' + BLUE + ' #%d(%d)' + WHITE + ':%s') % (i, len(line), line) + ENDC
+
         # check the TAB key
         if string.find(line, '\t') >= 0:
             if not file_name_printed:
