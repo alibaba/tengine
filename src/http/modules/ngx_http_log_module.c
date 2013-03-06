@@ -2125,6 +2125,7 @@ ngx_http_log_condition_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+
 static char *
 ngx_http_log_env_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -2210,7 +2211,7 @@ ngx_http_log_block_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_log_env_t            *env = conf;
 
     if (env->conditions == NULL) {
-        env->conditions = ngx_array_create(cf->pool, 7,
+        env->conditions = ngx_array_create(cf->pool, 8,
                                            sizeof(ngx_http_log_condition_t));
         if (env->conditions == NULL) {
             return NGX_CONF_ERROR;
@@ -2516,8 +2517,8 @@ ngx_http_log_condition(ngx_conf_t *cf, ngx_http_log_condition_t *lc,
         ngx_uint_t                prior;
     } op_arr[3] = {
         { NULL, NULL, 0 },
-        { ngx_http_script_and_code, ngx_http_script_test_code, 5 },
-        { ngx_http_script_or_code, ngx_http_script_test_not_code, 4 }
+        { ngx_http_script_and_code, ngx_http_script_jz_code, 5 },
+        { ngx_http_script_or_code, ngx_http_script_jnz_code, 4 }
     };
 
     value = cf->args->elts;

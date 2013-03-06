@@ -258,8 +258,8 @@ void ngx_http_script_no_more_than_code(ngx_http_script_engine_t *e);
 void ngx_http_script_no_less_than_code(ngx_http_script_engine_t *e);
 void ngx_http_script_and_code(ngx_http_script_engine_t *e);
 void ngx_http_script_or_code(ngx_http_script_engine_t *e);
-void ngx_http_script_test_code(ngx_http_script_engine_t *e);
-void ngx_http_script_test_not_code(ngx_http_script_engine_t *e);
+void ngx_http_script_jz_code(ngx_http_script_engine_t *e);
+void ngx_http_script_jnz_code(ngx_http_script_engine_t *e);
 
 
 #endif /* _NGX_HTTP_SCRIPT_H_INCLUDED_ */

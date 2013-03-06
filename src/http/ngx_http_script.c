@@ -1980,7 +1980,7 @@ void ngx_http_script_or_code(ngx_http_script_engine_t *e)
 
 
 void
-ngx_http_script_test_code(ngx_http_script_engine_t *e)
+ngx_http_script_jz_code(ngx_http_script_engine_t *e)
 {
     ngx_http_script_if_code_t  *code;
     ngx_http_variable_value_t  *vv;
@@ -1996,11 +1996,6 @@ ngx_http_script_test_code(ngx_http_script_engine_t *e)
                    "http script test: s=%v", vv);
 
     if (vv->len && (vv->len != 1 || vv->data[0] != '0')) {
-        if (code->loc_conf) {
-            e->request->loc_conf = code->loc_conf;
-            ngx_http_update_location_config(e->request);
-        }
-
         e->ip += sizeof(ngx_http_script_if_code_t);
         return;
     }
@@ -2013,7 +2008,7 @@ ngx_http_script_test_code(ngx_http_script_engine_t *e)
 
 
 void
-ngx_http_script_test_not_code(ngx_http_script_engine_t *e)
+ngx_http_script_jnz_code(ngx_http_script_engine_t *e)
 {
     ngx_http_script_if_code_t  *code;
     ngx_http_variable_value_t  *vv;
@@ -2029,11 +2024,6 @@ ngx_http_script_test_not_code(ngx_http_script_engine_t *e)
                    "http script test not: s=%v", vv);
 
     if (vv->len == 0 || (vv->len == 1 && vv->data[0] == '0')) {
-        if (code->loc_conf) {
-            e->request->loc_conf = code->loc_conf;
-            ngx_http_update_location_config(e->request);
-        }
-
         e->ip += sizeof(ngx_http_script_if_code_t);
         return;
     }
