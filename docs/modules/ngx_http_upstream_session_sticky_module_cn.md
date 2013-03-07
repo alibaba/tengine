@@ -62,7 +62,7 @@
 这个cookie对于后端的应用完全是透明的。direct选项，与indirect相反，不
 会删除cookie。
 +   maxidle设置session cookie的最长空闲的超时时间
-+   maxlinfe设置session cookie的最长生存期
++   maxlife设置session cookie的最长生存期
 +   fallback设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
 
 ## session\_sticky\_header ##
