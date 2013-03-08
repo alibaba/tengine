@@ -3,12 +3,12 @@ Introduction
 ------------
 Tengine is a web server originated by Taobao, the largest e-commerce website in Asia. It is based on Nginx HTTP server and has many advanced features. Tengine has been proven very stable and efficient on the top 100 global websites, including taobao.com and tmall.com.
 
-Tengine has been an open source project since December 2011. It is now developed and maintained by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies.
+Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to get involved.
 
 
 Features
 --------
-* All features of nginx-1.2.5 are inherited, i.e. it is 100% compatible with nginx.
+* All features of nginx-1.2.7 are inherited, i.e. it is 100% compatible with nginx.
 * Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
 * Input body filter support. It's quite handy to write Web Application Firewalls by using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and easy to extend core functionalities.
