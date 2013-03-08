@@ -31,7 +31,7 @@ ngx_minheap_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
     parent = ngx_minheap_parent(index);
 
     p = (ngx_minheap_node_t **)h->elts;
-    while (index && p[parent]->key > node->key) {
+    while (index && ngx_minheap_less(node->key, p[parent]->key)) {
         (p[index] = p[parent])->index = index;
         index = parent;
         parent = ngx_minheap_parent(index);
@@ -54,8 +54,8 @@ ngx_minheap_delete(ngx_minheap_t *h, ngx_uint_t index)
     node = p[--h->nelts];
     parent = ngx_minheap_parent(index);
 
-    if (node->key < p[parent]->key) {
-        while (parent && p[parent]->key > node->key) {
+    if (ngx_minheap_less(node->key, p[parent]->key)) {
+        while (parent && ngx_minheap_less(node->key, p[parent]->key)) {
             p[index] = p[parent];
             p[index]->index = index;
 
@@ -69,8 +69,9 @@ ngx_minheap_delete(ngx_minheap_t *h, ngx_uint_t index)
     } else {
         child = ngx_minheap_child(index);
         while (child <= h->nelts) {
-            child -= child == h->nelts || p[child] > p[child - 1];
-            if (p[child]->key > node->key) {
+            child -= child == h->nelts
+					 || ngx_minheap_less(p[child - 1], p[child]);
+            if (ngx_minheap_less(node->key, p[child]->key)) {
                 break;
             }
 
@@ -109,11 +110,11 @@ ngx_minheap4_insert(ngx_minheap_t *h, ngx_minheap_node_t *node)
     parent = ngx_minheap4_parent(index);
 
     p = (ngx_minheap_node_t **) h->elts;
-    while (index && p[parent]->key > node->key) {
+    while (index && ngx_minheap_less(node->key, p[parent]->key)) {
         p[index] = p[parent];
         p[index]->index = index;
         index = parent;
-        parent = ngx_minheap_parent(index);
+        parent = ngx_minheap4_parent(index);
     }
 
     node->index = index;
@@ -131,8 +132,8 @@ ngx_minheap4_delete(ngx_minheap_t *h, ngx_uint_t index)
     node = p[--h->nelts];
     parent = ngx_minheap4_parent(index);
 
-    if (node->key < p[parent]->key) {
-        while (parent && p[parent]->key > node->key) {
+    if (ngx_minheap_less(node->key, p[parent]->key)) {
+        while (parent && ngx_minheap_less(node->key, p[parent]->key)) {
             p[index] = p[parent];
             p[index]->index = index;
 
@@ -148,19 +149,22 @@ ngx_minheap4_delete(ngx_minheap_t *h, ngx_uint_t index)
 
         while (child < h->nelts) {
             minpos = child;
-            if (child + 1 < h->nelts && p[child + 1]->key < p[minpos]->key) {
+            if (child + 1 < h->nelts
+				&& ngx_minheap_less(p[child + 1]->key, p[minpos]->key)) {
                 minpos = child + 1;
             }
 
-            if (child + 2 < h->nelts && p[child + 2]->key < p[minpos]->key) {
+            if (child + 2 < h->nelts
+				&& ngx_minheap_less(p[child + 2]->key, p[minpos]->key)) {
                 minpos = child + 2;
             }
 
-            if (child + 3 < h->nelts && p[child +3]->key < p[minpos]->key) {
+            if (child + 3 < h->nelts
+				&& ngx_minheap_less(p[child + 3]->key, p[minpos]->key)) {
                 minpos = child + 3;
             }
 
-            if (node->key <= p[minpos]->key) {
+            if (ngx_minheap_less(node->key, p[minpos]->key)) {
                 break;
             }
 

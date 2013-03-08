@@ -12,6 +12,7 @@
 #include <ngx_core.h>
 
 
+#define ngx_minheap_less(x, y) ((ngx_minheap_key_int_t) ((x) - (y)) <= 0)
 #define ngx_minheap_child(i)   ((i << 1) + 2)
 #define ngx_minheap_parent(i)  (i > 0 ? (i - 1) >> 1 : 0)
 #define ngx_minheap4_child(i)  ((i << 2) + 1)
