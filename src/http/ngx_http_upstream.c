@@ -1802,16 +1802,16 @@ ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
 
 #endif
 
-    if (!r->request_buffering) {
-        ngx_http_upstream_send_non_buffered_request(r, u);
-        return;
-    }
-
     if (u->header_sent) {
         u->write_event_handler = ngx_http_upstream_dummy_handler;
 
         (void) ngx_handle_write_event(c->write, 0);
 
+        return;
+    }
+
+    if (!r->request_buffering) {
+        ngx_http_upstream_send_non_buffered_request(r, u);
         return;
     }
 
