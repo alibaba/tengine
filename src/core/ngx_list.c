@@ -81,9 +81,7 @@ ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
     last = (u_char *) cur->elts + cur->nelts * list->size;
 
     while (d < last) {
-        *s = *d;
-        s++;
-        d++;
+        *s++ = *d++;
     }
 
     cur->nelts--;

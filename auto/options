@@ -101,7 +101,7 @@ NGX_ALL_MODULES="
     ngx_http_mp4_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
-    ngx_http_session_sticky_module
+    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_keepalive_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
@@ -688,7 +688,7 @@ cat << END
   --with-http_upstream_least_conn_module=shared
                                      enable ngx_http_upstream_least_conn_module (shared)
   --with-http_upstream_session_sticky_module=shared
-                                     enable ngx_http_session_sticky_module (shared)
+                                     enable ngx_http_upstream_session_sticky_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -720,7 +720,7 @@ cat << END
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
   --without-http_upstream_session_sticky_module
-                                     disable ngx_http_session_sticky_module
+                                     disable ngx_http_upstream_session_sticky_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_ip_hash_module

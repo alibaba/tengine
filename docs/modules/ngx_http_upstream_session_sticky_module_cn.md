@@ -14,7 +14,7 @@
 
     server {
         location / {
-            proxy_pass http://test;
+            proxy_pass http://foo;
         }
     }
 
@@ -30,7 +30,7 @@
       location / {
         #在insert + indirect模式或者prefix模式下需要配置session_sticky_header
         #它可以删除本模块用来会话保持的cookie, 让后端完全感觉不到会话保持的存在
-        session_sticky_header upstream=test switch=on;
+        session_sticky_header upstream=test;
         proxy_pass http://test;
       }
     }

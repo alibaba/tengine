@@ -146,7 +146,7 @@ static ngx_http_module_t ngx_http_session_sticky_ctx = {
 };
 
 
-ngx_module_t ngx_http_session_sticky_module = {
+ngx_module_t ngx_http_upstream_session_sticky_module = {
     NGX_MODULE_V1,
     &ngx_http_session_sticky_ctx,        /* module context */
     ngx_http_session_sticky_commands,    /* module directives */
@@ -444,7 +444,7 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     }
 
     ss_scf = ngx_http_conf_upstream_srv_conf(us,
-                                    ngx_http_session_sticky_module);
+                                    ngx_http_upstream_session_sticky_module);
     if (ss_scf == NULL) {
         return NGX_ERROR;
     }
@@ -530,8 +530,8 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
     }
 
     sscf = ngx_http_conf_upstream_srv_conf(us,
-                                    ngx_http_session_sticky_module);
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+                                    ngx_http_upstream_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     if (ctx == NULL) {
         ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
         if (ctx == NULL) {
@@ -542,7 +542,7 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
 
         ctx->sscf = sscf;
 
-        ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
+        ngx_http_set_ctx(r, ctx, ngx_http_upstream_session_sticky_module);
 
         rc = ngx_http_session_sticky_get_cookie(r);
         if (rc != NGX_OK) {
@@ -574,7 +574,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     ngx_http_upstream_srv_conf_t    *uscf;
     ngx_http_upstream_ss_srv_conf_t *sscf;
 
-    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_session_sticky_module);
+    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_session_sticky_module);
     if (ss_lcf->enable == 0) {
         return NGX_DECLINED;
     }
@@ -588,13 +588,13 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     uscf = ss_lcf->uscf;
     sscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                             ngx_http_session_sticky_module);
+                                             ngx_http_upstream_session_sticky_module);
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_http_set_ctx(r, ctx, ngx_http_session_sticky_module);
+    ngx_http_set_ctx(r, ctx, ngx_http_upstream_session_sticky_module);
     ctx->sscf = sscf;
 
     return ngx_http_session_sticky_get_cookie(r);
@@ -620,7 +620,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         value
     } state;
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     sscf = ctx->sscf;
     ctx->tries = 1;
 
@@ -706,7 +706,23 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         }
         p++;
     }
-    goto not_found;
+not_found:
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "session sticky [firstseen]");
+    ctx->frist = 1;
+    ctx->sid.len = 0;
+    ctx->sid.data = NULL;
+    ctx->firstseen = now;
+    ctx->lastseen = now;
+
+    ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, ctx->lastseen);
+    ngx_http_session_sticky_tmtoa(r, &ctx->s_firstseen, ctx->firstseen);
+
+    if (ctx->s_lastseen.data == NULL || ctx->s_firstseen.data == NULL) {
+        return NGX_ERROR;
+    }
+    return NGX_OK;
 
 success:
     if (sscf->flag & NGX_HTTP_SESSION_STICKY_PREFIX) {
@@ -812,24 +828,6 @@ success:
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "session sticky sid [%V]", &ctx->sid);
     return NGX_OK;
-
-not_found:
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "session sticky [firstseen]");
-    ctx->frist = 1;
-    ctx->sid.len = 0;
-    ctx->sid.data = NULL;
-    ctx->firstseen = now;
-    ctx->lastseen = now;
-
-    ngx_http_session_sticky_tmtoa(r, &ctx->s_lastseen, ctx->lastseen);
-    ngx_http_session_sticky_tmtoa(r, &ctx->s_firstseen, ctx->firstseen);
-
-    if (ctx->s_lastseen.data == NULL || ctx->s_firstseen.data == NULL) {
-        return NGX_ERROR;
-    }
-    return NGX_OK;
 }
 
 
@@ -849,7 +847,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
     n = sscf->number;
     server = sscf->server;
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
 
     if (ctx->frist == 1 || ctx->sid.len == 0) {
         goto failed;
@@ -980,9 +978,9 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
         return ngx_http_ss_next_header_filter(r);
     }
 
-    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_session_sticky_module);
+    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_session_sticky_module);
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     if (ctx == NULL || ctx->sscf == NULL || ctx->sscf->flag == 0) {
         return ngx_http_ss_next_header_filter(r);
     }
@@ -1074,7 +1072,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
         pre_value
     } state;
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     p = ngx_strlcasestrn(table->value.data,
                          table->value.data + table->value.len,
                          ctx->sscf->cookie.data,
@@ -1084,13 +1082,6 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     }
 
     last = table->value.data + table->value.len;
-    table->value.len += ctx->sid.len + 1;
-
-    s = ngx_pnalloc(r->pool, table->value.len);
-    if (s == NULL) {
-        return NGX_ERROR;
-    }
-
     state = 0;
     p += ctx->sscf->cookie.len;
     while (p < last) {
@@ -1117,6 +1108,11 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     return NGX_AGAIN;
 
 success:
+    table->value.len += ctx->sid.len + 1;
+    s = ngx_pnalloc(r->pool, table->value.len);
+    if (s == NULL) {
+        return NGX_ERROR;
+    }
     t = s;
     t = ngx_cpymem(t, table->value.data, p - table->value.data);
     t = ngx_cpymem(t, ctx->sid.data, ctx->sid.len);
@@ -1140,7 +1136,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
         value
     } state;
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     p = ngx_strlcasestrn(table->value.data,
                          table->value.data + table->value.len,
                          ctx->sscf->cookie.data,
@@ -1219,7 +1215,7 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
     ngx_table_elt_t    *set_cookie, *table;
     ngx_http_ss_ctx_t  *ctx;
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_session_sticky_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     if (ctx->frist != 1 && ctx->sscf->maxidle == NGX_CONF_UNSET) {
         return NGX_OK;
     }
