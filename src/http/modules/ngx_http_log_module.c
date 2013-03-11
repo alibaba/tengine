@@ -320,8 +320,10 @@ ngx_http_log_handler(ngx_http_request_t *r)
         return NGX_OK;
     }
 
-    if (r->headers_out.status == NGX_HTTP_BAD_REQUEST && !lcf->log_empty_request
-        && (r->header_in && r->header_in->last == r->header_in->start))
+    if (!lcf->log_empty_request
+        && (r->header_in && r->header_in->last == r->header_in->start)
+        && (r->headers_out.status == NGX_HTTP_BAD_REQUEST
+            || r->headers_out.status == NGX_HTTP_REQUEST_TIME_OUT))
     {
         return NGX_OK;
     }
