@@ -580,8 +580,9 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     }
 
     if (ss_lcf->uscf == NGX_CONF_UNSET_PTR) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "session sticky didn't configure session_sticky_header");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                       "session sticky with insert and rewrite"
+					   "need configure session_sticky_header");
 
         return NGX_DECLINED;
     }
