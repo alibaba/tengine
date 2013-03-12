@@ -2821,7 +2821,8 @@ static void
 ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t ft_type)
 {
-    ngx_uint_t  status, state;
+    ngx_uint_t                 status, state;
+    ngx_http_core_loc_conf_t  *clcf;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http next upstream, %xi", ft_type);
@@ -2845,13 +2846,10 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
                       "upstream timed out");
     }
 
-#if 0
-    /* I don't know why it should keep retrying the cached connection.
-     * This code seems meaningless and there are some side effects,
-     * as it always retry other servers and don't honor the tries and
-     * u->conf->next_upstream variable.
-     */
-    if (u->peer.cached && ft_type == NGX_HTTP_UPSTREAM_FT_ERROR) {
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->retry_cached_connection
+        && u->peer.cached && ft_type == NGX_HTTP_UPSTREAM_FT_ERROR) {
         status = 0;
 
         /* TODO: inform balancer instead */
@@ -2859,7 +2857,6 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->peer.tries++;
 
     } else {
-#endif
         switch(ft_type) {
 
         case NGX_HTTP_UPSTREAM_FT_TIMEOUT:
@@ -2882,9 +2879,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         default:
             status = NGX_HTTP_BAD_GATEWAY;
         }
-#if 0
     }
-#endif
 
     if (r->connection->error) {
         ngx_http_upstream_finalize_request(r, u,
