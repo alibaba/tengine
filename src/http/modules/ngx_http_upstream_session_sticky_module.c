@@ -97,7 +97,6 @@ static ngx_int_t ngx_http_upstream_session_sticky_get_peer(
     ngx_peer_connection_t *pc, void *data);
 static ngx_int_t ngx_http_session_sticky_header_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_session_sticky_get_cookie(ngx_http_request_t *r);
-static time_t ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len);
 static void ngx_http_session_sticky_tmtoa(ngx_http_request_t *r,
     ngx_str_t *str, time_t t);
 static ngx_int_t ngx_http_session_sticky_header_filter(ngx_http_request_t *r);
@@ -784,10 +783,8 @@ success:
         }
         ngx_memcpy(ctx->s_firstseen.data, v, ctx->s_firstseen.len);
 
-        ctx->firstseen = ngx_http_session_sticky_atotm(ctx->s_firstseen.data,
-                                                       ctx->s_firstseen.len);
-        ctx->lastseen = ngx_http_session_sticky_atotm(ctx->s_lastseen.data,
-                                                      ctx->s_lastseen.len);
+        ctx->firstseen = ngx_atotm(ctx->s_firstseen.data, ctx->s_firstseen.len);
+        ctx->lastseen = ngx_atotm(ctx->s_lastseen.data, ctx->s_lastseen.len);
 
         if (ctx->firstseen == NGX_ERROR || ctx->lastseen == NGX_ERROR) {
             goto not_found;
@@ -919,27 +916,6 @@ failed:
     }
 
     return rc;
-}
-
-
-static time_t
-ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len)
-{
-    time_t     value;
-    ngx_int_t  i;
-
-    value = 0;
-
-    for (i = 0; i < len; i++) {
-        if (s[i] >= '0' && s[i] <= '9') {
-            value = value * 10 + s[i] - '0';
-
-        } else {
-            return NGX_ERROR;
-        }
-    }
-
-    return value;
 }
 
 
