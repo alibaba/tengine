@@ -29,7 +29,7 @@
     server {
       location / {
         #在insert + indirect模式或者prefix模式下需要配置session_sticky_header
-        #它可以删除本模块用来会话保持的cookie, 让后端完全感觉不到会话保持的存在
+        #这种模式不会将保持会话使用的cookie传给后端服务，让保持会话的cookie对后端透明
         session_sticky_header upstream=test;
         proxy_pass http://test;
       }
@@ -55,15 +55,13 @@
 + `maxage`设置cookie的生存期，默认不设置，即为session cookie，浏览器关闭即失效
 + `mode`设置cookie的模式:
     - **insert**: 在回复中本模块通过Set-Cookie头直接插入相应名称的cookie。
-    - **prefix**: 不会发出新的cookie，它会在已有的Set-Cookie的值前面插入服务器标识符。当请求带着这个修改过的cookie再次来请求时，它会删除前面的标识符，然后再传给后端服务器，所以服务器还能使用原来的cookie。它修改过的cookie形式如："Cookie: NAME=SRV~VALUE"。
-    - **rewrite**: cookie是由后端服务器提供的，在回复中看到该cookie，它可以把这个cookie完全用服务器标识符修改掉。这样做的好处是，服务器可以控制哪些请求可以session sticky，如果后端没有发出Set-Cookie头，就说明这些请求都不需要session sticky。
+    - **prefix**: 不会生成新的cookie，但会在响应的cookie值前面加上特定的前缀，当浏览器带着这个有特定标识的cookie再次请求时，模块在传给后端服务前先删除加入的前缀，后端服务拿到的还是原来的cookie值，这些动作对后端透明。如："Cookie: NAME=SRV~VALUE"。
+    - **rewrite**: 使用服务端标识覆盖后端设置的用于session sticky的cookie。如果后端服务在响应头中没有设置该cookie，则认为该请求不需要进行session sticky，使用这种模式，后端服务可以控制哪些请求需要sesstion sticky，哪些请求不需要。
 
-+   option设置cookie的一些选项，indirect选项，请求过来时，插入的cookie会被tengine删除，
-这个cookie对于后端的应用完全是透明的。direct选项，与indirect相反，不
-会删除cookie。
-+   maxidle设置session cookie的最长空闲的超时时间
-+   maxlife设置session cookie的最长生存期
-+   fallback设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
++ `option` 设置用于session sticky的cookie的选项，可设置成indirect或direct。indirect不会将session sticky的cookie传送给后端服务，该cookie对后端应用完全透明。direct则与indirect相反。
++ `maxidle`设置session cookie的最长空闲的超时时间
++ `maxlife`设置session cookie的最长生存期
++ `fallback`设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
 
 ## session\_sticky\_header ##
 
@@ -75,4 +73,4 @@
 
 说明：
 
-需要跟`proxy_pass`指令结合使用，在`insert`+`indirect`模式和`prefix`模式下，当客户端携带会话cookie过来访问时，该指令会删除该cookie。参数`upstream`是设置需要处理cookie的upsteam名称, 参数`switch`是关闭或者开启对于cookie的处理。出现这个指令的原因是，在upstream块内的函数，不能删除或者修改cookie，不得已我们在location里面加了这个冗余的指令。
+配合proxy_pass指令使用。用于在insert+indirect模式和prefix模式下删除请求用于session sticky的cookie，这样就不会将该cookie传递给后端服务。upstream表示需要进行操作的upstream名称。switch用于表示打开或关闭对cookie的处理，默认为on。
