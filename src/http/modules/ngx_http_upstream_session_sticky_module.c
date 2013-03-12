@@ -260,26 +260,26 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
     value = cf->args->elts;
     for (i = 1; i < cf->args->nelts; i++) {
         if (ngx_strncmp(value[i].data, "cookie=", 7) == 0){
-            sscf->cookie.data = value[i].data + sizeof("cookie=") - 1;
-            sscf->cookie.len = value[i].len - sizeof("cookie=") + 1;
+            sscf->cookie.data = value[i].data + 7;
+            sscf->cookie.len = value[i].len - 7;
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "domain=", 7) == 0) {
-            sscf->domain.data = value[i].data + sizeof("domain=") - 1;
-            sscf->domain.len = value[i].len - sizeof("domain=") + 1;
+            sscf->domain.data = value[i].data + 7;
+            sscf->domain.len = value[i].len - 7;
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "path=", 5) == 0) {
-            sscf->path.data = value[i].data + sizeof("path=") - 1;
-            sscf->path.len = value[i].len - sizeof("path=") + 1;
+            sscf->path.data = value[i].data + 5;
+            sscf->path.len = value[i].len - 5;
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "maxage=", 7) == 0) {
-            sscf->maxage.data = value[i].data + sizeof("maxage=") - 1;
-            sscf->maxage.len = value[i].len - sizeof("maxage=") + 1;
+            sscf->maxage.data = value[i].data + 7;
+            sscf->maxage.len = value[i].len - 7;
             continue;
         }
 
@@ -420,8 +420,8 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid argument of \"%V\"", &value[i]);
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument of \"%V\"",
+                           &value[i]);
         return NGX_CONF_ERROR;
     }
 
@@ -451,8 +451,7 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     peers = (ngx_http_upstream_rr_peers_t *) us->peer.data;
     number = peers->number;
 
-    sscf->server = ngx_palloc(cf->pool,
-                                number * sizeof(ngx_http_ss_server_t));
+    sscf->server = ngx_palloc(cf->pool, number * sizeof(ngx_http_ss_server_t));
     if (sscf->server == NULL) {
         return NGX_ERROR;
     }
@@ -470,8 +469,8 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
         sscf->server[i].check_index = peer->check_index;
 #endif
 
-        if (ngx_http_upstream_session_sticky_set_sid(cf,
-                                    &sscf->server[i]) != NGX_OK)
+        if (ngx_http_upstream_session_sticky_set_sid(cf, &sscf->server[i])
+            != NGX_OK)
         {
             return NGX_ERROR;
         }
@@ -638,9 +637,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
             continue;
         }
 
-        if (*(p + sscf->cookie.len) == ' '
-            || *(p + sscf->cookie.len) == '=')
-        {
+        if (*(p + sscf->cookie.len) == ' ' || *(p + sscf->cookie.len) == '=') {
             break;
         }
     }
@@ -661,25 +658,31 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         case pre_key:
             if (*p == ';') {
                 goto not_found;
+
             } else if (!is_space(*p)) {
                 state = key;
             }
+
             break;
 
         case key:
             if (is_space(*p)) {
                 state = pre_equal;
+
             } else if (*p == '=') {
                 state = pre_value;
             }
+
             break;
 
         case pre_equal:
             if (*p == '=') {
                 state = pre_value;
+
             } else if (!is_space(*p)) {
                 goto not_found;
             }
+
             break;
 
         case pre_value:
@@ -687,6 +690,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
                 state = value;
                 v = p;
             }
+
             break;
 
         case value:
@@ -700,6 +704,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
                 p++;
                 goto success;
             }
+
             break;
 
         default:
@@ -743,9 +748,9 @@ success:
         vv = p;
     }
 
-    if (sscf->flag & NGX_HTTP_SESSION_STICKY_INSERT
-        && sscf->maxidle != NGX_CONF_UNSET) {
-
+    if ((sscf->flag & NGX_HTTP_SESSION_STICKY_INSERT)
+        && sscf->maxidle != NGX_CONF_UNSET)
+    {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "session_sticky mode [insert]");
 
@@ -814,17 +819,15 @@ success:
     }
 
     if (sscf->flag
-        & (NGX_HTTP_SESSION_STICKY_PREFIX
-           | NGX_HTTP_SESSION_STICKY_INDIRECT)) {
-
+        & (NGX_HTTP_SESSION_STICKY_PREFIX | NGX_HTTP_SESSION_STICKY_INDIRECT))
+    {
         cookie->len -= (end - st);
         if (cookie->len == 0) {
             return ngx_list_delete(&r->headers_in.headers, cookies[i]);
         }
+
         while (end < last) {
-            *st = *end;
-            st++;
-            end++;
+            *st++ = *end++;
         }
     }
 
@@ -871,6 +874,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
             if (ngx_http_upstream_check_peer_down(server[i].check_index)) {
                 if (ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_FALLBACK_OFF) {
                     return NGX_BUSY;
+
                 } else {
                     goto failed;
                 }
@@ -968,7 +972,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     }
 
     if (slcf->enable == 0
-        && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
+        && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE))
+    {
         return ngx_http_ss_next_header_filter(r);
     }
 
@@ -981,8 +986,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
             for (i = 0; i < part->nelts; i++) {
                 if (table[i].key.len == (sizeof("set-cookie") - 1)
                     && ngx_strncasecmp(table[i].key.data,
-                                        (u_char *) "set-cookie",
-                                        table[i].key.len) == 0)
+                                       (u_char *) "set-cookie",
+                                       table[i].key.len) == 0)
                 {
                     if (ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE) {
 
@@ -996,11 +1001,9 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                                           "set-cookie failed");
                         }
 
-                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
-                                       r->connection->log,
+                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log,
                                        0,
-                                       "session_sticky [rewrite]"
-                                       "set-cookie: %V",
+                                       "session_sticky [rewrite] set-cookie:%V",
                                        &table[i].value);
 
                         return ngx_http_ss_next_header_filter(r);
@@ -1016,16 +1019,15 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
                                       "set-cookie failed");
                     }
 
-                    ngx_log_debug1(NGX_LOG_DEBUG_HTTP,
-                                   r->connection->log,
-                                   0,
-                                   "session_sticky [prefix]"
+                    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log,
+                                   0, "session_sticky [prefix]"
                                    "set-cookie: %V",
                                    &table[i].value);
 
                     return ngx_http_ss_next_header_filter(r);
                 }
             }
+
             part = part->next;
         }
 
@@ -1141,9 +1143,11 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
         case pre_equal:
             if (*p == '=') {
                 state = pre_value;
+
             } else if (*p == ';') {
                 goto success;
             }
+
             break;
 
         case pre_value:
