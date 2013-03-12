@@ -2212,6 +2212,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         st->file.segment_data = &segment_data[i];
         st->sp_curr = t->file.segment_index + i;
         st->sp_ready = NGX_HTTP_TFS_NO;
+        st->stat_info.size = 0;
 
         if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
             st->file.left_length = st->file.segment_data->segment_info.size;
