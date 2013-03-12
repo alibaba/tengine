@@ -19,6 +19,7 @@
 
 #define is_space(c) ((c) == ' ' || (c) == '\t' || (c) == '\n')
 
+
 typedef struct {
     ngx_str_t                           sid;
     ngx_str_t                          *name;
@@ -80,6 +81,7 @@ static void *ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_session_sticky_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
+
 static ngx_int_t ngx_http_session_sticky_init(ngx_conf_t *cf);
 static char *ngx_http_upstream_session_sticky(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
@@ -110,6 +112,7 @@ static ngx_http_output_header_filter_pt ngx_http_ss_next_header_filter;
 
 
 static ngx_command_t ngx_http_session_sticky_commands[] = {
+
     { ngx_string("session_sticky"),
       NGX_HTTP_UPS_CONF|NGX_CONF_ANY|NGX_CONF_1MORE,
       ngx_http_upstream_session_sticky,
@@ -124,7 +127,7 @@ static ngx_command_t ngx_http_session_sticky_commands[] = {
       0,
       NULL },
 
-    ngx_null_command
+      ngx_null_command
 };
 
 
@@ -165,38 +168,38 @@ ngx_module_t ngx_http_upstream_session_sticky_module = {
 static void *
 ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
 {
-    ngx_http_upstream_ss_srv_conf_t  *sscf;
+    ngx_http_upstream_ss_srv_conf_t  *conf;
 
-    sscf = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_ss_srv_conf_t));
-    if (sscf == NULL) {
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_upstream_ss_srv_conf_t));
+    if (conf == NULL) {
         return NULL;
     }
 
-    sscf->maxlife = NGX_MAX_INT32_VALUE;
-    sscf->maxidle = NGX_MAX_INT32_VALUE;
+    conf->maxlife = NGX_MAX_INT32_VALUE;
+    conf->maxidle = NGX_MAX_INT32_VALUE;
 
-    sscf->flag = NGX_HTTP_SESSION_STICKY_INSERT;
-    sscf->cookie.data = (u_char *) "route";
-    sscf->cookie.len = sizeof("route") - 1;
+    conf->flag = NGX_HTTP_SESSION_STICKY_INSERT;
+    conf->cookie.data = (u_char *) "route";
+    conf->cookie.len = sizeof("route") - 1;
 
-    return sscf;
+    return conf;
 }
 
 
 static void *
 ngx_http_session_sticky_create_loc_conf(ngx_conf_t *cf)
 {
-    ngx_http_ss_loc_conf_t  *ss_lcf;
+    ngx_http_ss_loc_conf_t  *conf;
 
-    ss_lcf = ngx_palloc(cf->pool, sizeof(ngx_http_ss_loc_conf_t));
-    if (ss_lcf == NULL) {
+    conf = ngx_palloc(cf->pool, sizeof(ngx_http_ss_loc_conf_t));
+    if (conf == NULL) {
         return NULL;
     }
 
-    ss_lcf->uscf = NGX_CONF_UNSET_PTR;
-    ss_lcf->enable = NGX_CONF_UNSET;
+    conf->uscf = NGX_CONF_UNSET_PTR;
+    conf->enable = NGX_CONF_UNSET;
 
-    return ss_lcf;
+    return conf;
 }
 
 
@@ -262,25 +265,25 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             sscf->cookie.len = value[i].len - sizeof("cookie=") + 1;
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "domain=", 7) == 0) {
             sscf->domain.data = value[i].data + sizeof("domain=") - 1;
             sscf->domain.len = value[i].len - sizeof("domain=") + 1;
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "path=", 5) == 0) {
             sscf->path.data = value[i].data + sizeof("path=") - 1;
             sscf->path.len = value[i].len - sizeof("path=") + 1;
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "maxage=", 7) == 0) {
             sscf->maxage.data = value[i].data + sizeof("maxage=") - 1;
             sscf->maxage.len = value[i].len - sizeof("maxage=") + 1;
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "maxidle=", 8) == 0) {
             sscf->maxidle = ngx_atotm(value[i].data + 8, value[i].len - 8);
             if (sscf->maxidle == NGX_ERROR) {
@@ -291,9 +294,10 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             if (sscf->maxlife == NGX_CONF_UNSET) {
                 sscf->maxlife = NGX_MAX_INT32_VALUE;
             }
+
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "maxlife=", 8) == 0) {
             sscf->maxlife = ngx_atotm(value[i].data + 8, value[i].len - 8);
             if (sscf->maxlife == NGX_ERROR) {
@@ -306,76 +310,68 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             }
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "mode=", 5) == 0) {
             value[i].data = value[i].data + 5;
             value[i].len = value[i].len - 5;
 
-            if (ngx_strncmp(value[i].data, "insert", value[i].len) == 0) {
+            if (ngx_strncmp(value[i].data, "insert", 6) == 0) {
                 sscf->flag |= NGX_HTTP_SESSION_STICKY_INSERT;
 
-            } else if (ngx_strncmp(value[i].data,
-                                   "prefix",
-                                   value[i].len) == 0)
-            {
+            } else if (ngx_strncmp(value[i].data, "prefix", 6) == 0) {
                 sscf->flag = NGX_HTTP_SESSION_STICKY_PREFIX;
 
-            } else if (ngx_strncmp(value[i].data,
-                                   "rewrite",
-                                   value[i].len) == 0)
-            {
+            } else if (ngx_strncmp(value[i].data, "rewrite", 7) == 0) {
                 sscf->flag = NGX_HTTP_SESSION_STICKY_REWRITE;
 
             } else {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid mode");
                 return NGX_CONF_ERROR;
             }
+
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "option=", 7) == 0) {
             value[i].data = value[i].data + 7;
             value[i].len = value[i].len - 7;
 
-            if (ngx_strncmp(value[i].data, "indirect", value[i].len) == 0) {
+            if (ngx_strncmp(value[i].data, "indirect", 8) == 0) {
                 sscf->flag |= NGX_HTTP_SESSION_STICKY_INDIRECT;
 
-            } else if (ngx_strncmp(value[i].data,
-                                   "direct",
-                                   value[i].len) == 0)
-            {
+            } else if (ngx_strncmp(value[i].data, "direct", 6) == 0) {
                 sscf->flag &= ~NGX_HTTP_SESSION_STICKY_INDIRECT;
 
             } else {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid option");
                 return NGX_CONF_ERROR;
             }
+
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "fallback=", 9) == 0) {
             value[i].data = value[i].data + 9;
             value[i].len = value[i].len - 9;
 
-            if (ngx_strncmp(value[i].data, "on", sizeof("on") - 1) == 0) {
+            if (ngx_strncmp(value[i].data, "on", 2) == 0) {
                 sscf->flag |= NGX_HTTP_SESSION_STICKY_FALLBACK_ON;
 
-            } else if (ngx_strncmp(value[i].data,
-                                   "off",
-                                   sizeof("off") - 1) == 0)
-            {
+            } else if (ngx_strncmp(value[i].data, "off", 3) == 0) {
                 sscf->flag |= NGX_HTTP_SESSION_STICKY_FALLBACK_OFF;
 
             } else {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid fallback");
                 return NGX_CONF_ERROR;
             }
+
             continue;
         }
-        
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument");
         return NGX_CONF_ERROR;
     }
+
     return NGX_CONF_OK;
 }
 
@@ -383,14 +379,15 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *
 ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    size_t                   add;
-    ngx_str_t               *value;
-    ngx_url_t                u;
-    ngx_uint_t               i;
-    ngx_http_ss_loc_conf_t  *ss_lcf = conf;
+    ngx_http_ss_loc_conf_t  *slcf = conf;
+
+    size_t      add;
+    ngx_str_t  *value;
+    ngx_url_t   u;
+    ngx_uint_t  i;
 
     value = (ngx_str_t *) cf->args->elts;
-    ss_lcf->enable = 1;
+    slcf->enable = 1;
 
     for (i = 1; i < cf->args->nelts; i++) {
         if (ngx_strncmp(value[i].data, "upstream=", 9) == 0) {
@@ -402,25 +399,28 @@ ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             u.uri_part = 1;
             u.no_resolve = 1;
 
-            ss_lcf->uscf = ngx_http_upstream_add(cf, &u, 0);
-            if (ss_lcf->uscf == NULL) {
+            slcf->uscf = ngx_http_upstream_add(cf, &u, 0);
+            if (slcf->uscf == NULL) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "invalid upstream name");
                 return NGX_CONF_ERROR;
             }
+
             continue;
         }
-        
+
         if (ngx_strncmp(value[i].data, "switch=", 7) == 0) {
             add = 7;
             if (ngx_strncmp(value[i].data + add, "on", 2) == 0) {
-                ss_lcf->enable = 1;
+                slcf->enable = 1;
+
             } else {
-                ss_lcf->enable = 0;
+                slcf->enable = 0;
             }
+
             continue;
         }
-        
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid argument of \"%V\"", &value[i]);
         return NGX_CONF_ERROR;
@@ -437,42 +437,43 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_uint_t                        number, i;
     ngx_http_upstream_rr_peer_t      *peer;
     ngx_http_upstream_rr_peers_t     *peers;
-    ngx_http_upstream_ss_srv_conf_t  *ss_scf;
+    ngx_http_upstream_ss_srv_conf_t  *sscf;
 
     if (ngx_http_upstream_init_round_robin(cf, us) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    ss_scf = ngx_http_conf_upstream_srv_conf(us,
+    sscf = ngx_http_conf_upstream_srv_conf(us,
                                     ngx_http_upstream_session_sticky_module);
-    if (ss_scf == NULL) {
+    if (sscf == NULL) {
         return NGX_ERROR;
     }
 
     peers = (ngx_http_upstream_rr_peers_t *) us->peer.data;
     number = peers->number;
 
-    ss_scf->server = ngx_palloc(cf->pool,
+    sscf->server = ngx_palloc(cf->pool,
                                 number * sizeof(ngx_http_ss_server_t));
-    if (ss_scf->server == NULL) {
+    if (sscf->server == NULL) {
         return NGX_ERROR;
     }
 
-    ss_scf->number = number;
+    sscf->number = number;
 
     for (i = 0; i < number; i++) {
         peer = &peers->peer[i];
 
-        ss_scf->server[i].name = &peer->name;
-        ss_scf->server[i].sockaddr = peer->sockaddr;
-        ss_scf->server[i].socklen = peer->socklen;
+        sscf->server[i].name = &peer->name;
+        sscf->server[i].sockaddr = peer->sockaddr;
+        sscf->server[i].socklen = peer->socklen;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
-        ss_scf->server[i].check_index = peer->check_index;
+        sscf->server[i].check_index = peer->check_index;
 #endif
 
         if (ngx_http_upstream_session_sticky_set_sid(cf,
-                                    &ss_scf->server[i]) != NGX_OK) {
+                                    &sscf->server[i]) != NGX_OK)
+        {
             return NGX_ERROR;
         }
     }
@@ -481,6 +482,7 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 
     return NGX_OK;
 }
+
 
 /*
  * TODO: now the ID could be fetched from the server argument.
@@ -516,14 +518,14 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
     ngx_int_t                          rc;
     ngx_http_ss_ctx_t                 *ctx;
     ngx_http_upstream_ss_srv_conf_t   *sscf;
-    ngx_http_upstream_ss_peer_data_t  *ss_pd;
+    ngx_http_upstream_ss_peer_data_t  *sspd;
 
-    ss_pd = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_ss_peer_data_t));
-    if (ss_pd == NULL) {
+    sspd = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_ss_peer_data_t));
+    if (sspd == NULL) {
         return NGX_ERROR;
     }
 
-    r->upstream->peer.data = &ss_pd->rrp;
+    r->upstream->peer.data = &sspd->rrp;
     rc = ngx_http_upstream_init_round_robin_peer(r, us);
     if (rc != NGX_OK) {
         return rc;
@@ -555,11 +557,11 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
         }
     }
 
-    ss_pd->r = r;
-    ss_pd->sscf = sscf;
-    ss_pd->get_rr_peer = ngx_http_upstream_get_round_robin_peer;
+    sspd->r = r;
+    sspd->sscf = sscf;
+    sspd->get_rr_peer = ngx_http_upstream_get_round_robin_peer;
 
-    r->upstream->peer.data = ss_pd;
+    r->upstream->peer.data = sspd;
     r->upstream->peer.get = ngx_http_upstream_session_sticky_get_peer;
 
     return NGX_OK;
@@ -570,26 +572,27 @@ static ngx_int_t
 ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 {
     ngx_http_ss_ctx_t               *ctx;
-    ngx_http_ss_loc_conf_t          *ss_lcf;
+    ngx_http_ss_loc_conf_t          *slcf;
     ngx_http_upstream_srv_conf_t    *uscf;
     ngx_http_upstream_ss_srv_conf_t *sscf;
 
-    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_session_sticky_module);
-    if (ss_lcf->enable == 0) {
+    slcf = ngx_http_get_module_loc_conf(r,
+                ngx_http_upstream_session_sticky_module);
+    if (slcf->enable == 0) {
         return NGX_DECLINED;
     }
 
-    if (ss_lcf->uscf == NGX_CONF_UNSET_PTR) {
+    if (slcf->uscf == NGX_CONF_UNSET_PTR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                       "session sticky with insert and rewrite"
-					   "need configure session_sticky_header");
+                      "session sticky with insert and rewrite"
+                      "need configure session_sticky_header");
 
         return NGX_DECLINED;
     }
 
-    uscf = ss_lcf->uscf;
+    uscf = slcf->uscf;
     sscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                             ngx_http_upstream_session_sticky_module);
+                ngx_http_upstream_session_sticky_module);
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
@@ -631,9 +634,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
     for (i = 0; i < r->headers_in.cookies.nelts; i++) {
         cookie = &cookies[i]->value;
-        p = ngx_strnstr(cookie->data,
-                        (char *) sscf->cookie.data,
-                        cookie->len);
+        p = ngx_strnstr(cookie->data, (char *) sscf->cookie.data, cookie->len);
         if (p == NULL) {
             continue;
         }
@@ -658,55 +659,57 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     state = 0;
     while (p < last) {
         switch (state) {
-            case pre_key:
-                if (*p == ';') {
-                    goto not_found;
-                } else if (!is_space(*p)) {
-                    state = key;
-                }
-                break;
+        case pre_key:
+            if (*p == ';') {
+                goto not_found;
+            } else if (!is_space(*p)) {
+                state = key;
+            }
+            break;
 
-            case key:
-                if is_space(*p) {
-                    state = pre_equal;
-                } else if (*p == '=') {
-                    state = pre_value;
-                }
-                break;
+        case key:
+            if (is_space(*p)) {
+                state = pre_equal;
+            } else if (*p == '=') {
+                state = pre_value;
+            }
+            break;
 
-            case pre_equal:
-                if (*p == '=') {
-                    state = pre_value;
-                } else if (!is_space(*p)) {
-                    goto not_found;
-                }
-                break;
+        case pre_equal:
+            if (*p == '=') {
+                state = pre_value;
+            } else if (!is_space(*p)) {
+                goto not_found;
+            }
+            break;
 
-            case pre_value:
-                if (!is_space(*p)) {
-                    state = value;
-                    v = p;
-                }
-                break;
+        case pre_value:
+            if (!is_space(*p)) {
+                state = value;
+                v = p;
+            }
+            break;
 
-            case value:
-                if (*p == ';') {
-                    end = p + 1;
-                    goto success;
-                }
+        case value:
+            if (*p == ';') {
+                end = p + 1;
+                goto success;
+            }
 
-                if (p + 1 == last) {
-                    end = last;
-                    p++;
-                    goto success;
-                }
-                break;
+            if (p + 1 == last) {
+                end = last;
+                p++;
+                goto success;
+            }
+            break;
 
-            default:
+        default:
                 break;
         }
+
         p++;
     }
+
 not_found:
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -723,9 +726,11 @@ not_found:
     if (ctx->s_lastseen.data == NULL || ctx->s_firstseen.data == NULL) {
         return NGX_ERROR;
     }
+
     return NGX_OK;
 
 success:
+
     if (sscf->flag & NGX_HTTP_SESSION_STICKY_PREFIX) {
         st = v;
         for (vv = v; vv < p; vv++) {
@@ -841,10 +846,10 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
     ngx_http_request_t                *r;
     ngx_http_ss_server_t              *server;
     ngx_http_upstream_ss_srv_conf_t   *sscf;
-    ngx_http_upstream_ss_peer_data_t  *ss_pd = data;
+    ngx_http_upstream_ss_peer_data_t  *sspd = data;
 
-    sscf = ss_pd->sscf;
-    r = ss_pd->r;
+    sscf = sspd->sscf;
+    r = sspd->r;
     n = sscf->number;
     server = sscf->server;
 
@@ -862,8 +867,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
     for (i = 0; i < n; i++) {
         if (ctx->sid.len == server[i].sid.len
-            && ngx_strncmp(ctx->sid.data,
-                           server[i].sid.data,
+            && ngx_strncmp(ctx->sid.data, server[i].sid.data,
                            ctx->sid.len) == 0)
         {
 #if (NGX_HTTP_UPSTREAM_CHECK)
@@ -882,7 +886,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
             ctx->sid.len = server[i].sid.len;
             ctx->sid.data = server[i].sid.data;
 
-            ss_pd->rrp.current = i;
+            sspd->rrp.current = i;
             ctx->tries--;
 
             return NGX_OK;
@@ -898,15 +902,14 @@ failed:
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "session sticky failed, sid[%V]", &ctx->sid);
 
-    rc = ss_pd->get_rr_peer(pc, &ss_pd->rrp);
+    rc = sspd->get_rr_peer(pc, &sspd->rrp);
     if (rc != NGX_OK) {
         return rc;
     }
 
     for (i = 0; i < n; i++) {
         if (server[i].name->len == pc->name->len
-            && ngx_strncmp(server[i].name->data,
-                           pc->name->data,
+            && ngx_strncmp(server[i].name->data, pc->name->data,
                            pc->name->len) == 0)
         {
             ctx->sid.len = server[i].sid.len;
@@ -930,6 +933,7 @@ ngx_http_session_sticky_atotm(u_char *s, ngx_int_t len)
     for (i = 0; i < len; i++) {
         if (s[i] >= '0' && s[i] <= '9') {
             value = value * 10 + s[i] - '0';
+
         } else {
             return NGX_ERROR;
         }
@@ -973,27 +977,28 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     ngx_list_part_t         *part;
     ngx_table_elt_t         *table;
     ngx_http_ss_ctx_t       *ctx;
-    ngx_http_ss_loc_conf_t  *ss_lcf;
+    ngx_http_ss_loc_conf_t  *slcf;
 
     if (r->headers_out.status >= NGX_HTTP_BAD_REQUEST) {
         return ngx_http_ss_next_header_filter(r);
     }
 
-    ss_lcf = ngx_http_get_module_loc_conf(r, ngx_http_upstream_session_sticky_module);
+    slcf = ngx_http_get_module_loc_conf(r,
+               ngx_http_upstream_session_sticky_module);
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_upstream_session_sticky_module);
     if (ctx == NULL || ctx->sscf == NULL || ctx->sscf->flag == 0) {
         return ngx_http_ss_next_header_filter(r);
     }
 
-    if (ss_lcf->enable == 0
+    if (slcf->enable == 0
         && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
         return ngx_http_ss_next_header_filter(r);
     }
 
     if (ctx->sscf->flag
-        & (NGX_HTTP_SESSION_STICKY_PREFIX
-           | NGX_HTTP_SESSION_STICKY_REWRITE)) {
+        & (NGX_HTTP_SESSION_STICKY_PREFIX | NGX_HTTP_SESSION_STICKY_REWRITE))
+    {
         part = &r->headers_out.headers.part;
         while (part) {
             table = (ngx_table_elt_t *) part->elts;
@@ -1087,33 +1092,37 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
     p += ctx->sscf->cookie.len;
     while (p < last) {
         switch (state) {
-            case pre_equal:
-                if (*p == '=') {
-                    state = pre_value;
-                }
-                break;
+        case pre_equal:
+            if (*p == '=') {
+                state = pre_value;
+            }
+            break;
 
-            case pre_value:
-                if (*p == ';') {
-                    return NGX_AGAIN;
-                } else if (!is_space(*p)) {
-                    goto success;
-                }
-                break;
+        case pre_value:
+            if (*p == ';') {
+                return NGX_AGAIN;
+            } else if (!is_space(*p)) {
+                goto success;
+            }
+            break;
 
-            default:
-                break;
+        default:
+            break;
         }
+
         p++;
     }
+
     return NGX_AGAIN;
 
 success:
+
     table->value.len += ctx->sid.len + 1;
     s = ngx_pnalloc(r->pool, table->value.len);
     if (s == NULL) {
         return NGX_ERROR;
     }
+
     t = s;
     t = ngx_cpymem(t, table->value.data, p - table->value.data);
     t = ngx_cpymem(t, ctx->sid.data, ctx->sid.len);
@@ -1129,8 +1138,8 @@ success:
 static ngx_int_t
 ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
 {
-    u_char              *p, *st, *en, *last, *start;
-    ngx_http_ss_ctx_t   *ctx;
+    u_char             *p, *st, *en, *last, *start;
+    ngx_http_ss_ctx_t  *ctx;
     enum {
         pre_equal = 0,
         pre_value,
@@ -1153,37 +1162,41 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
     state = 0;
     while (p < last) {
         switch (state) {
-            case pre_equal:
-                if (*p == '=') {
-                    state = pre_value;
-                } else if (*p == ';') {
-                    goto success;
-                }
-                break;
+        case pre_equal:
+            if (*p == '=') {
+                state = pre_value;
+            } else if (*p == ';') {
+                goto success;
+            }
+            break;
 
-            case pre_value:
-                if (!is_space(*p)) {
-                    state = value;
-                }
-                break;
+        case pre_value:
+            if (!is_space(*p)) {
+                state = value;
+            }
+            break;
 
-            case value:
-                if (*p == ';') {
-                    goto success;
-                }
-                break;
+        case value:
+            if (*p == ';') {
+                goto success;
+            }
+            break;
 
-            default:
-                break;
+        default:
+            break;
         }
+
         p++;
     }
+
     if (p >= last && (state == value || state == pre_equal)) {
         goto success;
     }
+
     return NGX_AGAIN;
 
 success:
+
     en = p;
     table->value.len = table->value.len
                      - (en - st)
