@@ -576,7 +576,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     slcf = ngx_http_get_module_loc_conf(r,
                 ngx_http_upstream_session_sticky_module);
-    if (slcf->enable == 0) {
+    if (!slcf->enable) {
         return NGX_DECLINED;
     }
 
@@ -971,9 +971,7 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
         return ngx_http_ss_next_header_filter(r);
     }
 
-    if (slcf->enable == 0
-        && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE))
-    {
+    if (!slcf->enable && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
         return ngx_http_ss_next_header_filter(r);
     }
 
