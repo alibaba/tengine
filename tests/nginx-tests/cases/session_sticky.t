@@ -150,25 +150,22 @@ http {
 
     server {
         listen     127.0.0.1:9000;
-        session_sticky_hide_cookie switch=off;
         location / {
-            add_header  Set-Cookie test=fuck;
+            add_header  Set-Cookie test=test1234;
             index       9000;
         }
     }
 
     server {
         listen     127.0.0.1:9001;
-        session_sticky_hide_cookie switch=off;
         location / {
-            add_header Set-Cookie test=fuck;
+            add_header Set-Cookie test=test1234;
             index       9001;
         }
     }
 
     server {
         listen     127.0.0.1:9002;
-        session_sticky_hide_cookie switch=off;
         location / {
             index       9002;
         }
@@ -176,7 +173,6 @@ http {
 
     server {
         listen     127.0.0.1:9003;
-        session_sticky_hide_cookie switch=off;
         location / {
             index       9003;
         }
@@ -184,7 +180,6 @@ http {
 
     server {
         listen    127.0.0.1:9004;
-        session_sticky_hide_cookie switch=off;
         location / {
             if ($cookie_test != "") {
                 return 401;

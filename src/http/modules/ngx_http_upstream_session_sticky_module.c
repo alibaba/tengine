@@ -48,7 +48,6 @@ typedef struct {
 
 
 typedef struct {
-    ngx_flag_t                          enable;
     ngx_http_upstream_srv_conf_t       *uscf;
 } ngx_http_ss_loc_conf_t;
 
@@ -123,7 +122,7 @@ static ngx_command_t ngx_http_session_sticky_commands[] = {
       NULL },
 
     { ngx_string("session_sticky_hide_cookie"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_session_sticky_hide_cookie,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -234,15 +233,8 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     slcf = ngx_http_get_module_loc_conf(r,
                 ngx_http_upstream_session_sticky_module);
-    if (!slcf->enable) {
-        return NGX_DECLINED;
-    }
 
     if (slcf->uscf == NGX_CONF_UNSET_PTR) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "session sticky with insert and rewrite"
-                      "need configure session_sticky_header");
-
         return NGX_DECLINED;
     }
 
@@ -629,7 +621,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
         return ngx_http_ss_next_header_filter(r);
     }
 
-    if (!slcf->enable && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
+    if ((slcf->uscf == NGX_CONF_UNSET_PTR)
+        && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
         return ngx_http_ss_next_header_filter(r);
     }
 
@@ -992,8 +985,6 @@ ngx_http_session_sticky_create_loc_conf(ngx_conf_t *cf)
     }
 
     conf->uscf = NGX_CONF_UNSET_PTR;
-    conf->enable = NGX_CONF_UNSET;
-
     return conf;
 }
 
@@ -1005,7 +996,6 @@ ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_ss_loc_conf_t  *prev = parent;
     ngx_http_ss_loc_conf_t  *conf = child;
 
-    ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_ptr_value(conf->uscf, prev->uscf, NGX_CONF_UNSET_PTR);
 
     return NGX_CONF_OK;
@@ -1179,49 +1169,29 @@ ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd, void *co
     size_t      add;
     ngx_str_t  *value;
     ngx_url_t   u;
-    ngx_uint_t  i;
 
     value = (ngx_str_t *) cf->args->elts;
-    slcf->enable = 1;
+    if (ngx_strncmp(value[1].data, "upstream=", 9) == 0) {
+        add = 9;
+        ngx_memzero(&u, sizeof(ngx_url_t));
 
-    for (i = 1; i < cf->args->nelts; i++) {
-        if (ngx_strncmp(value[i].data, "upstream=", 9) == 0) {
-            add = 9;
-            ngx_memzero(&u, sizeof(ngx_url_t));
+        u.url.len = value[1].len - add;
+        u.url.data = value[1].data + add;
+        u.uri_part = 1;
+        u.no_resolve = 1;
 
-            u.url.len = value[i].len - add;
-            u.url.data = value[i].data + add;
-            u.uri_part = 1;
-            u.no_resolve = 1;
-
-            slcf->uscf = ngx_http_upstream_add(cf, &u, 0);
-            if (slcf->uscf == NULL) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "invalid upstream name");
-                return NGX_CONF_ERROR;
-            }
-
-            continue;
+        slcf->uscf = ngx_http_upstream_add(cf, &u, 0);
+        if (slcf->uscf == NULL) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid upstream name");
+            return NGX_CONF_ERROR;
         }
-
-        if (ngx_strncmp(value[i].data, "switch=", 7) == 0) {
-            add = 7;
-            if (ngx_strncmp(value[i].data + add, "on", 2) == 0) {
-                slcf->enable = 1;
-
-            } else {
-                slcf->enable = 0;
-            }
-
-            continue;
-        }
-
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument of \"%V\"",
-                           &value[i]);
-        return NGX_CONF_ERROR;
+        return NGX_CONF_OK;
     }
 
-    return NGX_CONF_OK;
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument of \"%V\"",
+                       &value[1]);
+    return NGX_CONF_ERROR;
 }
 
 
