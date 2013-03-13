@@ -102,7 +102,7 @@ static char *ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf,
 static ngx_int_t ngx_http_session_sticky_init(ngx_conf_t *cf);
 static char *ngx_http_upstream_session_sticky(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
-static char *ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd,
+static char *ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
@@ -122,9 +122,9 @@ static ngx_command_t ngx_http_session_sticky_commands[] = {
       0,
       NULL },
 
-    { ngx_string("session_sticky_header"),
+    { ngx_string("session_sticky_hide_cookie"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
-      ngx_http_session_sticky_header,
+      ngx_http_session_sticky_hide_cookie,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -1172,7 +1172,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 
 
 static char *
-ngx_http_session_sticky_header(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_ss_loc_conf_t  *slcf = conf;
 

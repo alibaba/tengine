@@ -28,9 +28,9 @@
 
     server {
       location / {
-        #在insert + indirect模式或者prefix模式下需要配置session_sticky_header
+        #在insert + indirect模式或者prefix模式下需要配置session_sticky_hide_cookie
         #这种模式不会将保持会话使用的cookie传给后端服务，让保持会话的cookie对后端透明
-        session_sticky_header upstream=test;
+        session_sticky_hide_cookie upstream=test;
         proxy_pass http://test;
       }
     }

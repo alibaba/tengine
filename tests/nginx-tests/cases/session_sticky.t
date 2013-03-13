@@ -150,7 +150,7 @@ http {
 
     server {
         listen     127.0.0.1:9000;
-        session_sticky_header switch=off;
+        session_sticky_hide_cookie switch=off;
         location / {
             add_header  Set-Cookie test=fuck;
             index       9000;
@@ -159,7 +159,7 @@ http {
 
     server {
         listen     127.0.0.1:9001;
-        session_sticky_header switch=off;
+        session_sticky_hide_cookie switch=off;
         location / {
             add_header Set-Cookie test=fuck;
             index       9001;
@@ -168,7 +168,7 @@ http {
 
     server {
         listen     127.0.0.1:9002;
-        session_sticky_header switch=off;
+        session_sticky_hide_cookie switch=off;
         location / {
             index       9002;
         }
@@ -176,7 +176,7 @@ http {
 
     server {
         listen     127.0.0.1:9003;
-        session_sticky_header switch=off;
+        session_sticky_hide_cookie switch=off;
         location / {
             index       9003;
         }
@@ -184,7 +184,7 @@ http {
 
     server {
         listen    127.0.0.1:9004;
-        session_sticky_header switch=off;
+        session_sticky_hide_cookie switch=off;
         location / {
             if ($cookie_test != "") {
                 return 401;
@@ -199,85 +199,85 @@ http {
         server_name localhost;
 
         location /test_insert_indirect {
-            session_sticky_header upstream=insert_indirect;
+            session_sticky_hide_cookie upstream=insert_indirect;
             proxy_pass  http://insert_indirect/;
         }
 
         location /test_insert {
-            session_sticky_header upstream=insert;
+            session_sticky_hide_cookie upstream=insert;
             proxy_pass  http://insert/;
         }
 
         location /test_rewrite {
-            session_sticky_header upstream=rewrite;
+            session_sticky_hide_cookie upstream=rewrite;
             proxy_pass  http://rewrite/;
         }
 
         location /test_rewrite_no_setcookie {
-            session_sticky_header upstream=rewrite_no_setcookie;
+            session_sticky_hide_cookie upstream=rewrite_no_setcookie;
             proxy_pass http://rewrite_no_setcookie/;
         }
 
         location /test_prefix {
-            session_sticky_header upstream=prefix;
+            session_sticky_hide_cookie upstream=prefix;
             proxy_pass  http://prefix/;
         }
 
         location /test_prefix_no_setcookie {
-            session_sticky_header upstream=prefix_no_setcookie;
+            session_sticky_hide_cookie upstream=prefix_no_setcookie;
             proxy_pass http://prefix_no_setcookie/;
         }
 
         location /test_insert_indirect_off {
-            session_sticky_header upstream=insert_indirect_off;
+            session_sticky_hide_cookie upstream=insert_indirect_off;
             proxy_pass http://insert_indirect_off/;
         }
 
         location /test_insert_off {
-            session_sticky_header upstream=insert_off;
+            session_sticky_hide_cookie upstream=insert_off;
             proxy_pass http://insert_off/;
         }
         location /test_rewrite_off {
-            session_sticky_header upstream=rewrite_off;
+            session_sticky_hide_cookie upstream=rewrite_off;
             proxy_pass http://rewrite_off/;
         }
 
         location /test_prefix_off {
-            session_sticky_header upstream=prefix_off;
+            session_sticky_hide_cookie upstream=prefix_off;
             proxy_pass http://prefix_off/;
         }
 
         location /test_insert_nodomain {
-            session_sticky_header upstream=insert_nodomain;
+            session_sticky_hide_cookie upstream=insert_nodomain;
             proxy_pass http://insert_nodomain/;
         }
 
         location /test_insert_nopath {
-            session_sticky_header upstream=insert_nopath;
+            session_sticky_hide_cookie upstream=insert_nopath;
             proxy_pass http://insert_nopath/;
         }
 
         location /test_insert_nomaxage {
-            session_sticky_header upstream=insert_nomaxage;
+            session_sticky_hide_cookie upstream=insert_nomaxage;
             proxy_pass http://insert_nomaxage/;
         }
 
         location /test_insert_nomalife {
-            session_sticky_header upstream=insert_nomaxlife;
+            session_sticky_hide_cookie upstream=insert_nomaxlife;
             proxy_pass http://insert_nomaxlife/;
         }
         location /test_insert_nomaxidle {
-            session_sticky_header upstream=insert_nomaxidle;
+            session_sticky_hide_cookie upstream=insert_nomaxidle;
             proxy_pass http://insert_nomaxidle/;
         }
 
         location /test_insert_nocookie {
-            session_sticky_header upstream=insert_nocookie;
+            session_sticky_hide_cookie upstream=insert_nocookie;
             proxy_pass http://insert_nocookie/;
         }
 
         location /test_insert_nocookie_notfound {
-            session_sticky_header upstream=insert_nocookie;
+            session_sticky_hide_cookie upstream=insert_nocookie;
             proxy_pass http://insert_nocookie;
         }
 
@@ -286,17 +286,17 @@ http {
         }
 
         location /test_cookie {
-            session_sticky_header upstream=nocookie;
+            session_sticky_hide_cookie upstream=nocookie;
             proxy_pass http://nocookie/;
         }
 
         location /test_havecookie {
-            session_sticky_header upstream=havecookie;
+            session_sticky_hide_cookie upstream=havecookie;
             proxy_pass http://havecookie/;
         }
 
         location /test_nothing {
-            session_sticky_header upstream=nothing;
+            session_sticky_hide_cookie upstream=nothing;
             proxy_pass http://nothing/;
         }
     }
@@ -392,7 +392,7 @@ like(http_get('/test_insert_nocookie_notfound'), qr/404 Not Found/, 'Not Found')
 $r = http_get('/test_rewrite_no_header');
 $cookie = getcookie($r);
 $res = getres($r);
-like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_header');
+like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_hide_cookie');
 $r = http_get('/test_insert_nomalife');
 $cookie=getcookie($r);
 $res=getres($r);
