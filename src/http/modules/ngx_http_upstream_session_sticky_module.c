@@ -101,7 +101,8 @@ static char *ngx_http_session_sticky_merge_loc_conf(ngx_conf_t *cf,
 static ngx_int_t ngx_http_session_sticky_init(ngx_conf_t *cf);
 static char *ngx_http_upstream_session_sticky(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
-static char *ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd,
+static char *ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf,
+    ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
@@ -205,6 +206,7 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
         if (rc != NGX_OK) {
             return rc;
         }
+
     } else {
         if (ctx->sscf != sscf) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -232,7 +234,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
     ngx_http_upstream_ss_srv_conf_t *sscf;
 
     slcf = ngx_http_get_module_loc_conf(r,
-                ngx_http_upstream_session_sticky_module);
+                                    ngx_http_upstream_session_sticky_module);
 
     if (slcf->uscf == NGX_CONF_UNSET_PTR) {
         return NGX_DECLINED;
@@ -240,7 +242,7 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 
     uscf = slcf->uscf;
     sscf = ngx_http_conf_upstream_srv_conf(uscf,
-                ngx_http_upstream_session_sticky_module);
+                                    ngx_http_upstream_session_sticky_module);
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ss_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
@@ -1162,7 +1164,8 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 
 
 static char *
-ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
 {
     ngx_http_ss_loc_conf_t  *slcf = conf;
 
