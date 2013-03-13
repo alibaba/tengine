@@ -652,6 +652,10 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
         return NGX_ERROR;
     }
 
+    if (ngx_process == NGX_PROCESS_WORKER) {
+        return ngx_http_upstream_check_add_dynamic_peer(cf->pool, us, peer_addr);
+    }
+
     ucmcf = ngx_http_conf_get_module_main_conf(cf,
                                                ngx_http_upstream_check_module);
     peers = ucmcf->peers;
