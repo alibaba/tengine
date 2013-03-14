@@ -965,8 +965,8 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    conf->maxlife = NGX_MAX_INT32_VALUE;
-    conf->maxidle = NGX_MAX_INT32_VALUE;
+    conf->maxlife = NGX_CONF_UNSET;
+    conf->maxidle = NGX_CONF_UNSET;
 
     conf->flag = NGX_HTTP_SESSION_STICKY_INSERT;
     conf->cookie.data = (u_char *) "route";
