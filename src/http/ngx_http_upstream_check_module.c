@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
- * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Weibin Yao (yaoweibin@gmail.com)
  */
 
 
@@ -16,6 +16,8 @@ typedef struct ngx_http_upstream_check_srv_conf_s
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(push, 1)
+#elif (NGX_SOLARIS)
+#pragma pack(1)
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
@@ -60,6 +62,8 @@ typedef struct {
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(pop)
+#elif (NGX_SOLARIS)
+#pragma pack()
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
