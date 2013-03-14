@@ -571,6 +571,7 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r,
             r->header_in->pos += (size_t) r->headers_in.content_length_n;
             r->request_length += r->headers_in.content_length_n;
             b->last = r->header_in->pos;
+            b->last_buf = 1;
 
             post_handler(r);
 
@@ -733,6 +734,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                            r->request_length, rb->rest, rb->postpone_size);
 
             if (rb->rest == 0) {
+                rb->buf->last_buf = 1;
                 goto read_ok;
             }
 
