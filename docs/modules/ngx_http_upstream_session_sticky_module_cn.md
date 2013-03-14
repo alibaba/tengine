@@ -39,7 +39,7 @@
 
 ## session_sticky ##
 
-语法：**session_sticky** `[cookie=name] [domain=your_domain] [path=your_path] [maxage=time] [mode=insert|rewrite|prefix] [option=indirect] [maxidle=time] [maxlife=time] [fallback=on|off]`
+语法：**session_sticky** `[cookie=name] [domain=your_domain] [path=your_path] [maxage=time] [mode=insert|rewrite|prefix] [option=indirect] [maxidle=time] [maxlife=time] [fallback=on|off] [hash=plain|md5]`
 
 默认值：`session_sticky cookie=route mode=insert fallback=on`
 
@@ -62,6 +62,7 @@
 + `maxidle`设置session cookie的最长空闲的超时时间
 + `maxlife`设置session cookie的最长生存期
 + `fallback`设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
++ `hash` 设置cookie中server标识是用明文还是使用md5值，默认使用md5
 
 ## session\_sticky\_header ##
 

@@ -16,6 +16,8 @@
 #define NGX_HTTP_SESSION_STICKY_REWRITE         0x0008
 #define NGX_HTTP_SESSION_STICKY_FALLBACK_ON     0x0010
 #define NGX_HTTP_SESSION_STICKY_FALLBACK_OFF    0x0020
+#define NGX_HTTP_SESSION_STICKY_MD5             0x0030
+#define NGX_HTTP_SESSION_STICKY_PLAIN           0X0040
 
 #define is_space(c) ((c) == ' ' || (c) == '\t' || (c) == '\n')
 
@@ -968,7 +970,7 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
     conf->maxlife = NGX_CONF_UNSET;
     conf->maxidle = NGX_CONF_UNSET;
 
-    conf->flag = NGX_HTTP_SESSION_STICKY_INSERT;
+    conf->flag = NGX_HTTP_SESSION_STICKY_INSERT | NGX_HTTP_SESSION_STICKY_MD5;
     conf->cookie.data = (u_char *) "route";
     conf->cookie.len = sizeof("route") - 1;
 
@@ -1155,6 +1157,18 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "hash=", 5) == 0) {
+            value[i].data = value[i].data + 5;
+            value[i].len = value[i].len - 5;
+
+            if (ngx_strncmp(value[i].data, "plain", 5) == 0) {
+                sscf->flag = (sscf->flag & (~NGX_HTTP_SESSION_STICKY_MD5))
+                           | NGX_HTTP_SESSION_STICKY_PLAIN;
+            }
+
+            continue;
+        }
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument");
         return NGX_CONF_ERROR;
     }
@@ -1237,9 +1251,12 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 #if (NGX_HTTP_UPSTREAM_CHECK)
         sscf->server[i].check_index = peer->check_index;
 #endif
+        if (sscf->flag & NGX_HTTP_SESSION_STICKY_PLAIN) {
+            sscf->server[i].sid.data = peer->id.data;
+            sscf->server[i].sid.len = peer->id.len;
 
-        if (ngx_http_upstream_session_sticky_set_sid(cf, &sscf->server[i])
-            != NGX_OK)
+        } else if (ngx_http_upstream_session_sticky_set_sid(
+                                                cf, &sscf->server[i]) != NGX_OK)
         {
             return NGX_ERROR;
         }

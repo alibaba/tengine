@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(36);
+my $t = Test::Nginx->new()->plan(38);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -148,6 +148,12 @@ http {
         server 127.0.0.1:9004;
     }
 
+    upstream hash {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on hash=plain;
+        server          127.0.0.1:9002 id=9002;
+        server          127.0.0.1:9003 id=9003;
+    }
+
     server {
         listen     127.0.0.1:9000;
         location / {
@@ -196,6 +202,11 @@ http {
         location /test_insert_indirect {
             session_sticky_hide_cookie upstream=insert_indirect;
             proxy_pass  http://insert_indirect/;
+        }
+
+        location /test_hash {
+            session_sticky_hide_cookie upstream=hash;
+            proxy_pass http://hash/;
         }
 
         location /test_insert {
@@ -406,6 +417,12 @@ $cookie = getcookie($r);
 $res = getres($r);
 like($r, qr/200/, 'prefix--without maxidle or maxlife');
 like(my_http_get('/test_nothing', $cookie), qr/$res/, 'prefix--without maxidle or maxlife');
+$r = http_get('/test_hash');
+like($r, qr/set-cookie: test=\d{4}/i, "hash=plain");
+$cookie = getcookie($r);
+$res = getres($r);
+$r = my_http_get('/test_hash', $cookie);
+like($r, qr/$res/, 'hash=plain, the same real server');
 $t->stop();
 #####################################################################################
 #####################################################################################
