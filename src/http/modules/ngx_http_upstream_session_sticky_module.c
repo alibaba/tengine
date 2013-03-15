@@ -16,8 +16,8 @@
 #define NGX_HTTP_SESSION_STICKY_REWRITE         0x0008
 #define NGX_HTTP_SESSION_STICKY_FALLBACK_ON     0x0010
 #define NGX_HTTP_SESSION_STICKY_FALLBACK_OFF    0x0020
-#define NGX_HTTP_SESSION_STICKY_MD5             0x0030
-#define NGX_HTTP_SESSION_STICKY_PLAIN           0X0040
+#define NGX_HTTP_SESSION_STICKY_MD5             0x0040
+#define NGX_HTTP_SESSION_STICKY_PLAIN           0X0080
 
 #define is_space(c) ((c) == ' ' || (c) == '\t' || (c) == '\n')
 
@@ -1075,7 +1075,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 
         if (ngx_strncmp(value[i].data, "maxidle=", 8) == 0) {
             sscf->maxidle = ngx_atotm(value[i].data + 8, value[i].len - 8);
-            if (sscf->maxidle == NGX_ERROR) {
+            if (sscf->maxidle <= NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxidle");
                 return NGX_CONF_ERROR;
             }
@@ -1089,7 +1089,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
 
         if (ngx_strncmp(value[i].data, "maxlife=", 8) == 0) {
             sscf->maxlife = ngx_atotm(value[i].data + 8, value[i].len - 8);
-            if (sscf->maxlife == NGX_ERROR) {
+            if (sscf->maxlife <= NGX_ERROR) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxlife");
                 return NGX_CONF_ERROR;
             }
