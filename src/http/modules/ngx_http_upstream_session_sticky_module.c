@@ -10,6 +10,7 @@
 #include <ngx_md5.h>
 
 
+#define NGX_HTTP_SESSION_STICKY_DELIMITER       '|'
 #define NGX_HTTP_SESSION_STICKY_PREFIX          0x0001
 #define NGX_HTTP_SESSION_STICKY_INDIRECT        0x0002
 #define NGX_HTTP_SESSION_STICKY_INSERT          0x0004
@@ -262,7 +263,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 {
     time_t                           now;
     u_char                          *p, *v, *vv, *st, *last, *end;
-    ngx_int_t                        diff;
+    ngx_int_t                        diff, delimiter;
     ngx_str_t                       *cookie;
     ngx_uint_t                       i;
     ngx_table_elt_t                **cookies;
@@ -408,26 +409,33 @@ success:
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "session_sticky mode [insert]");
 
+        delimiter = 0;
         for (p = v; p < vv; p++) {
-            if (*p == '!') {
-                ctx->sid.len = p - v;
-                ctx->sid.data = ngx_pnalloc(r->pool, ctx->sid.len);
-                if (ctx->sid.data == NULL) {
-                    return NGX_ERROR;
-                }
-                ngx_memcpy(ctx->sid.data, v, ctx->sid.len);
-                v = p + 1;
+            if (*p == NGX_HTTP_SESSION_STICKY_DELIMITER) {
+                delimiter++;
+                if (delimiter == 1) {
+                    ctx->sid.len = p - v;
+                    ctx->sid.data = ngx_pnalloc(r->pool, ctx->sid.len);
+                    if (ctx->sid.data == NULL) {
+                        return NGX_ERROR;
+                    }
+                    ngx_memcpy(ctx->sid.data, v, ctx->sid.len);
+                    v = p + 1;
 
-            } else if (*p == '^') {
-                ctx->s_lastseen.len = p - v;
-                ctx->s_lastseen.data = ngx_pnalloc(r->pool,
-                                                   ctx->s_lastseen.len);
-                if (ctx->s_lastseen.data == NULL) {
-                    return NGX_ERROR;
+                } else if(delimiter == 2) {
+                    ctx->s_lastseen.len = p - v;
+                    ctx->s_lastseen.data = ngx_pnalloc(r->pool,
+                                                       ctx->s_lastseen.len);
+                    if (ctx->s_lastseen.data == NULL) {
+                        return NGX_ERROR;
+                    }
+                    ngx_memcpy(ctx->s_lastseen.data, v, ctx->s_lastseen.len);
+                    v = p + 1;
+                    break;
+
+                } else {
+                    goto not_found;
                 }
-                ngx_memcpy(ctx->s_lastseen.data, v, ctx->s_lastseen.len);
-                v = p + 1;
-                break;
             }
         }
 
@@ -916,7 +924,7 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
         set_cookie->value.len = set_cookie->value.len
                               + ctx->s_lastseen.len
                               + ctx->s_firstseen.len
-                              + 2; /* '!' and '^' */
+                              + 2; /* '|' and '|' */
     } else {
         set_cookie->value.len = set_cookie->value.len
                               + sizeof(";Max-Age=") - 1
@@ -934,9 +942,9 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
     *p++ = '=';
     p = ngx_cpymem(p, ctx->sid.data, ctx->sid.len);
     if (ctx->sscf->maxidle != NGX_CONF_UNSET) {
-        *(p++) = '!';
+        *(p++) = NGX_HTTP_SESSION_STICKY_DELIMITER;
         p = ngx_cpymem(p, ctx->s_lastseen.data, ctx->s_lastseen.len);
-        *(p++) = '^';
+        *(p++) = NGX_HTTP_SESSION_STICKY_DELIMITER;
         p = ngx_cpymem(p, ctx->s_firstseen.data, ctx->s_firstseen.len);
     }
     if (ctx->sscf->domain.len) {
