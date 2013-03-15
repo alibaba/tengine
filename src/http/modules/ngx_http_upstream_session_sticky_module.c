@@ -1164,6 +1164,14 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             if (ngx_strncmp(value[i].data, "plain", 5) == 0) {
                 sscf->flag = (sscf->flag & (~NGX_HTTP_SESSION_STICKY_MD5))
                            | NGX_HTTP_SESSION_STICKY_PLAIN;
+
+            } else if (ngx_strncmp(value[i].data, "md5", 4) == 0) {
+                sscf->flag = (sscf->flag & (~NGX_HTTP_SESSION_STICKY_PLAIN))
+                           | NGX_HTTP_SESSION_STICKY_MD5;
+
+            } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid hash mode");
+                return NGX_CONF_ERROR;
             }
 
             continue;
