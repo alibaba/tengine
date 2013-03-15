@@ -626,7 +626,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     }
 
     if ((slcf->uscf == NGX_CONF_UNSET_PTR)
-        && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE)) {
+                     && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE))
+    {
         return ngx_http_ss_next_header_filter(r);
     }
 
@@ -1260,6 +1261,12 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
         sscf->server[i].check_index = peer->check_index;
 #endif
         if (sscf->flag & NGX_HTTP_SESSION_STICKY_PLAIN) {
+            if (peer->id.len == 0) {
+                sscf->server[i].sid.data = peer->name.data;
+                sscf->server[i].sid.len = peer->name.len;
+                continue;
+            }
+
             sscf->server[i].sid.data = peer->id.data;
             sscf->server[i].sid.len = peer->id.len;
 
