@@ -1,6 +1,6 @@
 #TFS RESTful API
 
-NOTE: Words in <b>bold</b> are reserved words, words in <i>italics</i> are inputs.
+NOTE: <b>bold</b> words are fixed and reserved for API, <i>italics</i> words are input arguments.
 
 ##Raw TFS
 
@@ -8,7 +8,7 @@ NOTE: Words in <b>bold</b> are reserved words, words in <i>italics</i> are input
 
 ####Description
 
-The implementation of WRITE operation saves data as a TFS file. File name is returned in JSON format.
+The implementation of WRITE operation stores data as a TFS file. File name is returned in JSON format.
 
 ####Syntax
 
@@ -35,7 +35,7 @@ The implementation of WRITE operation saves data as a TFS file. File name is ret
 	</tr>
 	<tr align="left">
 		<td>simple_name</td>
-		<td>whether require the right suffix to access TFS file<br>1: require the right suffix to access<br>0: no such restrict</td>
+		<td>whether require the right suffix to access the file<br>1: require the right suffix to access<br>0: no such restrict</td>
 	</tr>
 	<tr align="left">
 		<td>large_file</td>
@@ -79,7 +79,7 @@ The implementation of WRITE operation saves data as a TFS file. File name is ret
 
 ####Examples
 
-The following request will use tfs as appkey to WRITE a TFS file without suffix:
+The following request will use tfs as appkey to write a TFS file without suffix:
 <pre>
 POST /v1/tfs HTTP/1.1
 Host: 10.0.0.1:7500
@@ -104,7 +104,7 @@ Connection: keep-alive
 }
 </pre>
 
-The following request will use tfs as appkey to WRITE a TFS file with ".jpg" as its suffix. Access with this suffix is required.
+The following request will use tfs as appkey to write a TFS file with ".jpg" as its suffix. Access with this suffix is required.
 
 <pre>
 POST /v1/tfs?suffix=.jpg&simple_name=1 HTTP/1.1
@@ -161,7 +161,7 @@ The implementation of UPDATE updates a existing TFS file. Also a TFS file name w
 	</tr>
 	<tr align="left">
 		<td>simple_name</td>
-		<td>whether require the right suffix to access TFS file<br>1: require the right suffix to access<br>0: no such restrict</td>
+		<td>whether require the right suffix to access the file<br>1: require the right suffix to access<br>0: no such restrict</td>
 	</tr>
 </table>
 
@@ -409,7 +409,7 @@ No
 
 ####Examples
 
-The following request will use tfs as appkey to delete TFS file T1FOZHB4ET1RCvBVdK:
+The following request will use tfs as appkey to delete file T1FOZHB4ET1RCvBVdK:
 
 <pre>
 DELETE /v1/tfs/T1FOZHB4ET1RCvBVdK HTTP/1.1
@@ -427,7 +427,7 @@ Content-Length: 0
 Connection: keep-alive
 </pre>
 
-The following request will use tfs as appkey to conceal TFS file T1FOZHB4ET1RCvBVdK.jpg:
+The following request will use tfs as appkey to conceal file T1FOZHB4ET1RCvBVdK.jpg:
 
 <pre>
 DELETE /v1/tfs/T1FOZHB4ET1RCvBVdK.jpg?hide=1 HTTP/1.1
