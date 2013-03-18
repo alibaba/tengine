@@ -343,7 +343,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         case pre_value:
             if (!is_space(*p)) {
                 state = value;
-                v = p;
+                v = p--;
             }
 
             break;
@@ -459,12 +459,12 @@ success:
 
         if (ctx->sid.len != 0) {
             diff = (ngx_int_t) (now - ctx->lastseen);
-            if (diff < 0 || diff > ctx->sscf->maxidle) {
+            if (diff > ctx->sscf->maxidle) {
                 goto not_found;
             }
 
             diff = (ngx_int_t) (now - ctx->firstseen);
-            if (diff < 0 || diff > ctx->sscf->maxlife) {
+            if (diff > ctx->sscf->maxlife) {
                 goto not_found;
             }
         }
@@ -580,6 +580,7 @@ failed:
             break;
         }
     }
+    ctx->frist = 1;
 
     return rc;
 }
@@ -982,6 +983,8 @@ ngx_http_upstream_session_sticky_create_srv_conf(ngx_conf_t *cf)
     conf->flag = NGX_HTTP_SESSION_STICKY_INSERT | NGX_HTTP_SESSION_STICKY_MD5;
     conf->cookie.data = (u_char *) "route";
     conf->cookie.len = sizeof("route") - 1;
+    conf->path.data = (u_char *) "/";
+    conf->path.len = 1;
 
     return conf;
 }

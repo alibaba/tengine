@@ -382,7 +382,7 @@ like(http_get('/test_prefix_off'), qr/900\d/, 'prefix -- frist and fallback off'
 #18
 unlike(http_get('/test_insert_nodomain'), qr/domain/i, 'insert -- without domain');
 #19
-unlike(http_get('/test_insert_nopath'), qr/path/i, 'insert -- without path');
+like(http_get('/test_insert_nopath'), qr/path=\//i, 'insert -- without path');
 #20
 unlike(http_get('/test_insert_nomaxage'), qr/max-age/i, 'insert--without max-age');
 #21
