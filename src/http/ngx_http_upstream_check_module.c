@@ -843,33 +843,34 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 
 
 void
-ngx_http_upstream_check_delete_dynamic_peer(ngx_uint_t index)
+ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
+    ngx_addr_t *peer_addr)
 {
-    ngx_uint_t                            i;
-    ngx_http_upstream_check_peer_t       *peer, *chosen;
-    ngx_http_upstream_check_peers_t      *peers;
-    ngx_http_upstream_check_peer_shm_t   *peer_shm;
-    ngx_http_upstream_check_peers_shm_t  *peers_shm;
-
-    peers_shm = check_peers_ctx->peers_shm;
-    peer_shm = peers_shm->peers;
-
-    if (upstream_check_index_invalid(check_peers_ctx, index)) {
-        return;
-    }
+    ngx_uint_t                        i;
+    ngx_http_upstream_check_peer_t   *peer, *chosen;
+    ngx_http_upstream_check_peers_t  *peers;
 
     chosen = NULL;
     peers = check_peers_ctx;
     peer = peers->peers.elts;
     for (i = 0; i < peers->peers.nelts; i++) {
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
-        if (index == peer->index) {
-            chosen = peer;
-            break;
+        if (peer[i].upstream_name->len != name->len
+            || ngx_strncmp(peer[i].upstream_name->data,
+                           name->data, name->len) != 0) {
+            continue;
         }
+
+        if (peer[i].peer_addr->socklen != peer_addr->socklen
+            || ngx_memcmp(peer[i].peer_addr->sockaddr, peer_addr->sockaddr,
+                          peer_addr->socklen) != 0) {
+            continue;
+        }
+
+        chosen = &peer[i];
     }
 
     if (chosen == NULL) {
@@ -878,15 +879,13 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_uint_t index)
 
     ngx_http_upstream_check_clear_peer(chosen);
 
-    ngx_shmtx_lock(&peer_shm[index].mutex);
-    peer_shm[index].ref--;
-    if (peer_shm[index].ref <= 0 && peer_shm[index].delete != PEER_DELETED) {
-        ngx_http_upstream_check_clear_dynamic_peer_shm(&peer_shm[index]);
-        peer_shm[index].delete = PEER_DELETED;
-    } else {
-        peer_shm[index].delete = PEER_DELETING;
+    ngx_shmtx_lock(&peer->shm->mutex);
+    peer->shm->ref--;
+    if (peer->shm->ref <= 0 && peer->shm->delete != PEER_DELETED) {
+        ngx_http_upstream_check_clear_dynamic_peer_shm(peer->shm);
+        peer->shm->delete = PEER_DELETED;
     }
-    ngx_shmtx_unlock(&peer_shm[index].mutex);
+    ngx_shmtx_unlock(&peer->shm->mutex);
 }
 
 
@@ -919,8 +918,7 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
     for (i = 0; i < peers_shm->number; i++) {
 
         /* TODO: lock the peer mutex */
-        if (peer_shm[i].delete == PEER_DELETED
-            || peer_shm[i].delete == PEER_DELETING) {
+        if (peer_shm[i].delete == PEER_DELETED) {
             continue;
         }
 
@@ -1178,17 +1176,7 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     ngx_shmtx_lock(&peer->shm->mutex);
 
-    if (peer->shm->delete == PEER_DELETING
-        || peers_shm->generation != ngx_http_upstream_check_shm_generation) {
-
-        ngx_http_upstream_check_clear_peer(peer);
-        peer->shm->ref--;
-
-        if (peer->shm->ref <= 0) {
-            ngx_http_upstream_check_clear_dynamic_peer_shm(peer->shm);
-            peer->shm->delete = PEER_DELETED;
-        }
-
+    if (peers_shm->generation != ngx_http_upstream_check_shm_generation) {
         ngx_shmtx_unlock(&peer->shm->mutex);
         return;
     }
@@ -2038,8 +2026,7 @@ ngx_http_upstream_check_status_update(ngx_http_upstream_check_peer_t *peer,
 
     ngx_shmtx_lock(&peer->shm->mutex);
 
-    if (peer->shm->delete == PEER_DELETING
-        || peer->shm->delete == PEER_DELETED) {
+    if (peer->shm->delete == PEER_DELETED) {
 
         ngx_shmtx_unlock(&peer->shm->mutex);
         return;
