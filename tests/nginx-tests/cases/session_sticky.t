@@ -376,7 +376,7 @@ like(my_http_get('/test_rewrite_off', "asdfasfasdfsadf\|$now\|$now"), qr/502/, '
 like(http_get('/test_rewrite_off'), qr/900\d/, 'rewrite -- frist and fallback off');
 #16
 $now = time();
-like(my_http_get('/test_prefix_off', "asdfasfasdfsadf\|$now\|$now"), qr/502/, 'prefix -- fallback off');
+like(my_http_get('/test_prefix_off', "asdfasfasdfsadf\|$now\|$now"), qr/200/, 'prefix-cookie invailied');
 #17
 like(http_get('/test_prefix_off'), qr/900\d/, 'prefix -- frist and fallback off');
 #18

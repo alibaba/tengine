@@ -408,6 +408,9 @@ success:
                 break;
             }
         }
+        if (vv >= p) {
+            goto not_found;
+        }
 
     } else {
         vv = p;
