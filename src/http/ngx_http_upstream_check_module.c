@@ -2834,8 +2834,10 @@ ngx_http_upstream_check_http_expect_alive(ngx_conf_t *cf, ngx_command_t *cmd,
             }
 
             if (bit & mask[m].mask) {
+#if 0
                 ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                                    "duplicate value \"%s\"", value[i].data);
+#endif
 
             } else {
                 bit |= mask[m].mask;
