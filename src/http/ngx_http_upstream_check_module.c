@@ -671,7 +671,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->conf = ucscf;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
-
+    
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
@@ -811,6 +811,11 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
 
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, pool->log, 0,
+                   "http upstream check add dynamic upstream: %V, "
+                   "peer: %V, index: %ui",
+                   &us->host, &peer_addr->name, index);
+
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
@@ -828,12 +833,14 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
         peer->check_peer_addr = peer->peer_addr;
     }
 
+    peer->shm = &peer_shm[index];
+
     ngx_http_upstream_check_add_timer(peer, ucscf->check_type_conf,
                                       0, pool->log);
-
-    peer->shm = &peer_shm[index];
-    /* TODO: lock, atomic ? */
-    peer_shm[index].ref++;
+   
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, pool->log, 0,
+                   "http upstream check add peer: %p, index: %ui, shm->ref: %i",
+                   peer, peer->index, peer->shm->ref);
 
     peers->checksum +=
         ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
@@ -853,10 +860,19 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
     chosen = NULL;
     peers = check_peers_ctx;
     peer = peers->peers.elts;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "http upstream check delete dynamic upstream: %V, "
+                   "peer: %V", name, &peer_addr->name);
+
     for (i = 0; i < peers->peers.nelts; i++) {
         if (peer[i].delete) {
             continue;
         }
+
+        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "http upstream check delete [%ui], index=%ui, addr:%V",
+                       i, peer[i].index, &peer[i].peer_addr->name);
 
         if (peer[i].upstream_name->len != name->len
             || ngx_strncmp(peer[i].upstream_name->data,
@@ -871,6 +887,7 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
         }
 
         chosen = &peer[i];
+        break;
     }
 
     if (chosen == NULL) {
@@ -879,13 +896,18 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
 
     ngx_http_upstream_check_clear_peer(chosen);
 
-    ngx_shmtx_lock(&peer->shm->mutex);
-    peer->shm->ref--;
-    if (peer->shm->ref <= 0 && peer->shm->delete != PEER_DELETED) {
-        ngx_http_upstream_check_clear_dynamic_peer_shm(peer->shm);
-        peer->shm->delete = PEER_DELETED;
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "http upstream check delete peer: %p, index: %ui, "
+                   "shm->ref: %i",
+                   chosen, chosen->index, chosen->shm->ref);
+
+    ngx_shmtx_lock(&chosen->shm->mutex);
+    chosen->shm->ref--;
+    if (chosen->shm->ref <= 0 && chosen->shm->delete != PEER_DELETED) {
+        ngx_http_upstream_check_clear_dynamic_peer_shm(chosen->shm);
+        chosen->shm->delete = PEER_DELETED;
     }
-    ngx_shmtx_unlock(&peer->shm->mutex);
+    ngx_shmtx_unlock(&chosen->shm->mutex);
 }
 
 
@@ -1085,11 +1107,10 @@ ngx_http_upstream_check_add_timers(ngx_cycle_t *cycle)
         delay = ucscf->check_interval > 1000 ? ucscf->check_interval : 1000;
         t = ngx_random() % delay;
 
+        peer[i].shm = &peer_shm[i];
+
         ngx_http_upstream_check_add_timer(&peer[i], ucscf->check_type_conf, t, cycle->log);
 
-        /* TODO: lock */
-        peer_shm[i].ref++;
-        peer[i].shm = &peer_shm[i];
     }
 
     return NGX_OK;
@@ -1126,6 +1147,9 @@ ngx_http_upstream_check_add_timer(ngx_http_upstream_check_peer_t *peer,
     peer->reinit = check_conf->reinit;
 
     ngx_add_timer(&peer->check_ev, timer);
+
+    /* TODO: lock */
+    peer->shm->ref++;
 
     return NGX_OK;
 }
@@ -1355,6 +1379,10 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
     }
 
     ctx = peer->check_data;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "http check send total: %z",
+                   ctx->send.last - ctx->send.pos);
 
     while (ctx->send.pos < ctx->send.last) {
 
@@ -3197,13 +3225,6 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
 
         peer_shm = &peers_shm->peers[i];
 
-        /*
-         * This function may be triggered before the old stale
-         * work process exits. The owner may stick to the old
-         * pid.
-         */
-        peer_shm->owner = NGX_INVALID_PID;
-
         if (same) {
             continue;
         }
@@ -3353,6 +3374,8 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 
         psh->down         = init_down;
     }
+
+    psh->owner = NGX_INVALID_PID;
 
 #if (NGX_HAVE_ATOMIC_OPS)
 
