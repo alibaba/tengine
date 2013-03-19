@@ -2630,6 +2630,7 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                           *value, s;
     ngx_uint_t                           i, port, rise, fall, default_down;
     ngx_msec_t                           interval, timeout;
+    ngx_check_conf_t                    *check;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     /* default values */
@@ -2765,6 +2766,17 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (ucscf->check_type_conf == NGX_CONF_UNSET_PTR) {
         ngx_str_set(&s, "tcp");
         ucscf->check_type_conf = ngx_http_get_check_type_conf(&s);
+    }
+    
+    check = ucscf->check_type_conf;
+
+    if (ucscf->send.len == 0) {
+        ucscf->send.data = check->default_send.data;
+        ucscf->send.len = check->default_send.len;
+    }
+
+    if (ucscf->code.status_alive == 0) {
+        ucscf->code.status_alive = check->default_status_alive;
     }
 
     return NGX_CONF_OK;
