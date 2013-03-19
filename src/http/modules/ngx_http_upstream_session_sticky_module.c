@@ -112,6 +112,9 @@ static ngx_int_t ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 static ngx_int_t ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
     ngx_http_ss_server_t *s);
 
+static ngx_conf_deprecated_t ngx_conf_deprecated_session_sticky_header = {
+    ngx_conf_deprecated, "session_sticky_header", "session_sticky_hide_cookie"
+};
 
 static ngx_http_output_header_filter_pt ngx_http_ss_next_header_filter;
 
@@ -126,6 +129,13 @@ static ngx_command_t ngx_http_session_sticky_commands[] = {
       NULL },
 
     { ngx_string("session_sticky_hide_cookie"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_session_sticky_hide_cookie,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("session_sticky_header"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_session_sticky_hide_cookie,
       NGX_HTTP_LOC_CONF_OFFSET,
@@ -459,12 +469,12 @@ success:
 
         if (ctx->sid.len != 0) {
             diff = (ngx_int_t) (now - ctx->lastseen);
-            if (diff > ctx->sscf->maxidle) {
+            if (diff > ctx->sscf->maxidle || diff < -86400) {
                 goto not_found;
             }
 
             diff = (ngx_int_t) (now - ctx->firstseen);
-            if (diff > ctx->sscf->maxlife) {
+            if (diff > ctx->sscf->maxlife || diff < -86400) {
                 goto not_found;
             }
         }
@@ -741,7 +751,7 @@ ngx_http_session_sticky_prefix(ngx_http_request_t *r, ngx_table_elt_t *table)
 
         case pre_value:
             if (*p == ';') {
-                return NGX_AGAIN;
+                goto success;
             } else if (!is_space(*p)) {
                 goto success;
             }
@@ -1209,6 +1219,11 @@ ngx_http_session_sticky_hide_cookie(ngx_conf_t *cf, ngx_command_t *cmd,
     ngx_url_t   u;
 
     value = (ngx_str_t *) cf->args->elts;
+    if (ngx_strncmp(value[0].data, "session_sticky_header", 21) == 0) {
+        ngx_conf_deprecated(cf,
+                            &ngx_conf_deprecated_session_sticky_header, NULL);
+    }
+
     if (ngx_strncmp(value[1].data, "upstream=", 9) == 0) {
         add = 9;
         ngx_memzero(&u, sizeof(ngx_url_t));
