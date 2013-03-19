@@ -105,6 +105,7 @@ NGX_ALL_MODULES="
     ngx_http_concat_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
+    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_keepalive_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
@@ -200,9 +201,9 @@ HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_USER_AGENT=YES
-HTTP_SESSION_STICKY=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
+HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
@@ -243,9 +244,9 @@ HTTP_LIMIT_REQ_SHARED=NO
 HTTP_EMPTY_GIF_SHARED=NO
 HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
-HTTP_SESSION_STICKY_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
+HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -466,14 +467,15 @@ do
                                                    HTTP_BROWSER=NO                   ;;
         --with-http_user_agent_module=shared)      HTTP_USER_AGENT_SHARED=YES
                                                    HTTP_USER_AGENT=NO                ;;
-        --with-http_session_sticky_module=shared)  HTTP_SESSION_STICKY=NO
-                                                   HTTP_SESSION_STICKY_SHARED=YES    ;;
         --with-http_upstream_ip_hash_module=shared)
                                                    HTTP_UPSTREAM_IP_HASH_SHARED=YES
                                                    HTTP_UPSTREAM_IP_HASH=NO          ;;
         --with-http_upstream_least_conn_module=shared)
                                                    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
                                                    HTTP_UPSTREAM_LEAST_CONN=NO       ;;
+        --with-http_upstream_session_sticky_module=shared)
+                                                   HTTP_UPSTREAM_SESSION_STICKY=NO
+                                                   HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
@@ -506,12 +508,12 @@ use the \"--without-http_limit_conn_module\" option instead"
         --without-http_empty_gif_module) HTTP_EMPTY_GIF=NO          ;;
         --without-http_browser_module)   HTTP_BROWSER=NO            ;;
         --without-http_user_agent_module) HTTP_USER_AGENT=NO        ;;
-        --without-http_session_sticky_module)
-                                         HTTP_SESSION_STICKY=NO     ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
         --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO   ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO ;;
+        --without-http_upstream_session_sticky_module)
+                                         HTTP_UPSTREAM_SESSION_STICKY=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
@@ -705,8 +707,8 @@ cat << END
                                      enable ngx_http_upstream_ip_hash_module (shared)
   --with-http_upstream_least_conn_module=shared
                                      enable ngx_http_upstream_least_conn_module (shared)
-  --with-http_session_sticky_module=shared
-                                     enable ngx_http_session_sticky_module (shared)
+  --with-http_upstream_session_sticky_module=shared
+                                     enable ngx_http_upstream_session_sticky_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -734,12 +736,12 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
-  --without-http_session_sticky_module
-                                     disable ngx_http_session_sticky_module
   --without-http_upstream_check_module
                                      disable ngx_http_upstream_check_module
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
+  --without-http_upstream_session_sticky_module
+                                     disable ngx_http_upstream_session_sticky_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_ip_hash_module
