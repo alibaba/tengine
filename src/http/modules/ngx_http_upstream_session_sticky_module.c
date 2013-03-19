@@ -816,6 +816,7 @@ ngx_http_session_sticky_rewrite(ngx_http_request_t *r, ngx_table_elt_t *table)
         case pre_value:
             if (!is_space(*p)) {
                 state = value;
+                p--;
             }
             break;
 
