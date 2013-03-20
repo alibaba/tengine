@@ -80,10 +80,12 @@ NGX_ALL_MODULES="
     ngx_http_limit_conn_module
     ngx_http_limit_req_module
     ngx_http_realip_module
+    ngx_http_sysguard_module
     ngx_http_geo_module
     ngx_http_geoip_module
     ngx_http_map_module
     ngx_http_split_clients_module
+    ngx_http_user_agent_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -99,6 +101,8 @@ NGX_ALL_MODULES="
     ngx_http_degradation_module
     ngx_http_flv_module
     ngx_http_mp4_module
+    ngx_http_slice_module
+    ngx_http_concat_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_session_sticky_module
@@ -117,6 +121,7 @@ NGX_ALL_MODULES="
     ngx_http_sub_filter_module
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
+    ngx_http_footer_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -129,7 +134,8 @@ NGX_ALL_MODULES="
     ngx_mail_smtp_module
     ngx_mail_auth_http_module
     ngx_mail_proxy_module
-    ngx_google_perftools_module"
+    ngx_google_perftools_module
+    ngx_backtrace_module"
 
 # dso shared
 NGX_SHARED_MODULES=
@@ -179,6 +185,7 @@ HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_PERL=NO
 HTTP_LUA=NO
+HTTP_TFS=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
@@ -211,6 +218,7 @@ HTTP_CONCAT_SHARED=NO
 HTTP_RANDOM_INDEX_SHARED=NO
 HTTP_GEOIP_SHARED=NO
 HTTP_LUA_SHARED=NO
+HTTP_TFS_SHARED=NO
 HTTP_SECURE_LINK_SHARED=NO
 HTTP_SYSGUARD_SHARED=NO
 HTTP_FLV_SHARED=NO
@@ -281,6 +289,9 @@ LUAJIT_INC=
 LUAJIT_LIB=
 LUA_INC=
 LUA_LIB=
+
+LIBYAJL_INC=
+LIBYAJL_LIB=
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -516,6 +527,12 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-lua-inc=*)                LUA_INC="$value"           ;;
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
+        --with-http_tfs_module)          HTTP_TFS=YES               ;;
+        --with-http_tfs_module=shared)   HTTP_TFS_SHARED=YES
+                                         HTTP_TFS=NO                ;;
+        --with-libyajl-inc=*)            LIBYAJL_INC="$value"       ;;
+        --with-libyajl-lib=*)            LIBYAJL_LIB="$value"       ;;
+
         # STUB
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
@@ -737,6 +754,11 @@ cat << END
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
+
+  --with-http_tfs_module             enable ngx_http_tfs_module (will also enable --with-md5)
+  --with-http_tfs_module=shared      enable ngx_http_tfs_module (shared) (will also enable --with-md5)
+  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h is located)
+  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} is located)
 
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store

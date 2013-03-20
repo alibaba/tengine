@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -33,6 +33,7 @@ typedef struct {
 } ngx_dso_conf_ctx_t;
 
 
+static void *ngx_dso_create_conf(ngx_cycle_t *cycle);
 static char *ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_dso_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf);
 static char *ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
@@ -68,7 +69,7 @@ static ngx_command_t  ngx_dso_module_commands[] = {
 
 static ngx_core_module_t  ngx_dso_module_ctx = {
     ngx_string("dso"),
-    NULL,
+    ngx_dso_create_conf,
     NULL,
 };
 
@@ -102,38 +103,19 @@ static ngx_dso_flagpole_t module_flagpole[] = {
 };
 
 
-static char *
-ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+static void *
+ngx_dso_create_conf(ngx_cycle_t *cycle)
 {
-    char                *rv;
-    ngx_conf_t           pcf;
     ngx_dso_conf_ctx_t  *ctx;
     ngx_pool_cleanup_t  *cln;
 
-    ctx = ((void **) cf->ctx)[ngx_dso_module.index];
-    if (ctx != NULL) {
-        return "is duplicate";
-    }
-
-    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_dso_conf_ctx_t));
+    ctx = ngx_pcalloc(cycle->pool, sizeof(ngx_dso_conf_ctx_t));
 
     if (ctx == NULL) {
-        return NGX_CONF_ERROR;
+        return NULL;
     }
 
-    *(ngx_dso_conf_ctx_t **) conf = ctx;
-
-    ctx->modules = ngx_array_create(cf->pool, 50, sizeof(ngx_dso_module_t));
-    if (ctx->modules == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    ctx->stubs = ngx_array_create(cf->pool, 50, sizeof(ngx_str_t));
-    if (ctx->stubs == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    if (ngx_is_init_cycle(cf->cycle->old_cycle)) {
+    if (ngx_is_init_cycle(cycle->old_cycle)) {
         ngx_memcpy(ngx_static_modules, ngx_modules,
                    sizeof(ngx_module_t *) * ngx_max_module);
         ngx_memcpy(ngx_static_module_names, ngx_module_names,
@@ -151,10 +133,48 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                    sizeof(u_char *) * NGX_DSO_MAX);
     }
 
+    cln = ngx_pool_cleanup_add(cycle->pool, 0);
+    if (cln == NULL) {
+        return NULL;
+    }
+
+    cln->handler = ngx_dso_cleanup;
+    cln->data = cycle;
+
+    return ctx;
+}
+
+
+static char *
+ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                *rv;
+    ngx_conf_t           pcf;
+    ngx_dso_conf_ctx_t  *ctx;
+
+    ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
+                                              ngx_dso_module);
+
+    if (ctx->modules != NULL) {
+        return "is duplicate";
+    }
+
+    ctx->modules = ngx_array_create(cf->pool, 50, sizeof(ngx_dso_module_t));
+    if (ctx->modules == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ctx->stubs = ngx_array_create(cf->pool, 50, sizeof(ngx_str_t));
+    if (ctx->stubs == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
     ctx->flag_postion = ngx_dso_get_position(&module_flagpole[0].entry);
     if (ctx->flag_postion == NGX_ERROR) {
         return NGX_CONF_ERROR;
     }
+
+    *(ngx_dso_conf_ctx_t **) conf = ctx;
 
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0,
                    "dso flag postion (%i)", ctx->flag_postion);
@@ -164,15 +184,6 @@ ngx_dso_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cf->module_type = NGX_CORE_MODULE;
     cf->handler = ngx_dso_parse;
     cf->handler_conf = conf;
-
-    cln = ngx_pool_cleanup_add(cf->pool, 0);
-    if (cln == NULL) {
-        rv = NGX_CONF_ERROR;
-        goto failed;
-    }
-
-    cln->handler = ngx_dso_cleanup;
-    cln->data = cf->cycle;
 
     rv = ngx_conf_parse(cf, NULL);
     if (rv != NGX_CONF_OK) {
@@ -238,9 +249,11 @@ ngx_dso_cleanup(void *data)
     }
 
     if (cycle->conf_ctx) {
-        ctx = (ngx_dso_conf_ctx_t *) cycle->conf_ctx[ngx_dso_module.index];
 
-        if (ctx != NULL) {
+        ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cycle->conf_ctx,
+                                                  ngx_dso_module);
+
+        if (ctx != NULL && ctx->modules != NULL) {
             dm = ctx->modules->elts;
 
             for (i = 0; i < ctx->modules->nelts; i++) {
@@ -757,7 +770,7 @@ ngx_is_dynamic_module(ngx_conf_t *cf, u_char *name,
     ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                               ngx_dso_module);
 
-    if (ctx == NULL) {
+    if (ctx == NULL || ctx->modules == NULL) {
         return NGX_DECLINED;
     }
 
@@ -795,7 +808,7 @@ ngx_show_dso_directives(ngx_conf_t *cf)
     ctx = (ngx_dso_conf_ctx_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                               ngx_dso_module);
 
-    if (ctx == NULL) {
+    if (ctx == NULL || ctx->modules == NULL) {
         return;
     }
 
