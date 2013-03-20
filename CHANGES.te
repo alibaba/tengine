@@ -16,8 +16,8 @@ Changes with Tengine 1.4.4                                       21 Mar 2013
 
     *) Change: CPU affinity is off by default now. (cfsego)
 
-    *) fixed a bug with sysguard and upstream_check module which couldn't
-       be compiled on Solaris 11. (lifeibo, yaoweibin)
+    *) Bugfix: fixed a bug that sysguard and upstream_check module didn't
+       compile on Solaris 11. (lifeibo, yaoweibin)
 
     *) Bugfix: fixed a bug with TFS module that it might return bad values.
        (zhcn381)
