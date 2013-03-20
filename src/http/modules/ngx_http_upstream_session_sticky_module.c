@@ -1313,10 +1313,6 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 }
 
 
-/*
- * TODO: now the ID could be fetched from the server argument.
- * This session ID could be equal to the server ID.
- */
 static ngx_int_t
 ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
     ngx_http_ss_server_t *s)

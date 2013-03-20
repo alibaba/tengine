@@ -64,9 +64,9 @@
 + `fallback`设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
 + `hash` 设置cookie中server标识是用明文还是使用md5值，默认使用md5
 
-## session\_sticky\_header ##
+## session\_sticky\_hide\_cookie ##
 
-语法: **session\_sticky\_header** upstream=name [switch=[on|off]];
+语法: **session\_sticky\_hide\_cookie** upstream=name;
 
 默认值: none
 
