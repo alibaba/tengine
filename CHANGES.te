@@ -1,26 +1,29 @@
 Changes with Tengine 1.4.4                                       21 Mar 2013
 
-    *) Feature: added the session sticky module which provides sticky
-       session for client and upstream server. (dinic)
+    *) Feature: added the session_sticky module by using which one client
+       can be always served by the same upstream server. (dinic)
 
-    *) Feature: now the sysguard module can guard the OS free memory.
-       (lifeibo) 
+    *) Feature: now the sysguard module can protect the server based on
+       the amount of free memory. (lifeibo) 
 
     *) Feature: added support for geoip regional database in geoip module.
        (jasonlfunk)
 
-    *) Change: merged the changes from Nginx-1.2.6 and Nginx-1.2.7. (cfsego)
+    *) Feature: log_empty_request can also disable the logs for timeout (408)
+       empty request. (yaoweibin)
 
-    *) Change: turned off CPU affinity by default. (cfsego)
+    *) Change: merged changes between Nginx-1.2.5 and Nginx-1.2.7. (cfsego)
 
-    *) Change: log_empty_request can also disable the logs for timeout (408)
-       empty request. (cfsego)
+    *) Change: CPU affinity is off by default now. (cfsego)
 
-    *) Bugfix: fixed the compile error with sysguard and upstream check
-       module in Solaris 11. (lifeibo yaoweibin)
+    *) fixed a bug with sysguard and upstream_check module which couldn't
+       be compiled on Solaris 11. (lifeibo, yaoweibin)
 
-    *) Bugfix: fixed the bugs of some bad return values and corrupted
-       large file in TFS module.
+    *) Bugfix: fixed a bug with TFS module that it might return bad values.
+       (zhcn381)
+
+    *) Bugfix: fixed a bug with TFS module that it might corrupt large files.
+       (zhcn381)
 
  
 Changes with Tengine 1.4.3                                       21 Jan 2013
