@@ -13,7 +13,8 @@
     (s)->data = (t)->data
 
 ngx_int_t
-ngx_segment_tree_init(ngx_segment_tree_t *tree, ngx_uint_t num, ngx_pool_t *pool)
+ngx_segment_tree_init(ngx_segment_tree_t *tree, ngx_uint_t num,
+    ngx_pool_t *pool)
 {
     tree->segments = ngx_pcalloc(pool,
                                 ((num + 1) << 2) * sizeof(ngx_segment_node_t));

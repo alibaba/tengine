@@ -22,7 +22,7 @@ typedef struct {
     u_char                                  down;
     uint32_t                                hash;
     ngx_uint_t                              index;
-    ngx_uint_t                              rnindex; // real node index
+    ngx_uint_t                              rnindex;
 #ifdef NGX_HTTP_UPSTREAM_ID
     ngx_int_t                               sid;
 #endif
@@ -53,10 +53,6 @@ typedef struct {
 static void *ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf);
 static ngx_int_t ngx_http_upstream_init_chash(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
-static uint32_t ngx_http_upstream_chash_md5(u_char *str, size_t len);
-#ifdef NGX_HTTP_UPSTREAM_ID
-static uint32_t ngx_murmur_hash(u_char *data, size_t len, uint32_t seed);
-#endif
 static ngx_int_t ngx_http_upstream_chash_cmp(const void *one, const void *two);
 static ngx_int_t ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us);
@@ -157,12 +153,9 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
 static ngx_int_t
 ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 {
-#ifdef NGX_HTTP_UPSTREAM_ID
-    ngx_uint_t                               sid, id;
-#endif
     u_char                                   hash_buf[256];
-    ngx_uint_t                               hash_len;
     ngx_int_t                                j, weight;
+    ngx_uint_t                               sid, id, hash_len;
     ngx_uint_t                               i, n, *number, rnindex;
     ngx_http_upstream_rr_peer_t             *peer;
     ngx_http_upstream_rr_peers_t            *peers;
@@ -196,9 +189,9 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     for (i = 0; i < n; i++) {
         ucscf->number += peers->peer[i].weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
         ucscf->real_node[i] = ngx_pcalloc(cf->pool,
-                                          (peers->peer[i].weight
-                                           * NGX_CHASH_VIRTUAL_NODE_NUMBER + 1) *
-                                          sizeof(ngx_http_upstream_chash_server_t*));
+                                    (peers->peer[i].weight
+                                     * NGX_CHASH_VIRTUAL_NODE_NUMBER + 1) *
+                                     sizeof(ngx_http_upstream_chash_server_t*));
         if (ucscf->real_node[i] == NULL) {
             return NGX_ERROR;
         }
@@ -208,52 +201,53 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
     ucscf->servers = ngx_pcalloc(cf->pool,
                                  (ucscf->number + 1) *
-                                 sizeof(ngx_http_upstream_chash_server_t));
+                                  sizeof(ngx_http_upstream_chash_server_t));
+
     if (ucscf->servers == NULL) {
         return NGX_ERROR;
     }
 
     ucscf->d_servers = ngx_pcalloc(cf->pool,
-                                  (ucscf->number + 1) *
-                            sizeof(ngx_http_upstream_chash_down_server_t));
+                                (ucscf->number + 1) *
+                                sizeof(ngx_http_upstream_chash_down_server_t));
+
     if (ucscf->d_servers == NULL) {
         return NGX_ERROR;
     }
 
     ucscf->number = 0;
     for (i = 0; i < n ; i++) {
+
         peer = &peers->peer[i];
-#ifdef NGX_HTTP_UPSTREAM_ID
         sid = (ngx_uint_t) ngx_atoi(peer->id.data, peer->id.len);
+
         if (sid == (ngx_uint_t) NGX_ERROR || sid > 65535) {
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0, "server id %d", sid);
             ngx_snprintf(hash_buf, 256, "%V%Z", &peer->name);
             hash_len = ngx_strlen(hash_buf);
-            sid = ngx_http_upstream_chash_md5(hash_buf, hash_len);
+            sid = ngx_murmur_hash2(hash_buf, hash_len);
         }
 
-#endif
         weight = peer->weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
-#ifdef NGX_HTTP_UPSTREAM_ID
+
         if (weight >= 1<<14) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "weigth[%d] is too large", weight);
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "weigth[%d] is too large", weight);
             weight = 1<<14;
         }
-#endif
+
         for (j = 0; j < weight; j++) {
+
             server = &ucscf->servers[++ucscf->number];
             server->peer = peer;
             server->rnindex = i;
-#ifdef NGX_HTTP_UPSTREAM_ID
+
             id = sid * 256 * 16 + j;
-            server->hash = ngx_murmur_hash((u_char *) (&id),
-                                           4,
-                                           0x9e3779b9);
-#else
+            server->hash = ngx_murmur_hash2((u_char *) (&id), 4);
             ngx_snprintf(hash_buf, 256, "%V#%i%Z", &peer->name, j);
             hash_len = ngx_strlen(hash_buf);
-            server->hash = ngx_http_upstream_chash_md5(hash_buf, hash_len);
-#endif
+            server->hash = ngx_murmur_hash2(hash_buf, hash_len);
+
         }
     }
 
@@ -273,6 +267,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         ucscf->real_node[rnindex][number[rnindex]] = &ucscf->servers[i];
         number[rnindex]++;
     }
+
     ngx_free(number);
 
     ucscf->tree = ngx_pcalloc(cf->pool, sizeof(ngx_segment_tree_t));
@@ -281,7 +276,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     ngx_segment_tree_init(ucscf->tree, ucscf->number, cf->pool);
-
     ucscf->tree->build(ucscf->tree, 1, 1, ucscf->number);
 
     ucscf->step = NGX_MAX_UINT32_VALUE / ucscf->number;
@@ -290,63 +284,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
     return NGX_OK;
 }
-
-
-static uint32_t
-ngx_http_upstream_chash_md5(u_char *str, size_t len)
-{
-    u_char      md5_buf[16];
-    ngx_md5_t   md5;
-
-    ngx_md5_init(&md5);
-    ngx_md5_update(&md5, str, len);
-    ngx_md5_final(md5_buf, &md5);
-
-    return ngx_crc32_long(md5_buf, 16);
-}
-
-#ifdef NGX_HTTP_UPSTREAM_ID
-static uint32_t
-ngx_murmur_hash(u_char *data, size_t len, uint32_t seed)
-{
-    uint32_t  h, k;
-
-    h = seed ^ len;
-
-    while (len >= 4) {
-        k  = data[0];
-        k |= data[1] << 8;
-        k |= data[2] << 16;
-        k |= data[3] << 24;
-
-        k *= 0x5bd1e995;
-        k ^= k >> 24;
-        k *= 0x5bd1e995;
-
-        h *= 0x5bd1e995;
-        h ^= k;
-
-        data += 4;
-        len -= 4;
-    }
-
-    switch (len) {
-    case 3:
-        h ^= data[2] << 16;
-    case 2:
-        h ^= data[1] << 8;
-    case 1:
-        h ^= data[0];
-        h *= 0x5bd1e995;
-    }
-
-    h ^= h >> 13;
-    h *= 0x5bd1e995;
-    h ^= h >> 15;
-
-    return h;
-}
-#endif
 
 
 static ngx_int_t
@@ -391,11 +328,7 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
                 ucscf->lengths->elts, 0, ucscf->values->elts) == NULL) {
         return NGX_ERROR;
     }
-#ifdef NGX_HTTP_UPSTREAM_ID
-    uchpd->hash = ngx_murmur_hash(hash_value.data, hash_value.len, 0x9e3779b9);
-#else
-    uchpd->hash = ngx_crc32_long(hash_value.data, hash_value.len);
-#endif
+    uchpd->hash = ngx_murmur_hash2(hash_value.data, hash_value.len);
 
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
@@ -411,8 +344,8 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 {
 
     time_t                                   now;
-    uint32_t                                 index, index_1, index_2;
-    uint32_t                                 diff_1, diff_2;
+    uint32_t                                 index, index1, index2;
+    uint32_t                                 diff1, diff2;
     ngx_queue_t                             *q, *temp;
     ngx_segment_node_t                       node, *p;
     ngx_http_upstream_rr_peer_t             *peer;
@@ -490,43 +423,44 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 
             p = ucscf->tree->query(ucscf->tree, 1, 1, ucscf->number,
                                    1, index - 1);
-            index_1 = p->key;
+            index1 = p->key;
             p = ucscf->tree->query(ucscf->tree, 1, 1, ucscf->number,
                                    index + 1, ucscf->number);
-            index_2 = p->key;
+            index2 = p->key;
 
-            if (index_1 == ucscf->tree->extreme) {
+            if (index1 == ucscf->tree->extreme) {
 
-                if (index_2 == ucscf->tree->extreme) {
-                    ngx_log_error(NGX_LOG_ERR, pc->log, 0, "all servers are down!");
+                if (index2 == ucscf->tree->extreme) {
+                    ngx_log_error(NGX_LOG_ERR, pc->log, 0,
+                                  "all servers are down!");
                     return NGX_BUSY;
 
                 } else {
-                    index_1 = index_2;
-                    server = &ucscf->servers[index_2];
+                    index1 = index2;
+                    server = &ucscf->servers[index2];
                 }
 
-            } else if (index_2 == ucscf->tree->extreme) {
-                server = &ucscf->servers[index_1];
+            } else if (index2 == ucscf->tree->extreme) {
+                server = &ucscf->servers[index1];
 
             } else {
-                if (ucscf->servers[index_1].hash > uchpd->hash) {
-                    diff_1 = ucscf->servers[index_1].hash - uchpd->hash;
+                if (ucscf->servers[index1].hash > uchpd->hash) {
+                    diff1 = ucscf->servers[index1].hash - uchpd->hash;
 
                 } else {
-                    diff_1 = uchpd->hash - ucscf->servers[index_1].hash;
+                    diff1 = uchpd->hash - ucscf->servers[index1].hash;
                 }
 
-                if (uchpd->hash > ucscf->servers[index_2].hash) {
-                    diff_2 = uchpd->hash - ucscf->servers[index_2].hash;
+                if (uchpd->hash > ucscf->servers[index2].hash) {
+                    diff2 = uchpd->hash - ucscf->servers[index2].hash;
 
                 } else {
-                    diff_2 = ucscf->servers[index_2].hash - uchpd->hash;
+                    diff2 = ucscf->servers[index2].hash - uchpd->hash;
                 }
 
-                index_1 = diff_1 > diff_2 ? index_2 : index_1;
+                index1 = diff1 > diff2 ? index2 : index1;
 
-                server = &ucscf->servers[index_1];
+                server = &ucscf->servers[index1];
             }
 
             if (
@@ -534,8 +468,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
             ngx_http_upstream_check_peer_down(server->peer->check_index) ||
 #endif
                 server->peer->fails > server->peer->max_fails
-                || server->peer->down
-                )
+                || server->peer->down)
             {
                 ngx_http_upstream_chash_delete_node(ucscf, server);
 
@@ -543,7 +476,7 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
                 break;
             }
 
-            index = index_1;
+            index = index1;
         }
     }
 
@@ -569,6 +502,7 @@ ngx_http_upstream_chash_delete_node(ngx_http_upstream_chash_srv_conf_t *ucscf,
 {
     ngx_http_upstream_chash_server_t **servers, *p;
     servers = ucscf->real_node[server->rnindex];
+
     for (; *servers; servers++) {
         p = *servers;
         if (!p->down) {
@@ -632,8 +566,6 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
     if (pc->tries) {
         pc->tries--;
     }
-
-    return;
 }
 
 
@@ -677,9 +609,7 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     uscf->peer.init_upstream = ngx_http_upstream_init_chash;
 
     uscf->flags = NGX_HTTP_UPSTREAM_CREATE
-#ifdef NGX_HTTP_UPSTREAM_ID
                   | NGX_HTTP_UPSTREAM_ID
-#endif
                   | NGX_HTTP_UPSTREAM_WEIGHT
                   | NGX_HTTP_UPSTREAM_MAX_FAILS
                   | NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
