@@ -790,10 +790,21 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     peer = NULL;
 
     p = peers->peers.elts;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pool->log, 0,
+                   "http upstream check add dynamic upstream: %p, n: %ui",
+                   p, peers->peers.nelts);
+
     for (i = 0; i < peers->peers.nelts; i++) {
+
+        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, pool->log, 0,
+                       "http upstream check add [%ui], index=%ui, delete:%ud",
+                       i, p[i].index, p[i].delete);
+
         if (p[i].delete) {
             p[i].delete = 0;
             peer = &p[i];
+            break;
         }
     }
 
@@ -862,6 +873,10 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
     peer = peers->peers.elts;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "http upstream check delete dynamic upstream: %p, n: %ui",
+                   peer, peers->peers.nelts);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "http upstream check delete dynamic upstream: %V, "
                    "peer: %V", name, &peer_addr->name);
 
@@ -894,8 +909,6 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
         return;
     }
 
-    ngx_http_upstream_check_clear_peer(chosen);
-
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "http upstream check delete peer: %p, index: %ui, "
                    "shm->ref: %i",
@@ -908,6 +921,8 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
         chosen->shm->delete = PEER_DELETED;
     }
     ngx_shmtx_unlock(&chosen->shm->mutex);
+
+    ngx_http_upstream_check_clear_peer(chosen);
 }
 
 
@@ -2196,6 +2211,8 @@ ngx_http_upstream_check_clear_peer(ngx_http_upstream_check_peer_t  *peer)
         ngx_destroy_pool(peer->pool);
         peer->pool = NULL;
     }
+
+    ngx_memzero(peer, sizeof(ngx_http_upstream_check_peer_t));
 
     peer->delete = 1;
 }
