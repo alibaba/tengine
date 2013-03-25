@@ -1081,7 +1081,6 @@ ngx_http_upstream_check_add_timers(ngx_cycle_t *cycle)
 {
     ngx_uint_t                           i;
     ngx_msec_t                           t, delay;
-    ngx_core_conf_t                     *ccf;
     ngx_http_upstream_check_peer_t      *peer;
     ngx_http_upstream_check_peers_t     *peers;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
@@ -1108,8 +1107,6 @@ ngx_http_upstream_check_add_timers(ngx_cycle_t *cycle)
 
     peer = peers->peers.elts;
     peer_shm = peers_shm->peers;
-
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     for (i = 0; i < peers->peers.nelts; i++) {
 
