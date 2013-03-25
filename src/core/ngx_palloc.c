@@ -331,19 +331,19 @@ ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
         return NULL;
     }
 	
-	if (new_size <= old_size) {
-	    return p;
-	}
-	
-	if (old_size <= pool->max) {
-	    for (node = pool; node; node = node->d.next) {
-		    if ((u_char *)p + old_size == node->d.last
-			    && (u_char *)p + new_size <= node->d.end) {
-				node->d.last = (u_char *)p + new_size;
-				return p;
-		    }
+    if (old_size <= pool->max) {
+        for (node = pool; node; node = node->d.next) {
+            if ((u_char *)p + old_size == node->d.last
+                && (u_char *)p + new_size <= node->d.end) {
+                node->d.last = (u_char *)p + new_size;
+                return p;
+            }
         }		
-	}
+    }
+		
+    if (new_size <= old_size) {
+       return p;
+    }
 	
     new = ngx_palloc(pool, new_size);
     if (new == NULL) {
