@@ -243,14 +243,20 @@ ngx_http_restful_parse_custom_name(ngx_http_request_t *r,
             ctx->file_path_s.data = appid;
             ctx->file_path_s.len = 5;
             return NGX_OK;
-        } else {
-            return NGX_ERROR;
         }
+        return NGX_ERROR;
     }
 
     ctx->file_path_s.len = p - ctx->file_path_s.data;
     if (ctx->file_path_s.len < 1
         || ctx->file_path_s.len > NGX_HTTP_TFS_MAX_FILE_NAME_LEN)
+    {
+        return NGX_ERROR;
+    }
+
+    /* forbid file actions on "/" */
+    if (ctx->file_type == NGX_HTTP_TFS_CUSTOM_FT_FILE
+        && ctx->file_path_s.len == 1)
     {
         return NGX_ERROR;
     }
@@ -401,10 +407,12 @@ ngx_http_restful_parse_action(ngx_http_request_t *r,
                           &file_path_d, &ctx->file_path_s);
 
             if (file_path_d.len < 1
-                || file_path_d.len > NGX_HTTP_TFS_MAX_FILE_NAME_LEN)
+                || file_path_d.len > NGX_HTTP_TFS_MAX_FILE_NAME_LEN
+                || ctx->file_path_s.len == 1)
             {
                 return NGX_HTTP_BAD_REQUEST;
             }
+
             if (ctx->file_path_s.len == file_path_d.len
                 && ngx_strncmp(ctx->file_path_s.data, file_path_d.data,
                                file_path_d.len) == 0)
@@ -418,6 +426,7 @@ ngx_http_restful_parse_action(ngx_http_request_t *r,
             if (ctx->file_type == NGX_HTTP_TFS_CUSTOM_FT_FILE) {
                 ctx->action.code = NGX_HTTP_TFS_ACTION_MOVE_FILE;
                 ngx_str_set(&ctx->action.msg, "move_file");
+
             } else {
                 ctx->action.code = NGX_HTTP_TFS_ACTION_MOVE_DIR;
                 ngx_str_set(&ctx->action.msg, "move_dir");
@@ -429,6 +438,11 @@ ngx_http_restful_parse_action(ngx_http_request_t *r,
                 ngx_str_set(&ctx->action.msg, "create_file");
 
             } else {
+                /* forbid create "/" */
+                if (ctx->file_path_s.len == 1) {
+                    return NGX_HTTP_BAD_REQUEST;
+                }
+
                 ctx->action.code = NGX_HTTP_TFS_ACTION_CREATE_DIR;
                 ngx_str_set(&ctx->action.msg, "create_dir");
             }
@@ -457,12 +471,12 @@ ngx_http_restful_parse_action(ngx_http_request_t *r,
                 }
 
             } else {
-                ctx->offset = -1; /* no specify offset, append by default */
+                /* no specify offset, append by default */
+                ctx->offset = NGX_HTTP_TFS_APPEND_OFFSET;
             }
             return NGX_OK;
         }
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "put method is forbid in dir");
+        /* forbid put aciont on dir */
         return NGX_ERROR;
     case NGX_HTTP_DELETE:
         if (ctx->file_type == NGX_HTTP_TFS_CUSTOM_FT_FILE) {
@@ -473,6 +487,12 @@ ngx_http_restful_parse_action(ngx_http_request_t *r,
 
             return NGX_OK;
         }
+
+        /* forbid delete "/" */
+        if (ctx->file_path_s.len == 1) {
+            return NGX_HTTP_BAD_REQUEST;
+        }
+
         ctx->action.code = NGX_HTTP_TFS_ACTION_REMOVE_DIR;
         ngx_str_set(&ctx->action.msg, "remove_dir");
         break;
@@ -502,7 +522,6 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
 
     switch(r->method) {
     case NGX_HTTP_GET:
-
         if (ngx_http_arg(r, (u_char *) "suffix", 6, &arg_value) == NGX_OK) {
             ctx->file_suffix = arg_value;
         }
@@ -679,7 +698,7 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
 
         /* large file not support UNDELETE */
         if ((ctx->fsname.file_type == NGX_HTTP_TFS_LARGE_FILE_TYPE)
-            && ctx->unlink_type == 2)
+            && ctx->unlink_type == NGX_HTTP_TFS_UNLINK_UNDELETE)
         {
             return NGX_HTTP_BAD_REQUEST;
         }

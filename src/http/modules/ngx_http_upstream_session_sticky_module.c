@@ -407,6 +407,7 @@ not_found:
 success:
 
     if (sscf->flag & NGX_HTTP_SESSION_STICKY_PREFIX) {
+
         for (vv = v; vv < p; vv++) {
             if (*vv == '~') {
                 end = vv + 1;
@@ -462,6 +463,7 @@ success:
         if (p >= vv || v >= vv) {
             legal = 0;
             goto finish;
+
         }
 
         ctx->s_firstseen.len = vv - v;
@@ -1079,6 +1081,7 @@ static char *
 ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)
 {
+    ngx_int_t                        rc;
     ngx_uint_t                       i;
     ngx_str_t                       *value;
     ngx_http_upstream_srv_conf_t    *uscf;
@@ -1099,24 +1102,41 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
         if (ngx_strncmp(value[i].data, "cookie=", 7) == 0){
             sscf->cookie.data = value[i].data + 7;
             sscf->cookie.len = value[i].len - 7;
+            if (sscf->cookie.len == 0) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid cookie");
+                return NGX_CONF_ERROR;
+            }
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "domain=", 7) == 0) {
             sscf->domain.data = value[i].data + 7;
             sscf->domain.len = value[i].len - 7;
+            if (sscf->domain.len == 0) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid domain");
+                return NGX_CONF_ERROR;
+            }
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "path=", 5) == 0) {
             sscf->path.data = value[i].data + 5;
             sscf->path.len = value[i].len - 5;
+            if (sscf->path.len == 0) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid path");
+                return NGX_CONF_ERROR;
+            }
             continue;
         }
 
         if (ngx_strncmp(value[i].data, "maxage=", 7) == 0) {
             sscf->maxage.data = value[i].data + 7;
             sscf->maxage.len = value[i].len - 7;
+            rc = ngx_atoi(sscf->maxage.data, sscf->maxage.len);
+            if (rc == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid maxage");
+                return NGX_CONF_ERROR;
+            }
             continue;
         }
 
@@ -1337,10 +1357,6 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 }
 
 
-/*
- * TODO: now the ID could be fetched from the server argument.
- * This session ID could be equal to the server ID.
- */
 static ngx_int_t
 ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
     ngx_http_ss_server_t *s)

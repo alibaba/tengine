@@ -464,8 +464,8 @@ ngx_http_tfs_create_batch_block_info_message(ngx_http_tfs_t *t)
     ngx_http_tfs_ns_batch_block_info_request_t  *req;
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     real_block_count = block_count;
@@ -698,8 +698,8 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
          + sizeof(ngx_http_tfs_ns_batch_block_info_response_t);
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
     real_block_count = resp->block_count;
 

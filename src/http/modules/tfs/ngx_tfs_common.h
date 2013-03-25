@@ -13,7 +13,6 @@
 
 #define NGX_HTTP_TFS_HEADER                           0
 #define NGX_HTTP_TFS_BODY                             1
-#define NGX_HTTP_TFS_METASERVER_COUNT                 10240
 
 #define NGX_HTTP_TFS_YES                              1
 #define NGX_HTTP_TFS_NO                               0
@@ -31,6 +30,7 @@
 
 /* rcs, ns, ds, rs, ms */
 #define NGX_HTTP_TFS_SERVER_COUNT                     5
+#define NGX_HTTP_TFS_METASERVER_COUNT                 10240
 /* master_conifg_server;slave_config_server;group */
 #define NGX_HTTP_TFS_TAIR_SERVER_ADDR_PART_COUNT      3
 /* master && slave */
@@ -42,6 +42,7 @@
 #define NGX_HTTP_TFS_USE_LARGE_FILE_SIZE              (15 * 1024 * 1024)
 #define NGX_HTTP_TFS_MAX_SIZE                         (ULLONG_MAX - 1)
 
+#define NGX_HTTP_TFS_DEFAULT_BODY_BUFFER_SIZE         (2 * 1024 * 1024)
 #define NGX_HTTP_TFS_ZERO_BUF_SIZE                    (512 * 1024)
 #define NGX_HTTP_TFS_INIT_FILE_HOLE_COUNT             5
 
@@ -65,10 +66,10 @@
 #define NGX_HTTP_TFS_CMD_GET_GROUP_SEQ                 23
 
 #define NGX_HTTP_TFS_GMT_TIME_SIZE                  \
-    (sizeof("Mon, 28 Sep 1970 06:00:00 UTC+0800") - 1)
+    (sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1)
 
 #define NGX_HTTP_TFS_MAX_FRAGMENT_SIZE                 (2 * 1024 * 1024)
-#define NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT               8
+#define NGX_HTTP_TFS_MAX_BATCH_COUNT                   8
 
 
 #define NGX_HTTP_TFS_MUR_HASH_SEED                     97

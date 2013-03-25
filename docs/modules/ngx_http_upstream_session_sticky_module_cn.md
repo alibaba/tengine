@@ -64,9 +64,9 @@
 + `fallback`设置是否重试其他机器，当sticky的后端机器挂了以后，是否需要尝试其他机器
 + `hash` 设置cookie中server标识是用明文还是使用md5值，默认使用md5
 
-## session\_sticky\_header ##
+## session\_sticky\_hide\_cookie ##
 
-语法: **session\_sticky\_header** upstream=name [switch=[on|off]];
+语法: **session\_sticky\_hide\_cookie** upstream=name;
 
 默认值: none
 
@@ -74,4 +74,4 @@
 
 说明：
 
-配合proxy_pass指令使用。用于在insert+indirect模式和prefix模式下删除请求用于session sticky的cookie，这样就不会将该cookie传递给后端服务。upstream表示需要进行操作的upstream名称。switch用于表示打开或关闭对cookie的处理，默认为on。
+配合proxy_pass指令使用。用于在insert+indirect模式和prefix模式下删除请求用于session sticky的cookie，这样就不会将该cookie传递给后端服务。upstream表示需要进行操作的upstream名称。

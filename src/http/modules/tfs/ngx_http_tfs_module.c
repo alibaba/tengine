@@ -781,7 +781,7 @@ ngx_http_tfs_init_main_conf(ngx_conf_t *cf, void *conf)
     }
 
     if (tmcf->body_buffer_size == NGX_CONF_UNSET_SIZE) {
-        tmcf->body_buffer_size = (size_t) ngx_pagesize * 2;
+        tmcf->body_buffer_size = NGX_HTTP_TFS_DEFAULT_BODY_BUFFER_SIZE;
     }
 
     return NGX_CONF_OK;
