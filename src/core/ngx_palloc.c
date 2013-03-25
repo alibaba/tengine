@@ -315,7 +315,7 @@ void *
 ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 {
     void *new;
-	ngx_pool_t *node;
+    ngx_pool_t *node;
 
     if (p == NULL) {
         return ngx_palloc(pool, new_size);
