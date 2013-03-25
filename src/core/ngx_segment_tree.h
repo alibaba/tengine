@@ -7,6 +7,7 @@
 #ifndef _NGX_SEGMENT_TREE_H_INCLUDE_
 #define _NGX_SEGMENT_TREE_H_INCLUDE_
 
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 
@@ -31,7 +32,6 @@ struct ngx_segment_node_s {
     void                 *data;
 };
 
-
 struct ngx_segment_tree_s {
     uint32_t              extreme;
     ngx_pool_t           *pool;
@@ -46,10 +46,6 @@ struct ngx_segment_tree_s {
 };
 
 
-ngx_int_t ngx_segment_tree_min(ngx_segment_node_t *one,
-    ngx_segment_node_t *two);
-ngx_int_t ngx_segment_tree_max(ngx_segment_node_t *one,
-    ngx_segment_node_t *two);
 void ngx_segment_tree_build(ngx_segment_tree_t *tree, ngx_int_t index,
     ngx_int_t l, ngx_int_t r);
 void ngx_segment_tree_insert(ngx_segment_tree_t *tree, ngx_int_t index,
@@ -58,9 +54,8 @@ ngx_segment_node_t *ngx_segment_tree_query(ngx_segment_tree_t *tree,
     ngx_int_t index, ngx_int_t l, ngx_int_t r, ngx_int_t ll, ngx_int_t rr);
 void ngx_segment_tree_delete(ngx_segment_tree_t *tree, ngx_int_t index,
     ngx_int_t l, ngx_int_t r, ngx_int_t pos);
-
-
 ngx_int_t ngx_segment_tree_init(ngx_segment_tree_t *tree, ngx_uint_t num,
     ngx_pool_t *pool);
+
 
 #endif

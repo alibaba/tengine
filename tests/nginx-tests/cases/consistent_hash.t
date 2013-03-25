@@ -36,7 +36,6 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        consistent_mode native;
         server 127.0.0.1:9000 id=9000 weight=1;
         server 127.0.0.1:9001 id=9001 weight=1;
         server 127.0.0.1:9002 id=9002 weight=1;
@@ -106,7 +105,6 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        consistent_mode native;
         server 127.0.0.1:9000 id=9000 weight=1 max_fails=0;
         server 127.0.0.1:9001 id=9001 weight=1 max_fails=0;
         server 127.0.0.1:9002 id=9002 weight=1 max_fails=0;
@@ -154,7 +152,6 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        consistent_mode native;
         server 127.0.0.1:9000 id=9000 weight=16;
         server 127.0.0.1:9001 id=9001 weight=16;
         server 127.0.0.1:9002 id=9002 weight=16;
@@ -228,7 +225,6 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        consistent_mode native;
         server 127.0.0.1:9000 id=9000 weight=1;
         server 127.0.0.1:9001 id=9001 weight=10;
         server 127.0.0.1:9002 id=9002 weight=100;
