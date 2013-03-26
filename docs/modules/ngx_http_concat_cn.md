@@ -96,6 +96,12 @@
        
 定义模块是否忽略文件不存在（404）或者没有权限（403）错误
 
+**concat_file_error_body**  string
+**默认** 无
+**上下文** 'http, server, location'
+
+如果 `concat_ignore_file_error` 设置为 `on`,当访问的文件出错，则使用此处配置的`string`作为文件内容发送给客户端
+
 ## 安装
 
  1. 编译concat模块

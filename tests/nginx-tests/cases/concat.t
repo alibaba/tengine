@@ -19,7 +19,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http concat/)->plan(169);
+my $t = Test::Nginx->new()->has(qw/http concat/)->plan(178);
 
 $t->set_dso("ngx_http_concat_module", "ngx_http_concat_module.so");
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
@@ -2910,3 +2910,160 @@ like(http_get('/concatFile/??hello.js,world.js,jack.js,/'), $concat_message50, '
 
 $t->stop();
 ###############################################################################
+###############################################################################
+$d = $t->testdir();
+
+mkdir("$d/concatFile");
+$t->write_file('concatFile/hello.js', 'hello');
+$t->write_file('concatFile/world.js', 'world');
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+master_process off;
+daemon         off;
+
+%%TEST_GLOBALS_DSO%%
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+    
+    default_type application/octet-stream;
+
+    server {
+        listen      127.0.0.1:8080;
+        server_name localhost;
+
+        location /concatFile/ {
+            concat                   on;
+            concat_max_files         20;
+            concat_ignore_file_error on;
+            concat_file_error_body   test;
+        }
+    }
+}
+
+EOF
+
+$t->run();
+
+like(http_get('/concatFile/??not_found_file.js,hello.js,world.js'), qr/testhelloworld/, 'concat - insert errorBody');
+like(http_get('/concatFile/??hello.js,not_found_file.js,world.js'), qr/hellotestworld/,'concat - insert errorBody');
+like(http_get('/concatFile/??hello.js,world.js,not_found_file.js'), qr/helloworldtest/, 'concat - insert errorBody');
+$t->stop();
+###############################################################################
+###############################################################################
+$d = $t->testdir();
+
+mkdir("$d/concatFile");
+$t->write_file('concatFile/hello.js', 'hello');
+$t->write_file('concatFile/world.js', 'world');
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+master_process off;
+daemon         off;
+
+%%TEST_GLOBALS_DSO%%
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+    
+    default_type application/octet-stream;
+
+    server {
+        listen      127.0.0.1:8080;
+        server_name localhost;
+
+        location /concatFile/ {
+            concat                   on;
+            concat_max_files         20;
+            concat_ignore_file_error off;
+            concat_file_error_body   test;
+        }
+    }
+}
+
+EOF
+
+$t->run();
+
+like(http_get('/concatFile/??not_found_file.js,hello.js,world.js'), qr/404 Not Found/, 'concat - insert error body');
+like(http_get('/concatFile/??hello.js,not_found_file.js, world.js'), qr/404 Not Found/,'concat - insert errorBody');
+like(http_get('/concatFile/??hello.js,world.js,not_found_file.js'), qr/404 Not Found/, 'concat - insert errorBody');
+$t->stop();
+###############################################################################
+###############################################################################
+$d = $t->testdir();
+
+mkdir("$d/concatFile");
+$t->write_file('concatFile/hello.js', 'hello');
+$t->write_file('concatFile/world.js', 'world');
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+master_process off;
+daemon         off;
+
+%%TEST_GLOBALS_DSO%%
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+    }
+    
+    default_type application/octet-stream;
+
+    server {
+        listen      127.0.0.1:8080;
+        server_name localhost;
+
+        location /concatFile/ {
+            concat                   on;
+            concat_max_files         20;
+            concat_ignore_file_error on;
+        }
+    }
+}
+
+EOF
+
+$t->run();
+
+like(http_get('/concatFile/??not_found_file.js,hello.js,world.js'), qr/helloworld/, 'concat - no errorBody');
+like(http_get('/concatFile/??hello.js,not_found_file.js,world.js'), qr/helloworld/,'concat - no errorBody');
+like(http_get('/concatFile/??hello.js,world.js,not_found_file.js'), qr/helloworld/, 'concat - no errorBody');
+$t->stop();
