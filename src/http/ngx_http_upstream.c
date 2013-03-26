@@ -1648,6 +1648,11 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         rc = ngx_output_chain(&u->output, u->request_bufs);
 
+        /* Flush the buffer for sure. It may be stucked in the SSL buffer. */
+        if (rc == NGX_AGAIN && c->buffered) {
+            rc = ngx_output_chain(&u->output, NULL);
+        }
+
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http upstream send no buffered request: rc=%i", rc);
 
