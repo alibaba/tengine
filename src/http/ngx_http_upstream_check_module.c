@@ -248,6 +248,7 @@ struct ngx_http_upstream_check_srv_conf_s {
     } code;
 
     ngx_uint_t                               default_down;
+    ngx_uint_t                               unique;
 };
 
 
@@ -260,7 +261,7 @@ typedef struct {
     (check_ctx == NULL                                     \
      || index >= check_ctx->peers_shm->number              \
      || index >= check_ctx->peers_shm->max_number)
-    
+
 
 #define PEER_NORMAL   0x00
 #define PEER_DELETING 0x01
@@ -376,6 +377,10 @@ static char *ngx_http_upstream_check_init_main_conf(ngx_conf_t *cf,
 
 static void *ngx_http_upstream_check_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf);
+
+static ngx_uint_t ngx_http_upstream_check_unique_peer(
+    ngx_http_upstream_check_peers_t *peers, ngx_addr_t *peer_addr,
+    ngx_http_upstream_check_srv_conf_t *peer_conf);
 
 static void *ngx_http_upstream_check_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_http_upstream_check_merge_loc_conf(ngx_conf_t *cf,
@@ -637,6 +642,7 @@ ngx_uint_t
 ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer_addr)
 {
+    ngx_uint_t                            index;
     ngx_http_upstream_check_peer_t       *peer;
     ngx_http_upstream_check_peers_t      *peers;
     ngx_http_upstream_check_srv_conf_t   *ucscf;
@@ -660,6 +666,13 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
                                                ngx_http_upstream_check_module);
     peers = ucmcf->peers;
 
+    if (ucscf->unique) {
+        index = ngx_http_upstream_check_unique_peer(peers, peer_addr, ucscf);
+        if (index != (ngx_uint_t) NGX_ERROR) {
+            return index;
+        }
+    }
+
     peer = ngx_array_push(&peers->peers);
     if (peer == NULL) {
         return NGX_ERROR;
@@ -671,7 +684,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->conf = ucscf;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
-    
+
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
@@ -818,7 +831,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     }
 
     peer->conf = ucscf;
-    peer->index = index; 
+    peer->index = index;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
 
@@ -848,7 +861,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 
     ngx_http_upstream_check_add_timer(peer, ucscf->check_type_conf,
                                       0, pool->log);
-   
+
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, pool->log, 0,
                    "http upstream check add peer: %p, index: %ui, shm->ref: %i",
                    peer, peer->index, peer->shm->ref);
@@ -1017,6 +1030,56 @@ ngx_http_upstream_check_clear_dynamic_peer_shm(
     ngx_slab_free_locked(check_peers_ctx->shpool, peer_shm->sockaddr);
 }
 
+
+
+static ngx_uint_t
+ngx_http_upstream_check_unique_peer(ngx_http_upstream_check_peers_t *peers,
+    ngx_addr_t *peer_addr, ngx_http_upstream_check_srv_conf_t *peer_conf)
+{
+    ngx_uint_t                           i;
+    ngx_http_upstream_check_peer_t      *peer;
+    ngx_http_upstream_check_srv_conf_t  *opeer_conf;
+
+    peer = peers->peers.elts;
+    for (i = 0; i < peers->peers.nelts; i++) {
+
+        if (peer[i].delete) {
+            continue;
+        }
+
+        if (peer[i].peer_addr->socklen != peer_addr->socklen) {
+            continue;
+        }
+
+        if (ngx_memcmp(peer[i].peer_addr->sockaddr,
+                       peer_addr->sockaddr, peer_addr->socklen) != 0) {
+            continue;
+        }
+
+        opeer_conf = peer[i].conf;
+
+        if (opeer_conf->check_type_conf != peer_conf->check_type_conf) {
+            continue;
+        }
+
+        if (opeer_conf->send.len != peer_conf->send.len) {
+            continue;
+        }
+
+        if (ngx_strncmp(opeer_conf->send.data,
+                        peer_conf->send.data, peer_conf->send.len) != 0) {
+            continue;
+        }
+
+        if (opeer_conf->code.status_alive != peer_conf->code.status_alive) {
+            continue;
+        }
+
+        return i;
+    }
+
+    return NGX_ERROR;
+}
 
 
 ngx_uint_t
@@ -2645,7 +2708,7 @@ static char *
 ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                           *value, s;
-    ngx_uint_t                           i, port, rise, fall, default_down;
+    ngx_uint_t                           i, port, rise, fall, default_down, unique;
     ngx_msec_t                           interval, timeout;
     ngx_check_conf_t                    *check;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
@@ -2657,6 +2720,7 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     interval = 30000;
     timeout = 1000;
     default_down = 1;
+    unique = 0;
 
     value = cf->args->elts;
 
@@ -2770,6 +2834,25 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "unique=", 7) == 0) {
+            s.len = value[i].len - 7;
+            s.data = value[i].data + 7;
+
+            if (ngx_strcasecmp(s.data, (u_char *) "true") == 0) {
+                unique = 1;
+            } else if (ngx_strcasecmp(s.data, (u_char *) "false") == 0) {
+                unique = 0;
+            } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid value \"%s\", "
+                                   "it must be \"true\" or \"false\"",
+                                   value[i].data);
+                return NGX_CONF_ERROR;
+            }
+
+            continue;
+        }
+
         goto invalid_check_parameter;
     }
 
@@ -2779,12 +2862,13 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ucscf->fall_count = fall;
     ucscf->rise_count = rise;
     ucscf->default_down = default_down;
+    ucscf->unique = unique;
 
     if (ucscf->check_type_conf == NGX_CONF_UNSET_PTR) {
         ngx_str_set(&s, "tcp");
         ucscf->check_type_conf = ngx_http_get_check_type_conf(&s);
     }
-    
+
     check = ucscf->check_type_conf;
 
     if (ucscf->send.len == 0) {
