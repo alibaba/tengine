@@ -134,6 +134,7 @@ fi
 #         ngx_http_addition_filter
 #         ngx_http_userid_filter
 #         ngx_http_footer_filter
+#         ngx_http_trim_filter
 #         ngx_http_headers_filter
 #     ngx_http_copy_filter
 #     ngx_http_range_body_filter
@@ -235,6 +236,16 @@ fi
 if [ $HTTP_FOOTER_SHARED = YES ]; then
     NGX_SHARED_MODULES="$NGX_SHARED_MODULES $HTTP_FOOTER_FILTER_MODULE"
     NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_FOOTER_FILTER_SRCS"
+fi
+
+if [ $HTTP_TRIM = YES ]; then
+    HTTP_FILTER_MODULES="$HTTP_FILTER_MODULES $HTTP_TRIM_FILTER_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_TRIM_FILTER_SRCS"
+fi
+
+if [ $HTTP_TRIM_SHARED = YES ]; then
+    NGX_SHARED_MODULES="$NGX_SHARED_MODULES $HTTP_TRIM_FILTER_MODULE"
+    NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_TRIM_FILTER_SRCS"
 fi
 
 HTTP_MODULES="$HTTP_MODULES $HTTP_STATIC_MODULE"

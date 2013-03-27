@@ -200,6 +200,7 @@ HTTP_MP4=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
+HTTP_TRIM=YES
 HTTP_USER_AGENT=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
@@ -227,6 +228,7 @@ HTTP_MP4_SHARED=NO
 HTTP_CHARSET_SHARED=NO
 HTTP_USERID_SHARED=NO
 HTTP_FOOTER_SHARED=NO
+HTTP_TRIM_SHARED=NO
 HTTP_ACCESS_SHARED=NO
 HTTP_AUTOINDEX_SHARED=NO
 HTTP_STATUS_SHARED=NO
@@ -436,6 +438,8 @@ do
                                                    HTTP_USERID=NO                    ;;
         --with-http_footer_filter_module=shared)   HTTP_FOOTER_SHARED=YES
                                                    HTTP_FOOTER=NO                    ;;
+        --with-http_trim_filter_module=shared)     HTTP_TRIM_SHARED=YES
+                                                   HTTP_TRIM=NO                      ;;
         --with-http_access_module=shared)          HTTP_ACCESS_SHARED=YES
                                                    HTTP_ACCESS=NO                    ;;
         --with-http_autoindex_module=shared)       HTTP_AUTOINDEX_SHARED=YES
@@ -482,6 +486,7 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO             ;;
         --without-http_footer_module)    HTTP_FOOTER=NO             ;;
+        --without-http_trim_module)      HTTP_TRIM=NO               ;;
         --without-http_access_module)    HTTP_ACCESS=NO             ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
         --without-http_autoindex_module) HTTP_AUTOINDEX=NO          ;;
@@ -678,6 +683,8 @@ cat << END
                                      enable ngx_http_userid_filter_module (shared)
   --with-http_footer_filter_module=shared
                                      enable ngx_http_footer_filter_module (shared)
+  --with-http_trim_filter_module=shared
+                                     enable ngx_http_trim_filter_module (shared)
   --with-http_access_module=shared   enable ngx_http_access_module (shared)
   --with-http_autoindex_module=shared
                                      enable ngx_http_autoindex_module (shared)
@@ -714,6 +721,8 @@ cat << END
   --without-http_userid_module       disable ngx_http_userid_filter_module
   --without-http_footer_filter_module
                                      disable ngx_http_footer_filter_module
+  --without-http_trim_filter_module
+                                     disable ngx_http_trim_filter_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
