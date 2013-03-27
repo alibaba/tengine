@@ -108,6 +108,7 @@ NGX_ALL_MODULES="
     ngx_http_concat_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
+    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_keepalive_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
@@ -187,6 +188,7 @@ HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_PERL=NO
 HTTP_LUA=NO
+HTTP_TFS=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
@@ -204,6 +206,7 @@ HTTP_FOOTER=YES
 HTTP_USER_AGENT=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
+HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 
 # STUB
@@ -218,6 +221,7 @@ HTTP_CONCAT_SHARED=NO
 HTTP_RANDOM_INDEX_SHARED=NO
 HTTP_GEOIP_SHARED=NO
 HTTP_LUA_SHARED=NO
+HTTP_TFS_SHARED=NO
 HTTP_SECURE_LINK_SHARED=NO
 HTTP_SYSGUARD_SHARED=NO
 HTTP_FLV_SHARED=NO
@@ -244,6 +248,7 @@ HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
+HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -287,6 +292,9 @@ LUAJIT_INC=
 LUAJIT_LIB=
 LUA_INC=
 LUA_LIB=
+
+LIBYAJL_INC=
+LIBYAJL_LIB=
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -470,6 +478,9 @@ do
         --with-http_upstream_least_conn_module=shared)
                                                    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
                                                    HTTP_UPSTREAM_LEAST_CONN=NO       ;;
+        --with-http_upstream_session_sticky_module=shared)
+                                                   HTTP_UPSTREAM_SESSION_STICKY=NO
+                                                   HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
                                          HTTP_CHARSET_SHARED=NO     ;;
@@ -527,6 +538,9 @@ use the \"--without-http_limit_conn_module\" option instead"
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO
                                          HTTP_UPSTREAM_LEAST_CONN_SHARED=NO  ;;
+        --without-http_upstream_session_sticky_module)
+                                         HTTP_UPSTREAM_SESSION_STICKY=NO 
+					 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
@@ -540,6 +554,12 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-luajit-lib=*)             LUAJIT_LIB="$value"        ;;
         --with-lua-inc=*)                LUA_INC="$value"           ;;
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
+
+        --with-http_tfs_module)          HTTP_TFS=YES               ;;
+        --with-http_tfs_module=shared)   HTTP_TFS_SHARED=YES
+                                         HTTP_TFS=NO                ;;
+        --with-libyajl-inc=*)            LIBYAJL_INC="$value"       ;;
+        --with-libyajl-lib=*)            LIBYAJL_LIB="$value"       ;;
 
         # STUB
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
@@ -715,6 +735,8 @@ cat << END
                                      enable ngx_http_upstream_ip_hash_module (shared)
   --with-http_upstream_least_conn_module=shared
                                      enable ngx_http_upstream_least_conn_module (shared)
+  --with-http_upstream_session_sticky_module=shared
+                                     enable ngx_http_upstream_session_sticky_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -745,6 +767,8 @@ cat << END
                                      disable ngx_http_upstream_check_module
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
+  --without-http_upstream_session_sticky_module
+                                     disable ngx_http_upstream_session_sticky_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_ip_hash_module
@@ -761,6 +785,11 @@ cat << END
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
+
+  --with-http_tfs_module             enable ngx_http_tfs_module (will also enable --with-md5)
+  --with-http_tfs_module=shared      enable ngx_http_tfs_module (shared) (will also enable --with-md5)
+  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h is located)
+  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} is located)
 
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
@@ -869,6 +898,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_USER_AGENT_SHARED=YES
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
+    HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
 
     HTTP_XSLT=NO
     HTTP_IMAGE_FILTER=NO
@@ -903,6 +933,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_USER_AGENT=NO
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
+    HTTP_UPSTREAM_SESSION_STICKY=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CACHE=YES
@@ -953,6 +984,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_USER_AGENT=YES
     HTTP_UPSTREAM_CHECK=YES
     HTTP_UPSTREAM_LEAST_CONN=YES
+    HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
 
     HTTP_XSLT_SHARED=NO
@@ -989,6 +1021,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_USER_AGENT_SHARED=NO
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
+    HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
 fi
 
 
