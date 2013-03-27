@@ -2920,7 +2920,7 @@ ngx_http_upstream_check_http_expect_alive(ngx_conf_t *cf, ngx_command_t *cmd,
 
     ucscf = ngx_http_conf_get_module_srv_conf(cf,
                                               ngx_http_upstream_check_module);
-    bit = ucscf->code.status_alive;
+    bit = 0;
 
     for (i = 1; i < cf->args->nelts; i++) {
         for (m = 0; mask[m].name.len != 0; m++) {
@@ -2932,10 +2932,8 @@ ngx_http_upstream_check_http_expect_alive(ngx_conf_t *cf, ngx_command_t *cmd,
             }
 
             if (bit & mask[m].mask) {
-#if 0
                 ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                                    "duplicate value \"%s\"", value[i].data);
-#endif
 
             } else {
                 bit |= mask[m].mask;
