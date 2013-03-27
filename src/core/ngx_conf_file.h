@@ -90,21 +90,12 @@ struct ngx_open_file_s {
     ngx_fd_t              fd;
     ngx_str_t             name;
 
-    u_char               *buffer;
-    u_char               *pos;
-    u_char               *last;
-
-#if 0
-    /* e.g. append mode, error_log */
-    ngx_uint_t            flags;
-    /* e.g. reopen db file */
-    ngx_uint_t          (*handler)(void *data, ngx_open_file_t *file);
+    void                (*flush)(ngx_open_file_t *file, ngx_log_t *log);
     void                 *data;
-#endif
 };
 
 
-#define NGX_NUMBER_MAJOR  1
+#define NGX_NUMBER_MAJOR  2
 #define NGX_NUMBER_MINOR  1
 
 #define NGX_MODULE_V1          0, 0, 0, 0, 0, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR

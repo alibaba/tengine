@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -422,6 +422,10 @@ ngx_http_user_agent_variable(ngx_http_request_t *r,
 
     uacf = (ngx_http_user_agent_ctx_t *) data;
     trie = uacf->trie;
+
+    if (r->headers_in.user_agent == NULL) {
+      goto end;
+    }
 
     user_agent = &(r->headers_in.user_agent->value);
 
