@@ -540,7 +540,7 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_UPSTREAM_LEAST_CONN_SHARED=NO  ;;
         --without-http_upstream_session_sticky_module)
                                          HTTP_UPSTREAM_SESSION_STICKY=NO 
-					 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
+                                         HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
