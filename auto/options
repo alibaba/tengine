@@ -518,6 +518,8 @@ use the \"--without-http_limit_conn_module\" option instead"
         --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO   ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO ;;
+        --without-http_upstream_consistent_hash_module)
+                                         HTTP_UPSTREAM_CONSISTENT_HASH=NO ;;
         --without-http_upstream_session_sticky_module)
                                          HTTP_UPSTREAM_SESSION_STICKY=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
