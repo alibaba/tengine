@@ -175,6 +175,7 @@ ngx_http_headers_filter(ngx_http_request_t *r)
 
     if (r != r->main
         || (r->headers_out.status != NGX_HTTP_OK
+            && r->headers_out.status != NGX_HTTP_CREATED
             && r->headers_out.status != NGX_HTTP_NO_CONTENT
             && r->headers_out.status != NGX_HTTP_PARTIAL_CONTENT
             && r->headers_out.status != NGX_HTTP_MOVED_PERMANENTLY

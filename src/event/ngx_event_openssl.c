@@ -105,22 +105,24 @@ ngx_ssl_init(ngx_log_t *log)
 
     OpenSSL_add_all_algorithms();
 
+#if OPENSSL_VERSION_NUMBER >= 0x0090800fL
 #ifndef SSL_OP_NO_COMPRESSION
     {
     /*
      * Disable gzip compression in OpenSSL prior to 1.0.0 version,
      * this saves about 522K per connection.
      */
-    int                 i, n;
+    int                  n;
     STACK_OF(SSL_COMP)  *ssl_comp_methods;
 
     ssl_comp_methods = SSL_COMP_get_compression_methods();
     n = sk_SSL_COMP_num(ssl_comp_methods);
 
-    for (i = 0; i < n; i++) {
-        (void) sk_SSL_COMP_delete(ssl_comp_methods, i);
+    while (n--) {
+        (void) sk_SSL_COMP_pop(ssl_comp_methods);
     }
     }
+#endif
 #endif
 
     ngx_ssl_connection_index = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
@@ -572,9 +574,9 @@ ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name)
         return NGX_ERROR;
     }
 
-    SSL_CTX_set_tmp_ecdh(ssl->ctx, ecdh);
-
     SSL_CTX_set_options(ssl->ctx, SSL_OP_SINGLE_ECDH_USE);
+
+    SSL_CTX_set_tmp_ecdh(ssl->ctx, ecdh);
 
     EC_KEY_free(ecdh);
 #endif
@@ -737,6 +739,10 @@ ngx_ssl_handshake(ngx_connection_t *c)
             return NGX_ERROR;
         }
 
+        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
         return NGX_AGAIN;
     }
 
@@ -744,6 +750,10 @@ ngx_ssl_handshake(ngx_connection_t *c)
         c->write->ready = 0;
         c->read->handler = ngx_ssl_handshake_handler;
         c->write->handler = ngx_ssl_handshake_handler;
+
+        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+            return NGX_ERROR;
+        }
 
         if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
             return NGX_ERROR;
@@ -1097,8 +1107,8 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         buf->end = buf->start + NGX_SSL_BUFSIZE;
     }
 
-    send = 0;
-    flush = (in == NULL) ? 1 : 0;
+    send = buf->last - buf->pos;
+    flush = (in == NULL) ? 1 : buf->flush;
 
     for ( ;; ) {
 
@@ -1120,7 +1130,6 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
             if (send + size > limit) {
                 size = (ssize_t) (limit - send);
-                flush = 1;
             }
 
             ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
@@ -1137,10 +1146,16 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
             }
         }
 
+        if (!flush && send < limit && buf->last < buf->end) {
+            break;
+        }
+
         size = buf->last - buf->pos;
 
-        if (!flush && buf->last < buf->end && c->ssl->buffer) {
-            break;
+        if (size == 0) {
+            buf->flush = 0;
+            c->buffered &= ~NGX_SSL_BUFFERED;
+            return in;
         }
 
         n = ngx_ssl_write(c, buf->pos, size);
@@ -1150,8 +1165,7 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         }
 
         if (n == NGX_AGAIN) {
-            c->buffered |= NGX_SSL_BUFFERED;
-            return in;
+            break;
         }
 
         buf->pos += n;
@@ -1161,15 +1175,17 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
             break;
         }
 
-        if (buf->pos == buf->last) {
-            buf->pos = buf->start;
-            buf->last = buf->start;
-        }
+        flush = 0;
+
+        buf->pos = buf->start;
+        buf->last = buf->start;
 
         if (in == NULL || send == limit) {
             break;
         }
     }
+
+    buf->flush = flush;
 
     if (buf->pos < buf->last) {
         c->buffered |= NGX_SSL_BUFFERED;
@@ -2499,14 +2515,17 @@ ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
 static int
 ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
 {
+    int         k, len, ci;
     FILE       *fp;
     char        c, b[NGX_MAX_PATH];
     u_char     *p;
     ngx_str_t   file;
-    ngx_int_t   k, len = -1;
+
     static int  first_in = 1;
 
     ngx_http_ssl_pphrase_dialog_conf_t  *dialog = conf;
+
+    len = -1;
 
     if (ngx_strcmp(dialog->type->data, (u_char *) "builtin") == 0) {
         if (first_in) {
@@ -2550,7 +2569,10 @@ ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
             return -1;
         }
 
-        for (k = 0; (c = fgetc(fp)) != EOF && k < size; /* void */) {
+        for (k = 0; (ci = fgetc(fp)) != EOF && k < size; /* void */) {
+
+            c = (char) ci;
+
             if (c == '\n' || c == '\r') {
                 break;
             }

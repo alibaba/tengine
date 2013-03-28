@@ -106,7 +106,7 @@ static ngx_command_t  ngx_http_limit_req_commands[] = {
       NULL },
 
     { ngx_string("limit_req"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1234,
       ngx_http_limit_req,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -285,7 +285,6 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         ctx = limit_req[i].shm_zone->data;
 
         ngx_crc32_init(hash);
-        total_len = 0;
 
         total_len = ngx_http_limit_req_copy_variables(r, &hash, ctx, NULL);
         if (total_len == 0) {

@@ -1035,9 +1035,14 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #if (NGX_HAVE_CPU_AFFINITY)
 
+    /* in default, disable cpu affinity */
+
+    if (ccf->cpu_affinity_n == 0 && ccf->cpu_affinity == NULL) {
+        ccf->cpu_affinity_n = 1;
+    }
+
     if (ccf->cpu_affinity_n == 0) {
 
-        ccf->cpu_affinity = NULL;
         n = ngx_ncpu - 1;
 
         if (ngx_ncpu > 0 && ngx_ncpu <= CPU_SETSIZE) {
