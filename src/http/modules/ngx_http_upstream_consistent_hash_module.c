@@ -220,7 +220,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
         weight = peer->weight * NGX_CHASH_VIRTUAL_NODE_NUMBER;
 
         if (weight >= 1 << 14) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            ngx_log_error(NGX_LOG_WARN, cf->log, 0,
                           "weigth[%d] is too large, is must be less than %d",
                           weight / NGX_CHASH_VIRTUAL_NODE_NUMBER,
                           (1 << 14) / NGX_CHASH_VIRTUAL_NODE_NUMBER);
