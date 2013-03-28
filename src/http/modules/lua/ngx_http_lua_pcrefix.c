@@ -1,7 +1,15 @@
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
 #include "ddebug.h"
+
 
 #include "ngx_http_lua_pcrefix.h"
 #include "stdio.h"
@@ -95,5 +103,4 @@ ngx_http_lua_pcre_malloc_done(ngx_pool_t *old_pool)
 
 #endif /* NGX_PCRE */
 
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
-
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */
