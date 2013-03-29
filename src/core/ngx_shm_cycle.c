@@ -10,7 +10,7 @@
 
 
 #define NGX_CMD_SHM_CYCLE         (NGX_CMD_USER + 1)
-#define NGX_MAX_SHM_CYCLES        40
+#define NGX_MAX_SHM_CYCLES        40000
 #define NGX_SHM_CYCLE_POOL_SIZE   2048
 
 
