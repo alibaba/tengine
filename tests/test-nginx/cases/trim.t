@@ -6,93 +6,58 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: do not trim within 'textarea'
+=== TEST 1: do not trim within 'textarea' 'pre' 'script' 'style' 'ie-comment'
 --- config
     trim on;
-    trim_comment on;
+    trim_comment off;
 --- user_files
 >>> trim.html
 <textarea>
    hello
         world!
 </textarea>
---- request
-    GET /trim.html
---- response_body
-<textarea>
-   hello
-        world!
-</textarea>
 
-=== TEST 2: do not trim within 'pre'
---- config
-    trim on;
-    trim_comment off;
---- user_files
->>> trim.html
-<pre>
-  hello     world!
-    </pre>
---- request
-    GET /trim.html
---- response_body
-<pre>
+     <pre>
   hello     world!
     </pre>
 
-=== TEST 3: do not trim within 'script'
---- config
-    trim on;
-    trim_comment off;
---- user_files
->>> trim.html
-<script type="text/javascript"> 
-       hello
-world !
-
-</script>
---- request
-    GET /trim.html
---- response_body
-<script type="text/javascript"> 
+<script type="text/javascript">
        hello
 world !
 
 </script>
 
-=== TEST 4: do not trim within 'style'
---- config
-    trim on;
-    trim_comment off;
---- user_files
->>> trim.html
-<style>
- hello     world   !
-</style>
---- request
-    GET /trim.html
---- response_body
 <style>
  hello     world   !
 </style>
 
-=== TEST 5: do not trim within ie comment
---- config
-    trim on;
-    trim_comment off;
---- user_files
->>> trim.html
+
 <!--[if IE]> hello    world    ! <![endif]-->
     <!-- hello     world   ! -->
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 --- request
     GET /trim.html
 --- response_body
+<textarea>
+   hello
+        world!
+</textarea>
+<pre>
+  hello     world!
+    </pre>
+<script type="text/javascript">
+       hello
+world !
+
+</script>
+<style>
+ hello     world   !
+</style>
 <!--[if IE]> hello    world    ! <![endif]-->
 <!-- hello world ! -->
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 
-=== TEST 6: trim within other tags
+=== TEST 2: trim within other tags
 --- config
     trim on;
     trim_comment off;
@@ -106,7 +71,7 @@ world !
 <body>hello world, it
 is good to see you </body>
 
-=== TEST 7: trim within non-ie comment
+=== TEST 3: trim within non-ie comment
 --- config
     trim on;
     trim_comment on;
@@ -124,7 +89,7 @@ is good to see you </body>
 <!--[if IE]> hello    world    ! <![endif]-->
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 
-=== TEST 8: trim within tag
+=== TEST 4: trim within tag value
 --- config
     trim on;
     trim_comment off;
@@ -139,7 +104,7 @@ is good to see you </body>
 <body style="text-align:   center;">hello world, it
 is good to see you </body>
 
-=== TEST 9: trim newline
+=== TEST 5: trim newline
 --- config
     trim on;
     trim_comment on;
@@ -167,7 +132,22 @@ is good to see you </body>
 <body>hello world!<body> 
 <html>
 
-=== TEST 10: trim
+=== TEST 6:  return zero size
+--- config
+    trim on;
+    trim_comment on;
+--- user_files
+>>> trim.html
+ 	   
+  <!-- hello  world -->    
+  <!-- ---->
+--- request
+    GET /trim.html
+--- response_body eval
+''
+--- error_code: 200
+
+=== TEST 7: trim all
 --- config
     trim on;
     trim_comment on;

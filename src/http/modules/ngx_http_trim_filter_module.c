@@ -31,7 +31,9 @@ typedef struct {
 
     ngx_str_t      *tag_name;
 
-    ngx_chain_t    *out;
+    u_char          prev;
+
+    ngx_chain_t    *in;
     ngx_chain_t    *free;
     ngx_chain_t    *busy;
 
@@ -45,16 +47,21 @@ typedef struct {
 
 typedef enum {
     trim_state_text = 0,
-    trim_state_whitespace,
-    trim_state_comment_whitespace,
-    trim_state_tag,                     /* < */
+    trim_state_text_newline,            /* \n */
+    trim_state_text_whitespace,         /* \r \f \t ' ' */
+    trim_state_tag,                     /* <  */
+    trim_state_tag_text,
+    trim_state_tag_whitespace,          /* \r \n \f \t ' ' */
+    trim_state_tag_single_quote,        /* '  */
+    trim_state_tag_double_quote,        /* "  */
     trim_state_tag_s,                   /* <s */
     trim_state_tag_begin,               /* <tag_name */
+    trim_state_tag_end,                 /* <tag_name  </tag_name> */
     trim_state_comment_begin,           /* <!-- */
     trim_state_comment_ie_begin,        /* <!--[if */
-    trim_state_tag_end,                 /* <tag_name  </tag_name */
     trim_state_comment_end,             /* <!--  --> */
     trim_state_comment_ie_end,          /* <!--[if  <![endif]--> */
+    trim_state_comment_whitespace,      /* \r \n \f \t ' ' */
 } ngx_http_trim_state_e;
 
 
@@ -153,16 +160,18 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    ngx_str_set(&ctx->pre, "</pre");
-    ngx_str_set(&ctx->style, "</style");
-    ngx_str_set(&ctx->script, "</script");
+    ctx->prev = '\n';
+
+    ngx_str_set(&ctx->pre, "</pre>");
+    ngx_str_set(&ctx->style, "</style>");
+    ngx_str_set(&ctx->script, "</script>");
     ngx_str_set(&ctx->comment, "-->");
-    ngx_str_set(&ctx->textarea, "</textarea");
+    ngx_str_set(&ctx->textarea, "</textarea>");
     ngx_str_set(&ctx->comment_ie, "[if");
     ngx_str_set(&ctx->comment_ie_end, "<![endif]-->");
 
     ngx_str_set(&ctx->saved_comment, "<!--[if");
-
+    
     ngx_http_set_ctx(r, ctx, ngx_http_trim_filter_module);
 
     r->main_filter_need_in_memory = 1;
@@ -178,7 +187,7 @@ static ngx_int_t
 ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
     ngx_int_t             rc;
-    ngx_chain_t          *cl, *ln, *prev;
+    ngx_chain_t          *cl, *ln, *out, **ll;
     ngx_http_trim_ctx_t  *ctx;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -193,11 +202,15 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return ngx_http_next_body_filter(r, in);
     }
 
-    if (ngx_chain_add_copy(r->pool, &ctx->out, in) != NGX_OK) {
+    ctx->in = NULL;
+    if (ngx_chain_add_copy(r->pool, &ctx->in, in) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    for (ln = ctx->out, prev = NULL; ln; ln = ln->next) {
+    out = NULL;
+    ll = &out;
+
+    for (ln = ctx->in; ln; ln = ln->next) {
         ngx_http_trim_parse(r, ln->buf, ctx);
 
         if (ctx->saved) {
@@ -212,40 +225,39 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             cl->buf->pos = ctx->saved_comment.data;
             cl->buf->last = cl->buf->pos + ctx->saved;
 
-            if (prev) {
-               cl->next = prev->next;
-               prev->next = cl;
-               prev = cl;
-
-            } else {
-               cl->next = ctx->out;
-               ctx->out = cl;
-               prev = cl;
-            }
+            *ll = cl;
+            ll = &cl->next;
 
             ctx->saved = 0;
         }
 
-        if (ln->buf->pos == ln->buf->last && !ln->buf->last_buf) {
-            if (prev) {
-                prev->next = ln->next;
+        if (ngx_buf_size(ln->buf) == 0) {
+            if (ln->buf->last_buf) {
+                cl = ngx_chain_get_free_buf(r->pool, &ctx->free);
+                if (cl == NULL) {
+                    return NGX_ERROR;
+                }
 
-            } else {
-                ctx->out = ln->next;
+                ngx_memzero(cl->buf, sizeof(ngx_buf_t));
+                cl->buf->tag = (ngx_buf_tag_t) &ngx_http_trim_filter_module;
+                cl->buf->last_buf = 1;
+
+                *ll = cl;
             }
 
         } else {
-            prev = ln;
+            *ll = ln;
+            ll = &ln->next;
         }
     }
 
-    if (ctx->out == NULL) {
+    if (out == NULL) {
         return NGX_OK;
     }
 
-    rc = ngx_http_next_body_filter(r, ctx->out);
+    rc = ngx_http_next_body_filter(r, out);
 
-    ngx_chain_update_chains(r->pool, &ctx->free, &ctx->busy, &ctx->out,
+    ngx_chain_update_chains(r->pool, &ctx->free, &ctx->busy, &out,
                             (ngx_buf_tag_t) &ngx_http_trim_filter_module);
 
     return rc;
@@ -271,11 +283,24 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
         case trim_state_text:
             switch (ch) {
             case '\r':
-            case '\n':
+            case '\f':
             case '\t':
             case ' ':
-                ctx->state = trim_state_whitespace;
-                break;
+                ctx->state = trim_state_text_whitespace;
+                if (ctx->prev == '\n' || ctx->prev == ch) {
+                    continue;
+
+                } else {
+                    break;
+                }
+            case '\n':
+                ctx->state = trim_state_text_newline;
+                if (ctx->prev == '\n') {
+                    continue;
+
+                } else {
+                    break;
+                }
             case '<':
                 ctx->state = trim_state_tag;
 
@@ -294,9 +319,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
             case '\t':
             case ' ':
-                ctx->state = trim_state_whitespace;
+                *read = ' ';
+                ctx->state = trim_state_tag_whitespace;
                 break;
             case '!':
                 ctx->state = trim_state_comment_begin;
@@ -311,21 +338,21 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case 'p':
                 ctx->state = trim_state_tag_begin;
                 ctx->tag_name = &ctx->pre;
-                ctx->looked_tag = 3;    /* </pre */
+                ctx->looked_tag = 3;    /* </pre> */
                 break;
             case 't':
                 ctx->state = trim_state_tag_begin;
                 ctx->tag_name = &ctx->textarea;
-                ctx->looked_tag = 3;    /* </textarea */
-                break;
-            case '<':
-                ctx->state = trim_state_tag;
+                ctx->looked_tag = 3;    /* </textarea> */
                 break;
             case 's':
                 ctx->state = trim_state_tag_s;
                 break;
-            default:
+            case '>':
                 ctx->state = trim_state_text;
+                break;
+            default:
+                ctx->state = trim_state_tag_text;
                 break;
             }
 
@@ -337,44 +364,59 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 } else {
                     ctx->saved = ctx->saved_comment.len;
                 }
-
-                if (ch == '<') {
-                    ctx->saved_comment.len = 1;
-                    continue;
-                }
             }
 
+            break;
+
+        case trim_state_tag_text:
+            switch (ch) {
+            case '\r':
+            case '\n':
+            case '\f':
+            case '\t':
+            case ' ':
+                *read = ' ';
+                ctx->state = trim_state_tag_whitespace;
+                break;
+            case '\'':
+                ctx->state = trim_state_tag_single_quote;
+                break;
+            case '"':
+                ctx->state = trim_state_tag_double_quote;
+                break;
+            case '>':
+                ctx->state = trim_state_text;
+                break;
+            default:
+                break;
+            }
             break;
 
         case trim_state_tag_s:
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
             case '\t':
             case ' ':
-                ctx->state = trim_state_whitespace;
+                *read = ' ';
+                ctx->state = trim_state_tag_whitespace;
                 break;
             case 't':
                 ctx->state = trim_state_tag_begin;
                 ctx->tag_name = &ctx->style;
-                ctx->looked_tag = 4;    /* </style */
+                ctx->looked_tag = 4;    /* </style> */
                 break;
             case 'c':
                 ctx->state = trim_state_tag_begin;
                 ctx->tag_name = &ctx->script;
-                ctx->looked_tag = 4;    /* </script */
+                ctx->looked_tag = 4;    /* </script> */
                 break;
-            case '<':
-                ctx->state = trim_state_tag;
-
-                if (conf->comment_enable) {
-                    ctx->saved_comment.len = 1;
-                    continue;
-                }
-
+            case '>':
+                ctx->state = trim_state_text;
                 break;
             default:
-                ctx->state = trim_state_text;
+                ctx->state = trim_state_tag_text;
                 break;
             }
             break;
@@ -398,15 +440,17 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
             case '\t':
             case ' ':
-                ctx->state = trim_state_whitespace;
+                *read = ' ';
+                ctx->state = trim_state_tag_whitespace;
                 break;
-            case '<':
-                ctx->state = trim_state_tag;
+            case '>':
+                ctx->state = trim_state_text;
                 break;
             default:
-                ctx->state = trim_state_text;
+                ctx->state = trim_state_tag_text;
                 break;
             }
 
@@ -417,11 +461,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                 } else {
                     ctx->saved = ctx->saved_comment.len;
-                }
-
-                if (ch == '<') {
-                    ctx->saved_comment.len = 1;
-                    continue;
                 }
             }
 
@@ -458,9 +497,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
             case '\t':
             case ' ':
                 ctx->state = trim_state_comment_whitespace;
+                ctx->looked_comment = 0;
                 break;
             case '-':
                 ctx->state = trim_state_comment_end;
@@ -479,10 +520,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             break;
 
         case trim_state_tag_begin:
-            look = ctx->tag_name->data[ctx->looked_tag++];
+            look = ctx->tag_name->data[ctx->looked_tag++];    /* <tag_name> */
             if (ch == look) {
                 if (ctx->looked_tag == ctx->tag_name->len) {
                     ctx->state = trim_state_tag_end;
+                    ctx->looked_tag = 0;
                 }
                 break;
             }
@@ -490,21 +532,23 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
             case '\t':
             case ' ':
-                ctx->state = trim_state_whitespace;
-                break;
-            case '<':
-                ctx->state = trim_state_tag;
+                *read = ' ';
+                if (ctx->looked_tag == ctx->tag_name->len) {
+                    ctx->state = trim_state_tag_end;
+                    ctx->looked_tag = 0;
 
-                if (conf->comment_enable) {
-                    ctx->saved_comment.len = 1;
-                    continue;
+                } else {
+                    ctx->state = trim_state_tag_whitespace;
                 }
-
+                break;
+            case '>':
+                ctx->state = trim_state_text;
                 break;
             default:
-                ctx->state = trim_state_text;
+                ctx->state = trim_state_tag_text;
                 break;
             }
             break;
@@ -520,6 +564,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 switch (ch) {
                 case '\r':
                 case '\n':
+                case '\f':
                 case '\t':
                 case ' ':
                     ctx->state = trim_state_comment_whitespace;
@@ -543,7 +588,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
         case trim_state_comment_ie_end:
             look = ctx->comment_ie_end.data[ctx->looked_comment++];
             if (ch == look) {
-                if (ctx->looked_comment == ctx->comment.len) {
+                if (ctx->looked_comment == ctx->comment_ie_end.len) {
                     ctx->state = trim_state_text;
                 }
 
@@ -564,10 +609,106 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             }
             break;
 
-        case trim_state_whitespace:
+        case trim_state_text_whitespace:
+            switch (ch) {
+            case '\r':
+            case '\f':
+            case '\t':
+            case ' ':
+                continue;
+            case '\n':
+                ctx->state = trim_state_text_newline;
+                if (ctx->prev == '\n') {
+                    continue;
+
+                } else {
+                    break;
+                }
+            case '<':
+                ctx->state = trim_state_tag;
+
+                if (conf->comment_enable) {
+                    ctx->saved_comment.len = 1;
+                    continue;
+                }
+
+                break;
+            default:
+                ctx->state = trim_state_text;
+                break;
+            }
+            break;
+
+        case trim_state_tag_whitespace:
             switch (ch) {
             case '\r':
             case '\n':
+            case '\f':
+            case '\t':
+            case ' ':
+                continue;
+            case '\'':
+                ctx->state = trim_state_tag_single_quote;
+                break;
+            case '"':
+                ctx->state = trim_state_tag_double_quote;
+                break;
+            case '>':
+                ctx->state = trim_state_text;
+                break;
+            default:
+                ctx->state = trim_state_tag_text;
+                break;
+            }
+            break;
+
+        case trim_state_comment_whitespace:
+            switch (ch) {
+            case '\r':
+            case '\n':
+            case '\f':
+            case '\t':
+            case ' ':
+                continue;
+            case '-':
+                ctx->state = trim_state_comment_end;
+                ctx->looked_comment++;
+                break;
+            default:
+                ctx->state = trim_state_comment_end;
+                break;
+            }
+
+            if (conf->comment_enable) {
+                continue;
+            }
+            break;
+
+        case trim_state_tag_single_quote:
+            switch (ch) {
+            case '\'':
+                ctx->state = trim_state_tag_text;
+                break;
+            default:
+                break;
+            }
+            break;
+
+        case trim_state_tag_double_quote:
+            switch (ch) {
+            case '"':
+                ctx->state = trim_state_tag_text;
+                break;
+            default:
+                break;
+            }
+            break;
+
+        case trim_state_text_newline:
+            switch (ch) {
+            case '\r':
+            case '\n':
+            case '\f':
             case '\t':
             case ' ':
                 continue;
@@ -586,29 +727,12 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             }
             break;
 
-        case trim_state_comment_whitespace:
-            switch (ch) {
-            case '\r':
-            case '\n':
-            case '\t':
-            case ' ':
-                continue;
-            case '-':
-                ctx->state = trim_state_comment_end;
-                ctx->looked_comment++;
-                break;
-            default:
-                ctx->state = trim_state_comment_end;
-                break;
-            }
-
-            if (conf->comment_enable) {
-                continue;
-            }
+        default:
             break;
         }
 
         *write++ = *read;
+        ctx->prev = *read;
     }
 
     buf->last = write;
