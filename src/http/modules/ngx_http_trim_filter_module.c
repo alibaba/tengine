@@ -317,14 +317,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
         case trim_state_tag:
             switch (ch) {
-            case '\r':
-            case '\n':
-            case '\f':
-            case '\t':
-            case ' ':
-                *read = ' ';
-                ctx->state = trim_state_tag_whitespace;
-                break;
             case '!':
                 ctx->state = trim_state_comment_begin;
                 ctx->looked_comment = 0;    /* --> */
@@ -348,11 +340,18 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case 's':
                 ctx->state = trim_state_tag_s;
                 break;
+            case '<':
+                break;
             case '>':
                 ctx->state = trim_state_text;
                 break;
             default:
-                ctx->state = trim_state_tag_text;
+                if (ch >= 'a' && ch <= 'z') {
+                    ctx->state = trim_state_tag_text;
+
+                } else {
+                    ctx->state = trim_state_text;
+                }
                 break;
             }
 
@@ -364,6 +363,10 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 } else {
                     ctx->saved = ctx->saved_comment.len;
                 }
+            }
+
+            if (conf->comment_enable && ch == '<') {
+                continue;
             }
 
             break;

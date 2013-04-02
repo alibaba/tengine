@@ -1,6 +1,7 @@
 use lib 'lib';
 use Test::Nginx::Socket;
 
+log_level('debug');
 plan tests => 2 * blocks();
 run_tests();
 
@@ -10,6 +11,7 @@ __DATA__
 --- config
     trim on;
     trim_comment off;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 <textarea>
@@ -60,7 +62,8 @@ world !
 === TEST 2: trim within other tags
 --- config
     trim on;
-    trim_comment off;
+    trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 <body>hello   world,   it
@@ -75,6 +78,7 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 <body>hello <!--world--></body>
@@ -92,7 +96,8 @@ is good to see you </body>
 === TEST 4: trim within tag value
 --- config
     trim on;
-    trim_comment off;
+    trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 <body
@@ -108,6 +113,7 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 
@@ -136,6 +142,7 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
  	   
@@ -151,6 +158,7 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
 --- user_files
 >>> trim.html
 <html>
@@ -224,3 +232,29 @@ hello world !
 </html>
 <!--[if IE]> ie comment <![endif]-->
 <!--[if !IE ]>--> non-ie html code <!--<![endif]--> 
+
+=== TEST 8: trim more tags
+--- config
+    trim on;
+    trim_comment on;
+    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+--- user_files
+>>> trim.html
+<      <PRE>hello     world  ! </pre>
+<2     <pre>hello     world  ! </pre>
+<<<    <pre>hello     world  ! </pre>
+<   <  <pre>hello     world  ! </pre>
+<     <<pre>hello     world  ! </pre>
+<x    <<pre>hello     world  ! </pre>
+<     <<<!doctype   html>
+                  
+--- request
+    GET /trim.html
+--- response_body
+< <PRE>hello     world  ! </pre>
+<2 <pre>hello     world  ! </pre>
+<<< <pre>hello     world  ! </pre>
+< < <pre>hello     world  ! </pre>
+< <<pre>hello     world  ! </pre>
+<x <<pre>hello world ! </pre>
+< <<<!doctype html>
