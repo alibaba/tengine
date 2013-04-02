@@ -346,7 +346,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->state = trim_state_text;
                 break;
             default:
-                if (ch >= 'a' && ch <= 'z') {
+                if ((ch >= 'a' && ch <= 'z') || ch == '/') {
                     ctx->state = trim_state_tag_text;
 
                 } else {
