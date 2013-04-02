@@ -12,9 +12,23 @@
 
 * 如果后端机器宕机，这请求会被迁移到其他机器
 
-* `server` *id* 字段，如果配置id字段，则使用id字段作为server标识，否则使用server ip和端口作为server标识
+* `server` *id* 字段，如果配置id字段，则使用id字段作为server标识，否则使用server ip和端口作为server标识，
 
-* `server` *wegiht* 字段，作为server权重
+    使用id字段可以手动设置server的标识，比如一台机器的ip或者端口变化，id仍然可以表示这台机器
+
+* `server` *wegiht* 字段，作为server权重，对应虚拟节点数目
+
+* 具体算法，将每个server虚拟成n个节点，均匀分布到hash环上，每次请求，根据配置的参数计算出一个hash值，在hash环
+
+    上查找离这个hash最近的虚拟节点，对应的server作为该次请求的后端机器。
+
+* 该模块可以根据配置参数采取不同的方式将请求均匀映射到后端机器，比如：
+
+    `consistent_hash $remote_addr`：可以根据客户端ip映射
+
+    `consistent_hash $request_uri`： 根据客户端请求的uri映射
+
+    `consistent_hash $args`：根据客户端携带的参数进行映射
 
 
 例子
@@ -46,7 +60,7 @@ consistent_hash
 
 **Context**: *upstream*
 
-配置upstream采用一致性hash作为负载均衡算法，并使用配置的变量名作为hash输入
+配置upstream采用一致性hash作为负载均衡算法，并使用配置的变量名作为hash输入。
 
 
 consistent_tries
@@ -58,20 +72,20 @@ consistent_tries
 
 **Context**: *upstream*
 
-配置当访问后端返回502后，重试的次数
+配置当访问后端出错后重试的次数，该指令只有在next_upstream 没有被设置成off的时候才生效。
 
 
 编译安装
 ===========
 
-* 在configure的时候打开一致性hash模块，关闭使用选项`--without-http_upstream_consistent_hash_module`.
+* 在configure的时候打开一致性hash模块，关闭使用选项`--without-http_upstream_consistent_hash_module`。
 
       $ ./configure
       
-* 编译它.
+* 编译
 
     $ make
     
-* 安装模块.
+* 安装模块
 
     $ make install
