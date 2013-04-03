@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -737,7 +736,7 @@ cat << END
   --with-perl_modules_path=PATH      set Perl modules path
   --with-perl=PATH                   set perl binary pathname
 
-  --with-http_lua_module             enable ngx_http_lua_module (will also enable --with-md5 and --with-sha1)
+  --with-http_lua_module             enable ngx_http_lua_module (shared, will also enable --with-md5 and --with-sha1)
   --with-luajit-inc=PATH             set LuaJIT headers path (where lua.h/lauxlib.h/... are located)
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
