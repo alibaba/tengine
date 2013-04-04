@@ -444,6 +444,12 @@ ngx_write_syslog(ngx_syslog_t *task, u_char *buf, size_t len)
     n = writev(task->fd, iovs, 4);
 
     if (n < 0) {
+
+        if(errno == ENOTCONN || errno == ECONNREFUSED){
+            ngx_close_socket(task->fd);
+            task->fd = NGX_INVALID_FILE;
+        }
+
         return NGX_ERROR;
     }
 
