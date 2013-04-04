@@ -468,11 +468,12 @@ ngx_syslog_prebuild_header(ngx_syslog_t *task)
     p = ngx_snprintf(pid, NGX_INT64_LEN, "%P", ngx_log_pid);
 
     len = sizeof(" ") - 1
-        + ngx_syslog_hostname.len
+        // + ngx_syslog_hostname.len
+        // + sizeof(" ") - 1
         + (task->ident.len == 0
             ? (ident_len = sizeof(NGINX_VAR) - 1)
             : (ident_len = task->ident.len))
-        + sizeof(" [") - 1
+        + sizeof("[") - 1
         + p - pid
         + sizeof("]: ") - 1;
 
@@ -481,8 +482,9 @@ ngx_syslog_prebuild_header(ngx_syslog_t *task)
 
     ngx_snprintf(task->header.data,
                  task->header.len,
-                 " %V %*s[%*s]: ",
-                 &ngx_syslog_hostname,
+                 // " %V %*s[%*s]: ",
+                 // &ngx_syslog_hostname,
+                 " %*s[%*s]: ",
                  ident_len,
                  (task->ident.len == 0 ? appname : task->ident.data),
                  p - pid,
