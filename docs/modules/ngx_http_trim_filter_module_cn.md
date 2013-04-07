@@ -35,9 +35,9 @@
 在配置的地方使删除html注释功能有效（失效）， 对于ie注释不作删除处理。
 例如html代码
 
-　  <html><!--non-ie comment--><!--[if IE]> ie comment <![endif]--></html>
-　　如果配置为**trim_comment on**，将保留ie注释，处理之后如下：
-　　<html><!--[if IE]> ie comment <![endif]--></html>
+    <html><!--non-ie comment--><!--[if IE]> ie comment <![endif]--></html>
+    如果配置为**trim_comment on**，将保留ie注释，处理之后如下：
+    <html><!--[if IE]> ie comment <![endif]--></html>
     
 <br/>
 <br/>
