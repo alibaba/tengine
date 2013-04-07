@@ -267,8 +267,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
     for (write = buf->pos, read = buf->pos; read < buf->last; read++) {
 
-        ch = *read;
-        ch = ngx_tolower(ch);
+        ch = ngx_tolower(*read);
 
         switch (ctx->state) {
 
@@ -355,10 +354,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 } else {
                     ctx->saved = ctx->saved_comment;
                 }
-            }
 
-            if (conf->comment_enable && ch == '<') {
-                continue;
+                if (ch == '<') {
+                    continue;
+                }
+                
             }
 
             break;
@@ -370,7 +370,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\f':
             case '\t':
             case ' ':
-                *read = ' ';
                 ctx->state = trim_state_tag_whitespace;
                 break;
             case '\'':
@@ -394,7 +393,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\f':
             case '\t':
             case ' ':
-                *read = ' ';
                 ctx->state = trim_state_tag_whitespace;
                 break;
             case 't':
@@ -438,7 +436,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\f':
             case '\t':
             case ' ':
-                *read = ' ';
                 ctx->state = trim_state_tag_whitespace;
                 break;
             case '>':
@@ -530,7 +527,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\f':
             case '\t':
             case ' ':
-                *read = ' ';
                 if (ctx->looked_tag == ctx->tag_name->len) {
                     ctx->state = trim_state_tag_end;
                     ctx->looked_tag = 0;

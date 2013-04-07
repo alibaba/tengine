@@ -3,6 +3,9 @@ use Test::Nginx::Socket;
 
 log_level('debug');
 plan tests => 2 * blocks();
+
+$ENV{TEST_NGINX_TRIM_PORT} ||= "1984";
+
 run_tests();
 
 __DATA__
@@ -11,7 +14,8 @@ __DATA__
 --- config
     trim on;
     trim_comment off;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <textarea>
@@ -38,7 +42,7 @@ world !
     <!-- hello     world   ! -->
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 <textarea>
    hello
@@ -63,13 +67,14 @@ world !
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <body>hello   world,   it
    is good  to     see you   </body>
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 <body>hello world, it
 is good to see you </body>
@@ -78,7 +83,8 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <body>hello <!--world--></body>
@@ -87,7 +93,7 @@ is good to see you </body>
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 <body>hello </body>
 <!--[if IE]> hello    world    ! <![endif]-->
@@ -97,23 +103,26 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <body
     style="text-align:   center;">hello   world,   it
    is good  to     see you   </body>
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
-<body style="text-align:   center;">hello world, it
+<body
+style="text-align:   center;">hello world, it
 is good to see you </body>
 
 === TEST 5: trim newline
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 
@@ -132,7 +141,7 @@ is good to see you </body>
 
                   
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 <html>
 <body>hello world!<body> 
@@ -142,14 +151,15 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
  	   
   <!-- hello  world -->    
   <!-- ---->
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body eval
 ''
 --- error_code: 200
@@ -158,7 +168,8 @@ is good to see you </body>
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <html>
@@ -189,8 +200,7 @@ hello    world
    hello world    !
 </script>
     
-<a
-     href='hello  world    !'> hello     world   ! 
+<a   href='hello  world    !'> hello     world   ! 
      </a>
    </body>
     </html>
@@ -202,7 +212,7 @@ hello    world
 
 <!--[if !IE ]>--> non-ie html code <!--<![endif]-->                  
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 <html>
 <head>trim test </head>
@@ -237,7 +247,8 @@ hello world !
 --- config
     trim on;
     trim_comment on;
-    location /trim.html { proxy_buffering off; proxy_pass http://127.0.0.1:8000;}
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <      <PRE>hello     world  ! </pre>
@@ -249,7 +260,7 @@ hello world !
 <     <<<!doctype   html>
                   
 --- request
-    GET /trim.html
+    GET /t/trim.html
 --- response_body
 < <PRE>hello     world  ! </pre>
 <2 <pre>hello     world  ! </pre>
@@ -258,3 +269,18 @@ hello world !
 < <<pre>hello     world  ! </pre>
 <x <<pre>hello world ! </pre>
 < <<<!doctype html>
+
+=== TEST 9: trim Chinese characters
+--- config
+    trim on;
+    trim_comment on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<title>世界      你好  !</title>
+                  
+--- request
+    GET /t/trim.html
+--- response_body
+<title>世界 你好 !</title>
