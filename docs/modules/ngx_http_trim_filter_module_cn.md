@@ -24,7 +24,6 @@
 对于标签 pre，textarea，script，style内的内容不作删除操作。
 
 <br/>
-<br/>
 
 **trim_comment** `on` | `off`
 
@@ -37,11 +36,10 @@
 
     <html><!--non-ie comment--><!--[if IE]> ie comment <![endif]--></html>
 
-如果配置为**trim_comment on**，将保留ie注释，处理之后如下：
+如果配置为** `trim_comment on`，将保留ie注释，处理之后如下：
 
     <html><!--[if IE]> ie comment <![endif]--></html>
     
-<br/>
 <br/>
 
 **trim_types** `MIME types`
@@ -52,5 +50,4 @@
 
 定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。
 
-<br/>
 <br/>
