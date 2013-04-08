@@ -662,3 +662,27 @@ hello,
 world
 --- timeout: 5
 
+
+
+=== TEST 36: ngx.print table arguments (github issue #54)
+--- config
+    location /t {
+        content_by_lua 'ngx.print({10, {0, 5}, 15}, 32)';
+    }
+--- request
+    GET /t
+--- response_body chop
+10051532
+
+
+
+=== TEST 37: ngx.say table arguments (github issue #54)
+--- config
+    location /t {
+        content_by_lua 'ngx.say({10, {0, "5"}, 15}, 32)';
+    }
+--- request
+    GET /t
+--- response_body
+10051532
+
