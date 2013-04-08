@@ -539,6 +539,16 @@ ngx_dso_load(ngx_conf_t *cf)
             return NGX_CONF_ERROR;
         }
 
+        if (dm[i].module->abi_compatibility
+            != NGX_DSO_ABI_COMPATIBILITY_MODULES)
+        {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "module \"%V\" is not compatible with this "
+                               "abi of nginx ",
+                               &dm[i].name, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR);
+            return NGX_CONF_ERROR;
+        }
+
         postion = ngx_dso_find_postion(ctx, dm[i].name);
 
         ngx_log_debug2(NGX_LOG_DEBUG_CORE, cf->log, 0,

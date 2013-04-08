@@ -98,7 +98,8 @@ struct ngx_open_file_s {
 #define NGX_NUMBER_MAJOR  2
 #define NGX_NUMBER_MINOR  1
 
-#define NGX_MODULE_V1          0, 0, 0, 0, 0, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR
+#define NGX_MODULE_V1          0, 0, 0, 0,                              \
+        NGX_DSO_ABI_COMPATIBILITY_MODULES, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
 struct ngx_module_s {
@@ -107,7 +108,7 @@ struct ngx_module_s {
 
     ngx_uint_t            spare0;
     ngx_uint_t            spare1;
-    ngx_uint_t            spare2;
+    ngx_uint_t            abi_compatibility;
 
     ngx_uint_t            major_version;
     ngx_uint_t            minor_version;
