@@ -259,6 +259,8 @@ MAIL_SMTP=YES
 # procs module
 PROCS=YES
 
+NO_MEMORY_POOL=NO
+
 NGX_ADDONS=
 
 USE_PCRE=NO
@@ -565,6 +567,8 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-http_stub_status_module)    HTTP_STUB_STATUS=YES     ;;
         --without-http_stub_status_module) HTTP_STUB_STATUS=NO      ;;
 
+        --without-memory-pool)           NO_MEMORY_POOL=YES         ;;
+
         --with-mail)                     MAIL=YES                   ;;
         --with-mail_ssl_module)          MAIL_SSL=YES               ;;
         # STUB
@@ -775,6 +779,8 @@ cat << END
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+
+  --without-memory-pool              disable memory pool (just for debug)
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

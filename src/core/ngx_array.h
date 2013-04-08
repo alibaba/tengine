@@ -13,12 +13,29 @@
 #include <ngx_core.h>
 
 
+#ifdef NGX_NO_MEMORY_POOL
+
+typedef struct ngx_array_link_s ngx_array_link_t;
+
+
+struct ngx_array_link_s {
+    void                    *elts;
+    ngx_array_link_t        *next;
+};
+
+#endif
+
+
 struct ngx_array_s {
     void        *elts;
     ngx_uint_t   nelts;
     size_t       size;
     ngx_uint_t   nalloc;
     ngx_pool_t  *pool;
+
+#ifdef NGX_NO_MEMORY_POOL
+    ngx_array_link_t *old_elts;
+#endif
 };
 
 
@@ -40,6 +57,10 @@ ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size)
     array->size = size;
     array->nalloc = n;
     array->pool = pool;
+
+#ifdef NGX_NO_MEMORY_POOL
+    array->old_elts = NULL;
+#endif
 
     array->elts = ngx_palloc(pool, n * size);
     if (array->elts == NULL) {
