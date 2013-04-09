@@ -300,6 +300,20 @@ ngx_pfree(ngx_pool_t *pool, void *p)
 
 
 void *
+ngx_pcalloc(ngx_pool_t *pool, size_t size)
+{
+    void *p;
+
+    p = ngx_palloc(pool, size);
+    if (p) {
+        ngx_memzero(p, size);
+    }
+
+    return p;
+}
+
+
+void *
 ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 {
     void        *new;
@@ -545,6 +559,20 @@ ngx_pfree(ngx_pool_t *pool, void *data)
 
 
 void *
+ngx_pcalloc(ngx_pool_t *pool, size_t size)
+{
+    void *p;
+
+    p = ngx_palloc(pool, size);
+    if (p) {
+        ngx_memzero(p, size);
+    }
+
+    return p;
+}
+
+
+void *
 ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 {
     void        *new;
@@ -576,20 +604,6 @@ ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 }
 
 #endif
-
-
-void *
-ngx_pcalloc(ngx_pool_t *pool, size_t size)
-{
-    void *p;
-
-    p = ngx_palloc(pool, size);
-    if (p) {
-        ngx_memzero(p, size);
-    }
-
-    return p;
-}
 
 
 ngx_pool_cleanup_t *
