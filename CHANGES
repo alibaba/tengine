@@ -1,4 +1,21 @@
 
+Changes with nginx 1.2.8                                         02 Apr 2013
+
+    *) Bugfix: new sessions were not always stored if the "ssl_session_cache
+       shared" directive was used and there was no free space in shared
+       memory.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: responses might hang if subrequests were used and a DNS error
+       happened during subrequest processing.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+       Thanks to Gernot Vormayr.
+
+    *) Bugfix: in backend usage accounting.
+
+
 Changes with nginx 1.2.7                                         12 Feb 2013
 
     *) Change: now if the "include" directive with mask is used on Unix
