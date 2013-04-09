@@ -807,7 +807,7 @@ ngx_open_and_stat_file(ngx_str_t *name, ngx_open_file_info_t *of,
          * This flag has no effect on a regular files.
          */
 
-        fd = ngx_open_file_wrapper(name, of, NGX_FILE_RDONLY|NGX_FILE_NONBLOCK,
+        fd = ngx_open_file_wrapper(name, of, (of->is_rw ? NGX_FILE_RDWR : NGX_FILE_RDONLY)|NGX_FILE_NONBLOCK,
                                    NGX_FILE_OPEN, 0, log);
 
     } else {

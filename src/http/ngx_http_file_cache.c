@@ -329,6 +329,7 @@ ngx_http_file_cache_open(ngx_http_request_t *r)
     of.events = clcf->open_file_cache_events;
     of.directio = NGX_OPEN_FILE_DIRECTIO_OFF;
     of.read_ahead = clcf->read_ahead;
+    of.is_rw = 1;
 
     if (ngx_open_cached_file(clcf->open_file_cache, &c->file.name, &of, r->pool)
         != NGX_OK)
@@ -966,6 +967,54 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
 
     c->node->updating = 0;
 
+    ngx_shmtx_unlock(&cache->shpool->mutex);
+}
+
+
+void
+ngx_http_file_cache_flush(ngx_http_request_t *r, ngx_temp_file_t *tf)
+{
+    ngx_http_cache_t        *c;
+    ngx_http_file_cache_t  *cache;
+    ngx_int_t               rc;
+
+    c = r->cache;
+
+    if (c->updated) {
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http file cache flush by NGX_HTTP_NOT_MODIFIED");
+
+    cache = c->file_cache;
+
+    if (r->cache->file.fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, ngx_errno,
+                      ngx_open_file_n " update cache expiers \"%s\" failed",
+                      r->cache->file.name.data);
+        return;
+    }
+
+    ngx_shmtx_lock(&cache->shpool->mutex);
+
+    c->updating = 0;
+    c->node->updating = 0;
+	c->node->valid_sec = c->valid_sec;
+	
+    rc = ngx_write_file(&r->cache->file, (u_char *) &r->cache->valid_sec,
+                    sizeof(time_t),
+                    offsetof(ngx_http_file_cache_header_t, valid_sec));
+    if (rc == NGX_ERROR)
+    {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, ngx_errno,
+                      "write proxy_cache \"%s\" failed",
+                      r->cache->file.name.data);
+        c->error = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+	
+    c->updated = 1;
+	
     ngx_shmtx_unlock(&cache->shpool->mutex);
 }
 
