@@ -2818,6 +2818,7 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     opeers_shm = NULL;
     peers_shm = NULL;
+    oshm_name.len = 0;
 
     same = 0;
     peers = check_peers_ctx;

@@ -156,6 +156,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
     ident.len = 0;
     ident.data = NULL;
     state = sw_facility;
+    ngx_memset(&addr, 0, sizeof(addr));
 
     /**
      * format example:
