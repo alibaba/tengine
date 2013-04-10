@@ -39,7 +39,6 @@
     http {
         upstream test {
             consistent_hash $request_uri;
-            consistent_hash 10;
 
             server 127.0.0.1:9001 id=1001 wegiht=3;
             server 127.0.0.1:9002 id=1002 wegiht=10;
@@ -61,18 +60,6 @@ consistent_hash
 **Context**: *upstream*
 
 配置upstream采用一致性hash作为负载均衡算法，并使用配置的变量名作为hash输入。
-
-
-consistent_tries
-------------------------
-
-**Syntax**: *consistent_tries number*
-
-**Default**: *none*
-
-**Context**: *upstream*
-
-配置当访问后端出错后重试的次数，该指令只有在next_upstream 没有被设置成off的时候才生效。
 
 
 编译安装

@@ -29,7 +29,6 @@ typedef struct {
 } ngx_http_upstream_chash_server_t;
 
 typedef struct {
-    ngx_uint_t                              tries;
     ngx_uint_t                              number;
     ngx_queue_t                             down_servers;
     ngx_array_t                            *values;
@@ -59,8 +58,6 @@ static void ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc,
     void *data, ngx_uint_t state);
 static char *ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static char *ngx_http_upstream_chash_tries(ngx_conf_t *cf, ngx_command_t *cmd,
-    void *conf);
 static uint32_t ngx_http_upstream_chash_get_server_index(
     ngx_http_upstream_chash_server_t *servers, uint32_t n, uint32_t hash);
 static void ngx_http_upstream_chash_delete_node(
@@ -77,14 +74,7 @@ static ngx_command_t ngx_http_upstream_chash_commands[] = {
       0,
       NULL },
 
-    { ngx_string("consistent_tries"),
-      NGX_HTTP_UPS_CONF | NGX_CONF_TAKE1,
-      ngx_http_upstream_chash_tries,
-      0,
-      0,
-      NULL },
-
-    ngx_null_command
+      ngx_null_command
 };
 
 
@@ -130,8 +120,6 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
     if (ucscf == NULL) {
         return NULL;
     }
-
-    ucscf->tries = NGX_CONF_UNSET_UINT;
 
     return ucscf;
 }
@@ -183,8 +171,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
             return NGX_ERROR;
         }
     }
-
-    ucscf->tries = ucscf->tries == NGX_CONF_UNSET_UINT ? n : ucscf->tries;
 
     ucscf->servers = ngx_pcalloc(cf->pool,
                                  (ucscf->number + 1) *
@@ -323,7 +309,6 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
     r->upstream->peer.data = uchpd;
-    r->upstream->peer.tries = ucscf->tries;
 
     return NGX_OK;
 }
@@ -488,7 +473,7 @@ ngx_http_upstream_chash_delete_node(ngx_http_upstream_chash_srv_conf_t *ucscf,
         if (!p->down) {
             ucscf->tree->del(ucscf->tree, 1, 1, ucscf->number, p->index);
             p->down = 1;
-            ucscf->d_servers[p->index].timeout = ngx_time() 
+            ucscf->d_servers[p->index].timeout = ngx_time()
                                                + p->peer->fail_timeout;
             ngx_queue_insert_head(&ucscf->down_servers,
                                   &ucscf->d_servers[p->index].queue);
@@ -532,8 +517,8 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state)
 {
     ngx_http_upstream_chash_peer_data_t *uchpd = data;
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "consistent hash free  peer %ui %ui", pc->tries, state);
+    ngx_log_debug(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                  "consistent hash free  peer %ui", state);
 
     if (uchpd->server == NULL) {
         return;
@@ -541,10 +526,6 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
 
     if (state & NGX_PEER_FAILED) {
         uchpd->server->peer->fails++;
-    }
-
-    if (pc->tries) {
-        pc->tries--;
     }
 }
 
@@ -595,35 +576,5 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                   |NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
                   |NGX_HTTP_UPSTREAM_DOWN;
 
-    return NGX_CONF_OK;
-}
-
-
-static char *
-ngx_http_upstream_chash_tries(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_int_t                            tries;
-    ngx_str_t                           *value;
-    ngx_http_upstream_srv_conf_t        *uscf;
-    ngx_http_upstream_chash_srv_conf_t  *ucscf;
-
-    uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
-    if (uscf == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    ucscf = ngx_http_conf_upstream_srv_conf(uscf,
-                                     ngx_http_upstream_consistent_hash_module);
-    if (ucscf == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    value = cf->args->elts;
-    tries = ngx_atoi(value[1].data, value[1].len);
-    if (tries == NGX_ERROR) {
-        return NGX_CONF_ERROR;
-    }
-
-    ucscf->tries = (ngx_uint_t) tries;
     return NGX_CONF_OK;
 }

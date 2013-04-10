@@ -543,10 +543,11 @@ use the \"--without-http_limit_conn_module\" option instead"
                                                 HTTP_UPSTREAM_IP_HASH_SHARED=NO ;;
         --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO ;;
         --without-http_upstream_least_conn_module)
-                                         HTTP_UPSTREAM_LEAST_CONN=NO ;;
-                                         HTTP_UPSTREAM_LEAST_CONN_SHARED=NO  ;;
+                                         HTTP_UPSTREAM_LEAST_CONN=NO
+                                         HTTP_UPSTREAM_LEAST_CONN_SHARED=NO ;;
         --without-http_upstream_consistent_hash_module)
-                                         HTTP_UPSTREAM_CONSISTENT_HASH=NO ;;
+                                         HTTP_UPSTREAM_CONSISTENT_HASH=NO
+                                         HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO ;;
         --without-http_upstream_session_sticky_module)
                                          HTTP_UPSTREAM_SESSION_STICKY=NO 
                                          HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;

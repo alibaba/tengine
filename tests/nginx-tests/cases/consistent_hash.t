@@ -131,8 +131,8 @@ EOF
 
 $t->run();
 $r = http_get('/?abcdef');
-like($r, qr/9004/, 'check fallback');
-unlike($r, qr/$res/, 'check fallback');
+like($r, qr/502/, 'check fallback, no fallback');
+unlike($r, qr/$res/, 'check fallback, no fallback');
 $t->stop();
 
 ###################################################################
