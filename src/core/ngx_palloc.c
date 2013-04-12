@@ -376,9 +376,6 @@ ngx_create_pool(size_t size, ngx_log_t *log)
 
     ngx_memzero(p, size);
 
-    size = size - sizeof(ngx_pool_t);
-    p->max = (size < NGX_MAX_ALLOC_FROM_POOL) ? size : NGX_MAX_ALLOC_FROM_POOL;
-
     p->current = p;
     p->log = log;
 

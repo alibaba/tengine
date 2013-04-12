@@ -80,7 +80,6 @@ struct ngx_pool_data_s {
 
 struct ngx_pool_s {
     ngx_pool_data_t      *d;
-    size_t                max;
     ngx_pool_t           *current;
     ngx_chain_t          *chain;
     ngx_pool_cleanup_t   *cleanup;
