@@ -91,7 +91,7 @@ static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
       NULL },
 
     { ngx_string("keepalive_timeout"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
       ngx_http_upstream_keepalive_timeout,
       0,
       0,
