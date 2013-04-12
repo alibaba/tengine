@@ -744,8 +744,6 @@ ngx_http_trim_create_loc_conf(ngx_conf_t *cf)
     /*
      * set by ngx_pcalloc():
      *
-     *     conf->trim_enable = 0;
-     *     conf->comment_enable = 0;
      *     conf->types = { NULL };
      *     conf->types_keys = NULL;
      */
