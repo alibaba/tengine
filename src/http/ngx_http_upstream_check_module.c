@@ -1030,9 +1030,7 @@ ngx_http_upstream_check_clear_dynamic_peer_shm(
         return;
     }
 
-    ngx_shmtx_destroy(&peer_shm->mutex);
     ngx_slab_free_locked(check_peers_ctx->shpool, peer_shm->sockaddr);
-    ngx_memzero(peer_shm, sizeof(ngx_http_upstream_check_peer_shm_t));
 }
 
 
