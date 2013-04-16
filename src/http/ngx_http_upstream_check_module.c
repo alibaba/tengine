@@ -658,7 +658,11 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
         return NGX_ERROR;
     }
 
-    if (ngx_process == NGX_PROCESS_WORKER) {
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0,
+                   "http upstream check add upstream process: %ui",
+                   ngx_process);
+
+    if (ngx_process != NGX_PROCESS_MASTER) {
         return ngx_http_upstream_check_add_dynamic_peer(cf->pool, us, peer_addr);
     }
 
@@ -877,13 +881,15 @@ void
 ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
     ngx_addr_t *peer_addr)
 {
-    ngx_uint_t                        i;
-    ngx_http_upstream_check_peer_t   *peer, *chosen;
-    ngx_http_upstream_check_peers_t  *peers;
+    ngx_uint_t                            i;
+    ngx_http_upstream_check_peer_t       *peer, *chosen;
+    ngx_http_upstream_check_peers_t      *peers;
+    ngx_http_upstream_check_peers_shm_t  *peers_shm;
 
     chosen = NULL;
     peers = check_peers_ctx;
     peer = peers->peers.elts;
+    peers_shm = check_peers_ctx->peers_shm;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "http upstream check delete dynamic upstream: %p, n: %ui",
@@ -928,10 +934,16 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
                    chosen, chosen->index, chosen->shm->ref);
 
     ngx_shmtx_lock(&chosen->shm->mutex);
+
+    if (chosen->shm->owner == ngx_pid) {
+        chosen->shm->owner = NGX_INVALID_PID;
+    }
+
     chosen->shm->ref--;
     if (chosen->shm->ref <= 0 && chosen->shm->delete != PEER_DELETED) {
         ngx_http_upstream_check_clear_dynamic_peer_shm(chosen->shm);
         chosen->shm->delete = PEER_DELETED;
+        peers_shm->number--;
     }
     ngx_shmtx_unlock(&chosen->shm->mutex);
 
