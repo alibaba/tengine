@@ -2474,7 +2474,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
     /* TODO: two locks */
     for (i = 0; i < peers->peers.nelts; i++) {
 
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
@@ -2520,7 +2520,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
 
     for (i = 0; i < peers->peers.nelts; i++) {
 
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
@@ -2576,7 +2576,7 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
     peer = peers->peers.elts;
     for (i = 0; i < peers->peers.nelts; i++) {
 
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
@@ -2620,7 +2620,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
 
     for (i = 0; i < peers->peers.nelts; i++) {
 
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
@@ -2651,7 +2651,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
     last = peers->peers.nelts - 1;
     for (i = 0; i < peers->peers.nelts; i++) {
 
-        if (peer->delete) {
+        if (peer[i].delete) {
             continue;
         }
 
