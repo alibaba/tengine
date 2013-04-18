@@ -291,8 +291,6 @@ hello world !
     sendfile on;
     trim on;
     trim_comment on;
-    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
-    location /trim.html { trim off;}
 --- user_files
 >>> trim.html
 <!DOCTYPE html>
@@ -320,7 +318,7 @@ working. Further configuration is required.</p>
 </html>
 
 --- request
-    GET /t/trim.html
+    GET /trim.html
 --- response_body
 <!DOCTYPE html>
 <html>

@@ -211,7 +211,6 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             }
 
             cl->buf->tag = (ngx_buf_tag_t) &ngx_http_trim_filter_module;
-            cl->buf->temporary = 0;
             cl->buf->memory = 1;
             cl->buf->pos = ngx_http_trim_saved.data;
             cl->buf->last = cl->buf->pos + ctx->saved;
@@ -220,6 +219,23 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ll = &cl->next;
 
             ctx->saved = 0;
+        }
+
+        if(ln->buf->in_file
+           && (ln->buf->file_last - ln->buf->file_pos)
+               != (off_t) (ln->buf->last - ln->buf->pos))
+        {
+            cl = ngx_chain_get_free_buf(r->pool, &ctx->free);
+            if (cl == NULL) {
+                return NGX_ERROR;
+            }
+
+            ngx_memcpy(cl->buf, ln->buf, sizeof(ngx_buf_t));
+            cl->buf->tag = (ngx_buf_tag_t) &ngx_http_trim_filter_module;
+            cl->buf->in_file = 0;
+
+            cl->next = ln->next;
+            ln = cl;
         }
 
         if (ngx_buf_size(ln->buf) == 0) {
@@ -241,7 +257,6 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ll = &ln->next;
         }
 
-        ln->buf->in_file = 0;
     }
 
     if (out == NULL) {
