@@ -95,7 +95,7 @@ struct ngx_open_file_s {
 };
 
 
-#define NGX_NUMBER_MAJOR  2
+#define NGX_NUMBER_MAJOR  3
 #define NGX_NUMBER_MINOR  1
 
 #define NGX_MODULE_V1          0, 0, 0, 0,                              \

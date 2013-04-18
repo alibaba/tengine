@@ -531,7 +531,7 @@ ngx_dso_load(ngx_conf_t *cf)
         {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "module \"%V\" is not compatible with this "
-                               "version of nginx "
+                               "version of tengine "
                                "(require %ui.%ui, found %ui.%ui).",
                                &dm[i].name, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR,
                                dm[i].module->major_version,
@@ -544,8 +544,8 @@ ngx_dso_load(ngx_conf_t *cf)
         {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "module \"%V\" is not compatible with this "
-                               "abi of nginx ",
-                               &dm[i].name, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR);
+                               "ABI of tengine ",
+                               &dm[i].name);
             return NGX_CONF_ERROR;
         }
 
