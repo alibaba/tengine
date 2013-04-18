@@ -7,7 +7,6 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
-#include <nginx.h>
 
 
 typedef struct {
@@ -146,10 +145,10 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
 
     conf = ngx_http_get_module_loc_conf(r, ngx_http_trim_filter_module);
 
-    if (r->headers_out.status != NGX_HTTP_OK
+    if (!conf->trim_enable
+        || r->headers_out.status != NGX_HTTP_OK
         || (r->method & NGX_HTTP_HEAD)
         || r->headers_out.content_length_n == 0
-        || !conf->trim_enable
         || (r->headers_out.content_encoding
             && r->headers_out.content_encoding->value.len)
         || ngx_http_test_content_type(r, &conf->types) == NULL)
@@ -241,6 +240,8 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             *ll = ln;
             ll = &ln->next;
         }
+
+        ln->buf->in_file = 0;
     }
 
     if (out == NULL) {

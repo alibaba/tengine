@@ -166,6 +166,7 @@ is good to see you </body>
 
 === TEST 7: trim all
 --- config
+    sendfile on;
     trim on;
     trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
@@ -284,3 +285,61 @@ hello world !
     GET /t/trim.html
 --- response_body
 <title>世界 你好 !</title>
+
+=== TEST 10: home page of tengine
+--- config
+    sendfile on;
+    trim on;
+    trim_comment on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to tengine!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to tengine!</h1>
+<p>If you see this page, the tengine web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://tengine.taobao.org/">tengine.taobao.org</a>.</p>
+
+<p><em>Thank you for using tengine.</em></p>
+</body>
+</html>
+
+--- request
+    GET /t/trim.html
+--- response_body
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to tengine!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to tengine!</h1>
+<p>If you see this page, the tengine web server is successfully installed and
+working. Further configuration is required.</p>
+<p>For online documentation and support please refer to
+<a href="http://tengine.taobao.org/">tengine.taobao.org</a>.</p>
+<p><em>Thank you for using tengine.</em></p>
+</body>
+</html>
