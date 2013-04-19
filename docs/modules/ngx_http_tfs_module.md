@@ -1,7 +1,7 @@
 Name
 ====
 
-* tfs module
+* TFS module
 
 Description
 ===========
@@ -156,7 +156,7 @@ tfs_pass
 
 **Context**： *location*
 
-Specify tfs upstream. Remember that protocol used here must be "tfs".
+Specify TFS upstream. Remember that protocol used here must be "tfs".
 
 Example:
 
@@ -176,7 +176,7 @@ tfs_keepalive
 
 **Context**： *http, server*
 
-Defines connection pool used by tfs module. This connection pool caches upstream connections.
+Defines connection pool used by TFS module. This connection pool caches upstream connections.
 
 The following parameters must be defined:
 
