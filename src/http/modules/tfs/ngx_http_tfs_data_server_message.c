@@ -54,6 +54,7 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
         if (block_info->ds_count > 0) {
             if (segment_data->ds_retry > 0) {
                 segment_data->ds_index %= block_info->ds_count;
+
             } else {
                 segment_data->ds_index = ngx_random() % block_info->ds_count;
             }

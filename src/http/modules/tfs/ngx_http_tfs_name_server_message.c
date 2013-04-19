@@ -670,9 +670,8 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
 {
     u_char                                       *p;
     uint16_t                                      type;
-    uint32_t                                      block_count, real_block_count,
-                                                  complete_count, ds_count,
-                                                  block_id;
+    uint32_t                                      block_count, complete_count,
+                                                  ds_count, block_id;
     ngx_str_t                                     err_msg;
     ngx_uint_t                                    i, j, k;
     ngx_http_tfs_header_t                        *header;
@@ -701,9 +700,9 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
     if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
         block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
-    real_block_count = resp->block_count;
+    t->file.curr_batch_count = resp->block_count;
 
-    for (i = 0; i < real_block_count; i++) {
+    for (i = 0; i < resp->block_count; i++) {
         j = i;
         /* block id */
         block_id = *(uint32_t *) p;

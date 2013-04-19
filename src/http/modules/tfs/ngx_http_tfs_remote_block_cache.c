@@ -373,6 +373,9 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
                            "batch lookup remote block cache, hit_count: %ui",
                            hit_count);
 
+            /* remote block cache hit count */
+            t->file.curr_batch_count += hit_count;
+
             if (hit_count == kvs->nelts) {
                 /* all cache hit, start batch process */
                 t->decline_handler = ngx_http_tfs_batch_process_start;

@@ -98,6 +98,7 @@ typedef struct {
     uint32_t                       segment_index;
     uint32_t                       segment_count;
     ngx_http_tfs_segment_data_t   *segment_data;
+    uint32_t                       curr_batch_count;
 } NGX_PACKED ngx_http_tfs_file_t;
 
 
