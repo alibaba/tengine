@@ -128,14 +128,14 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
 static ngx_int_t
 ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 {
-    u_char                                   hash_buf[256];
-    ngx_int_t                                j, weight;
-    ngx_uint_t                               sid, id, hash_len;
-    ngx_uint_t                               i, n, *number, rnindex;
-    ngx_http_upstream_rr_peer_t             *peer;
-    ngx_http_upstream_rr_peers_t            *peers;
-    ngx_http_upstream_chash_server_t        *server;
-    ngx_http_upstream_chash_srv_conf_t      *ucscf;
+    u_char                               hash_buf[256];
+    ngx_int_t                            j, weight;
+    ngx_uint_t                           sid, id, hash_len;
+    ngx_uint_t                           i, n, *number, rnindex;
+    ngx_http_upstream_rr_peer_t         *peer;
+    ngx_http_upstream_rr_peers_t        *peers;
+    ngx_http_upstream_chash_server_t    *server;
+    ngx_http_upstream_chash_srv_conf_t  *ucscf;
 
     if (ngx_http_upstream_init_round_robin(cf, us) == NGX_ERROR) {
         return NGX_ERROR;
@@ -189,7 +189,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     ucscf->number = 0;
-    for (i = 0; i < n ; i++) {
+    for (i = 0; i < n; i++) {
 
         peer = &peers->peer[i];
         sid = (ngx_uint_t) ngx_atoi(peer->id.data, peer->id.len);
@@ -318,16 +318,16 @@ static ngx_int_t
 ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 {
 
-    time_t                                   now;
-    uint32_t                                 index, index1, index2;
-    uint32_t                                 diff1, diff2;
-    ngx_queue_t                             *q, *temp;
-    ngx_segment_node_t                       node, *p;
-    ngx_http_upstream_rr_peer_t             *peer;
-    ngx_http_upstream_chash_server_t        *server;
-    ngx_http_upstream_chash_srv_conf_t      *ucscf;
-    ngx_http_upstream_chash_peer_data_t     *uchpd = data;
-    ngx_http_upstream_chash_down_server_t   *down_server;
+    time_t                                  now;
+    uint32_t                                index, index1, index2;
+    uint32_t                                diff1, diff2;
+    ngx_queue_t                            *q, *temp;
+    ngx_segment_node_t                      node, *p;
+    ngx_http_upstream_rr_peer_t            *peer;
+    ngx_http_upstream_chash_server_t       *server;
+    ngx_http_upstream_chash_srv_conf_t     *ucscf;
+    ngx_http_upstream_chash_peer_data_t    *uchpd = data;
+    ngx_http_upstream_chash_down_server_t  *down_server;
 
     ucscf = uchpd->ucscf;
 
@@ -486,7 +486,7 @@ static uint32_t
 ngx_http_upstream_chash_get_server_index(
     ngx_http_upstream_chash_server_t *servers, uint32_t n, uint32_t hash)
 {
-    uint32_t    low, hight, mid;
+    uint32_t  low, hight, mid;
 
     low = 1;
     hight = n;
@@ -533,10 +533,10 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
 static char *
 ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                                       *value;
-    ngx_http_script_compile_t                        sc;
-    ngx_http_upstream_srv_conf_t                    *uscf;
-    ngx_http_upstream_chash_srv_conf_t              *ucscf;
+    ngx_str_t                           *value;
+    ngx_http_script_compile_t            sc;
+    ngx_http_upstream_srv_conf_t        *uscf;
+    ngx_http_upstream_chash_srv_conf_t  *ucscf;
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
     if (uscf == NULL) {
