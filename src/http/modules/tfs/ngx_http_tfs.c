@@ -376,6 +376,8 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
                                                &keys, &kvs);
     /* local cache hit(maybe partial) */
     if (rc != NGX_ERROR && kvs.nelts > 0) {
+        /* local block cache hit count */
+        t->file.curr_batch_count += kvs.nelts;
         kv = kvs.elts;
         for (i = 0; i < kvs.nelts; i++, kv++) {
             /* find out segment */
@@ -841,7 +843,7 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         if (t->decline_handler) {
             rc = t->decline_handler(t);
             if (rc == NGX_ERROR) {
-                ngx_http_tfs_finalize_request(r, t, NGX_ERROR);
+                ngx_http_tfs_finalize_request(r, t, NGX_HTTP_INTERNAL_SERVER_ERROR);
             }
         }
         return;
@@ -2171,17 +2173,13 @@ ngx_http_tfs_set_duplicate_info(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
 {
-    uint32_t                         block_count, i;
+    uint32_t                         i;
     ngx_http_tfs_t                  *st, **tt;
     ngx_http_tfs_inet_t             *addr;
     ngx_http_tfs_segment_data_t     *segment_data;
     ngx_http_tfs_peer_connection_t  *data_server;
 
     segment_data = &t->file.segment_data[t->file.segment_index];
-    block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
-    }
 
     t->sp_count = 0;
     t->sp_done_count = 0;
@@ -2192,7 +2190,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
     tt = &t->next;
 
     /* create sub process */
-    for (i = 0; i < block_count; i++) {
+    for (i = 0; i < t->file.curr_batch_count; i++) {
         st = ngx_http_tfs_alloc_st(t);
         if (st == NULL) {
             return NGX_ERROR;
@@ -2212,6 +2210,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         st->file.segment_data = &segment_data[i];
         st->sp_curr = t->file.segment_index + i;
         st->sp_ready = NGX_HTTP_TFS_NO;
+        st->stat_info.size = 0;
 
         if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
             st->file.left_length = st->file.segment_data->segment_info.size;
@@ -2314,6 +2313,7 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
     }
 
     t->file.segment_index += t->sp_count;
+    t->file.curr_batch_count = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
                    "batch process segment count: %uD, rest segment count: %D ",
