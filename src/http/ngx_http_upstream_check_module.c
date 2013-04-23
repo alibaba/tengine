@@ -943,7 +943,6 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
     if (chosen->shm->ref <= 0 && chosen->shm->delete != PEER_DELETED) {
         ngx_http_upstream_check_clear_dynamic_peer_shm(chosen->shm);
         chosen->shm->delete = PEER_DELETED;
-        peers_shm->number--;
     }
     ngx_shmtx_unlock(&chosen->shm->mutex);
 
@@ -991,9 +990,11 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
     }
 
     for (i = 0; i < peers_shm->number; i++) {
+
         if (peer_shm[i].delete == PEER_DELETED) {
             peer_shm[i].delete = PEER_NORMAL;
             index = i;
+            break;
         }
     }
 
