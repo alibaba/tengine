@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -138,6 +138,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
     u_char                *p, *p_bak, pri[5];
     ngx_int_t              rc, port, facility, loglevel;
     ngx_str_t              ident;
+    ngx_url_t              u;
     ngx_addr_t             addr;
     ngx_uint_t             i;
     enum {
@@ -155,6 +156,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
     ident.len = 0;
     ident.data = NULL;
     state = sw_facility;
+    ngx_memset(&addr, 0, sizeof(ngx_addr_t));
 
     /**
      * format example:
@@ -243,12 +245,19 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
                 addr.name.data = p_bak;
                 addr.name.len = len;
 
-                rc = ngx_parse_addr(pool, &addr, p_bak, len);
-                if (rc == NGX_DECLINED) {
+                ngx_memzero(&u, sizeof(ngx_url_t));
+                u.url.data = p_bak;
+                u.url.len = len;
+                u.one_addr = 1;
+
+                rc = ngx_parse_url(pool, &u);
+                if (rc != NGX_OK) {
                     rc = ngx_set_unix_domain(pool, &addr, p_bak, len);
                     state = sw_ident;
                 } else {
                     state = sw_port;
+                    addr.socklen = u.addrs[0].socklen;
+                    addr.sockaddr = u.addrs[0].sockaddr;
                 }
             }
 
@@ -317,7 +326,7 @@ ngx_log_set_syslog(ngx_pool_t *pool, ngx_str_t *value, ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    p = ngx_snprintf(pri, 5, "<%d>", facility + loglevel);
+    p = ngx_snprintf(pri, 5, "<%i>", facility + loglevel);
     log->syslog->syslog_pri.len = p - pri;
     log->syslog->syslog_pri.data = ngx_pcalloc(pool, p - pri);
     if (log->syslog->syslog_pri.data == NULL) {

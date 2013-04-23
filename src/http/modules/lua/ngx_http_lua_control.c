@@ -108,7 +108,8 @@ ngx_http_lua_ngx_exec(lua_State *L)
                 n);
     }
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -137,6 +138,13 @@ ngx_http_lua_ngx_exec(lua_State *L)
     uri.len = len;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return luaL_error(L, "no ctx found");
+    }
+
+    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_REWRITE
+                               | NGX_HTTP_LUA_CONTEXT_ACCESS
+                               | NGX_HTTP_LUA_CONTEXT_CONTENT);
 
     if (ngx_http_parse_unsafe_uri(r, &uri, &args, &flags)
         != NGX_OK)
@@ -171,6 +179,11 @@ ngx_http_lua_ngx_exec(lua_State *L)
 
             break;
 
+        case LUA_TNIL:
+            user_args.data = NULL;
+            user_args.len = 0;
+            break;
+
         default:
             msg = lua_pushfstring(L, "string, number, or table expected, "
                     "but got %s", luaL_typename(L, 2));
@@ -193,7 +206,7 @@ ngx_http_lua_ngx_exec(lua_State *L)
 
             q = ngx_copy(p, args.data, args.len);
             *q++ = '&';
-            q = ngx_copy(q, user_args.data, user_args.len);
+            ngx_memcpy(q, user_args.data, user_args.len);
 
             args.data = p;
             args.len += user_args.len + 1;
@@ -248,7 +261,8 @@ ngx_http_lua_ngx_redirect(lua_State *L)
         rc = NGX_HTTP_MOVED_TEMPORARILY;
     }
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -260,6 +274,10 @@ ngx_http_lua_ngx_redirect(lua_State *L)
     if (ctx == NULL) {
         return luaL_error(L, "no request ctx found");
     }
+
+    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_REWRITE
+                               | NGX_HTTP_LUA_CONTEXT_ACCESS
+                               | NGX_HTTP_LUA_CONTEXT_CONTENT);
 
     if (ctx->headers_sent) {
         return luaL_error(L, "attempt to call ngx.redirect after sending out "
@@ -317,7 +335,8 @@ ngx_http_lua_ngx_exit(lua_State *L)
         return luaL_error(L, "expecting one argument");
     }
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -330,11 +349,21 @@ ngx_http_lua_ngx_exit(lua_State *L)
         return luaL_error(L, "no request ctx found");
     }
 
+    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_REWRITE
+                               | NGX_HTTP_LUA_CONTEXT_ACCESS
+                               | NGX_HTTP_LUA_CONTEXT_CONTENT);
+
     rc = (ngx_int_t) luaL_checkinteger(L, 1);
 
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE && ctx->headers_sent) {
-        return luaL_error(L, "attempt to call ngx.exit after sending "
-                "out the headers");
+
+        if (rc != (ngx_int_t) r->headers_out.status) {
+            return luaL_error(L, "attempt to set status %d via ngx.exit after "
+                              "sending out the response status %d", (int) rc,
+                              (int) r->headers_out.status);
+        }
+
+        rc = NGX_HTTP_OK;
     }
 
     ctx->exit_code = rc;

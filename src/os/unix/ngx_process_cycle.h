@@ -26,6 +26,7 @@
 #define NGX_PROCESS_SIGNALLER  2
 #define NGX_PROCESS_WORKER     3
 #define NGX_PROCESS_HELPER     4
+#define NGX_PROCESS_PROC       5
 
 
 typedef struct {

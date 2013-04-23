@@ -70,11 +70,15 @@ if [ $USE_PERL = YES ]; then
     . auto/lib/perl/conf
 fi
 
-if [ $HTTP_LUA = YES ]; then
+if [ $HTTP_LUA = YES ] || [ $HTTP_LUA_SHARED = YES ]; then
     . auto/lib/lua/conf
 fi
 
-if [ $HTTP_GEOIP = YES ]; then
+if [ $HTTP_TFS = YES ] || [ $HTTP_TFS_SHARED = YES ]; then
+    . auto/lib/libyajl/conf
+fi
+
+if [ $HTTP_GEOIP = YES ] || [ $HTTP_GEOIP_SHARED = YES ]; then
     . auto/lib/geoip/conf
 fi
 
@@ -84,4 +88,8 @@ fi
 
 if [ $NGX_LIBATOMIC != NO ]; then
     . auto/lib/libatomic/conf
+fi
+
+if [ $JEMALLOC != NO ]; then
+    . auto/lib/jemalloc/conf
 fi

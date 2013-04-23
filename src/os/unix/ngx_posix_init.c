@@ -53,7 +53,7 @@ ngx_os_init(ngx_log_t *log)
 
         if (ngx_ncpu <= 0) {
             ngx_log_error(NGX_LOG_ALERT, log, 0,
-                          "sysconf(_SC_NPROCESSORS_ONLN): %d", ngx_ncpu);
+                          "sysconf(_SC_NPROCESSORS_ONLN): %i", ngx_ncpu);
         }
     }
 #endif
@@ -103,6 +103,8 @@ ngx_os_status(ngx_log_t *log)
 }
 
 
+#if 0
+
 ngx_int_t
 ngx_posix_post_conf_init(ngx_log_t *log)
 {
@@ -127,3 +129,5 @@ ngx_posix_post_conf_init(ngx_log_t *log)
 
     return NGX_OK;
 }
+
+#endif

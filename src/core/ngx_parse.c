@@ -33,6 +33,12 @@ ngx_parse_size(ngx_str_t *line)
         scale = 1024 * 1024;
         break;
 
+    case 'G':
+    case 'g':
+        len--;
+        scale = 1024 * 1024 * 1024;
+        break;
+
     default:
         scale = 1;
     }

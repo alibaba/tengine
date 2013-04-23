@@ -138,6 +138,13 @@ ngx_conf_split_clients_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     name = value[2];
+
+    if (name.data[0] != '$') {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid variable name \"%V\"", &name);
+        return NGX_CONF_ERROR;
+    }
+
     name.len--;
     name.data++;
 
@@ -211,7 +218,7 @@ ngx_http_split_clients(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
         part->percent = 0;
 
     } else {
-        if (value[0].data[value[0].len - 1] != '%') {
+        if (value[0].len == 0 || value[0].data[value[0].len - 1] != '%') {
             goto invalid;
         }
 

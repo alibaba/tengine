@@ -138,7 +138,7 @@ ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_string("Keep-Alive"), offsetof(ngx_http_headers_in_t, keep_alive),
                  ngx_http_process_header_line },
 
-#if (NGX_HTTP_PROXY || NGX_HTTP_REALIP || NGX_HTTP_GEO)
+#if (NGX_HTTP_X_FORWARDED_FOR)
     { ngx_string("X-Forwarded-For"),
                  offsetof(ngx_http_headers_in_t, x_forwarded_for),
                  ngx_http_process_header_line },
@@ -759,6 +759,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             r->request_line.len = r->request_end - r->request_start;
             r->request_line.data = r->request_start;
+            r->request_length = r->header_in->pos - r->request_start;
 
 
             if (r->args_start) {
@@ -824,7 +825,28 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
 #if (NGX_WIN32)
             {
-            u_char  *p;
+            u_char  *p, *last;
+
+            p = r->uri.data;
+            last = r->uri.data + r->uri.len;
+
+            while (p < last) {
+
+                if (*p++ == ':') {
+
+                    /*
+                     * this check covers "::$data", "::$index_allocation" and
+                     * ":$i30:$index_allocation"
+                     */
+
+                    if (p < last && *p == '$') {
+                        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                      "client sent unsafe win32 URI");
+                        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                        return;
+                    }
+                }
+            }
 
             p = r->uri.data + r->uri.len - 1;
 
@@ -837,11 +859,6 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
                 if (*p == '.') {
                     p--;
-                    continue;
-                }
-
-                if (ngx_strncasecmp(p - 6, (u_char *) "::$data", 7) == 0) {
-                    p -= 7;
                     continue;
                 }
 
@@ -1052,6 +1069,8 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
         if (rc == NGX_OK) {
 
+            r->request_length += r->header_in->pos - r->header_name_start;
+
             if (r->invalid_header && cscf->ignore_invalid_headers) {
 
                 /* there was error while a header line parsing */
@@ -1115,7 +1134,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
             ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http header done");
 
-            r->request_length += r->header_in->pos - r->header_in->start;
+            r->request_length += r->header_in->pos - r->header_name_start;
 
             r->http_state = NGX_HTTP_PROCESS_REQUEST_STATE;
 
@@ -1222,8 +1241,6 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
         /* the client fills up the buffer with "\r\n" */
 
-        r->request_length += r->header_in->end - r->header_in->start;
-
         r->header_in->pos = r->header_in->start;
         r->header_in->last = r->header_in->start;
 
@@ -1283,8 +1300,6 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
          * to relocate the parser header pointers
          */
 
-        r->request_length += r->header_in->end - r->header_in->start;
-
         r->header_in = b;
 
         return NGX_OK;
@@ -1292,8 +1307,6 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http large header copy: %d", r->header_in->pos - old);
-
-    r->request_length += old - r->header_in->start;
 
     new = b->start;
 
@@ -1628,7 +1641,9 @@ ngx_http_process_request(ngx_http_request_t *r)
         if (sscf->verify) {
             rc = SSL_get_verify_result(c->ssl->connection);
 
-            if (rc != X509_V_OK) {
+            if (rc != X509_V_OK
+                && (sscf->verify != 3 || !ngx_ssl_verify_error_optional(rc)))
+            {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client SSL certificate verify error: (%l:%s)",
                               rc, X509_verify_cert_error_string(rc));
@@ -1817,7 +1832,7 @@ ngx_http_find_virtual_server(ngx_http_request_t *r, u_char *host, size_t len)
 
 #endif
 
-    return NGX_OK;
+    return NGX_DECLINED;
 
 found:
 
@@ -1943,7 +1958,6 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
     if (rc == NGX_OK && r->filter_finalize) {
         c->error = 1;
-        return;
     }
 
     if (rc == NGX_DECLINED) {
@@ -2011,14 +2025,6 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             return;
         }
 
-#if (NGX_DEBUG)
-        if (r != c->data) {
-            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "http finalize non-active request: \"%V?%V\"",
-                           &r->uri, &r->args);
-        }
-#endif
-
         pr = r->parent;
 
         if (r == c->data) {
@@ -2051,6 +2057,10 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             c->data = pr;
 
         } else {
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http finalize non-active request: \"%V?%V\"",
+                           &r->uri, &r->args);
 
             r->write_event_handler = ngx_http_request_finalizer;
 
@@ -2741,6 +2751,21 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     if (n == NGX_AGAIN) {
         if (ngx_handle_read_event(rev, 0) != NGX_OK) {
             ngx_http_close_connection(c);
+            return;
+        }
+
+        /*
+         * Like ngx_http_set_keepalive() we are trying to not hold
+         * c->buffer's memory for a keepalive connection.
+         */
+
+        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+
+            /*
+             * the special note that c->buffer's memory was freed
+             */
+
+            b->pos = NULL;
         }
 
         return;

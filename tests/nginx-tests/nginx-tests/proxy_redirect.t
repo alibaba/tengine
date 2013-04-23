@@ -115,44 +115,24 @@ is(http_get_location('http://127.0.0.1:8080/off/test.html'),
 is(http_get_location('http://127.0.0.1:8080/off/on/test.html'),
 	'http://127.0.0.1:8080/on/test.html', 'rewrite off overwrite');
 
-TODO: {
-local $TODO = 'rewrite off inheritance bug';
-
 is(http_get_location('http://127.0.0.1:8080/off/on/on/test.html'),
 	'http://127.0.0.1:8080/on/on/test.html', 'rewrite inheritance');
-
-}
-
-TODO: {
-local $TODO = 'support variables in first argument';
 
 is(http_get_location('http://127.0.0.1:8080/var_here/test.html'),
 	'http://127.0.0.1:8080/replaced/test.html', 'variable in first arg');
 is(http_get_refresh('http://127.0.0.1:8080/var_here/test.html'),
 	'7; url=/replaced/test.html', 'variable in first arg (refresh)');
 
-}
-
-TODO: {
-local $TODO = 'support for regular expressions';
-
 is(http_get_location('http://127.0.0.1:8080/ReeegEX/test.html'),
 	'http://127.0.0.1:8080/replaced/test.html', 'caseless regexp');
 is(http_get_location('http://127.0.0.1:8080/regex_w_captures/test.html'),
 	'http://127.0.0.1:8080/captures/test.html', 'regexp w/captures');
-
-}
-
-TODO: {
-local $TODO = 'regular expressions and Refresh header';
 
 is(http_get_refresh('http://127.0.0.1:8080/ReeegEX/test.html'),
 	'7; url=/replaced/test.html', 'caseless regexp (refresh)');
 is(http_get_refresh('http://127.0.0.1:8080/regex_w_captures/test.html'),
 	'7; url=http://127.0.0.1:8080/captures/test.html',
 	'regexp w/captures (refresh)');
-
-}
 
 ###############################################################################
 

@@ -14,31 +14,22 @@
 
 static ngx_int_t ngx_http_set_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_set_header_helper(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value,
     ngx_table_elt_t **output_header,
     unsigned no_create);
-
 static ngx_int_t ngx_http_set_builtin_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_set_content_length_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_clear_builtin_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_clear_content_length_header(ngx_http_request_t *r,
         ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_set_host_header(ngx_http_request_t *r,
         ngx_http_lua_header_val_t *hv, ngx_str_t *value);
-
 static ngx_int_t ngx_http_lua_rm_header_helper(ngx_list_t *l,
         ngx_list_part_t *cur, ngx_uint_t i);
-
-static ngx_int_t ngx_http_lua_rm_header(ngx_list_t *l, ngx_table_elt_t *h);
 
 
 static ngx_http_lua_set_header_t ngx_http_lua_set_handlers[] = {
@@ -129,12 +120,11 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
         goto new_header;
     }
 
+retry:
     part = &r->headers_in.headers.part;
     h = part->elts;
 
     for (i = 0; /* void */; i++) {
-        dd("i: %d, part: %p", (int) i, part);
-
         if (i >= part->nelts) {
             if (part->next == NULL) {
                 break;
@@ -144,6 +134,8 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
             h = part->elts;
             i = 0;
         }
+
+        dd("i: %d, part: %p", (int) i, part);
 
         if (h[i].key.len == hv->key.len
                 && ngx_strncasecmp(h[i].key.data,
@@ -161,7 +153,7 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
                         *output_header = NULL;
                     }
 
-                    return NGX_OK;
+                    goto retry;
                 }
             }
 
@@ -177,7 +169,7 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
     }
 
     if (value->len == 0) {
-      return NGX_OK;
+        return NGX_OK;
     }
 
 new_header:
@@ -223,7 +215,6 @@ ngx_http_set_builtin_header(ngx_http_request_t *r,
         ngx_http_lua_header_val_t *hv, ngx_str_t *value)
 {
     ngx_table_elt_t             *h, **old;
-    ngx_int_t                    rc;
 
     dd("entered set_builtin_header (input)");
 
@@ -250,15 +241,7 @@ ngx_http_set_builtin_header(ngx_http_request_t *r,
         h->hash = 0;
         h->value = *value;
 
-        rc = ngx_http_lua_rm_header(&r->headers_in.headers, h);
-
-        dd("rm header: %d", (int) rc);
-
-        if (rc == NGX_OK) {
-            *old = NULL;
-        }
-
-        return rc;
+        return ngx_http_set_header_helper(r, hv, value, old, 0);
     }
 
     h->hash = hv->hash;
@@ -266,6 +249,7 @@ ngx_http_set_builtin_header(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
 
 static ngx_int_t
 ngx_http_set_host_header(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
@@ -277,6 +261,7 @@ ngx_http_set_host_header(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
 
     return ngx_http_set_builtin_header(r, hv, value);
 }
+
 
 static ngx_int_t
 ngx_http_set_content_length_header(ngx_http_request_t *r,
@@ -300,6 +285,7 @@ ngx_http_set_content_length_header(ngx_http_request_t *r,
     return ngx_http_set_builtin_header(r, hv, value);
 }
 
+
 static ngx_int_t
 ngx_http_clear_content_length_header(ngx_http_request_t *r,
         ngx_http_lua_header_val_t *hv, ngx_str_t *value)
@@ -308,6 +294,7 @@ ngx_http_clear_content_length_header(ngx_http_request_t *r,
 
     return ngx_http_clear_builtin_header(r, hv, value);
 }
+
 
 static ngx_int_t
 ngx_http_clear_builtin_header(ngx_http_request_t *r,
@@ -371,42 +358,6 @@ ngx_http_lua_set_input_header(ngx_http_request_t *r, ngx_str_t key,
 
 
 static ngx_int_t
-ngx_http_lua_rm_header(ngx_list_t *l, ngx_table_elt_t *h)
-{
-    ngx_uint_t                   i;
-    ngx_list_part_t             *part;
-    ngx_table_elt_t             *data;
-
-    part = &l->part;
-    data = part->elts;
-
-    for (i = 0; /* void */; i++) {
-        dd("i: %d, part: %p", (int) i, part);
-
-        if (i >= part->nelts) {
-            if (part->next == NULL) {
-                break;
-            }
-
-            part = part->next;
-            data = part->elts;
-
-            h = part->elts;
-            i = 0;
-        }
-
-        if (&data[i] == h) {
-            dd("found header");
-
-            return ngx_http_lua_rm_header_helper(l, part, i);
-        }
-    }
-
-    return NGX_ERROR;
-}
-
-
-static ngx_int_t
 ngx_http_lua_rm_header_helper(ngx_list_t *l, ngx_list_part_t *cur,
         ngx_uint_t i)
 {
@@ -420,6 +371,9 @@ ngx_http_lua_rm_header_helper(ngx_list_t *l, ngx_list_part_t *cur,
 
     dd("cur: nelts %d, nalloc %d", (int) cur->nelts,
             (int) l->nalloc);
+
+    dd("removing: \"%.*s:%.*s\"", (int) data[i].key.len, data[i].key.data,
+            (int) data[i].value.len, data[i].value.data);
 
     if (i == 0) {
         cur->elts = (char *) cur->elts + l->size;
@@ -465,6 +419,8 @@ ngx_http_lua_rm_header_helper(ngx_list_t *l, ngx_list_part_t *cur,
     }
 
     if (i == cur->nelts - 1) {
+        dd("last entry in the part");
+
         cur->nelts--;
 
         if (cur == l->last) {
@@ -473,6 +429,8 @@ ngx_http_lua_rm_header_helper(ngx_list_t *l, ngx_list_part_t *cur,
 
         return NGX_OK;
     }
+
+    dd("the middle entry in the part");
 
     new = ngx_palloc(l->pool, sizeof(ngx_list_part_t));
     if (new == NULL) {
@@ -490,8 +448,6 @@ ngx_http_lua_rm_header_helper(ngx_list_t *l, ngx_list_part_t *cur,
     if (cur == l->last) {
         l->last = new;
     }
-
-    cur = new;
 
     return NGX_OK;
 }

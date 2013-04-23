@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -199,7 +199,7 @@ ngx_open_pipes(ngx_cycle_t *cycle)
         stat = ngx_open_pipe(cycle, &ngx_pipes[i]);
 
         ngx_log_debug4(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                       "pipe: %p(%d, %d) \"%s\"",
+                       "pipe: %ui(%d, %d) \"%s\"",
                        i, ngx_pipes[i].pfd[0],
                        ngx_pipes[i].pfd[1], ngx_pipes[i].cmd);
 
@@ -471,7 +471,7 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             exit(2);
         }
 
-        execv((const char *) argv[0], (char ** const) op->argv->elts);
+        execv((const char *) argv[0], (char *const *) op->argv->elts);
         exit(0);
     }
 

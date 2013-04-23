@@ -185,18 +185,14 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     if (size == 0 && !(c->buffered & NGX_LOWLEVEL_BUFFERED)) {
-        if (last) {
+        if (last || flush) {
+            for (cl = r->out; cl; /* void */) {
+                ln = cl;
+                cl = cl->next;
+                ngx_free_chain(r->pool, ln);
+            }
+
             r->out = NULL;
-            c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
-
-            return NGX_OK;
-        }
-
-        if (flush) {
-            do {
-                r->out = r->out->next;
-            } while (r->out);
-
             c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
 
             return NGX_OK;
@@ -211,7 +207,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     if (r->limit_rate) {
-        limit = r->limit_rate * (ngx_time() - r->start_sec + 1)
+        limit = (off_t) r->limit_rate * (ngx_time() - r->start_sec + 1)
                 - (c->sent - clcf->limit_rate_after);
 
         if (limit <= 0) {

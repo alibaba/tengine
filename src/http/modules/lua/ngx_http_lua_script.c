@@ -84,6 +84,8 @@ ngx_http_lua_compile_complex_value(ngx_http_lua_compile_complex_value_t *ccv)
     sc.complete_values = 1;
 
     if (ngx_http_lua_script_compile(&sc) != NGX_OK) {
+        ngx_array_destroy(&lengths);
+        ngx_array_destroy(&values);
         return NGX_ERROR;
     }
 

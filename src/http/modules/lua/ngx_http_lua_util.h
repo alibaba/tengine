@@ -10,11 +10,50 @@
 #define NGX_UNESCAPE_URI_COMPONENT  0
 #endif
 
+/* char whose address we'll use as key in Lua vm registry for
+ * user code cache table */
+extern char ngx_http_lua_code_cache_key;
+
+/* char whose address we'll use as key in Lua vm registry for
+ * all the "ngx.ctx" tables */
+extern char ngx_http_lua_ctx_tables_key;
+
+/* char whose address we'll use as key in Lua vm registry for
+ * regex cache table  */
+extern char ngx_http_lua_regex_cache_key;
+
+/* char whose address we'll use as key in Lua vm registry for
+ * socket connection pool table */
+extern char ngx_http_lua_socket_pool_key;
+
+/* char whose address we'll use as key for the nginx request pointer */
+extern char ngx_http_lua_request_key;
+
+/* char whose address we'll use as key for the nginx config logger */
+extern char ngx_http_lua_cf_log_key;
+
 
 #ifndef ngx_str_set
 #define ngx_str_set(str, text)                                               \
     (str)->len = sizeof(text) - 1; (str)->data = (u_char *) text
 #endif
+
+
+#define ngx_http_lua_context_name(c)                                         \
+    ((c) == NGX_HTTP_LUA_CONTEXT_SET ? "set_by_lua*"                         \
+     : (c) == NGX_HTTP_LUA_CONTEXT_REWRITE ? "rewrite_by_lua*"               \
+     : (c) == NGX_HTTP_LUA_CONTEXT_ACCESS ? "access_by_lua*"                 \
+     : (c) == NGX_HTTP_LUA_CONTEXT_CONTENT ? "content_by_lua*"               \
+     : (c) == NGX_HTTP_LUA_CONTEXT_LOG ? "log_by_lua*"                       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_HEADER_FILTER ? "header_filter_by_lua*"   \
+     : "(unknown)")
+
+#define ngx_http_lua_check_context(L, ctx, flags)                            \
+    if (!((ctx)->context & (flags))) {                                       \
+        return luaL_error(L, "API disabled in the context of %s",            \
+                          ngx_http_lua_context_name((ctx)->context));        \
+    }
+
 
 lua_State * ngx_http_lua_new_state(ngx_conf_t *cf,
     ngx_http_lua_main_conf_t *lmcf);
@@ -68,8 +107,6 @@ uintptr_t ngx_http_lua_escape_uri(u_char *dst, u_char *src,
 
 void ngx_http_lua_inject_req_api(ngx_log_t *log, lua_State *L);
 
-void ngx_http_lua_inject_req_api_no_io(ngx_log_t *log, lua_State *L);
-
 void ngx_http_lua_process_args_option(ngx_http_request_t *r,
     lua_State *L, int table, ngx_str_t *args);
 
@@ -80,6 +117,10 @@ void ngx_http_lua_inject_internal_utils(ngx_log_t *log, lua_State *L);
 
 ngx_chain_t * ngx_http_lua_chains_get_free_buf(ngx_log_t *log, ngx_pool_t *p,
     ngx_chain_t **free, size_t len, ngx_buf_tag_t tag);
+
+void ngx_http_lua_create_new_global_table(lua_State *L, int narr, int nrec);
+
+int ngx_http_lua_traceback(lua_State *L);
 
 
 #endif /* NGX_HTTP_LUA_UTIL_H */

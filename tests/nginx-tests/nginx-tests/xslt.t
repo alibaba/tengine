@@ -109,15 +109,8 @@ $t->run();
 
 like(http_get("/x1"), qr!200 OK.*test xslt result!ms, 'simple');
 like(http_get("/x1"), qr!200 OK.*Content-Type: text/html!ms, 'content type');
-
-TODO: {
-local $TODO = 'broken in 0.7.44 (r2589)';
-
 like(http_get("/x2"), qr!200 OK.*param1=value1.*param2=data.*param3=value3!ms,
 	'params');
-
-}
-
 like(http_get("/x3"), qr!200 OK.*data=test entity!ms, 'entities');
 like(http_get("/x4"), qr!200 OK.*data=other data!ms, 'several stylesheets');
 

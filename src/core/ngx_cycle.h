@@ -48,7 +48,7 @@ struct ngx_cycle_s {
     ngx_queue_t               reusable_connections_queue;
 
     ngx_array_t               listening;
-    ngx_array_t               pathes;
+    ngx_array_t               paths;
     ngx_list_t                open_files;
     ngx_list_t                shared_memory;
 
@@ -138,6 +138,8 @@ extern volatile ngx_cycle_t  *ngx_cycle;
 extern ngx_array_t            ngx_old_cycles;
 extern ngx_module_t           ngx_core_module;
 extern ngx_uint_t             ngx_test_config;
+extern ngx_uint_t             ngx_show_modules;
+extern ngx_uint_t             ngx_show_directives;
 extern ngx_uint_t             ngx_quiet_mode;
 #if (NGX_THREADS)
 extern ngx_tls_key_t          ngx_core_tls_key;

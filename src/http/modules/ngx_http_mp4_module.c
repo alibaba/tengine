@@ -500,7 +500,6 @@ ngx_http_mp4_handler(ngx_http_request_t *r)
     r->root_tested = !r->error_page;
     r->allow_ranges = 1;
 
-    start = -1;
     r->headers_out.content_length_n = of.size;
     mp4 = NULL;
     b = NULL;
@@ -616,7 +615,7 @@ ngx_http_mp4_handler(ngx_http_request_t *r)
     b->file_last = of.size;
 
     b->in_file = b->file_last ? 1 : 0;
-    b->last_buf = 1;
+    b->last_buf = (r == r->main) ? 1 : 0;
     b->last_in_chain = 1;
 
     b->file->fd = of.fd;
@@ -749,6 +748,13 @@ ngx_http_mp4_process(ngx_http_mp4_file_t *mp4)
     mp4->content_length += mp4->moov_size;
 
     *prev = &mp4->mdat_atom;
+
+    if (start_offset > mp4->mdat_data.buf->file_last) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "start time is out mp4 mdat atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     adjustment = mp4->ftyp_size + mp4->moov_size
                  + ngx_http_mp4_update_mdat_atom(mp4, start_offset)
@@ -1024,6 +1030,10 @@ ngx_http_mp4_read_moov_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
                          + NGX_HTTP_MP4_MOOV_BUFFER_EXCESS * no_mdat;
     }
 
+    if (ngx_http_mp4_read(mp4, (size_t) atom_data_size) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
     mp4->trak.elts = &mp4->traks;
     mp4->trak.size = sizeof(ngx_http_mp4_trak_t);
     mp4->trak.nalloc = 2;
@@ -1043,6 +1053,12 @@ ngx_http_mp4_read_moov_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     if (no_mdat) {
         mp4->buffer_start = mp4->buffer_pos;
         mp4->buffer_size = NGX_HTTP_MP4_MOOV_BUFFER_EXCESS;
+
+        if (mp4->buffer_start + mp4->buffer_size > mp4->buffer_end) {
+            mp4->buffer = NULL;
+            mp4->buffer_pos = NULL;
+            mp4->buffer_end = NULL;
+        }
 
     } else {
         /* skip atoms after moov atom */
@@ -2488,7 +2504,13 @@ found:
 
     ngx_mp4_set_32value(entry->chunk, 1);
 
-    if (trak->chunk_samples) {
+    if (trak->chunk_samples && next_chunk - trak->start_chunk == 2) {
+
+        /* last chunk in the entry */
+
+        ngx_mp4_set_32value(entry->samples, samples - trak->chunk_samples);
+
+    } else if (trak->chunk_samples) {
 
         first = &trak->stsc_chunk_entry;
         ngx_mp4_set_32value(first->chunk, 1);
@@ -2504,6 +2526,7 @@ found:
 
         ngx_mp4_set_32value(entry->chunk, 2);
 
+        entries++;
         atom_size += sizeof(ngx_mp4_stsc_entry_t);
     }
 

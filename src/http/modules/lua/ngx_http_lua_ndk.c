@@ -5,6 +5,7 @@
 
 
 #include "ngx_http_lua_ndk.h"
+#include "ngx_http_lua_util.h"
 
 
 #if defined(NDK) && NDK
@@ -84,7 +85,8 @@ ngx_http_lua_run_set_var_directive(lua_State *L)
     arg.data = (u_char *) luaL_checklstring(L, 1, &len);
     arg.len = len;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 

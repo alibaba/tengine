@@ -6,6 +6,7 @@
 #include "ddebug.h"
 
 #include "ngx_http_lua_exception.h"
+#include "ngx_http_lua_util.h"
 
 
 /*  longjmp mark for restoring nginx execution after Lua VM crashing */
@@ -24,17 +25,24 @@ int
 ngx_http_lua_atpanic(lua_State *L)
 {
     u_char                  *s;
+    size_t                   len;
     ngx_http_request_t      *r;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
     /*  log Lua VM crashing reason to error log */
     if (r && r->connection && r->connection->log) {
-        s = (u_char *) lua_tostring(L, 1);
+        s = (u_char *) lua_tolstring(L, -1, &len);
+        if (s == NULL) {
+            s = (u_char *) "unknown reason";
+            len = sizeof("unknown reason") - 1;
+        }
+
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "lua atpanic: Lua VM crashed, reason: %s", s);
+                "lua atpanic: Lua VM crashed, reason: %*s", len, s);
 
     } else {
 

@@ -30,7 +30,7 @@ ngx_http_lua_rewrite_handler(ngx_http_request_t *r)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua rewrite handler, uri \"%V\"", &r->uri);
+                   "lua rewrite handler, uri \"%V\"", &r->uri);
 
     lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
 
@@ -164,7 +164,7 @@ ngx_http_lua_rewrite_handler_inline(ngx_http_request_t *r)
         }
 
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "Failed to load Lua inlined code: %s", err);
+                      "failed to load Lua inlined code: %s", err);
 
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -210,7 +210,7 @@ ngx_http_lua_rewrite_handler_file(ngx_http_request_t *r)
         }
 
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "Failed to load Lua file code: %s", err);
+                      "failed to load Lua file code: %s", err);
 
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -233,7 +233,7 @@ ngx_http_lua_rewrite_by_chunk(lua_State *L, ngx_http_request_t *r)
 
     if (cc == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "lua: failed to create new coroutine to handle request");
+                      "lua: failed to create new coroutine to handle request");
 
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -245,13 +245,10 @@ ngx_http_lua_rewrite_by_chunk(lua_State *L, ngx_http_request_t *r)
     lua_pushvalue(cc, LUA_GLOBALSINDEX);
     lua_setfenv(cc, -2);
 
-    /*  save reference of code to ease forcing stopping */
-    lua_pushvalue(cc, -1);
-    lua_setglobal(cc, GLOBALS_SYMBOL_RUNCODE);
-
     /*  save nginx request in coroutine globals table */
+    lua_pushlightuserdata(cc, &ngx_http_lua_request_key);
     lua_pushlightuserdata(cc, r);
-    lua_setglobal(cc, GLOBALS_SYMBOL_REQUEST);
+    lua_rawset(cc, LUA_GLOBALSINDEX);
     /*  }}} */
 
     /*  {{{ initialize request context */
@@ -284,6 +281,8 @@ ngx_http_lua_rewrite_by_chunk(lua_State *L, ngx_http_request_t *r)
         ctx->cleanup = &cln->handler;
     }
     /*  }}} */
+
+    ctx->context = NGX_HTTP_LUA_CONTEXT_REWRITE;
 
     rc = ngx_http_lua_run_thread(L, r, ctx, 0);
 

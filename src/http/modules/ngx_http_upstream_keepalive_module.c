@@ -12,7 +12,7 @@
 
 typedef struct {
     ngx_uint_t                         max_cached;
-    ngx_uint_t                         single;       /* unsigned:1 */
+    ngx_msec_t                         keepalive_timeout;
 
     ngx_queue_t                        cache;
     ngx_queue_t                        free;
@@ -37,8 +37,6 @@ typedef struct {
     ngx_event_set_peer_session_pt      original_set_session;
     ngx_event_save_peer_session_pt     original_save_session;
 #endif
-
-    ngx_uint_t                         failed;       /* unsigned:1 */
 
 } ngx_http_upstream_keepalive_peer_data_t;
 
@@ -77,6 +75,8 @@ static void ngx_http_upstream_keepalive_save_session(ngx_peer_connection_t *pc,
 static void *ngx_http_upstream_keepalive_create_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
 
 
 static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
@@ -84,6 +84,13 @@ static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
     { ngx_string("keepalive"),
       NGX_HTTP_UPS_CONF|NGX_CONF_TAKE12,
       ngx_http_upstream_keepalive,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("keepalive_timeout"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_http_upstream_keepalive_timeout,
       0,
       0,
       NULL },
@@ -221,38 +228,11 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "get keepalive peer");
 
-    kp->failed = 0;
-
-    /* single pool of cached connections */
-
-    if (kp->conf->single && !ngx_queue_empty(&kp->conf->cache)) {
-
-        q = ngx_queue_head(&kp->conf->cache);
-
-        item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t, queue);
-        c = item->connection;
-
-        ngx_queue_remove(q);
-        ngx_queue_insert_head(&kp->conf->free, q);
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                       "get keepalive peer: using connection %p", c);
-
-        c->idle = 0;
-        c->log = pc->log;
-        c->read->log = pc->log;
-        c->write->log = pc->log;
-        c->pool->log = pc->log;
-
-        pc->connection = c;
-        pc->cached = 1;
-
-        return NGX_DONE;
-    }
+    /* ask balancer */
 
     rc = kp->original_get_peer(pc, kp->data);
 
-    if (kp->conf->single || rc != NGX_OK) {
+    if (rc != NGX_OK) {
         return rc;
     }
 
@@ -283,6 +263,10 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
             c->write->log = pc->log;
             c->pool->log = pc->log;
 
+            if (c->read->timer_set) {
+                ngx_del_timer(c->read);
+            }
+
             pc->connection = c;
             pc->cached = 1;
 
@@ -308,18 +292,12 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "free keepalive peer");
 
-    /* remember failed state - peer.free() may be called more than once */
-
-    if (state & NGX_PEER_FAILED) {
-        kp->failed = 1;
-    }
-
     /* cache valid connections */
 
     u = kp->upstream;
     c = pc->connection;
 
-    if (kp->failed
+    if (state & NGX_PEER_FAILED
         || c == NULL
         || c->read->eof
         || c->read->error
@@ -369,6 +347,12 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
         ngx_del_timer(c->write);
     }
 
+    if (kp->conf->keepalive_timeout != NGX_CONF_UNSET_MSEC &&
+        kp->conf->keepalive_timeout != 0)
+    {
+        ngx_add_timer(c->read, kp->conf->keepalive_timeout);
+    }
+
     c->write->handler = ngx_http_upstream_keepalive_dummy_handler;
     c->read->handler = ngx_http_upstream_keepalive_close_handler;
 
@@ -416,6 +400,12 @@ ngx_http_upstream_keepalive_close_handler(ngx_event_t *ev)
     c = ev->data;
 
     if (c->close) {
+        goto close;
+    }
+
+    if (c->read->timedout) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0,
+                       "keepalive max idle timeout");
         goto close;
     }
 
@@ -508,6 +498,7 @@ ngx_http_upstream_keepalive_create_conf(ngx_conf_t *cf)
      */
 
     conf->max_cached = 1;
+    conf->keepalive_timeout = NGX_CONF_UNSET_MSEC;
 
     return conf;
 }
@@ -527,6 +518,10 @@ ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     kcf = ngx_http_conf_upstream_srv_conf(uscf,
                                           ngx_http_upstream_keepalive_module);
+
+    if (kcf->original_init_upstream) {
+        return "is duplicate";
+    }
 
     kcf->original_init_upstream = uscf->peer.init_upstream
                                   ? uscf->peer.init_upstream
@@ -552,7 +547,8 @@ ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     for (i = 2; i < cf->args->nelts; i++) {
 
         if (ngx_strcmp(value[i].data, "single") == 0) {
-            kcf->single = 1;
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "the \"single\" parameter is deprecated");
             continue;
         }
 
@@ -568,3 +564,35 @@ invalid:
 
     return NGX_CONF_ERROR;
 }
+
+
+static char *
+ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_upstream_srv_conf_t            *uscf;
+    ngx_http_upstream_keepalive_srv_conf_t  *kcf;
+
+    ngx_str_t   *value;
+    ngx_msec_t   timeout;
+
+    uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+
+    kcf = ngx_http_conf_upstream_srv_conf(uscf,
+                                          ngx_http_upstream_keepalive_module);
+
+    if (kcf->keepalive_timeout != NGX_CONF_UNSET_MSEC) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    timeout = ngx_parse_time(&value[1], 0);
+    if (timeout == (ngx_msec_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    kcf->keepalive_timeout = timeout;
+
+    return NGX_CONF_OK;
+}
+

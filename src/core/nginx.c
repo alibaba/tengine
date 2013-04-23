@@ -187,11 +187,10 @@ ngx_module_t  ngx_core_module = {
 ngx_uint_t          ngx_max_module;
 ngx_uint_t          ngx_dump_config;
 
+
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
-static ngx_uint_t   ngx_show_modules;
 static ngx_uint_t   ngx_show_configure;
-static ngx_uint_t   ngx_show_directives;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -207,7 +206,6 @@ main(int argc, char *const *argv)
     ngx_int_t         i;
     ngx_log_t        *log;
     ngx_cycle_t      *cycle, init_cycle;
-    ngx_command_t    *cmd;
     ngx_core_conf_t  *ccf;
 
     ngx_debug_init();
@@ -270,32 +268,7 @@ main(int argc, char *const *argv)
                 "configure arguments:" NGX_CONFIGURE NGX_LINEFEED);
         }
 
-        if (ngx_show_modules) {
-            ngx_log_stderr(0, "compiled in modules:");
-
-            for (i = 0; ngx_module_names[i]; i++) {
-                ngx_log_stderr(0, "    %s", ngx_module_names[i]);
-            }
-        }
-
-        if (ngx_show_directives) {
-            ngx_log_stderr(0, "all available directives:");
-
-            for (i = 0; ngx_modules[i]; i++) {
-               ngx_log_stderr(0, "%s:", ngx_module_names[i]);
-
-               cmd = ngx_modules[i]->commands;
-               if(cmd == NULL) {
-                  continue;
-               }
-
-               for ( /* void */ ; cmd->name.len; cmd++) {
-                  ngx_log_stderr(0, "    %V", &cmd->name);
-               }
-            }
-        }
-
-        if(!ngx_test_config) {
+        if(!ngx_test_config && !ngx_show_modules && !ngx_show_directives) {
             return 0;
         }
     }
@@ -379,6 +352,10 @@ main(int argc, char *const *argv)
                            cycle->conf_file.data);
         }
 
+        return 0;
+    }
+
+    if (ngx_show_modules || ngx_show_directives) {
         return 0;
     }
 
@@ -636,6 +613,10 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
     var = ngx_alloc(sizeof(NGINX_VAR)
                     + cycle->listening.nelts * (NGX_INT32_LEN + 1) + 2,
                     cycle->log);
+    if (var == NULL) {
+        ngx_free(env);
+        return NGX_INVALID_PID;
+    }
 
     p = ngx_cpymem(var, NGINX_VAR "=", sizeof(NGINX_VAR));
 
@@ -675,7 +656,7 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
-    if (ngx_rename_file(ccf->pid.data, ccf->oldpid.data) != NGX_OK) {
+    if (ngx_rename_file(ccf->pid.data, ccf->oldpid.data) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       ngx_rename_file_n " %s to %s failed "
                       "before executing new binary process \"%s\"",
@@ -690,7 +671,9 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
     pid = ngx_execute(cycle, &ctx);
 
     if (pid == NGX_INVALID_PID) {
-        if (ngx_rename_file(ccf->oldpid.data, ccf->pid.data) != NGX_OK) {
+        if (ngx_rename_file(ccf->oldpid.data, ccf->pid.data)
+            == NGX_FILE_ERROR)
+        {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           ngx_rename_file_n " %s back to %s failed after "
                           "an attempt to execute new binary process \"%s\"",
@@ -900,7 +883,7 @@ ngx_process_options(ngx_cycle_t *cycle)
         len = ngx_strlen(ngx_prefix);
         p = ngx_prefix;
 
-        if (!ngx_path_separator(*p)) {
+        if (len && !ngx_path_separator(p[len - 1])) {
             p = ngx_pnalloc(cycle->pool, len + 1);
             if (p == NULL) {
                 return NGX_ERROR;
@@ -1058,9 +1041,14 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #if (NGX_HAVE_CPU_AFFINITY)
 
+    /* in default, disable cpu affinity */
+
+    if (ccf->cpu_affinity_n == 0 && ccf->cpu_affinity == NULL) {
+        ccf->cpu_affinity_n = 1;
+    }
+
     if (ccf->cpu_affinity_n == 0) {
 
-        ccf->cpu_affinity = NULL;
         n = ngx_ncpu - 1;
 
         if (ngx_ncpu > 0 && ngx_ncpu <= CPU_SETSIZE) {
@@ -1377,15 +1365,22 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t        *value;
     ngx_uint_t        i, j, n;
 
-    if (ccf->cpu_affinity) {
+    if (ccf->cpu_affinity || ccf->cpu_affinity_n) {
         return "is duplicate";
     }
 
     value = cf->args->elts;
 
-    if (ngx_strncasecmp((u_char *) "auto", value[1].data, 4) == 0) {
+    if (ngx_strcasecmp((u_char *) "auto", value[1].data) == 0) {
 
         ccf->cpu_affinity = NGX_CONF_UNSET_PTR;
+
+        return NGX_CONF_OK;
+    }
+
+    if (ngx_strcasecmp((u_char *) "off", value[1].data) == 0) {
+
+        ccf->cpu_affinity_n = 1;
 
         return NGX_CONF_OK;
     }

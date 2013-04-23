@@ -5,6 +5,7 @@
 
 #include "ngx_http_lua_misc.h"
 #include "ngx_http_lua_ctx.h"
+#include "ngx_http_lua_util.h"
 
 
 static int ngx_http_lua_ngx_get(lua_State *L);
@@ -32,7 +33,8 @@ ngx_http_lua_ngx_get(lua_State *L)
     size_t                       len;
     ngx_http_lua_ctx_t          *ctx;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -90,7 +92,8 @@ ngx_http_lua_ngx_set(lua_State *L)
     size_t                       len;
     ngx_http_lua_ctx_t          *ctx;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 

@@ -1,9 +1,5 @@
 #!/usr/bin/perl
 
-# (C) Maxim Dounin
-
-# Test for fastcgi backend.
-
 ###############################################################################
 
 use warnings;
@@ -24,13 +20,20 @@ use Time::Parse;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(72)
-	->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->plan(72);
+
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
+
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -159,6 +162,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -233,6 +238,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -310,6 +317,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -389,6 +398,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -470,6 +481,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -553,6 +566,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
@@ -633,6 +648,8 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
+
+%%TEST_GLOBALS_DSO%%
 
 events {
 }

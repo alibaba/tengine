@@ -126,7 +126,7 @@ ngx_http_status_handler(ngx_http_request_t *r)
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;
 
-    b->last_buf = 1;
+    b->last_buf = (r == r->main) ? 1 : 0;
 
     rc = ngx_http_send_header(r);
 
@@ -173,7 +173,7 @@ ngx_http_status_log_handler(ngx_http_request_t *r)
 
     ms = ngx_max(ms, 0);
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http status: request_time %d", ms);
+                   "http status: request_time %M", ms);
 
     (void) ngx_atomic_fetch_add(ngx_stat_request_time, ms);
 

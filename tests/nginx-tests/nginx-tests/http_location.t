@@ -78,7 +78,13 @@ like(http_get('/t.gif'), qr/X-Location: regex/, 'regex');
 like(http_get('/t.GIF'), qr/X-Location: regex/, 'regex with mungled case');
 like(http_get('/casefull/t.gif'), qr/X-Location: regex/, 'first regex wins');
 like(http_get('/casefull/'), qr/X-Location: casefull/, 'casefull regex');
-like(http_get('/CASEFULL/'), qr/X-Location: root/,
-     'casefull regex do not match wrong case');
+
+SKIP: {
+	skip 'caseless os', 1
+		if $^O eq 'MSWin32' or $^O eq 'darwin';
+
+	like(http_get('/CASEFULL/'), qr/X-Location: root/,
+     		'casefull regex do not match wrong case');
+}
 
 ###############################################################################

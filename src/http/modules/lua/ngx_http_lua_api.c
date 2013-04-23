@@ -4,6 +4,7 @@
 
 #include "ngx_http_lua_common.h"
 #include "api/ngx_http_lua_api.h"
+#include "ngx_http_lua_util.h"
 
 
 lua_State *
@@ -22,7 +23,8 @@ ngx_http_lua_get_request(lua_State *L)
 {
     ngx_http_request_t *r;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -30,19 +32,48 @@ ngx_http_lua_get_request(lua_State *L)
 }
 
 
-void
+ngx_int_t
 ngx_http_lua_add_package_preload(ngx_conf_t *cf, const char *package,
                          lua_CFunction func)
 {
-    ngx_http_lua_main_conf_t *lmcf;
-    lua_State                *L;
+    lua_State                     *L;
+    ngx_http_lua_main_conf_t      *lmcf;
+    ngx_http_lua_preload_hook_t   *hook;
 
     lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
+
     L = lmcf->lua;
-    lua_getglobal(L, "package");
-    lua_getfield(L, -1, "preload");
-    lua_pushcfunction(L, func);
-    lua_setfield(L, -2, package);
-    lua_pop(L, 2);
+
+    if (L) {
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "preload");
+        lua_pushcfunction(L, func);
+        lua_setfield(L, -2, package);
+        lua_pop(L, 2);
+
+        return NGX_OK;
+    }
+
+    /* L == NULL */
+
+    if (lmcf->preload_hooks == NULL) {
+        lmcf->preload_hooks =
+            ngx_array_create(cf->pool, 4,
+                             sizeof(ngx_http_lua_preload_hook_t));
+
+        if (lmcf->preload_hooks == NULL) {
+            return NGX_ERROR;
+        }
+    }
+
+    hook = ngx_array_push(lmcf->preload_hooks);
+    if (hook == NULL) {
+        return NGX_ERROR;
+    }
+
+    hook->package = package;
+    hook->loader = func;
+
+    return NGX_OK;
 }
 

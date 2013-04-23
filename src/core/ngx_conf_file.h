@@ -45,13 +45,12 @@
 #define NGX_CONF_ANY         0x00000400
 #define NGX_CONF_1MORE       0x00000800
 #define NGX_CONF_2MORE       0x00001000
-#define NGX_CONF_MULTI       0x00002000
+#define NGX_CONF_MULTI       0x00000000  /* compatibility */
 
 #define NGX_DIRECT_CONF      0x00010000
 
 #define NGX_MAIN_CONF        0x01000000
 #define NGX_ANY_CONF         0x0F000000
-
 
 
 #define NGX_CONF_UNSET       -1
@@ -91,21 +90,15 @@ struct ngx_open_file_s {
     ngx_fd_t              fd;
     ngx_str_t             name;
 
-    u_char               *buffer;
-    u_char               *pos;
-    u_char               *last;
-
-#if 0
-    /* e.g. append mode, error_log */
-    ngx_uint_t            flags;
-    /* e.g. reopen db file */
-    ngx_uint_t          (*handler)(void *data, ngx_open_file_t *file);
+    void                (*flush)(ngx_open_file_t *file, ngx_log_t *log);
     void                 *data;
-#endif
 };
 
 
-#define NGX_MODULE_V1          0, 0, 0, 0, 0, 0, 1
+#define NGX_NUMBER_MAJOR  2
+#define NGX_NUMBER_MINOR  1
+
+#define NGX_MODULE_V1          0, 0, 0, 0, 0, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
 struct ngx_module_s {
@@ -115,9 +108,9 @@ struct ngx_module_s {
     ngx_uint_t            spare0;
     ngx_uint_t            spare1;
     ngx_uint_t            spare2;
-    ngx_uint_t            spare3;
 
-    ngx_uint_t            version;
+    ngx_uint_t            major_version;
+    ngx_uint_t            minor_version;
 
     void                 *ctx;
     ngx_command_t        *commands;
@@ -317,6 +310,7 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
 
 char *ngx_conf_param(ngx_conf_t *cf);
 char *ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename);
+char *ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
 ngx_int_t ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name,
@@ -344,7 +338,8 @@ char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 extern ngx_uint_t     ngx_dump_config;
 extern ngx_uint_t     ngx_max_module;
 extern ngx_module_t  *ngx_modules[];
-extern const char    *ngx_module_names[];
+extern u_char        *ngx_module_names[];
+extern const char    *ngx_all_module_names[];
 
 
 #endif /* _NGX_HTTP_CONF_FILE_H_INCLUDED_ */

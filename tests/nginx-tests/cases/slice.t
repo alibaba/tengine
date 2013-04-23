@@ -19,7 +19,13 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http/)->plan(23);
+my $t = Test::Nginx->new()->has(qw/http slice/)->plan(23);
+
+$t->set_dso("ngx_http_slice_module", "ngx_http_slice_module.so");
+$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
+$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
+$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
+
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -27,13 +33,14 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
+%%TEST_GLOBALS_DSO%%
+
 events {
 }
 
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    include mime.types;
     default_type application/octet-stream;
 
     server {
@@ -90,10 +97,6 @@ $t->write_file('hnf/demo.txt', 'ZJQW');
 $d = $t->testdir();
 mkdir("$d/fnl");
 $t->write_file('fnl/demo.txt', 'ZJQW');
-
-my $m;
-$m = dirname(dirname($ENV{TEST_NGINX_BINARY})) . '/conf/mime.types';
-copy($m, $t->testdir()) or die 'copy mime.types failed: $!';
 
 $t->run();
 

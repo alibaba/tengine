@@ -41,7 +41,8 @@ ngx_http_lua_ngx_req_get_headers(lua_State *L) {
         max = NGX_HTTP_LUA_MAX_HEADERS;
     }
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -98,8 +99,10 @@ ngx_http_lua_ngx_header_get(lua_State *L)
     ngx_str_t                    key;
     ngx_uint_t                   i;
     size_t                       len;
+    ngx_http_lua_loc_conf_t     *llcf;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -112,10 +115,14 @@ ngx_http_lua_ngx_header_get(lua_State *L)
 
     dd("key: %.*s, len %d", (int) len, p, (int) len);
 
-    /* replace "_" with "-" */
-    for (i = 0; i < len; i++) {
-        if (p[i] == '_') {
-            p[i] = '-';
+    llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
+
+    if (llcf->transform_underscores_in_resp_headers) {
+        /* replace "_" with "-" */
+        for (i = 0; i < len; i++) {
+            if (p[i] == '_') {
+                p[i] = '-';
+            }
         }
     }
 
@@ -146,8 +153,10 @@ ngx_http_lua_ngx_header_set(lua_State *L)
     ngx_http_lua_ctx_t          *ctx;
     ngx_int_t                    rc;
     ngx_uint_t                   n;
+    ngx_http_lua_loc_conf_t     *llcf;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -167,10 +176,14 @@ ngx_http_lua_ngx_header_set(lua_State *L)
 
     dd("key: %.*s, len %d", (int) len, p, (int) len);
 
-    /* replace "_" with "-" */
-    for (i = 0; i < len; i++) {
-        if (p[i] == '_') {
-            p[i] = '-';
+    llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
+
+    if (llcf->transform_underscores_in_resp_headers) {
+        /* replace "_" with "-" */
+        for (i = 0; i < len; i++) {
+            if (p[i] == '_') {
+                p[i] = '-';
+            }
         }
     }
 
@@ -224,7 +237,7 @@ ngx_http_lua_ngx_header_set(lua_State *L)
                 rc = ngx_http_lua_set_output_header(r, key, value,
                         i == 1 /* override */);
 
-                if (rc != NGX_OK) {
+                if (rc == NGX_ERROR) {
                     return luaL_error(L,
                             "failed to set header %s (error: %d)",
                             key.data, (int) rc);
@@ -250,7 +263,7 @@ ngx_http_lua_ngx_header_set(lua_State *L)
 
     rc = ngx_http_lua_set_output_header(r, key, value, 1 /* override */);
 
-    if (rc != NGX_OK) {
+    if (rc == NGX_ERROR) {
         return luaL_error(L, "failed to set header %s (error: %d)",
                 key.data, (int) rc);
     }
@@ -297,7 +310,8 @@ ngx_http_lua_ngx_req_header_set_helper(lua_State *L)
     ngx_int_t                    rc;
     ngx_uint_t                   n;
 
-    lua_getglobal(L, GLOBALS_SYMBOL_REQUEST);
+    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
+    lua_rawget(L, LUA_GLOBALSINDEX);
     r = lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -360,7 +374,7 @@ ngx_http_lua_ngx_req_header_set_helper(lua_State *L)
                 rc = ngx_http_lua_set_input_header(r, key, value,
                         i == 1 /* override */);
 
-                if (rc != NGX_OK) {
+                if (rc == NGX_ERROR) {
                     return luaL_error(L,
                             "failed to set header %s (error: %d)",
                             key.data, (int) rc);
@@ -392,7 +406,7 @@ ngx_http_lua_ngx_req_header_set_helper(lua_State *L)
 
     rc = ngx_http_lua_set_input_header(r, key, value, 1 /* override */);
 
-    if (rc != NGX_OK) {
+    if (rc == NGX_ERROR) {
         return luaL_error(L, "failed to set header %s (error: %d)",
                 key.data, (int) rc);
     }

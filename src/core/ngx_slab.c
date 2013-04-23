@@ -45,9 +45,7 @@
 
 #define ngx_slab_junk(p, size)     ngx_memset(p, 0xA5, size)
 
-#else
-
-#if (NGX_HAVE_DEBUG_MALLOC)
+#elif (NGX_HAVE_DEBUG_MALLOC)
 
 #define ngx_slab_junk(p, size)                                                \
     if (ngx_debug_malloc)          ngx_memset(p, 0xA5, size)
@@ -55,8 +53,6 @@
 #else
 
 #define ngx_slab_junk(p, size)
-
-#endif
 
 #endif
 
@@ -166,8 +162,8 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
         ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
                        "slab alloc: %uz", size);
 
-        page = ngx_slab_alloc_pages(pool, (size + ngx_pagesize - 1)
-                                          >> ngx_pagesize_shift);
+        page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
+                                          + ((size % ngx_pagesize) ? 1 : 0));
         if (page) {
             p = (page - pool->pages) << ngx_pagesize_shift;
             p += (uintptr_t) pool->start;

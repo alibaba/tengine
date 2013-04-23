@@ -75,6 +75,16 @@ case $NGX_LIBATOMIC in
     *)     echo "  + using libatomic_ops library: $NGX_LIBATOMIC" ;;
 esac
 
+if [ $USE_JEMALLOC = NO ]; then
+    
+    case $JEMALLOC in
+        NONE)  echo "  + jemalloc library is disabled" ;;
+        *)     echo "  + using jemalloc library: $JEMALLOC" ;;
+    esac
+else
+    echo "  + using system jemalloc library"
+fi
+
 echo
 
 
@@ -96,6 +106,10 @@ cat << END
   nginx http access log file: "$NGX_HTTP_LOG_PATH"
   nginx http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"
 END
+
+if [ $NGX_DSO = YES ]; then
+    echo "  nginx dso module path: \"$NGX_DSO_PATH\""
+fi
 
 if [ $HTTP_PROXY = YES ]; then
     echo "  nginx http proxy temporary files: \"$NGX_HTTP_PROXY_TEMP_PATH\""

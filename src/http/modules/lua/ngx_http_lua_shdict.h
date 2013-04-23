@@ -29,6 +29,8 @@ typedef struct {
     ngx_http_lua_shdict_shctx_t  *sh;
     ngx_slab_pool_t              *shpool;
     ngx_str_t                     name;
+    ngx_http_lua_main_conf_t     *main_conf;
+    ngx_log_t                    *log;
 } ngx_http_lua_shdict_ctx_t;
 
 

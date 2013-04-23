@@ -2,16 +2,19 @@
 Introduction
 ============
 
-Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on the popular [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has been proven very stable and efficient on the top 100 websites, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
+Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has been proven very stable and efficient on the top 100 global websites, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
 
-Tengine has been an open source project since December 2011.
+Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to get involved.
 
 Features
 ========
 
-* All features of Nginx-1.0.15 are inherited, i.e. it is 100% compatible with Nginx.
+* All features of nginx-1.2.7 are inherited, i.e. it is 100% compatible with nginx.
+* Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
 * Input body filter support. It's quite handy to write Web Application Firewalls by using this mechanism.
+* Dynamic scripting language (Lua) support, which is very efficient and easy to extend core functionalities.
 * Logging enhancement. Syslog (local and remote), pipe logging and log sampling are supported.
+* A mechanism to support standalone processes.
 * Protecting server in case system load or memory use goes too high.
 * Multiple CSS or JavaScript requests can be combined into one request to reduce downloading time.
 * Proactive health checks of upstream servers can be performed.
@@ -23,8 +26,30 @@ Features
 * Error pages can be reset to 'default'.
 * ...
 
-Mail list
-=========
+Installation
+============
 
-* Chinese: [http://code.taobao.org/mailman/listinfo/tengine-cn](http://code.taobao.org/mailman/listinfo/tengine-cn)
-* English: [http://code.taobao.org/mailman/listinfo/tengine](http://code.taobao.org/mailman/listinfo/tengine)
+Tengine can be downloaded at [http://tengine.taobao.org/download/tengine.tar.gz](http://tengine.taobao.org/download/tengine.tar.gz). You can also checkout the latest source code from GitHub at [https://github.com/alibaba/tengine](https://github.com/alibaba/tengine)
+
+To install Tengine, just follow these three steps:
+
+    $ ./configure
+    $ make
+    # make install
+
+By default, it will be installed to _/usr/local/nginx_. You can use the __'--prefix'__ option to specify the root directory.
+If you want to know all the _'configure'_ options, you should run __'./configure --help'__ for help.
+
+Documentation
+=============
+
+The homepage of Tengine is at [http://tengine.taobao.org/](http://tengine.taobao.org/)
+You can access [http://tengine.taobao.org/documentation.html](http://tengine.taobao.org/documentation.html) for more information.
+
+Mailing lists
+=============
+
+Mailing lists are usually good places to ask questions. We highly recommend you subscribe Tengine's mailing lists below:
+* [http://code.taobao.org/mailman/listinfo/tengine](http://code.taobao.org/mailman/listinfo/tengine) (English)
+* [http://code.taobao.org/mailman/listinfo/tengine-cn](http://code.taobao.org/mailman/listinfo/tengine-cn) (Chinese)
+

@@ -21,6 +21,8 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'win32') if $^O eq 'MSWin32';
+
 my $t = Test::Nginx->new()->has(qw/http proxy cache gzip/)->plan(12)
 	->write_file_expand('nginx.conf', <<'EOF');
 
@@ -99,7 +101,7 @@ like(http_get_range('/t.html', 'Range: bytes=0-2,4-'), qr/^SEE.*^THIS/ms,
 like(http_get('/empty.html'), qr/HTTP/, 'empty get first');
 like(http_get('/empty.html'), qr/HTTP/, 'empty get second');
 
-sleep(2);
+select(undef, undef, undef, 1.1);
 unlink $t->testdir() . '/t.html';
 like(http_gzip_request('/t.html'),
 	qr/HTTP.*1c\x0d\x0a.{28}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
@@ -110,12 +112,8 @@ like(http_gzip_request('/empty.html'),
 	qr/HTTP.*14\x0d\x0a.{20}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
 	'empty get stale');
 
-{
-local $TODO = 'patch pending';
-
 http_get('/fake/unfinished');
 like(http_get('/fake/unfinished'), qr/unfinished 2/, 'unfinished not cached');
-}
 
 ###############################################################################
 

@@ -70,13 +70,9 @@ $t->run();
 
 ###############################################################################
 
-{
-local $TODO = 'not yet';
-
 like(http_get('/'), qr/\x0d\x0aSEE-THIS$/s, 'chunked');
 like(http_get('/nobuffering'), qr/\x0d\x0aSEE-THIS$/s, 'chunked nobuffering');
 like(http_get('/inmemory.html'), qr/\x0d\x0aSEE-THIS$/s, 'chunked inmemory');
-}
 
 ###############################################################################
 

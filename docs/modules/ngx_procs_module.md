@@ -3,26 +3,32 @@
 
 provides a mechanism to support standalone processes
 
+# Code Examples #
+
+a daytime server module, run in a standalone process.
+
+http://tengine.taobao.org/examples/ngx_proc_daytime_module
+
 # Examples #
 
-	processes {
-		process echo {
-			eho_str "hello, world";
-			echo on;
-			listen 8888;
-			count 1;
-			priority 1;
-			delay_start 10s;
-			respawn off;
-		}
+    processes {
+        process echo {
+            eho_str "hello, world";
+            echo on;
+            listen 8888;
+            count 1;
+            priority 1;
+            delay_start 10s;
+            respawn off;
+        }
 
-		process example {
-			count 1;
-			priority 0;
-			delay_start 0s;
-			respawn on;
-		}
-	}
+        process example {
+            count 1;
+            priority 0;
+            delay_start 0s;
+            respawn on;
+        }
+    }
 
 
 # Directives #
@@ -62,7 +68,7 @@ Priority is a value in the range -20 to 20. Lower priorities cause more favorabl
 
 Syntax: **delay\_start** `time`
 
-Default: `0s`
+Default: `300ms`
 
 Context: `process`
 

@@ -67,6 +67,9 @@ our $SleepBeforeTest        = $ENV{TEST_NGINX_SLEEP_BEFORE} || 0;
 our $BuildSlaveName         = $ENV{TEST_NGINX_BUILDSLAVE};
 our $ForceRestartOnTest     = (defined $ENV{TEST_NGINX_FORCE_RESTART_ON_TEST})
                                ? $ENV{TEST_NGINX_FORCE_RESTART_ON_TEST} : 1;
+our $DSO_path               = $ENV{TEST_NGINX_DSO_PATH} || "none";
+
+our @DSO_modules;
 
 sub server_port (@) {
     if (@_) {
@@ -191,6 +194,7 @@ our $ErrLogFile = File::Spec->catfile($LogDir, 'error.log');
 our $AccLogFile = File::Spec->catfile($LogDir, 'access.log');
 our $HtmlDir    = File::Spec->catfile($ServRoot, 'html');
 our $ConfDir    = File::Spec->catfile($ServRoot, 'conf');
+our $DsoDir     = File::Spec->catfile($ServRoot, 'modules');
 our $ConfFile   = File::Spec->catfile($ConfDir, 'nginx.conf');
 our $PidFile    = File::Spec->catfile($LogDir, 'nginx.pid');
 
@@ -242,6 +246,8 @@ sub setup_server_root () {
             die "Can't remove $HtmlDir";
         system("rm -rf $LogDir > /dev/null") == 0 or
             die "Can't remove $LogDir";
+        system("rm -rf $DsoDir > /dev/null") == 0 or
+            die "Can't remove $ConfDir";
         system("rm -rf $ServRoot/*_temp > /dev/null") == 0 or
             die "Can't remove $ServRoot/*_temp";
         system("rmdir $ServRoot > /dev/null") == 0 or
@@ -253,6 +259,8 @@ sub setup_server_root () {
         die "Failed to do mkdir $LogDir\n";
     mkdir $HtmlDir or
         die "Failed to do mkdir $HtmlDir\n";
+    mkdir $DsoDir or
+        die "Failed to do mkdir $DsoDir\n";
 
     my $index_file = "$HtmlDir/index.html";
 
@@ -266,6 +274,86 @@ sub setup_server_root () {
     mkdir $ConfDir or
         die "Failed to do mkdir $ConfDir\n";
 }
+
+sub include_dso_modules ($) {
+    my $block = shift;
+
+    @DSO_modules = ();
+    my @modules;
+
+    if (!defined $block->include_dso_modules) {
+        return;
+    }
+
+    my $raw = $block->include_dso_modules;
+    my $in;
+
+    open $in, '<', \$raw;
+    while (<$in>) {
+        if (/(\S+)(?:\s+(.+))?/) {
+            push @modules, [$DSO_path . $1, $2];
+        }
+    }
+
+    my $dso_compile_dir;
+
+    if ($NginxBinary =~ /^(.*\/)?([^\/]+)$/) {
+        $dso_compile_dir = $1;
+    } else {
+        $dso_compile_dir = "./";
+    }
+
+    #warn "$NginxBinary\n";
+
+    my $dso_compile_script;
+
+    $dso_compile_script = $dso_compile_dir . "dso_tool";
+
+    for my $module (@modules) {
+        my ($dir, $name) = @$module;
+
+        my $modules_dir;
+
+        if (-d $dir) {
+            $modules_dir = $DsoDir;
+            system("$dso_compile_script --dst=$DsoDir --add-module=\"$dir\"") == 0
+                or die "Can't compile dso module $dir";
+        }
+        else {
+            #warn "$dso_compile_dir\n";
+
+            #The module is compiled in the modules directory?
+            if ($dso_compile_dir =~ /^(.*\/)?([^\/]+)\/?$/) {
+                $modules_dir = $1 . "modules";
+            } else {
+                $modules_dir = "./";
+            }
+        }
+
+        my $dso_module_lib = $modules_dir . "/" . $name . ".so";
+
+        if (-f "$dso_module_lib") {
+            push @DSO_modules, [$name, $dso_module_lib];
+        } else {
+            die "Can't find dso module $dso_module_lib";
+        }
+    }
+}
+
+sub write_dso_config () {
+    my $content;
+
+    $content .= "dso {\n";
+    for my $module (@DSO_modules) {
+        my ($name, $lib) = @$module;
+
+        $content .= "load $name $lib;\n";
+    }
+    $content .= "}\n";
+
+    return $content;
+}
+
 
 sub write_user_files ($) {
     my $block = shift;
@@ -328,12 +416,17 @@ sub write_user_files ($) {
 
 sub write_config_file ($$$) {
     my ($config, $http_config, $main_config) = @_;
+    my $dso_config;
 
     if ($UseHup) {
         master_on(); # config reload is buggy when master is off
 
     } elsif ($UseValgrind) {
         master_off();
+    }
+
+    if ($DSO_path ne "none") {
+        $dso_config = write_dso_config();
     }
 
     $http_config = expand_env_in_config($http_config);
@@ -361,8 +454,15 @@ sub write_config_file ($$$) {
         $main_config = '';
     }
 
-    open my $out, ">$ConfFile" or
+    if (!defined $dso_config) {
+        $dso_config = '';
+    }
+
+    my $out;
+
+    open $out, ">$ConfFile" or
         die "Can't open $ConfFile for writing: $!\n";
+
     print $out <<_EOC_;
 worker_processes  $Workers;
 daemon $DaemonEnabled;
@@ -373,6 +473,7 @@ env MOCKEAGAIN_VERBOSE;
 env MOCKEAGAIN_WRITE_TIMEOUT_PATTERN;
 env LD_PRELOAD;
 
+$dso_config
 $main_config
 
 http {
@@ -724,6 +825,9 @@ start_nginx:
 
             #warn "*** Restarting the nginx server...\n";
             setup_server_root();
+            if ($DSO_path ne "none") {
+                include_dso_modules($block);
+            }
             write_user_files($block);
             write_config_file($config, $block->http_config, $block->main_config);
             #warn "nginx binary: $NginxBinary";

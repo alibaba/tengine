@@ -45,9 +45,11 @@ static ngx_http_lua_set_header_t ngx_http_lua_set_handlers[] = {
                  offsetof(ngx_http_headers_out_t, date),
                  ngx_http_set_builtin_header },
 
+#if 1
     { ngx_string("Content-Encoding"),
                  offsetof(ngx_http_headers_out_t, content_encoding),
                  ngx_http_set_builtin_header },
+#endif
 
     { ngx_string("Location"),
                  offsetof(ngx_http_headers_out_t, location),

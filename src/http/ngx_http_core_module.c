@@ -224,7 +224,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       NULL },
 
     { ngx_string("server"),
-      NGX_HTTP_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_MULTI|NGX_CONF_NOARGS,
+      NGX_HTTP_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
       ngx_http_core_server,
       0,
       0,
@@ -1023,6 +1023,7 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
                       "client intended to send too large body: %O bytes",
                       r->headers_in.content_length_n);
 
+        r->expect_tested = 1;
         (void) ngx_http_discard_request_body(r);
         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
         return NGX_OK;
@@ -2621,6 +2622,7 @@ ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name)
 
             r->internal = 1;
             r->content_handler = NULL;
+            r->uri_changed = 0;
             r->loc_conf = (*clcfp)->loc_conf;
 
             /* clear the modules contexts */
@@ -2632,6 +2634,7 @@ ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name)
 
             r->phase_handler = cmcf->phase_engine.location_rewrite_index;
 
+            r->write_event_handler = ngx_http_core_run_phases;
             ngx_http_core_run_phases(r);
 
             return NGX_DONE;
@@ -2728,6 +2731,117 @@ ngx_http_set_disable_symlinks(ngx_http_request_t *r,
 #endif
 
     return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_http_get_forwarded_addr(ngx_http_request_t *r, ngx_addr_t *addr,
+    u_char *xff, size_t xfflen, ngx_array_t *proxies, int recursive)
+{
+    u_char           *p;
+    in_addr_t         inaddr;
+    ngx_addr_t        paddr;
+    ngx_cidr_t       *cidr;
+    ngx_uint_t        family, i;
+#if (NGX_HAVE_INET6)
+    ngx_uint_t        n;
+    struct in6_addr  *inaddr6;
+#endif
+
+#if (NGX_SUPPRESS_WARN)
+    inaddr = 0;
+#if (NGX_HAVE_INET6)
+    inaddr6 = NULL;
+#endif
+#endif
+
+    family = addr->sockaddr->sa_family;
+
+    if (family == AF_INET) {
+        inaddr = ((struct sockaddr_in *) addr->sockaddr)->sin_addr.s_addr;
+    }
+
+#if (NGX_HAVE_INET6)
+    else if (family == AF_INET6) {
+        inaddr6 = &((struct sockaddr_in6 *) addr->sockaddr)->sin6_addr;
+
+        if (IN6_IS_ADDR_V4MAPPED(inaddr6)) {
+            family = AF_INET;
+
+            p = inaddr6->s6_addr;
+
+            inaddr = p[12] << 24;
+            inaddr += p[13] << 16;
+            inaddr += p[14] << 8;
+            inaddr += p[15];
+
+            inaddr = htonl(inaddr);
+        }
+    }
+#endif
+
+    for (cidr = proxies->elts, i = 0; i < proxies->nelts; i++) {
+        if (cidr[i].family != family) {
+            goto next;
+        }
+
+        switch (family) {
+
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            for (n = 0; n < 16; n++) {
+                if ((inaddr6->s6_addr[n] & cidr[i].u.in6.mask.s6_addr[n])
+                    != cidr[i].u.in6.addr.s6_addr[n])
+                {
+                    goto next;
+                }
+            }
+            break;
+#endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+        case AF_UNIX:
+            break;
+#endif
+
+        default: /* AF_INET */
+            if ((inaddr & cidr[i].u.in.mask) != cidr[i].u.in.addr) {
+                goto next;
+            }
+            break;
+        }
+
+        for (p = xff + xfflen - 1; p > xff; p--, xfflen--) {
+            if (*p != ' ' && *p != ',') {
+                break;
+            }
+        }
+
+        for ( /* void */ ; p > xff; p--) {
+            if (*p == ' ' || *p == ',') {
+                p++;
+                break;
+            }
+        }
+
+        if (ngx_parse_addr(r->pool, &paddr, p, xfflen - (p - xff)) != NGX_OK) {
+            return NGX_DECLINED;
+        }
+
+        *addr = paddr;
+
+        if (recursive && p > xff) {
+            (void) ngx_http_get_forwarded_addr(r, addr, xff, p - 1 - xff,
+                                               proxies, 1);
+        }
+
+        return NGX_OK;
+
+    next:
+        continue;
+    }
+
+    return NGX_DECLINED;
 }
 
 
@@ -3121,7 +3235,7 @@ ngx_http_core_type(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 {
     ngx_http_core_loc_conf_t *clcf = conf;
 
-    ngx_str_t       *value, *content_type, *old, file;
+    ngx_str_t       *value, *content_type, *old;
     ngx_uint_t       i, n, hash;
     ngx_hash_key_t  *type;
 
@@ -3134,15 +3248,8 @@ ngx_http_core_type(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
                                " in \"include\" directive");
             return NGX_CONF_ERROR;
         }
-        file = value[1];
 
-        if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
-
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
-
-        return ngx_conf_parse(cf, &file);
+        return ngx_conf_include(cf, dummy, conf);
     }
 
     content_type = ngx_palloc(cf->pool, sizeof(ngx_str_t));
@@ -4558,7 +4665,7 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_str_null(&args);
 
-    if (cv.lengths == NULL && uri.data[0] == '/') {
+    if (cv.lengths == NULL && uri.len && uri.data[0] == '/') {
         p = (u_char *) ngx_strchr(uri.data, '?');
 
         if (p) {
@@ -4592,7 +4699,7 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         for (j = 0; j < clcf->error_pages->nelts; j++) {
             if (err[j].status == status) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "error_page code \"%d\" duplicated",
+                                   "error_page code \"%i\" duplicated",
                                    status);
                 return NGX_CONF_ERROR;
             }
@@ -4692,7 +4799,7 @@ ngx_http_core_try_files(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         code = ngx_atoi(tf[i - 1].name.data + 1, tf[i - 1].name.len - 2);
 
-        if (code == NGX_ERROR) {
+        if (code == NGX_ERROR || code > 999) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid code \"%*s\"",
                                tf[i - 1].name.len - 1, tf[i - 1].name.data);

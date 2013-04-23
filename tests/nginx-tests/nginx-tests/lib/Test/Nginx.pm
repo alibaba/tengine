@@ -40,6 +40,10 @@ sub new {
 	)
 		or die "Can't create temp directory: $!\n";
 
+	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
+	$self->{_dso_module} = ();
+	mkdir("$self->{_testdir}/logs");
+
 	return $self;
 }
 
@@ -61,6 +65,12 @@ sub has($;) {
 	}
 
 	return $self;
+}
+
+sub set_dso($;) {
+        my ($self, $module_name, $module_path) = @_;
+
+        $self->{_dso_module}{$module_name} = $module_path;
 }
 
 sub has_module($) {
@@ -118,8 +128,19 @@ sub has_module($) {
 sub has_daemon($) {
 	my ($self, $daemon) = @_;
 
+	if ($^O eq 'MSWin32') {
+		Test::More::plan(skip_all => "win32");
+		return $self;
+	}
+
+	if ($^O eq 'solaris') {
+		Test::More::plan(skip_all => "$daemon not found")
+			unless `command -v $daemon`;
+		return $self;
+	}
+
 	Test::More::plan(skip_all => "$daemon not found")
-		unless `command -v $daemon`;
+		unless `which $daemon`;
 
 	return $self;
 }
@@ -149,8 +170,8 @@ sub run(;$) {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		exec($NGINX, '-c', "$testdir/nginx.conf", @globals)
-			or die "Unable to exec(): $!\n";
+		exec($NGINX, '-c', "$testdir/nginx.conf", '-p', "$testdir",
+		     @globals) or die "Unable to exec(): $!\n";
 	}
 
 	# wait for nginx to start
@@ -199,7 +220,19 @@ sub stop() {
 
 	return $self unless $self->{_started};
 
-	kill 'QUIT', `cat $self->{_testdir}/nginx.pid`;
+	if ($^O eq 'MSWin32') {
+		my $testdir = $self->{_testdir};
+		my @globals = $self->{_test_globals} ?
+			() : ('-g', "pid $testdir/nginx.pid; "
+			. "error_log $testdir/error.log debug;");
+		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'stop',
+			@globals) == 0
+			or die "system() failed: $?\n";
+
+	} else {
+		kill 'QUIT', `cat $self->{_testdir}/nginx.pid`;
+	}
+
 	wait;
 
 	$self->{_started} = 0;
@@ -212,7 +245,7 @@ sub stop_daemons() {
 
 	while ($self->{_daemons} && scalar @{$self->{_daemons}}) {
 		my $p = shift @{$self->{_daemons}};
-		kill 'TERM', $p;
+		kill $^O eq 'MSWin32' ? 9 : 'TERM', $p;
 		wait;
 	}
 
@@ -234,6 +267,7 @@ sub write_file_expand($$) {
 	my ($self, $name, $content) = @_;
 
 	$content =~ s/%%TEST_GLOBALS%%/$self->test_globals()/gmse;
+        $content =~ s/%%TEST_GLOBALS_DSO%%/$self->test_globals_dso()/gmse;
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
 
@@ -279,6 +313,28 @@ sub test_globals() {
 	$s .= "error_log $self->{_testdir}/error.log debug;\n";
 
 	$self->{_test_globals} = $s;
+}
+
+sub test_globals_dso() {
+        my ($self) = @_;
+
+        return "" unless defined $ENV{TEST_NGINX_DSO};
+
+	return $self->{_test_globals_dso}
+		if defined $self->{_test_globals_dso};
+
+        my $s = '';
+        
+        $s .= "dso {\n";
+        if (defined $ENV{NGINX_DSO_PATH}) {
+            $s .= "path $ENV{NGINX_DSO_PATH};\n";
+        }
+        while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
+          $s .= "load $key $value;\n";
+        }
+        $s .= "}\n";
+
+        $self->{_test_globals_dso} = $s;
 }
 
 sub test_globals_http() {

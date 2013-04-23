@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -13,7 +13,7 @@
 static char *ngx_procs_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_procs_cycle(ngx_cycle_t *cycle, void *data);
 static void ngx_procs_process_init(ngx_cycle_t *cycle,
-    ngx_proc_module_t *module, ngx_uint_t priority);
+    ngx_proc_module_t *module, ngx_int_t priority);
 static void ngx_procs_channel_handler(ngx_event_t *ev);
 static void ngx_procs_process_exit(ngx_cycle_t *cycle,
     ngx_proc_module_t *module);
@@ -23,6 +23,8 @@ static char *ngx_proc_process(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void *ngx_proc_create_main_conf(ngx_conf_t *cf);
 static void *ngx_proc_create_conf(ngx_conf_t *cf);
 static char *ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_procs_set_priority(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 
 
 static ngx_command_t ngx_procs_commands[] = {
@@ -79,9 +81,9 @@ static ngx_command_t ngx_proc_core_commands[] = {
 
     { ngx_string("priority"),
       NGX_PROC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
+      ngx_procs_set_priority,
       NGX_PROC_CONF_OFFSET,
-      offsetof(ngx_proc_conf_t, priority),
+      0,
       NULL },
 
     { ngx_string("delay_start"),
@@ -381,14 +383,14 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
     module = args->module;
     cpcf = args->proc_conf;
     ctx = module->ctx;
-    ngx_process = NGX_PROCESS_WORKER;
+    ngx_process = NGX_PROCESS_PROC;
+
+    ngx_setproctitle((char *) ctx->name.data);
+    ngx_msleep(cpcf->delay_start);
 
     ngx_procs_process_init(cycle, ctx, cpcf->priority);
-    ngx_setproctitle((char *) ctx->name.data);
     ngx_close_listening_sockets(cycle);
     ngx_use_accept_mutex = 0;
-
-    ngx_msleep(cpcf->delay_start);
 
     for ( ;; ) {
         if (ngx_exiting || ngx_quit) {
@@ -440,7 +442,7 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
 
 static void
 ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
-    ngx_uint_t priority)
+    ngx_int_t priority)
 {
     sigset_t          set;
     ngx_int_t         n;
@@ -456,11 +458,11 @@ ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
-    if (priority && ccf->priority != 0) {
-        if (setpriority(PRIO_PROCESS, 0, ccf->priority) == -1) {
+    if (priority != 0) {
+        if (setpriority(PRIO_PROCESS, 0, (int) priority) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                          "process %V setpriority(%d) failed", &module->name,
-                          ccf->priority);
+                          "process %V setpriority(%i) failed", &module->name,
+                          priority);
         }
     }
 
@@ -529,7 +531,8 @@ ngx_procs_process_init(ngx_cycle_t *cycle, ngx_proc_module_t *module,
 
     if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                      "process %V prctl(PR_SET_DUMPABLE) failed", &module->name);
+                      "process %V prctl(PR_SET_DUMPABLE) failed",
+                      &module->name);
     }
 
 #endif
@@ -659,7 +662,7 @@ ngx_procs_channel_handler(ngx_event_t *ev)
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
-                       "process channel command: %d", ch.command);
+                       "process channel command: %ui", ch.command);
 
         switch (ch.command) {
 
@@ -944,8 +947,16 @@ ngx_proc_create_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    /*
+     * set by ngx_pcalloc()
+     *
+     *     cpcf->delay_start = 0;
+     *     cpcf->priority = 0;
+     *     cpcf->count = 0;
+     *     cpcf->respawn = 0;
+     */
+
     cpcf->delay_start = NGX_CONF_UNSET_MSEC;
-    cpcf->priority = NGX_CONF_UNSET_UINT;
     cpcf->count = NGX_CONF_UNSET_UINT;
     cpcf->respawn = NGX_CONF_UNSET;
 
@@ -959,10 +970,49 @@ ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_proc_conf_t  *prev = parent;
     ngx_proc_conf_t  *conf = child;
 
-    ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 0);
-    ngx_conf_merge_uint_value(conf->priority, prev->priority, 0);
+    ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 300);
     ngx_conf_merge_uint_value(conf->count, prev->count, 1);
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_procs_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_proc_conf_t  *pcf = conf;
+
+    ngx_str_t        *value;
+    ngx_uint_t        n, minus;
+
+    if (pcf->priority != 0) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (value[1].data[0] == '-') {
+        n = 1;
+        minus = 1;
+
+    } else if (value[1].data[0] == '+') {
+        n = 1;
+        minus = 0;
+
+    } else {
+        n = 0;
+        minus = 0;
+    }
+
+    pcf->priority = ngx_atoi(&value[1].data[n], value[1].len - n);
+    if (pcf->priority == NGX_ERROR) {
+        return "invalid number";
+    }
+
+    if (minus) {
+        pcf->priority = -pcf->priority;
+    }
 
     return NGX_CONF_OK;
 }
