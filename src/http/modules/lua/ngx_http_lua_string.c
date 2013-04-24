@@ -1,3 +1,10 @@
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
@@ -242,7 +249,7 @@ ngx_http_lua_ngx_quote_sql_str(lua_State *L)
 
     if (p != dst + dlen) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "ngx.quote_sql_str: buffer error");
+                      "ngx.quote_sql_str: buffer error");
         return NGX_ERROR;
     }
 
@@ -552,7 +559,7 @@ ngx_http_lua_ngx_crc32_long(lua_State *L)
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "expecting one argument, but got %d",
-                lua_gettop(L));
+                          lua_gettop(L));
     }
 
     p = (u_char *) luaL_checklstring(L, 1, &len);
@@ -569,7 +576,7 @@ ngx_http_lua_ngx_encode_args(lua_State *L) {
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "expecting 1 argument but seen %d",
-                lua_gettop(L));
+                          lua_gettop(L));
     }
 
     lua_pushlightuserdata(L, &ngx_http_lua_request_key);
@@ -593,7 +600,7 @@ static int
 ngx_http_lua_ngx_decode_args(lua_State *L) {
     ngx_http_request_t          *r;
     u_char                      *buf;
-    u_char                      *last;
+    u_char                      *tmp;
     size_t                       len = 0;
     int                          n;
     int                          max;
@@ -623,16 +630,16 @@ ngx_http_lua_ngx_decode_args(lua_State *L) {
         return luaL_error(L, "no request object found");
     }
 
+    tmp = lua_newuserdata(L, len);
+    ngx_memcpy(tmp, buf, len);
+
     lua_createtable(L, 0, 4);
 
-    last = buf + len;
-
-    return ngx_http_lua_parse_args(r, L, buf, last, max);
+    return ngx_http_lua_parse_args(r, L, tmp, tmp + len, max);
 }
 
 
 #if (NGX_OPENSSL)
-
 static int
 ngx_http_lua_ngx_hmac_sha1(lua_State *L)
 {
@@ -644,7 +651,7 @@ ngx_http_lua_ngx_hmac_sha1(lua_State *L)
 
     if (lua_gettop(L) != 2) {
         return luaL_error(L, "expecting one argument, but got %d",
-                lua_gettop(L));
+                          lua_gettop(L));
     }
 
     sec = (u_char *) luaL_checklstring(L, 1, &lsec);
@@ -660,3 +667,4 @@ ngx_http_lua_ngx_hmac_sha1(lua_State *L)
 }
 #endif
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

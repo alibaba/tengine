@@ -15,9 +15,6 @@ plan tests => repeat_each() * (blocks() * 3 + 1);
 #no_diff();
 #no_long_string();
 
-$ENV{TEST_NGINX_PORT} ||= 1984;
-$ENV{TEST_NGINX_CLIENT_PORT} ||= 1984;
-
 run_tests();
 
 __DATA__
@@ -26,14 +23,14 @@ __DATA__
 --- config
     location /read {
         content_by_lua '
-            ngx.redirect("http://www.taobao.com/foo");
+            ngx.redirect("http://agentzh.org/foo");
             ngx.say("hi")
         ';
     }
 --- request
 GET /read
 --- response_headers
-Location: http://www.taobao.com/foo
+Location: http://agentzh.org/foo
 --- response_body_like: 302 Found
 --- error_code: 302
 
@@ -43,14 +40,14 @@ Location: http://www.taobao.com/foo
 --- config
     location /read {
         content_by_lua '
-            ngx.redirect("http://www.taobao.com/foo", ngx.HTTP_MOVED_TEMPORARILY);
+            ngx.redirect("http://agentzh.org/foo", ngx.HTTP_MOVED_TEMPORARILY);
             ngx.say("hi")
         ';
     }
 --- request
 GET /read
 --- response_headers
-Location: http://www.taobao.com/foo
+Location: http://agentzh.org/foo
 --- response_body_like: 302 Found
 --- error_code: 302
 
@@ -60,14 +57,14 @@ Location: http://www.taobao.com/foo
 --- config
     location /read {
         content_by_lua '
-            ngx.redirect("http://www.taobao.com/foo", ngx.HTTP_MOVED_PERMANENTLY);
+            ngx.redirect("http://agentzh.org/foo", ngx.HTTP_MOVED_PERMANENTLY);
             ngx.say("hi")
         ';
     }
 --- request
 GET /read
 --- response_headers
-Location: http://www.taobao.com/foo
+Location: http://agentzh.org/foo
 --- response_body_like: 301 Moved Permanently
 --- error_code: 301
 
@@ -77,7 +74,7 @@ Location: http://www.taobao.com/foo
 --- config
     location /read {
         content_by_lua '
-            ngx.redirect("http://www.taobao.com/foo", 404);
+            ngx.redirect("http://agentzh.org/foo", 404);
             ngx.say("hi")
         ';
     }
@@ -113,7 +110,7 @@ GET /read
         echo hello, world;
     }
     location /proxy {
-        proxy_pass http://127.0.0.1:$TEST_NGINX_CLIENT_PORT/echo;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_SERVER_PORT/echo;
     }
     location /read {
         content_by_lua '
@@ -134,14 +131,14 @@ GET /read
 --- config
     location /read {
         content_by_lua '
-            ngx.redirect("http://www.taobao.com/foo?bar=3");
+            ngx.redirect("http://agentzh.org/foo?bar=3");
             ngx.say("hi")
         ';
     }
 --- request
 GET /read
 --- response_headers
-Location: http://www.taobao.com/foo?bar=3
+Location: http://agentzh.org/foo?bar=3
 --- response_body_like: 302 Found
 --- error_code: 302
 
@@ -153,7 +150,7 @@ Location: http://www.taobao.com/foo?bar=3
         echo hello, world;
     }
     location /proxy {
-        proxy_pass http://127.0.0.1:$TEST_NGINX_CLIENT_PORT/echo;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_SERVER_PORT/echo;
     }
     location /read {
         content_by_lua '

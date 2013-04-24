@@ -5,12 +5,13 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => blocks() * repeat_each() * 2;
-
-#no_diff();
-#no_long_string();
+plan tests => repeat_each() * (blocks() * 2 + 4);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
+
+#no_diff();
+#no_shuffle();
+#no_long_string();
 
 run_tests();
 
@@ -539,10 +540,37 @@ hello
         proxy_pass http://127.0.0.1:$server_port/foo;
     }
     location /foo {
+        #echo_status 201;
         echo bah;
     }
 --- request
     GET /main
 --- response_body
 hello, bah
+
+
+
+=== TEST 24: jump to an internal location
+--- config
+    location /t {
+        content_by_lua '
+            return ngx.exec("/proxy", ngx.var.args)
+        ';
+    }
+
+    location /proxy {
+        internal;
+
+        proxy_pass http://127.0.0.1:$server_port/dummy;
+    }
+
+    location = /dummy {
+        echo -n dummy;
+    }
+--- pipelined_requests eval
+["GET /t", "GET /t?foo"]
+--- response_body eval
+["dummy", "dummy"]
+--- no_error_log
+[error]
 

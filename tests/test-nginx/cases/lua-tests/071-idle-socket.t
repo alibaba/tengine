@@ -9,7 +9,6 @@ plan tests => repeat_each() * (blocks() * 3);
 
 our $HtmlDir = html_dir;
 
-$ENV{TEST_NGINX_CLIENT_PORT} ||= server_port();
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 
 no_long_string();
@@ -24,7 +23,7 @@ __DATA__
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -304,7 +303,7 @@ close: 1 nil
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -359,17 +358,17 @@ close: 1 nil
     }
 --- request
 GET /t
---- response_body eval
-qq{connected: 1
+--- response_body_like eval
+qr{connected: 1
 request sent: 57
-read: HTTP/1.1 200 OK\r
+read: HTTP/1\.1 200 OK\r
 Server: nginx\r
 Content-Type: text/plain\r
 Transfer-Encoding: chunked\r
 Connection: close\r
 \r
 6\r
-failed to set keepalive: connection in dubious state
+failed to set keepalive: (?:unread data in buffer|connection in dubious state)
 }
 --- no_error_log
 [error]

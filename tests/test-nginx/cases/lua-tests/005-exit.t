@@ -11,12 +11,12 @@ repeat_each(2);
 #log_level('warn');
 #worker_connections(1024);
 
-plan tests => repeat_each() * (blocks() * 3 - 1);
+plan tests => repeat_each() * (blocks() * 3 + 3);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 $ENV{TEST_NGINX_MYSQL_PORT} ||= 3306;
 
-$ENV{LUA_CPATH} ||=
+our $LuaCpath = $ENV{LUA_CPATH} ||
     '/usr/local/openresty-debug/lualib/?.so;/usr/local/openresty/lualib/?.so;;';
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
@@ -63,10 +63,11 @@ GET /lua
 --- request
 GET /lua
 --- error_log
-attempt to call ngx.exit after sending out the headers
+attempt to set status 404 via ngx.exit after sending out the response status 200
 --- no_error_log
 alert
---- ignore_response
+--- response_body
+hi
 
 
 
@@ -122,13 +123,15 @@ GET /api?user=agentz
 
 
 === TEST 6: working with ngx_auth_request (simplest form, w/o ngx_memc)
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
-
+"
 --- config
     location /memc {
         internal;
@@ -192,13 +195,15 @@ Logged in 56
 
 
 === TEST 7: working with ngx_auth_request (simplest form)
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
-
+"
 --- config
     location /memc {
         internal;
@@ -262,23 +267,25 @@ Logged in 56
 
 
 === TEST 8: working with ngx_auth_request
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
 
     upstream memc_a {
-        server 127.0.0.1:$TEST_NGINX_MEMCACHED_PORT;
+        server 127.0.0.1:\$TEST_NGINX_MEMCACHED_PORT;
     }
 
     upstream memc_b {
-        server 127.0.0.1:$TEST_NGINX_MEMCACHED_PORT;
+        server 127.0.0.1:\$TEST_NGINX_MEMCACHED_PORT;
     }
 
     upstream_list memc_cluster memc_a memc_b;
-
+"
 --- config
     location /memc {
         internal;
@@ -339,6 +346,7 @@ GET /api?uid=32
 Logged in 56
 --- no_error_log
 [error]
+--- timeout: 5
 
 
 
@@ -474,7 +482,7 @@ hello
 --- request
 GET /lua
 --- error_code: 501
---- response_body_like: 501 Method Not Implemented
+--- response_body_like: 501 (?:Method )?Not Implemented
 --- no_error_log
 [error]
 
@@ -490,7 +498,48 @@ GET /lua
 --- request
 GET /lua
 --- error_code: 501
---- response_body_like: 501 Method Not Implemented
+--- response_body_like: 501 (?:Method )?Not Implemented
 --- no_error_log
 [error]
+
+
+
+=== TEST 14: throw 403 after sending out headers with 200
+--- config
+    location /lua {
+        rewrite_by_lua '
+            ngx.send_headers()
+            ngx.say("Hello World")
+            ngx.exit(403)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+Hello World
+--- error_log
+attempt to set status 403 via ngx.exit after sending out the response status 200
+--- no_error_log
+[alert]
+
+
+
+=== TEST 15: throw 403 after sending out headers with 403
+--- config
+    location /lua {
+        rewrite_by_lua '
+            ngx.status = 403
+            ngx.send_headers()
+            ngx.say("Hello World")
+            ngx.exit(403)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+Hello World
+--- error_code: 403
+--- no_error_log
+[error]
+[alert]
 

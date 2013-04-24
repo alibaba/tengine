@@ -5,12 +5,12 @@ use Test::Nginx::Socket;
 
 #worker_connections(1014);
 #master_process_enabled(1);
-#log_level('warn');
+log_level('warn');
 
 #repeat_each(120);
-repeat_each(1);
+repeat_each(2);
 
-plan tests => blocks() * repeat_each() * 2;
+plan tests => repeat_each() * (blocks() * 2 + 2);
 
 #no_diff();
 #no_long_string();
@@ -152,4 +152,41 @@ GET /201
 GET /201
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+
+
+
+=== TEST 10: set ngx.status before headers are sent
+--- config
+    location /t {
+        content_by_lua '
+            ngx.say("ok")
+            ngx.status = 201
+        ';
+    }
+--- request
+    GET /t
+--- response_body
+ok
+--- error_code: 200
+--- error_log eval
+qr/\[error\] .*? attempt to set ngx\.status after sending out response headers/
+
+
+
+=== TEST 11: http 1.0 and ngx.status
+--- config
+    location /nil {
+        content_by_lua '
+            ngx.status = ngx.HTTP_UNAUTHORIZED
+            ngx.say("invalid request")
+            ngx.exit(ngx.HTTP_OK)
+        ';
+    }
+--- request
+GET /nil HTTP/1.0
+--- response_body
+invalid request
+--- error_code: 401
+--- no_error_log
+[error]
 
