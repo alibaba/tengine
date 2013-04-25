@@ -134,12 +134,9 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
         return NGX_ERROR;
     }
 
-    /* handler it */
-
     p = buf;
     end = buf + file_size;
     line = p;
-
 
     for (; p != end; p++) {
         if (*p == CR || *p == LF) {
