@@ -9,7 +9,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 8);
+plan tests => repeat_each() * (blocks() * 2 + 9);
 
 #no_diff();
 #no_long_string();
@@ -197,8 +197,8 @@ pcre JIT compiling result: 1
 --- config
     location /re {
         content_by_lua '
-            rc, err = pcall(ngx.re.gmatch, "hello\\nworld", "(abc", "j")
-            if not rc then
+            local m, err = ngx.re.gmatch("hello\\nworld", "(abc", "j")
+            if not m then
                 ngx.say("error: ", err)
                 return
             end
@@ -208,5 +208,7 @@ pcre JIT compiling result: 1
 --- request
     GET /re
 --- response_body
-error: bad argument #2 to '?' (failed to compile regex "(abc": pcre_compile() failed: missing ) in "(abc")
+error: failed to compile regex "(abc": pcre_compile() failed: missing ) in "(abc"
+--- no_error_log
+[error]
 

@@ -3,9 +3,9 @@
 use lib 'lib';
 use Test::Nginx::Socket;
 
-repeat_each(1);
+repeat_each(2);
 
-plan tests => blocks() * repeat_each() * 2;
+plan tests => blocks() * repeat_each() * 3;
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
 $ENV{TEST_NGINX_MYSQL_PORT} ||= 3306;
@@ -68,6 +68,8 @@ __DATA__
 thread id = \d+
 kill status = 200
 kill body = {"errcode":0}$
+--- error_log eval
+qr{upstream timed out \(\d+: Connection timed out\) while sending query to drizzle upstream}
 
 
 

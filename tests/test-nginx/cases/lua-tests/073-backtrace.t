@@ -10,7 +10,7 @@ use Test::Nginx::Socket;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * 4;
+plan tests => repeat_each() * 10;
 
 #no_diff();
 #no_long_string();
@@ -18,7 +18,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: basic print
+=== TEST 1: sanity
 --- config
     location /lua {
         content_by_lua
@@ -39,4 +39,30 @@ attempt to call global 'lua_concat'
 : in function 'bar'
 :5: in function 'foo'
 :7: in function
+
+
+
+=== TEST 2: error(nil)
+--- config
+    location /lua {
+        content_by_lua
+        '   function bar()
+                error(nil)
+            end
+            function foo()
+                bar()
+            end
+            foo()
+        ';
+    }
+--- request
+GET /lua
+--- ignore_response
+--- error_log
+lua entry thread aborted: runtime error: unknown reason
+stack traceback:
+ in function 'error'
+: in function 'bar'
+:5: in function 'foo'
+:7: in function <[string "content_by_lua"]:1>
 

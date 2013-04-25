@@ -8,7 +8,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2);
+plan tests => repeat_each() * (blocks() * 2 + 1);
 
 #no_diff();
 #no_long_string();
@@ -50,7 +50,7 @@ hello, world
 Host: localhost\r
 Content-Length: 100\r
 Connection: close\r
-
+\r
 hello, world"
 --- response_body:
 --- error_code_like: ^(?:500)?$
@@ -100,4 +100,26 @@ hello, world
 --- response_body
 hello, world
 sub: foo
+
+
+
+=== TEST 5: failed to write 100 continue
+--- config
+    location = /test {
+        rewrite_by_lua '
+            ngx.req.read_body()
+            ngx.say(ngx.var.request_body)
+            ngx.exit(200)
+        ';
+    }
+--- request
+POST /test
+hello, world
+--- more_headers
+Expect: 100-Continue
+--- ignore_response
+--- no_error_log
+[alert]
+[error]
+http finalize request: 500, "/test?" a:1, c:0
 
