@@ -81,12 +81,9 @@ typedef struct {
 
 typedef struct {
     ngx_http_status_t              status;
+    ngx_http_chunked_t             chunked;
     ngx_http_proxy_vars_t          vars;
-    size_t                         internal_body_length;
-
-    ngx_uint_t                     state;
-    off_t                          size;
-    off_t                          length;
+    off_t                          internal_body_length;
 
     ngx_uint_t                     head;  /* unsigned  head:1 */
 } ngx_http_proxy_ctx_t;
@@ -558,6 +555,8 @@ static char  ngx_http_proxy_version_11[] = " HTTP/1.1" CRLF;
 static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
+    { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
+    { ngx_string("Transfer-Encoding"), ngx_string("") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -583,6 +582,8 @@ static ngx_str_t  ngx_http_proxy_hide_headers[] = {
 static ngx_keyval_t  ngx_http_proxy_cache_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
+    { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
+    { ngx_string("Transfer-Encoding"), ngx_string("") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -1006,6 +1007,9 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
 
         ctx->internal_body_length = body_len;
         len += body_len;
+
+    } else {
+        ctx->internal_body_length = r->headers_in.content_length_n;
     }
 
     le.ip = plcf->headers_set_len->elts;
@@ -1252,7 +1256,7 @@ ngx_http_proxy_reinit_request(ngx_http_request_t *r)
     ctx->status.count = 0;
     ctx->status.start = NULL;
     ctx->status.end = NULL;
-    ctx->state = 0;
+    ctx->chunked.state = 0;
 
     r->upstream->process_header = ngx_http_proxy_process_status_line;
     r->upstream->pipe->input_filter = ngx_http_proxy_copy_filter;
@@ -1470,6 +1474,14 @@ ngx_http_proxy_process_header(ngx_http_request_t *r)
                 u->keepalive = !u->headers_in.connection_close;
             }
 
+            if (u->headers_in.status_n == NGX_HTTP_SWITCHING_PROTOCOLS) {
+                u->keepalive = 0;
+
+                if (r->headers_in.upgrade) {
+                    u->upgrade = 1;
+                }
+            }
+
             return NGX_OK;
         }
 
@@ -1618,265 +1630,6 @@ ngx_http_proxy_copy_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
 }
 
 
-static ngx_inline ngx_int_t
-ngx_http_proxy_parse_chunked(ngx_http_request_t *r, ngx_buf_t *buf)
-{
-    u_char                *pos, ch, c;
-    ngx_int_t              rc;
-    ngx_http_proxy_ctx_t  *ctx;
-    enum {
-        sw_chunk_start = 0,
-        sw_chunk_size,
-        sw_chunk_extension,
-        sw_chunk_extension_almost_done,
-        sw_chunk_data,
-        sw_after_data,
-        sw_after_data_almost_done,
-        sw_last_chunk_extension,
-        sw_last_chunk_extension_almost_done,
-        sw_trailer,
-        sw_trailer_almost_done,
-        sw_trailer_header,
-        sw_trailer_header_almost_done
-    } state;
-
-    ctx = ngx_http_get_module_ctx(r, ngx_http_proxy_module);
-
-    if (ctx == NULL) {
-        return NGX_ERROR;
-    }
-
-    state = ctx->state;
-
-    if (state == sw_chunk_data && ctx->size == 0) {
-        state = sw_after_data;
-    }
-
-    rc = NGX_AGAIN;
-
-    for (pos = buf->pos; pos < buf->last; pos++) {
-
-        ch = *pos;
-
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http proxy chunked byte: %02Xd s:%d", ch, state);
-
-        switch (state) {
-
-        case sw_chunk_start:
-            if (ch >= '0' && ch <= '9') {
-                state = sw_chunk_size;
-                ctx->size = ch - '0';
-                break;
-            }
-
-            c = (u_char) (ch | 0x20);
-
-            if (c >= 'a' && c <= 'f') {
-                state = sw_chunk_size;
-                ctx->size = c - 'a' + 10;
-                break;
-            }
-
-            goto invalid;
-
-        case sw_chunk_size:
-            if (ch >= '0' && ch <= '9') {
-                ctx->size = ctx->size * 16 + (ch - '0');
-                break;
-            }
-
-            c = (u_char) (ch | 0x20);
-
-            if (c >= 'a' && c <= 'f') {
-                ctx->size = ctx->size * 16 + (c - 'a' + 10);
-                break;
-            }
-
-            if (ctx->size == 0) {
-
-                switch (ch) {
-                case CR:
-                    state = sw_last_chunk_extension_almost_done;
-                    break;
-                case LF:
-                    state = sw_trailer;
-                    break;
-                case ';':
-                case ' ':
-                case '\t':
-                    state = sw_last_chunk_extension;
-                    break;
-                default:
-                    goto invalid;
-                }
-
-                break;
-            }
-
-            switch (ch) {
-            case CR:
-                state = sw_chunk_extension_almost_done;
-                break;
-            case LF:
-                state = sw_chunk_data;
-                break;
-            case ';':
-            case ' ':
-            case '\t':
-                state = sw_chunk_extension;
-                break;
-            default:
-                goto invalid;
-            }
-
-            break;
-
-        case sw_chunk_extension:
-            switch (ch) {
-            case CR:
-                state = sw_chunk_extension_almost_done;
-                break;
-            case LF:
-                state = sw_chunk_data;
-            }
-            break;
-
-        case sw_chunk_extension_almost_done:
-            if (ch == LF) {
-                state = sw_chunk_data;
-                break;
-            }
-            goto invalid;
-
-        case sw_chunk_data:
-            rc = NGX_OK;
-            goto data;
-
-        case sw_after_data:
-            switch (ch) {
-            case CR:
-                state = sw_after_data_almost_done;
-                break;
-            case LF:
-                state = sw_chunk_start;
-            }
-            break;
-
-        case sw_after_data_almost_done:
-            if (ch == LF) {
-                state = sw_chunk_start;
-                break;
-            }
-            goto invalid;
-
-        case sw_last_chunk_extension:
-            switch (ch) {
-            case CR:
-                state = sw_last_chunk_extension_almost_done;
-                break;
-            case LF:
-                state = sw_trailer;
-            }
-            break;
-
-        case sw_last_chunk_extension_almost_done:
-            if (ch == LF) {
-                state = sw_trailer;
-                break;
-            }
-            goto invalid;
-
-        case sw_trailer:
-            switch (ch) {
-            case CR:
-                state = sw_trailer_almost_done;
-                break;
-            case LF:
-                goto done;
-            default:
-                state = sw_trailer_header;
-            }
-            break;
-
-        case sw_trailer_almost_done:
-            if (ch == LF) {
-                goto done;
-            }
-            goto invalid;
-
-        case sw_trailer_header:
-            switch (ch) {
-            case CR:
-                state = sw_trailer_header_almost_done;
-                break;
-            case LF:
-                state = sw_trailer;
-            }
-            break;
-
-        case sw_trailer_header_almost_done:
-            if (ch == LF) {
-                state = sw_trailer;
-                break;
-            }
-            goto invalid;
-
-        }
-    }
-
-data:
-
-    ctx->state = state;
-    buf->pos = pos;
-
-    switch (state) {
-
-    case sw_chunk_start:
-        ctx->length = 3 /* "0" LF LF */;
-        break;
-    case sw_chunk_size:
-        ctx->length = 2 /* LF LF */
-                      + (ctx->size ? ctx->size + 4 /* LF "0" LF LF */ : 0);
-        break;
-    case sw_chunk_extension:
-    case sw_chunk_extension_almost_done:
-        ctx->length = 1 /* LF */ + ctx->size + 4 /* LF "0" LF LF */;
-        break;
-    case sw_chunk_data:
-        ctx->length = ctx->size + 4 /* LF "0" LF LF */;
-        break;
-    case sw_after_data:
-    case sw_after_data_almost_done:
-        ctx->length = 4 /* LF "0" LF LF */;
-        break;
-    case sw_last_chunk_extension:
-    case sw_last_chunk_extension_almost_done:
-        ctx->length = 2 /* LF LF */;
-        break;
-    case sw_trailer:
-    case sw_trailer_almost_done:
-        ctx->length = 1 /* LF */;
-        break;
-    case sw_trailer_header:
-    case sw_trailer_header_almost_done:
-        ctx->length = 2 /* LF LF */;
-        break;
-
-    }
-
-    return rc;
-
-done:
-
-    return NGX_DONE;
-
-invalid:
-
-    return NGX_ERROR;
-}
-
-
 static ngx_int_t
 ngx_http_proxy_chunked_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
 {
@@ -1902,7 +1655,7 @@ ngx_http_proxy_chunked_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
 
     for ( ;; ) {
 
-        rc = ngx_http_proxy_parse_chunked(r, buf);
+        rc = ngx_http_parse_chunked(r, buf, &ctx->chunked);
 
         if (rc == NGX_OK) {
 
@@ -1953,16 +1706,16 @@ ngx_http_proxy_chunked_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
             ngx_log_debug2(NGX_LOG_DEBUG_EVENT, p->log, 0,
                            "input buf #%d %p", b->num, b->pos);
 
-            if (buf->last - buf->pos >= ctx->size) {
+            if (buf->last - buf->pos >= ctx->chunked.size) {
 
-                buf->pos += ctx->size;
+                buf->pos += ctx->chunked.size;
                 b->last = buf->pos;
-                ctx->size = 0;
+                ctx->chunked.size = 0;
 
                 continue;
             }
 
-            ctx->size -= buf->last - buf->pos;
+            ctx->chunked.size -= buf->last - buf->pos;
             buf->pos = buf->last;
             b->last = buf->last;
 
@@ -1983,7 +1736,7 @@ ngx_http_proxy_chunked_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
 
             /* set p->length, minimal amount of data we want to see */
 
-            p->length = ctx->length;
+            p->length = ctx->chunked.length;
 
             break;
         }
@@ -1998,7 +1751,7 @@ ngx_http_proxy_chunked_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http proxy chunked state %d, length %d",
-                   ctx->state, p->length);
+                   ctx->chunked.state, p->length);
 
     if (b) {
         b->shadow = buf;
@@ -2095,7 +1848,7 @@ ngx_http_proxy_non_buffered_chunked_filter(void *data, ssize_t bytes)
 
     for ( ;; ) {
 
-        rc = ngx_http_proxy_parse_chunked(r, buf);
+        rc = ngx_http_parse_chunked(r, buf, &ctx->chunked);
 
         if (rc == NGX_OK) {
 
@@ -2117,13 +1870,13 @@ ngx_http_proxy_non_buffered_chunked_filter(void *data, ssize_t bytes)
             b->pos = buf->pos;
             b->tag = u->output.tag;
 
-            if (buf->last - buf->pos >= ctx->size) {
-                buf->pos += ctx->size;
+            if (buf->last - buf->pos >= ctx->chunked.size) {
+                buf->pos += ctx->chunked.size;
                 b->last = buf->pos;
-                ctx->size = 0;
+                ctx->chunked.size = 0;
 
             } else {
-                ctx->size -= buf->last - buf->pos;
+                ctx->chunked.size -= buf->last - buf->pos;
                 buf->pos = buf->last;
                 b->last = buf->last;
             }
@@ -2261,32 +2014,44 @@ static ngx_int_t
 ngx_http_proxy_add_x_forwarded_for_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
-    u_char  *p;
+    size_t             len;
+    u_char            *p;
+    ngx_uint_t         i, n;
+    ngx_table_elt_t  **h;
 
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    if (r->headers_in.x_forwarded_for == NULL) {
+    n = r->headers_in.x_forwarded_for.nelts;
+    h = r->headers_in.x_forwarded_for.elts;
+
+    len = 0;
+
+    for (i = 0; i < n; i++) {
+        len += h[i]->value.len + sizeof(", ") - 1;
+    }
+
+    if (len == 0) {
         v->len = r->connection->addr_text.len;
         v->data = r->connection->addr_text.data;
         return NGX_OK;
     }
 
-    v->len = r->headers_in.x_forwarded_for->value.len
-             + sizeof(", ") - 1 + r->connection->addr_text.len;
+    len += r->connection->addr_text.len;
 
-    p = ngx_pnalloc(r->pool, v->len);
+    p = ngx_pnalloc(r->pool, len);
     if (p == NULL) {
         return NGX_ERROR;
     }
 
+    v->len = len;
     v->data = p;
 
-    p = ngx_copy(p, r->headers_in.x_forwarded_for->value.data,
-                 r->headers_in.x_forwarded_for->value.len);
-
-    *p++ = ','; *p++ = ' ';
+    for (i = 0; i < n; i++) {
+        p = ngx_copy(p, h[i]->value.data, h[i]->value.len);
+        *p++ = ','; *p++ = ' ';
+    }
 
     ngx_memcpy(p, r->connection->addr_text.data, r->connection->addr_text.len);
 
@@ -2302,7 +2067,7 @@ ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_proxy_module);
 
-    if (ctx == NULL) {
+    if (ctx == NULL || ctx->internal_body_length < 0) {
         v->not_found = 1;
         return NGX_OK;
     }
@@ -2311,13 +2076,13 @@ ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    v->data = ngx_pnalloc(r->connection->pool, NGX_SIZE_T_LEN);
+    v->data = ngx_pnalloc(r->connection->pool, NGX_OFF_T_LEN);
 
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(v->data, "%uz", ctx->internal_body_length) - v->data;
+    v->len = ngx_sprintf(v->data, "%O", ctx->internal_body_length) - v->data;
 
     return NGX_OK;
 }
@@ -2624,6 +2389,8 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
 
+    conf->upstream.local = NGX_CONF_UNSET_PTR;
+
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.read_timeout = NGX_CONF_UNSET_MSEC;
@@ -2707,6 +2474,9 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->upstream.ignore_client_abort,
                               prev->upstream.ignore_client_abort, 0);
+
+    ngx_conf_merge_ptr_value(conf->upstream.local,
+                              prev->upstream.local, NULL);
 
     ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
                               prev->upstream.connect_timeout, 60000);
@@ -3086,8 +2856,6 @@ ngx_http_proxy_merge_headers(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
     }
 
     if (conf->headers_set_hash.buckets
-        && ((conf->body_source.data == NULL)
-            == (prev->body_source.data == NULL))
 #if (NGX_HTTP_CACHE)
         && ((conf->upstream.cache == NULL) == (prev->upstream.cache == NULL))
 #endif
@@ -3168,16 +2936,6 @@ ngx_http_proxy_merge_headers(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
     next:
 
         h++;
-    }
-
-    if (conf->body_source.data) {
-        s = ngx_array_push(&headers_merged);
-        if (s == NULL) {
-            return NGX_ERROR;
-        }
-
-        ngx_str_set(&s->key, "Content-Length");
-        ngx_str_set(&s->value, "$proxy_internal_body_length");
     }
 
 

@@ -533,10 +533,11 @@ ngx_http_scgi_create_key(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_scgi_create_request(ngx_http_request_t *r)
 {
+    off_t                         content_length_n;
     u_char                        ch, *key, *val, *lowcase_key;
     size_t                        len, key_len, val_len, allocated;
     ngx_buf_t                    *b;
-    ngx_str_t                    *content_length;
+    ngx_str_t                     content_length;
     ngx_uint_t                    i, n, hash, skip_empty, header_params;
     ngx_chain_t                  *cl, *body;
     ngx_list_part_t              *part;
@@ -545,12 +546,20 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
     ngx_http_script_engine_t      e, le;
     ngx_http_scgi_loc_conf_t     *scf;
     ngx_http_script_len_code_pt   lcode;
-    static ngx_str_t              zero = ngx_string("0");
+    u_char                        buffer[NGX_OFF_T_LEN];
 
-    content_length = r->headers_in.content_length ?
-                         &r->headers_in.content_length->value : &zero;
+    content_length_n = 0;
+    body = r->upstream->request_bufs;
 
-    len = sizeof("CONTENT_LENGTH") + content_length->len + 1;
+    while (body) {
+        content_length_n += ngx_buf_size(body->buf);
+        body = body->next;
+    }
+
+    content_length.data = buffer;
+    content_length.len = ngx_sprintf(buffer, "%O", content_length_n) - buffer;
+
+    len = sizeof("CONTENT_LENGTH") + content_length.len + 1;
 
     header_params = 0;
     ignored = NULL;
@@ -672,11 +681,8 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
 
     cl->buf = b;
 
-    b->last = ngx_snprintf(b->last,
-                           NGX_SIZE_T_LEN + 1 + sizeof("CONTENT_LENGTH")
-                           + NGX_OFF_T_LEN + 1,
-                           "%ui:CONTENT_LENGTH%Z%V%Z",
-                           len, content_length);
+    b->last = ngx_sprintf(b->last, "%ui:CONTENT_LENGTH%Z%V%Z",
+                          len, &content_length);
 
     if (scf->params_len) {
         ngx_memzero(&e, sizeof(ngx_http_script_engine_t));
@@ -978,7 +984,7 @@ ngx_http_scgi_process_header(ngx_http_request_t *r)
             u = r->upstream;
 
             if (u->headers_in.status_n) {
-                return NGX_OK;
+                goto done;
             }
 
             if (u->headers_in.status) {
@@ -1007,6 +1013,14 @@ ngx_http_scgi_process_header(ngx_http_request_t *r)
 
             if (u->state) {
                 u->state->status = u->headers_in.status_n;
+            }
+
+        done:
+
+            if (u->headers_in.status_n == NGX_HTTP_SWITCHING_PROTOCOLS
+                && r->headers_in.upgrade)
+            {
+                u->upgrade = 1;
             }
 
             return NGX_OK;
@@ -1060,6 +1074,8 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.store_access = NGX_CONF_UNSET_UINT;
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
+
+    conf->upstream.local = NGX_CONF_UNSET_PTR;
 
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
@@ -1128,6 +1144,9 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->upstream.ignore_client_abort,
                               prev->upstream.ignore_client_abort, 0);
+
+    ngx_conf_merge_ptr_value(conf->upstream.local,
+                              prev->upstream.local, NULL);
 
     ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
                               prev->upstream.connect_timeout, 60000);

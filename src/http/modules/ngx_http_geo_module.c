@@ -314,18 +314,17 @@ static ngx_int_t
 ngx_http_geo_addr(ngx_http_request_t *r, ngx_http_geo_ctx_t *ctx,
     ngx_addr_t *addr)
 {
-    ngx_table_elt_t  *xfwd;
+    ngx_array_t  *xfwd;
 
     if (ngx_http_geo_real_addr(r, ctx, addr) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    xfwd = r->headers_in.x_forwarded_for;
+    xfwd = &r->headers_in.x_forwarded_for;
 
-    if (xfwd != NULL && ctx->proxies != NULL) {
-        (void) ngx_http_get_forwarded_addr(r, addr, xfwd->value.data,
-                                           xfwd->value.len, ctx->proxies,
-                                           ctx->proxy_recursive);
+    if (xfwd->nelts > 0 && ctx->proxies != NULL) {
+        (void) ngx_http_get_forwarded_addr(r, addr, xfwd, NULL,
+                                           ctx->proxies, ctx->proxy_recursive);
     }
 
     return NGX_OK;
@@ -431,14 +430,14 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    pool = ngx_create_pool(16384, cf->log);
+    pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE, cf->log);
     if (pool == NULL) {
         return NGX_CONF_ERROR;
     }
 
     ngx_memzero(&ctx, sizeof(ngx_http_geo_conf_ctx_t));
 
-    ctx.temp_pool = ngx_create_pool(16384, cf->log);
+    ctx.temp_pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE, cf->log);
     if (ctx.temp_pool == NULL) {
         return NGX_CONF_ERROR;
     }
