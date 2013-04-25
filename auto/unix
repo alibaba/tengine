@@ -847,3 +847,10 @@ ngx_feature_test="struct stat sb;
                   openat(AT_FDCWD, \".\", O_RDONLY|O_NOFOLLOW);
                   fstatat(AT_FDCWD, \".\", &sb, AT_SYMLINK_NOFOLLOW);"
 . auto/feature
+
+
+if [ -f "/etc/resolv.conf" ]; then
+    have=NGX_RESOLVER_FILE
+    value=\"/etc/resolv.conf\"
+    . auto/define
+fi
