@@ -161,6 +161,7 @@ HTTP_CACHE=YES
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
 HTTP_SSL=YES
+HTTP_SPDY=NO
 HTTP_SSI=YES
 HTTP_POSTPONE=NO
 HTTP_REALIP=NO
@@ -200,6 +201,7 @@ HTTP_SYSGUARD=NO
 HTTP_FLV=NO
 HTTP_SLICE=NO
 HTTP_MP4=NO
+HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
@@ -382,6 +384,7 @@ do
         --http-scgi-temp-path=*)                   NGX_HTTP_SCGI_TEMP_PATH="$value" ;;
 
         --with-http_ssl_module)                    HTTP_SSL=YES                      ;;
+        --with-http_spdy_module)                   HTTP_SPDY=YES                     ;;
         --with-http_realip_module)                 HTTP_REALIP=YES                   ;;
         --with-http_addition_module)               HTTP_ADDITION=YES
                                                    HTTP_ADDITION_SHARED=NO           ;;
@@ -400,6 +403,7 @@ do
                                                    HTTP_SLICE_SHARED=NO              ;;
         --with-http_mp4_module)                    HTTP_MP4=YES
                                                    HTTP_MP4_SHARED=NO                ;;
+        --with-http_gunzip_module)                 HTTP_GUNZIP=YES                   ;;
         --with-http_gzip_static_module)            HTTP_GZIP_STATIC=YES              ;;
         --with-http_concat_module)                 HTTP_CONCAT=YES
                                                    HTTP_CONCAT_SHARED=NO             ;;
@@ -672,6 +676,7 @@ cat << END
   --without-dso                      disable dso module load
 
   --with-http_realip_module          enable ngx_http_realip_module
+  --with-http_spdy_module            enable ngx_http_spdy_module
   --with-http_addition_module        enable ngx_http_addition_filter_module
   --with-http_xslt_module            enable ngx_http_xslt_filter_module
   --with-http_image_filter_module    enable ngx_http_image_filter_module
@@ -681,6 +686,7 @@ cat << END
   --with-http_flv_module             enable ngx_http_flv_module
   --with-http_slice_module           enable ngx_http_slice_module
   --with-http_mp4_module             enable ngx_http_mp4_module
+  --with-http_gunzip_module          enable ngx_http_gunzip_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
   --with-http_concat_module          enable ngx_http_concat_module
   --with-http_random_index_module    enable ngx_http_random_index_module

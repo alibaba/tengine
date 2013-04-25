@@ -585,6 +585,10 @@ ngx_http_mp4_handler(ngx_http_request_t *r)
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.last_modified_time = of.mtime;
 
+    if (ngx_http_set_etag(r) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     if (ngx_http_set_content_type(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -748,6 +752,13 @@ ngx_http_mp4_process(ngx_http_mp4_file_t *mp4)
     mp4->content_length += mp4->moov_size;
 
     *prev = &mp4->mdat_atom;
+
+    if (start_offset > mp4->mdat_data.buf->file_last) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "start time is out mp4 mdat atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     adjustment = mp4->ftyp_size + mp4->moov_size
                  + ngx_http_mp4_update_mdat_atom(mp4, start_offset)
@@ -1836,14 +1847,6 @@ ngx_http_mp4_read_stsd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
                    "stsd entries:%uD, media:%*s",
                    ngx_mp4_get_32value(stsd_atom->entries),
                    4, stsd_atom->media_name);
-
-    /* supported media format: "avc1" (H.264) and "mp4a" (MPEG-4/AAC) */
-
-    if (ngx_strncmp(stsd_atom->media_name, "avc1", 4) != 0
-        && ngx_strncmp(stsd_atom->media_name, "mp4a", 4) != 0)
-    {
-        return NGX_DECLINED;
-    }
 
     trak = ngx_mp4_last_trak(mp4);
 

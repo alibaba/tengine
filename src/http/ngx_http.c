@@ -1235,6 +1235,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #if (NGX_HTTP_SSL)
     ngx_uint_t             ssl;
 #endif
+#if (NGX_HTTP_SPDY)
+    ngx_uint_t             spdy;
+#endif
 
     /*
      * we cannot compare whole sockaddr struct's as kernel
@@ -1287,6 +1290,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #if (NGX_HTTP_SSL)
         ssl = lsopt->ssl || addr[i].opt.ssl;
 #endif
+#if (NGX_HTTP_SPDY)
+        spdy = lsopt->spdy || addr[i].opt.spdy;
+#endif
 
         if (lsopt->set) {
 
@@ -1317,6 +1323,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #if (NGX_HTTP_SSL)
         addr[i].opt.ssl = ssl;
 #endif
+#if (NGX_HTTP_SPDY)
+        addr[i].opt.spdy = spdy;
+#endif
 
         return NGX_OK;
     }
@@ -1346,6 +1355,14 @@ ngx_http_add_address(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
             return NGX_ERROR;
         }
     }
+
+#if (NGX_HTTP_SPDY && NGX_HTTP_SSL && !defined TLSEXT_TYPE_next_proto_neg)
+    if (lsopt->spdy && lsopt->ssl) {
+        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                           "nginx was built without OpenSSL NPN support, "
+                           "SPDY is not enabled for %s", lsopt->addr);
+    }
+#endif
 
     addr = ngx_array_push(&port->addrs);
     if (addr == NULL) {
@@ -1472,7 +1489,7 @@ ngx_http_server_names(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
 
     ngx_memzero(&ha, sizeof(ngx_hash_keys_arrays_t));
 
-    ha.temp_pool = ngx_create_pool(16384, cf->log);
+    ha.temp_pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE, cf->log);
     if (ha.temp_pool == NULL) {
         return NGX_ERROR;
     }
@@ -1830,6 +1847,9 @@ ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
 #if (NGX_HTTP_SSL)
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
+#if (NGX_HTTP_SPDY)
+        addrs[i].conf.spdy = addr[i].opt.spdy;
+#endif
 
         if (addr[i].hash.buckets == NULL
             && (addr[i].wc_head == NULL
@@ -1890,6 +1910,9 @@ ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
         addrs6[i].conf.default_server = addr[i].default_server;
 #if (NGX_HTTP_SSL)
         addrs6[i].conf.ssl = addr[i].opt.ssl;
+#endif
+#if (NGX_HTTP_SPDY)
+        addrs6[i].conf.spdy = addr[i].opt.spdy;
 #endif
 
         if (addr[i].hash.buckets == NULL

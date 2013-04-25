@@ -373,10 +373,6 @@ ngx_http_upstream_free_least_conn_peer(ngx_peer_connection_t *pc,
         return;
     }
 
-    if (state == 0 && pc->tries == 0) {
-        return;
-    }
-
     lcp->conns[lcp->rrp.current]--;
 
     lcp->free_rr_peer(pc, &lcp->rrp, state);
@@ -410,6 +406,11 @@ ngx_http_upstream_least_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_upstream_srv_conf_t  *uscf;
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
+
+    if (uscf->peer.init_upstream) {
+        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                           "load balancing method redefined");
+    }
 
     uscf->peer.init_upstream = ngx_http_upstream_init_least_conn;
 
