@@ -1,10 +1,11 @@
 
-Tengine-1.4.5 [2013-04-26]
+Tengine-1.4.5 [2013-04-28]
 * Feature：增加一致性hash模块，可以为后端服务器提供一致性hash的负载均衡方法 [dinic]
-* Feature：后端keepalive的连接提供超时功能 [jinglong]
+* Feature：通过keepalive_timeout指令可以设置后端keepalive连接的超时时间 [jinglong]
 * Feature：加入所有模块静态编译或者所有模块动态编译的编译选项 [monadbobo]
+* Change：更新Lua模块至0.7.19 [jinglong]
 * Change：合并Nginx-1.2.8的更新 [yaoweibin]
-* Bugfix：修正syslog和upstream_check模块GCC-4.4.5编译出错的问题 [magicbear]
+* Bugfix：修正syslog和upstream_check模块在GCC-4.4.5上的编译警告 [magicbear]
 
 Tengine-1.4.4 [2013-03-21]
 * Feature：增加session_sticky模块，可以为客户端和后端服务器提供会话保持功能 [dinic]
