@@ -1,12 +1,18 @@
-#ifndef NGX_HTTP_LUA_SOCKET_UDP_H
-#define NGX_HTTP_LUA_SOCKET_UDP_H
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
+#ifndef _NGX_HTTP_LUA_SOCKET_UDP_H_INCLUDED_
+#define _NGX_HTTP_LUA_SOCKET_UDP_H_INCLUDED_
 
 
 #include "ngx_http_lua_common.h"
 
 
 typedef struct ngx_http_lua_socket_udp_upstream_s
-        ngx_http_lua_socket_udp_upstream_t;
+    ngx_http_lua_socket_udp_upstream_t;
 
 
 typedef
@@ -36,12 +42,15 @@ struct ngx_http_lua_socket_udp_upstream_s {
     size_t                           received; /* for receive */
     size_t                           recv_buf_size;
 
-    unsigned                         waiting:1;
+    ngx_http_lua_co_ctx_t           *co_ctx;
+
+    unsigned                         waiting; /* :1 */
 };
 
 
 void ngx_http_lua_inject_socket_udp_api(ngx_log_t *log, lua_State *L);
 
 
-#endif /* NGX_HTTP_LUA_SOCKET_UDP_H */
+#endif /* _NGX_HTTP_LUA_SOCKET_UDP_H_INCLUDED_ */
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

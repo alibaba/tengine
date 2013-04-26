@@ -5,17 +5,16 @@ use Test::Nginx::Socket;
 #worker_connections(1014);
 #master_on();
 #workers(2);
-#log_level('warn');
+log_level('warn');
 
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 2 + 5);
+plan tests => repeat_each() * (blocks() * 2 + 7);
 
 no_root_location();
 
-$ENV{TEST_NGINX_CLIENT_PORT} ||= $ENV{TEST_NGINX} ||= server_port();
-
+#no_shuffle();
 #no_diff();
 no_long_string();
 run_tests();
@@ -114,7 +113,7 @@ b r = 4a 2
 
 === TEST 4: empty
 --- config
-    location /lua {
+    location /t {
         content_by_lua '
             local args = ngx.req.get_uri_args()
             local keys = {}
@@ -131,7 +130,7 @@ b r = 4a 2
         ';
     }
 --- request
-GET /lua
+GET /t
 --- response_body
 done
 
@@ -358,7 +357,7 @@ done
             ngx.req.set_uri_args("hello")
             ngx.req.set_uri("/bar", true);
         ';
-        proxy_pass http://www.taobao.com:5678;
+        proxy_pass http://agentzh.org:12345;
     }
 --- request
     GET /foo?world
@@ -440,7 +439,7 @@ foo: /bar?hello
 --- request
     GET /foo?world
 --- response_body
-err: [string "ngx.req.set_uri"]:1: attempt to use zero-length uri
+err: attempt to use zero-length uri
 foo: /foo?world
 
 
@@ -456,7 +455,7 @@ foo: /foo?world
             ngx.req.set_uri_args("hello")
             ngx.req.set_uri("/bar")
         ';
-        proxy_pass http://127.0.0.1:$TEST_NGINX_CLIENT_PORT;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_SERVER_PORT;
     }
 --- request
     GET /foo?world
@@ -476,7 +475,7 @@ HTTP/1.0 hello
             ngx.req.set_uri("/bar")
             ngx.req.set_uri_args({["ca t"] = "%"})
         ';
-        proxy_pass http://127.0.0.1:$TEST_NGINX_CLIENT_PORT;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_SERVER_PORT;
     }
 --- request
     GET /foo?world
@@ -497,7 +496,7 @@ HTTP/1.0 ca%20t=%25
             ngx.req.set_uri("/bar", true);
             ngx.exit(503)
         ';
-        proxy_pass http://www.taobao.com:5678;
+        proxy_pass http://agentzh.org:12345;
     }
 --- request
     GET /foo?world
@@ -523,7 +522,7 @@ hello
 --- request
     GET /foo?world
 --- response_body
-err: [string "ngx.req.set_uri"]:1: attempt to call ngx.req.set_uri to do location jump in contexts other than rewrite_by_lua and rewrite_by_lua_file
+err: API disabled in the context of access_by_lua*
 
 
 
@@ -562,7 +561,7 @@ uri: /bar
 --- request
     GET /foo?world
 --- response_body
-err: [string "ngx.req.set_uri"]:1: attempt to call ngx.req.set_uri to do location jump in contexts other than rewrite_by_lua and rewrite_by_lua_file
+err: API disabled in the context of content_by_lua*
 
 
 
@@ -602,30 +601,11 @@ uri: /bar
 --- request
     GET /foo?world
 --- response_body
-err: [string "ngx.req.set_uri"]:1: attempt to call ngx.req.set_uri to do location jump in contexts other than rewrite_by_lua and rewrite_by_lua_file
+err: API disabled in the context of set_by_lua*
 
 
 
-=== TEST 25: ngx.req.set_uri without jump is allowed in set_by_lua
---- config
-    location /bar {
-        echo $query_string;
-    }
-    location /foo {
-        set_by_lua $dummy '
-            ngx.req.set_uri("/bar")
-            return ""
-        ';
-        echo "uri: $uri";
-    }
---- request
-    GET /foo?world
---- response_body
-uri: /bar
-
-
-
-=== TEST 26: ngx.encode_args (sanity)
+=== TEST 25: ngx.encode_args (sanity)
 --- config
     location /lua {
         set_by_lua $args_str '
@@ -641,7 +621,7 @@ a=bar&b=foo
 
 
 
-=== TEST 27: ngx.encode_args (empty table)
+=== TEST 26: ngx.encode_args (empty table)
 --- config
     location /lua {
         content_by_lua '
@@ -656,7 +636,7 @@ args:
 
 
 
-=== TEST 28: ngx.encode_args (value is table)
+=== TEST 27: ngx.encode_args (value is table)
 --- config
     location /lua {
         content_by_lua '
@@ -671,7 +651,7 @@ GET /lua
 
 
 
-=== TEST 29: ngx.encode_args (boolean values)
+=== TEST 28: ngx.encode_args (boolean values)
 --- config
     location /lua {
         content_by_lua '
@@ -686,7 +666,7 @@ GET /lua
 
 
 
-=== TEST 30: ngx.encode_args (boolean values, false)
+=== TEST 29: ngx.encode_args (boolean values, false)
 --- config
     location /lua {
         content_by_lua '
@@ -701,7 +681,7 @@ args: foo=3
 
 
 
-=== TEST 31: ngx.encode_args (bad table value)
+=== TEST 30: ngx.encode_args (bad table value)
 --- config
     location /lua {
         content_by_lua '
@@ -717,7 +697,7 @@ rc: false, err: attempt to use boolean as query arg value
 
 
 
-=== TEST 32: ngx.encode_args (bad user data value)
+=== TEST 31: ngx.encode_args (bad user data value)
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -735,7 +715,7 @@ rc: false, err: attempt to use userdata as query arg value
 
 
 
-=== TEST 33: ngx.encode_args (empty table)
+=== TEST 32: ngx.encode_args (empty table)
 --- config
     location /lua {
         content_by_lua '
@@ -750,7 +730,7 @@ args:
 
 
 
-=== TEST 34: ngx.encode_args (bad arg)
+=== TEST 33: ngx.encode_args (bad arg)
 --- config
     location /lua {
         content_by_lua '
@@ -765,7 +745,7 @@ rc: false, err: bad argument #1 to '?' (table expected, got boolean)
 
 
 
-=== TEST 35: max args (limited after normal key=value)
+=== TEST 34: max args (limited after normal key=value)
 --- config
     location /lua {
         content_by_lua '
@@ -788,10 +768,11 @@ bar = 4
 foo = 3
 --- error_log
 lua hit query args limit 2
+--- log_level: debug
 
 
 
-=== TEST 36: max args (limited after an orphan key)
+=== TEST 35: max args (limited after an orphan key)
 --- config
     location /lua {
         content_by_lua '
@@ -814,10 +795,11 @@ bar = true
 foo = 3
 --- error_log
 lua hit query args limit 2
+--- log_level: debug
 
 
 
-=== TEST 37: max args (limited after an empty key, but non-emtpy values)
+=== TEST 36: max args (limited after an empty key, but non-emtpy values)
 --- config
     location /lua {
         content_by_lua '
@@ -842,10 +824,11 @@ foo = 3
 done
 --- error_log
 lua hit query args limit 2
+--- log_level: debug
 
 
 
-=== TEST 38: default max 100 args
+=== TEST 37: default max 100 args
 --- config
     location /lua {
         content_by_lua '
@@ -889,10 +872,11 @@ CORE::join("", @k);
 --- timeout: 4
 --- error_log
 lua hit query args limit 100
+--- log_level: debug
 
 
 
-=== TEST 39: custom max 102 args
+=== TEST 38: custom max 102 args
 --- config
     location /lua {
         content_by_lua '
@@ -936,10 +920,11 @@ CORE::join("", @k);
 --- timeout: 4
 --- error_log
 lua hit query args limit 102
+--- log_level: debug
 
 
 
-=== TEST 40: custom unlimited args
+=== TEST 39: custom unlimited args
 --- config
     location /lua {
         content_by_lua '
@@ -984,7 +969,7 @@ CORE::join("", @k);
 
 
 
-=== TEST 41: rewrite uri and args (multi-value args)
+=== TEST 40: rewrite uri and args (multi-value args)
 --- config
     location /bar {
         echo $server_protocol $query_string;
@@ -995,10 +980,212 @@ CORE::join("", @k);
             ngx.req.set_uri_args({a = 3, b = {5, 6}})
             ngx.req.set_uri("/bar")
         ';
-        proxy_pass http://127.0.0.1:$TEST_NGINX_CLIENT_PORT;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_SERVER_PORT;
     }
 --- request
     GET /foo?world
 --- response_body
 HTTP/1.0 a=3&b=5&b=6
+
+
+
+=== TEST 41: ngx.decode_args (sanity)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a=bar&b=foo"
+            args = ngx.decode_args(args)
+            ngx.say("a = ", args.a)
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = bar
+b = foo
+
+
+
+=== TEST 42: ngx.decode_args (multi-value)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a=bar&b=foo&a=baz"
+            args = ngx.decode_args(args)
+            ngx.say("a = ", table.concat(args.a, ", "))
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = bar, baz
+b = foo
+
+
+
+=== TEST 43: ngx.decode_args (empty string)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = ""
+            args = ngx.decode_args(args)
+            ngx.say("n = ", #args)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+n = 0
+
+
+
+=== TEST 44: ngx.decode_args (boolean args)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a&b"
+            args = ngx.decode_args(args)
+            ngx.say("a = ", args.a)
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = true
+b = true
+
+
+
+=== TEST 45: ngx.decode_args (empty value args)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a=&b="
+            args = ngx.decode_args(args)
+            ngx.say("a = ", args.a)
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = 
+b = 
+
+
+
+=== TEST 46: ngx.decode_args (max_args = 1)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a=bar&b=foo"
+            args = ngx.decode_args(args, 1)
+            ngx.say("a = ", args.a)
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = bar
+b = nil
+
+
+
+=== TEST 47: ngx.decode_args (max_args = -1)
+--- config
+    location /lua {
+        content_by_lua '
+            local args = "a=bar&b=foo"
+            args = ngx.decode_args(args, -1)
+            ngx.say("a = ", args.a)
+            ngx.say("b = ", args.b)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+a = bar
+b = foo
+
+
+
+=== TEST 48: ngx.decode_args should not modify lua strings in place
+--- config
+    location /lua {
+        content_by_lua '
+            local s = "f+f=bar&B=foo"
+            args = ngx.decode_args(s)
+            for k, v in pairs(args) do
+                ngx.say("key: ", k)
+            end
+            ngx.say("s = ", s)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+key: f f
+key: B
+s = f+f=bar&B=foo
+--- no_error_log
+[error]
+
+
+
+=== TEST 49: ngx.decode_args should not modify lua strings in place (sample from Xu Jian)
+--- config
+    lua_need_request_body on;
+    location /t {
+        content_by_lua '
+            function split(s, delimiter)
+                local result = {}
+                local from = 1
+                local delim_from, delim_to = string.find(s, delimiter, from)
+                while delim_from do
+                    table.insert(result, string.sub(s, from, delim_from - 1))
+                    from = delim_to + 1
+                    delim_from, delim_to = string.find(s, delimiter, from)
+                end
+                table.insert(result, string.sub(s, from))
+                return result
+            end
+
+            local post_data = ngx.req.get_body_data()
+
+            local commands = split(post_data, "||")
+            for _, command in pairs(commands) do
+                --command = ngx.unescape_uri(command)
+                local request_args = ngx.decode_args(command, 0)
+                for key, value in pairs(request_args) do
+                    ngx.say(key, ": ", value)
+                end
+                ngx.say(" ===============")
+            end
+        ';
+    }
+--- request
+POST /t
+method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852||method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852||method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852
+--- response_body
+arg2: 780984852
+method: zadd
+key: User:1227713:likes:twitters
+arg1: 1356514698
+ ===============
+arg2: 780984852
+method: zadd
+key: User:1227713:likes:twitters
+arg1: 1356514698
+ ===============
+arg2: 780984852
+method: zadd
+key: User:1227713:likes:twitters
+arg1: 1356514698
+ ===============
+--- no_error_log
+[error]
 

@@ -20,7 +20,7 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
 
     if [ $ngx_found = no ]; then
         cat << END
-        $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUAJIT_LIB is defined as $LUAJIT_LIB and LUAJIT_INC $LUAJIT_INC, but we cannot find LuaJIT there.
+        $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUAJIT_LIB is defined as $LUAJIT_LIB and LUAJIT_INC (path for lua.h) $LUAJIT_INC, but we cannot find LuaJIT there.
 END
         exit 1
     fi
@@ -60,7 +60,7 @@ else
 
         if [ $ngx_found = no ]; then
             cat << END
-            $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUA_LIB is defined as $LUA_LIB and LUA_INC is $LUA_INC, but we cannot find standard Lua there.
+            $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUA_LIB is defined as $LUA_LIB and LUA_INC (path for lua.h) is $LUA_INC, but we cannot find standard Lua there.
 END
             exit 1
         fi
@@ -71,7 +71,19 @@ END
         . auto/feature
 
         if [ $ngx_found = no ]; then
-            # OpenBSD
+            # OpenBSD-5.2
+            ngx_feature="Lua library in /usr/local/"
+            ngx_feature_path="/usr/local/include/lua-5.1"
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -llua -lm"
+            else
+                ngx_feature_libs="-L/usr/local/lib -llua5.1 -lm"
+            fi
+            . auto/feature
+        fi
+
+        if [ $ngx_found = no ]; then
+            # OpenBSD < 5.2
             ngx_feature="Lua library in /usr/local/"
             ngx_feature_path="/usr/local/include"
             if [ $NGX_RPATH = YES ]; then
@@ -108,7 +120,7 @@ END
 
         if [ $ngx_found = no ]; then
             # FreeBSD
-            ngx_feature="Lua library in /usr/local/../lua51/"
+            ngx_feature="Lua library in /usr/local/*/lua51/"
             ngx_feature_path="/usr/local/include/lua51"
             if [ $NGX_RPATH = YES ]; then
                 ngx_feature_libs="-R/usr/local/lib/lua51 -L/usr/local/lib/lua51 -llua -lm"
@@ -129,17 +141,41 @@ END
             fi
             . auto/feature
         fi
+
+        if [ $ngx_found = no ]; then
+            # FreeBSD with luajit-2.0 from ports collection
+            ngx_feature="LuaJIT library in /usr/local/"
+            ngx_feature_path="/usr/local/include/luajit-2.0"
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -lluajit-5.1 -lm"
+            else
+                ngx_feature_libs="-L/usr/local/lib -lluajit-5.1 -lm"
+            fi
+            . auto/feature
+        fi
+
+        if [ $ngx_found = no ]; then
+            # Gentoo with LuaJIT-2.0
+            ngx_feature="LuaJIT library in /usr/"
+            ngx_feature_path="/usr/include/luajit-2.0"
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1"
+            else
+                ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1"
+            fi
+            . auto/feature
+        fi
     fi
 fi
 
 if [ $ngx_found = yes ]; then
-   if [ $HTTP_LUA_SHARED = YES ]; then
-       DSO_INCS="$DSO_INCS|$NGX_HTTP_LUA_MODULE:$ngx_feature_path"
-       DSO_LIBS="$DSO_LIBS|$NGX_HTTP_LUA_MODULE:$ngx_feature_libs"
-   else
-       CORE_INCS="$CORE_INCS $ngx_feature_path"
-       CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
-   fi
+    if [ $HTTP_LUA_SHARED = YES ]; then
+        DSO_INCS="$DSO_INCS|$NGX_HTTP_LUA_MODULE:$ngx_feature_path"
+        DSO_LIBS="$DSO_LIBS|$NGX_HTTP_LUA_MODULE:$ngx_feature_libs"
+    else
+        CORE_INCS="$CORE_INCS $ngx_feature_path"
+        CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+    fi
 else
  cat << END
  $0: error: ngx_http_lua_module requires the Lua library.
@@ -148,6 +184,7 @@ END
 fi
 
 CFLAGS="$CFLAGS -DNDK_SET_VAR"
+
 ngx_feature="export symbols by default"
 ngx_feature_libs="-Wl,-E"
 ngx_feature_name=
@@ -165,3 +202,18 @@ if [ $ngx_found = yes ]; then
        CORE_LIBS="-Wl,-E $CORE_LIBS"
    fi
 fi
+
+#NGX_DTRACE_PROVIDERS="$NGX_DTRACE_PROVIDERS $ngx_addon_dir/dtrace/ngx_lua_provider.d"
+#NGX_TAPSET_SRCS="$NGX_TAPSET_SRCS $ngx_addon_dir/tapset/ngx_lua.stp"
+
+ngx_feature="SO_PASSCRED"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_SO_PASSCRED"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+#include <sys/socket.h>"
+ngx_feature_path=
+ngx_feature_test='setsockopt(1, SOL_SOCKET, SO_PASSCRED, NULL, 0);'
+
+. auto/feature
+

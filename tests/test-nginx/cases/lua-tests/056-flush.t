@@ -14,10 +14,10 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => 82;
+plan tests => repeat_each() * 44;
 
 #no_diff();
-#no_long_string();
+no_long_string();
 run_tests();
 
 __DATA__
@@ -293,4 +293,100 @@ Content-Length: 23
 lua buffering output bufs for the HTTP 1.0 request
 lua http 1.0 buffering makes ngx.flush() a no-op
 --- timeout: 5
+
+
+
+=== TEST 13: flush wait in a user coroutine
+--- config
+    location /test {
+        content_by_lua '
+            function f()
+                ngx.say("hello, world")
+                ngx.flush(true)
+                coroutine.yield()
+                ngx.say("hiya")
+            end
+            local c = coroutine.create(f)
+            ngx.say(coroutine.resume(c))
+            ngx.say(coroutine.resume(c))
+        ';
+    }
+--- request
+GET /test
+--- stap2
+F(ngx_http_lua_wev_handler) {
+    printf("wev handler: wev:%d\n", $r->connection->write->ready)
+}
+
+global ids, cur
+
+function gen_id(k) {
+    if (ids[k]) return ids[k]
+    ids[k] = ++cur
+    return cur
+}
+
+F(ngx_http_handler) {
+    delete ids
+    cur = 0
+}
+
+/*
+F(ngx_http_lua_run_thread) {
+    id = gen_id($ctx->cur_co)
+    printf("run thread %d\n", id)
+}
+
+probe process("/usr/local/openresty-debug/luajit/lib/libluajit-5.1.so.2").function("lua_resume") {
+    id = gen_id($L)
+    printf("lua resume %d\n", id)
+}
+*/
+
+M(http-lua-user-coroutine-resume) {
+    p = gen_id($arg2)
+    c = gen_id($arg3)
+    printf("resume %x in %x\n", c, p)
+}
+
+M(http-lua-entry-coroutine-yield) {
+    println("entry coroutine yield")
+}
+
+/*
+F(ngx_http_lua_coroutine_yield) {
+    printf("yield %x\n", gen_id($L))
+}
+*/
+
+M(http-lua-user-coroutine-yield) {
+    p = gen_id($arg2)
+    c = gen_id($arg3)
+    printf("yield %x in %x\n", c, p)
+}
+
+F(ngx_http_lua_atpanic) {
+    printf("lua atpanic(%d):", gen_id($L))
+    print_ubacktrace();
+}
+
+M(http-lua-user-coroutine-create) {
+    p = gen_id($arg2)
+    c = gen_id($arg3)
+    printf("create %x in %x\n", c, p)
+}
+
+F(ngx_http_lua_ngx_exec) { println("exec") }
+
+F(ngx_http_lua_ngx_exit) { println("exit") }
+
+F(ngx_http_writer) { println("http writer") }
+
+--- response_body
+hello, world
+true
+hiya
+true
+--- error_log
+lua reuse free buf memory 13 >= 5
 

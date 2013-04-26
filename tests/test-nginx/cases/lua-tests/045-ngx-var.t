@@ -88,3 +88,18 @@ X-My-Host: foo
 foo
 --- SKIP
 
+
+
+=== TEST 5: variable name is caseless
+--- config
+    location = /test {
+        set $Var 32;
+        content_by_lua '
+            ngx.say("value: ", ngx.var.VAR)
+        ';
+    }
+--- request
+GET /test
+--- response_body
+value: 32
+

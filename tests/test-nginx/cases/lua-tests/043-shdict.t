@@ -8,7 +8,7 @@ use Test::Nginx::Socket;
 
 #repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 5);
+plan tests => repeat_each() * (blocks() * 2 + 15);
 
 #no_diff();
 no_long_string();
@@ -363,6 +363,7 @@ false expecting exactly two arguments, but only seen 1
 --- config
     location = /test {
         content_by_lua '
+            collectgarbage("collect")
             local dogs = ngx.shared.dogs
             local res, err, forcible = dogs:set("foo", string.rep("helloworld", 10000))
             ngx.say(res, " ", err, " ", forcible)
@@ -372,6 +373,9 @@ false expecting exactly two arguments, but only seen 1
 GET /test
 --- response_body
 false no memory false
+--- log_level: info
+--- error_log eval
+qr/\[info\] .* ngx_slab_alloc\(\) failed: no memory in lua_shared_dict zone "dogs"/
 
 
 
@@ -631,6 +635,7 @@ hello
 --- config
     location = /test {
         content_by_lua '
+            collectgarbage("collect")
             local dogs = ngx.shared.dogs
             dogs:set("bah", "hello")
             local res, err, forcible = dogs:set("foo", string.rep("helloworld", 10000))
@@ -641,6 +646,9 @@ hello
 GET /test
 --- response_body
 false no memory true
+--- log_level: info
+--- error_log eval
+qr/\[info\] .* ngx_slab_alloc\(\) failed: no memory in lua_shared_dict zone "dogs"/
 
 
 
@@ -1076,4 +1084,371 @@ GET /t
 10502 number
 nil nil
 nil nil
+
+
+
+=== TEST 45: flush_expires
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs:set("foo", "x", 1)
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 100)
+
+            ngx.sleep(1.5)
+
+            local num = dogs:flush_expired()
+            ngx.say(num)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+1
+
+
+
+=== TEST 46: flush_expires with number
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            for i=1,100 do
+                dogs:set(tostring(i), "x", 1)
+            end
+
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 100)
+
+            ngx.sleep(1.5)
+
+            local num = dogs:flush_expired(42)
+            ngx.say(num)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+42
+
+
+
+=== TEST 47: flush_expires an empty dict
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            local num = dogs:flush_expired()
+            ngx.say(num)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+0
+
+
+
+=== TEST 48: flush_expires a dict without expired items
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 100)
+
+            local num = dogs:flush_expired()
+            ngx.say(num)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+0
+
+
+
+=== TEST 49: list all keys in a shdict
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 0)
+            local keys = dogs:get_keys()
+            ngx.say(#keys)
+            table.sort(keys)
+            for _,k in ipairs(keys) do
+                ngx.say(k)
+            end
+        ';
+    }
+--- request
+GET /t
+--- response_body
+2
+bah
+bar
+
+
+
+=== TEST 50: list keys in a shdict with limit
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 0)
+            local keys = dogs:get_keys(1)
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+1
+
+
+
+=== TEST 51: list all keys in a shdict with expires
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs:set("foo", "x", 1)
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 100)
+
+            ngx.sleep(1.5)
+
+            local keys = dogs:get_keys()
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+2
+
+
+
+=== TEST 52: list keys in a shdict with limit larger than number of keys
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+
+            dogs:set("bah", "y", 0)
+            dogs:set("bar", "z", 0)
+            local keys = dogs:get_keys(3)
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+2
+
+
+
+=== TEST 53: list keys in an empty shdict
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            local keys = dogs:get_keys()
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+0
+
+
+
+=== TEST 54: list keys in an empty shdict with a limit
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            local keys = dogs:get_keys(4)
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+0
+
+
+
+=== TEST 55: list all keys in a shdict with all keys expired
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs:set("foo", "x", 1)
+            dogs:set("bah", "y", 1)
+            dogs:set("bar", "z", 1)
+
+            ngx.sleep(1.5)
+
+            local keys = dogs:get_keys()
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+0
+
+
+
+=== TEST 56: list all keys in a shdict with more than 1024 keys with no limit set
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            for i=1,2048 do
+                dogs:set(tostring(i), i)
+            end
+            local keys = dogs:get_keys()
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+1024
+
+
+
+=== TEST 57: list all keys in a shdict with more than 1024 keys with 0 limit set
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /t {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            for i=1,2048 do
+                dogs:set(tostring(i), i)
+            end
+            local keys = dogs:get_keys(0)
+            ngx.say(#keys)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+2048
+
+
+
+=== TEST 58: safe_set
+--- http_config
+    lua_shared_dict dogs 100k;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            local i = 0
+            while i < 1000 do
+                i = i + 1
+                local val = string.rep(" hello", 10) .. i
+                local res, err = dogs:safe_set("key_" .. i, val)
+                if not res then
+                    ngx.say(res, " ", err)
+                    break
+                end
+            end
+            ngx.say("abort at ", i)
+            ngx.say("cur value: ", dogs:get("key_" .. i))
+            if i > 1 then
+                ngx.say("1st value: ", dogs:get("key_1"))
+            end
+            if i > 2 then
+                ngx.say("2nd value: ", dogs:get("key_2"))
+            end
+        ';
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test"]
+--- response_body eval
+my $a = "nil no memory\nabort at (353|705)\ncur value: nil\n1st value: " . (" hello" x 10) . "1\n2nd value: " . (" hello" x 10) . "2\n";
+[qr/$a/, qr/$a/]
+--- no_error_log
+[error]
+
+
+
+=== TEST 59: safe_add
+--- http_config
+    lua_shared_dict dogs 100k;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            local i = 0
+            while i < 1000 do
+                i = i + 1
+                local val = string.rep(" hello", 10) .. i
+                local res, err = dogs:safe_add("key_" .. i, val)
+                if not res then
+                    ngx.say(res, " ", err)
+                    break
+                end
+            end
+            ngx.say("abort at ", i)
+            ngx.say("cur value: ", dogs:get("key_" .. i))
+            if i > 1 then
+                ngx.say("1st value: ", dogs:get("key_1"))
+            end
+            if i > 2 then
+                ngx.say("2nd value: ", dogs:get("key_2"))
+            end
+        ';
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test"]
+--- response_body eval
+my $a = "nil no memory\nabort at (353|705)\ncur value: nil\n1st value: " . (" hello" x 10) . "1\n2nd value: " . (" hello" x 10) . "2\n";
+[qr/$a/,
+q{false exists
+abort at 1
+cur value:  hello hello hello hello hello hello hello hello hello hello1
+}
+]
+--- no_error_log
+[error]
 
