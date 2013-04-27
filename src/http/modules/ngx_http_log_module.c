@@ -2314,6 +2314,7 @@ ngx_http_log_condition_value(ngx_conf_t *cf,
     sc.values = &lc->codes;
     sc.variables = n;
     sc.complete_lengths = 1;
+    sc.complete_values = 1;
 
     if (ngx_http_script_compile(&sc) != NGX_OK) {
         return NGX_ERROR;
