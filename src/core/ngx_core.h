@@ -67,6 +67,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #endif
 #include <ngx_trie.h>
 #include <ngx_radix_tree.h>
+#include <ngx_segment_tree.h>
 #include <ngx_times.h>
 #include <ngx_shmtx.h>
 #include <ngx_slab.h>

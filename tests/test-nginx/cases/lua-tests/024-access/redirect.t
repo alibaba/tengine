@@ -15,8 +15,6 @@ plan tests => blocks() * repeat_each() * 3;
 #no_diff();
 #no_long_string();
 
-$ENV{TEST_NGINX_PORT} ||= 1984;
-
 run_tests();
 
 __DATA__

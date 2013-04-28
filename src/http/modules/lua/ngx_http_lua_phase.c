@@ -1,3 +1,9 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
@@ -80,3 +86,4 @@ ngx_http_lua_inject_phase_api(lua_State *L)
     lua_setfield(L, -2, "get_phase");
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

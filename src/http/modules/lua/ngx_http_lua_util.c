@@ -1,4 +1,9 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
 
 #ifndef DDEBUG
 #define DDEBUG 0
@@ -28,6 +33,7 @@
 #include "ngx_http_lua_consts.h"
 #include "ngx_http_lua_req_method.h"
 #include "ngx_http_lua_shdict.h"
+#include "ngx_http_lua_coroutine.h"
 #include "ngx_http_lua_socket_tcp.h"
 #include "ngx_http_lua_socket_udp.h"
 #include "ngx_http_lua_sleep.h"
@@ -36,6 +42,15 @@
 #include "ngx_http_lua_bodyfilterby.h"
 #include "ngx_http_lua_logby.h"
 #include "ngx_http_lua_phase.h"
+#include "ngx_http_lua_probe.h"
+#include "ngx_http_lua_uthread.h"
+#include "ngx_http_lua_contentby.h"
+
+
+#if 1
+#undef ngx_http_lua_probe_info
+#define ngx_http_lua_probe_info(msg)
+#endif
 
 
 char ngx_http_lua_code_cache_key;
@@ -43,29 +58,41 @@ char ngx_http_lua_ctx_tables_key;
 char ngx_http_lua_regex_cache_key;
 char ngx_http_lua_socket_pool_key;
 char ngx_http_lua_request_key;
+char ngx_http_lua_coroutines_key;
+char ngx_http_lua_req_get_headers_metatable_key;
 
-
-/*  coroutine anchoring table key in Lua vm registry */
-static char ngx_http_lua_coroutines_key;
 
 static ngx_int_t ngx_http_lua_send_http10_headers(ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx);
+    ngx_http_lua_ctx_t *ctx);
 static void ngx_http_lua_init_registry(ngx_conf_t *cf, lua_State *L);
 static void ngx_http_lua_init_globals(ngx_conf_t *cf, lua_State *L);
 static void ngx_http_lua_set_path(ngx_conf_t *cf, lua_State *L, int tab_idx,
-        const char *fieldname, const char *path, const char *default_path);
+    const char *fieldname, const char *path, const char *default_path);
 static ngx_int_t ngx_http_lua_handle_exec(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int cc_ref);
+    ngx_http_lua_ctx_t *ctx);
 static ngx_int_t ngx_http_lua_handle_exit(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int cc_ref);
+    ngx_http_lua_ctx_t *ctx);
 static ngx_int_t ngx_http_lua_handle_rewrite_jump(lua_State *L,
-    ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx, int cc_ref);
-static int ngx_http_lua_ngx_check_aborted(lua_State *L);
-static int ngx_http_lua_thread_traceback(lua_State *L, lua_State *cc);
+    ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx);
+static int ngx_http_lua_thread_traceback(lua_State *L, lua_State *co,
+    ngx_http_lua_co_ctx_t *coctx);
 static void ngx_http_lua_inject_ngx_api(ngx_conf_t *cf, lua_State *L);
 static void ngx_http_lua_inject_arg_api(lua_State *L);
 static int ngx_http_lua_param_get(lua_State *L);
 static int ngx_http_lua_param_set(lua_State *L);
+static void ngx_http_lua_del_all_threads(ngx_http_request_t *r, lua_State *L,
+    ngx_http_lua_ctx_t *ctx);
+static ngx_int_t ngx_http_lua_output_filter(ngx_http_request_t *r,
+    ngx_chain_t *in);
+static ngx_int_t ngx_http_lua_send_special(ngx_http_request_t *r,
+    ngx_uint_t flags);
+static void ngx_http_lua_finalize_coroutines(ngx_http_request_t *r,
+    ngx_http_lua_ctx_t *ctx);
+static ngx_int_t ngx_http_lua_post_zombie_thread(ngx_http_request_t *r,
+    ngx_http_lua_co_ctx_t *parent, ngx_http_lua_co_ctx_t *thread);
+static void ngx_http_lua_cleanup_zombie_child_uthreads(ngx_http_request_t *r,
+    lua_State *L, ngx_http_lua_ctx_t *ctx, ngx_http_lua_co_ctx_t *coctx);
+static ngx_int_t ngx_http_lua_on_abort_resume(ngx_http_request_t *r);
 
 
 #ifndef LUA_PATH_SEP
@@ -76,14 +103,14 @@ static int ngx_http_lua_param_set(lua_State *L);
 
 
 enum {
-    LEVELS1	= 12,       /* size of the first part of the stack */
-    LEVELS2	= 10        /* size of the second part of the stack */
+    LEVELS1 = 12,       /* size of the first part of the stack */
+    LEVELS2 = 10        /* size of the second part of the stack */
 };
 
 
 static void
 ngx_http_lua_set_path(ngx_conf_t *cf, lua_State *L, int tab_idx,
-        const char *fieldname, const char *path, const char *default_path)
+    const char *fieldname, const char *path, const char *default_path)
 {
     const char          *tmp_path;
     const char          *prefix;
@@ -100,10 +127,17 @@ ngx_http_lua_set_path(ngx_conf_t *cf, lua_State *L, int tab_idx,
 
     dd("tmp_path path: %s", tmp_path);
 
-    tmp_path = luaL_gsub(L, tmp_path, AUX_MARK, default_path);
+#if (NGX_DEBUG)
+    tmp_path =
+#else
+    (void)
+#endif
+        luaL_gsub(L, tmp_path, AUX_MARK, default_path);
 
+#if (NGX_DEBUG)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-            "lua setting lua package.%s to \"%s\"", fieldname, tmp_path);
+                   "lua setting lua package.%s to \"%s\"", fieldname, tmp_path);
+#endif
 
     lua_remove(L, -2);
 
@@ -153,14 +187,15 @@ ngx_http_lua_new_state(ngx_conf_t *cf, ngx_http_lua_main_conf_t *lmcf)
 
     if (!lua_istable(L, -1)) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                "the \"package\" table does not exist");
+                           "the \"package\" table does not exist");
         return NULL;
     }
 
 #ifdef LUA_DEFAULT_PATH
 #   define LUA_DEFAULT_PATH_LEN (sizeof(LUA_DEFAULT_PATH) - 1)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-            "lua prepending default package.path with %s", LUA_DEFAULT_PATH);
+                   "lua prepending default package.path with %s",
+                   LUA_DEFAULT_PATH);
 
     lua_pushliteral(L, LUA_DEFAULT_PATH ";"); /* package default */
     lua_getfield(L, -2, "path"); /* package default old */
@@ -172,7 +207,8 @@ ngx_http_lua_new_state(ngx_conf_t *cf, ngx_http_lua_main_conf_t *lmcf)
 #ifdef LUA_DEFAULT_CPATH
 #   define LUA_DEFAULT_CPATH_LEN (sizeof(LUA_DEFAULT_CPATH) - 1)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-            "lua prepending default package.cpath with %s", LUA_DEFAULT_CPATH);
+                   "lua prepending default package.cpath with %s",
+                   LUA_DEFAULT_CPATH);
 
     lua_pushliteral(L, LUA_DEFAULT_CPATH ";"); /* package default */
     lua_getfield(L, -2, "cpath"); /* package default old */
@@ -223,69 +259,164 @@ lua_State *
 ngx_http_lua_new_thread(ngx_http_request_t *r, lua_State *L, int *ref)
 {
     int              base;
-    lua_State       *cr;
+    lua_State       *co;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua creating new thread");
+                   "lua creating new thread");
 
     base = lua_gettop(L);
 
     lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
     lua_rawget(L, LUA_REGISTRYINDEX);
 
-    cr = lua_newthread(L);
+    co = lua_newthread(L);
 
-    if (cr) {
-        /*  {{{ inherit coroutine's globals to main thread's globals table
-         *  for print() function will try to find tostring() in current
-         *  globals table.
-         */
-        /*  new globals table for coroutine */
-        ngx_http_lua_create_new_global_table(cr, 0, 0);
+    /*  {{{ inherit coroutine's globals to main thread's globals table
+     *  for print() function will try to find tostring() in current
+     *  globals table.
+     */
+    /*  new globals table for coroutine */
+    ngx_http_lua_create_new_global_table(co, 0, 0);
 
-        lua_createtable(cr, 0, 1);
-        lua_pushvalue(cr, LUA_GLOBALSINDEX);
-        lua_setfield(cr, -2, "__index");
-        lua_setmetatable(cr, -2);
+    lua_createtable(co, 0, 1);
+    lua_pushvalue(co, LUA_GLOBALSINDEX);
+    lua_setfield(co, -2, "__index");
+    lua_setmetatable(co, -2);
 
-        lua_replace(cr, LUA_GLOBALSINDEX);
-        /*  }}} */
+    lua_replace(co, LUA_GLOBALSINDEX);
+    /*  }}} */
 
-        *ref = luaL_ref(L, -2);
+    *ref = luaL_ref(L, -2);
 
-        if (*ref == LUA_NOREF) {
-            lua_settop(L, base);  /* restore main thread stack */
-            return NULL;
-        }
+    if (*ref == LUA_NOREF) {
+        lua_settop(L, base);  /* restore main thread stack */
+        return NULL;
     }
 
-    /*  pop coroutine reference on main thread's stack after anchoring it
-     *  in registry */
-    lua_pop(L, 1);
-
-    return cr;
+    lua_settop(L, base);
+    return co;
 }
 
 
 void
-ngx_http_lua_del_thread(ngx_http_request_t *r, lua_State *L, int ref)
+ngx_http_lua_del_thread(ngx_http_request_t *r, lua_State *L,
+    ngx_http_lua_ctx_t *ctx, ngx_http_lua_co_ctx_t *coctx)
 {
+    if (coctx->co_ref == LUA_NOREF) {
+        return;
+    }
+
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua deleting thread");
+                   "lua deleting light thread");
 
     lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
     lua_rawget(L, LUA_REGISTRYINDEX);
 
-    /* release reference to coroutine */
-    luaL_unref(L, -1, ref);
+    ngx_http_lua_probe_thread_delete(r, coctx->co, ctx);
+
+    luaL_unref(L, -1, coctx->co_ref);
+    coctx->co_ref = LUA_NOREF;
+    coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
     lua_pop(L, 1);
 }
 
 
-ngx_int_t
-ngx_http_lua_has_inline_var(ngx_str_t *s)
+static void
+ngx_http_lua_del_all_threads(ngx_http_request_t *r, lua_State *L,
+    ngx_http_lua_ctx_t *ctx)
 {
-    return (ngx_http_script_variables_count(s) != 0);
+    int                              inited = 0;
+    int                              ref;
+    ngx_uint_t                       i;
+    ngx_list_part_t                 *part;
+    ngx_http_lua_co_ctx_t           *entry_coctx;
+    ngx_http_lua_co_ctx_t           *cc;
+
+    cc = ctx->on_abort_co_ctx;
+    if (cc) {
+        lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+        lua_rawget(L, LUA_REGISTRYINDEX);
+        inited = 1;
+
+        if (cc->co_ref != LUA_NOREF) {
+            ngx_http_lua_probe_thread_delete(r, cc->co, ctx);
+
+            luaL_unref(L, -1, cc->co_ref);
+            cc->co_ref = LUA_NOREF;
+
+            if (cc->co_status != NGX_HTTP_LUA_CO_SUSPENDED) {
+                ctx->uthreads--;
+            }
+
+            cc->co_status = NGX_HTTP_LUA_CO_DEAD;
+        }
+
+        ctx->on_abort_co_ctx = NULL;
+    }
+
+    if (ctx->uthreads && ctx->user_co_ctx) {
+        /* release all pending user threads */
+
+        if (!inited) {
+            lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+            lua_rawget(L, LUA_REGISTRYINDEX);
+            inited = 1;
+        }
+
+        part = &ctx->user_co_ctx->part;
+        cc = part->elts;
+
+        for (i = 0; /* void */; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+
+                part = part->next;
+                cc = part->elts;
+                i = 0;
+            }
+
+            ref = cc[i].co_ref;
+
+            if (ref != LUA_NOREF) {
+                ngx_http_lua_probe_thread_delete(r, cc[i].co, ctx);
+
+                luaL_unref(L, -1, ref);
+                cc[i].co_ref = LUA_NOREF;
+                cc[i].co_status = NGX_HTTP_LUA_CO_DEAD;
+                ctx->uthreads--;
+
+                if (ctx->uthreads == 0) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /* release the reference to the entry thread */
+
+    entry_coctx = &ctx->entry_co_ctx;
+
+    if (entry_coctx->co_ref != LUA_NOREF) {
+        if (!inited) {
+            lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+            lua_rawget(L, LUA_REGISTRYINDEX);
+            inited = 1;
+        }
+
+        ngx_http_lua_probe_thread_delete(r, entry_coctx->co, ctx);
+
+        luaL_unref(L, -1, entry_coctx->co_ref);
+        entry_coctx->co_ref = LUA_NOREF;
+        entry_coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+    }
+
+    if (inited) {
+        lua_pop(L, 1);
+    }
 }
 
 
@@ -328,7 +459,7 @@ ngx_http_lua_rebase_path(ngx_pool_t *pool, u_char *src, size_t len)
 
 ngx_int_t
 ngx_http_lua_send_header_if_needed(ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx)
+    ngx_http_lua_ctx_t *ctx)
 {
     ngx_int_t            rc;
 
@@ -360,7 +491,7 @@ ngx_http_lua_send_header_if_needed(ngx_http_request_t *r,
 
 ngx_int_t
 ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
-        ngx_chain_t *in)
+    ngx_chain_t *in)
 {
     ngx_int_t                     rc;
     ngx_chain_t                  *cl;
@@ -413,7 +544,8 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
             }
 
             if (ctx->out) {
-                rc = ngx_http_output_filter(r, ctx->out);
+
+                rc = ngx_http_lua_output_filter(r, ctx->out);
 
                 if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
                     return rc;
@@ -436,9 +568,10 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
         ctx->eof = 1;
 
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua sending last buf of the response body");
+                       "lua sending last buf of the response body");
 
-        rc = ngx_http_send_special(r, NGX_HTTP_LAST);
+        rc = ngx_http_lua_send_special(r, NGX_HTTP_LAST);
+
         if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
             return rc;
         }
@@ -450,7 +583,7 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
 
     if (ctx->buffering) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua buffering output bufs for the HTTP 1.0 request");
+                       "lua buffering output bufs for the HTTP 1.0 request");
 
         for (cl = ctx->out, ll = &ctx->out; cl; cl = cl->next) {
             ll = &cl->next;
@@ -461,13 +594,57 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
         return NGX_OK;
     }
 
+    return ngx_http_lua_output_filter(r, in);
+}
+
+
+static ngx_int_t
+ngx_http_lua_send_special(ngx_http_request_t *r, ngx_uint_t flags)
+{
+    ngx_int_t            rc;
+    ngx_http_request_t  *ar; /* active request */
+
+    ar = r->connection->data;
+
+    if (ar != r) {
+
+        /* bypass ngx_http_postpone_filter_module */
+
+        r->connection->data = r;
+        rc = ngx_http_send_special(r, flags);
+        r->connection->data = ar;
+        return rc;
+    }
+
+    return ngx_http_send_special(r, flags);
+}
+
+
+static ngx_int_t
+ngx_http_lua_output_filter(ngx_http_request_t *r, ngx_chain_t *in)
+{
+    ngx_int_t            rc;
+    ngx_http_request_t  *ar; /* active request */
+
+    ar = r->connection->data;
+
+    if (ar != r) {
+
+        /* bypass ngx_http_postpone_filter_module */
+
+        r->connection->data = r;
+        rc = ngx_http_output_filter(r, in);
+        r->connection->data = ar;
+        return rc;
+    }
+
     return ngx_http_output_filter(r, in);
 }
 
 
 static ngx_int_t
 ngx_http_lua_send_http10_headers(ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx)
+    ngx_http_lua_ctx_t *ctx)
 {
     size_t               size;
     ngx_chain_t         *cl;
@@ -478,7 +655,7 @@ ngx_http_lua_send_http10_headers(ngx_http_request_t *r,
     }
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua sending HTTP 1.0 response headers");
+                   "lua sending HTTP 1.0 response headers");
 
     if (r->header_only) {
         goto send;
@@ -507,7 +684,7 @@ static void
 ngx_http_lua_init_registry(ngx_conf_t *cf, lua_State *L)
 {
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-            "lua initializing lua registry");
+                   "lua initializing lua registry");
 
     /* {{{ register a table to anchor lua coroutines reliably:
      * {([int]ref) = [cort]} */
@@ -534,7 +711,7 @@ ngx_http_lua_init_registry(ngx_conf_t *cf, lua_State *L)
 #endif
 
     /* {{{ register table to cache user code:
-     * {([string]cache_key) = [code closure]} */
+     * { [(string)cache_key] = <code closure> } */
     lua_pushlightuserdata(L, &ngx_http_lua_code_cache_key);
     lua_newtable(L);
     lua_rawset(L, LUA_REGISTRYINDEX);
@@ -550,12 +727,7 @@ static void
 ngx_http_lua_init_globals(ngx_conf_t *cf, lua_State *L)
 {
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-            "lua initializing lua globals");
-
-    /* {{{ remove unsupported globals */
-    lua_pushnil(L);
-    lua_setfield(L, LUA_GLOBALSINDEX, "coroutine");
-    /* }}} */
+                   "lua initializing lua globals");
 
 #if defined(NDK) && NDK
     ngx_http_lua_inject_ndk_api(L);
@@ -572,9 +744,7 @@ ngx_http_lua_inject_ngx_api(ngx_conf_t *cf, lua_State *L)
 
     lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
 
-    lua_createtable(L, 0 /* narr */, 89 /* nrec */);    /* ngx.* */
-
-    ngx_http_lua_inject_internal_utils(cf->log, L);
+    lua_createtable(L, 0 /* narr */, 85 /* nrec */);    /* ngx.* */
 
     ngx_http_lua_inject_arg_api(L);
 
@@ -600,6 +770,7 @@ ngx_http_lua_inject_ngx_api(ngx_conf_t *cf, lua_State *L)
     ngx_http_lua_inject_shdict_api(lmcf, L);
     ngx_http_lua_inject_socket_tcp_api(cf->log, L);
     ngx_http_lua_inject_socket_udp_api(cf->log, L);
+    ngx_http_lua_inject_uthread_api(cf->log, L);
 
     ngx_http_lua_inject_misc_api(L);
 
@@ -610,6 +781,8 @@ ngx_http_lua_inject_ngx_api(ngx_conf_t *cf, lua_State *L)
     lua_pop(L, 2);
 
     lua_setglobal(L, "ngx");
+
+    ngx_http_lua_inject_coroutine_api(cf->log, L);
 }
 
 
@@ -627,17 +800,11 @@ ngx_http_lua_discard_bufs(ngx_pool_t *pool, ngx_chain_t *in)
 
 ngx_int_t
 ngx_http_lua_add_copy_chain(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
-        ngx_chain_t **chain, ngx_chain_t *in)
+    ngx_chain_t ***plast, ngx_chain_t *in)
 {
-    ngx_chain_t     *cl, **ll;
+    ngx_chain_t     *cl;
     size_t           len;
     ngx_buf_t       *b;
-
-    ll = chain;
-
-    for (cl = *chain; cl; cl = cl->next) {
-        ll = &cl->next;
-    }
 
     len = 0;
 
@@ -667,13 +834,14 @@ ngx_http_lua_add_copy_chain(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
     while (in) {
         if (ngx_buf_in_memory(in->buf)) {
             b->last = ngx_copy(b->last, in->buf->pos,
-                    in->buf->last - in->buf->pos);
+                               in->buf->last - in->buf->pos);
         }
 
         in = in->next;
     }
 
-    *ll = cl;
+    **plast = cl;
+    *plast = &cl->next;
 
     return NGX_OK;
 }
@@ -681,18 +849,21 @@ ngx_http_lua_add_copy_chain(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
 
 void
 ngx_http_lua_reset_ctx(ngx_http_request_t *r, lua_State *L,
-        ngx_http_lua_ctx_t *ctx)
+    ngx_http_lua_ctx_t *ctx)
 {
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua reset ctx");
+                   "lua reset ctx");
 
-    if (ctx->cc_ref != LUA_NOREF) {
-        ngx_http_lua_del_thread(r, L, ctx->cc_ref);
-        ctx->cc_ref = LUA_NOREF;
+    ngx_http_lua_del_all_threads(r, L, ctx);
+
+    if (ctx->user_co_ctx) {
+        /* no way to destroy a list but clean up the whole pool */
+        ctx->user_co_ctx = NULL;
     }
 
-    ctx->waiting = 0;
-    ctx->done = 0;
+    ngx_memzero(&ctx->entry_co_ctx, sizeof(ngx_http_lua_co_ctx_t));
+
+    ctx->entry_co_ctx.co_ref = LUA_NOREF;
 
     ctx->entered_rewrite_phase = 0;
     ctx->entered_access_phase = 0;
@@ -700,14 +871,12 @@ ngx_http_lua_reset_ctx(ngx_http_request_t *r, lua_State *L,
 
     ctx->exit_code = 0;
     ctx->exited = 0;
-    ctx->exec_uri.data = NULL;
-    ctx->exec_uri.len = 0;
+    ctx->resume_handler = ngx_http_lua_wev_handler;
 
-    ctx->sr_statuses = NULL;
-    ctx->sr_headers = NULL;
-    ctx->sr_bodies = NULL;
+    ngx_str_null(&ctx->exec_uri);
+    ngx_str_null(&ctx->exec_args);
 
-    ctx->aborted = 0;
+    ctx->co_op = 0;
 }
 
 
@@ -718,7 +887,7 @@ ngx_http_lua_generic_phase_post_read(ngx_http_request_t *r)
     ngx_http_lua_ctx_t  *ctx;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua post read for rewrite/access phases");
+                   "lua post read for rewrite/access phases");
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
@@ -745,24 +914,19 @@ ngx_http_lua_request_cleanup(void *data)
     ngx_http_lua_main_conf_t    *lmcf;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua request cleanup");
+                   "lua request cleanup");
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
     /*  force coroutine handling the request quit */
     if (ctx == NULL) {
+        dd("ctx is NULL");
         return;
     }
 
     if (ctx->cleanup) {
         *ctx->cleanup = NULL;
         ctx->cleanup = NULL;
-    }
-
-    if (ctx->sleep.timer_set) {
-        dd("cleanup: deleting timer for ngx.sleep");
-
-        ngx_del_timer(&ctx->sleep);
     }
 
     lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
@@ -778,7 +942,7 @@ ngx_http_lua_request_cleanup(void *data)
 
         if (llcf->log_handler == NULL) {
             ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                    "lua release ngx.ctx");
+                           "lua release ngx.ctx");
 
             lua_pushlightuserdata(L, &ngx_http_lua_ctx_tables_key);
             lua_rawget(L, LUA_REGISTRYINDEX);
@@ -788,131 +952,330 @@ ngx_http_lua_request_cleanup(void *data)
         }
     }
 
-    if (ctx->cc_ref == LUA_NOREF) {
-        return;
-    }
-
-    lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_rawgeti(L, -1, ctx->cc_ref);
-
-    if (lua_isthread(L, -1)) {
-        /*  coroutine not finished yet, force quit */
-        ngx_http_lua_del_thread(r, L, ctx->cc_ref);
-        ctx->cc_ref = LUA_NOREF;
-
-    } else {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua internal error: not a thread object for the current "
-                "coroutine");
-
-        luaL_unref(L, -2, ctx->cc_ref);
-    }
-
-    lua_pop(L, 2);
+    ngx_http_lua_finalize_coroutines(r, ctx);
+    ngx_http_lua_del_all_threads(r, L, ctx);
 }
 
 
+/*
+ * description:
+ *  run a Lua coroutine specified by ctx->cur_co_ctx->co
+ * return value:
+ *  NGX_AGAIN:      I/O interruption: r->main->count intact
+ *  NGX_DONE:       I/O interruption: r->main->count already incremented by 1
+ *  NGX_ERROR:      error
+ *  >= 200          HTTP status code
+ */
 ngx_int_t
 ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int nret)
+    ngx_http_lua_ctx_t *ctx, int nret)
 {
-    int                      rv;
-    int                      cc_ref;
-    lua_State               *cc;
+    ngx_http_lua_co_ctx_t   *next_coctx, *parent_coctx, *orig_coctx;
+    int                      rv, nrets, success = 1;
+    lua_State               *next_co;
+    lua_State               *old_co;
     const char              *err, *msg, *trace;
     ngx_int_t                rc;
 #if (NGX_PCRE)
-    ngx_pool_t              *old_pool;
-    unsigned                 pcre_pool_resumed = 0;
+    ngx_pool_t              *old_pool = NULL;
 #endif
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua run thread");
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua run thread, top:%d c:%ud", lua_gettop(L),
+                   r->main->count);
 
     /* set Lua VM panic handler */
     lua_atpanic(L, ngx_http_lua_atpanic);
 
     dd("ctx = %p", ctx);
 
-    cc = ctx->cc;
-    cc_ref = ctx->cc_ref;
+    NGX_LUA_EXCEPTION_TRY {
+
+        if (ctx->cur_co_ctx->thread_spawn_yielded) {
+            ngx_http_lua_probe_info("thread spawn yielded");
+
+            ctx->cur_co_ctx->thread_spawn_yielded = 0;
+            nrets = 1;
+
+        } else {
+            nrets = nret;
+        }
+
+        for ( ;; ) {
+
+            dd("calling lua_resume: vm %p, nret %d", ctx->cur_co_ctx->co,
+               (int) nret);
 
 #if (NGX_PCRE)
-        /* XXX: work-around to nginx regex subsystem */
-    old_pool = ngx_http_lua_pcre_malloc_init(r->pool);
+            /* XXX: work-around to nginx regex subsystem */
+            old_pool = ngx_http_lua_pcre_malloc_init(r->pool);
 #endif
 
-    NGX_LUA_EXCEPTION_TRY {
-        dd("calling lua_resume: vm %p, nret %d", cc, (int) nret);
+            /*  run code */
+            dd("ctx: %p", ctx);
+            dd("cur co: %p", ctx->cur_co_ctx->co);
 
-        /*  run code */
-        rv = lua_resume(cc, nret);
+            orig_coctx = ctx->cur_co_ctx;
+            rv = lua_resume(orig_coctx->co, nrets);
 
 #if (NGX_PCRE)
-        /* XXX: work-around to nginx regex subsystem */
-        ngx_http_lua_pcre_malloc_done(old_pool);
-        pcre_pool_resumed = 1;
+            /* XXX: work-around to nginx regex subsystem */
+            ngx_http_lua_pcre_malloc_done(old_pool);
 #endif
 
 #if 0
-        /* test the longjmp thing */
-        if (rand() % 2 == 0) {
-            NGX_LUA_EXCEPTION_THROW(1);
-        }
+            /* test the longjmp thing */
+            if (rand() % 2 == 0) {
+                NGX_LUA_EXCEPTION_THROW(1);
+            }
 #endif
 
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "lua resume returned %d", rv);
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "lua resume returned %d", rv);
 
-        switch (rv) {
+            switch (rv) {
             case LUA_YIELD:
                 /*  yielded, let event handler do the rest job */
                 /*  FIXME: add io cmd dispatcher here */
 
                 ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                        "lua thread yielded");
+                               "lua thread yielded");
 
                 if (r->uri_changed) {
-                    return ngx_http_lua_handle_rewrite_jump(L, r, ctx, cc_ref);
+                    return ngx_http_lua_handle_rewrite_jump(L, r, ctx);
                 }
 
                 if (ctx->exited) {
-                    return ngx_http_lua_handle_exit(L, r, ctx, cc_ref);
+                    return ngx_http_lua_handle_exit(L, r, ctx);
                 }
 
                 if (ctx->exec_uri.len) {
-                    return ngx_http_lua_handle_exec(L, r, ctx, cc_ref);
+                    return ngx_http_lua_handle_exec(L, r, ctx);
                 }
 
-#if 0
-                ngx_http_lua_dump_postponed(r);
-#endif
+                /*
+                 * check if coroutine.resume or coroutine.yield called
+                 * lua_yield()
+                 */
+                switch(ctx->co_op) {
+                case NGX_HTTP_LUA_USER_CORO_NOP:
+                    dd("hit! it is the API yield");
 
-                lua_settop(cc, 0);
-                return NGX_AGAIN;
+                    lua_settop(ctx->cur_co_ctx->co, 0);
+                    ctx->cur_co_ctx = NULL;
+
+                    return NGX_AGAIN;
+
+                case NGX_HTTP_LUA_USER_THREAD_RESUME:
+
+                    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                                   "lua user thread resume");
+
+                    ctx->co_op = NGX_HTTP_LUA_USER_CORO_NOP;
+                    nrets = lua_gettop(ctx->cur_co_ctx->co) - 1;
+                    dd("nrets = %d", nrets);
+
+                    break;
+
+                case NGX_HTTP_LUA_USER_CORO_RESUME:
+                    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                                   "lua coroutine: resume");
+
+                    /*
+                     * the target coroutine lies at the base of the
+                     * parent's stack
+                     */
+                    ctx->co_op = NGX_HTTP_LUA_USER_CORO_NOP;
+
+                    old_co = ctx->cur_co_ctx->parent_co_ctx->co;
+
+                    nrets = lua_gettop(old_co);
+                    if (nrets) {
+                        lua_xmove(old_co, ctx->cur_co_ctx->co, nrets);
+                    }
+
+                    break;
+
+                default:
+                    /* ctx->co_op == NGX_HTTP_LUA_USER_CORO_YIELD */
+
+                    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                                   "lua coroutine: yield");
+
+                    ctx->co_op = NGX_HTTP_LUA_USER_CORO_NOP;
+
+                    if (ngx_http_lua_is_thread(ctx)) {
+                        ngx_http_lua_probe_thread_yield(r, ctx->cur_co_ctx->co);
+
+                        lua_settop(ctx->cur_co_ctx->co, 0);
+
+                        ngx_http_lua_probe_info("set co running");
+                        ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_RUNNING;
+
+                        if (ctx->posted_threads) {
+                            ngx_http_lua_post_thread(r, ctx, ctx->cur_co_ctx);
+                            ctx->cur_co_ctx = NULL;
+                            return NGX_AGAIN;
+                        }
+
+                        /* no pending threads, so resume the thread
+                         * immediately */
+
+                        nrets = 0;
+                        continue;
+                    }
+
+                    /* being a user coroutine that has a parent */
+
+                    nrets = lua_gettop(ctx->cur_co_ctx->co);
+
+                    next_coctx = ctx->cur_co_ctx->parent_co_ctx;
+                    next_co = next_coctx->co;
+
+                    /*
+                     * prepare return values for coroutine.resume
+                     * (true plus any retvals)
+                     */
+                    lua_pushboolean(next_co, 1);
+
+                    if (nrets) {
+                        lua_xmove(ctx->cur_co_ctx->co, next_co, nrets);
+                    }
+
+                    nrets++;
+
+                    ctx->cur_co_ctx = next_coctx;
+
+                    break;
+                }
+
+                /* try resuming on the new coroutine again */
+                continue;
 
             case 0:
-                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                        "lua thread ended normally");
 
-#if 0
-                ngx_http_lua_dump_postponed(r);
-#endif
+                ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 1);
 
-                ngx_http_lua_del_thread(r, L, cc_ref);
-                ctx->cc_ref = LUA_NOREF;
+                ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
 
-                if (ctx->entered_content_phase) {
-                    rc = ngx_http_lua_send_chain_link(r, ctx,
-                            NULL /* indicate last_buf */);
-
-                    if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
-                        return rc;
-                    }
+                if (ctx->cur_co_ctx->zombie_child_threads) {
+                    ngx_http_lua_cleanup_zombie_child_uthreads(r, L, ctx,
+                                                               ctx->cur_co_ctx);
                 }
 
-                return NGX_OK;
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                               "lua light thread ended normally");
+
+                if (ngx_http_lua_is_entry_thread(ctx)) {
+
+                    lua_settop(L, 0);
+
+                    ngx_http_lua_del_thread(r, L, ctx, ctx->cur_co_ctx);
+
+                    dd("uthreads: %d", (int) ctx->uthreads);
+
+                    if (ctx->uthreads) {
+
+                        ctx->cur_co_ctx = NULL;
+                        return NGX_AGAIN;
+                    }
+
+                    /* all user threads terminated already */
+                    goto done;
+                }
+
+                if (ctx->cur_co_ctx->is_uthread) {
+                    /* being a user thread */
+
+                    lua_settop(L, 0);
+
+                    parent_coctx = ctx->cur_co_ctx->parent_co_ctx;
+
+                    if (ngx_http_lua_coroutine_alive(parent_coctx)) {
+                        if (ctx->cur_co_ctx->waited_by_parent) {
+                            ngx_http_lua_probe_info("parent already waiting");
+                            ctx->cur_co_ctx->waited_by_parent = 0;
+                            success = 1;
+                            goto user_co_done;
+                        }
+
+                        ngx_http_lua_probe_info("parent still alive");
+
+                        if (ngx_http_lua_post_zombie_thread(r, parent_coctx,
+                                                            ctx->cur_co_ctx)
+                            != NGX_OK)
+                        {
+                            return NGX_ERROR;
+                        }
+
+                        lua_pushboolean(ctx->cur_co_ctx->co, 1);
+                        lua_insert(ctx->cur_co_ctx->co, 1);
+
+                        ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_ZOMBIE;
+                        ctx->cur_co_ctx = NULL;
+                        return NGX_AGAIN;
+                    }
+
+                    ngx_http_lua_del_thread(r, L, ctx, ctx->cur_co_ctx);
+                    ctx->uthreads--;
+
+                    if (ctx->uthreads == 0) {
+                        if (ngx_http_lua_entry_thread_alive(ctx)) {
+                            ctx->cur_co_ctx = NULL;
+                            return NGX_AGAIN;
+                        }
+
+                        /* all threads terminated already */
+                        goto done;
+                    }
+
+                    /* some other user threads still running */
+                    ctx->cur_co_ctx = NULL;
+                    return NGX_AGAIN;
+                }
+
+                /* being a user coroutine that has a parent */
+
+                success = 1;
+
+user_co_done:
+                nrets = lua_gettop(ctx->cur_co_ctx->co);
+
+                next_coctx = ctx->cur_co_ctx->parent_co_ctx;
+
+                if (next_coctx == NULL) {
+                    /* being a light thread */
+                    goto no_parent;
+                }
+
+                next_co = next_coctx->co;
+
+                /*
+                 * ended successful, coroutine.resume returns true plus
+                 * any return values
+                 */
+                lua_pushboolean(next_co, success);
+
+                if (nrets) {
+                    lua_xmove(ctx->cur_co_ctx->co, next_co, nrets);
+                }
+
+                if (ctx->cur_co_ctx->is_uthread) {
+                    ngx_http_lua_del_thread(r, L, ctx, ctx->cur_co_ctx);
+                    ctx->uthreads--;
+                }
+
+                nrets++;
+                ctx->cur_co_ctx = next_coctx;
+
+                ngx_http_lua_probe_info("set parent running");
+
+                next_coctx->co_status = NGX_HTTP_LUA_CO_RUNNING;
+
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                               "lua coroutine: lua user thread ended normally");
+
+                continue;
 
             case LUA_ERRRUN:
                 err = "runtime error";
@@ -933,44 +1296,167 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
             default:
                 err = "unknown error";
                 break;
+            }
+
+            if (ctx->cur_co_ctx != orig_coctx) {
+                ctx->cur_co_ctx = orig_coctx;
+            }
+
+            if (lua_isstring(ctx->cur_co_ctx->co, -1)) {
+                dd("user custom error msg");
+                msg = lua_tostring(ctx->cur_co_ctx->co, -1);
+
+            } else {
+                msg = "unknown reason";
+            }
+
+            ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 0);
+
+            ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
+            ngx_http_lua_thread_traceback(L, ctx->cur_co_ctx->co,
+                                          ctx->cur_co_ctx);
+            trace = lua_tostring(L, -1);
+
+            if (ctx->cur_co_ctx->is_uthread) {
+
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "lua user thread aborted: %s: %s\n%s",
+                              err, msg, trace);
+
+                lua_settop(L, 0);
+
+                parent_coctx = ctx->cur_co_ctx->parent_co_ctx;
+
+                if (ngx_http_lua_coroutine_alive(parent_coctx)) {
+                    if (ctx->cur_co_ctx->waited_by_parent) {
+                        ctx->cur_co_ctx->waited_by_parent = 0;
+                        success = 0;
+                        goto user_co_done;
+                    }
+
+                    if (ngx_http_lua_post_zombie_thread(r, parent_coctx,
+                                                        ctx->cur_co_ctx)
+                        != NGX_OK)
+                    {
+                        return NGX_ERROR;
+                    }
+
+                    lua_pushboolean(ctx->cur_co_ctx->co, 0);
+                    lua_insert(ctx->cur_co_ctx->co, 1);
+
+                    ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_ZOMBIE;
+                    ctx->cur_co_ctx = NULL;
+                    return NGX_AGAIN;
+                }
+
+                ngx_http_lua_del_thread(r, L, ctx, ctx->cur_co_ctx);
+                ctx->uthreads--;
+
+                if (ctx->uthreads == 0) {
+                    if (ngx_http_lua_entry_thread_alive(ctx)) {
+                        ctx->cur_co_ctx = NULL;
+                        return NGX_AGAIN;
+                    }
+
+                    /* all threads terminated already */
+                    goto done;
+                }
+
+                /* some other user threads still running */
+                ctx->cur_co_ctx = NULL;
+                return NGX_AGAIN;
+            }
+
+            if (ngx_http_lua_is_entry_thread(ctx)) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "lua entry thread aborted: %s: %s\n%s",
+                              err, msg, trace);
+
+                lua_settop(L, 0);
+
+                /* being the entry thread aborted */
+
+                if (r->filter_finalize) {
+                    ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+                }
+
+                ngx_http_lua_request_cleanup(r);
+
+                dd("headers sent? %d", ctx->headers_sent ? 1 : 0);
+
+                if (ctx->no_abort) {
+                    ctx->no_abort = 0;
+                    return NGX_ERROR;
+                }
+
+                return ctx->headers_sent ? NGX_ERROR :
+                            NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            /* being a user coroutine that has a parent */
+
+            next_coctx = ctx->cur_co_ctx->parent_co_ctx;
+            if (next_coctx == NULL) {
+                goto no_parent;
+            }
+
+            next_co = next_coctx->co;
+
+            ngx_http_lua_probe_info("set parent running");
+
+            next_coctx->co_status = NGX_HTTP_LUA_CO_RUNNING;
+
+            /*
+             * ended with error, coroutine.resume returns false plus
+             * err msg
+             */
+            lua_pushboolean(next_co, 0);
+            lua_xmove(ctx->cur_co_ctx->co, next_co, 1);
+            nrets = 2;
+
+            ctx->cur_co_ctx = next_coctx;
+
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "lua coroutine: %s: %s\n%s", err, msg, trace);
+
+            /* try resuming on the new coroutine again */
+            continue;
         }
-
-        if (lua_isstring(cc, -1)) {
-            dd("user custom error msg");
-            msg = lua_tostring(cc, -1);
-
-        } else {
-            msg = "unknown reason";
-        }
-
-        ngx_http_lua_thread_traceback(L, cc);
-        trace = lua_tostring(L, -1);
-        lua_pop(L, 1);
-
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "lua handler aborted: %s: %s\n%s", err, msg, trace);
-
-        ngx_http_lua_del_thread(r, L, cc_ref);
-        ctx->cc_ref = LUA_NOREF;
-
-        ngx_http_lua_request_cleanup(r);
-
-        dd("headers sent? %d", ctx->headers_sent ? 1 : 0);
-
-        return ctx->headers_sent ? NGX_ERROR : NGX_HTTP_INTERNAL_SERVER_ERROR;
 
     } NGX_LUA_EXCEPTION_CATCH {
-
         dd("nginx execution restored");
-
-#if (NGX_PCRE)
-        if (!pcre_pool_resumed) {
-            ngx_http_lua_pcre_malloc_done(old_pool);
-        }
-#endif
     }
 
     return NGX_ERROR;
+
+no_parent:
+    lua_settop(L, 0);
+
+    ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
+    if (r->filter_finalize) {
+        ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+    }
+
+    ngx_http_lua_request_cleanup(r);
+
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "lua handler aborted: "
+                  "user coroutine has no parent");
+
+    return ctx->headers_sent ? NGX_ERROR : NGX_HTTP_INTERNAL_SERVER_ERROR;
+
+done:
+    if (ctx->entered_content_phase) {
+        rc = ngx_http_lua_send_chain_link(r, ctx,
+                                          NULL /* last_buf */);
+
+        if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
+            return rc;
+        }
+    }
+
+    return NGX_OK;
 }
 
 
@@ -978,27 +1464,25 @@ ngx_int_t
 ngx_http_lua_wev_handler(ngx_http_request_t *r)
 {
     ngx_int_t                    rc;
+    ngx_list_part_t             *part;
     ngx_http_lua_ctx_t          *ctx;
-    ngx_http_lua_main_conf_t    *lmcf;
-    int                          nret = 0;
     ngx_connection_t            *c;
     ngx_event_t                 *wev;
     ngx_http_core_loc_conf_t    *clcf;
     ngx_chain_t                 *cl;
-
-    ngx_http_lua_socket_tcp_upstream_t      *tcp;
-    ngx_http_lua_socket_udp_upstream_t      *udp;
+    ngx_http_lua_co_ctx_t       *coctx;
+    ngx_uint_t                   i;
 
     c = r->connection;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-            "lua run write event handler");
+                   "lua run write event handler");
 
     wev = c->write;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
     if (ctx == NULL) {
-        goto error;
+        return NGX_ERROR;
     }
 
     clcf = ngx_http_get_module_loc_conf(r->main, ngx_http_core_module);
@@ -1023,95 +1507,28 @@ ngx_http_lua_wev_handler(ngx_http_request_t *r)
             ngx_add_timer(wev, clcf->send_timeout);
 
             if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
-                ngx_http_finalize_request(r, NGX_ERROR);
+                if (ctx->entered_content_phase) {
+                    ngx_http_finalize_request(r, NGX_ERROR);
+                }
                 return NGX_ERROR;
             }
         }
     }
 
-    dd("wev handler %.*s %.*s a:%d, postponed:%p",
-            (int) r->uri.len, r->uri.data,
-            (int) ngx_cached_err_log_time.len,
-            ngx_cached_err_log_time.data,
-            r == c->data,
-            r->postponed);
-#if 0
-    ngx_http_lua_dump_postponed(r);
-#endif
-
-    dd("ctx = %p", ctx);
-    dd("request done: %d", (int) r->done);
-    dd("cleanup done: %p", ctx->cleanup);
-
-    if (ctx->cleanup == NULL) {
-        /* already done */
-        dd("cleanup is null: %.*s", (int) r->uri.len, r->uri.data);
-
-        if (ctx->entered_content_phase) {
-            ngx_http_finalize_request(r,
-                    ngx_http_lua_flush_postponed_outputs(r));
-        }
-
-        return NGX_OK;
+    if (!wev->ready) {
+        goto useless;
     }
-
-    if (ctx->waiting_more_body && !ctx->req_read_body_done) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                "lua write event handler waiting for more request body data");
-
-        return NGX_DONE;
-    }
-
-    dd("waiting: %d, done: %d", (int) ctx->waiting,
-            ctx->done);
-
-    if (ctx->waiting && !ctx->done) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                "lua waiting for pending subrequests");
-
-#if 0
-        ngx_http_lua_dump_postponed(r);
-#endif
-
-        if (r == c->data && r->postponed) {
-            if (r->postponed->request) {
-                ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                        "lua activating the next postponed request %V?%V",
-                        &r->postponed->request->uri,
-                        &r->postponed->request->args);
-
-                c->data = r->postponed->request;
-
-#if defined(nginx_version) && nginx_version >= 8012
-                ngx_http_post_request(r->postponed->request, NULL);
-#else
-                ngx_http_post_request(r->postponed->request);
-#endif
-
-            } else {
-                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                        "lua flushing postponed output");
-
-                ngx_http_lua_flush_postponed_outputs(r);
-            }
-        }
-
-        return NGX_DONE;
-    }
-
-    dd("req read body done: %d", (int) ctx->req_read_body_done);
 
     if (c->buffered) {
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                "lua wev handler flushing output: buffered 0x%uxd",
-                c->buffered);
+                       "lua wev handler flushing output: buffered 0x%uxd",
+                       c->buffered);
 
-        rc = ngx_http_output_filter(r, NULL);
+        rc = ngx_http_lua_output_filter(r, NULL);
 
         if (rc == NGX_ERROR || rc > NGX_OK) {
             if (ctx->entered_content_phase) {
                 ngx_http_finalize_request(r, rc);
-                return NGX_DONE;
             }
 
             return rc;
@@ -1143,178 +1560,103 @@ ngx_http_lua_wev_handler(ngx_http_request_t *r)
             if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
                 if (ctx->entered_content_phase) {
                     ngx_http_finalize_request(r, NGX_ERROR);
-                    return NGX_DONE;
                 }
 
                 return NGX_ERROR;
             }
 
-            if (ctx->waiting_flush) {
+            if (ctx->flushing_coros) {
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                        "lua flush still waiting: buffered 0x%uxd",
-                        c->buffered);
+                               "lua flush still waiting: buffered 0x%uxd",
+                               c->buffered);
 
                 return NGX_DONE;
             }
-        }
-    }
 
-    if (ctx->sleep.timer_set) {
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "lua still waiting for a sleep timer: \"%V?%V\"",
-                       &r->uri, &r->args);
-
-        if (wev->ready) {
-            ngx_handle_write_event(wev, 0);
-        }
-
-        return NGX_DONE;
-    }
-
-    if (ctx->sleep.timedout) {
-        ctx->sleep.timedout = 0;
-        nret = 0;
-        goto run;
-    }
-
-    if (ctx->socket_busy && !ctx->socket_ready) {
-        return NGX_DONE;
-    }
-
-    if (ctx->udp_socket_busy && !ctx->udp_socket_ready) {
-        return NGX_DONE;
-    }
-
-    if (!ctx->udp_socket_busy && ctx->udp_socket_ready) {
-        ctx->udp_socket_ready = 0;
-
-        udp = ctx->data;
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua dup socket calling prepare retvals handler %p",
-                       udp->prepare_retvals);
-
-        nret = udp->prepare_retvals(r, udp, ctx->cc);
-        if (nret == NGX_AGAIN) {
-            return NGX_DONE;
-        }
-
-        goto run;
-    }
-
-    if (!ctx->socket_busy && ctx->socket_ready) {
-
-        dd("resuming socket api");
-
-        dd("setting socket_ready to 0");
-
-        ctx->socket_ready = 0;
-
-        tcp = ctx->data;
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua tcp socket calling prepare retvals handler %p",
-                       tcp->prepare_retvals);
-
-        nret = tcp->prepare_retvals(r, tcp, ctx->cc);
-        if (nret == NGX_AGAIN) {
-            return NGX_DONE;
-        }
-
-        goto run;
-
-    } else if (ctx->waiting_flush) {
-
-        ctx->waiting_flush = 0;
-        nret = 0;
-
-        goto run;
-
-    } else if (ctx->req_read_body_done) {
-
-        dd("turned off req read body done");
-
-        ctx->req_read_body_done = 0;
-
-        nret = 0;
-
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                "lua read req body done, resuming lua thread");
-
-        goto run;
-
-    } else if (ctx->done) {
-
-        ctx->done = 0;
-
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                "lua run subrequests done, resuming lua thread");
-
-        dd("nsubreqs: %d", (int) ctx->nsubreqs);
-
-        ngx_http_lua_handle_subreq_responses(r, ctx);
-
-        dd("free sr_statues/headers/bodies memory ASAP");
-
+        } else {
 #if 1
-        ngx_pfree(r->pool, ctx->sr_statuses);
-
-        ctx->sr_statuses = NULL;
-        ctx->sr_headers = NULL;
-        ctx->sr_bodies = NULL;
+            if (wev->timer_set) {
+                ngx_del_timer(wev);
+            }
 #endif
-
-        nret = ctx->nsubreqs;
-
-        dd("location capture nret: %d", (int) nret);
-
-        goto run;
+        }
     }
 
+    if (ctx->flushing_coros) {
+
+        coctx = &ctx->entry_co_ctx;
+
+        if (coctx->flushing) {
+            coctx->flushing = 0;
+
+            ctx->flushing_coros--;
+            ctx->cur_co_ctx = coctx;
+
+            rc = ngx_http_lua_flush_resume_helper(r, ctx);
+            if (rc == NGX_ERROR || rc >= NGX_OK) {
+                return rc;
+            }
+
+            /* rc == NGX_DONE */
+        }
+
+        if (ctx->flushing_coros) {
+
+            if (ctx->user_co_ctx == NULL) {
+                return NGX_ERROR;
+            }
+
+            part = &ctx->user_co_ctx->part;
+            coctx = part->elts;
+
+            for (i = 0; /* void */; i++) {
+
+                if (i >= part->nelts) {
+                    if (part->next == NULL) {
+                        break;
+                    }
+
+                    part = part->next;
+                    coctx = part->elts;
+                    i = 0;
+                }
+
+                if (coctx[i].flushing) {
+                    coctx[i].flushing = 0;
+                    ctx->cur_co_ctx = &coctx[i];
+
+                    rc = ngx_http_lua_flush_resume_helper(r, ctx);
+                    if (rc == NGX_ERROR || rc >= NGX_OK) {
+                        return rc;
+                    }
+
+                    /* rc == NGX_DONE */
+
+                    if (--ctx->flushing_coros == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (ctx->flushing_coros) {
+            return NGX_ERROR;
+        }
+
+        return NGX_DONE;
+    }
+
+    /* ctx->flushing_coros == 0 */
+
+useless:
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
-            "useless lua write event handler");
+                   "useless lua write event handler");
 
     if (ctx->entered_content_phase) {
-        ngx_http_finalize_request(r, NGX_DONE);
+        return NGX_OK;
     }
 
-    return NGX_OK;
-
-run:
-    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
-
-    dd("about to run thread for %.*s...", (int) r->uri.len, r->uri.data);
-
-    rc = ngx_http_lua_run_thread(lmcf->lua, r, ctx, nret);
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-            "lua run thread returned %d", rc);
-
-    if (rc == NGX_AGAIN) {
-        return NGX_DONE;
-    }
-
-    if (rc == NGX_DONE) {
-        ngx_http_finalize_request(r, rc);
-        return NGX_DONE;
-    }
-
-    dd("entered content phase: %d", (int) ctx->entered_content_phase);
-
-    if (ctx->entered_content_phase) {
-        ngx_http_finalize_request(r, rc);
-        return NGX_DONE;
-    }
-
-    return rc;
-
-error:
-    if (ctx && ctx->entered_content_phase) {
-        ngx_http_finalize_request(r,
-                ctx->headers_sent ? NGX_ERROR: NGX_HTTP_INTERNAL_SERVER_ERROR);
-    }
-
-    return NGX_ERROR;
+    return NGX_DONE;
 }
 
 
@@ -1329,69 +1671,6 @@ ngx_http_lua_digest_hex(u_char *dest, const u_char *buf, int buf_len)
     ngx_md5_final(md5_buf, &md5);
 
     return ngx_hex_dump(dest, md5_buf, sizeof(md5_buf));
-}
-
-
-void
-ngx_http_lua_dump_postponed(ngx_http_request_t *r)
-{
-    ngx_http_postponed_request_t    *pr;
-    ngx_uint_t                       i;
-    ngx_str_t                        out;
-    size_t                           len;
-    ngx_chain_t                     *cl;
-    u_char                          *p;
-    ngx_str_t                        nil_str;
-
-    ngx_str_set(&nil_str, "(nil)");
-
-    for (i = 0, pr = r->postponed; pr; pr = pr->next, i++) {
-        out.data = NULL;
-        out.len = 0;
-
-        len = 0;
-        for (cl = pr->out; cl; cl = cl->next) {
-            len += ngx_buf_size(cl->buf);
-        }
-
-        if (len) {
-            p = ngx_palloc(r->pool, len);
-            if (p == NULL) {
-                return;
-            }
-
-            out.data = p;
-
-            for (cl = pr->out; cl; cl = cl->next) {
-                p = ngx_copy(p, cl->buf->pos, ngx_buf_size(cl->buf));
-            }
-
-            out.len = len;
-        }
-
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                "postponed request for %V: "
-                "c:%d, "
-                "a:%d, i:%d, r:%V, out:%V",
-                &r->uri,
-                r->main->count,
-                r == r->connection->data, i,
-                pr->request ? &pr->request->uri : &nil_str, &out);
-    }
-}
-
-
-ngx_int_t
-ngx_http_lua_flush_postponed_outputs(ngx_http_request_t *r)
-{
-    if (r == r->connection->data && r->postponed) {
-        /* notify the downstream postpone filter to flush the postponed
-         * outputs of the current request */
-        return ngx_http_lua_next_body_filter(r, NULL);
-    }
-
-    /* do nothing */
-    return NGX_OK;
 }
 
 
@@ -1588,7 +1867,7 @@ ngx_http_lua_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
 /* XXX we also decode '+' to ' ' */
 void
 ngx_http_lua_unescape_uri(u_char **dst, u_char **src, size_t size,
-        ngx_uint_t type)
+    ngx_uint_t type)
 {
     u_char  *d, *s, ch, c, decoded;
     enum {
@@ -1726,19 +2005,15 @@ ngx_http_lua_inject_req_api(ngx_log_t *log, lua_State *L)
 {
     /* ngx.req table */
 
-    lua_createtable(L, 0 /* narr */, 21 /* nrec */);    /* .req */
+    lua_createtable(L, 0 /* narr */, 23 /* nrec */);    /* .req */
 
-    ngx_http_lua_inject_req_header_api(L);
-
+    ngx_http_lua_inject_req_header_api(log, L);
     ngx_http_lua_inject_req_uri_api(log, L);
-
     ngx_http_lua_inject_req_args_api(L);
-
     ngx_http_lua_inject_req_body_api(L);
-
     ngx_http_lua_inject_req_socket_api(L);
-
     ngx_http_lua_inject_req_method_api(L);
+    ngx_http_lua_inject_req_time_api(L);
 
     lua_setfield(L, -2, "req");
 }
@@ -1746,28 +2021,41 @@ ngx_http_lua_inject_req_api(ngx_log_t *log, lua_State *L)
 
 static ngx_int_t
 ngx_http_lua_handle_exec(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int cc_ref)
+    ngx_http_lua_ctx_t *ctx)
 {
     ngx_int_t               rc;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua thread initiated internal redirect to %V",
-            &ctx->exec_uri);
+                   "lua thread initiated internal redirect to %V",
+                   &ctx->exec_uri);
 
-    ngx_http_lua_del_thread(r, L, cc_ref);
-    ctx->cc_ref = LUA_NOREF;
+    ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 1);
+
+    ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
+    if (r->filter_finalize) {
+        ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+    }
 
     ngx_http_lua_request_cleanup(r);
 
     if (ctx->exec_uri.data[0] == '@') {
         if (ctx->exec_args.len > 0) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                    "query strings %V ignored when exec'ing "
-                    "named location %V",
-                    &ctx->exec_args, &ctx->exec_uri);
+                          "query strings %V ignored when exec'ing "
+                          "named location %V",
+                          &ctx->exec_args, &ctx->exec_uri);
         }
 
         r->write_event_handler = ngx_http_request_empty_handler;
+
+#if 1
+        if (r->read_event_handler == ngx_http_lua_rd_check_broken_connection) {
+            /* resume the read event handler */
+
+            r->read_event_handler = ngx_http_block_reading;
+        }
+#endif
 
 #if 1
         /* clear the modules contexts */
@@ -1796,11 +2084,15 @@ ngx_http_lua_handle_exec(lua_State *L, ngx_http_request_t *r,
     dd("internal redirect to %.*s", (int) ctx->exec_uri.len,
             ctx->exec_uri.data);
 
-    /* resume the write event handler */
     r->write_event_handler = ngx_http_request_empty_handler;
 
-    rc = ngx_http_internal_redirect(r, &ctx->exec_uri,
-            &ctx->exec_args);
+    if (r->read_event_handler == ngx_http_lua_rd_check_broken_connection) {
+        /* resume the read event handler */
+
+        r->read_event_handler = ngx_http_block_reading;
+    }
+
+    rc = ngx_http_internal_redirect(r, &ctx->exec_uri, &ctx->exec_args);
 
     dd("internal redirect returned %d when in content phase? "
             "%d", (int) rc, ctx->entered_content_phase);
@@ -1808,8 +2100,6 @@ ngx_http_lua_handle_exec(lua_State *L, ngx_http_request_t *r,
     if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
         return rc;
     }
-
-    dd("XXYY HERE %d\n", (int) r->main->count);
 
 #if 0
     if (!ctx->entered_content_phase) {
@@ -1827,22 +2117,30 @@ ngx_http_lua_handle_exec(lua_State *L, ngx_http_request_t *r,
 
 static ngx_int_t
 ngx_http_lua_handle_exit(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int cc_ref)
+    ngx_http_lua_ctx_t *ctx)
 {
     ngx_int_t           rc;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua thread aborting request with status %d",
-            ctx->exit_code);
+                   "lua thread aborting request with status %d",
+                   ctx->exit_code);
 
 #if 1
-    if (!ctx->headers_sent && ctx->exit_code >= NGX_HTTP_OK) {
+    if (!ctx->headers_sent
+        && r->headers_out.status == 0
+        && ctx->exit_code >= NGX_HTTP_OK)
+    {
         r->headers_out.status = ctx->exit_code;
     }
 #endif
 
-    ngx_http_lua_del_thread(r, L, cc_ref);
-    ctx->cc_ref = LUA_NOREF;
+    ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 1);
+
+    ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
+    if (r->filter_finalize) {
+        ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+    }
 
     ngx_http_lua_request_cleanup(r);
 
@@ -1851,12 +2149,9 @@ ngx_http_lua_handle_exit(lua_State *L, ngx_http_request_t *r,
         || (ctx->exit_code >= NGX_HTTP_OK
             && ctx->exit_code < NGX_HTTP_SPECIAL_RESPONSE))
     {
-        rc = ngx_http_lua_send_chain_link(r, ctx,
-                NULL /* indicate last_buf */);
+        rc = ngx_http_lua_send_chain_link(r, ctx, NULL /* indicate last_buf */);
 
-        if (rc == NGX_ERROR ||
-                rc >= NGX_HTTP_SPECIAL_RESPONSE)
-        {
+        if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
             return rc;
         }
     }
@@ -1867,7 +2162,7 @@ ngx_http_lua_handle_exit(lua_State *L, ngx_http_request_t *r,
 
 void
 ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
-        int table, ngx_str_t *args)
+    int table, ngx_str_t *args)
 {
     u_char              *key;
     size_t               key_len;
@@ -1889,7 +2184,7 @@ ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
     while (lua_next(L, table) != 0) {
         if (lua_type(L, -2) != LUA_TSTRING) {
             luaL_error(L, "attempt to use a non-string key in the "
-                    "\"args\" option table");
+                       "\"args\" option table");
             return;
         }
 
@@ -1929,7 +2224,7 @@ ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
 
                 if (value == NULL) {
                     luaL_error(L, "attempt to use %s as query arg value",
-                            luaL_typename(L, -1));
+                               luaL_typename(L, -1));
                     return;
                 }
 
@@ -1952,7 +2247,7 @@ ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
 
         default:
             luaL_error(L, "attempt to use %s as query arg value",
-                    luaL_typename(L, -1));
+                       luaL_typename(L, -1));
             return;
         }
 
@@ -2095,14 +2390,19 @@ ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
 
 static ngx_int_t
 ngx_http_lua_handle_rewrite_jump(lua_State *L, ngx_http_request_t *r,
-        ngx_http_lua_ctx_t *ctx, int cc_ref)
+    ngx_http_lua_ctx_t *ctx)
 {
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "lua thread aborting request with URI rewrite jump: \"%V?%V\"",
-            &r->uri, &r->args);
+                   "lua thread aborting request with URI rewrite jump: "
+                   "\"%V?%V\"", &r->uri, &r->args);
 
-    ngx_http_lua_del_thread(r, L, cc_ref);
-    ctx->cc_ref = LUA_NOREF;
+    ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 1);
+
+    ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+
+    if (r->filter_finalize) {
+        ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+    }
 
     ngx_http_lua_request_cleanup(r);
 
@@ -2113,7 +2413,7 @@ ngx_http_lua_handle_rewrite_jump(lua_State *L, ngx_http_request_t *r,
 /* XXX ngx_open_and_stat_file is static in the core. sigh. */
 ngx_int_t
 ngx_http_lua_open_and_stat_file(u_char *name, ngx_open_file_info_t *of,
-        ngx_log_t *log)
+    ngx_log_t *log)
 {
     ngx_fd_t         fd;
     ngx_file_info_t  fi;
@@ -2221,84 +2521,6 @@ failed:
 }
 
 
-void
-ngx_http_lua_inject_internal_utils(ngx_log_t *log, lua_State *L)
-{
-    ngx_int_t         rc;
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_check_aborted);
-    lua_setfield(L, -2, "_check_aborted"); /* deprecated */
-
-    /* override the default pcall */
-
-    lua_getglobal(L, "pcall");
-    lua_setfield(L, -2, "_pcall");
-
-    {
-        const char    buf[] = "local ret = {ngx._pcall(...)} "
-                              "ngx._check_aborted() return unpack(ret)";
-
-        rc = luaL_loadbuffer(L, buf, sizeof(buf) - 1, "ngx_lua pcall");
-    }
-
-    if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_CRIT, log, 0,
-                      "failed to load Lua code for ngx_lua pcall(): %i",
-                      rc);
-
-    } else {
-        lua_setglobal(L, "pcall");
-    }
-
-    /* override the default xpcall */
-
-    lua_getglobal(L, "xpcall");
-    lua_setfield(L, -2, "_xpcall");
-
-    {
-        const char    buf[] = "local ret = {ngx._xpcall(...)} "
-                              "ngx._check_aborted() return unpack(ret)";
-
-        rc = luaL_loadbuffer(L, buf, sizeof(buf) - 1, "ngx_lua xpcall");
-    }
-
-    if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_CRIT, log, 0,
-                      "failed to load Lua code for ngx_lua xpcall(): %i",
-                      rc);
-
-    } else {
-        lua_setglobal(L, "xpcall");
-    }
-}
-
-
-static int
-ngx_http_lua_ngx_check_aborted(lua_State *L)
-{
-    ngx_http_request_t          *r;
-    ngx_http_lua_ctx_t          *ctx;
-
-    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
-    lua_rawget(L, LUA_GLOBALSINDEX);
-    r = lua_touserdata(L, -1);
-    lua_pop(L, 1);
-
-    if (r == NULL) {
-        return 0;
-    }
-
-    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
-    if (ctx == NULL) {
-        return 0;
-    }
-
-    NGX_HTTP_LUA_CHECK_ABORTED(L, ctx);
-
-    return 0;
-}
-
-
 ngx_chain_t *
 ngx_http_lua_chains_get_free_buf(ngx_log_t *log, ngx_pool_t *p,
     ngx_chain_t **free, size_t len, ngx_buf_tag_t tag)
@@ -2314,8 +2536,8 @@ ngx_http_lua_chains_get_free_buf(ngx_log_t *log, ngx_pool_t *p,
         b = cl->buf;
         if ((size_t) (b->end - b->start) >= len) {
             ngx_log_debug4(NGX_LOG_DEBUG_HTTP, log, 0,
-                    "lua reuse free buf memory %O >= %uz, cl:%p, p:%p",
-                    (off_t) (b->end - b->start), len, cl, b->start);
+                           "lua reuse free buf memory %O >= %uz, cl:%p, p:%p",
+                           (off_t) (b->end - b->start), len, cl, b->start);
 
             b->pos = b->start;
             b->last = b->start;
@@ -2378,10 +2600,11 @@ ngx_http_lua_chains_get_free_buf(ngx_log_t *log, ngx_pool_t *p,
 
 
 static int
-ngx_http_lua_thread_traceback(lua_State *L, lua_State *cc)
+ngx_http_lua_thread_traceback(lua_State *L, lua_State *co,
+    ngx_http_lua_co_ctx_t *coctx)
 {
     int         base;
-    int         level = 0;
+    int         level = 0, count = 0;
     int         firstpart = 1;  /* still before eventual `...' */
     lua_Debug   ar;
 
@@ -2389,50 +2612,70 @@ ngx_http_lua_thread_traceback(lua_State *L, lua_State *cc)
 
     lua_pushliteral(L, "stack traceback:");
 
-    while (lua_getstack(cc, level++, &ar)) {
+    while (co) {
 
-        if (level > LEVELS1 && firstpart) {
-            /* no more than `LEVELS2' more levels? */
-            if (!lua_getstack(cc, level + LEVELS2, &ar)) {
-                level--;  /* keep going */
+        lua_pushfstring(L, "\ncoroutine %d:", count++);
 
-            } else {
-                lua_pushliteral(L, "\n\t...");  /* too many levels */
-                /* This only works with LuaJIT 2.x. Avoids O(n^2) behaviour. */
-                lua_getstack(cc, -10, &ar);
-                level = ar.i_ci - LEVELS2;
+        while (lua_getstack(co, level++, &ar)) {
+
+            if (level > LEVELS1 && firstpart) {
+                /* no more than `LEVELS2' more levels? */
+                if (!lua_getstack(co, level + LEVELS2, &ar)) {
+                    level--;  /* keep going */
+
+                } else {
+                    lua_pushliteral(L, "\n\t...");  /* too many levels */
+                    /*
+                     * This only works with LuaJIT 2.x.
+                     * Avoids O(n^2) behaviour.
+                     */
+                    lua_getstack(co, -10, &ar);
+                    level = ar.i_ci - LEVELS2;
+                }
+
+                firstpart = 0;
+                continue;
             }
 
-            firstpart = 0;
-            continue;
-        }
+            lua_pushliteral(L, "\n\t");
+            lua_getinfo(co, "Snl", &ar);
+            lua_pushfstring(L, "%s:", ar.short_src);
 
-        lua_pushliteral(L, "\n\t");
-        lua_getinfo(cc, "Snl", &ar);
-        lua_pushfstring(L, "%s:", ar.short_src);
+            if (ar.currentline > 0) {
+                lua_pushfstring(L, "%d:", ar.currentline);
+            }
 
-        if (ar.currentline > 0) {
-            lua_pushfstring(L, "%d:", ar.currentline);
-        }
-
-        if (*ar.namewhat != '\0') {  /* is there a name? */
-            lua_pushfstring(L, " in function " LUA_QS, ar.name);
-
-        } else {
-            if (*ar.what == 'm') {  /* main? */
-                lua_pushfstring(L, " in main chunk");
-
-            } else if (*ar.what == 'C' || *ar.what == 't') {
-                lua_pushliteral(L, " ?");  /* C function or tail call */
+            if (*ar.namewhat != '\0') {  /* is there a name? */
+                lua_pushfstring(L, " in function " LUA_QS, ar.name);
 
             } else {
-                lua_pushfstring(L, " in function <%s:%d>",
-                                ar.short_src, ar.linedefined);
+                if (*ar.what == 'm') {  /* main? */
+                    lua_pushfstring(L, " in main chunk");
+
+                } else if (*ar.what == 'C' || *ar.what == 't') {
+                    lua_pushliteral(L, " ?");  /* C function or tail call */
+
+                } else {
+                    lua_pushfstring(L, " in function <%s:%d>",
+                                    ar.short_src, ar.linedefined);
+                }
             }
         }
+
+        lua_concat(L, lua_gettop(L) - base);
+
+        level = 0;
+        firstpart = 1;
+
+        /* check if the coroutine has a parent coroutine*/
+        coctx = coctx->parent_co_ctx;
+        if (!coctx || coctx->co_status == NGX_HTTP_LUA_CO_DEAD) {
+            break;
+        }
+
+        co = coctx->co;
     }
 
-    lua_concat(L, lua_gettop(L) - base);
     return 1;
 }
 
@@ -2543,3 +2786,498 @@ ngx_http_lua_param_set(lua_State *L)
     return ngx_http_lua_body_filter_param_set(L, r, ctx);
 }
 
+
+ngx_http_lua_co_ctx_t *
+ngx_http_lua_get_co_ctx(lua_State *L, ngx_http_lua_ctx_t *ctx)
+{
+    ngx_uint_t                   i;
+    ngx_list_part_t             *part;
+    ngx_http_lua_co_ctx_t       *coctx;
+
+    if (L == ctx->entry_co_ctx.co) {
+        return &ctx->entry_co_ctx;
+    }
+
+    if (ctx->user_co_ctx == NULL) {
+        return NULL;
+    }
+
+    part = &ctx->user_co_ctx->part;
+    coctx = part->elts;
+
+    /* FIXME: we should use rbtree here to prevent O(n) lookup overhead */
+
+    for (i = 0; /* void */; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            coctx = part->elts;
+            i = 0;
+        }
+
+        if (coctx[i].co == L) {
+            return &coctx[i];
+        }
+    }
+
+    return NULL;
+}
+
+
+ngx_http_lua_co_ctx_t *
+ngx_http_lua_create_co_ctx(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
+{
+    ngx_http_lua_co_ctx_t       *coctx;
+
+    if (ctx->user_co_ctx == NULL) {
+        ctx->user_co_ctx = ngx_list_create(r->pool, 4,
+                                           sizeof(ngx_http_lua_co_ctx_t));
+        if (ctx->user_co_ctx == NULL) {
+            return NULL;
+        }
+    }
+
+    coctx = ngx_list_push(ctx->user_co_ctx);
+    if (coctx == NULL) {
+        return NULL;
+    }
+
+    ngx_memzero(coctx, sizeof(ngx_http_lua_co_ctx_t));
+
+    coctx->co_ref = LUA_NOREF;
+
+    return coctx;
+}
+
+
+/* this is for callers other than the content handler */
+ngx_int_t
+ngx_http_lua_run_posted_threads(ngx_connection_t *c, lua_State *L,
+    ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
+{
+    ngx_int_t                        rc;
+    ngx_http_lua_posted_thread_t    *pt;
+
+    for ( ;; ) {
+        if (c->destroyed) {
+            return NGX_DONE;
+        }
+
+        pt = ctx->posted_threads;
+        if (pt == NULL) {
+            return NGX_DONE;
+        }
+
+        ctx->posted_threads = pt->next;
+
+        ngx_http_lua_probe_run_posted_thread(r, pt->co_ctx->co,
+                                             (int) pt->co_ctx->co_status);
+
+        if (pt->co_ctx->co_status != NGX_HTTP_LUA_CO_RUNNING) {
+            continue;
+        }
+
+        ctx->cur_co_ctx = pt->co_ctx;
+
+        rc = ngx_http_lua_run_thread(L, r, ctx, 0);
+
+        if (rc == NGX_AGAIN) {
+            continue;
+        }
+
+        if (rc == NGX_DONE) {
+            ngx_http_finalize_request(r, NGX_DONE);
+            continue;
+        }
+
+        /* rc == NGX_ERROR || rc >= NGX_OK */
+
+        if (ctx->entered_content_phase) {
+            ngx_http_finalize_request(r, rc);
+        }
+
+        return rc;
+    }
+
+    return NGX_DONE;
+}
+
+
+ngx_int_t
+ngx_http_lua_post_thread(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
+    ngx_http_lua_co_ctx_t *coctx)
+{
+    ngx_http_lua_posted_thread_t  **p;
+    ngx_http_lua_posted_thread_t   *pt;
+
+    pt = ngx_palloc(r->pool, sizeof(ngx_http_lua_posted_thread_t));
+    if (pt == NULL) {
+        return NGX_ERROR;
+    }
+
+    pt->co_ctx = coctx;
+    pt->next = NULL;
+
+    for (p = &ctx->posted_threads; *p; p = &(*p)->next) { /* void */ }
+
+    *p = pt;
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_http_lua_finalize_coroutines(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
+{
+    ngx_http_lua_co_ctx_t           *cc, *coctx;
+    ngx_list_part_t                 *part;
+    ngx_uint_t                       i;
+
+    if (ctx->uthreads == 0) {
+        if (ngx_http_lua_is_entry_thread(ctx)) {
+            return;
+        }
+
+        /* the current thread is not the entry thread */
+
+        if (ctx->entry_co_ctx.co_status == NGX_HTTP_LUA_CO_DEAD) {
+            return;
+        }
+    }
+
+    if (ctx->user_co_ctx) {
+        part = &ctx->user_co_ctx->part;
+        cc = part->elts;
+
+        for (i = 0; /* void */; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+
+                part = part->next;
+                cc = part->elts;
+                i = 0;
+            }
+
+            coctx = &cc[i];
+            if (coctx->cleanup) {
+                coctx->cleanup(coctx);
+                coctx->cleanup = NULL;
+                coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+                /* TODO we could also free the user thread here */
+            }
+        }
+    }
+
+    coctx = &ctx->entry_co_ctx;
+    if (coctx->cleanup) {
+        coctx->cleanup(coctx);
+    }
+}
+
+
+static ngx_int_t
+ngx_http_lua_post_zombie_thread(ngx_http_request_t *r,
+    ngx_http_lua_co_ctx_t *parent, ngx_http_lua_co_ctx_t *thread)
+{
+    ngx_http_lua_posted_thread_t  **p;
+    ngx_http_lua_posted_thread_t   *pt;
+
+    pt = ngx_palloc(r->pool, sizeof(ngx_http_lua_posted_thread_t));
+    if (pt == NULL) {
+        return NGX_ERROR;
+    }
+
+    pt->co_ctx = thread;
+    pt->next = NULL;
+
+    for (p = &parent->zombie_child_threads; *p; p = &(*p)->next) { /* void */ }
+
+    *p = pt;
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_http_lua_cleanup_zombie_child_uthreads(ngx_http_request_t *r,
+    lua_State *L, ngx_http_lua_ctx_t *ctx, ngx_http_lua_co_ctx_t *coctx)
+{
+    ngx_http_lua_posted_thread_t   *pt;
+
+    for (pt = coctx->zombie_child_threads; pt; pt = pt->next) {
+        if (pt->co_ctx->co_ref != LUA_NOREF) {
+            ngx_http_lua_del_thread(r, L, ctx, pt->co_ctx);
+            ctx->uthreads--;
+        }
+    }
+
+    coctx->zombie_child_threads = NULL;
+}
+
+
+ngx_int_t
+ngx_http_lua_check_broken_connection(ngx_http_request_t *r, ngx_event_t *ev)
+{
+    int                  n;
+    char                 buf[1];
+    ngx_err_t            err;
+    ngx_int_t            event;
+    ngx_connection_t     *c;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ev->log, 0,
+                   "http lua check client, write event:%d, \"%V\"",
+                   ev->write, &r->uri);
+
+    c = r->connection;
+
+    if (c->error) {
+        if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+
+            event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+            if (ngx_del_event(ev, event, 0) != NGX_OK) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+        }
+
+        return NGX_HTTP_CLIENT_CLOSED_REQUEST;
+    }
+
+#if (NGX_HAVE_KQUEUE)
+
+    if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+
+        if (!ev->pending_eof) {
+            return NGX_OK;
+        }
+
+        ev->eof = 1;
+
+        if (ev->kq_errno) {
+            ev->error = 1;
+        }
+
+        ngx_log_error(NGX_LOG_INFO, ev->log, ev->kq_errno,
+                      "kevent() reported that client prematurely closed "
+                      "connection");
+
+        return NGX_HTTP_CLIENT_CLOSED_REQUEST;
+    }
+
+#endif
+
+    n = recv(c->fd, buf, 1, MSG_PEEK);
+
+    err = ngx_socket_errno;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ev->log, err,
+                   "http lua recv(): %d", n);
+
+    if (ev->write && (n >= 0 || err == NGX_EAGAIN)) {
+        return NGX_OK;
+    }
+
+    if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+        dd("event is active");
+
+        event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+#if 1
+        if (ngx_del_event(ev, event, 0) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+#endif
+    }
+
+    dd("HERE %d", (int) n);
+
+    if (n > 0) {
+        return NGX_OK;
+    }
+
+    if (n == -1) {
+        if (err == NGX_EAGAIN) {
+            dd("HERE");
+            return NGX_OK;
+        }
+
+        ev->error = 1;
+
+    } else { /* n == 0 */
+        err = 0;
+    }
+
+    ev->eof = 1;
+
+    ngx_log_error(NGX_LOG_INFO, ev->log, err,
+                  "client prematurely closed connection");
+
+    return NGX_HTTP_CLIENT_CLOSED_REQUEST;
+}
+
+
+void
+ngx_http_lua_rd_check_broken_connection(ngx_http_request_t *r)
+{
+    ngx_int_t                   rc;
+    ngx_event_t                *rev;
+    ngx_http_lua_ctx_t         *ctx;
+
+    if (r->done) {
+        return;
+    }
+
+    rc = ngx_http_lua_check_broken_connection(r, r->connection->read);
+
+    if (rc == NGX_OK) {
+        return;
+    }
+
+    /* rc == NGX_ERROR || rc > NGX_OK */
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return;
+    }
+
+    if (ctx->on_abort_co_ctx == NULL) {
+        r->connection->error = 1;
+        ngx_http_lua_request_cleanup(r);
+        ngx_http_finalize_request(r, rc);
+        return;
+    }
+
+    if (ctx->on_abort_co_ctx->co_status != NGX_HTTP_LUA_CO_SUSPENDED) {
+
+        /* on_abort already run for the current request handler */
+
+        rev = r->connection->read;
+
+        if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && rev->active) {
+            if (ngx_del_event(rev, NGX_READ_EVENT, 0) != NGX_OK) {
+                ngx_http_lua_request_cleanup(r);
+                ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+        }
+
+        return;
+    }
+
+    ctx->uthreads++;
+    ctx->resume_handler = ngx_http_lua_on_abort_resume;
+    ctx->on_abort_co_ctx->co_status = NGX_HTTP_LUA_CO_RUNNING;
+    ctx->cur_co_ctx = ctx->on_abort_co_ctx;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua waking up the on_abort callback thread");
+
+    if (ctx->entered_content_phase) {
+        r->write_event_handler = ngx_http_lua_content_wev_handler;
+
+    } else {
+        r->write_event_handler = ngx_http_core_run_phases;
+    }
+
+    r->write_event_handler(r);
+}
+
+
+static ngx_int_t
+ngx_http_lua_on_abort_resume(ngx_http_request_t *r)
+{
+    ngx_int_t                    rc;
+    ngx_connection_t            *c;
+    ngx_http_lua_ctx_t          *ctx;
+    ngx_http_lua_main_conf_t    *lmcf;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ctx->resume_handler = ngx_http_lua_wev_handler;
+
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua resuming the on_abort callback thread");
+
+#if 0
+    ngx_http_lua_probe_info("tcp resume");
+#endif
+
+    c = r->connection;
+
+    rc = ngx_http_lua_run_thread(lmcf->lua, r, ctx, 0);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua run thread returned %d", rc);
+
+    if (rc == NGX_AGAIN) {
+        return ngx_http_lua_run_posted_threads(c, lmcf->lua, r, ctx);
+    }
+
+    if (rc == NGX_DONE) {
+        ngx_http_finalize_request(r, NGX_DONE);
+        return ngx_http_lua_run_posted_threads(c,lmcf->lua, r, ctx);
+    }
+
+    if (ctx->entered_content_phase) {
+        ngx_http_finalize_request(r, rc);
+        return NGX_DONE;
+    }
+
+    return rc;
+}
+
+
+ngx_int_t
+ngx_http_lua_test_expect(ngx_http_request_t *r)
+{
+    ngx_int_t   n;
+    ngx_str_t  *expect;
+
+    if (r->expect_tested
+        || r->headers_in.expect == NULL
+        || r->http_version < NGX_HTTP_VERSION_11)
+    {
+        return NGX_OK;
+    }
+
+    r->expect_tested = 1;
+
+    expect = &r->headers_in.expect->value;
+
+    if (expect->len != sizeof("100-continue") - 1
+        || ngx_strncasecmp(expect->data, (u_char *) "100-continue",
+                           sizeof("100-continue") - 1)
+           != 0)
+    {
+        return NGX_OK;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "send 100 Continue");
+
+    n = r->connection->send(r->connection,
+                            (u_char *) "HTTP/1.1 100 Continue" CRLF CRLF,
+                            sizeof("HTTP/1.1 100 Continue" CRLF CRLF) - 1);
+
+    if (n == sizeof("HTTP/1.1 100 Continue" CRLF CRLF) - 1) {
+        return NGX_OK;
+    }
+
+    /* we assume that such small packet should be send successfully */
+
+    return NGX_ERROR;
+}
+
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

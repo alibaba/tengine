@@ -10,7 +10,6 @@ plan tests => repeat_each() * (blocks() * 3 + 1);
 our $HtmlDir = html_dir;
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
-$ENV{TEST_NGINX_CLIENT_PORT} ||= server_port();
 
 my $pwd = `pwd`;
 chomp $pwd;

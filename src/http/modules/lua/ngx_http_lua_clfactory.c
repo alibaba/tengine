@@ -1,9 +1,15 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
 
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
 #include "ddebug.h"
+
 
 #include <nginx.h>
 #include "ngx_http_lua_clfactory.h"
@@ -62,6 +68,7 @@
 #define    LUA_BIG_ENDIAN_8BYTES_CODE_LEN           (8 + 8 + 8)
 #define    LUAC_HEADERSIZE         12
 #define    LUAC_VERSION            0x51
+
 
 /*
  * taken from chaoslawful:
@@ -283,8 +290,9 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L, clfactory_file_ctx_t *lf,
 {
     int                 x = 1, size_of_int, size_of_size_t, little_endian,
                         size_of_inst, version, stripped;
-    size_t              size, bytecode_len;
+    static int          num_of_inst = 3, num_of_inter_func = 1;
     const char         *filename, *emsg, *serr, *bytecode;
+    size_t              size, bytecode_len;
     ngx_file_info_t     fi;
 
     serr = NULL;
@@ -359,6 +367,7 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L, clfactory_file_ctx_t *lf,
         size_t i = 0;
         dd("==LJ_END_CODE: %ld rest_len: %ld==", lf->end_code_len,
            lf->rest_len);
+
         for (i = 0; i < lf->end_code_len; i++) {
             dd("%ld: 0x%02X", i, (unsigned) ((u_char) lf->end_code.ptr[i]));
         }
@@ -404,12 +413,13 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L, clfactory_file_ctx_t *lf,
             goto error;
         }
 
-        /* source string length */
-        *(size_t *) (lf->begin_code.str + POS_SOURCE_STR_LEN) = 0;
-        /* start line */
-        *(int *) (lf->begin_code.str + POS_START_LINE) = 0;
-        /* last line */
-        *(int *) (lf->begin_code.str + POS_LAST_LINE) = 0;
+        /* clear the following fields to zero:
+         * - source string length
+         * - start line
+         * - last line
+         */
+        ngx_memzero(lf->begin_code.str + POS_SOURCE_STR_LEN,
+                    sizeof(size_t) + sizeof(int) * 2);
         /* number of upvalues */
         *(lf->begin_code.str + POS_NUM_OF_UPVS) = 0;
         /* number of paramters */
@@ -419,7 +429,8 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L, clfactory_file_ctx_t *lf,
         /* max stack size */
         *(lf->begin_code.str + POS_MAX_STACK_SIZE) = 2;
         /* number of bytecode instructions */
-        *(int *) (lf->begin_code.str + POS_NUM_OF_INST) = 3;
+        ngx_memcpy(lf->begin_code.str + POS_NUM_OF_INST, &num_of_inst,
+                   sizeof(int));
 
         lf->begin_code_len = POS_BYTECODE;
 
@@ -448,10 +459,11 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L, clfactory_file_ctx_t *lf,
         ngx_memcpy(lf->begin_code.str + POS_BYTECODE, bytecode, bytecode_len);
 
         /* number of consts */
-        *(int *) (lf->begin_code.str + POS_BYTECODE + bytecode_len) = 0;
+        ngx_memzero(lf->begin_code.str + POS_BYTECODE + bytecode_len,
+                    sizeof(int));
         /* number of internal functions */
-        *(int *) (lf->begin_code.str + POS_BYTECODE + bytecode_len
-                  + sizeof(int)) = 1;
+        ngx_memcpy(lf->begin_code.str + POS_BYTECODE + bytecode_len
+                   + sizeof(int), &num_of_inter_func, sizeof(int));
 
         lf->begin_code_len += bytecode_len + sizeof(int) + sizeof(int);
 
@@ -652,7 +664,8 @@ ngx_http_lua_clfactory_loadbuffer(lua_State *L, const char *buff,
 
     ls.s = buff;
     ls.size = size;
-    ls.sent_begin = ls.sent_end = 0;
+    ls.sent_begin = 0;
+    ls.sent_end = 0;
 
     return lua_load(L, clfactory_getS, &ls, name);
 }
@@ -754,9 +767,7 @@ clfactory_errfile(lua_State *L, const char *what, int fname_index)
 static const char *
 clfactory_getS(lua_State *L, void *ud, size_t *size)
 {
-    clfactory_buffer_ctx_t      *ls;
-
-    ls = (clfactory_buffer_ctx_t *) ud;
+    clfactory_buffer_ctx_t      *ls = ud;
 
     if (ls->sent_begin == 0) {
         ls->sent_begin = 1;
@@ -781,3 +792,4 @@ clfactory_getS(lua_State *L, void *ud, size_t *size)
     return ls->s;
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */
