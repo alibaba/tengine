@@ -1,4 +1,24 @@
 
+Changes with Tengine 1.4.5                                       1 May 2013
+
+    *) Feature: added the consistent_hash module which dispatches requests
+       to upstream servers based on consistent hashing algorithm of a
+       variable specified. (dinic)
+
+    *) Feature: added the "keepalive_timeout" directive to set timeout for
+       the upstream keepalive connections. (jinglong)
+
+    *) Feature: now the configure script supports compilation of all modules
+       to be shared or static. (monadbobo)
+
+    *) Change: updated the Lua module to 0.7.19. (jinglong)
+
+    *) Change: merged the changes of Nginx-1.2.8. (yaoweibin)
+
+    *) Bugfix: fixed the compile warnings of syslog and upstream_check
+       modules in GCC-4.4.5. (magicbear)
+
+
 Changes with Tengine 1.4.4                                       21 Mar 2013
 
     *) Feature: added the session_sticky module by using which one client
