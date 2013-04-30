@@ -9,7 +9,7 @@ Tengine has been an open source project since December 2011. It is being activel
 Features
 ========
 
-* All features of nginx-1.2.7 are inherited, i.e. it is 100% compatible with nginx.
+* All features of nginx-1.2.8 are inherited, i.e. it is 100% compatible with nginx.
 * Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
 * Input body filter support. It's quite handy to write Web Application Firewalls by using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and easy to extend core functionalities.
