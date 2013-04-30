@@ -1,19 +1,17 @@
 
-Changes with Tengine 1.4.5                                       28 Apr 2013
+Changes with Tengine 1.4.5                                       1 May 2013
 
-    *) Feature: added the consistent_hash module which always dispatches
-       the requests to the same upstream server based on a consistent hash
-       way with specified variable. (dinic)
+    *) Feature: added the consistent_hash module which dispatches requests
+       to upstream servers based on consistent hashing algorithm of a
+       variable specified. (dinic)
 
-    *) Feature: added the timeout parameter for the backend keepalive
-       connections with directive keepalive_timeout in the upstream block.
-       (jinglong)
+    *) Feature: added the "keepalive_timeout" directive to set timeout for
+       the upstream keepalive connections. (jinglong)
 
-    *) Feature: now the configure script can be configured to compile all
-       the modules to be shared or static ones with the option of
-       "--enable-mods-shared=all" or "--enable-mods-static=all". (monadbobo)
+    *) Feature: now the configure script supports compilation of all modules
+       to be shared or static. (monadbobo)
 
-    *) Change: updated the Lua module to be 0.7.19. (jinglong)
+    *) Change: updated the Lua module to 0.7.19. (jinglong)
 
     *) Change: merged the changes of Nginx-1.2.8. (yaoweibin)
 
