@@ -220,9 +220,6 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
 
             id = sid * 256 * 16 + j;
             server->hash = ngx_murmur_hash2((u_char *) (&id), 4);
-            ngx_snprintf(hash_buf, 256, "%V#%i%Z", &peer->name, j);
-            hash_len = ngx_strlen(hash_buf);
-            server->hash = ngx_murmur_hash2(hash_buf, hash_len);
         }
     }
 
