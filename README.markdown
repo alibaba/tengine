@@ -11,6 +11,7 @@ Features
 
 * All features of nginx-1.2.8 are inherited, i.e. it is 100% compatible with nginx.
 * Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
+* More load balancing methods, e.g. consistent hashing, session persistence.
 * Input body filter support. It's quite handy to write Web Application Firewalls by using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and easy to extend core functionalities.
 * Logging enhancement. Syslog (local and remote), pipe logging and log sampling are supported.
