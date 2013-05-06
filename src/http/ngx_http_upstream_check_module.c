@@ -846,20 +846,17 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 
             for (i = 0; i < peers->peers.nelts - 1; i++) {
 
-                if (p[i].check_ev.timer_set) {
-                    ngx_del_timer(&p[i].check_ev);
+                if (p[i].delete) {
+                    continue;
                 }
-
-                if (p[i].check_timeout_ev.timer_set) {
-                    ngx_del_timer(&p[i].check_timeout_ev);
-                }
-
                 ngx_log_error(NGX_LOG_INFO, pool->log, 0,
                               "http upstream %V old peer: %p, new peer: %p,"
                               "old timer: %p, new timer: %p",
                               np[i].upstream_name,
                               np[i].check_ev.data, &np[i],
                               &p[i].check_ev, &np[i].check_ev);
+
+                ngx_http_upstream_check_clear_peer(&p[i]);
 
                 ngx_http_upstream_check_add_timer(&np[i],
                                                   np[i].conf->check_type_conf,
