@@ -774,8 +774,9 @@ ngx_uint_t
 ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer_addr)
 {
+    void                                 *elts;
     ngx_uint_t                            i, index;
-    ngx_http_upstream_check_peer_t       *peer, *p;
+    ngx_http_upstream_check_peer_t       *peer, *p, *np;
     ngx_http_upstream_check_peers_t      *peers;
     ngx_http_upstream_check_srv_conf_t   *ucscf;
     ngx_http_upstream_check_main_conf_t  *ucmcf;
@@ -826,9 +827,41 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     }
 
     if (peer == NULL) {
+
+        elts = peers->peers.elts;
+
         peer = ngx_array_push(&peers->peers);
         if (peer == NULL) {
             return NGX_ERROR;
+        }
+
+        if (elts != peers->peers.elts) {
+
+            ngx_log_error(NGX_LOG_INFO, pool->log, 0,
+                          "http upstream check add peer realloc memory");
+
+            /* reset all upstream peers' timers */
+            p = elts;
+            np = peers->peers.elts;
+
+            for (i = 0; i < peers->peers.nelts - 1; i++) {
+
+                if (p[i].delete) {
+                    continue;
+                }
+                ngx_log_error(NGX_LOG_INFO, pool->log, 0,
+                              "http upstream %V old peer: %p, new peer: %p,"
+                              "old timer: %p, new timer: %p",
+                              np[i].upstream_name,
+                              np[i].check_ev.data, &np[i],
+                              &p[i].check_ev, &np[i].check_ev);
+
+                ngx_http_upstream_check_clear_peer(&p[i]);
+
+                ngx_http_upstream_check_add_timer(&np[i],
+                                                  np[i].conf->check_type_conf,
+                                                  0, pool->log);
+            }
         }
     }
 
@@ -2272,9 +2305,8 @@ ngx_http_upstream_check_clear_peer(ngx_http_upstream_check_peer_t  *peer)
 {
     if (peer != peer->check_ev.data) {
         ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, 0,
-                      "different peer: %p, data: %p",
-                      peer, peer->check_ev.data);
-        return;
+                      "different peer: %p, data: %p, timer: %p",
+                      peer, peer->check_ev.data, &peer->check_ev);
     }
 
     if (peer->check_ev.timer_set) {
