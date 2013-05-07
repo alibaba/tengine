@@ -662,7 +662,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
                    "http upstream check add upstream process: %ui",
                    ngx_process);
 
-    if (ngx_process != NGX_PROCESS_MASTER) {
+    if (ngx_process == NGX_PROCESS_WORKER) {
         return ngx_http_upstream_check_add_dynamic_peer(cf->pool, us, peer_addr);
     }
 
