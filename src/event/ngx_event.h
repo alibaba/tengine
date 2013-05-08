@@ -240,8 +240,11 @@ typedef struct {
 } ngx_event_actions_t;
 
 
-extern ngx_event_actions_t   ngx_event_actions;
+typedef ngx_int_t (*ngx_event_accept_filter_pt) (ngx_connection_t *c);
 
+
+extern ngx_event_actions_t   ngx_event_actions;
+extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 
 /*
  * The event filter requires to read/write the whole data:

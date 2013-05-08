@@ -354,6 +354,13 @@ ngx_event_accept(ngx_event_t *ev)
         log->data = NULL;
         log->handler = NULL;
 
+        /* accept filter */
+
+        if (ngx_event_top_accept_filter(c) != NGX_OK) {
+            ngx_close_accepted_connection(c);
+            return;
+        }
+
         ls->handler(c);
 
         if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
