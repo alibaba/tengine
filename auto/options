@@ -122,6 +122,7 @@ NGX_ALL_MODULES="
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
     ngx_http_footer_filter_module
+    ngx_http_trim_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
