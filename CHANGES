@@ -1,4 +1,13 @@
 
+Changes with nginx 1.4.1                                         07 May 2013
+
+    *) Security: a stack-based buffer overflow might occur in a worker
+       process while handling a specially crafted request, potentially
+       resulting in arbitrary code execution (CVE-2013-2028); the bug had
+       appeared in 1.3.9.
+       Thanks to Greg MacManus, iSIGHT Partners Labs.
+
+
 Changes with nginx 1.4.0                                         24 Apr 2013
 
     *) Bugfix: nginx could not be built with the ngx_http_perl_module if the
