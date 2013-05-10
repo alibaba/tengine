@@ -106,10 +106,13 @@ NGX_ALL_MODULES="
     ngx_http_mp4_module
     ngx_http_slice_module
     ngx_http_concat_module
+    ngx_http_tfs_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
-    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_keepalive_module
+    ngx_http_upstream_check_module
+    ngx_http_upstream_session_sticky_module
+    ngx_http_upstream_consistent_hash_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
     ngx_http_header_filter_module
