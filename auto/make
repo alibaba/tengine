@@ -525,7 +525,7 @@ END
             -e "s/\//$ngx_regex_dirsep/g"`
 
         ngx_dso_link=${CORE_LINK:+`echo $CORE_LINK \
-            | sed -e "s/\//$ngx_regex_dirsep%%/g" -e "s/^/$ngx_long_regex_cont/"`}
+            | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
 
         ngx_dso_feture_lib=`echo $DSO_LIBS | awk 'BEGIN { FS="|" } \
             {for (i=1; i<=NF; i++) print $i}' | awk -v module_name=$ngx_shared_modules \
