@@ -558,7 +558,6 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 void ngx_close_accepted_connection(ngx_connection_t *c);
 
 
-
 /* used in ngx_log_debugX() */
 #define ngx_event_ident(p)  ((ngx_connection_t *) (p))->fd
 
