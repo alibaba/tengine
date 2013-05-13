@@ -9,6 +9,9 @@
 #include <ngx_http.h>
 
 
+#define NGX_HTTP_TRIM_OFF      "trimoff"
+
+
 typedef struct {
     ngx_flag_t      trim_enable;
     ngx_flag_t      comment_enable;
@@ -140,6 +143,8 @@ static ngx_str_t ngx_http_trim_saved = ngx_string("<!--[if");
 static ngx_int_t
 ngx_http_trim_header_filter(ngx_http_request_t *r)
 {
+    ngx_int_t                  rc;
+    ngx_str_t                  flag;
     ngx_http_trim_ctx_t       *ctx;
     ngx_http_trim_loc_conf_t  *conf;
 
@@ -153,6 +158,13 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
             && r->headers_out.content_encoding->value.len)
         || ngx_http_test_content_type(r, &conf->types) == NULL)
     {
+        return ngx_http_next_header_filter(r);
+    }
+
+    rc = ngx_http_arg(r, (u_char *) NGX_HTTP_TRIM_OFF,
+                      sizeof(NGX_HTTP_TRIM_OFF) - 1, &flag);
+
+    if(rc == NGX_OK) {
         return ngx_http_next_header_filter(r);
     }
 

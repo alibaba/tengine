@@ -286,7 +286,7 @@ hello world !
 --- response_body
 <title>世界 你好 !</title>
 
-=== TEST 10: home page of tengine
+=== TEST 10: sendfile on
 --- config
     sendfile on;
     trim on;
@@ -341,3 +341,22 @@ working. Further configuration is required.</p>
 <p><em>Thank you for using tengine.</em></p>
 </body>
 </html>
+
+=== TEST 11: if $arg_trimoff existed, trim off.
+--- config
+    trim on;
+    trim_comment on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<body>hello   world,   it
+   is good  to     see you   </body>
+<!-- arg_trimoff -->
+--- request
+    GET /t/trim.html?trimoff=&hello=world
+--- response_body
+<body>hello   world,   it
+   is good  to     see you   </body>
+<!-- arg_trimoff -->
+
