@@ -1,4 +1,11 @@
 
+Changes with nginx 1.2.9                                         13 May 2013
+
+    *) Security: contents of worker process memory might be sent to a client
+       if HTTP backend returned specially crafted response (CVE-2013-2070);
+       the bug had appeared in 1.1.4.
+
+
 Changes with nginx 1.2.8                                         02 Apr 2013
 
     *) Bugfix: new sessions were not always stored if the "ssl_session_cache

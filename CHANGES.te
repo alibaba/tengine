@@ -1,4 +1,9 @@
 
+Changes with Tengine 1.4.6                                       14 May 2013
+
+    *) Bugfix: merged the changes of Nginx-1.2.9 and fixed the security problem
+       CVE-2013-2070. This bug had appeared in 1.4.0. (yaoweibin)
+
 Changes with Tengine 1.4.5                                       1 May 2013
 
     *) Feature: added the consistent_hash module which dispatches requests

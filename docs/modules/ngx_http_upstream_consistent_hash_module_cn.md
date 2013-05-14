@@ -42,9 +42,9 @@
         upstream test {
             consistent_hash $request_uri;
 
-            server 127.0.0.1:9001 id=1001 wegiht=3;
-            server 127.0.0.1:9002 id=1002 wegiht=10;
-            server 127.0.0.1:9003 id=1003 wegiht=20;
+            server 127.0.0.1:9001 id=1001 weight=3;
+            server 127.0.0.1:9002 id=1002 weight=10;
+            server 127.0.0.1:9003 id=1003 weight=20;
         }
     }
 
