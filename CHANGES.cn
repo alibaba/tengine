@@ -1,4 +1,7 @@
 
+Tengine-1.4.6 [2013-05-14]
+* Bugifx：合并nginx-1.2.9的更新，修正CVE-2013-2070带来的安全问题。该安全问题在1.4.0以后开始出现 [yaoweibin]
+
 Tengine-1.4.5 [2013-05-01]
 * Feature：增加一致性hash模块，可以为后端服务器提供一致性hash的负载均衡方法 [dinic]
 * Feature：通过keepalive_timeout指令可以设置后端keepalive连接的超时时间 [jinglong]
