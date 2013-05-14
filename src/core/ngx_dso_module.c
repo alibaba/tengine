@@ -540,11 +540,11 @@ ngx_dso_load(ngx_conf_t *cf)
         }
 
         if (dm[i].module->abi_compatibility
-            != NGX_DSO_ABI_COMPATIBILITY_MODULES)
+            != NGX_DSO_ABI_COMPATIBILITY)
         {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "module \"%V\" is not compatible with this "
-                               "ABI of tengine ",
+                               "ABI of tengine, you need recomplie module",
                                &dm[i].name);
             return NGX_CONF_ERROR;
         }
