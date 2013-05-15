@@ -1,8 +1,15 @@
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
-
 #include "ddebug.h"
+
 
 #include "ngx_http_lua_consts.h"
 
@@ -111,3 +118,4 @@ ngx_http_lua_inject_http_consts(lua_State *L)
     /* }}} */
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

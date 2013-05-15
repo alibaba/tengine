@@ -5,7 +5,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 1);
+plan tests => repeat_each() * (blocks() * 2 + 2);
 
 #no_diff();
 #no_long_string();
@@ -96,4 +96,56 @@ GET /luaset
 --- response_body
 68o32c9e64o2sc9j5co30c1g
 '2011.10.13+0000'
+
+
+
+=== TEST 6: set_by_lua
+--- config
+    location /read {
+        set_by_lua $r '
+            return ndk.set_var.set_unescape_uri("a%20b")
+        ';
+        echo $r;
+    }
+--- request
+GET /read
+--- response_body
+a b
+
+
+
+=== TEST 7: header_filter_by_lua
+--- config
+    location /read {
+        set $foo '';
+        content_by_lua '
+            ngx.send_headers()
+            ngx.say(ngx.var.foo)
+        ';
+        header_filter_by_lua '
+            ngx.var.foo = ndk.set_var.set_unescape_uri("a%20b")
+        ';
+    }
+--- request
+GET /read
+--- response_body
+a b
+
+
+
+=== TEST 8: log_by_lua
+--- config
+    location /read {
+        echo ok;
+        log_by_lua '
+            local foo = ndk.set_var.set_unescape_uri("a%20b")
+            ngx.log(ngx.WARN, "foo = ", foo)
+        ';
+    }
+--- request
+GET /read
+--- response_body
+ok
+--- error_log
+foo = a b
 

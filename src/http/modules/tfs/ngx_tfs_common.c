@@ -584,9 +584,12 @@ ngx_http_tfs_set_output_file_name(ngx_http_tfs_t *t)
                                                 t->is_large_file,
                                                 t->r_ctx.simple_name),
                NGX_HTTP_TFS_FILE_NAME_LEN);
-    if (t->r_ctx.file_suffix.data != NULL) {
-        ngx_memcpy(t->file_name.data + NGX_HTTP_TFS_FILE_NAME_LEN,
-                   t->r_ctx.file_suffix.data, t->r_ctx.file_suffix.len);
+
+    if (t->r_ctx.simple_name) {
+        if (t->r_ctx.file_suffix.data != NULL) {
+            ngx_memcpy(t->file_name.data + NGX_HTTP_TFS_FILE_NAME_LEN,
+                       t->r_ctx.file_suffix.data, t->r_ctx.file_suffix.len);
+        }
     }
 
     /* set dup_file_name(put to tair) */

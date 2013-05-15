@@ -4,11 +4,10 @@ use lib 'lib';
 use Test::Nginx::Socket;
 
 repeat_each(2);
-#repeat_each(1);
 
-plan tests => blocks() * repeat_each() * 2;
+plan tests => repeat_each() * (blocks() * 3 + 4);
 
-log_level("warn");
+#log_level("warn");
 no_long_string();
 
 run_tests();
@@ -25,6 +24,8 @@ __DATA__
 GET /lua
 --- response_body
 2
+--- no_error_log
+[error]
 
 
 
@@ -38,6 +39,8 @@ GET /lua
 GET /lua
 --- response_body
 helloworld
+--- no_error_log
+[error]
 
 
 
@@ -51,19 +54,23 @@ helloworld
 GET /lua
 --- response_body
 55
+--- no_error_log
+[error]
 
 
 
-=== TEST 4: internal script with argument
+=== TEST 4: inlined script with arguments
 --- config
     location /lua {
-        set_by_lua $res "return ngx.arg[1]+ngx.arg[2]" $arg_a $arg_b;
+        set_by_lua $res "return ngx.arg[1] + ngx.arg[2]" $arg_a $arg_b;
         echo $res;
     }
 --- request
 GET /lua?a=1&b=2
 --- response_body
 3
+--- no_error_log
+[error]
 
 
 
@@ -77,6 +84,8 @@ GET /lua?a=1&b=2
 GET /fib?n=10
 --- response_body
 55
+--- no_error_log
+[error]
 
 
 
@@ -94,6 +103,8 @@ GET /fib?n=10
 GET /adder?a=25&b=75
 --- response_body
 100
+--- no_error_log
+[error]
 
 
 
@@ -109,6 +120,8 @@ GET /adder?a=25&b=75
 GET /set-both
 --- response_body
 a = 33
+--- no_error_log
+[error]
 
 
 
@@ -126,6 +139,8 @@ GET /set-both
 --- response_body
 a = 7
 b = 32
+--- no_error_log
+[error]
 
 
 
@@ -141,6 +156,8 @@ b = 32
 GET /set-both
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+variable "b" not found for writing; maybe it is a built-in variable that is not changeable or you forgot to use "set $b '';" in the config file to define it first
 
 
 
@@ -155,6 +172,8 @@ GET /set-both
 GET /set
 --- response_body
 ''
+--- no_error_log
+[error]
 
 
 
@@ -168,6 +187,8 @@ GET /set
 GET /md5
 --- response_body
 5d41402abc4b2a76b9719d911017c592
+--- no_error_log
+[error]
 
 
 
@@ -181,6 +202,8 @@ GET /md5
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
 
 
 
@@ -194,10 +217,230 @@ GET /lua
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
 
 
 
-=== TEST 14: set $limit_rate (variables with set_handler)
+=== TEST 14: no ngx.flush
+--- config
+    location /lua {
+        set_by_lua $res "ngx.flush()";
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 15: no ngx.eof
+--- config
+    location /lua {
+        set_by_lua $res "ngx.eof()";
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 16: no ngx.send_headers
+--- config
+    location /lua {
+        set_by_lua $res "ngx.send_headers()";
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 17: no ngx.location.capture
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.location.capture("/sub")';
+        echo $res;
+    }
+
+    location /sub {
+        echo sub;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 18: no ngx.location.capture_multi
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.location.capture_multi{{"/sub"}}';
+        echo $res;
+    }
+
+    location /sub {
+        echo sub;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 19: no ngx.exit
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.exit(0)';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 20: no ngx.redirect
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.redirect("/blah")';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 21: no ngx.exec
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.exec("/blah")';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 22: no ngx.req.set_uri(uri, true)
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.req.set_uri("/blah", true)';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 23: ngx.req.set_uri(uri) exists
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.req.set_uri("/blah") return 1';
+        echo $uri;
+    }
+--- request
+GET /lua
+--- response_body
+/blah
+--- no_error_log
+[error]
+
+
+
+=== TEST 24: no ngx.req.read_body()
+--- config
+    location /lua {
+        set_by_lua $res 'ngx.req.read_body()';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 25: no ngx.req.socket()
+--- config
+    location /lua {
+        set_by_lua $res 'return ngx.req.socket()';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 26: no ngx.socket.tcp()
+--- config
+    location /lua {
+        set_by_lua $res 'return ngx.socket.tcp()';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 27: no ngx.socket.connect()
+--- config
+    location /lua {
+        set_by_lua $res 'return ngx.socket.connect("127.0.0.1", 80)';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+API disabled in the context of set_by_lua*
+
+
+
+=== TEST 28: set $limit_rate (variables with set_handler)
 --- config
     location /lua {
         set $limit_rate 1000;
@@ -210,10 +453,12 @@ GET /lua
     GET /lua
 --- response_body
 limit rate = 180
+--- no_error_log
+[error]
 
 
 
-=== TEST 15: set $args and read $query_string
+=== TEST 29: set $args and read $query_string
 --- config
     location /lua {
         set $args 'hello';
@@ -226,10 +471,12 @@ limit rate = 180
     GET /lua
 --- response_body
 world
+--- no_error_log
+[error]
 
 
 
-=== TEST 16: set $arg_xxx
+=== TEST 30: set $arg_xxx
 --- config
     location /lua {
         rewrite_by_lua '
@@ -241,4 +488,294 @@ world
     GET /lua?foo=3
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+variable "arg_foo" not found for writing; maybe it is a built-in variable that is not changeable or you forgot to use "set $arg_foo '';" in the config file to define it first
+
+
+
+=== TEST 31: symbol $ in lua code of set_by_lua
+--- config
+    location /lua {
+        set_by_lua $res 'return "$unknown"';
+        echo $res;
+    }
+--- request
+    GET /lua
+--- response_body
+$unknown
+--- no_error_log
+[error]
+
+
+
+=== TEST 32: symbol $ in lua code of set_by_lua_file
+--- config
+    location /lua {
+        set_by_lua_file $res html/a.lua;
+        echo $res;
+    }
+--- user_files
+>>> a.lua
+return "$unknown"
+--- request
+    GET /lua
+--- response_body
+$unknown
+--- no_error_log
+[error]
+
+
+
+=== TEST 33: external script files with arguments
+--- config
+    location /lua {
+        set_by_lua_file $res html/a.lua $arg_a $arg_b;
+        echo $res;
+    }
+--- user_files
+>>> a.lua
+return ngx.arg[1] + ngx.arg[2]
+--- request
+GET /lua?a=5&b=2
+--- response_body
+7
+--- no_error_log
+[error]
+
+
+
+=== TEST 34: variables in set_by_lua_file's file path
+--- config
+    location /lua {
+        set $path "html/a.lua";
+        set_by_lua_file $res $path $arg_a $arg_b;
+        echo $res;
+    }
+--- user_files
+>>> a.lua
+return ngx.arg[1] + ngx.arg[2]
+--- request
+GET /lua?a=5&b=2
+--- response_body
+7
+--- no_error_log
+[error]
+
+
+
+=== TEST 35: lua error (string)
+--- config
+    location /lua {
+        set_by_lua $res 'error("Bad")';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to run set_by_lua*: [string "set_by_lua"]:1: Bad
+
+
+
+=== TEST 36: lua error (nil)
+--- config
+    location /lua {
+        set_by_lua $res 'error(nil)';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to run set_by_lua*: unknown reason
+
+
+
+=== TEST 37: globals get cleared for every single request
+--- config
+    location /lua {
+        set_by_lua $res '
+            if not foo then
+                foo = 1
+            else
+                foo = foo + 1
+            end
+            return foo
+        ';
+        echo $res;
+    }
+--- request
+GET /lua
+--- response_body
+1
+--- no_error_log
+[error]
+
+
+
+=== TEST 38: user modules using ngx.arg
+--- http_config
+    lua_package_path "$prefix/html/?.lua;;";
+--- config
+    location /lua {
+        set_by_lua $res 'local foo = require "foo" return foo.go()' $arg_a $arg_b;
+        echo $res;
+    }
+--- user_files
+>>> foo.lua
+module("foo", package.seeall)
+
+function go()
+    return ngx.arg[1] + ngx.arg[2]
+end
+--- request
+GET /lua?a=1&b=2
+--- response_body
+3
+--- no_error_log
+[error]
+
+
+
+=== TEST 39: server scope (inline)
+--- config
+    location /lua {
+        set $a "[$res]";
+        echo $a;
+    }
+    set_by_lua $res "return 1+1";
+--- request
+GET /lua
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 40: server if scope (inline)
+--- config
+    location /lua {
+        set $a "[$res]";
+        echo $a;
+    }
+    if ($arg_name = "jim") {
+        set_by_lua $res "return 1+1";
+    }
+--- request
+GET /lua?name=jim
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 41: location if scope (inline)
+--- config
+    location /lua {
+        if ($arg_name = "jim") {
+            set_by_lua $res "return 1+1";
+            set $a "[$res]";
+            echo $a;
+        }
+    }
+--- request
+GET /lua?name=jim
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 42: server scope (file)
+--- config
+    location /lua {
+        set $a "[$res]";
+        echo $a;
+    }
+    set_by_lua_file $res html/a.lua;
+--- user_files
+>>> a.lua
+return 1+1
+--- request
+GET /lua
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 43: server if scope (file)
+--- config
+    location /lua {
+        set $a "[$res]";
+        echo $a;
+    }
+    if ($arg_name = "jim") {
+        set_by_lua_file $res html/a.lua;
+    }
+--- request
+GET /lua?name=jim
+--- user_files
+>>> a.lua
+return 1+1
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 44: location if scope (file)
+--- config
+    location /lua {
+        if ($arg_name = "jim") {
+            set_by_lua_file $res html/a.lua;
+            set $a "[$res]";
+            echo $a;
+        }
+    }
+--- user_files
+>>> a.lua
+return 1+1
+--- request
+GET /lua?name=jim
+--- response_body
+[2]
+--- no_error_log
+[error]
+
+
+
+=== TEST 45: backtrace
+--- config
+    location /t {
+        set_by_lua $a '
+            function foo()
+                bar()
+            end
+
+            function bar()
+                error("something bad happened")
+            end
+
+            foo()
+        ';
+        echo ok;
+    }
+--- request
+    GET /t
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+something bad happened
+stack traceback:
+in function 'error'
+in function 'bar'
+in function 'foo'
 

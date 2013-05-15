@@ -1,7 +1,15 @@
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
 #include "ddebug.h"
+
 
 #include "ngx_http_lua_args.h"
 #include "ngx_http_lua_util.h"
@@ -22,7 +30,7 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L) {
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "expecting 1 argument but seen %d",
-                lua_gettop(L));
+                          lua_gettop(L));
     }
 
     lua_pushlightuserdata(L, &ngx_http_lua_request_key);
@@ -58,7 +66,7 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L) {
 
     default:
         msg = lua_pushfstring(L, "string, number, or table expected, "
-                "but got %s", luaL_typename(L, 2));
+                              "but got %s", luaL_typename(L, 2));
         return luaL_argerror(L, 1, msg);
     }
 
@@ -170,7 +178,7 @@ ngx_http_lua_ngx_req_get_post_args(lua_State *L)
 
     if (r->request_body == NULL) {
         return luaL_error(L, "no request body found; "
-                "maybe you should turn on lua_need_request_body?");
+                          "maybe you should turn on lua_need_request_body?");
     }
 
     if (r->request_body->temp_file) {
@@ -240,7 +248,7 @@ ngx_http_lua_parse_args(ngx_http_request_t *r, lua_State *L, u_char *buf,
             src = q; dst = q;
 
             ngx_http_lua_unescape_uri(&dst, &src, p - q,
-                    NGX_UNESCAPE_URI_COMPONENT);
+                                      NGX_UNESCAPE_URI_COMPONENT);
 
             dd("pushing key %.*s", (int) (dst - q), q);
 
@@ -258,7 +266,7 @@ ngx_http_lua_parse_args(ngx_http_request_t *r, lua_State *L, u_char *buf,
             src = q; dst = q;
 
             ngx_http_lua_unescape_uri(&dst, &src, p - q,
-                    NGX_UNESCAPE_URI_COMPONENT);
+                                      NGX_UNESCAPE_URI_COMPONENT);
 
             dd("pushing key or value %.*s", (int) (dst - q), q);
 
@@ -296,7 +304,7 @@ ngx_http_lua_parse_args(ngx_http_request_t *r, lua_State *L, u_char *buf,
 
             if (max > 0 && ++count == max) {
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                        "lua hit query args limit %d", max);
+                               "lua hit query args limit %d", max);
 
                 return 1;
             }
@@ -310,7 +318,7 @@ ngx_http_lua_parse_args(ngx_http_request_t *r, lua_State *L, u_char *buf,
         src = q; dst = q;
 
         ngx_http_lua_unescape_uri(&dst, &src, p - q,
-                NGX_UNESCAPE_URI_COMPONENT);
+                                  NGX_UNESCAPE_URI_COMPONENT);
 
         dd("pushing key or value %.*s", (int) (dst - q), q);
 
@@ -361,3 +369,4 @@ ngx_http_lua_inject_req_args_api(lua_State *L)
     lua_setfield(L, -2, "get_post_args");
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

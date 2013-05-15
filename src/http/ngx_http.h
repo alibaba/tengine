@@ -98,7 +98,6 @@ ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 
 
-ngx_int_t ngx_http_find_server_conf(ngx_http_request_t *r);
 void ngx_http_update_location_config(ngx_http_request_t *r);
 void ngx_http_handler(ngx_http_request_t *r);
 void ngx_http_run_posted_requests(ngx_connection_t *c);

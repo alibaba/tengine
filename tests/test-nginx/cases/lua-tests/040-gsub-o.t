@@ -179,3 +179,24 @@ hello, world
 {foohbarhbaz}
 2
 
+
+
+=== TEST 10: named pattern repl w/ callback
+--- config
+    location /re {
+       content_by_lua '
+            local repl = function (m)
+                return "[" .. m[0] .. "," .. m["first"] .. "]"
+            end
+
+            local s, n = ngx.re.gsub("hello, world", "(?<first>[a-z])[a-z]+", repl, "o")
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+[hello,h], [world,w]
+2
+

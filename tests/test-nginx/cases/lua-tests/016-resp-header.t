@@ -9,7 +9,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 - 1);
+plan tests => repeat_each() * (blocks() * 3 + 2);
 
 #no_diff();
 no_long_string();
@@ -74,13 +74,13 @@ Hel
     location /read {
         content_by_lua '
             ngx.status = 302;
-            ngx.header["Location"] = "http://www.taobao.com/foo";
+            ngx.header["Location"] = "http://agentzh.org/foo";
         ';
     }
 --- request
 GET /read
 --- response_headers
-Location: http://www.taobao.com/foo
+Location: http://agentzh.org/foo
 --- response_body
 --- error_code: 302
 
@@ -274,7 +274,8 @@ Fooy: cony1, cony2
     }
 --- request
     GET /lua
---- ignore_response
+--- response_body chop
+hello
 --- error_log
 attempt to set ngx.header.HEADER after sending out response headers
 --- no_error_log eval
@@ -759,4 +760,97 @@ If-Modified-Since: Thu, 18 Nov 2010 11:27:34 GMTT
 Last-Modified: Thu, 18 Nov 2010 11:27:35 GMT
 --- response_body
 Thu, 18 Nov 2010 11:27:35 GMT
+
+
+
+=== TEST 39: set response content-encoding header should bypass ngx_http_gzip_filter_module
+--- config
+    default_type text/plain;
+    gzip             on;
+    gzip_min_length  1;
+    gzip_types       text/plain;
+    location /read {
+        content_by_lua '
+            ngx.header.content_encoding = "gzip";
+            ngx.say("Hello, world, my dear friend!");
+        ';
+    }
+--- request
+GET /read
+--- more_headers
+Accept-Encoding: gzip
+--- response_headers
+Content-Type: text/plain
+--- response_body
+Hello, world, my dear friend!
+
+
+
+=== TEST 40: no transform underscores (write)
+--- config
+    lua_transform_underscores_in_response_headers off;
+    location = /t {
+        content_by_lua '
+            ngx.header.foo_bar = "Hello"
+            ngx.say(ngx.header.foo_bar)
+            ngx.say(ngx.header["foo-bar"])
+        ';
+    }
+--- request
+    GET /t
+--- raw_response_headers_like eval
+"\r\nfoo_bar: Hello\r\n"
+--- response_body
+Hello
+nil
+
+
+
+=== TEST 41: with transform underscores (write)
+--- config
+    lua_transform_underscores_in_response_headers on;
+    location = /t {
+        content_by_lua '
+            ngx.header.foo_bar = "Hello"
+            ngx.say(ngx.header.foo_bar)
+            ngx.say(ngx.header["foo-bar"])
+        ';
+    }
+--- request
+    GET /t
+--- raw_response_headers_like eval
+"\r\nfoo-bar: Hello\r\n"
+--- response_body
+Hello
+Hello
+
+
+
+=== TEST 42: github issue #199: underscores in lua variables
+--- config
+    location /read {
+        content_by_lua '
+          ngx.header.content_type = "text/my-plain"
+
+          local results = {}
+          results.something = "hello"
+          results.content_type = "anything"
+          results.somehing_else = "hi"
+
+          for k, v in pairs(results) do
+            ngx.say(k .. ": " .. v)
+          end
+        ';
+    }
+--- request
+GET /read
+--- response_headers
+Content-Type: text/my-plain
+
+--- response_body
+somehing_else: hi
+something: hello
+content_type: anything
+--- no_error_log
+[error]
 
