@@ -102,6 +102,8 @@ static ngx_dso_flagpole_t module_flagpole[] = {
     { ngx_null_string, ngx_null_string}
 };
 
+extern const char *ngx_dso_abi_all_tags[];
+
 
 static void *
 ngx_dso_create_conf(ngx_cycle_t *cycle)
@@ -499,6 +501,26 @@ ngx_dso_save(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+static void
+ngx_dso_show_abi_compatibility(ngx_uint_t abi_compatibility)
+{
+    ngx_uint_t  i;
+
+    for (i = 0; i < sizeof(ngx_uint_t) * 8; i++) {
+
+        if (ngx_dso_abi_all_tags[i] == NULL) {
+            break;
+        }
+
+        if (abi_compatibility & 0x1) {
+            ngx_log_stderr(0, "    %s", ngx_dso_abi_all_tags[i]);
+        }
+
+        abi_compatibility >>= 1;
+    }
+}
+
+
 static char *
 ngx_dso_load(ngx_conf_t *cf)
 {
@@ -539,13 +561,17 @@ ngx_dso_load(ngx_conf_t *cf)
             return NGX_CONF_ERROR;
         }
 
-        if (dm[i].module->abi_compatibility
-            != NGX_DSO_ABI_COMPATIBILITY)
+        if (dm[i].module->abi_compatibility != NGX_DSO_ABI_COMPATIBILITY)
         {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "module \"%V\" is not compatible with this "
                                "ABI of tengine, you need recomplie module",
                                &dm[i].name);
+
+            ngx_log_stderr(0, "Tengine config option: ");
+            ngx_dso_show_abi_compatibility(NGX_DSO_ABI_COMPATIBILITY);
+            ngx_log_stderr(0, "module \"%V\" config option: ", &dm[i].name);
+            ngx_dso_show_abi_compatibility(dm[i].module->abi_compatibility);
             return NGX_CONF_ERROR;
         }
 

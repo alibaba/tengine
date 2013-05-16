@@ -148,6 +148,25 @@ NGX_SHARED_PATH=
 NGX_DSO_ALL_TARGETS=
 
 
+NGX_DSO_ABI_ALL_TAG="
+    with-http-stat-stub
+    with-http-upstream-check
+    with-http-degradation
+    with-http-proxy
+    with-http-ssl
+    with-http-geo
+    with-http-geoip
+    with-http-realip
+    with-http-dav
+    with-http-ssi
+    with-http-gzip-satic
+    with-http-gzip
+    with-syslog
+    with-ipv6
+    with-http-cache
+    with-http
+    with-debug"
+
 NGX_DSO_ABI_COMPATIBILITY=0x00000000
 NGX_DSO_DEBUG_TAG=0x00000001
 NGX_DSO_HTTP_TAG=0x00000002
@@ -163,10 +182,9 @@ NGX_DSO_GEOIP_TAG=0x00000400
 NGX_DSO_GEO_TAG=0x00000800
 NGX_DSO_SSL_TAG=0x00001000
 NGX_DSO_PROXY_TAG=0x00002000
-NGX_DSO_DEGRADATION_TAG=0x00008000
-NGX_DSO_UPSTREAM_CHECK_TAG=0x00010000
-NGX_DSO_STAT_STUB_TAG=0x00020000
-
+NGX_DSO_DEGRADATION_TAG=0x00004000
+NGX_DSO_UPSTREAM_CHECK_TAG=0x00008000
+NGX_DSO_STAT_STUB_TAG=0x00010000
 
 
 HTTP=YES

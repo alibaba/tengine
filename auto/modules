@@ -845,7 +845,22 @@ if [ $NGX_DSO = YES ] ; then
 
 END
 
-for mod in $NGX_ALL_MODULES
+
+    echo                                          >> $NGX_MODULES_C
+    echo 'const char *ngx_dso_abi_all_tags[] = {' >> $NGX_MODULES_C
+
+    for tag in $NGX_DSO_ABI_ALL_TAG
+    do
+        echo "    \"$tag\","                      >> $NGX_MODULES_C
+    done
+
+    cat << END                                    >> $NGX_MODULES_C
+    NULL
+};
+
+END
+
+    for mod in $NGX_ALL_MODULES
     do
         echo "module_stub $mod;"                  >> $NGX_MODULE_STUBS
     done
