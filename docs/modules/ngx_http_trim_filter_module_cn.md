@@ -9,7 +9,6 @@
 
     location / {
         trim on;
-        trim_comment on;
     }
 
 ## 指令
@@ -20,23 +19,13 @@
 
 **上下文:** `http, server, location` 
      
-在配置的地方使模块有效（失效），删除重复的空白符（/n，/f，/r，/t，' ')。  
-对于标签 pre，textarea，script，style内的内容不作删除操作。
-
-<br/>
-
-**trim_comment** `on` | `off`
-
-**默认:** `trim_comment off`
-
-**上下文:** `http, server, location`
-
-在配置的地方使删除html注释功能有效（失效）， 对于ie注释不作删除处理。  
-如下html代码:
+在配置的地方使模块有效（失效），删除html注释和重复的空白符（/n，/f，/r，/t，' ')。
+例外：对于标签 pre，textarea，script，style 和 ie注释 内的内容不作删除操作。
+如下html注释代码:
 
     <html><!--non-ie comment--><!--[if IE]> ie comment <![endif]--></html>
 
-如果配置为 `trim_comment on`，将保留ie注释，处理之后如下：
+如果配置为 `trim on`，将保留ie注释，处理之后如下：
 
     <html><!--[if IE]> ie comment <![endif]--></html>
     
