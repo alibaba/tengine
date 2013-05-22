@@ -671,7 +671,8 @@ ngx_http_session_sticky_header_filter(ngx_http_request_t *r)
     }
 
     if ((slcf->uscf == NGX_CONF_UNSET_PTR)
-         && !(ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_REWRITE))
+         && ((ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_PREFIX)
+            || (ctx->sscf->flag & NGX_HTTP_SESSION_STICKY_INDIRECT)))
     {
         return ngx_http_ss_next_header_filter(r);
     }
