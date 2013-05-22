@@ -149,6 +149,7 @@ NGX_DSO_ALL_TARGETS=
 
 
 NGX_DSO_ABI_ALL_TAG="
+    with-debug
     with-http-stat-stub
     with-http-upstream-check
     with-http-degradation
@@ -164,8 +165,7 @@ NGX_DSO_ABI_ALL_TAG="
     with-syslog
     with-ipv6
     with-http-cache
-    with-http
-    with-debug"
+    with-http"
 
 NGX_DSO_ABI_COMPATIBILITY=0x00000000
 NGX_DSO_DEBUG_TAG=0x00000001
