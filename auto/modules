@@ -649,12 +649,6 @@ fi
 #fi
 
 
-if [ $NGX_DSO = YES ] ; then
-
-    have=NGX_DSO_ABI_COMPATIBILITY value="$NGX_DSO_ABI_COMPATIBILITY" . auto/define
-fi
-
-
 if test -n "$NGX_ADDONS"; then
 
     echo configuring additional modules
@@ -714,6 +708,12 @@ if [ $HTTP = YES ]; then
     NGX_ADDON_DEPS="$NGX_ADDON_DEPS \$(HTTP_DEPS)"
 
     NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_HTTP_TAG))
+fi
+
+
+if [ $NGX_DSO = YES ] ; then
+
+    have=NGX_DSO_ABI_COMPATIBILITY value="$NGX_DSO_ABI_COMPATIBILITY" . auto/define
 fi
 
 

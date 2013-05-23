@@ -150,22 +150,22 @@ NGX_DSO_ALL_TARGETS=
 
 NGX_DSO_ABI_ALL_TAG="
     with-debug
-    with-http-stat-stub
-    with-http-upstream-check
-    with-http-degradation
-    with-http-proxy
-    with-http-ssl
-    with-http-geo
-    with-http-geoip
-    with-http-realip
-    with-http-dav
-    with-http-ssi
-    with-http-gzip-satic
-    with-http-gzip
-    with-syslog
-    with-ipv6
+    with-http
     with-http-cache
-    with-http"
+    with-ipv6
+    with-syslog
+    with-http-gzip
+    with-http-gzip-satic
+    with-http-ssi
+    with-http-dav
+    with-http-realip
+    with-http-geoip
+    with-http-geo
+    with-http-ssl
+    with-http-proxy
+    with-http-degradation
+    with-http-upstream-check
+    with-http-stat-stub"
 
 NGX_DSO_ABI_COMPATIBILITY=0x00000000
 NGX_DSO_DEBUG_TAG=0x00000001
