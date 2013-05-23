@@ -8,16 +8,19 @@ $ENV{TEST_NGINX_TRIM_PORT} ||= "1984";
 
 run_tests();
 
+# etcproxy 1986 1984
+# TEST_NGINX_TRIM_PORT=1986 prove ../cases/trim.t
+
 __DATA__
 
 === TEST 1: do not trim within 'textarea' 'pre' 'script' 'style' 'ie-comment'
 --- config
     trim on;
-    trim_comment off;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <textarea>
    hello
         world!
@@ -43,50 +46,48 @@ world !
 <!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
 --- request
     GET /t/trim.html
---- response_body
+--- response_body eval
+'<!DOCTYPE html>
 <textarea>
    hello
         world!
-</textarea>
-<pre>
+</textarea><pre>
   hello     world!
-    </pre>
-<script type="text/javascript">
+    </pre><script type="text/javascript">
        hello
 world !
 
-</script>
-<style>
+</script><style>
  hello     world   !
-</style>
-<!--[if IE]> hello    world    ! <![endif]-->
-<!-- hello world ! -->
-<!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
+</style><!--[if IE]> hello    world    ! <![endif]--><!--[if !IE ]>--> hello    world  ! <!--<![endif]-->'
 
 === TEST 2: trim within other tags
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <body>hello   world,   it
-   is good  to     see you   </body>
+is good  to     see you   </body>
+
+<body>hello   world,   it
+     is good  to     see you   </body>
 --- request
     GET /t/trim.html
---- response_body
-<body>hello world, it
-is good to see you </body>
+--- response_body eval
+'<!DOCTYPE html>
+<body>hello world, itis good to see you </body><body>hello world, it is good to see you </body>'
 
 === TEST 3: trim within non-ie comment
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <body>hello <!--world--></body>
 <!--[if IE]> hello    world    ! <![endif]-->
    <!-- hello world! -->
@@ -94,33 +95,30 @@ is good to see you </body>
 
 --- request
     GET /t/trim.html
---- response_body
-<body>hello </body>
-<!--[if IE]> hello    world    ! <![endif]-->
-<!--[if !IE ]>--> hello    world  ! <!--<![endif]-->
+--- response_body eval
+'<!DOCTYPE html>
+<body>hello </body><!--[if IE]> hello    world    ! <![endif]--><!--[if !IE ]>--> hello    world  ! <!--<![endif]-->'
 
 === TEST 4: trim within tag value
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <body
     style="text-align:   center;">hello   world,   it
    is good  to     see you   </body>
 --- request
     GET /t/trim.html
---- response_body
-<body
-style="text-align:   center;">hello world, it
-is good to see you </body>
+--- response_body eval
+'<!DOCTYPE html>
+<body style="text-align:   center;">hello world, it is good to see you </body>'
 
 === TEST 5: trim newline
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -128,6 +126,7 @@ is good to see you </body>
 
 
     
+<!DOCTYPE html>
 
 <html>
 
@@ -142,15 +141,13 @@ is good to see you </body>
                   
 --- request
     GET /t/trim.html
---- response_body
-<html>
-<body>hello world!<body> 
-<html>
+--- response_body eval
+'<!DOCTYPE html>
+<html><body>hello world!<body><html>'
 
 === TEST 6:  return zero size
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -161,30 +158,30 @@ is good to see you </body>
 --- request
     GET /t/trim.html
 --- response_body eval
-''
---- error_code: 200
+'
+'
 
 === TEST 7: trim all
 --- config
     sendfile on;
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <html>
     <head>trim   test <!-- hello world  !--> </head>
-<body 
+<body
      style="text-align:    center;"   >
-<pre> 
+<pre>
 
          hello world    !
     </pre>
 
 
      <textarea class="trim">
-hello    world  
+hello    world
    !
    </textarea>
 
@@ -197,61 +194,49 @@ hello    world
     world !
 
 </style>
-           <script type="text/javascript"> 
+           <script type="text/javascript">
    hello world    !
 </script>
-    
-<a   href='hello  world    !'> hello     world   ! 
+
+<a   href="hello  world    !"> hello     world   !
      </a>
    </body>
     </html>
-    
+
 <!--[if IE]> ie comment <![endif]-->
 
 <!----- non-ie comment------>
-     <!-- -->   <!--  ---->     	
+     <!-- -->   <!--  ---->
 
-<!--[if !IE ]>--> non-ie html code <!--<![endif]-->                  
+<!--[if !IE ]>--> non-ie html code <!--<![endif]-->
 --- request
     GET /t/trim.html
---- response_body
-<html>
-<head>trim test </head>
-<body style="text-align:    center;" >
-<pre> 
+--- response_body eval
+'<!DOCTYPE html>
+<html><head>trim test </head><body style="text-align:    center;" ><pre>
 
          hello world    !
-    </pre>
-<textarea class="trim">
-hello    world  
+    </pre><textarea class="trim">
+hello    world
    !
-   </textarea>
-<p>
-hello world !
-</p>
-<style>
+   </textarea><p>hello world ! </p><style>
     hello
     world !
 
-</style>
-<script type="text/javascript"> 
+</style><script type="text/javascript">
    hello world    !
-</script>
-<a href='hello  world    !'> hello world ! 
-</a>
-</body>
-</html>
-<!--[if IE]> ie comment <![endif]-->
-<!--[if !IE ]>--> non-ie html code <!--<![endif]--> 
+</script><a href="hello  world    !">hello world ! </a></body></html><!--[if IE]> ie comment <![endif]--><!--[if !IE ]>--> non-ie html code <!--<![endif]-->'
 
 === TEST 8: trim more tags
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+
+
+<!DOCTYPE html>
 <      <PRE>hello     world  ! </pre>
 <2     <pre>hello     world  ! </pre>
 <<<    <pre>hello     world  ! </pre>
@@ -262,19 +247,13 @@ hello world !
                   
 --- request
     GET /t/trim.html
---- response_body
-< <PRE>hello     world  ! </pre>
-<2 <pre>hello     world  ! </pre>
-<<< <pre>hello     world  ! </pre>
-< < <pre>hello     world  ! </pre>
-< <<pre>hello     world  ! </pre>
-<x <<pre>hello world ! </pre>
-< <<<!doctype html>
+--- response_body eval
+'<!DOCTYPE html>
+< <PRE>hello     world  ! </pre><2 <pre>hello     world  ! </pre><<< <pre>hello     world  ! </pre>< < <pre>hello     world  ! </pre>< <<pre>hello     world  ! </pre><x <<pre>hello world ! </pre>< <<<!doctype html>'
 
 === TEST 9: trim Chinese characters
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -283,14 +262,14 @@ hello world !
                   
 --- request
     GET /t/trim.html
---- response_body
-<title>世界 你好 !</title>
+--- response_body eval
+'<title>世界 你好 !</title>
+'
 
 === TEST 10: sendfile on
 --- config
     sendfile on;
     trim on;
-    trim_comment on;
 --- user_files
 >>> trim.html
 <!DOCTYPE html>
@@ -319,44 +298,32 @@ working. Further configuration is required.</p>
 
 --- request
     GET /trim.html
---- response_body
-<!DOCTYPE html>
-<html>
-<head>
-<title>Welcome to tengine!</title>
-<style>
+--- response_body eval
+'<!DOCTYPE html>
+<html><head><title>Welcome to tengine!</title><style>
     body {
         width: 35em;
         margin: 0 auto;
         font-family: Tahoma, Verdana, Arial, sans-serif;
     }
-</style>
-</head>
-<body>
-<h1>Welcome to tengine!</h1>
-<p>If you see this page, the tengine web server is successfully installed and
-working. Further configuration is required.</p>
-<p>For online documentation and support please refer to
-<a href="http://tengine.taobao.org/">tengine.taobao.org</a>.</p>
-<p><em>Thank you for using tengine.</em></p>
-</body>
-</html>
+</style></head><body><h1>Welcome to tengine!</h1><p>If you see this page, the tengine web server is successfully installed andworking. Further configuration is required.</p><p>For online documentation and support please refer to<a href="http://tengine.taobao.org/">tengine.taobao.org</a>.</p><p><em>Thank you for using tengine.</em></p></body></html>'
 
-=== TEST 11: if $arg_trimoff existed, trim off.
+=== TEST 11: if $arg_http_trim is off, trim off.
 --- config
     trim on;
-    trim_comment on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
+<!DOCTYPE html>
 <body>hello   world,   it
    is good  to     see you   </body>
-<!-- arg_trimoff -->
+<!-- trimoff -->
 --- request
-    GET /t/trim.html?trimoff=&hello=world
+    GET /t/trim.html?http_trim=off&hello=world
 --- response_body
+<!DOCTYPE html>
 <body>hello   world,   it
    is good  to     see you   </body>
-<!-- arg_trimoff -->
+<!-- trimoff -->
 
