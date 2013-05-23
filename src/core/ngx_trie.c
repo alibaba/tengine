@@ -95,6 +95,10 @@ ngx_trie_insert(ngx_trie_t *trie, ngx_str_t *str, ngx_uint_t mode)
         i++;
     }
 
+    if (p == NULL) {
+        return NULL;
+    }
+
     p->key = str->len;
     if (mode & NGX_TRIE_CONTINUE) {
         p->greedy = 1;
