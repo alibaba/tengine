@@ -89,14 +89,13 @@ ngx_trie_insert(ngx_trie_t *trie, ngx_str_t *str, ngx_uint_t mode)
 
         if (p->next[index] == NULL) {
             p->next[index] = ngx_trie_node_create(trie->pool);
+            if (p->next[index] == NULL) {
+                return NULL;
+            }
         }
 
         p = p->next[index];
         i++;
-    }
-
-    if (p == NULL) {
-        return NULL;
     }
 
     p->key = str->len;
