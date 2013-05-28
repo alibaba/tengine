@@ -308,7 +308,7 @@ body {
 '<!DOCTYPE html>
 <style type="text/css">"hello      world");"hello  \"  world");"hello  \\\\\"  world");</style>'
 
-=== TEST 15 trim aplus.js:
+=== TEST 15 trim aplus.js
 --- config
     trim on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
@@ -330,3 +330,48 @@ d.getElementsByTagName("head")[0].appendChild(t);
 --- response_body eval
 '<!DOCTYPE html>
 <script type="text/javascript">(function (d) {var t=d.createElement("script");t.type="text/javascript";t.async=true;t.id="tb-beacon-aplus";t.setAttribute("exparams","category=&userid=&aplus");t.src=("https:"==d.location.protocol?"https://s":"http://a")+".tbcdn.cn/s/aplus_v2.js";d.getElementsByTagName("head")[0].appendChild(t);})(document);</script>'
+
+=== TEST 15: do not trim css comment of child selector hack
+--- config
+    trim on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<style type="text/css">
+html >/**/ body p {
+    color: blue;
+}
+</style>
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<style type="text/css">html >/**/ body p {color:blue;}</style>'
+
+=== TEST 16: do not trim css comment of IE5/Mac hack
+--- config
+    trim on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<style type="text/css">
+/* Ignore the next rule in IE mac \*/
+.selector {
+    color: khaki;
+}
+/* Stop ignoring in IE mac */
+</style>
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<style type="text/css">/*\\*/
+.selector {
+    color: khaki;
+}
+/**/
+</style>'
