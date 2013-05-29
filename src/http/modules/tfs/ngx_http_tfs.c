@@ -48,6 +48,10 @@ static void ngx_http_tfs_process_upstream_request(ngx_http_request_t *r,
 
 static void ngx_http_tfs_handle_connection_failure(ngx_http_tfs_t *t,
     ngx_http_tfs_peer_connection_t *tp);
+static void ngx_http_tfs_rd_check_broken_connection(ngx_http_request_t *r);
+static void ngx_http_tfs_wr_check_broken_connection(ngx_http_request_t *r);
+static void ngx_http_tfs_check_broken_connection(ngx_http_request_t *r,
+    ngx_event_t *ev);
 
 
 extern ngx_module_t  ngx_http_tfs_module;
@@ -72,6 +76,9 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
 
     if (t->r_ctx.action.code != NGX_HTTP_TFS_ACTION_KEEPALIVE) {
         r = t->data;
+        r->read_event_handler = ngx_http_tfs_rd_check_broken_connection;
+        r->write_event_handler = ngx_http_tfs_wr_check_broken_connection;
+
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
         if (clcf == NULL) {
             return NGX_ERROR;
@@ -774,6 +781,15 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         }
     }
 
+    if (rc == NGX_HTTP_CLIENT_CLOSED_REQUEST
+        || rc == NGX_HTTP_REQUEST_TIME_OUT)
+    {
+        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                      "client prematurely closed connection or timed out");
+        ngx_http_tfs_finalize_request(r, t, rc);
+        return;
+    }
+
     if (rc == NGX_ERROR) {
         if (p) {
             ngx_log_error(NGX_LOG_ERR, t->log, 0,
@@ -817,7 +833,7 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         /* need stat data */
         if (!t->parent && t->srv_conf->log != NULL) {
             ngx_log_error(NGX_LOG_INFO, t->srv_conf->log, 0,
-                          "%d, %uL, %V, %V, %uD, %uL, %uL, %uL",
+                          "%d, %uL, %V, %V, %uD, %uL, %uL, %uL, %V",
                           t->r_ctx.action.code,
                           t->loc_conf->upstream->enable_rcs ?
                           t->rc_info_node->app_id : NGX_HTTP_TFS_DEFAULT_APPID,
@@ -826,7 +842,8 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
                           t->r_ctx.fsname.file.block_id,
                           ngx_http_tfs_raw_fsname_get_file_id(t->r_ctx.fsname),
                           t->r_ctx.offset,
-                          t->stat_info.size);
+                          t->stat_info.size,
+                          &r->connection->addr_text);
         }
 
         /* need send data */
@@ -1390,6 +1407,20 @@ ngx_http_tfs_process_non_buffered_downstream(ngx_http_request_t *r)
     if (wev->timedout) {
         c->timedout = 1;
         ngx_connection_error(c, NGX_ETIMEDOUT, "client timed out");
+
+        /* write need roll back, remove all segments */
+        if (t->r_ctx.version == 1
+            && t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE
+            && !t->parent)
+        {
+            r->write_event_handler = ngx_http_request_empty_handler;
+            t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+            t->is_rolling_back = NGX_HTTP_TFS_YES;
+            t->file.segment_index = 0;
+            ngx_http_tfs_finalize_state(t, NGX_OK);
+            return;
+        }
+
         ngx_http_tfs_finalize_request(t->data, t,
                                       NGX_HTTP_REQUEST_TIME_OUT);
         return;
@@ -2303,8 +2334,23 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
                       "sub process error, rest segment count: %D ",
                       t->file.segment_count - t->file.segment_index);
 
+        /* write need roll back, remove all segments writtern */
+        if (t->r_ctx.version == 1
+            && t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE)
+        {
+            t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+            t->is_rolling_back = NGX_HTTP_TFS_YES;
+            t->file.segment_count = t->file.segment_index + t->sp_count;
+            t->file.segment_index = 0;
+            ngx_http_tfs_finalize_state(t, NGX_OK);
+            return NGX_OK;
+        }
+
         if (t->request_timeout) {
             ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_REQUEST_TIME_OUT);
+
+        } else if (t->client_abort) {
+            ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_CLIENT_CLOSED_REQUEST);
 
         } else {
             ngx_http_tfs_finalize_state(t, NGX_ERROR);
@@ -2324,22 +2370,21 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
         if (t->r_ctx.version == 1 && t->is_large_file) {
             t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
 
-            /* all data write over */
-            if (t->file.left_length == 0) {
-                rc = ngx_http_tfs_set_meta_segment_data(t);
-                if (rc == NGX_ERROR) {
-                    ngx_http_tfs_finalize_state(t, NGX_ERROR);
-                    return NGX_ERROR;
-                }
+            /* need roll back, remove all segments writtern */
+            if (t->client_abort) {
+                t->is_rolling_back = NGX_HTTP_TFS_YES;
+                t->file.segment_count = t->file.segment_index;
+                t->file.segment_index = 0;
 
-                /* reuse the first segment */
-                t->send_body = t->meta_segment_data;
-                rc = ngx_http_tfs_get_segment_for_write(t);
-                if (rc == NGX_ERROR) {
-                    ngx_http_tfs_finalize_state(t, NGX_ERROR);
-                    return NGX_ERROR;
+            } else {
+                /* all data write over */
+                if (t->file.left_length == 0) {
+                    rc = ngx_http_tfs_set_meta_segment_data(t);
+                    if (rc == NGX_ERROR) {
+                        ngx_http_tfs_finalize_state(t, NGX_ERROR);
+                        return NGX_ERROR;
+                    }
                 }
-                t->is_process_meta_seg = NGX_HTTP_TFS_YES;
             }
 
         } else if (t->r_ctx.version == 2) {
@@ -2409,4 +2454,117 @@ ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
     }
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_tfs_rd_check_broken_connection(ngx_http_request_t *r)
+{
+    ngx_http_tfs_check_broken_connection(r, r->connection->read);
+}
+
+
+static void
+ngx_http_tfs_wr_check_broken_connection(ngx_http_request_t *r)
+{
+    ngx_http_tfs_check_broken_connection(r, r->connection->write);
+}
+
+
+static void
+ngx_http_tfs_check_broken_connection(ngx_http_request_t *r,
+    ngx_event_t *ev)
+{
+    int               n;
+    char              buf[1];
+    ngx_err_t         err;
+    ngx_int_t         event;
+    ngx_http_tfs_t    *t;
+    ngx_connection_t  *c;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ev->log, 0,
+                   "http tfs check client, write event:%d, \"%V\"",
+                   ev->write, &r->uri);
+
+    c = r->connection;
+    t = ngx_http_get_module_ctx(r, ngx_http_tfs_module);
+
+    if (c->error) {
+        if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+
+            event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+            ngx_del_event(ev, event, 0);
+        }
+
+        t->client_abort = NGX_HTTP_TFS_YES;
+
+        return;
+    }
+
+#if (NGX_HAVE_KQUEUE)
+
+    if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+
+        if (!ev->pending_eof) {
+            return;
+        }
+
+        ev->eof = 1;
+        c->error = 1;
+
+        if (ev->kq_errno) {
+            ev->error = 1;
+        }
+
+        ngx_log_error(NGX_LOG_INFO, ev->log, ev->kq_errno,
+                      "kevent() reported that client prematurely closed "
+                      "connection");
+        t->client_abort = NGX_HTTP_TFS_YES;
+
+        return;
+    }
+
+#endif
+
+    n = recv(c->fd, buf, 1, MSG_PEEK);
+
+    err = ngx_socket_errno;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ev->log, err,
+                   "http tfs recv(): %d", n);
+
+    if (ev->write && (n >= 0 || err == NGX_EAGAIN)) {
+        return;
+    }
+
+    if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+
+        event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+        ngx_del_event(ev, event, 0);
+    }
+
+    if (n > 0) {
+        return;
+    }
+
+    if (n == -1) {
+        if (err == NGX_EAGAIN) {
+            return;
+        }
+
+        ev->error = 1;
+
+    } else { /* n == 0 */
+        err = 0;
+    }
+
+    ev->eof = 1;
+    c->error = 1;
+
+    ngx_log_error(NGX_LOG_INFO, ev->log, err,
+                  "client prematurely closed connection");
+
+    t->client_abort = NGX_HTTP_TFS_YES;
 }
