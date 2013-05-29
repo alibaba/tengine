@@ -9,6 +9,8 @@
 #include <ngx_core.h>
 
 
+#ifndef NGX_NO_MEMORY_POOL
+
 static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
@@ -314,8 +316,8 @@ ngx_pcalloc(ngx_pool_t *pool, size_t size)
 void *
 ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 {
-    void *new;
-    ngx_pool_t *node;
+    void        *new;
+    ngx_pool_t  *node;
 
     if (p == NULL) {
         return ngx_palloc(pool, new_size);
@@ -324,27 +326,29 @@ ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
     if (new_size == 0) {
         if ((u_char *) p + old_size == pool->d.last) {
            pool->d.last = p;
+
         } else {
            ngx_pfree(pool, p);
         }
 
         return NULL;
     }
-	
+
     if (old_size <= pool->max) {
         for (node = pool; node; node = node->d.next) {
             if ((u_char *)p + old_size == node->d.last
-                && (u_char *)p + new_size <= node->d.end) {
+                && (u_char *)p + new_size <= node->d.end)
+            {
                 node->d.last = (u_char *)p + new_size;
                 return p;
             }
-        }		
+        }
     }
-		
+
     if (new_size <= old_size) {
        return p;
     }
-	
+
     new = ngx_palloc(pool, new_size);
     if (new == NULL) {
         return NULL;
@@ -356,6 +360,247 @@ ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 
     return new;
 }
+
+#else
+
+ngx_pool_t *
+ngx_create_pool(size_t size, ngx_log_t *log)
+{
+    ngx_pool_t        *p;
+
+    size = sizeof(ngx_pool_t);
+    p = ngx_alloc(size, log);
+    if (p == NULL) {
+        return NULL;
+    }
+
+    ngx_memzero(p, size);
+
+    p->current = p;
+    p->log = log;
+
+    return p;
+}
+
+
+void
+ngx_destroy_pool(ngx_pool_t *pool)
+{
+    ngx_pool_data_t     *d, *n;
+    ngx_pool_cleanup_t  *c;
+
+    for (c = pool->cleanup; c; c = c->next) {
+        if (c->handler) {
+            ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
+                           "run cleanup: %p", c);
+            c->handler(c->data);
+        }
+    }
+
+    if (pool->d == NULL) {
+        ngx_free(pool);
+        return;
+    }
+
+#if (NGX_DEBUG)
+
+    /*
+     * we could allocate the pool->log from this pool
+     * so we cannot use this log while free()ing the pool
+     */
+
+    for (d = pool->d, n = d->next; ; d = n, n = n->next) {
+        ngx_log_debug2(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
+                       "free: %p, unused: %d", d, 0);
+
+        if (n == NULL) {
+            break;
+        }
+    }
+
+#endif
+
+    for (d = pool->d, n = d->next; ; d = n, n = n->next) {
+        ngx_free(d->alloc);
+        ngx_free(d);
+
+        if (n == NULL) {
+            break;
+        }
+    }
+
+    pool->d = NULL;
+
+    ngx_free(pool);
+}
+
+
+void
+ngx_reset_pool(ngx_pool_t *pool)
+{
+    ngx_pool_data_t     *d, *n;
+    ngx_pool_data_t     *saved = NULL;
+
+    if (pool->d) {
+        for (d = pool->d, n = d->next; ; d = n, n = n->next) {
+            if (d->alloc == pool->log) {
+                saved = d;
+                continue;
+            }
+
+            ngx_free(d->alloc);
+            ngx_free(d);
+
+            if (n == NULL) {
+                break;
+            }
+        }
+
+        pool->d = saved;
+    }
+}
+
+
+void *
+ngx_malloc(ngx_pool_t *pool, size_t size)
+{
+    void                *p;
+    ngx_pool_data_t     *d;
+
+    p = ngx_alloc(size, pool->log);
+    if (p == NULL) {
+        return NULL;
+    }
+
+    d = ngx_alloc(sizeof(ngx_pool_data_t), pool->log);
+    if (d == NULL){
+        ngx_free(p);
+        return NULL;
+    }
+
+    d->alloc = p;
+    d->next = pool->d;
+    pool->d = d;
+    return p;
+}
+
+
+void *
+ngx_palloc(ngx_pool_t *pool, size_t size)
+{
+    return ngx_malloc(pool, size);
+}
+
+
+void *
+ngx_pnalloc(ngx_pool_t *pool, size_t size)
+{
+    return ngx_malloc(pool, size);
+}
+
+
+void *
+ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment)
+{
+    void              *p;
+    ngx_pool_data_t   *d;
+
+    p = ngx_memalign(alignment, size, pool->log);
+    if (p == NULL) {
+        return NULL;
+    }
+
+    d = ngx_alloc(sizeof(ngx_pool_data_t), pool->log);
+    if (d == NULL){
+        ngx_free(p);
+        return NULL;
+    }
+
+    d->alloc = p;
+    d->next = pool->d;
+    pool->d = d;
+    return p;
+}
+
+
+ngx_int_t
+ngx_pfree(ngx_pool_t *pool, void *data)
+{
+    ngx_pool_data_t     *p, *d;
+
+    p = NULL;
+    for (d = pool->d; d; p = d, d = d->next) {
+        if (data == d->alloc) {
+
+            ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, pool->log, 0,
+                           "free: %p", d->alloc);
+
+            ngx_free(d->alloc);
+            d->alloc = NULL;
+
+            if (p) {
+                p->next = d->next;
+
+            } else {
+                pool->d = d->next;
+            }
+
+            ngx_free(d);
+
+            return NGX_OK;
+        }
+    }
+
+    return NGX_DECLINED;
+}
+
+
+void *
+ngx_pcalloc(ngx_pool_t *pool, size_t size)
+{
+    void *p;
+
+    p = ngx_palloc(pool, size);
+    if (p) {
+        ngx_memzero(p, size);
+    }
+
+    return p;
+}
+
+
+void *
+ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
+{
+    void        *new;
+
+    if (p == NULL) {
+        return ngx_palloc(pool, new_size);
+    }
+
+    if (new_size == 0) {
+        ngx_pfree(pool, p);
+
+        return NULL;
+    }
+
+    if (new_size <= old_size) {
+       return p;
+    }
+
+    new = ngx_palloc(pool, new_size);
+    if (new == NULL) {
+        return NULL;
+    }
+
+    ngx_memcpy(new, p, old_size);
+
+    ngx_pfree(pool, p);
+
+    return new;
+}
+
+#endif
 
 
 ngx_pool_cleanup_t *
