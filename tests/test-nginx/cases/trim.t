@@ -61,7 +61,7 @@ is good  to     see you   </body>
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<body>hello world, itis good to see you </body><body>hello world, it is good to see you </body>'
+<body>hello world, it is good to see you </body><body>hello world, it is good to see you </body>'
 
 === TEST 3: trim within non-ie comment
 --- config
@@ -127,7 +127,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<html><body>hello world!<body><html>'
+<html><body>hello world!<body> <html>'
 
 === TEST 6: return zero size 
 --- config
