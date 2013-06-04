@@ -1375,16 +1375,16 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
     void                    *ident[4];
     ngx_event_t              ev;
 
-    /* 
-     * Set correct process type since closing listening Unix domain socket 
-     * in a master process also removes the Unix domain socket file. 
-     */ 
-    ngx_process = NGX_PROCESS_HELPER; 
+    /*
+     * Set correct process type since closing listening Unix domain socket
+     * in a master process also removes the Unix domain socket file.
+     */
+    ngx_process = NGX_PROCESS_HELPER;
 
-    ngx_close_listening_sockets(cycle); 
+    ngx_close_listening_sockets(cycle);
 
-    /* Set a moderate number of connections for a helper process. */ 
-    cycle->connection_n = 512; 
+    /* Set a moderate number of connections for a helper process. */
+    cycle->connection_n = 512;
 
     ngx_worker_process_init(cycle, -1);
 
