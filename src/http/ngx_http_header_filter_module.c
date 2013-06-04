@@ -46,7 +46,7 @@ ngx_module_t  ngx_http_header_filter_module = {
 };
 
 
-static char ngx_http_server_string[] = "Server: Tengine" CRLF;
+static char ngx_http_server_string[] = "Server: " TENGINE CRLF;
 static char ngx_http_server_full_string[] = "Server: " TENGINE_VER CRLF;
 
 
@@ -282,7 +282,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
                 : sizeof(ngx_http_server_string) - 1;
 
         } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-            len += clcf->server_tag.len;
+            len += clcf->server_tag_header.len;
         }
     }
 
@@ -469,8 +469,8 @@ ngx_http_header_filter(ngx_http_request_t *r)
 
             b->last = ngx_cpymem(b->last, p, len);
         } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-            p = clcf->server_tag.data;
-            len = clcf->server_tag.len;
+            p = clcf->server_tag_header.data;
+            len = clcf->server_tag_header.len;
             b->last = ngx_cpymem(b->last, p, len);
         }
 
