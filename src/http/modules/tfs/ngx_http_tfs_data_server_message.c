@@ -1359,11 +1359,12 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
 
     /* find out the segment we should start with */
     seg_count = t->seg_head->count;
-    max_seg_count = (b->last - (u_char *)seg_info) / sizeof(ngx_http_tfs_segment_info_t);
+    max_seg_count = (b->last - (u_char *) seg_info)
+                     / sizeof(ngx_http_tfs_segment_info_t);
     if (t->seg_head->count > max_seg_count) {
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                      "seg_count in seg_head larger than max seg_count, %uD > %uD, "
-                      " seg_head may be corrupted.",
+                      "seg_count in seg_head larger than max seg_count, "
+                      "%uD > %uD, seg_head may be corrupted.",
                       t->seg_head->count, max_seg_count);
         seg_count = max_seg_count - 1;
     }
@@ -1592,11 +1593,12 @@ ngx_http_tfs_get_segment_for_delete(ngx_http_tfs_t *t)
 
     /* all data segments plus meta segment */
     seg_count = t->seg_head->count + 1;
-    max_seg_count = (b->last - (u_char *)seg_info) / sizeof(ngx_http_tfs_segment_info_t);
+    max_seg_count = (b->last - (u_char *) seg_info)
+                    / sizeof(ngx_http_tfs_segment_info_t);
     if (t->seg_head->count > max_seg_count) {
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                      "seg_count in seg_head larger than max seg_count, %uD > %uD, "
-                      "seg_head may be corrupted",
+                      "seg_count in seg_head larger than max seg_count, "
+                      "%uD > %uD, seg_head may be corrupted",
                       t->seg_head->count, max_seg_count);
         seg_count = max_seg_count;
     }

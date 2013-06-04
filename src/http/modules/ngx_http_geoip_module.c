@@ -182,7 +182,7 @@ static ngx_http_variable_t  ngx_http_geoip_vars[] = {
 
     { ngx_string("geoip_country_code"), NULL,
       ngx_http_geoip_country_variable,
-      NGX_GEOIP_COUNTRY_CODE, 0, 0 },      
+      NGX_GEOIP_COUNTRY_CODE, 0, 0 },
 
     { ngx_string("geoip_country_code3"), NULL,
       ngx_http_geoip_country_variable,
@@ -467,17 +467,17 @@ ngx_http_geoip_region_variable(ngx_http_request_t *r,
     char         *val;
     size_t        len;
     GeoIPRegion  *gr;
-    
+
     ngx_http_geoip_conf_t  *gcf;
 
     gcf = ngx_http_get_module_main_conf(r, ngx_http_geoip_module);
-    
+
     if (gcf->region == NULL) {
         goto not_found;
     }
-    
+
     gr = GeoIP_region_by_ipnum(gcf->region, ngx_http_geoip_addr(r, gcf));
-    
+
     if (gr == NULL) {
         goto not_found;
     }
@@ -840,7 +840,7 @@ ngx_http_geoip_region(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
     }
-    
+
     switch (gcf->region->databaseType) {
         case GEOIP_REGION_EDITION_REV0:
         case GEOIP_REGION_EDITION_REV1:
@@ -1029,8 +1029,8 @@ ngx_http_geoip_cleanup(void *data)
     if (gcf->country) {
         GeoIP_delete(gcf->country);
     }
-    
-	if (gcf->region) {
+
+    if (gcf->region) {
         GeoIP_delete(gcf->region);
     }
 
