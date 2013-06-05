@@ -306,6 +306,7 @@ ngx_http_init_request(ngx_event_t *rev)
     r->http_connection = hc;
 
     c->sent = 0;
+    c->received = c->buffer ? c->buffer->last - c->buffer->pos : 0;
     r->signature = NGX_HTTP_MODULE;
 
     /* find the server configuration for the address:port */
@@ -1220,6 +1221,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
+    c->received += n;
 
     return n;
 }

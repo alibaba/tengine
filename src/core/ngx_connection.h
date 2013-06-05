@@ -125,6 +125,7 @@ struct ngx_connection_s {
     ngx_listening_t    *listening;
 
     off_t               sent;
+    off_t               received;
 
     ngx_log_t          *log;
 
