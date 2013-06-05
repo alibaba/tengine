@@ -19,6 +19,8 @@
 #define NGX_PEER_FAILED              4
 
 
+typedef struct ngx_peer_addrs_s ngx_peer_addrs_t;
+
 typedef struct ngx_peer_connection_s  ngx_peer_connection_t;
 
 typedef ngx_int_t (*ngx_event_get_peer_pt)(ngx_peer_connection_t *pc,
@@ -32,6 +34,12 @@ typedef ngx_int_t (*ngx_event_set_peer_session_pt)(ngx_peer_connection_t *pc,
 typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
     void *data);
 #endif
+
+
+struct ngx_peer_addrs_s {
+    ngx_array_t                     *addrs;
+    ngx_uint_t                        curr;
+};
 
 
 struct ngx_peer_connection_s {
@@ -56,7 +64,7 @@ struct ngx_peer_connection_s {
     ngx_atomic_t                    *lock;
 #endif
 
-    ngx_addr_t                      *local;
+    ngx_peer_addrs_t                *local;
 
     int                              rcvbuf;
 
