@@ -108,6 +108,8 @@ sub has_module($) {
 		browser	=> '(?s)^(?!.*--without-http_browser_module)',
 		upstream_ip_hash
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
+		reqstat
+			=> '(?s)^(?!.*--without-http_reqstat_module)',
 		http	=> '(?s)^(?!.*--without-http(?!\S))',
 		cache	=> '(?s)^(?!.*--without-http-cache)',
 		pop3	=> '(?s)^(?!.*--without-mail_pop3_module)',
