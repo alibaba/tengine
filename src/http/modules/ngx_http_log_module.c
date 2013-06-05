@@ -1448,7 +1448,7 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (ngx_strncmp(value[i].data, "buffer=", 7) == 0) {
-            if (skip_file == 0) {
+            if (skip_file) {
                 continue;
             }
 

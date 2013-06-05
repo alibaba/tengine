@@ -127,9 +127,9 @@ http {
     }
 
     upstream nothing {
-        session_sticky cookie=test maxidle=3600 option=indirect;
-        server         127.0.0.1:9000;
-        server         127.0.0.1:9001;
+        session_sticky cookie=test;
+        server         127.0.0.1:9002;
+        server         127.0.0.1:9003;
     }
 
     upstream insert_nocookie {
@@ -302,7 +302,6 @@ http {
         }
 
         location /test_nothing {
-            session_sticky_hide_cookie upstream=nothing;
             proxy_pass http://nothing/;
         }
     }
