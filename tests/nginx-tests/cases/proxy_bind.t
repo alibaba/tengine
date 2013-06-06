@@ -19,7 +19,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(4);
+my $t = Test::Nginx->new()->plan(8);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -51,9 +51,22 @@ http {
         server 127.0.0.1:1971 id="localhost:1971";
     }
 
+    split_clients "${remote_addr}AAA" $bind_ip {
+                    *   127.0.0.1;
+    }
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
+        location /foo1 {
+            proxy_bind  off;
+            proxy_pass http://foo/index.html;
+        }
+
+        location /foo2 {
+            proxy_bind  $bind_ip;
+            proxy_pass http://foo/index.html;
+        }
 
         location /foo {
             proxy_bind  127.0.0.1;
@@ -95,11 +108,18 @@ $t->run();
 
 like(http_get('/foo'), qr/hello, tengine!/, 'get index.html from foo servers');
 
+like(http_get('/foo1'), qr/hello, tengine!/, 'get index.html from foo servers');
+
+like(http_get('/foo2'), qr/hello, tengine!/, 'get index.html from foo servers');
+
 like(http_get('/bar'), qr/hello, tengine!/, 'get index.html from foo servers');
 
 like(http_get('/foo'), qr/hello, tengine!/, 'get index.html from foo servers');
 
+like(http_get('/foo1'), qr/hello, tengine!/, 'get index.html from foo servers');
+
+like(http_get('/foo2'), qr/hello, tengine!/, 'get index.html from foo servers');
+
 like(http_get('/bar'), qr/hello, tengine!/, 'get index.html from foo servers');
-my $l = <STDIN>;   
 
 ###############################################################################
