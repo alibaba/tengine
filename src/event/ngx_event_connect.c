@@ -17,7 +17,8 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     int                rc;
     ngx_int_t          event;
     ngx_err_t          err;
-    ngx_uint_t         level;
+    ngx_uint_t         level, i, success_bind;
+    ngx_addr_t        *addr, *paddr;
     ngx_socket_t       s;
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
@@ -67,10 +68,37 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
     if (pc->local) {
-        if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
-            ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
-                          "bind(%V) failed", &pc->local->name);
+        success_bind = 0;
+        i = pc->local->curr;
+        paddr = pc->local->addrs->elts;
 
+        do {
+            addr = &paddr[i];
+            i = (i + 1) % pc->local->addrs->nelts;
+
+            if (bind(s, addr->sockaddr, addr->socklen) == -1) {
+                err = ngx_socket_errno;
+
+                if (err == NGX_EINVAL) {
+                    ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
+                                  "bind(%V) failed", &addr->name);
+
+                    goto failed;
+                }
+
+                ngx_log_error(NGX_LOG_ERR, pc->log, ngx_socket_errno,
+                              "bind(%V) failed", &addr->name);
+
+                continue;
+            }
+
+            success_bind = 1;
+            pc->local->curr = i;
+
+            break;
+        } while (i != pc->local->curr);
+
+        if (!success_bind) {
             goto failed;
         }
     }
