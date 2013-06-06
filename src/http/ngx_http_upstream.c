@@ -134,7 +134,7 @@ static char *ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy);
 static char *ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-static ngx_addr_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
+static ngx_peer_addrs_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
     ngx_http_upstream_local_t *local);
 
 static void *ngx_http_upstream_create_main_conf(ngx_conf_t *cf);
@@ -4499,6 +4499,8 @@ ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
 
     ngx_int_t                           rc;
     ngx_str_t                          *value;
+    ngx_uint_t                          i;
+    ngx_addr_t                         *addr;
     ngx_http_complex_value_t            cv;
     ngx_http_upstream_local_t         **plocal, *local;
     ngx_http_compile_complex_value_t    ccv;
@@ -4544,36 +4546,51 @@ ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
         return NGX_CONF_OK;
     }
 
-    local->addr = ngx_palloc(cf->pool, sizeof(ngx_addr_t));
+    local->addr = ngx_pcalloc(cf->pool, sizeof(ngx_peer_addrs_t));
     if (local->addr == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    rc = ngx_parse_addr(cf->pool, local->addr, value[1].data, value[1].len);
-
-    switch (rc) {
-    case NGX_OK:
-        local->addr->name = value[1];
-        return NGX_CONF_OK;
-
-    case NGX_DECLINED:
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid address \"%V\"", &value[1]);
-        /* fall through */
-
-    default:
+    local->addr->addrs = ngx_array_create(cf->pool, 1, sizeof(ngx_addr_t));
+    if (local->addr->addrs == NULL) {
         return NGX_CONF_ERROR;
     }
+
+    for (i = 1; i < cf->args->nelts; i++) {
+        addr = ngx_array_push(local->addr->addrs);
+        if (addr == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        rc = ngx_parse_addr(cf->pool, addr, value[i].data, value[i].len);
+
+        switch (rc) {
+        case NGX_OK:
+            addr->name = value[1];
+            break;
+
+        case NGX_DECLINED:
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid address \"%V\"", &value[i]);
+            /* fall through */
+
+        default:
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
 }
 
 
-static ngx_addr_t *
+static ngx_peer_addrs_t *
 ngx_http_upstream_get_local(ngx_http_request_t *r,
     ngx_http_upstream_local_t *local)
 {
-    ngx_int_t    rc;
-    ngx_str_t    val;
-    ngx_addr_t  *addr;
+    ngx_int_t            rc;
+    ngx_str_t            val;
+    ngx_addr_t          *addr;
+    ngx_peer_addrs_t    *paddr;
 
     if (local == NULL) {
         return NULL;
@@ -4591,7 +4608,17 @@ ngx_http_upstream_get_local(ngx_http_request_t *r,
         return NULL;
     }
 
-    addr = ngx_palloc(r->pool, sizeof(ngx_addr_t));
+    paddr = ngx_pcalloc(r->pool, sizeof(ngx_peer_addrs_t));
+    if (paddr == NULL) {
+        return NULL;
+    }
+
+    paddr->addrs = ngx_array_create(r->pool, 1, sizeof(ngx_addr_t));
+    if (paddr->addrs == NULL) {
+        return NULL;
+    }
+
+    addr = ngx_array_push(paddr->addrs);
     if (addr == NULL) {
         return NULL;
     }
@@ -4601,7 +4628,7 @@ ngx_http_upstream_get_local(ngx_http_request_t *r,
     switch (rc) {
     case NGX_OK:
         addr->name = val;
-        return addr;
+        return paddr;
 
     case NGX_DECLINED:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
