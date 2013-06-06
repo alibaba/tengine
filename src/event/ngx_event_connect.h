@@ -38,7 +38,7 @@ typedef void (*ngx_event_save_peer_session_pt)(ngx_peer_connection_t *pc,
 
 struct ngx_peer_addrs_s {
     ngx_array_t                     *addrs;
-    ngx_uint_t                        curr;
+    ngx_uint_t                       curr;
 };
 
 

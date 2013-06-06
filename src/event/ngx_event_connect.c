@@ -79,12 +79,15 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
             if (bind(s, addr->sockaddr, addr->socklen) == -1) {
                 err = ngx_socket_errno;
 
-                if (err != NGX_EADDRINUSE) {
+                if (err == NGX_EINVAL) {
                     ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
                                   "bind(%V) failed", &addr->name);
 
                     goto failed;
                 }
+
+                ngx_log_error(NGX_LOG_ERR, pc->log, ngx_socket_errno,
+                              "bind(%V) failed", &addr->name);
 
                 continue;
             }
@@ -96,9 +99,6 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         } while (i != pc->local->curr);
 
         if (!success_bind) {
-            ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
-                          "bind failed");
-
             goto failed;
         }
     }
