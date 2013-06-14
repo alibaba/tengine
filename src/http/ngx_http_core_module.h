@@ -406,6 +406,7 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_uint_t    server_tag_type;         /* server tag type */
     ngx_str_t     server_tag;              /* customized server tag */
+    ngx_str_t     server_tag_header;       /* server tag header */
 
 #if (NGX_HTTP_GZIP)
     ngx_flag_t    gzip_vary;               /* gzip_vary */
