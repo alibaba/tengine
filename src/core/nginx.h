@@ -13,9 +13,10 @@
 #define NGINX_VERSION      "1.2.9"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
-#define tengine_version    1005000
-#define TENGINE_VERSION    "1.5.0"
-#define TENGINE_VER        "Tengine/" TENGINE_VERSION
+#define TENGINE            "Tengine"
+#define tengine_version    1004006
+#define TENGINE_VERSION    "1.4.6"
+#define TENGINE_VER        TENGINE "/" TENGINE_VERSION
 
 #define NGINX_VAR          "NGINX"
 #define NGX_OLDPID_EXT     ".oldbin"
