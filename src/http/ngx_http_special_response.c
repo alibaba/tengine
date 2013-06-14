@@ -732,7 +732,8 @@ ngx_http_send_special_response(ngx_http_request_t *r,
                 : sizeof(ngx_http_error_banner) - 1;
 
         } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-            r->headers_out.content_length_n += sizeof(ngx_http_error_powered_by) - 1;
+            r->headers_out.content_length_n += sizeof(ngx_http_error_powered_by)
+                                               - 1;
             r->headers_out.content_length_n += clcf->server_tag.len;
         }
 
