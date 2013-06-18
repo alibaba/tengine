@@ -18,6 +18,7 @@
 
 typedef struct {
     ngx_flag_t      trim_enable;
+    ngx_flag_t      jscss_enable;
     ngx_hash_t      types;
     ngx_array_t    *types_keys;
 } ngx_http_trim_loc_conf_t;
@@ -115,6 +116,13 @@ static ngx_command_t  ngx_http_trim_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_trim_loc_conf_t, trim_enable),
+      NULL },
+
+    { ngx_string("trim_jscss"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_trim_loc_conf_t, jscss_enable),
       NULL },
 
     { ngx_string("trim_types"),
@@ -641,7 +649,13 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             look = ngx_http_trim_script.data[ctx->looked++];    /* <script> */
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_script.len) {
-                    ctx->state = trim_state_tag_script_js_text;
+                    if (conf->jscss_enable) {
+                        ctx->state = trim_state_tag_script_js_text;
+
+                    } else {
+                        ctx->state = trim_state_tag_script_end;
+                    }
+
                     ctx->looked = 0;
                 }
                 break;
@@ -653,7 +667,13 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 if (ctx->looked == ngx_http_trim_script.len) {
-                    ctx->state = trim_state_tag_script_js_begin;
+                    if (conf->jscss_enable) {
+                        ctx->state = trim_state_tag_script_js_begin;
+
+                    } else {
+                        ctx->state = trim_state_tag_script_end;
+                    }
+
                     ctx->looked = 0;
 
                 } else {
@@ -955,7 +975,13 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             look = ngx_http_trim_style.data[ctx->looked++];    /* <style> */
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_style.len) {
-                    ctx->state = trim_state_tag_style_css_text;
+                    if (conf->jscss_enable) {
+                        ctx->state = trim_state_tag_style_css_text;
+
+                    } else {
+                        ctx->state = trim_state_tag_style_end;
+                    } 
+
                     ctx->looked = 0;
                 }
                 break;
@@ -967,7 +993,13 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 if (ctx->looked == ngx_http_trim_style.len) {
-                    ctx->state = trim_state_tag_style_css_begin;
+                    if (conf->jscss_enable) {
+                        ctx->state = trim_state_tag_style_css_begin;
+
+                    } else {
+                        ctx->state = trim_state_tag_style_end;
+                    }
+
                     ctx->looked = 0;
 
                 } else {
@@ -1013,7 +1045,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 ctx->state = trim_state_tag_style_css_whitespace;
                 if (ctx->prev == ';' || ctx->prev == '>' || ctx->prev == '{'
-                    || ctx->prev == '}' || ctx->prev == ' ' || ctx->prev == ':'
+                    || ctx->prev == '}' || ctx->prev == ',' || ctx->prev == ':'
                     || ctx->prev == ch)
                 {
                     continue;
@@ -1096,9 +1128,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             if (ch == '/') {
                 continue;
 
-            } else {
-                break;
             }
+            break;
 
         case trim_state_tag_style_css_comment_begin_empty:
             switch (ch) {
@@ -1489,6 +1520,7 @@ ngx_http_trim_create_loc_conf(ngx_conf_t *cf)
      */
 
     conf->trim_enable = NGX_CONF_UNSET;
+    conf->jscss_enable = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1501,6 +1533,7 @@ ngx_http_trim_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_trim_loc_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->trim_enable, prev->trim_enable, 0);
+    ngx_conf_merge_value(conf->jscss_enable, prev->jscss_enable, 0);
 
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
