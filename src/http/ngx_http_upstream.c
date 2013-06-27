@@ -1525,7 +1525,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u)
 {
     int                        tcp_nodelay;
-    off_t                      rest;
     ngx_int_t                  rc;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
@@ -1576,7 +1575,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         if (u->request_sent && rb->rest) {
             c->log->action = "reading no buffered request body from client";
-            rest = rb->rest;
 
             rc = ngx_http_do_read_non_buffered_client_request_body(r);
 
