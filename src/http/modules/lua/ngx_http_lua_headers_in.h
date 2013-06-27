@@ -1,7 +1,12 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
 
-#ifndef NGX_HTTP_LUA_HEADERS_IN_H
-#define NGX_HTTP_LUA_HEADERS_IN_H
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
+#ifndef _NGX_HTTP_LUA_HEADERS_IN_H_INCLUDED_
+#define _NGX_HTTP_LUA_HEADERS_IN_H_INCLUDED_
 
 
 #include <nginx.h>
@@ -9,8 +14,9 @@
 
 
 ngx_int_t ngx_http_lua_set_input_header(ngx_http_request_t *r, ngx_str_t key,
-        ngx_str_t value, unsigned override);
+    ngx_str_t value, unsigned override);
 
 
-#endif /* NGX_HTTP_LUA_HEADERS_IN_H */
+#endif /* _NGX_HTTP_LUA_HEADERS_IN_H_INCLUDED_ */
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

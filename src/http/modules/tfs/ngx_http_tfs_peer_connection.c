@@ -207,6 +207,7 @@ ngx_http_tfs_select_peer_v1(ngx_http_tfs_t *t)
         case NGX_HTTP_TFS_STATE_WRITE_CREATE_FILE_NAME:
         case NGX_HTTP_TFS_STATE_WRITE_WRITE_DATA:
         case NGX_HTTP_TFS_STATE_WRITE_CLOSE_FILE:
+        case NGX_HTTP_TFS_STATE_WRITE_DELETE_DATA:
             t->create_request = ngx_http_tfs_create_ds_request;
             t->process_request_body = ngx_http_tfs_process_ds;
             t->input_filter = NULL;
