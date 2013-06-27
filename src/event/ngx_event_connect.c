@@ -22,6 +22,10 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    pc->check_index = (ngx_uint_t) NGX_ERROR;
+#endif
+
     rc = pc->get(pc, pc->data);
     if (rc != NGX_OK) {
         return rc;

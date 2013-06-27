@@ -247,6 +247,9 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    pc->check_index = peer->check_index;
+#endif
 
     /* ngx_unlock_mutex(iphp->rrp.peers->mutex); */
 

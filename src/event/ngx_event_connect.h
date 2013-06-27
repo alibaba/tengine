@@ -42,6 +42,9 @@ struct ngx_peer_connection_s {
     ngx_str_t                       *name;
 
     ngx_uint_t                       tries;
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    ngx_uint_t                       check_index;
+#endif
 
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;

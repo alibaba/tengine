@@ -227,6 +227,7 @@ typedef struct {
 
 struct ngx_http_upstream_check_srv_conf_s {
     ngx_uint_t                               port;
+    ngx_uint_t                               max_busy;
     ngx_uint_t                               fall_count;
     ngx_uint_t                               rise_count;
     ngx_msec_t                               check_interval;
@@ -637,6 +638,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->conf = ucscf;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
+    peer->max_busy = ucscf->max_busy;
 
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
@@ -730,11 +732,35 @@ ngx_http_upstream_check_peer_down(ngx_uint_t index)
 
     peer = check_peers_ctx->peers.elts;
 
-    return (peer[index].shm->down);
+    if (peer[index].shm->down) {
+        return 1;
+    }
+
+    if (peer[index].max_busy
+        && peer[index].shm->busyness >= peer[index].max_busy) {
+
+        return 1;
+    }
+
+    return 0;
 }
 
 
-/* TODO: this interface can count each peer's busyness */
+ngx_uint_t
+ngx_http_upstream_check_peer_busyness(ngx_uint_t index)
+{
+    ngx_http_upstream_check_peer_t  *peer;
+
+    if (check_peers_ctx == NULL || index >= check_peers_ctx->peers.nelts) {
+        return 0;
+    }
+
+    peer = check_peers_ctx->peers.elts;
+
+    return (peer[index].shm->busyness);
+}
+
+
 void
 ngx_http_upstream_check_get_peer(ngx_uint_t index)
 {
@@ -2095,6 +2121,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
             "    <th>Upstream</th>\n"
             "    <th>Name</th>\n"
             "    <th>Status</th>\n"
+            "    <th>Busyness</th>\n"
             "    <th>Rise counts</th>\n"
             "    <th>Fall counts</th>\n"
             "    <th>Check type</th>\n"
@@ -2125,6 +2152,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
                 "    <td>%s</td>\n"
                 "    <td>%ui</td>\n"
                 "    <td>%ui</td>\n"
+                "    <td>%ui</td>\n"
                 "    <td>%V</td>\n"
                 "    <td>%ui</td>\n"
                 "  </tr>\n",
@@ -2133,6 +2161,7 @@ ngx_http_upstream_check_status_html_format(ngx_buf_t *b,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -2170,11 +2199,12 @@ ngx_http_upstream_check_status_csv_format(ngx_buf_t *b,
         }
 
         b->last = ngx_snprintf(b->last, b->end - b->last,
-                "%ui,%V,%V,%s,%ui,%ui,%V,%ui\n",
+                "%ui,%V,%V,%s,%ui,%ui,%ui,%V,%ui\n",
                 i,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -2241,6 +2271,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
                 "\"upstream\": \"%V\", "
                 "\"name\": \"%V\", "
                 "\"status\": \"%s\", "
+                "\"busyness\": %ui, "
                 "\"rise\": %ui, "
                 "\"fall\": %ui, "
                 "\"type\": \"%V\", "
@@ -2250,6 +2281,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
                 peer[i].upstream_name,
                 &peer[i].peer_addr->name,
                 peer[i].shm->down ? "down" : "up",
+                peer[i].shm->busyness,
                 peer[i].shm->rise_count,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
@@ -2295,12 +2327,14 @@ static char *
 ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                           *value, s;
+    ngx_uint_t                           max_busy;
     ngx_uint_t                           i, port, rise, fall, default_down;
     ngx_msec_t                           interval, timeout;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     /* default values */
     port = 0;
+    max_busy = 0;
     rise = 2;
     fall = 5;
     interval = 30000;
@@ -2372,6 +2406,20 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "max_busy=", 9) == 0) {
+            s.len = value[i].len - 9;
+            s.data = value[i].data + 9;
+
+            max_busy = ngx_atoi(s.data, s.len);
+            if (max_busy == (ngx_uint_t) NGX_ERROR) {
+                goto invalid_check_parameter;
+            } else if (max_busy == 0) {
+                goto invalid_check_parameter;
+            }
+
+            continue;
+        }
+
         if (ngx_strncmp(value[i].data, "rise=", 5) == 0) {
             s.len = value[i].len - 5;
             s.data = value[i].data + 5;
@@ -2425,6 +2473,7 @@ ngx_http_upstream_check(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ucscf->port = port;
     ucscf->check_interval = interval;
     ucscf->check_timeout = timeout;
+    ucscf->max_busy = max_busy;
     ucscf->fall_count = fall;
     ucscf->rise_count = rise;
     ucscf->default_down = default_down;
@@ -3042,20 +3091,20 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 
         psh->fall_count   = opsh->fall_count;
         psh->rise_count   = opsh->rise_count;
-        psh->busyness     = opsh->busyness;
 
         psh->down         = opsh->down;
 
-    } else{
+    } else {
         psh->access_time  = 0;
         psh->access_count = 0;
 
         psh->fall_count   = 0;
         psh->rise_count   = 0;
-        psh->busyness     = 0;
 
         psh->down         = init_down;
     }
+
+    psh->busyness = 0;
 
 #if (NGX_HAVE_ATOMIC_OPS)
 

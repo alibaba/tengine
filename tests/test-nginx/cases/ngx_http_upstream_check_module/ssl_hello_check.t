@@ -152,3 +152,21 @@ GET /
 --- error_code: 502
 --- response_body_like: ^.*$
 
+=== TEST 8: the ssl_hello_check test with max_busy
+--- http_config
+    upstream test{
+        server www.alipay.com:443;
+
+        check interval=4000 rise=1 fall=1 timeout=2000 type=ssl_hello max_busy=1;
+    }
+
+--- config
+    location / {
+        proxy_ssl_session_reuse off;
+        proxy_pass https://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^.*$
+

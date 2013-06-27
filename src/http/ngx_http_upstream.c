@@ -1161,6 +1161,12 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     /* rc == NGX_OK || rc == NGX_AGAIN */
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    if (u->peer.check_index != (ngx_uint_t) NGX_ERROR) {
+        ngx_http_upstream_check_get_peer(u->peer.check_index);
+    }
+#endif
+
     c = u->peer.connection;
 
     c->data = r;
@@ -2956,6 +2962,13 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
             ngx_destroy_pool(u->peer.connection->pool);
         }
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+        if (u->peer.check_index != (ngx_uint_t) NGX_ERROR) {
+            ngx_http_upstream_check_free_peer(u->peer.check_index);
+            u->peer.check_index = NGX_ERROR;
+        }
+#endif
+
         ngx_close_connection(u->peer.connection);
         u->peer.connection = NULL;
     }
@@ -3027,6 +3040,13 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         u->peer.free(&u->peer, u->peer.data, 0);
         u->peer.sockaddr = NULL;
     }
+
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    if (u->peer.check_index != (ngx_uint_t) NGX_ERROR) {
+        ngx_http_upstream_check_free_peer(u->peer.check_index);
+        u->peer.check_index = NGX_ERROR;
+    }
+#endif
 
     if (u->peer.connection) {
 
