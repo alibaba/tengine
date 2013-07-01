@@ -16,6 +16,7 @@ __DATA__
 === TEST 1: do not trim within 'textarea' 'pre' 'ie-comment'
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -47,6 +48,7 @@ __DATA__
 === TEST 2: trim within other tags
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -66,6 +68,7 @@ is good  to     see you   </body>
 === TEST 3: trim within non-ie comment
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -103,6 +106,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 5: trim newline
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -132,6 +136,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 6: return zero size 
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -146,6 +151,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 7: trim more tags
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -170,6 +176,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 8: trim Chinese characters
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -186,6 +193,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 --- config
     sendfile on;
     trim on;
+    trim_jscss on;
 --- user_files
 >>> trim.html
 <!DOCTYPE html>
@@ -201,6 +209,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 10: if $arg_http_trim is off, trim off.
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -220,6 +229,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 === TEST 11: trim javascript comment
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -248,6 +258,7 @@ document.write("hello world");
 === TEST 12: do not tirm javascript quote and RE 
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -271,6 +282,7 @@ str.replace(  /    /,"hello");
 === TEST 13: trim css comment
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -292,6 +304,7 @@ body {
 === TEST 14: do not trim css quote
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -311,6 +324,7 @@ body {
 === TEST 15 trim aplus.js
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -334,6 +348,7 @@ d.getElementsByTagName("head")[0].appendChild(t);
 === TEST 15: do not trim css comment of child selector hack
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
@@ -353,6 +368,7 @@ html >/**/ body p {
 === TEST 16: do not trim css comment of IE5/Mac hack
 --- config
     trim on;
+    trim_jscss on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
     location /trim.html { trim off;}
 --- user_files
