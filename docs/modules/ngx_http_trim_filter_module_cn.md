@@ -9,6 +9,7 @@
 
     location / {
         trim on;
+        trim_jscss on;
     }
 
 ## 指令
@@ -19,8 +20,18 @@
 
 **上下文:** `http, server, location` 
      
-在配置的地方使模块有效（失效），删除 html， 内嵌 javascript 和 css 的注释以及重复的空白符（/n，/r，/t，' ')。   
-例外：对于 `pre`，`textarea`，`ie注释`， 非javascript代码的`script`，非css代码的`style` 等标签内的内容不作删除操作。   
+在配置的地方使模块有效（失效），删除 html 的注释以及重复的空白符（/n，/r，/t，' ')。   
+例外：对于 `pre`，`textarea`，`ie注释`，`script`，`style` 等标签内的内容不作删除操作。   
+<br/>
+
+**trim_jscss** `on` | `off`
+
+**默认:** `trim_jscss off`
+
+**上下文:** `http, server, location` 
+     
+在配置的地方使模块有效（失效），删除内嵌 javascript 和 css 的注释以及重复的空白符（/n，/r，/t，' ')。   
+例外：对于非javascript代码的`script`，非css代码的`style` 等标签内的内容不作删除操作。   
 <br/>
 
 **trim_types** `MIME types`
