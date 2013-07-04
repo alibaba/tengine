@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# (C) Maxim Dounin
-
 # Tests for error_page directive (inherit).
 
 ###############################################################################

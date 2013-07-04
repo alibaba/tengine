@@ -291,8 +291,8 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
 
     segment_data = &t->file.segment_data[t->file.segment_index];
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     if (rc == NGX_OK) {
@@ -373,6 +373,9 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
                            "batch lookup remote block cache, hit_count: %ui",
                            hit_count);
 
+            /* remote block cache hit count */
+            t->file.curr_batch_count += hit_count;
+
             if (hit_count == kvs->nelts) {
                 /* all cache hit, start batch process */
                 t->decline_handler = ngx_http_tfs_batch_process_start;
@@ -399,11 +402,10 @@ ngx_http_tfs_get_remote_block_cache_instance(
     size_t                                server_addr_len;
     uint32_t                              server_addr_hash;
     ngx_int_t                             rc, i;
-    ngx_str_t                            *st;
+    ngx_str_t                            *st, *group_name;
     ngx_array_t                           config_server;
     ngx_http_tfs_t                       *t;
     ngx_http_tfs_tair_instance_t         *instance;
-    ngx_http_etair_server_conf_t         *server;
     ngx_http_tfs_tair_server_addr_info_t  server_addr_info;
 
     if (server_addr->len == 0
@@ -449,8 +451,8 @@ ngx_http_tfs_get_remote_block_cache_instance(
         }
     }
 
-    server = &server_addr_info.server[NGX_HTTP_TFS_TAIR_CONFIG_SERVER_COUNT];
-    instance->server = ngx_http_etair_create_server(server,
+    group_name = &server_addr_info.server[NGX_HTTP_TFS_TAIR_CONFIG_SERVER_COUNT];
+    instance->server = ngx_http_etair_create_server(group_name,
                                                     &config_server,
                                                     t->main_conf->tair_timeout,
                                                     (ngx_cycle_t *) ngx_cycle);

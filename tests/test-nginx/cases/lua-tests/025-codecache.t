@@ -3,9 +3,9 @@
 use lib 'lib';
 use Test::Nginx::Socket;
 
-repeat_each(1);
+repeat_each(2);
 
-plan tests => blocks() * repeat_each() * 2;
+plan tests => repeat_each() * (blocks() * 2);
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
 
@@ -565,4 +565,26 @@ loading
 hello, foo
 found
 found
+
+
+
+=== TEST 17: clear _G table
+--- http_config eval
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+--- config
+    lua_code_cache off;
+    location /t {
+        content_by_lua '
+            if not _G.foo then
+                _G.foo = 1
+            else
+                _G.foo = _G.foo + 1
+            end
+            ngx.say("_G.foo: ", _G.foo)
+        ';
+    }
+--- request
+    GET /t
+--- response_body
+_G.foo: 1
 

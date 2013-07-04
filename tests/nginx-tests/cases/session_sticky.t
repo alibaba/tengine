@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(36);
+my $t = Test::Nginx->new()->plan(38);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -30,7 +30,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 worker_processes  1;
 
 events {
-    use     epoll;
 }
 
 http {
@@ -122,15 +121,15 @@ http {
     }
 
     upstream insert_nomaxidle {
-        session_sticky cookie=test mode=insert maxlife=600 fallback=on;
+        session_sticky cookie=test mode=insert  fallback=on;
         server          127.0.0.1:9000;
         server          127.0.0.1:9001;
     }
 
     upstream nothing {
-        session_sticky cookie=test maxidle=3600 option=indirect;
-        server         127.0.0.1:9000;
-        server         127.0.0.1:9001;
+        session_sticky cookie=test;
+        server         127.0.0.1:9002;
+        server         127.0.0.1:9003;
     }
 
     upstream insert_nocookie {
@@ -149,27 +148,30 @@ http {
         server 127.0.0.1:9004;
     }
 
+    upstream hash {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on hash=plain;
+        server          127.0.0.1:9002 id=9002;
+        server          127.0.0.1:9003 id=9003;
+    }
+
     server {
         listen     127.0.0.1:9000;
-        session_sticky_header switch=off;
         location / {
-            add_header  Set-Cookie test=fuck;
+            add_header  Set-Cookie test=test1234;
             index       9000;
         }
     }
 
     server {
         listen     127.0.0.1:9001;
-        session_sticky_header switch=off;
         location / {
-            add_header Set-Cookie test=fuck;
+            add_header Set-Cookie test=test1234;
             index       9001;
         }
     }
 
     server {
         listen     127.0.0.1:9002;
-        session_sticky_header switch=off;
         location / {
             index       9002;
         }
@@ -177,7 +179,6 @@ http {
 
     server {
         listen     127.0.0.1:9003;
-        session_sticky_header switch=off;
         location / {
             index       9003;
         }
@@ -185,7 +186,6 @@ http {
 
     server {
         listen    127.0.0.1:9004;
-        session_sticky_header switch=off;
         location / {
             if ($cookie_test != "") {
                 return 401;
@@ -200,85 +200,90 @@ http {
         server_name localhost;
 
         location /test_insert_indirect {
-            session_sticky_header upstream=insert_indirect;
+            session_sticky_hide_cookie upstream=insert_indirect;
             proxy_pass  http://insert_indirect/;
         }
 
+        location /test_hash {
+            session_sticky_hide_cookie upstream=hash;
+            proxy_pass http://hash/;
+        }
+
         location /test_insert {
-            session_sticky_header upstream=insert;
+            session_sticky_hide_cookie upstream=insert;
             proxy_pass  http://insert/;
         }
 
         location /test_rewrite {
-            session_sticky_header upstream=rewrite;
+            session_sticky_hide_cookie upstream=rewrite;
             proxy_pass  http://rewrite/;
         }
 
         location /test_rewrite_no_setcookie {
-            session_sticky_header upstream=rewrite_no_setcookie;
+            session_sticky_hide_cookie upstream=rewrite_no_setcookie;
             proxy_pass http://rewrite_no_setcookie/;
         }
 
         location /test_prefix {
-            session_sticky_header upstream=prefix;
+            session_sticky_hide_cookie upstream=prefix;
             proxy_pass  http://prefix/;
         }
 
         location /test_prefix_no_setcookie {
-            session_sticky_header upstream=prefix_no_setcookie;
+            session_sticky_hide_cookie upstream=prefix_no_setcookie;
             proxy_pass http://prefix_no_setcookie/;
         }
 
         location /test_insert_indirect_off {
-            session_sticky_header upstream=insert_indirect_off;
+            session_sticky_hide_cookie upstream=insert_indirect_off;
             proxy_pass http://insert_indirect_off/;
         }
 
         location /test_insert_off {
-            session_sticky_header upstream=insert_off;
+            session_sticky_hide_cookie upstream=insert_off;
             proxy_pass http://insert_off/;
         }
         location /test_rewrite_off {
-            session_sticky_header upstream=rewrite_off;
+            session_sticky_hide_cookie upstream=rewrite_off;
             proxy_pass http://rewrite_off/;
         }
 
         location /test_prefix_off {
-            session_sticky_header upstream=prefix_off;
+            session_sticky_hide_cookie upstream=prefix_off;
             proxy_pass http://prefix_off/;
         }
 
         location /test_insert_nodomain {
-            session_sticky_header upstream=insert_nodomain;
+            session_sticky_hide_cookie upstream=insert_nodomain;
             proxy_pass http://insert_nodomain/;
         }
 
         location /test_insert_nopath {
-            session_sticky_header upstream=insert_nopath;
+            session_sticky_hide_cookie upstream=insert_nopath;
             proxy_pass http://insert_nopath/;
         }
 
         location /test_insert_nomaxage {
-            session_sticky_header upstream=insert_nomaxage;
+            session_sticky_hide_cookie upstream=insert_nomaxage;
             proxy_pass http://insert_nomaxage/;
         }
 
         location /test_insert_nomalife {
-            session_sticky_header upstream=insert_nomaxlife;
+            session_sticky_hide_cookie upstream=insert_nomaxlife;
             proxy_pass http://insert_nomaxlife/;
         }
         location /test_insert_nomaxidle {
-            session_sticky_header upstream=insert_nomaxidle;
+            session_sticky_hide_cookie upstream=insert_nomaxidle;
             proxy_pass http://insert_nomaxidle/;
         }
 
         location /test_insert_nocookie {
-            session_sticky_header upstream=insert_nocookie;
+            session_sticky_hide_cookie upstream=insert_nocookie;
             proxy_pass http://insert_nocookie/;
         }
 
         location /test_insert_nocookie_notfound {
-            session_sticky_header upstream=insert_nocookie;
+            session_sticky_hide_cookie upstream=insert_nocookie;
             proxy_pass http://insert_nocookie;
         }
 
@@ -287,17 +292,16 @@ http {
         }
 
         location /test_cookie {
-            session_sticky_header upstream=nocookie;
+            session_sticky_hide_cookie upstream=nocookie;
             proxy_pass http://nocookie/;
         }
 
         location /test_havecookie {
-            session_sticky_header upstream=havecookie;
+            session_sticky_hide_cookie upstream=havecookie;
             proxy_pass http://havecookie/;
         }
 
         location /test_nothing {
-            session_sticky_header upstream=nothing;
             proxy_pass http://nothing/;
         }
     }
@@ -317,7 +321,7 @@ my $res = getres($r);
 my $now = time();
 my $sid = getsid($cookie);
 #2
-like(my_http_get('/test_insert_indirect', "$sid!$now^$now"), qr/$res/, 'insert with cookie');
+like(my_http_get('/test_insert_indirect', "$sid\|$now\|$now"), qr/$res/, 'insert with cookie');
 $r = http_get('/test_insert');
 $cookie = getcookie($r);
 $res = getres($r);
@@ -329,16 +333,16 @@ if ($res eq 9000) {
     $res = 9000;
 }
 #3
-like(my_http_get('/test_insert', "$sid!$now^$now"), qr/$res/, 'insert with cookie, maxidle timeout');
+like(my_http_get('/test_insert', "$sid\|$now\|$now"), qr/$res/, 'insert with cookie, maxidle timeout');
 $r = http_get('/test_insert_indirect');
 #4
-like($r, qr/test=\w{32}!\d*\^\d*;/, 'insert with indirect');
+like($r, qr/test=\w{32}\|\d*\|\d*;/, 'insert with indirect');
 #5
 like($r, qr/\d{4}/, 'insert with indirect -- upstream don\'t recv cookie');
 #6
 $r = http_get('/test_rewrite');
 $cookie = getcookie($r);
-$res = getcookie($r);
+$res = getres($r);
 like($r, qr/set-cookie:[^\w]*test=\w{32}/i, 'rewrite -- upstream set cookie');
 unlike($r, qr/set-cookie:[^\w]*test=\w{32};[^\w]*domain/i, 'rewrite -- upstream set cookie and session_sticky modify the value only');
 like(my_http_get('/test_rewrite', "$cookie"), qr/$res/, 'rewrite -- with cookie in request');
@@ -356,35 +360,35 @@ unlike(http_get('/test_prefix_no_setcookie'), qr/set-cookie:[^\w]*test=\w{32}\W*
 
 #10
 $now = time();
-like(my_http_get('/test_insert_indirect_off', "asdfasfasdfsadf!$now^$now"), qr/502/, 'insert with indirect and fallback off');
+like(my_http_get('/test_insert_indirect_off', "asdfasfasdfsadf\|$now\|$now"), qr/502/, 'insert with indirect and fallback off');
 #11
-like(http_get('/test_insert_indirect_off'), qr/900\d/, 'insert with indirct --- frist and fallback off');
+like(http_get('/test_insert_indirect_off'), qr/200/, 'insert with indirct --- frist and fallback off');
 #12
 $now = time();
-like(my_http_get('/test_insert_off', "asdfasfasdfsadf!$now^$now"), qr/502/, 'insert without indirect adn fallback off');
+like(my_http_get('/test_insert_off', "asdfasfasdfsadf\|$now\|$now"), qr/502/, 'insert without indirect adn fallback off');
 #13
-like(http_get('/test_insert_off'), qr/900\d/, 'insert -- frist and fallback off');
+like(http_get('/test_insert_off'), qr/200/, 'insert -- frist and fallback off');
 #14
 $now = time();
-like(my_http_get('/test_rewrite_off', "asdfasfasdfsadf!$now^$now"), qr/502/, 'rewrite -- fallback off');
+like(my_http_get('/test_rewrite_off', "asdfasfasdfsadf\|$now\|$now"), qr/502/, 'rewrite -- fallback off');
 #15
-like(http_get('/test_rewrite_off'), qr/900\d/, 'rewrite -- frist and fallback off');
+like(http_get('/test_rewrite_off'), qr/200/, 'rewrite -- frist and fallback off');
 #16
 $now = time();
-like(my_http_get('/test_prefix_off', "asdfasfasdfsadf!$now^$now"), qr/502/, 'prefix -- fallback off');
+like(my_http_get('/test_prefix_off', "asdfasfasdfsadf~\|$now\|$now"), qr/502/, 'prefix-cookie invailied');
 #17
-like(http_get('/test_prefix_off'), qr/900\d/, 'prefix -- frist and fallback off');
+like(http_get('/test_prefix_off'), qr/200/, 'prefix -- frist and fallback off');
 #18
 unlike(http_get('/test_insert_nodomain'), qr/domain/i, 'insert -- without domain');
 #19
-unlike(http_get('/test_insert_nopath'), qr/path/i, 'insert -- without path');
+like(http_get('/test_insert_nopath'), qr/path=\//i, 'insert -- without path');
 #20
 unlike(http_get('/test_insert_nomaxage'), qr/max-age/i, 'insert--without max-age');
 #21
 $r = http_get('/test_insert_nomaxidle');
 like($r, qr/set-cookie:[^\w]*test=\w*/i, 'insert--without maxidle');
 #22
-unlike($r, qr/set-cookie:\W*test=\w{32}!\d*^\d*/i, 'insert--without maxidle');
+unlike($r, qr/set-cookie:\W*test=\w{32}\|\d*\|\d*/i, 'insert--without maxidle');
 #23
 like(http_get('/test_insert_nocookie'), qr/route/i, 'insert--without cookie');
 #24
@@ -393,7 +397,7 @@ like(http_get('/test_insert_nocookie_notfound'), qr/404 Not Found/, 'Not Found')
 $r = http_get('/test_rewrite_no_header');
 $cookie = getcookie($r);
 $res = getres($r);
-like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_header');
+like(my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_hide_cookie');
 $r = http_get('/test_insert_nomalife');
 $cookie=getcookie($r);
 $res=getres($r);
@@ -412,6 +416,12 @@ $cookie = getcookie($r);
 $res = getres($r);
 like($r, qr/200/, 'prefix--without maxidle or maxlife');
 like(my_http_get('/test_nothing', $cookie), qr/$res/, 'prefix--without maxidle or maxlife');
+$r = http_get('/test_hash');
+like($r, qr/set-cookie: test=\d{4}/i, "hash=plain");
+$cookie = getcookie($r);
+$res = getres($r);
+$r = my_http_get('/test_hash', $cookie);
+like($r, qr/$res/, 'hash=plain, the same real server');
 $t->stop();
 #####################################################################################
 #####################################################################################
@@ -427,21 +437,21 @@ sub getcookie
 sub getsid
 {
     my ($c) = @_;
-    $c =~ m/([^!]*)/;
+    $c =~ m/([^|]*)/;
     return $1;
 }
 
 sub getlastseen
 {
     my ($c) = @_;
-    $c =~ m/!(\d*)/;
+    $c =~ m/\|(\d*)\|/;
     return $1;
 }
 
 sub getfristseen
 {
     my ($c) = @_;
-    $c =~ m/\^(\d*)/;
+    $c =~ m/\|(\d*)$/;
     return $1;
 }
 

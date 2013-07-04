@@ -2,13 +2,13 @@
 use lib 'lib';
 use Test::Nginx::Socket;
 
-worker_connections(1014);
+#worker_connections(1014);
 #master_on();
 #workers(4);
 #log_level('warn');
 no_root_location();
 
-repeat_each(2);
+#repeat_each(2);
 
 plan tests => repeat_each() * (blocks() * 3);
 
@@ -35,7 +35,7 @@ __DATA__
 --- request
 GET /test
 --- response_body
-ngx: 87
+ngx: 85
 --- no_error_log
 [error]
 
@@ -56,7 +56,7 @@ ngx: 87
 --- request
 GET /test
 --- response_body
-71
+85
 --- no_error_log
 [error]
 
@@ -84,7 +84,7 @@ GET /test
 --- request
 GET /test
 --- response_body
-n = 71
+n = 85
 --- no_error_log
 [error]
 
@@ -124,7 +124,7 @@ n = 1
 --- request
 GET /test
 --- response_body
-n = 16
+n = 23
 --- no_error_log
 [error]
 
@@ -146,7 +146,7 @@ n = 16
 --- request
 GET /test
 --- response_body
-n = 9
+n = 23
 --- no_error_log
 [error]
 
@@ -173,7 +173,7 @@ n = 9
 --- request
 GET /test
 --- response_body
-n = 9
+n = 23
 --- no_error_log
 [error]
 
@@ -213,13 +213,14 @@ n = 2
 --- request
 GET /test
 --- response_body
-n = 2
+n = 3
 --- no_error_log
 [error]
 
 
 
 === TEST 10: entries under ngx._tcp_meta
+--- SKIP
 --- config
         location = /test {
             content_by_lua '
@@ -240,6 +241,7 @@ n = 10
 
 
 === TEST 11: entries under ngx._reqsock_meta
+--- SKIP
 --- config
         location = /test {
             content_by_lua '
@@ -277,7 +279,27 @@ n = 4
 --- request
 GET /test
 --- response_body
-n = 8
+n = 12
 --- no_error_log
 [error]
+
+
+
+=== TEST 13: entries under ngx. (log by lua)
+--- config
+    location = /t {
+        log_by_lua '
+            local n = 0
+            for k, v in pairs(ngx) do
+                n = n + 1
+            end
+            ngx.log(ngx.ERR, "ngx. entry count: ", n)
+        ';
+    }
+--- request
+GET /t
+--- response_body_like: 404 Not Found
+--- error_code: 404
+--- error_log
+ngx. entry count: 85
 

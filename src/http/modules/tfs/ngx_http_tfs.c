@@ -48,6 +48,10 @@ static void ngx_http_tfs_process_upstream_request(ngx_http_request_t *r,
 
 static void ngx_http_tfs_handle_connection_failure(ngx_http_tfs_t *t,
     ngx_http_tfs_peer_connection_t *tp);
+static void ngx_http_tfs_rd_check_broken_connection(ngx_http_request_t *r);
+static void ngx_http_tfs_wr_check_broken_connection(ngx_http_request_t *r);
+static void ngx_http_tfs_check_broken_connection(ngx_http_request_t *r,
+    ngx_event_t *ev);
 
 
 extern ngx_module_t  ngx_http_tfs_module;
@@ -72,6 +76,9 @@ ngx_http_tfs_init(ngx_http_tfs_t *t)
 
     if (t->r_ctx.action.code != NGX_HTTP_TFS_ACTION_KEEPALIVE) {
         r = t->data;
+        r->read_event_handler = ngx_http_tfs_rd_check_broken_connection;
+        r->write_event_handler = ngx_http_tfs_wr_check_broken_connection;
+
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
         if (clcf == NULL) {
             return NGX_ERROR;
@@ -348,8 +355,8 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
     ngx_http_tfs_block_cache_key_t  *key;
 
     block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
+    if (block_count > NGX_HTTP_TFS_MAX_BATCH_COUNT) {
+        block_count = NGX_HTTP_TFS_MAX_BATCH_COUNT;
     }
 
     rc = ngx_array_init(&keys, t->pool, block_count,
@@ -376,6 +383,8 @@ ngx_http_tfs_batch_lookup_block_cache(ngx_http_tfs_t *t)
                                                &keys, &kvs);
     /* local cache hit(maybe partial) */
     if (rc != NGX_ERROR && kvs.nelts > 0) {
+        /* local block cache hit count */
+        t->file.curr_batch_count += kvs.nelts;
         kv = kvs.elts;
         for (i = 0; i < kvs.nelts; i++, kv++) {
             /* find out segment */
@@ -772,6 +781,15 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         }
     }
 
+    if (rc == NGX_HTTP_CLIENT_CLOSED_REQUEST
+        || rc == NGX_HTTP_REQUEST_TIME_OUT)
+    {
+        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                      "client prematurely closed connection or timed out");
+        ngx_http_tfs_finalize_request(r, t, rc);
+        return;
+    }
+
     if (rc == NGX_ERROR) {
         if (p) {
             ngx_log_error(NGX_LOG_ERR, t->log, 0,
@@ -815,7 +833,7 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         /* need stat data */
         if (!t->parent && t->srv_conf->log != NULL) {
             ngx_log_error(NGX_LOG_INFO, t->srv_conf->log, 0,
-                          "%d, %uL, %V, %V, %uD, %uL, %uL, %uL",
+                          "%d, %uL, %V, %V, %uD, %uL, %uL, %uL, %V",
                           t->r_ctx.action.code,
                           t->loc_conf->upstream->enable_rcs ?
                           t->rc_info_node->app_id : NGX_HTTP_TFS_DEFAULT_APPID,
@@ -824,7 +842,8 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
                           t->r_ctx.fsname.file.block_id,
                           ngx_http_tfs_raw_fsname_get_file_id(t->r_ctx.fsname),
                           t->r_ctx.offset,
-                          t->stat_info.size);
+                          t->stat_info.size,
+                          &r->connection->addr_text);
         }
 
         /* need send data */
@@ -841,7 +860,8 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         if (t->decline_handler) {
             rc = t->decline_handler(t);
             if (rc == NGX_ERROR) {
-                ngx_http_tfs_finalize_request(r, t, NGX_ERROR);
+                ngx_http_tfs_finalize_request(r, t,
+                                              NGX_HTTP_INTERNAL_SERVER_ERROR);
             }
         }
         return;
@@ -1254,6 +1274,11 @@ ngx_http_tfs_set_header_line(ngx_http_tfs_t *t)
                 ngx_str_set(&r->headers_out.content_type, "application/json");
             }
 
+            /* set last-modified if have */
+            if (t->file_info.modify_time > 0) {
+                r->headers_out.last_modified_time = t->file_info.modify_time;
+            }
+
             r->headers_out.status = NGX_HTTP_OK;
             break;
 
@@ -1383,8 +1408,22 @@ ngx_http_tfs_process_non_buffered_downstream(ngx_http_request_t *r)
     if (wev->timedout) {
         c->timedout = 1;
         ngx_connection_error(c, NGX_ETIMEDOUT, "client timed out");
+
+        /* write need roll back, remove all segments */
+        if (t->r_ctx.version == 1
+            && t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE
+            && !t->parent)
+        {
+            r->write_event_handler = ngx_http_request_empty_handler;
+            t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+            t->is_rolling_back = NGX_HTTP_TFS_YES;
+            t->file.segment_index = 0;
+            ngx_http_tfs_finalize_state(t, NGX_OK);
+            return;
+        }
+
         ngx_http_tfs_finalize_request(t->data, t,
-                                      NGX_HTTP_INTERNAL_SERVER_ERROR);
+                                      NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
 
@@ -1654,6 +1693,9 @@ ngx_http_tfs_finalize_request(ngx_http_request_t *r, ngx_http_tfs_t *t,
 
         } else {
             t->parent->sp_fail_count++;
+            if (rc == NGX_HTTP_REQUEST_TIME_OUT) {
+                t->parent->request_timeout = NGX_HTTP_TFS_YES;
+            }
         }
         t->parent->sp_done_count++;
         t->parent->sp_curr++;
@@ -2163,17 +2205,13 @@ ngx_http_tfs_set_duplicate_info(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
 {
-    uint32_t                         block_count, i;
+    uint32_t                         i;
     ngx_http_tfs_t                  *st, **tt;
     ngx_http_tfs_inet_t             *addr;
     ngx_http_tfs_segment_data_t     *segment_data;
     ngx_http_tfs_peer_connection_t  *data_server;
 
     segment_data = &t->file.segment_data[t->file.segment_index];
-    block_count = t->file.segment_count - t->file.segment_index;
-    if (block_count > NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT) {
-        block_count = NGX_HTTP_TFS_MAX_SEND_FRAG_COUNT;
-    }
 
     t->sp_count = 0;
     t->sp_done_count = 0;
@@ -2184,7 +2222,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
     tt = &t->next;
 
     /* create sub process */
-    for (i = 0; i < block_count; i++) {
+    for (i = 0; i < t->file.curr_batch_count; i++) {
         st = ngx_http_tfs_alloc_st(t);
         if (st == NULL) {
             return NGX_ERROR;
@@ -2204,6 +2242,7 @@ ngx_http_tfs_batch_process_start(ngx_http_tfs_t *t)
         st->file.segment_data = &segment_data[i];
         st->sp_curr = t->file.segment_index + i;
         st->sp_ready = NGX_HTTP_TFS_NO;
+        st->stat_info.size = 0;
 
         if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
             st->file.left_length = st->file.segment_data->segment_info.size;
@@ -2296,11 +2335,34 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
                       "sub process error, rest segment count: %D ",
                       t->file.segment_count - t->file.segment_index);
 
-        ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        /* write need roll back, remove all segments writtern */
+        if (t->r_ctx.version == 1
+            && t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE)
+        {
+            t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+            t->is_rolling_back = NGX_HTTP_TFS_YES;
+            t->file.segment_count = t->file.segment_index + t->sp_count;
+            t->file.segment_index = 0;
+            ngx_http_tfs_finalize_state(t, NGX_OK);
+            return NGX_OK;
+        }
+
+        if (t->request_timeout) {
+            ngx_http_tfs_finalize_request(t->data, t,
+                                          NGX_HTTP_REQUEST_TIME_OUT);
+
+        } else if (t->client_abort) {
+            ngx_http_tfs_finalize_request(t->data, t,
+                                          NGX_HTTP_CLIENT_CLOSED_REQUEST);
+
+        } else {
+            ngx_http_tfs_finalize_state(t, NGX_ERROR);
+        }
         return NGX_ERROR;
     }
 
     t->file.segment_index += t->sp_count;
+    t->file.curr_batch_count = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
                    "batch process segment count: %uD, rest segment count: %D ",
@@ -2311,22 +2373,21 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
         if (t->r_ctx.version == 1 && t->is_large_file) {
             t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
 
-            /* all data write over */
-            if (t->file.left_length == 0) {
-                rc = ngx_http_tfs_set_meta_segment_data(t);
-                if (rc == NGX_ERROR) {
-                    ngx_http_tfs_finalize_state(t, NGX_ERROR);
-                    return NGX_ERROR;
-                }
+            /* need roll back, remove all segments writtern */
+            if (t->client_abort) {
+                t->is_rolling_back = NGX_HTTP_TFS_YES;
+                t->file.segment_count = t->file.segment_index;
+                t->file.segment_index = 0;
 
-                /* reuse the first segment */
-                t->send_body = t->meta_segment_data;
-                rc = ngx_http_tfs_get_segment_for_write(t);
-                if (rc == NGX_ERROR) {
-                    ngx_http_tfs_finalize_state(t, NGX_ERROR);
-                    return NGX_ERROR;
+            } else {
+                /* all data write over */
+                if (t->file.left_length == 0) {
+                    rc = ngx_http_tfs_set_meta_segment_data(t);
+                    if (rc == NGX_ERROR) {
+                        ngx_http_tfs_finalize_state(t, NGX_ERROR);
+                        return NGX_ERROR;
+                    }
                 }
-                t->is_process_meta_seg = NGX_HTTP_TFS_YES;
             }
 
         } else if (t->r_ctx.version == 2) {
@@ -2381,6 +2442,14 @@ ngx_int_t
 ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
 {
     if (t->sp_ready) {
+        if (t->parent->sp_fail_count > 0) {
+            ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                          "other sub process failed, will fail myself");
+
+            ngx_http_tfs_finalize_request(t->data, t, NGX_ERROR);
+            return NGX_OK;;
+        }
+
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
                        "segment[%uD] wake up, will output...",
                        t->sp_curr);
@@ -2388,4 +2457,117 @@ ngx_http_tfs_batch_process_next(ngx_http_tfs_t *t)
     }
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_tfs_rd_check_broken_connection(ngx_http_request_t *r)
+{
+    ngx_http_tfs_check_broken_connection(r, r->connection->read);
+}
+
+
+static void
+ngx_http_tfs_wr_check_broken_connection(ngx_http_request_t *r)
+{
+    ngx_http_tfs_check_broken_connection(r, r->connection->write);
+}
+
+
+static void
+ngx_http_tfs_check_broken_connection(ngx_http_request_t *r,
+    ngx_event_t *ev)
+{
+    int               n;
+    char              buf[1];
+    ngx_err_t         err;
+    ngx_int_t         event;
+    ngx_http_tfs_t    *t;
+    ngx_connection_t  *c;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ev->log, 0,
+                   "http tfs check client, write event:%d, \"%V\"",
+                   ev->write, &r->uri);
+
+    c = r->connection;
+    t = ngx_http_get_module_ctx(r, ngx_http_tfs_module);
+
+    if (c->error) {
+        if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+
+            event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+            ngx_del_event(ev, event, 0);
+        }
+
+        t->client_abort = NGX_HTTP_TFS_YES;
+
+        return;
+    }
+
+#if (NGX_HAVE_KQUEUE)
+
+    if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+
+        if (!ev->pending_eof) {
+            return;
+        }
+
+        ev->eof = 1;
+        c->error = 1;
+
+        if (ev->kq_errno) {
+            ev->error = 1;
+        }
+
+        ngx_log_error(NGX_LOG_INFO, ev->log, ev->kq_errno,
+                      "kevent() reported that client prematurely closed "
+                      "connection");
+        t->client_abort = NGX_HTTP_TFS_YES;
+
+        return;
+    }
+
+#endif
+
+    n = recv(c->fd, buf, 1, MSG_PEEK);
+
+    err = ngx_socket_errno;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ev->log, err,
+                   "http tfs recv(): %d", n);
+
+    if (ev->write && (n >= 0 || err == NGX_EAGAIN)) {
+        return;
+    }
+
+    if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
+
+        event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
+
+        ngx_del_event(ev, event, 0);
+    }
+
+    if (n > 0) {
+        return;
+    }
+
+    if (n == -1) {
+        if (err == NGX_EAGAIN) {
+            return;
+        }
+
+        ev->error = 1;
+
+    } else { /* n == 0 */
+        err = 0;
+    }
+
+    ev->eof = 1;
+    c->error = 1;
+
+    ngx_log_error(NGX_LOG_INFO, ev->log, err,
+                  "client prematurely closed connection");
+
+    t->client_abort = NGX_HTTP_TFS_YES;
 }

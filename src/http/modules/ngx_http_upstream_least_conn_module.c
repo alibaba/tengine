@@ -333,7 +333,9 @@ failed:
         lcp->rrp.peers = peers->next;
         pc->tries = lcp->rrp.peers->number;
 
-        n = lcp->rrp.peers->number / (8 * sizeof(uintptr_t)) + 1;
+        n = (lcp->rrp.peers->number + (8 * sizeof(uintptr_t) - 1))
+                / (8 * sizeof(uintptr_t));
+
         for (i = 0; i < n; i++) {
              lcp->rrp.tried[i] = 0;
         }
@@ -368,10 +370,6 @@ ngx_http_upstream_free_least_conn_peer(ngx_peer_connection_t *pc,
 
     if (lcp->rrp.peers->single) {
         lcp->free_rr_peer(pc, &lcp->rrp, state);
-        return;
-    }
-
-    if (state == 0 && pc->tries == 0) {
         return;
     }
 

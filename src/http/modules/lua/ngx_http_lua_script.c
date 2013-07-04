@@ -1,27 +1,34 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
 #include "ddebug.h"
+
 
 #include "ngx_http_lua_script.h"
 
 
 static void * ngx_http_lua_script_add_code(ngx_array_t *codes, size_t size);
 static size_t ngx_http_lua_script_copy_len_code(
-        ngx_http_lua_script_engine_t *e);
+    ngx_http_lua_script_engine_t *e);
 static void ngx_http_lua_script_copy_code(ngx_http_lua_script_engine_t *e);
 static ngx_int_t ngx_http_lua_script_add_copy_code(
-        ngx_http_lua_script_compile_t *sc, ngx_str_t *value, ngx_uint_t last);
+    ngx_http_lua_script_compile_t *sc, ngx_str_t *value, ngx_uint_t last);
 static ngx_int_t ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc);
 static ngx_int_t ngx_http_lua_script_add_capture_code(
-        ngx_http_lua_script_compile_t *sc, ngx_uint_t n);
+    ngx_http_lua_script_compile_t *sc, ngx_uint_t n);
 static size_t ngx_http_lua_script_copy_capture_len_code(
-        ngx_http_lua_script_engine_t *e);
+    ngx_http_lua_script_engine_t *e);
 static void ngx_http_lua_script_copy_capture_code(
-        ngx_http_lua_script_engine_t *e);
+    ngx_http_lua_script_engine_t *e);
 static ngx_int_t ngx_http_lua_script_done(ngx_http_lua_script_compile_t *sc);
 static ngx_int_t ngx_http_lua_script_init_arrays(
-        ngx_http_lua_script_compile_t *sc);
+    ngx_http_lua_script_compile_t *sc);
 
 
 ngx_int_t
@@ -52,7 +59,7 @@ ngx_http_lua_compile_complex_value(ngx_http_lua_compile_complex_value_t *ccv)
     }
 
     n = nv * (2 * sizeof(ngx_http_lua_script_copy_code_t)
-                  + sizeof(ngx_http_lua_script_copy_capture_code_t))
+                  + sizeof(ngx_http_lua_script_capture_code_t))
         + sizeof(uintptr_t);
 
     if (ngx_array_init(&lengths, ccv->pool, n, 1) != NGX_OK) {
@@ -60,9 +67,8 @@ ngx_http_lua_compile_complex_value(ngx_http_lua_compile_complex_value_t *ccv)
     }
 
     n = (nv * (2 * sizeof(ngx_http_lua_script_copy_code_t)
-                   + sizeof(ngx_http_lua_script_copy_capture_code_t))
+                   + sizeof(ngx_http_lua_script_capture_code_t))
                 + sizeof(uintptr_t)
-                + v->len
                 + sizeof(uintptr_t) - 1)
             & ~(sizeof(uintptr_t) - 1);
 
@@ -98,8 +104,8 @@ ngx_http_lua_compile_complex_value(ngx_http_lua_compile_complex_value_t *ccv)
 
 ngx_int_t
 ngx_http_lua_complex_value(ngx_http_request_t *r, ngx_str_t *subj,
-        size_t offset, ngx_int_t count, int *cap,
-        ngx_http_lua_complex_value_t *val, luaL_Buffer *luabuf)
+    size_t offset, ngx_int_t count, int *cap,
+    ngx_http_lua_complex_value_t *val, luaL_Buffer *luabuf)
 {
     size_t                            len;
     u_char                           *p;
@@ -179,10 +185,10 @@ ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc)
                 name.data = &sc->source->data[i];
                 i++;
                 name.len++;
-                sc->size += name.len;
 
                 if (ngx_http_lua_script_add_copy_code(sc, &name,
-                            (i == sc->source->len)) != NGX_OK)
+                                                      (i == sc->source->len))
+                    != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
@@ -250,8 +256,8 @@ ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc)
 
             if (bracket) {
                 ngx_log_error(NGX_LOG_ERR, sc->log, 0,
-                                   "the closing bracket in \"%V\" "
-                                   "variable is missing", &name);
+                              "the closing bracket in \"%V\" "
+                              "variable is missing", &name);
                 return NGX_ERROR;
             }
 
@@ -261,8 +267,10 @@ ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc)
 
             if (!num_var) {
                 ngx_log_error(NGX_LOG_ERR, sc->log, 0,
-                       "attempt to use named capturing variable "
-                       "\"%V\" (named captures not supported yet)", &name);
+                              "attempt to use named capturing variable "
+                              "\"%V\" (named captures not supported yet)",
+                              &name);
+
                 return NGX_ERROR;
             }
 
@@ -287,8 +295,6 @@ ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc)
             name.len++;
         }
 
-        sc->size += name.len;
-
         if (ngx_http_lua_script_add_copy_code(sc, &name, (i == sc->source->len))
             != NGX_OK)
         {
@@ -301,8 +307,8 @@ ngx_http_lua_script_compile(ngx_http_lua_script_compile_t *sc)
 invalid_variable:
 
     ngx_log_error(NGX_LOG_ERR, sc->log, 0,
-            "lua script: invalid capturing variable name found in \"%V\"",
-            sc->source);
+                  "lua script: invalid capturing variable name found in \"%V\"",
+                  sc->source);
 
     return NGX_ERROR;
 }
@@ -310,7 +316,7 @@ invalid_variable:
 
 static ngx_int_t
 ngx_http_lua_script_add_copy_code(ngx_http_lua_script_compile_t *sc,
-        ngx_str_t *value, ngx_uint_t last)
+    ngx_str_t *value, ngx_uint_t last)
 {
     size_t                            size, len;
     ngx_http_lua_script_copy_code_t  *code;
@@ -318,13 +324,13 @@ ngx_http_lua_script_add_copy_code(ngx_http_lua_script_compile_t *sc,
     len = value->len;
 
     code = ngx_http_lua_script_add_code(*sc->lengths,
-                            sizeof(ngx_http_lua_script_copy_code_t));
+                                    sizeof(ngx_http_lua_script_copy_code_t));
     if (code == NULL) {
         return NGX_ERROR;
     }
 
     code->code = (ngx_http_lua_script_code_pt)
-        ngx_http_lua_script_copy_len_code;
+                 ngx_http_lua_script_copy_len_code;
     code->len = len;
 
     size = (sizeof(ngx_http_lua_script_copy_code_t) + len +
@@ -339,7 +345,7 @@ ngx_http_lua_script_add_copy_code(ngx_http_lua_script_compile_t *sc,
     code->len = len;
 
     ngx_memcpy((u_char *) code + sizeof(ngx_http_lua_script_copy_code_t),
-                   value->data, value->len);
+               value->data, value->len);
 
     return NGX_OK;
 }
@@ -383,22 +389,22 @@ ngx_http_lua_script_copy_code(ngx_http_lua_script_engine_t *e)
 
 static ngx_int_t
 ngx_http_lua_script_add_capture_code(ngx_http_lua_script_compile_t *sc,
-        ngx_uint_t n)
+    ngx_uint_t n)
 {
-    ngx_http_lua_script_copy_capture_code_t  *code;
+    ngx_http_lua_script_capture_code_t  *code;
 
     code = ngx_http_lua_script_add_code(*sc->lengths,
-                            sizeof(ngx_http_lua_script_copy_capture_code_t));
+                                  sizeof(ngx_http_lua_script_capture_code_t));
     if (code == NULL) {
         return NGX_ERROR;
     }
 
     code->code = (ngx_http_lua_script_code_pt)
-                      ngx_http_lua_script_copy_capture_len_code;
+                 ngx_http_lua_script_copy_capture_len_code;
     code->n = 2 * n;
 
     code = ngx_http_lua_script_add_code(*sc->values,
-                        sizeof(ngx_http_lua_script_copy_capture_code_t));
+                                  sizeof(ngx_http_lua_script_capture_code_t));
     if (code == NULL) {
         return NGX_ERROR;
     }
@@ -415,12 +421,11 @@ ngx_http_lua_script_copy_capture_len_code(ngx_http_lua_script_engine_t *e)
 {
     int                                  *cap;
     ngx_uint_t                            n;
+    ngx_http_lua_script_capture_code_t   *code;
 
-    ngx_http_lua_script_copy_capture_code_t  *code;
+    code = (ngx_http_lua_script_capture_code_t *) e->ip;
 
-    code = (ngx_http_lua_script_copy_capture_code_t *) e->ip;
-
-    e->ip += sizeof(ngx_http_lua_script_copy_capture_code_t);
+    e->ip += sizeof(ngx_http_lua_script_capture_code_t);
 
     n = code->n;
 
@@ -439,11 +444,11 @@ ngx_http_lua_script_copy_capture_code(ngx_http_lua_script_engine_t *e)
     int                                  *cap;
     u_char                               *p, *pos;
     ngx_uint_t                            n;
-    ngx_http_lua_script_copy_capture_code_t  *code;
+    ngx_http_lua_script_capture_code_t   *code;
 
-    code = (ngx_http_lua_script_copy_capture_code_t *) e->ip;
+    code = (ngx_http_lua_script_capture_code_t *) e->ip;
 
-    e->ip += sizeof(ngx_http_lua_script_copy_capture_code_t);
+    e->ip += sizeof(ngx_http_lua_script_capture_code_t);
 
     n = code->n;
 
@@ -469,7 +474,7 @@ ngx_http_lua_script_init_arrays(ngx_http_lua_script_compile_t *sc)
 
     if (*sc->lengths == NULL) {
         n = sc->variables * (2 * sizeof(ngx_http_lua_script_copy_code_t)
-                             + sizeof(ngx_http_lua_script_copy_capture_code_t))
+                             + sizeof(ngx_http_lua_script_capture_code_t))
             + sizeof(uintptr_t);
 
         *sc->lengths = ngx_array_create(sc->pool, n, 1);
@@ -480,9 +485,8 @@ ngx_http_lua_script_init_arrays(ngx_http_lua_script_compile_t *sc)
 
     if (*sc->values == NULL) {
         n = (sc->variables * (2 * sizeof(ngx_http_lua_script_copy_code_t)
-                              + sizeof(ngx_http_lua_script_copy_capture_code_t))
+                              + sizeof(ngx_http_lua_script_capture_code_t))
                 + sizeof(uintptr_t)
-                + sc->source->len
                 + sizeof(uintptr_t) - 1)
             & ~(sizeof(uintptr_t) - 1);
 
@@ -531,3 +535,4 @@ ngx_http_lua_script_add_code(ngx_array_t *codes, size_t size)
     return ngx_array_push_n(codes, size);
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

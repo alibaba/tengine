@@ -1,4 +1,8 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
 
 #include "ddebug.h"
 
@@ -71,9 +75,10 @@ ngx_http_lua_add_package_preload(ngx_conf_t *cf, const char *package,
         return NGX_ERROR;
     }
 
-    hook->package = package;
+    hook->package = (u_char *) package;
     hook->loader = func;
 
     return NGX_OK;
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

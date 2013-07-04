@@ -486,12 +486,12 @@ ngx_http_tfs_time(u_char *buf, time_t t)
 
     ngx_gmtime(t, &tm);
 
-    return ngx_sprintf(buf, "%s, %02d %s %4d %02d:%02d:%02d UTC+0800",
+    return ngx_sprintf(buf, "%s, %02d %s %4d %02d:%02d:%02d GMT",
                        week[tm.ngx_tm_wday],
                        tm.ngx_tm_mday,
                        months[tm.ngx_tm_mon - 1],
                        tm.ngx_tm_year,
-                       tm.ngx_tm_hour + 8,
+                       tm.ngx_tm_hour,
                        tm.ngx_tm_min,
                        tm.ngx_tm_sec);
 }
@@ -584,9 +584,12 @@ ngx_http_tfs_set_output_file_name(ngx_http_tfs_t *t)
                                                 t->is_large_file,
                                                 t->r_ctx.simple_name),
                NGX_HTTP_TFS_FILE_NAME_LEN);
-    if (t->r_ctx.file_suffix.data != NULL) {
-        ngx_memcpy(t->file_name.data + NGX_HTTP_TFS_FILE_NAME_LEN,
-                   t->r_ctx.file_suffix.data, t->r_ctx.file_suffix.len);
+
+    if (t->r_ctx.simple_name) {
+        if (t->r_ctx.file_suffix.data != NULL) {
+            ngx_memcpy(t->file_name.data + NGX_HTTP_TFS_FILE_NAME_LEN,
+                       t->r_ctx.file_suffix.data, t->r_ctx.file_suffix.len);
+        }
     }
 
     /* set dup_file_name(put to tair) */
