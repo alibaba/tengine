@@ -2816,7 +2816,7 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
         }
     }
 
-    if (downstream->write->active && !downstream->write->ready) {
+    if (downstream->write->active) {
         ngx_add_timer(downstream->write, clcf->send_timeout);
 
     } else if (downstream->write->timer_set) {
