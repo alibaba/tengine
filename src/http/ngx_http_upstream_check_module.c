@@ -858,6 +858,10 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 
                 ngx_http_upstream_check_clear_peer(&p[i]);
 
+                ngx_memzero(&np[i].pc, sizeof(ngx_peer_connection_t));
+                np[i].check_data = NULL;
+                np[i].pool = NULL;
+
                 ngx_http_upstream_check_add_timer(&np[i],
                                                   np[i].conf->check_type_conf,
                                                   0, pool->log);
@@ -917,12 +921,10 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
     ngx_uint_t                            i;
     ngx_http_upstream_check_peer_t       *peer, *chosen;
     ngx_http_upstream_check_peers_t      *peers;
-    ngx_http_upstream_check_peers_shm_t  *peers_shm;
 
     chosen = NULL;
     peers = check_peers_ctx;
     peer = peers->peers.elts;
-    peers_shm = check_peers_ctx->peers_shm;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "http upstream check delete dynamic upstream: %p, n: %ui",
@@ -3108,11 +3110,21 @@ ngx_http_upstream_check_create_main_conf(ngx_conf_t *cf)
 
     ucmcf->peers->checksum = 0;
 
+#if (NGX_DEBUG)
+
+    if (ngx_array_init(&ucmcf->peers->peers, cf->pool, 1,
+                       sizeof(ngx_http_upstream_check_peer_t)) != NGX_OK)
+    {
+        return NULL;
+    }
+
+#else
     if (ngx_array_init(&ucmcf->peers->peers, cf->pool, 1024,
                        sizeof(ngx_http_upstream_check_peer_t)) != NGX_OK)
     {
         return NULL;
     }
+#endif
 
     return ucmcf;
 }
