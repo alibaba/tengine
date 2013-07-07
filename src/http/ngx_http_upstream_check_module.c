@@ -243,8 +243,6 @@ struct ngx_http_upstream_check_srv_conf_s {
         ngx_uint_t                           status_alive;
     } code;
 
-    ngx_flag_t                               fastcgi_status;
-
     ngx_array_t                             *fastcgi_params;
 
     ngx_uint_t                               default_down;
@@ -658,7 +656,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
     { NGX_HTTP_CHECK_HTTP,
       ngx_string("fastcgi"),
       ngx_string(""),
-      NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
+      0,
       ngx_http_upstream_check_send_handler,
       ngx_http_upstream_check_recv_handler,
       ngx_http_upstream_check_http_init,
@@ -1720,7 +1718,7 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
             /* rc = NGX_OK */
         }
 
-        if (ucscf->fastcgi_status == 0) {
+        if (ucscf->code.status_alive == 0) {
             return NGX_OK;
         }
 
@@ -3574,9 +3572,6 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
 
         if (ucscf->code.status_alive == 0) {
             ucscf->code.status_alive = check->default_status_alive;
-            ucscf->fastcgi_status = 0;
-        } else {
-            ucscf->fastcgi_status = 1;
         }
     }
 
