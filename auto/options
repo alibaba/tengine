@@ -538,8 +538,8 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO
                                          HTTP_USERID_SHARED=NO      ;;
-        --without-http_footer_module)    HTTP_FOOTER=NO
-                                         HTTP_FOOTER_SHARED=NO      ;;
+        --without-http_footer_filter_module) HTTP_FOOTER=NO
+                                             HTTP_FOOTER_SHARED=NO  ;;
         --without-http_access_module)    HTTP_ACCESS=NO
                                          HTTP_ACCESS_SHARED=NO      ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
