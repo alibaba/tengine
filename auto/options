@@ -487,7 +487,7 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO             ;;
         --without-http_footer_module)    HTTP_FOOTER=NO             ;;
-        --without-http_trim_module)      HTTP_TRIM=NO               ;;
+        --without-http_trim_filter_module) HTTP_TRIM=NO               ;;
         --without-http_access_module)    HTTP_ACCESS=NO             ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
         --without-http_autoindex_module) HTTP_AUTOINDEX=NO          ;;
