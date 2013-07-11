@@ -134,6 +134,7 @@ static ngx_int_t ngx_http_fastcgi_eval(ngx_http_request_t *r,
 #if (NGX_HTTP_CACHE)
 static ngx_int_t ngx_http_fastcgi_create_key(ngx_http_request_t *r);
 #endif
+static void ngx_http_fastcgi_last_record(ngx_http_fastcgi_header_t *h);
 static ngx_int_t ngx_http_fastcgi_create_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_fastcgi_reinit_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_fastcgi_process_header(ngx_http_request_t *r);
@@ -1194,19 +1195,26 @@ ngx_http_fastcgi_create_request(ngx_http_request_t *r)
     }
 
     if (r->request_buffering) {
-        h->version = 1;
-        h->type = NGX_HTTP_FASTCGI_STDIN;
-        h->request_id_hi = 0;
-        h->request_id_lo = 1;
-        h->content_length_hi = 0;
-        h->content_length_lo = 0;
-        h->padding_length = 0;
-        h->reserved = 0;
+        ngx_http_fastcgi_last_record(h);
     }
 
     cl->next = NULL;
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_fastcgi_last_record(ngx_http_fastcgi_header_t *h)
+{
+    h->version = 1;
+    h->type = NGX_HTTP_FASTCGI_STDIN;
+    h->request_id_hi = 0;
+    h->request_id_lo = 1;
+    h->content_length_hi = 0;
+    h->content_length_lo = 0;
+    h->padding_length = 0;
+    h->reserved = 0;
 }
 
 
@@ -1402,14 +1410,7 @@ last_chunk:
     h = (ngx_http_fastcgi_header_t *) b->last;
     b->last += sizeof(ngx_http_fastcgi_header_t);
 
-    h->version = 1;
-    h->type = NGX_HTTP_FASTCGI_STDIN;
-    h->request_id_hi = 0;
-    h->request_id_lo = 1;
-    h->content_length_hi = 0;
-    h->content_length_lo = 0;
-    h->padding_length = 0;
-    h->reserved = 0;
+    ngx_http_fastcgi_last_record(h);
 
     cl->buf = b;
     cl->next = NULL;
