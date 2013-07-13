@@ -59,6 +59,8 @@ typedef struct {
     ngx_uint_t                       response_msec;
     off_t                            response_length;
 
+    ngx_uint_t                       cached_connection;
+
     ngx_str_t                       *peer;
 } ngx_http_upstream_state_t;
 

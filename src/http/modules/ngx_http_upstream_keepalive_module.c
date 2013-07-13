@@ -334,6 +334,10 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                            "get keepalive peer: using connection %p", c);
 
+            if (kp->upstream->state) {
+                kp->upstream->state->cached_connection = 1;
+            }
+
             c->idle = 0;
             c->log = pc->log;
             c->read->log = pc->log;
@@ -371,6 +375,10 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
 
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                                "get keepalive peer: using connection %p", c);
+
+                if (kp->upstream->state) {
+                    kp->upstream->state->cached_connection = 1;
+                }
 
                 c->idle = 0;
                 c->log = pc->log;
