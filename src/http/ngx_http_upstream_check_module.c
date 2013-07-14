@@ -1684,13 +1684,6 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
             return NGX_ERROR;
         }
 
-#if 0
-        ngx_int_t i;
-
-        for (i=0; i < ctx->recv.last - ctx->recv.pos; i++) {
-            fprintf(stderr, "%c", ctx->recv.pos[i]);
-        }
-#endif
         ctx->status.code = 0;
 
         for ( ;; ) {
