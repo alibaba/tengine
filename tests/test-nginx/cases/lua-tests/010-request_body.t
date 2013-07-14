@@ -6,9 +6,9 @@ use Test::Nginx::Socket;
 #master_process_enabled(1);
 log_level('debug'); # to ensure any log-level can be outputed
 
-repeat_each(1);
+repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2);
+plan tests => repeat_each() * (blocks() * 2 + 2);
 
 #no_diff();
 #no_long_string();
@@ -247,4 +247,27 @@ POST /foo
 hi
 --- response_body
 2
+
+
+
+=== TEST 12: Expect: 100-Continue
+--- config
+    location /echo_body {
+        lua_need_request_body on;
+        content_by_lua '
+            ngx.print(ngx.var.request_body or "nil")
+        ';
+    }
+--- request
+POST /echo_body
+hello world
+--- more_headers
+Expect: 100-Continue
+--- ignore_response
+--- no_error_log
+[error]
+[alert]
+http finalize request: 500, "/echo_body?" a:1, c:2
+http finalize request: 500, "/echo_body?" a:1, c:0
+--- log_level: debug
 

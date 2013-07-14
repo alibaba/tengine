@@ -1,3 +1,9 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
@@ -12,7 +18,7 @@
 
 
 static ndk_set_var_value_pt ngx_http_lookup_ndk_set_var_directive(u_char *name,
-        size_t name_len);
+    size_t name_len);
 static int ngx_http_lua_ndk_set_var_get(lua_State *L);
 static int ngx_http_lua_ndk_set_var_set(lua_State *L);
 static int ngx_http_lua_run_set_var_directive(lua_State *L);
@@ -33,21 +39,15 @@ ngx_http_lua_ndk_set_var_get(lua_State *L)
 
     if (func == NULL) {
         return luaL_error(L, "ndk.set_var: directive \"%s\" not found "
-                "or does not use ndk_set_var_value",
-                p);
-
+                          "or does not use ndk_set_var_value", p);
     }
 
     lua_pushvalue(L, -1); /* table key key */
     lua_pushvalue(L, -1); /* table key key key */
-
     lua_pushlightuserdata(L, func); /* table key key key func */
-
     lua_pushcclosure(L, ngx_http_lua_run_set_var_directive, 2);
         /* table key key closure */
-
     lua_rawset(L, 1); /* table key */
-
     lua_rawget(L, 1); /* table closure */
 
     return 1;
@@ -104,7 +104,7 @@ ngx_http_lua_run_set_var_directive(lua_State *L)
 
     if (rc != NGX_OK) {
         return luaL_error(L, "calling directive %s failed with code %d",
-                p, (int) rc);
+                          p, (int) rc);
     }
 
     lua_pushlstring(L, (char *) res.data, res.len);
@@ -115,7 +115,7 @@ ngx_http_lua_run_set_var_directive(lua_State *L)
 
 static ndk_set_var_value_pt
 ngx_http_lookup_ndk_set_var_directive(u_char *name,
-        size_t name_len)
+    size_t name_len)
 {
     ndk_set_var_t           *filter;
     ngx_uint_t               i;
@@ -144,7 +144,7 @@ ngx_http_lookup_ndk_set_var_directive(u_char *name,
             }
 
             if (cmd->name.len != name_len
-                    || ngx_strncmp(cmd->name.data, name, name_len) != 0)
+                || ngx_strncmp(cmd->name.data, name, name_len) != 0)
             {
                 continue;
             }
@@ -185,3 +185,4 @@ ngx_http_lua_inject_ndk_api(lua_State *L)
 
 #endif /* defined(NDK) && NDK */
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

@@ -1,4 +1,9 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
 
 #ifndef DDEBUG
 #define DDEBUG 0
@@ -10,7 +15,6 @@
 #include "ngx_http_lua_directive.h"
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_cache.h"
-#include "ngx_http_lua_conf.h"
 #include "ngx_http_lua_contentby.h"
 #include "ngx_http_lua_accessby.h"
 #include "ngx_http_lua_rewriteby.h"
@@ -75,7 +79,7 @@ ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ctx->log = &cf->cycle->new_log;
 
     zone = ngx_shared_memory_add(cf, &name, (size_t) size,
-                                     &ngx_http_lua_module);
+                                 &ngx_http_lua_module);
     if (zone == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -84,8 +88,8 @@ ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ctx = zone->data;
 
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                   "lua_shared_dict \"%V\" is already defined as \"%V\"",
-                   &name, &ctx->name);
+                           "lua_shared_dict \"%V\" is already defined as "
+                           "\"%V\"", &name, &ctx->name);
         return NGX_CONF_ERROR;
     }
 
@@ -93,6 +97,10 @@ ngx_http_lua_shared_dict(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     zone->data = ctx;
 
     zp = ngx_array_push(lmcf->shm_zones);
+    if (zp == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
     *zp = zone;
 
     lmcf->requires_shm = 1;
@@ -117,7 +125,8 @@ ngx_http_lua_code_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (!*fp) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                "lua_code_cache is off; this will hurt performance");
+                           "lua_code_cache is off; this will hurt "
+                           "performance");
     }
 
     return NGX_CONF_OK;
@@ -351,7 +360,7 @@ ngx_http_lua_filter_set_by_lua_file(ngx_http_request_t *r, ngx_str_t *val,
 
     /*  load Lua script file (w/ cache)        sp = 1 */
     rc = ngx_http_lua_cache_loadfile(L, script_path, filter_data->key,
-            &err, llcf->enable_code_cache ? 1 : 0);
+                                     &err, llcf->enable_code_cache ? 1 : 0);
 
     if (rc != NGX_OK) {
         if (err == NULL) {
@@ -404,7 +413,7 @@ ngx_http_lua_rewrite_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
 
         return NGX_CONF_ERROR;
     }
@@ -486,7 +495,7 @@ ngx_http_lua_access_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
 
         return NGX_CONF_ERROR;
     }
@@ -569,7 +578,7 @@ ngx_http_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
         return NGX_CONF_ERROR;
     }
 
@@ -657,7 +666,7 @@ ngx_http_lua_log_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
 
         return NGX_CONF_ERROR;
     }
@@ -739,7 +748,7 @@ ngx_http_lua_header_filter_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
         return NGX_CONF_ERROR;
     }
 
@@ -820,7 +829,7 @@ ngx_http_lua_body_filter_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
         return NGX_CONF_ERROR;
     }
 
@@ -899,7 +908,7 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
     if (value[1].len == 0) {
         /*  Oops...Invalid location conf */
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
-                "Invalid location config: no runnable Lua code");
+                           "invalid location config: no runnable Lua code");
         return NGX_CONF_ERROR;
     }
 
@@ -922,3 +931,4 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

@@ -677,7 +677,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
 
                 if (ngx_rename_file((char *) ccf->oldpid.data,
                                     (char *) ccf->pid.data)
-                    != NGX_OK)
+                    == NGX_FILE_ERROR)
                 {
                     ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                                   ngx_rename_file_n " %s back to %s failed "
@@ -1375,16 +1375,16 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
     void                    *ident[4];
     ngx_event_t              ev;
 
-    /* 
-     * Set correct process type since closing listening Unix domain socket 
-     * in a master process also removes the Unix domain socket file. 
-     */ 
-    ngx_process = NGX_PROCESS_HELPER; 
+    /*
+     * Set correct process type since closing listening Unix domain socket
+     * in a master process also removes the Unix domain socket file.
+     */
+    ngx_process = NGX_PROCESS_HELPER;
 
-    ngx_close_listening_sockets(cycle); 
+    ngx_close_listening_sockets(cycle);
 
-    /* Set a moderate number of connections for a helper process. */ 
-    cycle->connection_n = 512; 
+    /* Set a moderate number of connections for a helper process. */
+    cycle->connection_n = 512;
 
     ngx_worker_process_init(cycle, -1);
 

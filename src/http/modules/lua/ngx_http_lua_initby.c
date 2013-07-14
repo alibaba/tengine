@@ -1,3 +1,9 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
@@ -16,9 +22,9 @@ char ngx_http_lua_cf_log_key;
 
 int
 ngx_http_lua_init_by_inline(ngx_log_t *log, ngx_http_lua_main_conf_t *lmcf,
-        lua_State *L)
+    lua_State *L)
 {
-    int                           status;
+    int         status;
 
     status = luaL_loadbuffer(L, (char *) lmcf->init_src.data,
                              lmcf->init_src.len, "init_by_lua")
@@ -30,9 +36,9 @@ ngx_http_lua_init_by_inline(ngx_log_t *log, ngx_http_lua_main_conf_t *lmcf,
 
 int
 ngx_http_lua_init_by_file(ngx_log_t *log, ngx_http_lua_main_conf_t *lmcf,
-        lua_State *L)
+    lua_State *L)
 {
-    int                           status;
+    int         status;
 
     status = luaL_loadfile(L, (char *) lmcf->init_src.data)
              || ngx_http_lua_do_call(log, L);
@@ -52,7 +58,7 @@ ngx_http_lua_report(ngx_log_t *log, lua_State *L, int status)
             msg = "unknown error";
         }
 
-        ngx_log_error(NGX_LOG_ERR, log, 0, "failed run init_by_lua*: %s",
+        ngx_log_error(NGX_LOG_ERR, log, 0, "failed to run init_by_lua*: %s",
                       msg);
         lua_pop(L, 1);
     }
@@ -67,8 +73,7 @@ ngx_http_lua_report(ngx_log_t *log, lua_State *L, int status)
 static int
 ngx_http_lua_do_call(ngx_log_t *log, lua_State *L)
 {
-    int status;
-    int base;
+    int     status, base;
 
     base = lua_gettop(L);  /* function index */
     lua_pushcfunction(L, ngx_http_lua_traceback);  /* push traceback function */
@@ -79,3 +84,4 @@ ngx_http_lua_do_call(ngx_log_t *log, lua_State *L)
     return status;
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

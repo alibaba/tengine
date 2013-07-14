@@ -3,19 +3,21 @@ use lib 'lib';
 use Test::Nginx::Socket;
 
 #master_on();
-workers(1);
+#workers(1);
 #worker_connections(1014);
 #log_level('warn');
 #master_process_enabled(1);
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 8);
+plan tests => repeat_each() * (blocks() * 3 + 11);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 
 #no_diff();
-#no_long_string();
+no_long_string();
+#no_shuffle();
+
 run_tests();
 
 __DATA__
@@ -39,6 +41,8 @@ __DATA__
 GET /lua
 --- response_body
 DELETE
+--- no_error_log
+[error]
 
 
 
@@ -65,6 +69,8 @@ DELETE
 GET /lua
 --- response_body
 DELETE
+--- no_error_log
+[error]
 
 
 
@@ -79,7 +85,7 @@ DELETE
         proxy_pass http://127.0.0.1:$server_port/other;
     }
 
-    location /lua {
+    location /t {
         content_by_lua '
             res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_POST });
@@ -88,9 +94,11 @@ DELETE
         ';
     }
 --- request
-GET /lua
+GET /t
 --- response_body
 POST
+--- no_error_log
+[error]
 
 
 
@@ -113,6 +121,8 @@ POST
 GET /lua
 --- response_body
 HEAD
+--- no_error_log
+[error]
 
 
 
@@ -139,6 +149,8 @@ HEAD
 GET /lua
 --- response_body
 GET
+--- no_error_log
+[error]
 
 
 
@@ -164,6 +176,8 @@ GET
 GET /lua
 --- response_body
 GET
+--- no_error_log
+[error]
 
 
 
@@ -189,6 +203,8 @@ GET
 GET /lua
 --- response_body
 GET
+--- no_error_log
+[error]
 
 
 
@@ -219,6 +235,8 @@ GET /lua
 --- response_body chomp
 PUT
 hello
+--- no_error_log
+[error]
 
 
 
@@ -246,6 +264,8 @@ GET /lua
 --- response_body chomp
 PUT
 hello
+--- no_error_log
+[error]
 
 
 
@@ -286,6 +306,8 @@ PUT
 hello
 GET
 []
+--- no_error_log
+[error]
 
 
 
@@ -316,6 +338,8 @@ GET /lua
 --- response_body chomp
 POST
 hello
+--- no_error_log
+[error]
 
 
 
@@ -354,6 +378,8 @@ GET /lua
 GET: 404
 PUT: 201
 cached: hello
+--- no_error_log
+[error]
 
 
 
@@ -394,6 +420,8 @@ GET /lua
 GET: 404
 PUT: 201
 cached: hello
+--- no_error_log
+[error]
 
 
 
@@ -413,6 +441,8 @@ cached: hello
 --- request
 GET /lua
 --- response_body eval: "\n"
+--- no_error_log
+[error]
 
 
 
@@ -433,6 +463,8 @@ GET /lua
 GET /lua
 --- response_body
 fo%3d=%3d%3e
+--- no_error_log
+[error]
 
 
 
@@ -454,6 +486,10 @@ fo%3d=%3d%3e
 GET /lua
 --- response_body_like chop
 ^(?:fo%3d=%3d%3e\&%3d=%3a|%3d=%3a\&fo%3d=%3d%3e)$
+--- no_error_log
+[error]
+--- no_error_log
+[error]
 
 
 
@@ -475,6 +511,8 @@ GET /lua
 GET /lua
 --- response_body_like chop
 ^(?:bar=hello\&foo=3|foo=3\&bar=hello)$
+--- no_error_log
+[error]
 
 
 
@@ -495,6 +533,8 @@ GET /lua
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+attempt to use a non-string key in the "args" option table
 
 
 
@@ -515,6 +555,8 @@ GET /lua
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+attempt to use a non-string key in the "args" option table
 
 
 
@@ -535,6 +577,8 @@ GET /lua
 GET /lua
 --- response_body
 a=3&b=4
+--- no_error_log
+[error]
 
 
 
@@ -555,6 +599,8 @@ a=3&b=4
 GET /lua
 --- response_body
 a=3&b=4
+--- no_error_log
+[error]
 
 
 
@@ -573,6 +619,8 @@ a=3&b=4
     GET /lua
 --- response_body
 main req
+--- no_error_log
+[error]
 
 
 
@@ -595,6 +643,8 @@ main req
     GET /main
 --- response_body
 sub req
+--- no_error_log
+[error]
 
 
 
@@ -618,6 +668,8 @@ sub req
     GET /main
 --- response_body
 sub req
+--- no_error_log
+[error]
 
 
 
@@ -642,6 +694,8 @@ GET /lua
 Foo: bar
 --- response_body
 header foo: [bar]
+--- no_error_log
+[error]
 
 
 
@@ -666,6 +720,8 @@ GET /lua
 Foo: bar
 --- response_body
 header foo: [bar]
+--- no_error_log
+[error]
 
 
 
@@ -701,6 +757,8 @@ hello, b
 hello, c
 --- error_log
 lua reuse free buf memory
+--- no_error_log
+[error]
 
 
 
@@ -732,6 +790,8 @@ hi
 --- response_body chomp
 POST
 hello
+--- no_error_log
+[error]
 
 
 
@@ -755,6 +815,8 @@ hello, static file
 ^200
 [A-Za-z]+, \d{1,2} [A-Za-z]+ \d{4} \d{2}:\d{2}:\d{2} GMT
 hello, static file$
+--- no_error_log
+[error]
 
 
 
@@ -779,6 +841,8 @@ GET /lua
 --- response_body
 bar
 nil
+--- no_error_log
+[error]
 
 
 
@@ -799,6 +863,8 @@ nil
 GET /lua
 --- response_body
 bar
+--- no_error_log
+[error]
 
 
 
@@ -806,7 +872,7 @@ bar
 --- http_config
     upstream memc {
         server 127.0.0.1:$TEST_NGINX_MEMCACHED_PORT;
-        keepalive 100 single;
+        keepalive 100;
     }
 --- config
     location /memc {
@@ -1044,4 +1110,744 @@ OPTIONS
 hello world
 --- no_error_log
 [error]
+
+
+
+=== TEST 40: encode args table with a multi-value arg.
+--- config
+    location /t {
+        content_by_lua '
+            local args = ngx.req.get_uri_args()
+            local res = ngx.location.capture("/sub", { args = args })
+            ngx.print(res.body)
+        ';
+    }
+
+    location /sub {
+        echo $query_string;
+    }
+--- request
+GET /t?r[]=http%3A%2F%2Fajax.googleapis.com%3A80%2Fajax%2Flibs%2Fjquery%2F1.7.2%2Fjquery.min.js&r[]=http%3A%2F%2Fajax.googleapis.com%3A80%2Fajax%2Flibs%2Fdojo%2F1.7.2%2Fdojo%2Fdojo.js.uncompressed.js
+--- response_body
+r%5b%5d=http%3a%2f%2fajax.googleapis.com%3a80%2fajax%2flibs%2fjquery%2f1.7.2%2fjquery.min.js&r%5b%5d=http%3a%2f%2fajax.googleapis.com%3a80%2fajax%2flibs%2fdojo%2f1.7.2%2fdojo%2fdojo.js.uncompressed.js
+--- no_error_log
+[error]
+
+
+
+=== TEST 41: subrequests finalized with NGX_ERROR
+--- config
+    location /sub {
+        content_by_lua '
+            ngx.exit(ngx.ERROR)
+        ';
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/sub")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- response_body
+status: 500
+body: 
+
+
+
+=== TEST 42: subrequests finalized with 500
+--- config
+    location /sub {
+        return 500;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/sub")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- response_body
+status: 500
+body: 
+
+
+
+=== TEST 43: subrequests with an output body filter returning NGX_ERROR
+--- config
+    location /sub {
+        echo hello world;
+        body_filter_by_lua '
+            return ngx.ERROR
+        ';
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/sub")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- stap2
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+--- response_body
+--- error_code
+--- no_error_log
+[error]
+
+
+
+=== TEST 44: subrequests truncated in its response body due to premature connection close (nonbuffered)
+--- config
+    server_tokens off;
+    location /memc {
+        internal;
+
+        set $memc_key 'foo';
+        #set $memc_exptime 300;
+        memc_pass 127.0.0.1:19112; #$TEST_NGINX_MEMCACHED_PORT;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/memc")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19112
+--- tcp_query_len: 9
+--- tcp_reply eval
+"VALUE foo 0 1024\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+upstream fin req: error=0 eof=1 rc=502
+post subreq: rc=0, status=502
+
+--- response_body
+status: 502
+body: hello world
+--- no_error_log
+[error]
+
+
+
+=== TEST 45: subrequests truncated in its response body due to upstream read timeout (nonbuffered)
+--- config
+    memc_read_timeout 100ms;
+    location /memc {
+        internal;
+
+        set $memc_key 'foo';
+        #set $memc_exptime 300;
+        memc_pass 127.0.0.1:19112; #$TEST_NGINX_MEMCACHED_PORT;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/memc")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19112
+--- tcp_no_close
+--- tcp_reply eval
+"VALUE foo 0 1024\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+conn err: 110: upstream timed out
+upstream fin req: error=0 eof=0 rc=504
+post subreq: rc=0, status=504
+
+--- response_body_like chop
+^status: 504
+body: 
+
+--- error_log
+upstream timed out
+
+
+
+=== TEST 46: subrequests truncated in its response body due to premature connection close (buffered)
+--- config
+    server_tokens off;
+
+    location /proxy {
+        internal;
+
+        #proxy_read_timeout 100ms;
+        proxy_buffering on;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_query_len: 65
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\nContent-Length: 1024\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+upstream fin req: error=0 eof=1 rc=502
+post subreq: rc=0, status=502
+
+--- response_body
+status: 502
+body: hello world
+--- no_error_log
+[error]
+
+
+
+=== TEST 47: subrequests truncated in its response body due to read timeout (buffered)
+--- config
+    location /proxy {
+        internal;
+
+        proxy_read_timeout 100ms;
+        proxy_buffering on;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_no_close
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\nContent-Length: 1024\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+conn err: 110: upstream timed out
+upstream fin req: error=0 eof=0 rc=502
+post subreq: rc=0, status=502
+
+--- response_body
+status: 502
+body: 
+--- error_log
+upstream timed out
+
+
+
+=== TEST 48: subrequests truncated in its response body due to premature connection close (buffered, no content-length)
+--- config
+    server_tokens off;
+    location /proxy {
+        internal;
+
+        #proxy_read_timeout 100ms;
+        proxy_buffering on;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_query_len: 65
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+upstream fin req: error=0 eof=1 rc=0
+post subreq: rc=0, status=200
+
+--- response_body
+status: 200
+body: hello world
+--- no_error_log
+[error]
+
+
+
+=== TEST 49: subrequests truncated in its response body due to read timeout (buffered, no content-length)
+--- config
+    location /proxy {
+        internal;
+
+        proxy_read_timeout 100ms;
+        proxy_buffering on;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_no_close
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+conn err: 110: upstream timed out
+upstream fin req: error=0 eof=0 rc=502
+post subreq: rc=0, status=502
+
+--- response_body
+status: 502
+body: 
+--- error_log
+upstream timed out
+
+
+
+=== TEST 50: subrequests truncated in its response body due to premature connection close (nonbuffered, no content-length)
+--- config
+    server_tokens off;
+
+    location /proxy {
+        internal;
+
+        #proxy_read_timeout 100ms;
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_query_len: 65
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+upstream fin req: error=0 eof=1 rc=0
+post subreq: rc=0, status=200
+
+--- response_body
+status: 200
+body: hello world
+--- no_error_log
+[error]
+
+
+
+=== TEST 51: subrequests truncated in its response body due to read timeout (nonbuffered, no content-length)
+--- config
+    location /proxy {
+        internal;
+
+        proxy_read_timeout 500ms;
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:19113;
+    }
+
+    location /main {
+        content_by_lua '
+            res = ngx.location.capture("/proxy")
+            ngx.say("status: ", res.status)
+            ngx.say("body: ", res.body)
+        ';
+    }
+--- request
+GET /main
+--- tcp_listen: 19113
+--- tcp_no_close
+--- tcp_reply eval
+"HTTP/1.0 200 OK\r\n\r\nhello world"
+
+--- stap
+F(ngx_http_upstream_finalize_request) {
+    printf("upstream fin req: error=%d eof=%d rc=%d\n",
+        $r->upstream->peer->connection->read->error,
+        $r->upstream->peer->connection->read->eof,
+        $rc)
+    #print_ubacktrace()
+}
+F(ngx_connection_error) {
+    printf("conn err: %d: %s\n", $err, user_string($text))
+    #print_ubacktrace()
+}
+F(ngx_http_lua_post_subrequest) {
+    printf("post subreq: rc=%d, status=%d\n", $rc, $r->headers_out->status)
+    #print_ubacktrace()
+}
+/*
+F(ngx_http_finalize_request) {
+    printf("finalize: %d\n", $rc)
+}
+*/
+--- stap_out
+conn err: 110: upstream timed out
+upstream fin req: error=0 eof=0 rc=504
+post subreq: rc=0, status=504
+
+--- response_body
+status: 504
+body: hello world
+--- error_log
+upstream timed out
+
+
+
+=== TEST 52: forwarding in-memory request bodies to multiple subrequests
+--- config
+    location /other {
+        default_type 'foo/bar';
+        proxy_pass http://127.0.0.1:$server_port/back;
+    }
+
+    location /back {
+        echo_read_request_body;
+        echo_request_body;
+    }
+
+    location /lua {
+        content_by_lua '
+            ngx.req.read_body()
+
+            for i = 1, 2 do
+                res = ngx.location.capture("/other",
+                    { method = ngx.HTTP_POST });
+
+                ngx.say(res.body)
+            end
+        ';
+    }
+
+--- request eval
+"POST /lua
+" . "hello world"
+
+--- response_body
+hello world
+hello world
+
+--- no_error_log
+[error]
+
+
+
+=== TEST 53: forwarding in-file request bodies to multiple subrequests (client_body_in_file_only)
+--- config
+    location /other {
+        default_type 'foo/bar';
+        proxy_pass http://127.0.0.1:$server_port/back;
+    }
+
+    location /back {
+        echo_read_request_body;
+        echo_request_body;
+    }
+
+    client_body_in_file_only on;
+
+    location /lua {
+        content_by_lua '
+            ngx.req.read_body()
+
+            for i = 1, 2 do
+                res = ngx.location.capture("/other",
+                    { method = ngx.HTTP_POST });
+
+                ngx.say(res.body)
+            end
+        ';
+    }
+
+--- request eval
+"POST /lua
+" . "hello world"
+
+--- response_body
+hello world
+hello world
+
+--- no_error_log
+[error]
+
+
+
+=== TEST 54: forwarding in-file request bodies to multiple subrequests (exceeding client_body_buffer_size)
+--- config
+    location /other {
+        default_type 'foo/bar';
+        proxy_pass http://127.0.0.1:$server_port/back;
+    }
+
+    location /back {
+        echo_read_request_body;
+        echo_request_body;
+    }
+
+    location /lua {
+        #client_body_in_file_only on;
+        client_body_buffer_size 1;
+        content_by_lua '
+            ngx.req.read_body()
+
+            for i = 1, 2 do
+                res = ngx.location.capture("/other",
+                    { method = ngx.HTTP_POST });
+
+                ngx.say(res.body)
+            end
+        ';
+    }
+--- request eval
+"POST /lua
+" . ("hello world" x 100)
+
+--- stap2
+global valid = 0
+global fds
+
+F(ngx_http_handler) { valid = 1  }
+
+probe syscall.open {
+    if (valid && pid() == target()) {
+        print(name, "(", argstr, ")")
+    }
+}
+
+probe syscall.close {
+    if (valid && pid() == target() && fds[sprintf("%d", $fd)]) {
+        println(name, "(", argstr, ")")
+    }
+}
+
+probe syscall.unlink {
+    if (valid && pid() == target()) {
+        println(name, "(", argstr, ")")
+    }
+}
+
+probe syscall.open.return {
+    if (valid && pid() == target()) {
+        println(" = ", retstr)
+        fds[retstr] = 1
+    }
+}
+
+F(ngx_http_lua_subrequest) {
+    println("lua subrequest")
+}
+
+F(ngx_output_chain) {
+    printf("output chain: %s\n", ngx_chain_dump($in))
+}
+
+F(ngx_pool_run_cleanup_file) {
+    println("clean up file: ", $fd)
+}
+
+--- response_body eval
+("hello world" x 100) . "\n"
+. ("hello world" x 100) . "\n"
+
+--- no_error_log
+[error]
+--- error_log
+a client request body is buffered to a temporary file
 

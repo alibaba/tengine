@@ -1,7 +1,15 @@
+
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
 #include "ddebug.h"
+
 
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_sleep.h"
@@ -10,6 +18,8 @@
 
 static int ngx_http_lua_ngx_sleep(lua_State *L);
 static void ngx_http_lua_sleep_handler(ngx_event_t *ev);
+static void ngx_http_lua_sleep_cleanup(void *data);
+static ngx_int_t ngx_http_lua_sleep_resume(ngx_http_request_t *r);
 
 
 static int
@@ -19,6 +29,7 @@ ngx_http_lua_ngx_sleep(lua_State *L)
     ngx_int_t                    delay; /* in msec */
     ngx_http_request_t          *r;
     ngx_http_lua_ctx_t          *ctx;
+    ngx_http_lua_co_ctx_t       *coctx;
 
     n = lua_gettop(L);
     if (n != 1) {
@@ -47,22 +58,26 @@ ngx_http_lua_ngx_sleep(lua_State *L)
         return luaL_error(L, "no request ctx found");
     }
 
-    ctx->sleep.handler = ngx_http_lua_sleep_handler;
-    ctx->sleep.data = r;
-    ctx->sleep.log = r->connection->log;
+    coctx = ctx->cur_co_ctx;
+    if (coctx == NULL) {
+        return luaL_error(L, "no co ctx found");
+    }
+
+    coctx->data = r;
+
+    coctx->sleep.handler = ngx_http_lua_sleep_handler;
+    coctx->sleep.data = coctx;
+    coctx->sleep.log = r->connection->log;
 
     dd("adding timer with delay %lu ms, r:%.*s", (unsigned long) delay,
-            (int) r->uri.len, r->uri.data);
+       (int) r->uri.len, r->uri.data);
 
-    ngx_add_timer(&ctx->sleep, (ngx_msec_t) delay);
+    ngx_add_timer(&coctx->sleep, (ngx_msec_t) delay);
+
+    coctx->cleanup = ngx_http_lua_sleep_cleanup;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "lua ready to sleep for %d ms", delay);
-
-    if (ctx->entered_content_phase) {
-        dd("set write event handler");
-        r->write_event_handler = ngx_http_lua_content_wev_handler;
-    }
 
     return lua_yield(L, 0);
 }
@@ -75,8 +90,11 @@ ngx_http_lua_sleep_handler(ngx_event_t *ev)
     ngx_http_request_t      *r;
     ngx_http_lua_ctx_t      *ctx;
     ngx_http_log_ctx_t      *log_ctx;
+    ngx_http_lua_co_ctx_t   *coctx;
 
-    r = ev->data;
+    coctx = ev->data;
+
+    r = coctx->data;
     c = r->connection;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
@@ -88,26 +106,18 @@ ngx_http_lua_sleep_handler(ngx_event_t *ev)
     log_ctx = c->log->data;
     log_ctx->current_request = r;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "lua sleep handler: \"%V?%V\"", &r->uri, &r->args);
-
-    if (!ctx->sleep.timedout) {
-        dd("reach lua sleep event handler without timeout!");
-        return;
-    }
+    coctx->cleanup = NULL;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "lua sleep timer expired: \"%V?%V\"", &r->uri, &r->args);
 
-    if (ctx->sleep.timer_set) {
-        dd("deleting timer for lua_sleep");
-        ngx_del_timer(&ctx->sleep);
-    }
+    ctx->cur_co_ctx = coctx;
 
     if (ctx->entered_content_phase) {
-        ngx_http_lua_wev_handler(r);
+        (void) ngx_http_lua_sleep_resume(r);
 
     } else {
+        ctx->resume_handler = ngx_http_lua_sleep_resume;
         ngx_http_core_run_phases(r);
     }
 
@@ -122,3 +132,59 @@ ngx_http_lua_inject_sleep_api(lua_State *L)
     lua_setfield(L, -2, "sleep");
 }
 
+
+static void
+ngx_http_lua_sleep_cleanup(void *data)
+{
+    ngx_http_lua_co_ctx_t          *coctx = data;
+
+    if (coctx->sleep.timer_set) {
+        dd("cleanup: deleting timer for ngx.sleep");
+
+        ngx_del_timer(&coctx->sleep);
+    }
+}
+
+
+static ngx_int_t
+ngx_http_lua_sleep_resume(ngx_http_request_t *r)
+{
+    ngx_connection_t            *c;
+    ngx_int_t                    rc;
+    ngx_http_lua_ctx_t          *ctx;
+    ngx_http_lua_main_conf_t    *lmcf;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ctx->resume_handler = ngx_http_lua_wev_handler;
+
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
+    c = r->connection;
+
+    rc = ngx_http_lua_run_thread(lmcf->lua, r, ctx, 0);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua run thread returned %d", rc);
+
+    if (rc == NGX_AGAIN) {
+        return ngx_http_lua_run_posted_threads(c, lmcf->lua, r, ctx);
+    }
+
+    if (rc == NGX_DONE) {
+        ngx_http_finalize_request(r, NGX_DONE);
+        return ngx_http_lua_run_posted_threads(c, lmcf->lua, r, ctx);
+    }
+
+    if (ctx->entered_content_phase) {
+        ngx_http_finalize_request(r, rc);
+        return NGX_DONE;
+    }
+
+    return rc;
+}
+
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */
