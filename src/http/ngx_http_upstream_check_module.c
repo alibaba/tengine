@@ -1646,28 +1646,6 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
             return NGX_AGAIN;
         }
 
-        if (ctx->state == ngx_http_fastcgi_st_padding) {
-
-            if (ctx->recv.pos + ctx->padding < ctx->recv.last) {
-                ctx->state = ngx_http_fastcgi_st_version;
-                ctx->recv.pos += ctx->padding;
-
-                continue;
-            }
-
-            if (ctx->recv.pos + ctx->padding == ctx->recv.last) {
-                ctx->state = ngx_http_fastcgi_st_version;
-                ctx->recv.pos = ctx->recv.last;
-
-                return NGX_AGAIN;
-            }
-
-            ctx->padding -= ctx->recv.last - ctx->recv.pos;
-            ctx->recv.pos = ctx->recv.last;
-
-            return NGX_AGAIN;
-        }
-
         if (ctx->status.code == NGX_HTTP_FASTCGI_STDERR) {
 
             ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
