@@ -129,7 +129,7 @@ static ngx_int_t ngx_http_upstream_response_time_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_upstream_response_length_variable(
     ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_upstream_use_cached_connection_variable(
+static ngx_int_t ngx_http_upstream_cached_connection_variable(
     ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 
 static char *ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy);
@@ -344,8 +344,8 @@ static ngx_http_variable_t  ngx_http_upstream_vars[] = {
       ngx_http_upstream_response_length_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
-    { ngx_string("upstream_use_cached_connection"), NULL,
-      ngx_http_upstream_use_cached_connection_variable, 0,
+    { ngx_string("upstream_cached_connection"), NULL,
+      ngx_http_upstream_cached_connection_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
 #if (NGX_HTTP_CACHE)
@@ -4100,7 +4100,7 @@ ngx_http_upstream_header_variable(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_upstream_use_cached_connection_variable(ngx_http_request_t *r,
+ngx_http_upstream_cached_connection_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
     u_char                     *p;
