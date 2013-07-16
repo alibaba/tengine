@@ -21,7 +21,7 @@ ngx_ebtree_delete(ngx_ebtree_node_t *node)
     parent = ngx_eb_untag(node->leaf, pside);
 
     if (ngx_eb_clrtag(parent->branches[NGX_EB_RIGHT]) == NULL) {
-        parent->branches[NGX_EB_RIGHT] = NULL;
+        parent->branches[NGX_EB_LEFT] = NULL;
         goto finish;
     }
 
@@ -54,7 +54,7 @@ ngx_ebtree_delete(ngx_ebtree_node_t *node)
 
     gpside = ngx_eb_gettag(parent->node);
     gparent = ngx_eb_untag(parent->node, gpside);
-    parent->branches[gpside] = ngx_eb_dotag(parent, NGX_EB_NODE);
+    gparent->branches[gpside] = ngx_eb_dotag(parent, NGX_EB_NODE);
 
     if (ngx_eb_gettag(parent->branches[NGX_EB_LEFT]) == NGX_EB_NODE) {
         temp = ngx_eb_untag(parent->branches[NGX_EB_LEFT], NGX_EB_NODE);
@@ -144,6 +144,8 @@ ngx_ebtree_insert(ngx_ebtree_t *tree, ngx_ebtree_node_t *node)
         root->branches[NGX_EB_LEFT] = ngx_eb_dotag(node, NGX_EB_LEAF);
         node->leaf = ngx_eb_dotag(root, NGX_EB_LEFT);
         node->node = NULL;
+        node->branches[0] = NULL;
+        node->branches[1] = NULL;
         return node;
     }
 
@@ -195,6 +197,7 @@ ngx_ebtree_insert(ngx_ebtree_t *tree, ngx_ebtree_node_t *node)
     } else {
         node->branches[NGX_EB_LEFT] = leaf;
         node->branches[NGX_EB_RIGHT] = troot;
+        node->leaf = leaf;
         *ptr = right;
     }
 
@@ -319,10 +322,6 @@ ngx_ebtree_le(ngx_ebtree_t *tree, uint32_t key)
 
     while (ngx_eb_gettag(root) == NGX_EB_LEFT) {
         temp = ngx_eb_untag(root, NGX_EB_LEFT);
-        if (temp == NULL) {
-            return NULL;
-        }
-
         root = temp->node;
         temp = temp->branches[NGX_EB_RIGHT];
         temp = ngx_eb_clrtag(temp);

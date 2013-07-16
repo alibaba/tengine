@@ -20,12 +20,12 @@
     if (x & 0xcccccccc) { x &= 0xcccccccc; bits += 2;}                        \
     if (x & 0xaaaaaaaa) { x &= 0xaaaaaaaa; bits += 1;}                        \
     bits + 1;                                                                 \
-    })                                                                        \
+    })
 
 
 #define NGX_EB_NODE_BITS       1
-#define NGX_EB_NODE_BRANCHES   (1 << NGX_EB_NODE_BITS)
-#define NGX_EB_NODE_BRACH_MASK (NGX_EB_NODE_BRANCHES - 1)
+#define NGX_EB_NODE_BRANCHES   2
+#define NGX_EB_NODE_BRACH_MASK 1
 
 
 #define NGX_EB_LEFT   0

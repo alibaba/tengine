@@ -27,6 +27,7 @@
 
 #define ngx_chash_diff_abs(a, b) (((a) > (b)) ? (a - b) : (b - a))
 
+
 typedef struct {
     ngx_event_t                  ev;
     ngx_ebtree_t                *tree;
@@ -34,16 +35,30 @@ typedef struct {
     ngx_http_upstream_rr_peer_t *peer;
 } ngx_http_upstream_chash_server_t;
 
-typedef struct {
-    ngx_array_t  *values;
-    ngx_array_t  *lengths;
-    ngx_ebtree_t *tree;
-} ngx_http_upstream_chash_srv_conf_t;
 
 typedef struct {
+    ngx_array_t                    *values;
+    ngx_array_t                    *lengths;
+    ngx_ebtree_t                   *tree;
+
+    ngx_http_upstream_init_pt       original_init_upstream;
+    ngx_http_upstream_init_peer_pt  original_init_peer;
+} ngx_http_upstream_chash_srv_conf_t;
+
+
+typedef struct {
+    void                               *data;
     uint32_t                            hash;
     ngx_http_upstream_chash_server_t   *server;
     ngx_http_upstream_chash_srv_conf_t *ucscf;
+
+#if (NGX_HTTP_SSL)
+
+    ngx_event_set_peer_session_pt       original_set_session;
+    ngx_event_save_peer_session_pt      original_save_session;
+
+#endif
+
 } ngx_http_upstream_chash_peer_data_t;
 
 
@@ -58,6 +73,13 @@ static void ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc,
     void *data, ngx_uint_t state);
 static char *ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_upstream_chash_set_session(ngx_peer_connection_t *pc,
+    void *data);
+static void ngx_http_upstream_chash_save_session(ngx_peer_connection_t *pc,
+    void *data);
+#endif
 
 
 static ngx_connection_t empty_connection;
@@ -152,23 +174,22 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     ngx_http_upstream_rr_peers_t        *peers;
     ngx_http_upstream_chash_server_t    *server;
     ngx_http_upstream_chash_srv_conf_t  *ucscf;
-
-    if (ngx_http_upstream_init_round_robin(cf, us) == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
+    
     ucscf = ngx_http_conf_upstream_srv_conf(us,
                                      ngx_http_upstream_consistent_hash_module);
-    if (ucscf == NULL) {
+
+    if (ucscf->original_init_upstream(cf, us) != NGX_OK) {
         return NGX_ERROR;
     }
+
+    ucscf->original_init_peer = us->peer.init;
+    us->peer.init = ngx_http_upstream_init_chash_peer;
 
     ucscf->tree = ngx_ebtree_create(cf->pool);
     if (ucscf->tree == NULL) {
         return NGX_ERROR;
     }
 
-    us->peer.init = ngx_http_upstream_init_chash_peer;
     peers = (ngx_http_upstream_rr_peers_t *) us->peer.data;
     if (peers == NULL) {
         return NGX_ERROR;
@@ -229,12 +250,13 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
 
     ucscf = ngx_http_conf_upstream_srv_conf(us,
                                      ngx_http_upstream_consistent_hash_module);
-    if (ucscf == NULL) {
-        return NGX_ERROR;
-    }
 
     uchpd = ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_chash_peer_data_t));
     if (uchpd == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ucscf->original_init_peer(r, us) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -243,12 +265,19 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
                 ucscf->lengths->elts, 0, ucscf->values->elts) == NULL) {
         return NGX_ERROR;
     }
-
     uchpd->hash = ngx_murmur_hash2(hash_value.data, hash_value.len);
+    uchpd->data = r->upstream->peer.data;
 
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
     r->upstream->peer.data = uchpd;
+
+#if (NGX_HTTP_SSL)
+    uchpd->original_set_session = r->upstream->peer.set_session;
+    uchpd->original_save_session = r->upstream->peer.save_session;
+    r->upstream->peer.set_session = ngx_http_upstream_chash_set_session;
+    r->upstream->peer.save_session = ngx_http_upstream_chash_save_session;
+#endif
 
     return NGX_OK;
 }
@@ -330,7 +359,12 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
     if (state & NGX_PEER_FAILED) {
         uchpd->server->peer->fails++;
         if (uchpd->server->peer->fails >= uchpd->server->peer->max_fails) {
-            ngx_log_error(NGX_LOG_ERR, pc->log, 0, "server down %v", &uchpd->server->peer->name);
+            ngx_log_error(NGX_LOG_ERR, pc->log, 0,
+                          "server down %v, fails %d, max_fails %d",
+                          &uchpd->server->peer->name,
+                          uchpd->server->peer->fails,
+                          uchpd->server->peer->max_fails);
+
             ngx_ebtree_delete(&uchpd->server->ebnode);
             ngx_add_timer(&uchpd->server->ev, 60000);
         }
@@ -353,9 +387,17 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ucscf = ngx_http_conf_upstream_srv_conf(uscf,
                                      ngx_http_upstream_consistent_hash_module);
-    if(ucscf == NULL) {
+    if (ucscf == NULL) {
         return NGX_CONF_ERROR;
     }
+
+    if (ucscf->original_init_upstream) {
+        return "is duplicate";
+    }
+
+    ucscf->original_init_upstream = uscf->peer.init_upstream
+                                    ? uscf->peer.init_upstream
+                                    : ngx_http_upstream_init_round_robin;
 
     value = cf->args->elts;
     if (value == NULL) {
@@ -386,3 +428,26 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+
+
+#if (NGX_HTTP_SSL)
+
+static ngx_int_t
+ngx_http_upstream_chash_set_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_upstream_chash_peer_data_t *uchpd = data;
+
+    return uchpd->original_set_session(pc, uchpd->data);
+}
+
+
+static void
+ngx_http_upstream_chash_save_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_upstream_chash_peer_data_t *uchpd = data;
+
+    uchpd->original_save_session(pc, uchpd->data);
+    return;
+}
+
+#endif
