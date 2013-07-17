@@ -492,11 +492,7 @@ do
         --with-http_footer_filter_module=shared)   HTTP_FOOTER_SHARED=YES
                                                    HTTP_FOOTER=NO                    ;;
         --with-http_trim_filter_module=shared)     HTTP_TRIM_SHARED=YES
-<<<<<<< HEAD
-                                                   HTTP_TRIM=NO                      ;;
-=======
                                                    HTTP_TRIM=NO                    ;;
->>>>>>> t
         --with-http_access_module=shared)          HTTP_ACCESS_SHARED=YES
                                                    HTTP_ACCESS=NO                    ;;
         --with-http_autoindex_module=shared)       HTTP_AUTOINDEX_SHARED=YES
@@ -545,12 +541,6 @@ do
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
         --without-http_ssi_module)       HTTP_SSI=NO                ;;
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
-<<<<<<< HEAD
-        --without-http_userid_module)    HTTP_USERID=NO             ;;
-        --without-http_footer_module)    HTTP_FOOTER=NO             ;;
-        --without-http_trim_filter_module) HTTP_TRIM=NO               ;;
-        --without-http_access_module)    HTTP_ACCESS=NO             ;;
-=======
         --without-http_userid_module)    HTTP_USERID=NO
                                          HTTP_USERID_SHARED=NO      ;;
         --without-http_footer_filter_module) HTTP_FOOTER=NO
@@ -559,7 +549,6 @@ do
                                            HTTP_TRIM_SHARED=NO  ;;
         --without-http_access_module)    HTTP_ACCESS=NO
                                          HTTP_ACCESS_SHARED=NO      ;;
->>>>>>> t
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
         --without-http_autoindex_module) HTTP_AUTOINDEX=NO
                                          HTTP_AUTOINDEX_SHARED=NO   ;;
@@ -817,12 +806,7 @@ cat << END
   --without-http_userid_module       disable ngx_http_userid_filter_module
   --without-http_footer_filter_module
                                      disable ngx_http_footer_filter_module
-<<<<<<< HEAD
-  --without-http_trim_filter_module
-                                     disable ngx_http_trim_filter_module
-=======
   --without-http_trim_filter_module  disable ngx_http_trim_filter_module
->>>>>>> t
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
