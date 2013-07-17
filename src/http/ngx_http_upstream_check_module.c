@@ -1573,6 +1573,7 @@ static ngx_int_t
 ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
 {
     ngx_int_t                            rc;
+    ngx_flag_t                           done;
     ngx_uint_t                           type, code, code_n;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
@@ -1583,6 +1584,8 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
     if ((ctx->recv.last - ctx->recv.pos) <= 0) {
         return NGX_AGAIN;
     }
+
+    done = 0;
 
     for ( ;; ) {
 
@@ -1683,13 +1686,17 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
             }
 
             if (rc == NGX_DONE) {
+                done = 1;
+                ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
+                              "fastcgi http parse status: %i",
+                              ctx->status.code);
                 break;
             }
 
             /* rc = NGX_OK */
         }
 
-        if (ucscf->code.status_alive == 0) {
+        if (ucscf->code.status_alive == 0 || done == 0) {
             return NGX_OK;
         }
 
