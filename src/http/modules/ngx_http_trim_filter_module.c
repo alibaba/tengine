@@ -718,9 +718,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 ctx->state = trim_state_tag_script_js_whitespace;
-                if (ctx->prev == '(' || ctx->prev == '[' || ctx->prev == '{'
-                    || ctx->prev == ';' || ctx->prev == ',' || ctx->prev == '>'
-                    || ctx->prev == '=' || ctx->prev == ch)
+                if (ctx->prev == '(' || ctx->prev == ',' || ctx->prev == '='
+                    || ctx->prev == ':' || ctx->prev == '[' || ctx->prev == '!'
+                    || ctx->prev == '&' || ctx->prev == '|' || ctx->prev == '?'
+                    || ctx->prev == ';' || ctx->prev == '>' || ctx->prev == '~'
+                    || ctx->prev == '*' || ctx->prev == '{' || ctx->prev == ch)
                 {
                     continue;
 
@@ -738,7 +740,12 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->looked = 1;
                 break;
             case '/':
-                if (ctx->prev == '(' || ctx->prev == '=' || ctx->prev == ',') {
+                if (ctx->prev == '(' || ctx->prev == ',' || ctx->prev == '='
+                    || ctx->prev == ':' || ctx->prev == '[' || ctx->prev == '!'
+                    || ctx->prev == '&' || ctx->prev == '|' || ctx->prev == '?'
+                    || ctx->prev == '+' || ctx->prev == '-' || ctx->prev == '~'
+                    || ctx->prev == '*' || ctx->prev == '{')
+                {
                     ctx->state = trim_state_tag_script_js_re_begin;
 
                 } else {
@@ -854,9 +861,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             switch (ch) {
             case '\n':
                 ctx->state = trim_state_tag_script_js_text;
-                if (ctx->prev == '(' || ctx->prev == '[' || ctx->prev == '{'
-                    || ctx->prev == ';' || ctx->prev == ',' || ctx->prev == '>'
-                    || ctx->prev == '=' || ctx->prev == ch)
+                if (ctx->prev == '(' || ctx->prev == ',' || ctx->prev == '='
+                    || ctx->prev == ':' || ctx->prev == '[' || ctx->prev == '!'
+                    || ctx->prev == '&' || ctx->prev == '|' || ctx->prev == '?'
+                    || ctx->prev == ';' || ctx->prev == '>' || ctx->prev == '~'
+                    || ctx->prev == '*' || ctx->prev == '{' || ctx->prev == ch)
                 {
                     continue;
 
@@ -934,9 +943,11 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
         case trim_state_tag_script_js_whitespace:
             switch (ch) {
             case '\n':
-                if (ctx->prev == '(' || ctx->prev == '[' || ctx->prev == '{'
-                    || ctx->prev == ';' || ctx->prev == ',' || ctx->prev == '>'
-                    || ctx->prev == '=' || ctx->prev == ch)
+                if (ctx->prev == '(' || ctx->prev == ',' || ctx->prev == '='
+                    || ctx->prev == ':' || ctx->prev == '[' || ctx->prev == '!'
+                    || ctx->prev == '&' || ctx->prev == '|' || ctx->prev == '?'
+                    || ctx->prev == ';' || ctx->prev == '>' || ctx->prev == '~'
+                    || ctx->prev == '*' || ctx->prev == '{' || ctx->prev == ch)
                 {
                     continue;
 
@@ -958,7 +969,12 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->looked = 1;
                 break;
             case '/':
-                if (ctx->prev == '(' || ctx->prev == '=' || ctx->prev == ',') {
+                if (ctx->prev == '(' || ctx->prev == ',' || ctx->prev == '='
+                    || ctx->prev == ':' || ctx->prev == '[' || ctx->prev == '!'
+                    || ctx->prev == '&' || ctx->prev == '|' || ctx->prev == '?'
+                    || ctx->prev == '+' || ctx->prev == '-' || ctx->prev == '~'
+                    || ctx->prev == '*' || ctx->prev == '{')
+                {
                     ctx->state = trim_state_tag_script_js_re_begin;
 
                 } else {
