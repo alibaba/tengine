@@ -976,9 +976,15 @@ ngx_limit_tcp_accepted(ngx_event_t *ev)
     ngx_shmtx_lock(&ctx->shpool->mutex);
     ngx_limit_tcp_expire(c, ctx, 1);
 
+    excess = 0;
+    node = 0;
     rc = ngx_limit_tcp_lookup(c, ctx, &excess, &node);
 
     ngx_shmtx_unlock(&ctx->shpool->mutex);
+
+    if (rc == NGX_ERROR || node == 0) {
+        goto accept_continue;
+    }
 
     if (rc == NGX_BUSY) {
         ngx_close_accepted_connection(c);
