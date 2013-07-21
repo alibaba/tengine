@@ -26,7 +26,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 worker_processes  1;
-
+worker_rlimit_core 1024M;
 events {
 }
 
@@ -36,10 +36,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        server 127.0.0.1:9000 id=9000 weight=1;
-        server 127.0.0.1:9001 id=9001 weight=1;
-        server 127.0.0.1:9002 id=9002 weight=1;
-        server 127.0.0.1:9003 id=9003 weight=1;
+        server 127.0.0.1:9000 weight=1;
+        server 127.0.0.1:9001 weight=1;
+        server 127.0.0.1:9002 weight=1;
+        server 127.0.0.1:9003 weight=1;
     }
 
     server {
@@ -96,6 +96,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 worker_processes  1;
 
+worker_rlimit_core 1024M;
 events {
 }
 
@@ -105,17 +106,18 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        server 127.0.0.1:9000 id=9000 weight=1 max_fails=0;
-        server 127.0.0.1:9001 id=9001 weight=1 max_fails=0;
-        server 127.0.0.1:9002 id=9002 weight=1 max_fails=0;
-        server 127.0.0.1:9003 id=9003 weight=1 max_fails=0;
-        server 127.0.0.1:9004 id=9004 weight=1 max_fails=0;
+        server 127.0.0.1:9000 weight=1 max_fails=0;
+        server 127.0.0.1:9001 weight=1 max_fails=0;
+        server 127.0.0.1:9002 weight=1 max_fails=0;
+        server 127.0.0.1:9003 weight=1 max_fails=0;
+        server 127.0.0.1:9004 weight=1 max_fails=0;
     }
 
     server {
         listen 8080;
         location / {
             proxy_pass http://consistent_hash/;
+            proxy_next_upstream off;
         }
     }
 
@@ -130,6 +132,7 @@ http {
 EOF
 
 $t->run();
+#sleep(10000000000);
 $r = http_get('/?abcdef');
 like($r, qr/502/, 'check fallback, no fallback');
 unlike($r, qr/$res/, 'check fallback, no fallback');
@@ -142,8 +145,9 @@ $t->stop();
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
-worker_processes  1;
+worker_processes  4;
 
+worker_rlimit_core 1024M;
 events {
 }
 
@@ -152,10 +156,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        server 127.0.0.1:9000 id=9000 weight=16;
-        server 127.0.0.1:9001 id=9001 weight=16;
-        server 127.0.0.1:9002 id=9002 weight=16;
-        server 127.0.0.1:9003 id=9003 weight=16;
+        server 127.0.0.1:9000 weight=16;
+        server 127.0.0.1:9001 weight=16;
+        server 127.0.0.1:9002 weight=16;
+        server 127.0.0.1:9003 weight=16;
     }
 
     server {
@@ -201,12 +205,15 @@ my @cset = (0..9, 'a'..'z', 'A'..'Z');
 my $arg;
 my %result;
 for (my $count = 1; $count <= 10000; $count++) {
-    $arg = join '', map { $cset[int rand @cset] } 0..1000;
+    $arg = join '', map { $cset[int rand @cset] } 0..10;
     $r = http_get("/?$arg");
-    $res = getres($r);
-    $result{$res} += 1;
+    if ($r ne '')
+    {
+        $res = getres($r);
+        $result{$res} += 1;
+    }
 }
-print "9000 weight=1  9001 weight=1  9002 weight=1  9003 weight=1\n";
+print "9000 weight=16  9001 weight=16  9002 weight=16  9003 weight=16\n";
 foreach $res (keys(%result)) {
     print ("server $res: $result{$res}\n");
 }
@@ -217,6 +224,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 worker_processes  1;
 
+worker_rlimit_core 1024M;
 events {
 }
 
@@ -225,9 +233,9 @@ http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
         consistent_hash $args;
-        server 127.0.0.1:9000 id=9000 weight=1;
-        server 127.0.0.1:9001 id=9001 weight=10;
-        server 127.0.0.1:9002 id=9002 weight=100;
+        server 127.0.0.1:9000 weight=1;
+        server 127.0.0.1:9001 weight=10;
+        server 127.0.0.1:9002 weight=100;
     }
 
     server {
@@ -275,7 +283,7 @@ foreach $res (keys(%result)) {
 for (my $count = 1; $count <= 10000; $count++) {
     $arg = join '', map { $cset[int rand @cset] } 0..1000;
     $r = http_get("/?$arg");
-    $res = getres($r);
+$res = getres($r);
     $result{$res} += 1;
 }
 
