@@ -29,7 +29,7 @@
 
 
 typedef struct {
-    ngx_event_t                  ev;
+    ngx_event_t                 *ev;
     ngx_ebtree_t                *tree;
     ngx_ebtree_node_t            ebnode;
     ngx_http_upstream_rr_peer_t *peer;
@@ -73,6 +73,8 @@ static void ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc,
     void *data, ngx_uint_t state);
 static char *ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static ngx_int_t ngx_http_upstream_chash_delete_server(
+    ngx_http_upstream_chash_server_t *server);
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t ngx_http_upstream_chash_set_session(ngx_peer_connection_t *pc,
@@ -82,7 +84,8 @@ static void ngx_http_upstream_chash_save_session(ngx_peer_connection_t *pc,
 #endif
 
 
-static ngx_connection_t empty_connection;
+static ngx_event_t      *events;
+static ngx_connection_t *empty_connections;
 
 static ngx_command_t ngx_http_upstream_chash_commands[] = {
 
@@ -147,19 +150,32 @@ ngx_http_upstream_chash_create_srv_conf(ngx_conf_t *cf)
 static void
 ngx_http_upstream_chash_recover(ngx_event_t *ev)
 {
-    ngx_http_upstream_chash_server_t *server;
+    ngx_uint_t                        i, n;
+    ngx_array_t                      *down_servers;
+    ngx_connection_t                 *ec;
+    ngx_http_upstream_chash_server_t *server, **p;
 
-    server = (ngx_http_upstream_chash_server_t *) ((u_char *) ev -
-                               offsetof(ngx_http_upstream_chash_server_t, ev));
+    ec = ev->data;
+    down_servers = ec->data;
+    p = down_servers->elts;
 
-    if (ngx_http_upstream_chash_check_peer_down(server->peer)) {
-        ngx_add_timer(&server->ev, 60000);
-        return;
+
+    n = down_servers->nelts;
+    if (n > 0) {
+        server = p[0];
+        if ((ngx_http_upstream_chash_check_peer_down(server->peer))) {
+            ngx_add_timer(server->ev, 10000);
+            return;
+        }
+        server->peer->down = 0;
+        server->peer->fails = 0;
     }
 
-    server->peer->down = 0;
-    server->peer->fails = 0;
-    ngx_ebtree_insert(server->tree, &server->ebnode);
+    down_servers->nelts = 0;
+    for (i = 0; i <n; i--) {
+        server = p[i];
+        ngx_ebtree_insert(server->tree, &server->ebnode);
+    }
 }
 
 
@@ -170,6 +186,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     ngx_int_t                            j, weight;
     ngx_uint_t                           sid, id, hash_len;
     ngx_uint_t                           i, n;
+    ngx_array_t                         *array;
     ngx_http_upstream_rr_peer_t         *peer;
     ngx_http_upstream_rr_peers_t        *peers;
     ngx_http_upstream_chash_server_t    *server;
@@ -196,6 +213,16 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
     }
 
     n = peers->number;
+    empty_connections = ngx_pcalloc(cf->pool, n * sizeof(ngx_connection_t));
+    if (empty_connections == NULL) {
+        return NGX_ERROR;
+    }
+
+    events = ngx_pcalloc(cf->pool, n * sizeof(ngx_event_t));
+    if (events == NULL) {
+        return NGX_ERROR;
+    }
+
     for (i = 0; i < n; i++) {
         peer = &peers->peer[i];
         sid = (ngx_uint_t) ngx_atoi(peer->id.data, peer->id.len);
@@ -217,6 +244,17 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
             weight = 1 << 14;
         }
 
+        array = ngx_array_create(cf->pool, weight,
+                                 sizeof(ngx_http_upstream_chash_server_t));
+        if (array == NULL) {
+            return NGX_ERROR;
+        }
+
+        empty_connections[i].data = array;
+        events[i].data = &empty_connections[i];
+        events[i].log = &cf->cycle->new_log;
+        events[i].handler = ngx_http_upstream_chash_recover;
+
         for (j = 0; j < weight; j++) {
             server = ngx_pcalloc(cf->pool,
                                  sizeof(ngx_http_upstream_chash_server_t));
@@ -228,10 +266,7 @@ ngx_http_upstream_init_chash(ngx_conf_t *cf, ngx_http_upstream_srv_conf_t *us)
             server->ebnode.key = ngx_murmur_hash2((u_char *) (&id), 4);
             server->tree = ucscf->tree;
             server->ebnode.data = server;
-            ngx_memzero(&server->ev, sizeof(ngx_event_t));
-            server->ev.handler = ngx_http_upstream_chash_recover;
-            server->ev.data = &empty_connection;
-            server->ev.log = &cf->cycle->new_log;
+            server->ev = &events[i];
             ngx_ebtree_insert(ucscf->tree, &server->ebnode);
         }
     }
@@ -287,6 +322,7 @@ static ngx_int_t
 ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 {
     uint32_t                             diff_ge, diff_le;
+    ngx_int_t                            rc;
     ngx_ebtree_node_t                   *node, *node_ge, *node_le;
     ngx_http_upstream_rr_peer_t         *peer;
     ngx_http_upstream_chash_server_t    *server;
@@ -321,8 +357,10 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 
         server = (ngx_http_upstream_chash_server_t *) node->data;
         if (ngx_http_upstream_chash_check_peer_down(server->peer)) {
-            ngx_ebtree_delete(&server->ebnode);
-            ngx_add_timer(&server->ev, 60000);
+            rc = ngx_http_upstream_chash_delete_server(server);
+            if (rc != NGX_OK) {
+                return rc;
+            }
             continue;
         }
         break;
@@ -343,6 +381,31 @@ ngx_http_upstream_get_chash_peer(ngx_peer_connection_t *pc, void *data)
 }
 
 
+static ngx_int_t
+ngx_http_upstream_chash_delete_server(ngx_http_upstream_chash_server_t *server)
+{
+    ngx_array_t      *down_servers;
+    ngx_connection_t *ec;
+    ngx_http_upstream_chash_server_t **p;
+
+    ec = server->ev->data;
+    down_servers = ec->data;
+
+    p = ngx_array_push(down_servers);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+    *p = server;
+
+    ngx_ebtree_delete(&server->ebnode);
+    if (!server->ev->timer_set) {
+        ngx_add_timer(server->ev, 10000);
+    }
+
+    return NGX_OK;
+}
+
+
 static void
 ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state)
@@ -358,15 +421,16 @@ ngx_http_upstream_free_chash_peer(ngx_peer_connection_t *pc, void *data,
 
     if (state & NGX_PEER_FAILED) {
         uchpd->server->peer->fails++;
-        if (uchpd->server->peer->fails >= uchpd->server->peer->max_fails) {
+        if (uchpd->server->peer->max_fails
+            && uchpd->server->peer->fails >= uchpd->server->peer->max_fails)
+        {
             ngx_log_error(NGX_LOG_ERR, pc->log, 0,
-                          "server down %v, fails %d, max_fails %d",
+                          "server down %V, fails %d, max_fails %d",
                           &uchpd->server->peer->name,
                           uchpd->server->peer->fails,
                           uchpd->server->peer->max_fails);
 
-            ngx_ebtree_delete(&uchpd->server->ebnode);
-            ngx_add_timer(&uchpd->server->ev, 60000);
+            ngx_http_upstream_chash_delete_server(uchpd->server);
         }
     }
 }
