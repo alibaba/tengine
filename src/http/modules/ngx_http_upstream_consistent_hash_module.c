@@ -155,11 +155,13 @@ ngx_http_upstream_chash_recover(ngx_event_t *ev)
     ngx_connection_t                 *ec;
     ngx_http_upstream_chash_server_t *server, **p;
 
+    if (ngx_quit ||  ngx_exiting || ngx_terminate) {
+        return;
+    }
+
     ec = ev->data;
     down_servers = ec->data;
     p = down_servers->elts;
-
-
     n = down_servers->nelts;
     if (n > 0) {
         server = p[0];
