@@ -492,6 +492,7 @@ ngx_http_create_request(ngx_connection_t *c)
 {
     ngx_pool_t                 *pool;
     ngx_time_t                 *tp;
+    struct timeval              tv;
     ngx_http_request_t         *r;
     ngx_http_log_ctx_t         *ctx;
     ngx_http_connection_t      *hc;

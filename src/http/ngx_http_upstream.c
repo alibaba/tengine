@@ -4917,53 +4917,6 @@ ngx_http_upstream_get_local(ngx_http_request_t *r,
 }
 
 
-static ngx_addr_t *
-ngx_http_upstream_get_local(ngx_http_request_t *r,
-    ngx_http_upstream_local_t *local)
-{
-    ngx_int_t    rc;
-    ngx_str_t    val;
-    ngx_addr_t  *addr;
-
-    if (local == NULL) {
-        return NULL;
-    }
-
-    if (local->value == NULL) {
-        return local->addr;
-    }
-
-    if (ngx_http_complex_value(r, local->value, &val) != NGX_OK) {
-        return NULL;
-    }
-
-    if (val.len == 0) {
-        return NULL;
-    }
-
-    addr = ngx_palloc(r->pool, sizeof(ngx_addr_t));
-    if (addr == NULL) {
-        return NULL;
-    }
-
-    rc = ngx_parse_addr(r->pool, addr, val.data, val.len);
-
-    switch (rc) {
-    case NGX_OK:
-        addr->name = val;
-        return addr;
-
-    case NGX_DECLINED:
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "invalid local address \"%V\"", &val);
-        /* fall through */
-
-    default:
-        return NULL;
-    }
-}
-
-
 char *
 ngx_http_upstream_param_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)

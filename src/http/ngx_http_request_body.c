@@ -1039,6 +1039,7 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 static ngx_int_t
 ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
+    ngx_int_t                  rc;
     ngx_chain_t               *cl;
     ngx_http_request_body_t   *rb;
 

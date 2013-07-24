@@ -803,11 +803,14 @@ ngx_http_limit_req_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     conf->delay_log_level = (conf->limit_log_level == NGX_LOG_INFO) ?
                                 NGX_LOG_INFO : conf->limit_log_level + 1;
 
+    ngx_conf_merge_uint_value(conf->status_code, prev->status_code,
+                              NGX_HTTP_SERVICE_UNAVAILABLE);
+
     ngx_conf_merge_value(conf->geo_var_index, prev->geo_var_index,
                          NGX_CONF_UNSET);
 
-    ngx_conf_merge_str_value(conf->geo_var_value, prev->geo_var_value,
-                             "");
+    ngx_conf_merge_str_value(conf->geo_var_value, prev->geo_var_value, "");
+
     return NGX_CONF_OK;
 }
 
@@ -964,9 +967,6 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     shm_zone->init = ngx_http_limit_req_init_zone;
     shm_zone->data = ctx;
-
-    ngx_conf_merge_uint_value(conf->status_code, prev->status_code,
-                              NGX_HTTP_SERVICE_UNAVAILABLE);
 
     return NGX_CONF_OK;
 }
