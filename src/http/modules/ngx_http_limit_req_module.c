@@ -65,6 +65,7 @@ typedef struct {
 
     ngx_uint_t                   limit_log_level;
     ngx_uint_t                   delay_log_level;
+    ngx_uint_t                   status_code;
 } ngx_http_limit_req_conf_t;
 
 
@@ -93,6 +94,11 @@ static ngx_conf_enum_t  ngx_http_limit_req_log_levels[] = {
     { ngx_string("warn"), NGX_LOG_WARN },
     { ngx_string("error"), NGX_LOG_ERR },
     { ngx_null_string, 0 }
+};
+
+
+static ngx_conf_num_bounds_t  ngx_http_limit_req_status_bounds = {
+    ngx_conf_check_num_bounds, 400, 599
 };
 
 
@@ -125,6 +131,13 @@ static ngx_command_t  ngx_http_limit_req_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_limit_req_conf_t, limit_log_level),
       &ngx_http_limit_req_log_levels },
+
+    { ngx_string("limit_req_status"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_limit_req_conf_t, status_code),
+      &ngx_http_limit_req_status_bounds },
 
       ngx_null_command
 };
@@ -950,6 +963,9 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     shm_zone->init = ngx_http_limit_req_init_zone;
     shm_zone->data = ctx;
+
+    ngx_conf_merge_uint_value(conf->status_code, prev->status_code,
+                              NGX_HTTP_SERVICE_UNAVAILABLE);
 
     return NGX_CONF_OK;
 }

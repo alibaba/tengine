@@ -10,6 +10,10 @@
 #include <ngx_http.h>
 
 
+static ngx_int_t ngx_http_stub_status_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_stub_status_add_variables(ngx_conf_t *cf);
+
 static char *ngx_http_set_status(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_stub_status_init(ngx_conf_t *cf);
@@ -121,7 +125,7 @@ ngx_http_status_handler(ngx_http_request_t *r)
     b->last = ngx_sprintf(b->last, " %uA %uA %uA %uA\n", ap, hn, rq, rt);
 
     b->last = ngx_sprintf(b->last, "Reading: %uA Writing: %uA Waiting: %uA \n",
-                          rd, wr, ac - (rd + wr));
+                          rd, wr, wa);
 
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;

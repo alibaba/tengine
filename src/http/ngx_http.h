@@ -18,6 +18,11 @@ typedef struct ngx_http_upstream_s    ngx_http_upstream_t;
 typedef struct ngx_http_cache_s       ngx_http_cache_t;
 typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
+typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
+
+#if (NGX_HTTP_SPDY)
+typedef struct ngx_http_spdy_stream_s  ngx_http_spdy_stream_t;
+#endif
 
 typedef ngx_int_t (*ngx_http_header_handler_pt)(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
@@ -52,6 +57,13 @@ struct ngx_http_log_ctx_s {
 };
 
 
+struct ngx_http_chunked_s {
+    ngx_uint_t           state;
+    off_t                size;
+    off_t                length;
+};
+
+
 typedef struct {
     ngx_uint_t           http_version;
     ngx_uint_t           code;
@@ -72,12 +84,14 @@ ngx_int_t ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 
 
 void ngx_http_init_connection(ngx_connection_t *c);
+void ngx_http_close_connection(ngx_connection_t *c);
 
 #ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
 int ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
 #endif
 
 ngx_int_t ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b);
+ngx_int_t ngx_http_parse_uri(ngx_http_request_t *r);
 ngx_int_t ngx_http_parse_complex_uri(ngx_http_request_t *r,
     ngx_uint_t merge_slashes);
 ngx_int_t ngx_http_parse_status_line(ngx_http_request_t *r, ngx_buf_t *b,
