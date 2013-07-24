@@ -330,7 +330,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
                 node = ngx_slab_alloc_locked(ctx->shpool, n);
                 if (node == NULL) {
                     ngx_shmtx_unlock(&ctx->shpool->mutex);
-                    return NGX_HTTP_SERVICE_UNAVAILABLE;
+                    return lrcf->status_code;
                 }
             }
 
@@ -379,8 +379,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         }
 
         if (rc == NGX_ERROR || limit_req[i].forbid_action.len == 0) {
+            return lrcf->status_code;
 
-            return NGX_HTTP_SERVICE_UNAVAILABLE;
         } else if (limit_req[i].forbid_action.data[0] == '@') {
 
             ngx_log_error(lrcf->limit_log_level, r->connection->log, 0,
@@ -778,6 +778,7 @@ ngx_http_limit_req_create_conf(ngx_conf_t *cf)
 
     conf->enable = NGX_CONF_UNSET;
     conf->limit_log_level = NGX_CONF_UNSET_UINT;
+    conf->status_code = NGX_CONF_UNSET_UINT;
     conf->geo_var_index = NGX_CONF_UNSET;
 
     return conf;
@@ -891,7 +892,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
 
             rate = ngx_atoi(value[i].data + 5, len - 5);
-            if (rate <= NGX_ERROR) {
+            if (rate <= 0) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "invalid rate \"%V\"", &value[i]);
                 return NGX_CONF_ERROR;

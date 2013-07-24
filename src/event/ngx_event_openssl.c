@@ -247,7 +247,9 @@ ngx_int_t
 ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
     ngx_str_t *key, ngx_http_ssl_pphrase_dialog_conf_t *dialog)
 {
-    X509       *certificate;
+    BIO        *bio;
+    X509       *certificate, *x509;
+    u_long      n;
     EVP_PKEY   *pkey;
     ngx_int_t   pk_type;
 
@@ -283,14 +285,81 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_ERROR;
     }
 
-    if (SSL_CTX_use_certificate_chain_file(ssl->ctx, (char *) cert->data)
+    /*
+     * we can't use SSL_CTX_use_certificate_chain_file() as it doesn't
+     * allow to access certificate later from SSL_CTX, so we reimplement
+     * it here
+     */
+
+    bio = BIO_new_file((char *) cert->data, "r");
+    if (bio == NULL) {
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                      "BIO_new_file(\"%s\") failed", cert->data);
+        return NGX_ERROR;
+    }
+
+    x509 = PEM_read_bio_X509_AUX(bio, NULL, NULL, NULL);
+    if (x509 == NULL) {
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                      "PEM_read_bio_X509_AUX(\"%s\") failed", cert->data);
+        BIO_free(bio);
+        return NGX_ERROR;
+    }
+
+    if (SSL_CTX_use_certificate(ssl->ctx, x509) == 0) {
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                      "SSL_CTX_use_certificate(\"%s\") failed", cert->data);
+        X509_free(x509);
+        BIO_free(bio);
+        return NGX_ERROR;
+    }
+
+    if (SSL_CTX_set_ex_data(ssl->ctx, ngx_ssl_certificate_index, x509)
         == 0)
     {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                      "SSL_CTX_use_certificate_chain_file(\"%s\") failed",
-                      cert->data);
+                      "SSL_CTX_set_ex_data() failed");
         return NGX_ERROR;
     }
+
+    X509_free(x509);
+
+    /* read rest of the chain */
+
+    for ( ;; ) {
+
+        x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+        if (x509 == NULL) {
+            n = ERR_peek_last_error();
+
+            if (ERR_GET_LIB(n) == ERR_LIB_PEM
+                && ERR_GET_REASON(n) == PEM_R_NO_START_LINE)
+            {
+                /* end of file */
+                ERR_clear_error();
+                break;
+            }
+
+            /* some real error */
+
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "PEM_read_bio_X509(\"%s\") failed", cert->data);
+            BIO_free(bio);
+            return NGX_ERROR;
+        }
+
+        if (SSL_CTX_add_extra_chain_cert(ssl->ctx, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_add_extra_chain_cert(\"%s\") failed",
+                          cert->data);
+            X509_free(x509);
+            BIO_free(bio);
+            return NGX_ERROR;
+        }
+    }
+
+    BIO_free(bio);
+
 
     if (ngx_conf_full_name(cf->cycle, key, 1) != NGX_OK) {
         return NGX_ERROR;

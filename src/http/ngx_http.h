@@ -31,14 +31,17 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 
 
 #include <ngx_http_variables.h>
+#include <ngx_http_config.h>
 #include <ngx_http_request.h>
 #include <ngx_http_script.h>
 #include <ngx_http_upstream.h>
 #include <ngx_http_upstream_round_robin.h>
-#include <ngx_http_config.h>
 #include <ngx_http_busy_lock.h>
 #include <ngx_http_core_module.h>
 
+#if (NGX_HTTP_SPDY)
+#include <ngx_http_spdy.h>
+#endif
 #if (NGX_HTTP_CACHE)
 #include <ngx_http_cache.h>
 #endif
@@ -106,18 +109,25 @@ ngx_int_t ngx_http_arg(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args);
+ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
+    ngx_http_chunked_t *ctx);
 ngx_int_t ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 
 
+ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
+ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);
+ngx_int_t ngx_http_process_request_header(ngx_http_request_t *r);
+void ngx_http_process_request(ngx_http_request_t *r);
 void ngx_http_update_location_config(ngx_http_request_t *r);
 void ngx_http_handler(ngx_http_request_t *r);
 void ngx_http_run_posted_requests(ngx_connection_t *c);
 ngx_int_t ngx_http_post_request(ngx_http_request_t *r,
     ngx_http_posted_request_t *pr);
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
+void ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc);
 
 void ngx_http_empty_handler(ngx_event_t *wev);
 void ngx_http_request_empty_handler(ngx_http_request_t *r);
