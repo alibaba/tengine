@@ -1530,9 +1530,13 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (size) {
 
         if (log->script) {
+#if 0
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "buffered logs cannot have variables in name");
             return NGX_CONF_ERROR;
+#else
+            log->file = ngx_pcalloc(cf->pool, sizeof(ngx_open_file_t));
+#endif
         }
 
         if (log->file->data) {
