@@ -1136,7 +1136,7 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
 
             if ((ngx_uint_t) excess > ctx->burst) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                              "limit %V over rate: %ui", &c->addr_text);
+                              "limit %V over rate: %i", &c->addr_text, excess);
                 return NGX_BUSY;
             }
 
