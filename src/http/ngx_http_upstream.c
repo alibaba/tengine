@@ -1224,7 +1224,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
          */
         if (!r->request_buffering) {
             ngx_http_upstream_finalize_request(r, u,
-                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+                                               NGX_HTTP_BAD_GATEWAY);
             return;
         }
 
