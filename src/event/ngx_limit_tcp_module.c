@@ -267,7 +267,7 @@ ngx_limit_tcp_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_ERROR;
     }
 
-    ngx_sprintf(ctx->shpool->log_ctx, " in limit_req zone \"%V\"%Z",
+    ngx_sprintf(ctx->shpool->log_ctx, " in limit_tcp zone \"%V\"%Z",
                 &shm_zone->shm.name);
 
     return NGX_OK;
@@ -1110,7 +1110,7 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
 
             if (ctx->concurrent && lr->count + 1 > ctx->concurrent) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                              "limit %V over concurrent: %ui",
+                              "limit tcp %V over concurrent: %ui",
                               &c->addr_text, lr->count);
                 return NGX_BUSY;
             }
