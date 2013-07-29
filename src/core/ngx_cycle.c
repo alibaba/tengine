@@ -551,7 +551,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 continue;
             }
 
-            if (shm_zone[i].shm.size == oshm_zone[n].shm.size) {
+            if (shm_zone[i].tag == oshm_zone[n].tag
+                && shm_zone[i].shm.size == oshm_zone[n].shm.size)
+            {
                 shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
 
                 if (shm_zone[i].init(&shm_zone[i], oshm_zone[n].data)
@@ -781,7 +783,7 @@ old_shm_zone_done:
             ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
                           "deleting socket %s", name);
 
-            if (ngx_delete_file(name) == -1) {
+            if (ngx_delete_file(name) == NGX_FILE_ERROR) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
                               ngx_delete_file_n " %s failed", name);
             }
@@ -1219,7 +1221,6 @@ ngx_test_lockfile(u_char *file, ngx_log_t *log)
 void
 ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
 {
-    ssize_t           n, len;
     ngx_fd_t          fd;
     ngx_uint_t        i;
     ngx_list_part_t  *part;
@@ -1243,24 +1244,8 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
             continue;
         }
 
-        len = file[i].pos - file[i].buffer;
-
-        if (file[i].buffer && len != 0) {
-
-            n = ngx_write_fd(file[i].fd, file[i].buffer, len);
-
-            if (n == NGX_FILE_ERROR) {
-                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                              ngx_write_fd_n " to \"%s\" failed",
-                              file[i].name.data);
-
-            } else if (n != len) {
-                ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
-                          ngx_write_fd_n " to \"%s\" was incomplete: %z of %uz",
-                          file[i].name.data, n, len);
-            }
-
-            file[i].pos = file[i].buffer;
+        if (file[i].flush) {
+            file[i].flush(&file[i], cycle->log);
         }
 
         fd = ngx_open_file(file[i].name.data, NGX_FILE_APPEND,

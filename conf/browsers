@@ -59,7 +59,19 @@ user_agent $browser {
     Maxthon                 3.0~3.9999                  maxthon3;
     Maxthon                 2.9999-                     maxthon_low;
 
-    Safari                                              safari5;
+    Safari                  419.9999-                   safari_low;
+    Safari                  522.0~525.29.9999           safari3;
+    Safari                  526.8~526.11.999            safari_dp1;
+    Safari                  530.18.0~533.15.999         safari4;
+    Safari                  533.16.0~533.17.999         safari501;
+    Safari                  533.18.0~533.18.6           safari502;
+    Safari                  6533.18.0~6533.18.5.99      safari502;
+    Safari                  533.19.4~533.19.9           safari503;
+    Safari                  533.20.0~533.20.27          safari504;
+    Safari                  533.21~533.22               safari505;
+    Safari                  7534.48~7534.48.9          safari51;
+    Safari                  534.53~534.57               safari51;
+    Safari                  8536.25~8536.9999           safari6;
 
     # match all versions
     Opera                                               opera;

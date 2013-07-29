@@ -17,6 +17,10 @@ BEGIN {
 
 use lib 'lib';
 use Test::Nginx::Socket;
+use t::StapThread;
+
+our $GCScript = $t::StapThread::GCScript;
+our $StapScript = $t::StapThread::StapScript;
 
 repeat_each(2);
 
@@ -24,12 +28,12 @@ plan tests => repeat_each() * (blocks() * 4 + 10);
 
 our $HtmlDir = html_dir;
 
-$ENV{TEST_NGINX_CLIENT_PORT} ||= server_port();
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 $ENV{TEST_NGINX_RESOLVER} ||= '8.8.8.8';
 
+log_level("debug");
 no_long_string();
-no_diff();
+#no_diff();
 run_tests();
 
 __DATA__
@@ -39,10 +43,11 @@ __DATA__
     server_tokens off;
     lua_socket_connect_timeout 100ms;
     resolver $TEST_NGINX_RESOLVER;
+    resolver_timeout 1s;
     location /t {
         content_by_lua '
             local sock = ngx.socket.tcp()
-            local ok, err = sock:connect("www.taobao.com", 12345)
+            local ok, err = sock:connect("agentzh.org", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -56,8 +61,8 @@ GET /t
 --- response_body
 failed to connect: timeout
 --- error_log
-lua socket connect timeout: 100
-lua socket connect timed out
+lua tcp socket connect timeout: 100
+lua tcp socket connect timed out
 
 
 
@@ -70,7 +75,7 @@ lua socket connect timed out
         content_by_lua '
             local sock = ngx.socket.tcp()
             sock:settimeout(150)
-            local ok, err = sock:connect("www.taobao.com", 12345)
+            local ok, err = sock:connect("agentzh.org", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -84,8 +89,8 @@ GET /t
 --- response_body
 failed to connect: timeout
 --- error_log
-lua socket connect timeout: 150
-lua socket connect timed out
+lua tcp socket connect timeout: 150
+lua tcp socket connect timed out
 
 
 
@@ -98,7 +103,7 @@ lua socket connect timed out
         content_by_lua '
             local sock = ngx.socket.tcp()
             sock:settimeout(nil)
-            local ok, err = sock:connect("www.taobao.com", 12345)
+            local ok, err = sock:connect("agentzh.org", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -112,8 +117,8 @@ GET /t
 --- response_body
 failed to connect: timeout
 --- error_log
-lua socket connect timeout: 102
-lua socket connect timed out
+lua tcp socket connect timeout: 102
+lua tcp socket connect timed out
 
 
 
@@ -126,7 +131,7 @@ lua socket connect timed out
         content_by_lua '
             local sock = ngx.socket.tcp()
             sock:settimeout(0)
-            local ok, err = sock:connect("www.taobao.com", 12345)
+            local ok, err = sock:connect("agentzh.org", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -140,8 +145,9 @@ GET /t
 --- response_body
 failed to connect: timeout
 --- error_log
-lua socket connect timeout: 102
-lua socket connect timed out
+lua tcp socket connect timeout: 102
+lua tcp socket connect timed out
+--- timeout: 5
 
 
 
@@ -154,7 +160,7 @@ lua socket connect timed out
         content_by_lua '
             local sock = ngx.socket.tcp()
             sock:settimeout(-1)
-            local ok, err = sock:connect("www.taobao.com", 12345)
+            local ok, err = sock:connect("agentzh.org", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -168,8 +174,8 @@ GET /t
 --- response_body
 failed to connect: timeout
 --- error_log
-lua socket connect timeout: 102
-lua socket connect timed out
+lua tcp socket connect timeout: 102
+lua tcp socket connect timed out
 
 
 
@@ -204,9 +210,9 @@ GET /t
 connected: 1
 failed to receive: timeout
 --- error_log
-lua socket read timeout: 100
-lua socket connect timeout: 60000
-lua socket read timed out
+lua tcp socket read timeout: 100
+lua tcp socket connect timeout: 60000
+lua tcp socket read timed out
 
 
 
@@ -243,9 +249,9 @@ GET /t
 connected: 1
 failed to receive: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket read timeout: 150
-lua socket read timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket read timeout: 150
+lua tcp socket read timed out
 
 
 
@@ -282,9 +288,9 @@ GET /t
 connected: 1
 failed to receive: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket read timeout: 102
-lua socket read timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket read timeout: 102
+lua tcp socket read timed out
 
 
 
@@ -322,9 +328,9 @@ GET /t
 connected: 1
 failed to receive: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket read timeout: 102
-lua socket read timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket read timeout: 102
+lua tcp socket read timed out
 
 
 
@@ -361,9 +367,9 @@ GET /t
 connected: 1
 failed to receive: timeout
 --- error_log
-lua socket read timeout: 102
-lua socket connect timeout: 60000
-lua socket read timed out
+lua tcp socket read timeout: 102
+lua tcp socket connect timeout: 60000
+lua tcp socket read timed out
 
 
 
@@ -394,13 +400,27 @@ lua socket read timed out
     }
 --- request
 GET /t
+--- stap2
+global active = 0
+F(ngx_http_lua_socket_send) {
+    active = 1
+    println(probefunc())
+}
+probe syscall.send,
+    syscall.sendto,
+    syscall.writev
+{
+    if (active && pid() == target()) {
+        println(probefunc())
+    }
+}
 --- response_body
 connected: 1
 failed to send: timeout
 --- error_log
-lua socket send timeout: 100
-lua socket connect timeout: 60000
-lua socket write timed out
+lua tcp socket send timeout: 100
+lua tcp socket connect timeout: 60000
+lua tcp socket write timed out
 
 
 
@@ -437,9 +457,9 @@ GET /t
 connected: 1
 failed to send: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket send timeout: 150
-lua socket write timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket send timeout: 150
+lua tcp socket write timed out
 
 
 
@@ -476,9 +496,9 @@ GET /t
 connected: 1
 failed to send: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket send timeout: 102
-lua socket write timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket send timeout: 102
+lua tcp socket write timed out
 
 
 
@@ -515,9 +535,9 @@ GET /t
 connected: 1
 failed to send: timeout
 --- error_log
-lua socket connect timeout: 60000
-lua socket send timeout: 102
-lua socket write timed out
+lua tcp socket connect timeout: 60000
+lua tcp socket send timeout: 102
+lua tcp socket write timed out
 
 
 
@@ -554,7 +574,101 @@ GET /t
 connected: 1
 failed to send: timeout
 --- error_log
-lua socket send timeout: 102
-lua socket connect timeout: 60000
-lua socket write timed out
+lua tcp socket send timeout: 102
+lua tcp socket connect timeout: 60000
+lua tcp socket write timed out
+
+
+
+=== TEST 16: exit in user thread (entry thread is still pending on tcpsock:send)
+--- config
+    location /lua {
+        content_by_lua '
+            function f()
+                ngx.say("hello in thread")
+                ngx.sleep(0.1)
+                ngx.exit(0)
+            end
+
+            ngx.say("before")
+            ngx.thread.spawn(f)
+            ngx.say("after")
+            local sock = ngx.socket.tcp()
+
+            local ok, err = sock:connect("127.0.0.1", $TEST_NGINX_MEMCACHED_PORT)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            sock:settimeout(12000)
+
+            local bytes, ok = sock:send("get helloworld!")
+            if not bytes then
+                ngx.say("failed to send: ", err)
+                return
+            end
+
+            ngx.say("end")
+        ';
+    }
+--- request
+GET /lua
+--- stap2 eval: $::StapScript
+--- stap eval
+<<'_EOC_' . $::GCScript;
+
+global timers
+
+F(ngx_http_free_request) {
+    println("free request")
+}
+
+M(timer-add) {
+    if ($arg2 == 12000 || $arg2 == 100) {
+        timers[$arg1] = $arg2
+        printf("add timer %d\n", $arg2)
+    }
+}
+
+M(timer-del) {
+    tm = timers[$arg1]
+    if (tm == 12000 || tm == 100) {
+        printf("delete timer %d\n", tm)
+        delete timers[$arg1]
+    }
+}
+
+M(timer-expire) {
+    tm = timers[$arg1]
+    if (tm == 12000 || tm == 100) {
+        printf("expire timer %d\n", timers[$arg1])
+        delete timers[$arg1]
+    }
+}
+
+F(ngx_http_lua_tcp_socket_cleanup) {
+    println("lua tcp socket cleanup")
+}
+_EOC_
+
+--- stap_out
+create 2 in 1
+spawn user thread 2 in 1
+add timer 100
+add timer 12000
+expire timer 100
+terminate 2: ok
+lua tcp socket cleanup
+delete timer 12000
+delete thread 2
+delete thread 1
+free request
+
+--- response_body
+before
+hello in thread
+after
+--- no_error_log
+[error]
 

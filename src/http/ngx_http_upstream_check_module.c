@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010-2012 Alibaba Group Holding Limited
- * Copyright (C) 2010-2012 Weibin Yao (yaoweibin@gmail.com)
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Weibin Yao (yaoweibin@gmail.com)
  */
 
 
@@ -16,6 +16,8 @@ typedef struct ngx_http_upstream_check_srv_conf_s
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(push, 1)
+#elif (NGX_SOLARIS)
+#pragma pack(1)
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
@@ -60,6 +62,8 @@ typedef struct {
 
 #if (NGX_HAVE_PACK_PRAGMA)
 #pragma pack(pop)
+#elif (NGX_SOLARIS)
+#pragma pack()
 #else
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
@@ -1096,10 +1100,12 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
         }
 #endif
 
-        if (size >= 0) {
+        if (size > 0) {
             ctx->send.pos += size;
-        } else if (size == NGX_AGAIN) {
+
+        } else if (size == 0 || size == NGX_AGAIN) {
             return;
+
         } else {
             c->error = 1;
             goto check_send_fail;
@@ -1212,6 +1218,12 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
     switch (rc) {
 
     case NGX_AGAIN:
+        /* The peer has closed its half side of the connection. */
+        if (size == 0) {
+            ngx_http_upstream_check_status_update(peer, 0);
+            break;
+        }
+
         return;
 
     case NGX_ERROR:
@@ -2814,6 +2826,7 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     opeers_shm = NULL;
     peers_shm = NULL;
+    ngx_str_null(&oshm_name);
 
     same = 0;
     peers = check_peers_ctx;

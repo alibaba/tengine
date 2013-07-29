@@ -5,15 +5,15 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 81;
+plan tests => repeat_each() * 95;
 
 our $HtmlDir = html_dir;
 
-$ENV{TEST_NGINX_CLIENT_PORT} ||= server_port();
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 $ENV{TEST_NGINX_RESOLVER} ||= '8.8.8.8';
 
 #log_level 'warn';
+log_level 'debug';
 
 #no_long_string();
 #no_diff();
@@ -26,7 +26,7 @@ __DATA__
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -67,9 +67,10 @@ __DATA__
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
+
 --- request
 GET /t
 --- response_body
@@ -94,7 +95,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 1234;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -135,7 +136,7 @@ close: nil closed
     }
 
     location /foo {
-        echo -n foo;
+        content_by_lua 'ngx.print("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -161,7 +162,7 @@ closed
     server_tokens off;
     location /t {
         #set $port 1234;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -201,12 +202,12 @@ attempt to send data on a closed socket:
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER;
-    resolver_timeout 5s;
+    resolver_timeout 1s;
     location /t {
         content_by_lua '
             local sock = ngx.socket.tcp()
             local port = 80
-            local ok, err = sock:connect("agentzh.org", port)
+            local ok, err = sock:connect("direct.agentzh.org", port)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -242,6 +243,7 @@ attempt to send data on a closed socket:
             end
         ';
     }
+
 --- request
 GET /t
 --- response_body
@@ -281,8 +283,8 @@ connect: nil connection refused
 send: nil closed
 receive: nil closed
 close: nil closed
---- error_log
-connect() failed (111: Connection refused)
+--- error_log eval
+qr/connect\(\) failed \(\d+: Connection refused\)/
 
 
 
@@ -292,11 +294,11 @@ connect() failed (111: Connection refused)
     lua_socket_connect_timeout 100ms;
     lua_socket_send_timeout 100ms;
     lua_socket_read_timeout 100ms;
-    resolver_timeout 2s;
+    resolver_timeout 1s;
     location /test {
         content_by_lua '
             local sock = ngx.socket.tcp()
-            local ok, err = sock:connect("taobao.com", 16787)
+            local ok, err = sock:connect("agentzh.org", 12345)
             ngx.say("connect: ", ok, " ", err)
 
             local bytes
@@ -319,7 +321,7 @@ send: nil closed
 receive: nil closed
 close: nil closed
 --- error_log
-lua socket connect timed out
+lua tcp socket connect timed out
 
 
 
@@ -328,7 +330,7 @@ lua socket connect timed out
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -360,7 +362,7 @@ connected: 1
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER;
-    resolver_timeout 4s;
+    resolver_timeout 1s;
     location /t {
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -429,7 +431,7 @@ attempt to send data on a closed socket
 --- request
 GET /t
 --- response_body_like
-^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(110: Operation timed out\))?
+^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(\d+: Operation timed out\))?
 connected: nil
 failed to send request: closed$
 --- error_log
@@ -442,7 +444,7 @@ attempt to send data on a closed socket
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -483,7 +485,7 @@ attempt to send data on a closed socket
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -510,7 +512,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -549,7 +551,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -578,7 +580,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -627,7 +629,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -658,7 +660,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -704,7 +706,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -734,7 +736,7 @@ close: nil closed
     lua_socket_buffer_size 1;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -780,7 +782,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -809,7 +811,7 @@ close: nil closed
     lua_socket_buffer_size 1;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -850,7 +852,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -877,7 +879,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local port = ngx.var.port
@@ -917,7 +919,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -964,10 +966,17 @@ close: nil closed
     }
 --- request
     GET /test
+
+--- stap2
+M(http-lua-info) {
+    printf("tcp resume: %p\n", $coctx)
+    print_ubacktrace()
+}
+
 --- response_body
 failed to connect: connection refused
---- error_log
-connect() failed (111: Connection refused)
+--- error_log eval
+qr/connect\(\) failed \(\d+: Connection refused\)/
 
 
 
@@ -976,7 +985,7 @@ connect() failed (111: Connection refused)
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1022,7 +1031,7 @@ connect() failed (111: Connection refused)
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -1164,6 +1173,12 @@ function go(port)
         ngx.say("failed to receive a line: ", err, " [", part, "]")
     end
 end
+
+--- stap2
+M(http-lua-info) {
+    printf("tcp resume\n")
+    print_ubacktrace()
+}
 --- request
 GET /t
 --- response_body_like eval
@@ -1381,7 +1396,7 @@ close: 1 nil
 --- no_error_log
 [error]
 --- error_log eval
-["lua reuse socket upstream", "lua socket reconnect without shutting down"]
+["lua reuse socket upstream", "lua tcp socket reconnect without shutting down"]
 
 
 
@@ -1391,7 +1406,7 @@ close: 1 nil
     location /t {
         #set $port 5000;
         set $port1 $TEST_NGINX_MEMCACHED_PORT;
-        set $port2 $TEST_NGINX_CLIENT_PORT;
+        set $port2 $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock1 = ngx.socket.tcp()
@@ -1481,7 +1496,7 @@ GET /t
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1524,7 +1539,7 @@ GET /t
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -1551,7 +1566,7 @@ close: nil closed
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1610,7 +1625,7 @@ bad argument #1 to 'send' (bad data type nil found)
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1669,7 +1684,7 @@ bad argument #1 to 'send' (bad data type boolean found)
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1795,7 +1810,7 @@ subrequest: 200, OK\r
     server_tokens off;
     location /t {
         #set $port 5000;
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -1856,4 +1871,224 @@ close: nil closed
 --- no_error_log
 [error]
 --- SKIP
+
+
+
+=== TEST 31: receive(0)
+--- config
+    server_tokens off;
+    location /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_SERVER_PORT;
+
+        content_by_lua '
+            local sock = ngx.socket.tcp()
+            local port = ngx.var.port
+            local ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.0\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n"
+            -- req = "OK"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            local data, err, part = sock:receive(0)
+            if not data then
+                ngx.say("failed to receive(0): ", err)
+                return
+            end
+
+            ngx.say("receive(0): [", data, "]")
+
+            ok, err = sock:close()
+            ngx.say("close: ", ok, " ", err)
+        ';
+    }
+
+    location /foo {
+        echo foo;
+        more_clear_headers Date;
+    }
+--- request
+GET /t
+--- response_body
+connected: 1
+request sent: 57
+receive(0): []
+close: 1 nil
+--- no_error_log
+[error]
+
+
+
+=== TEST 32: send("")
+--- config
+    server_tokens off;
+    location /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_SERVER_PORT;
+
+        content_by_lua '
+            local sock = ngx.socket.tcp()
+            local port = ngx.var.port
+            local ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.0\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n"
+            -- req = "OK"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            local bytes, err = sock:send("")
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("send(\\"\\"): ", bytes)
+
+            ok, err = sock:close()
+            ngx.say("close: ", ok, " ", err)
+        ';
+    }
+
+    location /foo {
+        echo foo;
+        more_clear_headers Date;
+    }
+--- request
+GET /t
+--- response_body
+connected: 1
+request sent: 57
+send(""): 0
+close: 1 nil
+--- no_error_log
+[error]
+
+
+
+=== TEST 33: github issue #215: Handle the posted requests in lua cosocket api (failed to resolve)
+--- config
+    resolver 8.8.8.8;
+
+    location = /sub {
+        content_by_lua '
+            local sock = ngx.socket.tcp()
+            local ok, err = sock:connect("xxx", 80)
+            if not ok then
+                ngx.say("failed to connect to xxx: ", err)
+                return
+            end
+            ngx.say("successfully connected to xxx!")
+            sock:close()
+        ';
+    }
+
+    location = /lua {
+        content_by_lua '
+            local res = ngx.location.capture("/sub")
+            ngx.print(res.body)
+        ';
+    }
+--- request
+GET /lua
+
+--- stap
+F(ngx_resolve_name_done) {
+    println("resolve name done")
+    #print_ubacktrace()
+}
+
+--- stap_out
+resolve name done
+
+--- response_body_like chop
+^failed to connect to xxx: xxx could not be resolved.*?Host not found
+
+--- no_error_log
+[error]
+
+
+
+=== TEST 34: github issue #215: Handle the posted requests in lua cosocket api (successfully resolved)
+--- config
+    resolver 8.8.8.8;
+
+    location = /sub {
+        content_by_lua '
+            if not package.i then
+                package.i = 1
+            end
+
+            local servers = {"openresty.org", "agentzh.org", "sregex.org"}
+            local server = servers[package.i]
+            package.i = package.i + 1
+
+            local sock = ngx.socket.tcp()
+            local ok, err = sock:connect(server, 80)
+            if not ok then
+                ngx.say("failed to connect to agentzh.org: ", err)
+                return
+            end
+            ngx.say("successfully connected to xxx!")
+            sock:close()
+        ';
+    }
+
+    location = /lua {
+        content_by_lua '
+            local res = ngx.location.capture("/sub")
+            ngx.print(res.body)
+        ';
+    }
+--- request
+GET /lua
+--- response_body
+successfully connected to xxx!
+
+--- stap
+F(ngx_http_lua_socket_resolve_handler) {
+    println("lua socket resolve handler")
+}
+
+F(ngx_http_lua_socket_tcp_connect_retval_handler) {
+    println("lua socket tcp connect retval handler")
+}
+
+F(ngx_http_run_posted_requests) {
+    println("run posted requests")
+}
+
+--- stap_out_like
+run posted requests
+lua socket resolve handler
+run posted requests
+lua socket tcp connect retval handler
+run posted requests
+
+--- no_error_log
+[error]
 

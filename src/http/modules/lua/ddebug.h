@@ -1,10 +1,16 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
 
-#ifndef DDEBUG_H
-#define DDEBUG_H
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
+#ifndef _DDEBUG_H_INCLUDED_
+#define _DDEBUG_H_INCLUDED_
+
 
 #include <nginx.h>
 #include <ngx_core.h>
+
 
 #if defined(DDEBUG) && (DDEBUG)
 
@@ -70,5 +76,7 @@ static void dd(const char *fmt, ...) {
 
 #endif
 
-#endif /* DDEBUG_H */
 
+#endif /* _DDEBUG_H_INCLUDED_ */
+
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

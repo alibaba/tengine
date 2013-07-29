@@ -1,7 +1,13 @@
-/* vim:set ft=c ts=4 sw=4 et fdm=marker: */
 
-#ifndef NGX_HTTP_LUA_COMMON_H
-#define NGX_HTTP_LUA_COMMON_H
+/*
+ * Copyright (C) Xiaozhe Wang (chaoslawful)
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
+#ifndef _NGX_HTTP_LUA_COMMON_H_INCLUDED_
+#define _NGX_HTTP_LUA_COMMON_H_INCLUDED_
+
 
 #include <nginx.h>
 #include <ngx_core.h>
@@ -23,11 +29,6 @@
 #ifndef MD5_DIGEST_LENGTH
 #define MD5_DIGEST_LENGTH 16
 #endif
-
-#define NGX_HTTP_LUA_CHECK_ABORTED(L, ctx) \
-        if (ctx && ctx->aborted) { \
-            return luaL_error(L, "coroutine aborted"); \
-        }
 
 /* Nginx HTTP Lua Inline tag prefix */
 
@@ -86,7 +87,7 @@ typedef ngx_int_t (*ngx_http_lua_conf_handler_pt)(ngx_log_t *log,
 
 
 typedef struct {
-    const char          *package;
+    u_char              *package;
     lua_CFunction        loader;
 } ngx_http_lua_preload_hook_t;
 
@@ -188,33 +189,47 @@ typedef struct {
     ngx_uint_t                       pool_size;
 
     ngx_flag_t                       transform_underscores_in_resp_headers;
-
+    ngx_flag_t                       log_socket_errors;
+    ngx_flag_t                       check_client_abort;
 } ngx_http_lua_loc_conf_t;
 
 
-typedef struct {
-    void                    *data;
+typedef enum {
+    NGX_HTTP_LUA_USER_CORO_NOP      = 0,
+    NGX_HTTP_LUA_USER_CORO_RESUME   = 1,
+    NGX_HTTP_LUA_USER_CORO_YIELD    = 2,
+    NGX_HTTP_LUA_USER_THREAD_RESUME = 3
+} ngx_http_lua_user_coro_op_t;
 
-    uint8_t                  context;
 
-    lua_State               *cc;  /*  coroutine to handle request */
+typedef enum {
+    NGX_HTTP_LUA_CO_RUNNING   = 0, /* coroutine running */
+    NGX_HTTP_LUA_CO_SUSPENDED = 1, /* coroutine suspended */
+    NGX_HTTP_LUA_CO_NORMAL    = 2, /* coroutine normal */
+    NGX_HTTP_LUA_CO_DEAD      = 3, /* coroutine dead */
+    NGX_HTTP_LUA_CO_ZOMBIE    = 4, /* coroutine zombie */
+} ngx_http_lua_co_status_t;
 
-    int                      cc_ref;  /*  reference to anchor coroutine in
-                                          the lua registry */
 
-    int                      ctx_ref;  /*  reference to anchor
-                                           request ctx data in lua
-                                           registry */
+typedef struct ngx_http_lua_co_ctx_s  ngx_http_lua_co_ctx_t;
 
-    ngx_chain_t             *out;  /* buffered output chain for HTTP 1.0 */
-    ngx_chain_t             *free_bufs;
-    ngx_chain_t             *busy_bufs;
-    ngx_chain_t             *free_recv_bufs;
-    ngx_chain_t             *flush_buf;
+typedef struct ngx_http_lua_posted_thread_s  ngx_http_lua_posted_thread_t;
 
-    ngx_http_cleanup_pt     *cleanup;
+struct ngx_http_lua_posted_thread_s {
+    ngx_http_lua_co_ctx_t               *co_ctx;
+    ngx_http_lua_posted_thread_t        *next;
+};
 
-    ngx_chain_t             *body; /* buffered response body chains */
+
+struct ngx_http_lua_co_ctx_s {
+    void                    *data;      /* user state for cosockets */
+
+    lua_State               *co;
+    ngx_http_lua_co_ctx_t   *parent_co_ctx;
+
+    ngx_http_lua_posted_thread_t    *zombie_child_threads;
+
+    ngx_http_cleanup_pt      cleanup;
 
     unsigned                 nsubreqs;  /* number of subrequests of the
                                          * current request */
@@ -225,19 +240,101 @@ typedef struct {
 
     ngx_str_t               *sr_bodies;   /* all captured subrequest bodies */
 
+    unsigned                 pending_subreqs; /* number of subrequests being
+                                                 waited */
+
+    ngx_event_t              sleep;  /* used for ngx.sleep */
+
+    int                      co_ref; /*  reference to anchor the thread
+                                         coroutines (entry coroutine and user
+                                         threads) in the Lua registry,
+                                         preventing the thread coroutine
+                                         from beging collected by the
+                                         Lua GC */
+
+    unsigned                 waited_by_parent:1;  /* whether being waited by
+                                                     a parent coroutine */
+
+    ngx_http_lua_co_status_t co_status:3;  /* the current coroutine's status */
+
+    unsigned                 flushing:1; /* indicates whether the current
+                                            coroutine is waiting for
+                                            ngx.flush(true) */
+
+    unsigned                 is_uthread:1; /* whether the current coroutine is
+                                              a user thread */
+
+    unsigned                 thread_spawn_yielded:1; /* yielded from
+                                                        the ngx.thread.spawn()
+                                                        call */
+};
+
+
+typedef struct ngx_http_lua_ctx_s {
+    uint8_t                  context;   /* the current running directive context
+                                           (or running phase) for the current
+                                           Lua chunk */
+
+    ngx_http_handler_pt      resume_handler;
+
+    ngx_http_lua_co_ctx_t   *cur_co_ctx; /* co ctx for the current coroutine */
+
+    /* FIXME: we should use rbtree here to prevent O(n) lookup overhead */
+    ngx_list_t              *user_co_ctx; /* coroutine contexts for user
+                                             coroutines */
+
+    ngx_http_lua_co_ctx_t    entry_co_ctx; /* coroutine context for the
+                                              entry coroutine */
+
+    ngx_http_lua_co_ctx_t   *on_abort_co_ctx; /* coroutine context for the
+                                                 on_abort thread */
+
+    int                      ctx_ref;  /*  reference to anchor
+                                           request ctx data in lua
+                                           registry */
+
+    unsigned                 flushing_coros; /* number of coroutines waiting on
+                                                ngx.flush(true) */
+
+    unsigned                 uthreads; /* number of active user threads */
+
+    ngx_chain_t             *out;  /* buffered output chain for HTTP 1.0 */
+    ngx_chain_t             *free_bufs;
+    ngx_chain_t             *busy_bufs;
+    ngx_chain_t             *free_recv_bufs;
+    ngx_chain_t             *flush_buf;
+
+    ngx_http_cleanup_pt     *cleanup;
+
+    ngx_chain_t             *body; /* buffered subrequest response body
+                                      chains */
+
+    ngx_chain_t            **last_body; /* for the "body" field */
+
+    ngx_str_t                exec_uri;
+    ngx_str_t                exec_args;
+
+    ngx_int_t                exit_code;
+
+    ngx_http_lua_co_ctx_t   *req_body_reader_co_ctx; /* co ctx for the coroutine
+                                                        reading the request
+                                                        body */
+
     ngx_uint_t               index;              /* index of the current
                                                     subrequest in its parent
                                                     request */
 
-    unsigned                 waiting;     /* number of subrequests being
-                                             waited */
+    ngx_http_lua_posted_thread_t   *posted_threads;
 
-    ngx_str_t        exec_uri;
-    ngx_str_t        exec_args;
+    unsigned                 run_post_subrequest:1; /* whether it has run
+                                                       post_subrequest
+                                                       (for subrequests only) */
 
-    ngx_int_t        exit_code;
+    unsigned                 waiting_more_body:1;   /* 1: waiting for more
+                                                       request body data;
+                                                       0: no need to wait */
 
-    ngx_event_t      sleep;      /* used for ngx.sleep */
+    ngx_http_lua_user_coro_op_t   co_op:2; /*  coroutine API operation */
 
     unsigned         exited:1;
 
@@ -247,49 +344,38 @@ typedef struct {
     unsigned         eof:1;             /*  1: last_buf has been sent;
                                             0: last_buf not sent yet */
 
-    unsigned         done:1;            /*  1: subrequest is just done;
-                                            0: subrequest is not done
-                                            yet or has already done */
+    unsigned         capture:1;  /*  1: response body of current request
+                                        is to be captured by the lua
+                                        capture filter,
+                                     0: not to be captured */
 
-    unsigned         capture:1;         /*  1: body of current request is
-                                            to be captured;
-                                            0: not captured */
 
     unsigned         read_body_done:1;      /* 1: request body has been all
                                                read; 0: body has not been
                                                all read */
 
-    unsigned         waiting_more_body:1;   /* 1: waiting for more data;
-                                               0: no need to wait */
-    unsigned         req_read_body_done:1;  /* used by ngx.req.read_body */
+    unsigned         headers_set:1; /* whether the user has set custom
+                                       response headers */
 
-    unsigned         headers_set:1;
     unsigned         entered_rewrite_phase:1;
     unsigned         entered_access_phase:1;
     unsigned         entered_content_phase:1;
 
-    /* whether it has run post_subrequest */
-    unsigned         run_post_subrequest:1;
-    unsigned         req_header_cached:1;
+    unsigned         buffering:1; /* HTTP 1.0 response body buffering flag */
 
-    unsigned         waiting_flush:1;
+    unsigned         no_abort:1; /* prohibit "world abortion" via ngx.exit()
+                                    and etc */
 
-    unsigned         socket_busy:1;  /* for TCP */
-    unsigned         socket_ready:1; /* for TCP */
-
-    unsigned         udp_socket_busy:1;  /* for UDP */
-    unsigned         udp_socket_ready:1; /* for UDP */
-
-    unsigned         aborted:1;
-    unsigned         buffering:1;
-
+    unsigned         seen_last_in_filter:1;  /* used by body_filter_by_lua* */
 } ngx_http_lua_ctx_t;
 
 
 typedef struct ngx_http_lua_header_val_s ngx_http_lua_header_val_t;
 
+
 typedef ngx_int_t (*ngx_http_lua_set_header_pt)(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
+
 
 struct ngx_http_lua_header_val_s {
     ngx_http_complex_value_t                value;
@@ -300,10 +386,11 @@ struct ngx_http_lua_header_val_s {
     unsigned                                no_override;
 };
 
+
 typedef struct {
     ngx_str_t                               name;
     ngx_uint_t                              offset;
-    ngx_http_lua_set_header_pt     handler;
+    ngx_http_lua_set_header_pt              handler;
 
 } ngx_http_lua_set_header_t;
 
@@ -313,5 +400,6 @@ extern ngx_http_output_header_filter_pt ngx_http_lua_next_header_filter;
 extern ngx_http_output_body_filter_pt ngx_http_lua_next_body_filter;
 
 
-#endif /* NGX_HTTP_LUA_COMMON_H */
+#endif /* _NGX_HTTP_LUA_COMMON_H_INCLUDED_ */
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

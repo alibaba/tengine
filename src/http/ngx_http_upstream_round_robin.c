@@ -73,11 +73,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            for (j = 0; j < server[i].naddrs; j++) {
-                if (server[i].backup) {
-                    continue;
-                }
+            if (server[i].backup) {
+                continue;
+            }
 
+            for (j = 0; j < server[i].naddrs; j++) {
                 peers->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peers->peer[n].socklen = server[i].addrs[j].socklen;
                 peers->peer[n].name = server[i].addrs[j].name;
@@ -143,11 +143,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            for (j = 0; j < server[i].naddrs; j++) {
-                if (!server[i].backup) {
-                    continue;
-                }
+            if (!server[i].backup) {
+                continue;
+            }
 
+            for (j = 0; j < server[i].naddrs; j++) {
                 backup->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 backup->peer[n].socklen = server[i].addrs[j].socklen;
                 backup->peer[n].name = server[i].addrs[j].name;
@@ -468,9 +468,14 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
 
     if (rrp->peers->single) {
         peer = &rrp->peers->peer[0];
+
+        if (peer->down) {
+            goto failed;
+        }
+
 #if (NGX_HTTP_UPSTREAM_CHECK)
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
-            return NGX_BUSY;
+            goto failed;
         }
 #endif
 
@@ -514,7 +519,9 @@ failed:
         rrp->peers = peers->next;
         pc->tries = rrp->peers->number;
 
-        n = rrp->peers->number / (8 * sizeof(uintptr_t)) + 1;
+        n = (rrp->peers->number + (8 * sizeof(uintptr_t) - 1))
+                / (8 * sizeof(uintptr_t));
+
         for (i = 0; i < n; i++) {
              rrp->tried[i] = 0;
         }
@@ -627,10 +634,6 @@ ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "free rr peer %ui %ui", pc->tries, state);
-
-    if (state == 0 && pc->tries == 0) {
-        return;
-    }
 
     /* TODO: NGX_PEER_KEEPALIVE */
 

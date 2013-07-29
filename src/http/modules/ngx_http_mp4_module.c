@@ -500,7 +500,6 @@ ngx_http_mp4_handler(ngx_http_request_t *r)
     r->root_tested = !r->error_page;
     r->allow_ranges = 1;
 
-    start = -1;
     r->headers_out.content_length_n = of.size;
     mp4 = NULL;
     b = NULL;
@@ -749,6 +748,13 @@ ngx_http_mp4_process(ngx_http_mp4_file_t *mp4)
     mp4->content_length += mp4->moov_size;
 
     *prev = &mp4->mdat_atom;
+
+    if (start_offset > mp4->mdat_data.buf->file_last) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "start time is out mp4 mdat atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     adjustment = mp4->ftyp_size + mp4->moov_size
                  + ngx_http_mp4_update_mdat_atom(mp4, start_offset)

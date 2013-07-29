@@ -7,20 +7,20 @@ use Test::Nginx::Socket;
 #master_on();
 log_level('debug');
 
-#repeat_each(120);
 repeat_each(3);
 
-plan tests => repeat_each() * (blocks() * 2 + 2);
+plan tests => repeat_each() * (blocks() * 2 + 23);
 
 our $HtmlDir = html_dir;
 #warn $html_dir;
-
-$ENV{LUA_CPATH} = "/home/lz/luax/?.so;;";
 
 #no_diff();
 #no_long_string();
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
+
+#no_shuffle();
+no_long_string();
 
 run_tests();
 
@@ -560,4 +560,257 @@ $s
 23
 24
 25
+
+
+
+=== TEST 26: unexpected globals sharing by using _G
+--- config
+    location /test {
+        content_by_lua '
+            if _G.t then
+                _G.t = _G.t + 1
+            else
+                _G.t = 0
+            end
+            ngx.print(t)
+        ';
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test", "GET /test"]
+--- response_body eval
+["0", "0", "0"]
+
+
+
+=== TEST 27: unexpected globals sharing by using _G (set_by_lua*)
+--- config
+    location /test {
+        set_by_lua $a '
+            if _G.t then
+                _G.t = _G.t + 1
+            else
+                _G.t = 0
+            end
+            return t
+        ';
+        echo -n $a;
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test", "GET /test"]
+--- response_body eval
+["0", "0", "0"]
+
+
+
+=== TEST 28: unexpected globals sharing by using _G (log_by_lua*)
+--- http_config
+    lua_shared_dict log_dict 100k;
+--- config
+    location /test {
+        content_by_lua '
+            local log_dict = ngx.shared.log_dict
+            ngx.print(log_dict:get("cnt") or 0)
+        ';
+
+        log_by_lua '
+            local log_dict = ngx.shared.log_dict
+            if _G.t then
+                _G.t = _G.t + 1
+            else
+                _G.t = 0
+            end
+            log_dict:set("cnt", t)
+        ';
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test", "GET /test"]
+--- response_body eval
+["0", "0", "0"]
+
+
+
+=== TEST 29: unexpected globals sharing by using _G (header_filter_by_lua*)
+--- config
+    location /test {
+        header_filter_by_lua '
+            if _G.t then
+                _G.t = _G.t + 1
+            else
+                _G.t = 0
+            end
+            ngx.ctx.cnt = tostring(t)
+        ';
+        content_by_lua '
+            ngx.send_headers()
+            ngx.print(ngx.ctx.cnt or 0)
+        ';
+    }
+--- pipelined_requests eval
+["GET /test", "GET /test", "GET /test"]
+--- response_body eval
+["0", "0", "0"]
+
+
+
+=== TEST 30: unexpected globals sharing by using _G (body_filter_by_lua*)
+--- config
+    location /test {
+        body_filter_by_lua '
+            if _G.t then
+                _G.t = _G.t + 1
+            else
+                _G.t = 0
+            end
+            ngx.ctx.cnt = _G.t
+        ';
+        content_by_lua '
+            ngx.print("a")
+            ngx.say(ngx.ctx.cnt or 0)
+        ';
+    }
+--- request
+GET /test
+--- response_body
+a0
+--- no_error_log
+[error]
+
+
+
+=== TEST 31: set content-type header with charset and default_type
+--- http_config
+--- config
+    location /lua {
+        default_type application/json;
+        charset utf-8;
+        charset_types application/json;
+        content_by_lua 'ngx.say("hi")';
+    }
+--- request
+    GET /lua
+--- response_body
+hi
+--- response_headers
+Content-Type: application/json; charset=utf-8
+
+
+
+=== TEST 32: hang on upstream_next (from kindy)
+--- http_config
+    upstream xx {
+        server 127.0.0.1:$TEST_NGINX_SERVER_PORT;
+        server 127.0.0.1:$TEST_NGINX_SERVER_PORT;
+    }
+
+    server {
+        server_name "xx";
+        listen $TEST_NGINX_SERVER_PORT;
+
+        return 444;
+    }
+--- config
+    location = /t {
+        proxy_pass http://xx;
+    }
+
+    location = /bad {
+        return 444;
+    }
+--- request
+    GET /t
+--- timeout: 1
+--- response_body_like: 502 Bad Gateway
+--- error_code: 502
+--- error_log
+upstream prematurely closed connection while reading response header from upstream
+
+
+
+=== TEST 33: last_in_chain is set properly in subrequests
+--- config
+    location = /sub {
+        echo hello;
+        body_filter_by_lua '
+            local eof = ngx.arg[2]
+            if eof then
+                print("eof found in body stream")
+            end
+        ';
+    }
+
+    location = /main {
+        echo_location /sub;
+    }
+
+--- request
+    GET /main
+--- response_body
+hello
+--- log_level: notice
+--- error_log
+eof found in body stream
+
+
+
+=== TEST 34: testing a segfault when using ngx_poll_module + ngx_resolver
+See more details here: http://mailman.nginx.org/pipermail/nginx-devel/2013-January/003275.html
+--- config
+    location /t {
+        set $myserver nginx.org;
+        proxy_pass http://$myserver/;
+        resolver 127.0.0.1;
+    }
+--- request
+    GET /t
+--- ignore_response
+--- abort
+--- timeout: 0.3
+--- log_level: notice
+--- no_error_log
+[alert]
+--- error_log eval
+qr/recv\(\) failed \(\d+: Connection refused\) while resolving/
+
+
+
+=== TEST 35: github issue #218: ngx.location.capture hangs when querying a remote host that does not exist or is really slow to respond
+--- config
+    set $myurl "https://not-exist.agentzh.org";
+    location /toto {
+        content_by_lua '
+                local proxyUrl = "/myproxy/entity"
+                local res = ngx.location.capture( proxyUrl,  { method = ngx.HTTP_GET })
+                ngx.say("Hello, ", res.status)
+            ';
+    }
+    location ~ /myproxy {
+
+        rewrite    ^/myproxy/(.*)  /$1  break;
+        resolver_timeout 1s;
+        #resolver 172.16.0.23; #  AWS DNS resolver address is the same in all regions - 172.16.0.23
+        resolver 8.8.8.8;
+        proxy_read_timeout 1s;
+        proxy_send_timeout 1s;
+        proxy_connect_timeout 1s;
+        proxy_pass $myurl:443;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length 0;
+        proxy_set_header  Accept-Encoding  "";
+    }
+
+--- request
+GET /toto
+
+--- stap2
+F(ngx_http_lua_post_subrequest) {
+    println("lua post subrequest")
+    print_ubacktrace()
+}
+
+--- response_body
+Hello, 502
+
+--- error_log
+not-exist.agentzh.org could not be resolved
+--- timeout: 3
 

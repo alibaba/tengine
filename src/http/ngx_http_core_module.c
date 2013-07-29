@@ -642,7 +642,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_set_server_tag,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_core_loc_conf_t, server_tag),
+      0,
       NULL },
 
     { ngx_string("if_modified_since"),
@@ -1023,6 +1023,7 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
                       "client intended to send too large body: %O bytes",
                       r->headers_in.content_length_n);
 
+        r->expect_tested = 1;
         (void) ngx_http_discard_request_body(r);
         ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);
         return NGX_OK;
@@ -3501,6 +3502,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
      *     clcf->alias = 0;
      *     clcf->gzip_proxied = 0;
      *     clcf->server_tag = { 0, NULL };
+     *     clcf->server_tag_header = { 0, NULL };
      *     clcf->keepalive_disable = 0;
      */
 
@@ -3765,6 +3767,8 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->server_tag_type, prev->server_tag_type,
                               NGX_HTTP_SERVER_TAG_ON);
     ngx_conf_merge_str_value(conf->server_tag, prev->server_tag, "");
+    ngx_conf_merge_str_value(conf->server_tag_header,
+                             prev->server_tag_header, "");
 
     ngx_conf_merge_off_value(conf->client_max_body_size,
                               prev->client_max_body_size, 1 * 1024 * 1024);
@@ -4664,7 +4668,7 @@ ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_str_null(&args);
 
-    if (cv.lengths == NULL && uri.data[0] == '/') {
+    if (cv.lengths == NULL && uri.len && uri.data[0] == '/') {
         p = (u_char *) ngx_strchr(uri.data, '?');
 
         if (p) {
@@ -5257,10 +5261,13 @@ ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     } else {
         ccf->server_tag_type = NGX_HTTP_SERVER_TAG_CUSTOMIZED;
 
-        ccf->server_tag.len  = value[1].len + sizeof("Server: ") - 1
+        ccf->server_tag = value[1];
+
+        ccf->server_tag_header.len = value[1].len + sizeof("Server: ") - 1
             + sizeof(CRLF) - 1;
-        ccf->server_tag.data = ngx_palloc(cf->pool, ccf->server_tag.len);
-        if ((p = ccf->server_tag.data) == NULL) {
+        ccf->server_tag_header.data = ngx_palloc(cf->pool,
+                                                 ccf->server_tag_header.len);
+        if ((p = ccf->server_tag_header.data) == NULL) {
             return NGX_CONF_ERROR;
         }
 

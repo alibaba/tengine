@@ -285,7 +285,6 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         ctx = limit_req[i].shm_zone->data;
 
         ngx_crc32_init(hash);
-        total_len = 0;
 
         total_len = ngx_http_limit_req_copy_variables(r, &hash, ctx, NULL);
         if (total_len == 0) {

@@ -74,6 +74,10 @@ if [ $HTTP_LUA = YES ] || [ $HTTP_LUA_SHARED = YES ]; then
     . auto/lib/lua/conf
 fi
 
+if [ $HTTP_TFS = YES ] || [ $HTTP_TFS_SHARED = YES ]; then
+    . auto/lib/libyajl/conf
+fi
+
 if [ $HTTP_GEOIP = YES ] || [ $HTTP_GEOIP_SHARED = YES ]; then
     . auto/lib/geoip/conf
 fi

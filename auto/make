@@ -21,6 +21,7 @@ mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
          $NGX_OBJS/src/http $NGX_OBJS/src/http/modules \
 	 $NGX_OBJS/src/http/modules/perl \
 	 $NGX_OBJS/src/http/modules/lua \
+	 $NGX_OBJS/src/http/modules/tfs \
          $NGX_OBJS/src/mail \
          $NGX_OBJS/src/misc \
 	 $NGX_OBJS/src/proc \
@@ -524,7 +525,7 @@ END
             -e "s/\//$ngx_regex_dirsep/g"`
 
         ngx_dso_link=${CORE_LINK:+`echo $CORE_LINK \
-            | sed -e "s/\//$ngx_regex_dirsep%%/g" -e "s/^/$ngx_long_regex_cont/"`}
+            | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
 
         ngx_dso_feture_lib=`echo $DSO_LIBS | awk 'BEGIN { FS="|" } \
             {for (i=1; i<=NF; i++) print $i}' | awk -v module_name=$ngx_shared_modules \
@@ -597,7 +598,7 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
-# Copyright (C) 2010-2012 Alibaba Group Holding Limited
+# Copyright (C) 2010-2013 Alibaba Group Holding Limited
 
 
 ngx_soext='$NGX_SOEXT'
@@ -612,6 +613,8 @@ CORE_LINK='$ngx_link'
 
 NGX_LD_OPT='$NGX_LD_OPT'
 NGX_PREFIX=$NGX_PREFIX
+
+NGX_RPATH=$NGX_RPATH
 
 ngx_regex_dirsep='$ngx_regex_dirsep'
 ngx_cont='$ngx_cont'

@@ -13,17 +13,18 @@ repeat_each(2);
 #log_level('warn');
 #worker_connections(1024);
 
-plan tests => repeat_each() * (blocks() * 2);
+plan tests => repeat_each() * (blocks() * 2 + 3);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 $ENV{TEST_NGINX_MYSQL_PORT} ||= 3306;
 
-$ENV{LUA_CPATH} ||=
+our $LuaCpath = $ENV{LUA_CPATH} ||
     '/usr/local/openresty-debug/lualib/?.so;/usr/local/openresty/lualib/?.so;;';
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
 
 no_long_string();
+#no_shuffle();
 
 run_tests();
 
@@ -64,10 +65,9 @@ GET /lua
 --- request
 GET /lua
 --- error_log
-attempt to call ngx.exit after sending out the headers
---- no_error_log
-[alert]
---- ignore_response
+attempt to set status 404 via ngx.exit after sending out the response status 200
+--- response_body
+hi
 
 
 
@@ -121,13 +121,15 @@ GET /api?user=agentz
 
 
 === TEST 6: working with ngx_auth_request (simplest form, w/o ngx_memc)
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
-
+"
 --- config
     location /memc {
         internal;
@@ -190,13 +192,15 @@ Logged in 56
 
 
 === TEST 7: working with ngx_auth_request (simplest form)
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
-
+"
 --- config
     location /memc {
         internal;
@@ -259,23 +263,25 @@ Logged in 56
 
 
 === TEST 8: working with ngx_auth_request
---- http_config
+--- http_config eval
+"
+    lua_package_cpath '$::LuaCpath';
     upstream backend {
-        drizzle_server 127.0.0.1:$TEST_NGINX_MYSQL_PORT protocol=mysql
+        drizzle_server 127.0.0.1:\$TEST_NGINX_MYSQL_PORT protocol=mysql
                        dbname=ngx_test user=ngx_test password=ngx_test;
         drizzle_keepalive max=300 mode=single overflow=ignore;
     }
 
     upstream memc_a {
-        server 127.0.0.1:$TEST_NGINX_MEMCACHED_PORT;
+        server 127.0.0.1:\$TEST_NGINX_MEMCACHED_PORT;
     }
 
     upstream memc_b {
-        server 127.0.0.1:$TEST_NGINX_MEMCACHED_PORT;
+        server 127.0.0.1:\$TEST_NGINX_MEMCACHED_PORT;
     }
 
     upstream_list memc_cluster memc_a memc_b;
-
+"
 --- config
     location /memc {
         internal;
@@ -335,6 +341,8 @@ ngx.var.uid = res[1].uid;
 GET /api?uid=32
 --- response_body
 Logged in 56
+--- no_error_log
+[error]
 
 
 
@@ -532,4 +540,27 @@ morning
 --- response_body
 This is our own content
 --- error_code: 410
+
+
+
+=== TEST 17: encode args table with a multi-value arg.
+--- config
+    location = /t {
+        rewrite_by_lua '
+            ngx.exit(204)
+        ';
+
+        proxy_pass http://127.0.0.1:$server_port/blah;
+    }
+
+    location = /blah {
+        echo blah;
+    }
+--- request
+GET /t
+--- more_headers2
+--- response_body
+--- error_code: 204
+--- no_error_log
+[error]
 

@@ -9,7 +9,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2);
+plan tests => repeat_each() * (blocks() * 2 + 9);
 
 #no_diff();
 no_long_string();
@@ -72,19 +72,22 @@ a [b c] [b] [c] [] [] d
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "a b c d",
+            local s, n, err = ngx.re.sub("a b c d",
                 "(b) (c)", "[$0] [$1] [$2] [$3] [$hello]")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            if s then
+                ngx.say(s, ": ", n)
+
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [$2] [$3] [$hello]"
-nil
+error: bad template for substitution: "[$0] [$1] [$2] [$3] [$hello]"
+--- error_log
+attempt to use named capturing variable "hello" (named captures not supported yet)
 
 
 
@@ -92,19 +95,21 @@ nil
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "a b c d",
+            local s, n, err = ngx.re.sub("a b c d",
                 "(b) (c)", "[$0] [$1] [$2] [$3] [${hello}]")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [$2] [$3] [${hello}]"
-nil
+error: bad template for substitution: "[$0] [$1] [$2] [$3] [${hello}]"
+--- error_log
+attempt to use named capturing variable "hello" (named captures not supported yet)
 
 
 
@@ -129,18 +134,20 @@ nil
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${134]")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            local s, n, err = ngx.re.sub("b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${134]")
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [${2}] [$3] [${134]"
-nil
+error: bad template for substitution: "[$0] [$1] [${2}] [$3] [${134]"
+--- error_log
+the closing bracket in "134" variable is missing
 
 
 
@@ -148,18 +155,20 @@ nil
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${134")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            local s, n, err = ngx.re.sub("b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${134")
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [${2}] [$3] [${134"
-nil
+error: bad template for substitution: "[$0] [$1] [${2}] [$3] [${134"
+--- error_log
+the closing bracket in "134" variable is missing
 
 
 
@@ -167,18 +176,20 @@ nil
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            local s, n, err = ngx.re.sub("b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [${")
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [${2}] [$3] [${"
-nil
+error: bad template for substitution: "[$0] [$1] [${2}] [$3] [${"
+--- error_log
+lua script: invalid capturing variable name found in "[$0] [$1] [${2}] [$3] [${"
 
 
 
@@ -186,18 +197,20 @@ nil
 --- config
     location /re {
         content_by_lua '
-            local rc, s, n = pcall(ngx.re.sub, "b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [$")
-            ngx.say(rc)
-            ngx.say(s)
-            ngx.say(n)
+            local s, n, err = ngx.re.sub("b c d", "(b) (c)", "[$0] [$1] [${2}] [$3] [$")
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
         ';
     }
 --- request
     GET /re
 --- response_body
-false
-bad template for substitution: "[$0] [$1] [${2}] [$3] [$"
-nil
+error: bad template for substitution: "[$0] [$1] [${2}] [$3] [$"
+--- error_log
+lua script: invalid capturing variable name found in "[$0] [$1] [${2}] [$3] [$"
 
 
 
@@ -365,4 +378,132 @@ nil
     GET /re
 --- response_body
 howdy, world
+
+
+
+=== TEST 20: matched and with variables w/o using named patterns in sub
+--- config
+    location /re {
+        content_by_lua '
+            local s, n = ngx.re.sub("a b c d", "(?<first>b) (?<second>c)", "[$0] [$1] [$2] [$3] [$134]")
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+a [b c] [b] [c] [] [] d
+1
+
+
+
+=== TEST 21: matched and with variables using named patterns in func
+--- config
+    error_log /tmp/nginx_error debug;
+    location /re {
+        content_by_lua '
+            local repl = function (m)
+                return "[" .. m[0] .. "] [" .. m["first"] .. "] [" .. m[2] .. "]"
+            end
+
+            local s, n = ngx.re.sub("a b c d", "(?<first>b) (?<second>c)", repl)
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+a [b c] [b] [c] d
+1
+
+
+
+=== TEST 22: matched and with variables w/ using named patterns in sub
+This is still a TODO
+--- SKIP
+--- config
+    location /re {
+        content_by_lua '
+            local s, n = ngx.re.sub("a b c d", "(?<first>b) (?<second>c)", "[$0] [${first}] [${second}] [$3] [$134]")
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+a [b c] [b] [c] [] [] d
+1
+--- no_error_log
+[error]
+
+
+
+=== TEST 23: $0 without parens
+--- config
+    location /re {
+        content_by_lua '
+            local s, n = ngx.re.sub("a b c d", [[\w]], "[$0]")
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+[a] b c d
+1
+--- no_error_log
+[error]
+
+
+
+=== TEST 24: bad pattern
+--- config
+    location /re {
+        content_by_lua '
+            local s, n, err = ngx.re.sub("hello\\nworld", "(abc", "")
+            if s then
+                ngx.say("subs: ", n)
+
+            else
+                ngx.say("error: ", err)
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+error: failed to compile regex "(abc": pcre_compile() failed: missing ) in "(abc"
+--- no_error_log
+[error]
+
+
+
+=== TEST 25: bad UTF-8
+--- config
+    location = /t {
+        content_by_lua '
+            local target = "你好"
+            local regex = "你好"
+
+            -- Note the D here
+            local s, n, err = ngx.re.sub(string.sub(target, 1, 4), regex, "", "u")
+
+            if s then
+                ngx.say(s, ": ", n)
+            else
+                ngx.say("error: ", err)
+            end
+        ';
+    }
+--- request
+GET /t
+--- response_body_like chop
+error: pcre_exec\(\) failed: -10 on "你.*?" using "你好"
+
+--- no_error_log
+[error]
 

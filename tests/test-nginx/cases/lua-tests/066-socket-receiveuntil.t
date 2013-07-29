@@ -9,7 +9,6 @@ plan tests => repeat_each() * (blocks() * 3);
 
 our $HtmlDir = html_dir;
 
-$ENV{TEST_NGINX_CLIENT_PORT} ||= server_port();
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 
 no_long_string();
@@ -76,7 +75,7 @@ close: 1 nil
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -118,7 +117,7 @@ close: 1 nil
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -145,7 +144,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -187,7 +186,7 @@ close: nil closed
     }
 
     location /foo {
-        echo foo;
+        content_by_lua 'ngx.say("foo")';
         more_clear_headers Date;
     }
 --- request
@@ -213,7 +212,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -262,7 +261,7 @@ close: nil closed
     }
 
     location /foo {
-        echo abcabcabd;
+        content_by_lua 'ngx.say("abcabcabd")';
         more_clear_headers Date;
     }
 --- request
@@ -284,7 +283,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -333,7 +332,7 @@ close: nil closed
     }
 
     location /foo {
-        echo abcabcaad;
+        content_by_lua 'ngx.say("abcabcaad")';
         more_clear_headers Date;
     }
 --- request
@@ -355,7 +354,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -426,7 +425,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -498,7 +497,7 @@ close: nil closed
     server_tokens off;
     lua_socket_buffer_size 2;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -570,7 +569,7 @@ close: nil closed
     server_tokens off;
     lua_socket_buffer_size 1;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -641,7 +640,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -712,7 +711,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -783,7 +782,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -854,7 +853,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -925,7 +924,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -996,7 +995,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -1072,7 +1071,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
         lua_socket_buffer_size 1;
 
         content_by_lua '
@@ -1149,7 +1148,7 @@ close: nil closed
 --- config
     server_tokens off;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
         lua_socket_buffer_size 1;
 
         content_by_lua '
@@ -1189,13 +1188,13 @@ close: nil closed
                     ngx.say("read: ", line)
 
                 else
-                    ngx.say("failed to read a line: ", err, " [", part, "]")
+                    ngx.say("failed to read a chunk: ", err, " [", part, "]")
                 end
 
                 local data, err, part = sock:receive(1)
                 if not data then
-                    ngx.say("failed to read a line: ", err, " [", part, "]")
-                    return
+                    ngx.say("failed to read a byte: ", err, " [", part, "]")
+                    break
                 else
                     ngx.say("read one byte: ", data)
                 end
@@ -1216,18 +1215,20 @@ GET /t
 qq{connected: 1
 request sent: 57
 read: hell
-read: o, w
-read: orld
-read:  --
+read one byte: o
+read: , wo
+read one byte: r
+read: ld -
+read one byte: -
 read: 
-failed to read a line: nil [nil]
-failed to read a line: closed [
-]
+read one byte: 
+
+failed to read a chunk: nil [nil]
+failed to read a byte: closed []
 close: nil closed
 }
 --- no_error_log
 [error]
---- SKIP
 
 
 
@@ -1236,7 +1237,7 @@ close: nil closed
     server_tokens off;
     lua_socket_buffer_size 3;
     location /t {
-        set $port $TEST_NGINX_CLIENT_PORT;
+        set $port $TEST_NGINX_SERVER_PORT;
 
         content_by_lua '
             -- collectgarbage("collect")
@@ -1301,4 +1302,32 @@ close: nil closed
 --- no_error_log
 [error]
 
+
+
+=== TEST 19: long patterns
+this exposed a memory leak in receiveuntil
+--- config
+    location /t {
+        content_by_lua '
+            local sock, err = ngx.req.socket()
+            if not sock then
+                ngx.say("failed to get req socket: ", err)
+                return
+            end
+            local reader, err = sock:receiveuntil("------------------------------------------- abcdefghijklmnopqrstuvwxyz")
+            if not reader then
+                ngx.say("failed to get reader: ", err)
+                return
+            end
+            ngx.say("ok")
+        ';
+    }
+--- request
+    POST /t
+
+--- more_headers: Content-Length: 1024
+--- response_body
+ok
+--- no_error_log
+[error]
 

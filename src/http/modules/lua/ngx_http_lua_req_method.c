@@ -1,6 +1,13 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
 #ifndef DDEBUG
 #define DDEBUG 0
 #endif
+
 
 #include "ddebug.h"
 #include "ngx_http_lua_req_method.h"
@@ -106,3 +113,4 @@ ngx_http_lua_ngx_req_set_method(lua_State *L)
     return 0;
 }
 
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

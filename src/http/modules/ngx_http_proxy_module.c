@@ -836,7 +836,7 @@ ngx_http_proxy_create_key(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    if (plcf->cache_key.value.len) {
+    if (plcf->cache_key.value.data) {
 
         if (ngx_http_complex_value(r, &plcf->cache_key, key) != NGX_OK) {
             return NGX_ERROR;
@@ -1610,7 +1610,8 @@ ngx_http_proxy_copy_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
         p->upstream_done = 1;
 
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "upstream sent too much data");
+                      "upstream sent more data than specified in "
+                      "\"Content-Length\" header");
     }
 
     return NGX_OK;
@@ -1862,6 +1863,10 @@ data:
         ctx->length = 2 /* LF LF */;
         break;
 
+    }
+
+    if (ctx->size < 0 || ctx->length < 0) {
+        goto invalid;
     }
 
     return rc;
@@ -2607,7 +2612,7 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
      *     conf->upstream.store_lengths = NULL;
      *     conf->upstream.store_values = NULL;
      *
-     *     conf->method = NULL;
+     *     conf->method = { 0, NULL };
      *     conf->headers_source = NULL;
      *     conf->headers_set_len = NULL;
      *     conf->headers_set = NULL;
@@ -2622,6 +2627,8 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.store_access = NGX_CONF_UNSET_UINT;
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
+
+    conf->upstream.local = NGX_CONF_UNSET_PTR;
 
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
@@ -2706,6 +2713,9 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->upstream.ignore_client_abort,
                               prev->upstream.ignore_client_abort, 0);
+
+    ngx_conf_merge_ptr_value(conf->upstream.local,
+                              prev->upstream.local, NULL);
 
     ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
                               prev->upstream.connect_timeout, 60000);
@@ -2906,10 +2916,11 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #endif
 
-    if (conf->method.len == 0) {
-        conf->method = prev->method;
+    ngx_conf_merge_str_value(conf->method, prev->method, "");
 
-    } else {
+    if (conf->method.len
+        && conf->method.data[conf->method.len - 1] != ' ')
+    {
         conf->method.data[conf->method.len] = ' ';
         conf->method.len++;
     }
@@ -3918,7 +3929,7 @@ ngx_http_proxy_cache_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (plcf->cache_key.value.len) {
+    if (plcf->cache_key.value.data) {
         return "is duplicate";
     }
 
