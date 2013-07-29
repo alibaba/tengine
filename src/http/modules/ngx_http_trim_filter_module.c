@@ -407,7 +407,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 }
 
                 ctx->state = trim_state_text_whitespace;
-                if (ctx->prev == ch || ctx->prev == ' ' || ctx->prev == '>') {
+                if (ctx->prev == ch || ctx->prev == ' ') {
                     continue;
 
                 } else {
