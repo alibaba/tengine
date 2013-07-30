@@ -14,6 +14,9 @@ typedef struct {
     ngx_uint_t                         max_cached;
     ngx_msec_t                         keepalive_timeout;
 
+    ngx_uint_t                         per_server_pool;
+    ngx_queue_t                        server_pools;
+
     ngx_queue_t                        cache;
     ngx_queue_t                        free;
 
@@ -42,7 +45,25 @@ typedef struct {
 
 
 typedef struct {
+    ngx_queue_t                        queue;
+
+    ngx_queue_t                        cache;
+    ngx_queue_t                        free;
+
+    ngx_uint_t                         cached;
+    ngx_uint_t                         cached_connection;
+    ngx_uint_t                         concurrent;
+
+    socklen_t                          socklen;
+    u_char                             sockaddr[NGX_SOCKADDRLEN];
+
+} ngx_http_upstream_keepalive_server_pool_t;
+
+
+typedef struct {
     ngx_http_upstream_keepalive_srv_conf_t  *conf;
+
+    ngx_http_upstream_keepalive_server_pool_t *server_pool;
 
     ngx_queue_t                        queue;
     ngx_connection_t                  *connection;
@@ -63,6 +84,10 @@ static void ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc,
 static void ngx_http_upstream_keepalive_dummy_handler(ngx_event_t *ev);
 static void ngx_http_upstream_keepalive_close_handler(ngx_event_t *ev);
 static void ngx_http_upstream_keepalive_close(ngx_connection_t *c);
+
+ngx_http_upstream_keepalive_server_pool_t *
+ngx_http_upstream_keepalive_in_server_pools(ngx_queue_t *pools,
+    struct sockaddr *sockaddr, socklen_t socklen);
 
 
 #if (NGX_HTTP_SSL)
@@ -134,9 +159,13 @@ static ngx_int_t
 ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
 {
-    ngx_uint_t                               i;
+    ngx_uint_t                               i, j, n;
     ngx_http_upstream_keepalive_srv_conf_t  *kcf;
     ngx_http_upstream_keepalive_cache_t     *cached;
+
+    ngx_http_upstream_server_t                   *server;
+    ngx_http_upstream_keepalive_server_pool_t    *server_pool;
+
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cf->log, 0,
                    "init keepalive");
@@ -154,18 +183,67 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
 
     /* allocate cache items and add to free queue */
 
-    cached = ngx_pcalloc(cf->pool,
-                sizeof(ngx_http_upstream_keepalive_cache_t) * kcf->max_cached);
-    if (cached == NULL) {
-        return NGX_ERROR;
-    }
+    if (kcf->per_server_pool && us->servers) {
 
-    ngx_queue_init(&kcf->cache);
-    ngx_queue_init(&kcf->free);
+        server = us->servers->elts;
 
-    for (i = 0; i < kcf->max_cached; i++) {
-        ngx_queue_insert_head(&kcf->free, &cached[i].queue);
-        cached[i].conf = kcf;
+        ngx_queue_init(&kcf->server_pools);
+
+        for (i = 0; i < us->servers->nelts; i++) {
+            for (j = 0; j < server[i].naddrs; j++) {
+                if (ngx_http_upstream_keepalive_in_server_pools(
+                                                   &kcf->server_pools,
+                                                   server[i].addrs[j].sockaddr,
+                                                   server[i].addrs[j].socklen))
+                {
+                    continue;
+                }
+
+                server_pool = ngx_pcalloc(cf->pool,
+                             sizeof(ngx_http_upstream_keepalive_server_pool_t));
+                if (server_pool == NULL) {
+                    return NGX_ERROR;
+                }
+
+                server_pool->socklen = server[i].addrs[j].socklen;
+                ngx_memcpy(&server_pool->sockaddr, server[i].addrs[j].sockaddr,
+                           server_pool->socklen);
+
+                ngx_queue_insert_head(&kcf->server_pools, &server_pool->queue);
+
+                cached = ngx_pcalloc(cf->pool,
+                                    sizeof(ngx_http_upstream_keepalive_cache_t)
+                                    * kcf->max_cached);
+                if (cached == NULL) {
+                    return NGX_ERROR;
+                }
+
+                ngx_queue_init(&server_pool->cache);
+                ngx_queue_init(&server_pool->free);
+
+                for (n = 0; n < kcf->max_cached; n++) {
+                    ngx_queue_insert_head(&server_pool->free, &cached[n].queue);
+                    cached[n].conf = kcf;
+                    cached[n].server_pool = server_pool;
+                }
+            }
+        }
+
+    } else {
+        cached = ngx_pcalloc(cf->pool,
+                    sizeof(ngx_http_upstream_keepalive_cache_t)
+                    * kcf->max_cached);
+        if (cached == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_queue_init(&kcf->cache);
+        ngx_queue_init(&kcf->free);
+
+        for (i = 0; i < kcf->max_cached; i++) {
+            ngx_queue_insert_head(&kcf->free, &cached[i].queue);
+            cached[i].conf = kcf;
+        }
     }
 
     return NGX_OK;
@@ -221,6 +299,10 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
     ngx_http_upstream_keepalive_peer_data_t  *kp = data;
     ngx_http_upstream_keepalive_cache_t      *item;
 
+    ngx_http_upstream_state_t                    *state;
+    ngx_http_upstream_keepalive_server_pool_t    *server_pool;
+
+
     ngx_int_t          rc;
     ngx_queue_t       *q, *cache;
     ngx_connection_t  *c;
@@ -238,24 +320,47 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
 
     /* search cache for suitable connection */
 
-    cache = &kp->conf->cache;
+    state = kp->upstream->state;
 
-    for (q = ngx_queue_head(cache);
-         q != ngx_queue_sentinel(cache);
-         q = ngx_queue_next(q))
-    {
-        item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t, queue);
-        c = item->connection;
+    if (kp->conf->per_server_pool) {
 
-        if (ngx_memn2cmp((u_char *) &item->sockaddr, (u_char *) pc->sockaddr,
-                         item->socklen, pc->socklen)
-            == 0)
-        {
+        server_pool = ngx_http_upstream_keepalive_in_server_pools(
+                                                       &kp->conf->server_pools,
+                                                       pc->sockaddr,
+                                                       pc->socklen);
+
+        server_pool->concurrent++;
+
+        if (ngx_queue_empty(&server_pool->cache)) {
+
+            if (state) {
+                state->concurrent = server_pool->concurrent;
+                state->cached_pool = server_pool->cached;
+                state->cached_count = server_pool->cached_connection;
+            }
+
+        } else {
+            q = ngx_queue_last(&server_pool->cache);
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
+
+            c = item->connection;
+
             ngx_queue_remove(q);
-            ngx_queue_insert_head(&kp->conf->free, q);
+            ngx_queue_insert_head(&server_pool->free, q);
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                            "get keepalive peer: using connection %p", c);
+
+            server_pool->cached--;
+            server_pool->cached_connection++;
+
+            if (state) {
+                state->cached_connection = 1;
+                state->concurrent = server_pool->concurrent;
+                state->cached_pool = server_pool->cached;
+                state->cached_count = server_pool->cached_connection;
+            }
 
             c->idle = 0;
             c->log = pc->log;
@@ -272,6 +377,49 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
 
             return NGX_DONE;
         }
+
+    } else {
+        cache = &kp->conf->cache;
+
+        for (q = ngx_queue_head(cache);
+             q != ngx_queue_sentinel(cache);
+             q = ngx_queue_next(q))
+        {
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
+            c = item->connection;
+
+            if (ngx_memn2cmp((u_char *) &item->sockaddr,
+                             (u_char *) pc->sockaddr,
+                             item->socklen, pc->socklen)
+                == 0)
+            {
+                ngx_queue_remove(q);
+                ngx_queue_insert_head(&kp->conf->free, q);
+
+                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                               "get keepalive peer: using connection %p", c);
+
+                if (kp->upstream->state) {
+                    kp->upstream->state->cached_connection = 1;
+                }
+
+                c->idle = 0;
+                c->log = pc->log;
+                c->read->log = pc->log;
+                c->write->log = pc->log;
+                c->pool->log = pc->log;
+
+                if (c->read->timer_set) {
+                    ngx_del_timer(c->read);
+                }
+
+                pc->connection = c;
+                pc->cached = 1;
+
+                return NGX_DONE;
+            }
+        }
     }
 
     return NGX_OK;
@@ -285,6 +433,8 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
     ngx_http_upstream_keepalive_peer_data_t  *kp = data;
     ngx_http_upstream_keepalive_cache_t      *item;
 
+    ngx_http_upstream_keepalive_server_pool_t    *server_pool;
+
     ngx_queue_t          *q;
     ngx_connection_t     *c;
     ngx_http_upstream_t  *u;
@@ -296,6 +446,19 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
 
     u = kp->upstream;
     c = pc->connection;
+    server_pool = NULL;
+
+    if (kp->conf->per_server_pool) {
+        server_pool = ngx_http_upstream_keepalive_in_server_pools(
+                                                        &kp->conf->server_pools,
+                                                        pc->sockaddr,
+                                                        pc->socklen);
+        server_pool->concurrent--;
+
+        if (kp->upstream->state && kp->upstream->state->cached_connection) {
+                server_pool->cached_connection--;
+        }
+    }
 
     if (state & NGX_PEER_FAILED
         || c == NULL
@@ -319,24 +482,51 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "free keepalive peer: saving connection %p", c);
 
-    if (ngx_queue_empty(&kp->conf->free)) {
+    if (kp->conf->per_server_pool) {
+        if (ngx_queue_empty(&server_pool->free)) {
 
-        q = ngx_queue_last(&kp->conf->cache);
-        ngx_queue_remove(q);
+            q = ngx_queue_last(&server_pool->cache);
+            ngx_queue_remove(q);
 
-        item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t, queue);
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
 
-        ngx_http_upstream_keepalive_close(item->connection);
+            ngx_http_upstream_keepalive_close(item->connection);
+
+        } else {
+            q = ngx_queue_head(&server_pool->free);
+            ngx_queue_remove(q);
+
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
+            server_pool->cached++;
+        }
+
+        item->connection = c;
+        ngx_queue_insert_head(&server_pool->cache, q);
 
     } else {
-        q = ngx_queue_head(&kp->conf->free);
-        ngx_queue_remove(q);
+        if (ngx_queue_empty(&kp->conf->free)) {
 
-        item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t, queue);
+            q = ngx_queue_last(&kp->conf->cache);
+            ngx_queue_remove(q);
+
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
+
+            ngx_http_upstream_keepalive_close(item->connection);
+
+        } else {
+            q = ngx_queue_head(&kp->conf->free);
+            ngx_queue_remove(q);
+
+            item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
+                                  queue);
+        }
+
+        item->connection = c;
+        ngx_queue_insert_head(&kp->conf->cache, q);
     }
-
-    item->connection = c;
-    ngx_queue_insert_head(&kp->conf->cache, q);
 
     pc->connection = NULL;
 
@@ -363,8 +553,10 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
     c->write->log = ngx_cycle->log;
     c->pool->log = ngx_cycle->log;
 
-    item->socklen = pc->socklen;
-    ngx_memcpy(&item->sockaddr, pc->sockaddr, pc->socklen);
+    if (!kp->conf->per_server_pool) {
+        item->socklen = pc->socklen;
+        ngx_memcpy(&item->sockaddr, pc->sockaddr, pc->socklen);
+    }
 
     if (c->read->ready) {
         ngx_http_upstream_keepalive_close_handler(c->read);
@@ -429,7 +621,14 @@ close:
     ngx_http_upstream_keepalive_close(c);
 
     ngx_queue_remove(&item->queue);
-    ngx_queue_insert_head(&conf->free, &item->queue);
+
+    if (conf->per_server_pool) {
+        ngx_queue_insert_head(&item->server_pool->free, &item->queue);
+        item->server_pool->cached--;
+
+    } else {
+        ngx_queue_insert_head(&conf->free, &item->queue);
+    }
 }
 
 
@@ -552,6 +751,11 @@ ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strcmp(value[i].data, "per_server") == 0) {
+            kcf->per_server_pool = 1;
+            continue;
+        }
+
         goto invalid;
     }
 
@@ -597,3 +801,29 @@ ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
+
+ngx_http_upstream_keepalive_server_pool_t *
+ngx_http_upstream_keepalive_in_server_pools(ngx_queue_t *pools,
+    struct sockaddr *sockaddr, socklen_t socklen)
+{
+    ngx_queue_t                                  *q;
+    ngx_http_upstream_keepalive_server_pool_t    *item;
+
+    for (q = ngx_queue_head(pools);
+         q != ngx_queue_sentinel(pools);
+         q = ngx_queue_next(q))
+    {
+        item = ngx_queue_data(q, ngx_http_upstream_keepalive_server_pool_t,
+                              queue);
+
+        if (ngx_memn2cmp((u_char *) &item->sockaddr,
+                         (u_char *) sockaddr,
+                         item->socklen, socklen)
+            == 0)
+        {
+            return item;
+        }
+    }
+
+    return NULL;
+}
