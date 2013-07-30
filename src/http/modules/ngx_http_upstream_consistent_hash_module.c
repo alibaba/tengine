@@ -166,7 +166,7 @@ ngx_http_upstream_chash_recover(ngx_event_t *ev)
     if (n > 0) {
         server = p[0];
         if ((ngx_http_upstream_chash_check_peer_down(server->peer))) {
-            ngx_add_timer(server->ev, 10000);
+            ngx_add_timer(server->ev, server->peer->fail_timeout * 1000);
             return;
         }
         server->peer->down = 0;
@@ -401,7 +401,7 @@ ngx_http_upstream_chash_delete_server(ngx_http_upstream_chash_server_t *server)
 
     ngx_ebtree_delete(&server->ebnode);
     if (!server->ev->timer_set) {
-        ngx_add_timer(server->ev, 10000);
+        ngx_add_timer(server->ev, server->peer->fail_timeout * 1000);
     }
 
     return NGX_OK;
