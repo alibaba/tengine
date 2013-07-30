@@ -322,7 +322,7 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
                                                        pc->sockaddr,
                                                        pc->socklen);
         if (!ngx_queue_empty(&server_pool->cache)) {
-            q = ngx_queue_last(&server_pool->cache);
+            q = ngx_queue_head(&server_pool->cache);
             item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
                                   queue);
 
