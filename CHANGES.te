@@ -1,4 +1,30 @@
 
+Changes with Tengine 1.5.0                                       31 Jul 2013
+
+    *) Feature: added DSO compatible verification, Tengine will not
+       start if the DSO module compilation options are not the same as
+       the original core's. (monadbobo)
+
+    *) Feature: added request body non buffering mechanism. Now the http
+       and fastcgi proxy module can send the request to backend server
+       when it receives part of the request body. (yaoweibin)
+
+    *) Feature: added trim module which can strip the redundant invisible
+       characters and the comments to reduce the size of page. (taoyuanyuan)
+
+    *) Feature: added the accept filter mechanism which supports to do some
+       filter processing after accepting a new connection. (yzprofile)
+
+    *) Feature: Now the server banner in the default error page can be
+       replaced by the token specified in server_tag. (zhuzhaoyuan)
+
+    *) Bugfix: fixed the argument of buffer may be ignored in the access_log
+       directive. (cfsego)
+
+    *) Bugfix: fixed the session_sticky module didn't issue the session cookie
+       in the direct mode. (dinic)
+
+
 Changes with Tengine 1.4.6                                       14 May 2013
 
     *) Bugfix: merged the changes of Nginx-1.2.9 and fixed the security problem

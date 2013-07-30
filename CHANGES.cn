@@ -1,6 +1,15 @@
 
+Tengine-1.5.0 [2013-07-31]
+* Feature: 增加DSO兼容性校验机制，如果动态模块和和核心代码的编译选项不同，会报错 [monadbobo]
+* Feature: 增加了请求body不缓存的机制，现在HTTP和Fastcgi代理模块收到部分请求body数据就可以转发给后端服务器 [yaoweibin]
+* Feature: 增加了trim模块，该模块可以自动删除HTML页面中无意义的空白符和注释，减小页面的大小 [taoyuanyuan]
+* Feature: 加入accept filter机制，支持在连接接收以后进行过滤处理 [yzprofile]
+* Feature: 现在server_tag指令可以改变默认错误页面的服务器标识 [zhuzhaoyuan]
+* Bugfix：修复access_log指令中buffer参数失效的问题 [cfsego]
+* Bugfix：修复session_sticky模块在某些情况下没有发出session cookie的问题 [dinic]
+
 Tengine-1.4.6 [2013-05-14]
-* Bugifx：合并nginx-1.2.9的更新，修正CVE-2013-2070带来的安全问题。该安全问题在1.4.0以后开始出现 [yaoweibin]
+* Bugfix：合并nginx-1.2.9的更新，修正CVE-2013-2070带来的安全问题。该安全问题在1.4.0以后开始出现 [yaoweibin]
 
 Tengine-1.4.5 [2013-05-01]
 * Feature：增加一致性hash模块，可以为后端服务器提供一致性hash的负载均衡方法 [dinic]
