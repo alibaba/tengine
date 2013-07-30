@@ -1,11 +1,5 @@
 #!/usr/bin/perl
 
-# (C) Maxim Dounin
-
-# Test for fastcgi backend.
-
-###############################################################################
-
 use warnings;
 use strict;
 
