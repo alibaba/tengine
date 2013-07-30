@@ -79,6 +79,9 @@ typedef struct {
 
 
 typedef struct {
+    ngx_shmtx_t                              mutex;
+    ngx_shmtx_sh_t                           lock;
+
     ngx_pid_t                                owner;
 
     ngx_msec_t                               access_time;
@@ -86,17 +89,15 @@ typedef struct {
     ngx_uint_t                               fall_count;
     ngx_uint_t                               rise_count;
 
-
-    ngx_shmtx_t                              mutex;
-    ngx_shmtx_sh_t                           lock;
-
-    ngx_atomic_t                             down;
-
     ngx_uint_t                               busyness;
     ngx_uint_t                               access_count;
 
     struct sockaddr                         *sockaddr;
     socklen_t                                socklen;
+
+    ngx_atomic_t                             down;
+
+    u_char                                   padding[64];
 } ngx_http_upstream_check_peer_shm_t;
 
 
@@ -251,6 +252,8 @@ typedef struct {
 
 static ngx_int_t ngx_http_upstream_check_add_timers(ngx_cycle_t *cycle);
 
+static ngx_int_t ngx_http_upstream_check_peek_one_byte(ngx_connection_t *c);
+
 static void ngx_http_upstream_check_begin_handler(ngx_event_t *event);
 static void ngx_http_upstream_check_connect_handler(ngx_event_t *event);
 
@@ -258,6 +261,8 @@ static void ngx_http_upstream_check_peek_handler(ngx_event_t *event);
 
 static void ngx_http_upstream_check_send_handler(ngx_event_t *event);
 static void ngx_http_upstream_check_recv_handler(ngx_event_t *event);
+
+static void ngx_http_upstream_check_dummy_handler(ngx_event_t *event);
 
 static ngx_int_t ngx_http_upstream_check_http_init(
     ngx_http_upstream_check_peer_t *peer);
@@ -884,9 +889,7 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
 
     /* This process is processing this peer now. */
     if (peer->shm->owner == ngx_pid ||
-        peer->pc.connection != NULL ||
         peer->check_timeout_ev.timer_set) {
-
         return;
     }
 
@@ -946,6 +949,15 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
     peer = event->data;
     ucscf = peer->conf;
 
+    if (peer->pc.connection != NULL) {
+        c = peer->pc.connection;
+        if ((rc = ngx_http_upstream_check_peek_one_byte(c)) == NGX_OK) {
+            goto upstream_check_connect_done;
+        } else {
+            ngx_close_connection(c);
+            peer->pc.connection = NULL;
+        }
+    }
     ngx_memzero(&peer->pc, sizeof(ngx_peer_connection_t));
 
     peer->pc.sockaddr = peer->check_peer_addr->sockaddr;
@@ -975,6 +987,7 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
     c->write->log = c->log;
     c->pool = peer->pool;
 
+upstream_check_connect_done:
     peer->state = NGX_HTTP_CHECK_CONNECT_DONE;
 
     c->write->handler = peer->send_handler;
@@ -988,13 +1001,30 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
     }
 }
 
-
-static void
-ngx_http_upstream_check_peek_handler(ngx_event_t *event)
+static ngx_int_t
+ngx_http_upstream_check_peek_one_byte(ngx_connection_t *c)
 {
     char                            buf[1];
     ngx_int_t                       n;
     ngx_err_t                       err;
+
+    n = recv(c->fd, buf, 1, MSG_PEEK);
+    err = ngx_socket_errno;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
+                   "http check upstream recv(): %i, fd: %d",
+                   n, c->fd);
+
+    if (n == 1 || (n == -1 && err == NGX_EAGAIN)) {
+        return NGX_OK;
+    } else {
+        return NGX_ERROR;
+    }
+}
+
+static void
+ngx_http_upstream_check_peek_handler(ngx_event_t *event)
+{
     ngx_connection_t               *c;
     ngx_http_upstream_check_peer_t *peer;
 
@@ -1005,15 +1035,7 @@ ngx_http_upstream_check_peek_handler(ngx_event_t *event)
     c = event->data;
     peer = c->data;
 
-    n = recv(c->fd, buf, 1, MSG_PEEK);
-
-    err = ngx_socket_errno;
-
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, err,
-                   "http check upstream recv(): %i, fd: %d",
-                   n, c->fd);
-
-    if (n >= 0 || err == NGX_EAGAIN) {
+    if (ngx_http_upstream_check_peek_one_byte(c) == NGX_OK) {
         ngx_http_upstream_check_status_update(peer, 1);
 
     } else {
@@ -1024,6 +1046,13 @@ ngx_http_upstream_check_peek_handler(ngx_event_t *event)
     ngx_http_upstream_check_clean_event(peer);
 
     ngx_http_upstream_check_finish_handler(event);
+}
+
+
+static void
+ngx_http_upstream_check_dummy_handler(ngx_event_t *event)
+{
+    return;
 }
 
 
@@ -1102,10 +1131,8 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
 
         if (size > 0) {
             ctx->send.pos += size;
-
         } else if (size == 0 || size == NGX_AGAIN) {
             return;
-
         } else {
             c->error = 1;
             goto check_send_fail;
@@ -1120,7 +1147,6 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
     return;
 
 check_send_fail:
-
     ngx_http_upstream_check_status_update(peer, 0);
     ngx_http_upstream_check_clean_event(peer);
 }
@@ -1760,12 +1786,18 @@ ngx_http_upstream_check_status_update(ngx_http_upstream_check_peer_t *peer,
         peer->shm->fall_count = 0;
         if (peer->shm->down && peer->shm->rise_count >= ucscf->rise_count) {
             peer->shm->down = 0;
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                          "enable check peer: %V ",
+                          &peer->check_peer_addr->name);
         }
     } else {
         peer->shm->rise_count = 0;
         peer->shm->fall_count++;
         if (!peer->shm->down && peer->shm->fall_count >= ucscf->fall_count) {
             peer->shm->down = 1;
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                          "disable check peer: %V ",
+                          &peer->check_peer_addr->name);
         }
     }
 
@@ -1785,8 +1817,13 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
                        "http check clean event: index:%i, fd: %d",
                        peer->index, c->fd);
 
-        ngx_close_connection(c);
-        peer->pc.connection = NULL;
+        if (c->error == 1) {
+            ngx_close_connection(c);
+            peer->pc.connection = NULL;
+        } else {
+            c->write->handler = ngx_http_upstream_check_dummy_handler;
+            c->read->handler = ngx_http_upstream_check_dummy_handler;
+        }
     }
 
     if (peer->check_timeout_ev.timer_set) {
@@ -1813,6 +1850,7 @@ ngx_http_upstream_check_timeout_handler(ngx_event_t *event)
     }
 
     peer = event->data;
+    peer->pc.connection->error = 1;
 
     ngx_log_error(NGX_LOG_ERR, event->log, 0,
                   "check time out with peer: %V ",
