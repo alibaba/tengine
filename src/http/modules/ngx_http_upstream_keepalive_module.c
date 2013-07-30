@@ -45,29 +45,33 @@ typedef struct {
 
 
 typedef struct {
-    ngx_http_upstream_keepalive_srv_conf_t  *conf;
-
-    ngx_queue_t                        queue;
-    ngx_connection_t                  *connection;
-
-    ngx_queue_t                       *free;
-
-    socklen_t                          socklen;
-    u_char                             sockaddr[NGX_SOCKADDRLEN];
-
-} ngx_http_upstream_keepalive_cache_t;
-
-
-typedef struct {
     ngx_queue_t                        queue;
 
     ngx_queue_t                        cache;
     ngx_queue_t                        free;
 
+    ngx_uint_t                         cached;
+    ngx_uint_t                         cached_connection;
+    ngx_uint_t                         concurrent;
+
     socklen_t                          socklen;
     u_char                             sockaddr[NGX_SOCKADDRLEN];
 
 } ngx_http_upstream_keepalive_server_pool_t;
+
+
+typedef struct {
+    ngx_http_upstream_keepalive_srv_conf_t  *conf;
+
+    ngx_http_upstream_keepalive_server_pool_t *server_pool;
+
+    ngx_queue_t                        queue;
+    ngx_connection_t                  *connection;
+
+    socklen_t                          socklen;
+    u_char                             sockaddr[NGX_SOCKADDRLEN];
+
+} ngx_http_upstream_keepalive_cache_t;
 
 
 static ngx_int_t ngx_http_upstream_init_keepalive_peer(ngx_http_request_t *r,
@@ -220,7 +224,7 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
                 for (n = 0; n < kcf->max_cached; n++) {
                     ngx_queue_insert_head(&server_pool->free, &cached[n].queue);
                     cached[n].conf = kcf;
-                    cached[n].free = &server_pool->free;
+                    cached[n].server_pool = server_pool;
                 }
             }
         }
@@ -295,6 +299,7 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
     ngx_http_upstream_keepalive_peer_data_t  *kp = data;
     ngx_http_upstream_keepalive_cache_t      *item;
 
+    ngx_http_upstream_state_t                    *state;
     ngx_http_upstream_keepalive_server_pool_t    *server_pool;
 
 
@@ -315,13 +320,26 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
 
     /* search cache for suitable connection */
 
+    state = kp->upstream->state;
+
     if (kp->conf->per_server_pool) {
 
         server_pool = ngx_http_upstream_keepalive_in_server_pools(
                                                        &kp->conf->server_pools,
                                                        pc->sockaddr,
                                                        pc->socklen);
-        if (!ngx_queue_empty(&server_pool->cache)) {
+
+        server_pool->concurrent++;
+
+        if (ngx_queue_empty(&server_pool->cache)) {
+
+            if (state) {
+                state->concurrent = server_pool->concurrent;
+                state->cached_pool = server_pool->cached;
+                state->cached_count = server_pool->cached_connection;
+            }
+
+        } else {
             q = ngx_queue_last(&server_pool->cache);
             item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
                                   queue);
@@ -334,8 +352,14 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                            "get keepalive peer: using connection %p", c);
 
-            if (kp->upstream->state) {
-                kp->upstream->state->cached_connection = 1;
+            server_pool->cached--;
+            server_pool->cached_connection++;
+
+            if (state) {
+                state->cached_connection = 1;
+                state->concurrent = server_pool->concurrent;
+                state->cached_pool = server_pool->cached;
+                state->cached_count = server_pool->cached_connection;
             }
 
             c->idle = 0;
@@ -422,6 +446,19 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
 
     u = kp->upstream;
     c = pc->connection;
+    server_pool = NULL;
+
+    if (kp->conf->per_server_pool) {
+        server_pool = ngx_http_upstream_keepalive_in_server_pools(
+                                                        &kp->conf->server_pools,
+                                                        pc->sockaddr,
+                                                        pc->socklen);
+        server_pool->concurrent--;
+
+        if (kp->upstream->state && kp->upstream->state->cached_connection) {
+                server_pool->cached_connection--;
+        }
+    }
 
     if (state & NGX_PEER_FAILED
         || c == NULL
@@ -446,10 +483,6 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
                    "free keepalive peer: saving connection %p", c);
 
     if (kp->conf->per_server_pool) {
-        server_pool = ngx_http_upstream_keepalive_in_server_pools(
-                                                        &kp->conf->server_pools,
-                                                        pc->sockaddr,
-                                                        pc->socklen);
         if (ngx_queue_empty(&server_pool->free)) {
 
             q = ngx_queue_last(&server_pool->cache);
@@ -466,6 +499,7 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
 
             item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t,
                                   queue);
+            server_pool->cached++;
         }
 
         item->connection = c;
@@ -589,7 +623,8 @@ close:
     ngx_queue_remove(&item->queue);
 
     if (conf->per_server_pool) {
-        ngx_queue_insert_head(item->free, &item->queue);
+        ngx_queue_insert_head(&item->server_pool->free, &item->queue);
+        item->server_pool->cached--;
 
     } else {
         ngx_queue_insert_head(&conf->free, &item->queue);
