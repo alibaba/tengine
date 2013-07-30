@@ -1115,8 +1115,6 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
                 return NGX_BUSY;
             }
 
-            (void) ngx_atomic_fetch_add(&lr->count, 1);
-
             if (!ctx->rate) {
                 return NGX_OK;
             }
@@ -1139,6 +1137,8 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
                               "limit %V over rate: %i", &c->addr_text, excess);
                 return NGX_BUSY;
             }
+
+            (void) ngx_atomic_fetch_add(&lr->count, 1);
 
             lr->excess = excess;
             lr->last = now;
@@ -1388,6 +1388,9 @@ ngx_limit_tcp_cleanup(void *data)
                        "delete connection timer");
         ngx_del_timer(c->write);
     }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "limit tcp cleanup connection count: [%ui]", node->count);
 
     (void) ngx_atomic_fetch_add(&node->count, -1);
 }
