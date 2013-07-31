@@ -355,6 +355,8 @@ struct ngx_http_core_loc_conf_s {
     off_t         directio;                /* directio */
     off_t         directio_alignment;      /* directio_alignment */
 
+    ngx_bufs_t    client_body_buffers;
+    size_t        client_body_postpone_size;
     size_t        client_body_buffer_size; /* client_body_buffer_size */
     size_t        send_lowat;              /* send_lowat */
     size_t        postpone_output;         /* postpone_output */
