@@ -379,6 +379,20 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_buffer_size),
       NULL },
 
+    { ngx_string("client_body_buffers"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
+      ngx_conf_set_bufs_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_core_loc_conf_t, client_body_buffers),
+      NULL },
+
+    { ngx_string("client_body_postpone_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_core_loc_conf_t, client_body_postpone_size),
+      NULL },
+
     { ngx_string("client_body_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -3495,6 +3509,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
      *     clcf->default_type = { 0, NULL };
      *     clcf->error_log = NULL;
      *     clcf->try_files = NULL;
+     *     clcf->client_body_buffers = { 0, 0 };
      *     clcf->client_body_path = NULL;
      *     clcf->regex = NULL;
      *     clcf->exact_match = 0;
@@ -3509,6 +3524,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->error_pages = NGX_CONF_UNSET_PTR;
     clcf->client_max_body_size = NGX_CONF_UNSET;
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
+    clcf->client_body_postpone_size = NGX_CONF_UNSET_SIZE;
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
     clcf->satisfy = NGX_CONF_UNSET_UINT;
     clcf->if_modified_since = NGX_CONF_UNSET_UINT;
@@ -3775,6 +3791,39 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->client_body_buffer_size,
                               prev->client_body_buffer_size,
                               (size_t) 2 * ngx_pagesize);
+    ngx_conf_merge_bufs_value(conf->client_body_buffers,
+                              prev->client_body_buffers,
+                              16, ngx_pagesize);
+
+    if (conf->client_body_buffers.num < 2) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "there must be at least 2 \"client_body_buffers\"");
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_conf_merge_size_value(conf->client_body_postpone_size,
+                              prev->client_body_postpone_size,
+                              64 * 1024);
+
+    if (conf->client_max_body_size <
+        (off_t)(conf->client_body_buffers.num *
+                conf->client_body_buffers.size)) {
+
+        conf->client_body_buffers.num = 1 + (conf->client_max_body_size /
+                                             conf->client_body_buffers.size);
+    }
+
+    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size) {
+        conf->client_body_postpone_size = conf->client_max_body_size;
+    }
+
+    if (conf->client_body_postpone_size >
+        (conf->client_body_buffers.num * conf->client_body_buffers.size)) {
+
+        conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
+                                             conf->client_body_buffers.size);
+    }
+
     ngx_conf_merge_msec_value(conf->client_body_timeout,
                               prev->client_body_timeout, 60000);
 
