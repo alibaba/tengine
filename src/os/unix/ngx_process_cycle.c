@@ -1035,7 +1035,11 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
     if (ecf->reuse_port) {
-        ngx_open_listening_sockets(cycle);
+        if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+            /* fatal */
+            exit(2);
+        }
+
         ngx_configure_listening_sockets(cycle);
     }
 
