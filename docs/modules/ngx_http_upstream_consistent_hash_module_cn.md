@@ -20,9 +20,9 @@
 
 * `server` *wegiht* 字段，作为server权重，对应虚拟节点数目
 
-* 具体算法，将每个server虚拟成n个节点，均匀分布到hash环上，每次请求，根据配置的参数计算出一个hash值，在hash环
+* 具体算法，该模块将n个server虚拟成n个节点，均匀分布到hash环上。每次请求进入时，模块根据配置的参数计算出一个hash值，在hash环
 
-    上查找离这个hash最近的虚拟节点，对应的server作为该次请求的后端机器。
+    上查找离这个hash值最近的虚拟节点，并将此节点对应的server作为该次请求的后端机器。
 
 * 该模块可以根据配置参数采取不同的方式将请求均匀映射到后端机器，比如：
 
@@ -67,7 +67,7 @@ consistent_hash
 编译安装
 ===========
 
-* 在configure的时候打开一致性hash模块，关闭使用选项`--without-http_upstream_consistent_hash_module`。
+* configure默认打开一致性hash模块，若要关闭请使用选项`--without-http_upstream_consistent_hash_module`。
 
       $ ./configure
       
