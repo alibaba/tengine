@@ -1938,12 +1938,13 @@ ngx_http_upstream_check_clear_all_events()
         }
 
         if (peer[i].check_timeout_ev.timer_set) {
-            c = peer[i].pc.connection;
-            if (c) {
-                ngx_close_connection(c);
-                peer[i].pc.connection = NULL;
-            }
             ngx_del_timer(&peer[i].check_timeout_ev);
+        }
+
+        c = peer[i].pc.connection;
+        if (c) {
+            ngx_close_connection(c);
+            peer[i].pc.connection = NULL;
         }
 
         if (peer[i].pool != NULL) {
