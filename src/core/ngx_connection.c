@@ -334,6 +334,36 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
+#if (NGX_HAVE_REUSEPORT)
+
+            ngx_event_conf_t    *ecf;
+
+            ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+            if (ecf->reuse_port) {
+
+                if ((ngx_process == NGX_PROCESS_SIGNALLER
+                    || ngx_process == NGX_PROCESS_WORKER
+                    || !ngx_is_init_cycle(cycle->old_cycle))
+                    && setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                                  (const void *) &reuse, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  "setsockopt(SO_REUSEPORT) %V failed",
+                                  &ls[i].addr_text);
+
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+
+                    return NGX_ERROR;
+                }
+            }
+#endif
+
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 
             if (ls[i].sockaddr->sa_family == AF_INET6 && ls[i].ipv6only) {
@@ -398,26 +428,6 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 continue;
             }
-
-#if (NGX_HAVE_REUSEPORT)
-
-            if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
-                           (const void *) &reuse, sizeof(int))
-                == -1)
-            {
-                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                              "setsockopt(SO_REUSEPORT) %V failed",
-                              &ls[i].addr_text);
-
-                if (ngx_close_socket(s) == -1) {
-                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  ngx_close_socket_n " %V failed",
-                                  &ls[i].addr_text);
-                }
-
-                return NGX_ERROR;
-            }
-#endif
 
 #if (NGX_HAVE_UNIX_DOMAIN)
 

@@ -381,6 +381,7 @@ static void
 ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 {
     ngx_int_t      i;
+    ngx_uint_t     listen_nelt;
     ngx_channel_t  ch;
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start worker processes");
@@ -392,11 +393,13 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
     ngx_event_conf_t    *ecf;
 
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
-    if (ecf->reuse_port) {    
+    if (ecf->reuse_port) {
+        listen_nelt = cycle->listening.nelts;
         ngx_close_listening_sockets(cycle);
+        cycle->listening.nelts = listen_nelt;
     }
 
-#endif    
+#endif
 
     for (i = 0; i < n; i++) {
 
