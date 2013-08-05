@@ -52,16 +52,16 @@ This directive will keep session alive. Specific parameters are as follows:
 + `cookie` sets name of session cookie.
 + `domain` sets domain of cookie. It is not set by default.
 + `path` sets url path of cookie. It is not set by default.
-+ `maxage` set lifetime of cookie (cookie max-age attribute). If not set, it is lifetime of session cookie by default. In that case cookie will become invalid when client(browser) closes the connection.
++ `maxage` set lifetime of cookie (cookie max-age attribute). If not set, it is lifetime of session(`maxlife`) by default. In that case cookie will become invalid when client(browser) closes the connection.
 + `mode` sets mode of cookie:
     - **insert**: This mode inserts cookie into http response via Set-Cookie header.
-    - **prefix**: This mode generates no cookie, but it inserts specific prefix ahead of cookie value of http response (e.g. "Cookie: NAME=SRV~VALUE"). When cliet(browser) requests next time with this specific cookie, it will delete inserted prefix before passing request to backend server. The operation is transparent to backend server which will get origin cookie .
+    - **prefix**: This mode generates no cookie, but it inserts specific prefix ahead of cookie value of http response (e.g. "Cookie: NAME=SRV~VALUE"). When client(browser) requests next time with this specific cookie, it will delete inserted prefix before passing request to backend server. The operation is transparent to backend server which will get origin cookie .
     - **rewrite**: In this mode, backend server can set cookie of session sticky itself. If backend server doesnt set this cookie in response, it disables session sticky for this request. In this mode, backend server manages which request needs sesstion sticky.
 
-+ `option` sets option value(indirect and direct) for cookie of session stickyt. If setting indirect, it hides cookie of session sticky from backend server, otherwise the opposite.
++ `option` sets option value(indirect and direct) for cookie of session sticky. If setting indirect, it hides cookie of session sticky from backend server, otherwise the opposite.
 + `maxidle` sets max idle time of session.
 + `maxlife` sets max lifetime of session.
-+ `fallback` sets whether it can retry others when backend server is down.
++ `fallback` sets whether it can retry others when current backend server is down.
 + `hash` sets whether server flag in cookie is passed through plaintext or md5. By default, md5 is used.
 
 ## session\_sticky\_hide\_cookie ##
@@ -70,8 +70,8 @@ Syntax: **session\_sticky\_hide\_cookie** upstream=name;
 
 Default: none
 
-Context： server, location
+Context: server, location
 
-Description：
+Description:
 
-This directive works with proxy_pass directive. It deletes cookie used as session sticky in insert+indirect and prefix mode, in which case cookie will be hidden from backend server. Upstream ame specifies which upstream this directive takes effect in.
+This directive works with proxy_pass directive. It deletes cookie used as session sticky in insert+indirect and prefix mode, in which case cookie will be hidden from backend server. Upstream name specifies which upstream this directive takes effect in.
