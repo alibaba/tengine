@@ -51,7 +51,8 @@ static void ngx_http_tfs_read_body_handler(ngx_http_request_t *r);
 static char *ngx_http_tfs_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-static char *ngx_http_tfs_rcs_heartbeat(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu);
+static char *ngx_http_tfs_rcs_heartbeat(ngx_conf_t *cf,
+    ngx_http_tfs_upstream_t *tu);
 
 static char *ngx_http_tfs_rcs_zone(ngx_conf_t *cf, ngx_http_tfs_upstream_t *tu);
 static char *ngx_http_tfs_block_cache_zone(ngx_conf_t *cf, ngx_command_t *cmd,

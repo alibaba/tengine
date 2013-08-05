@@ -332,7 +332,7 @@ GET /
 --- config
     location / {
         set $test "/";
-        proxy_pass http://blog.163.com$test;
+        proxy_pass http://www.taobao.com$test;
     }
 
 --- request

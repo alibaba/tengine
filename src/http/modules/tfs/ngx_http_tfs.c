@@ -860,7 +860,8 @@ ngx_http_tfs_finalize_state(ngx_http_tfs_t *t, ngx_int_t rc)
         if (t->decline_handler) {
             rc = t->decline_handler(t);
             if (rc == NGX_ERROR) {
-                ngx_http_tfs_finalize_request(r, t, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                ngx_http_tfs_finalize_request(r, t,
+                                              NGX_HTTP_INTERNAL_SERVER_ERROR);
             }
         }
         return;
@@ -2347,10 +2348,12 @@ ngx_http_tfs_batch_process_end(ngx_http_tfs_t *t)
         }
 
         if (t->request_timeout) {
-            ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_REQUEST_TIME_OUT);
+            ngx_http_tfs_finalize_request(t->data, t,
+                                          NGX_HTTP_REQUEST_TIME_OUT);
 
         } else if (t->client_abort) {
-            ngx_http_tfs_finalize_request(t->data, t, NGX_HTTP_CLIENT_CLOSED_REQUEST);
+            ngx_http_tfs_finalize_request(t->data, t,
+                                          NGX_HTTP_CLIENT_CLOSED_REQUEST);
 
         } else {
             ngx_http_tfs_finalize_state(t, NGX_ERROR);

@@ -119,7 +119,8 @@ ngx_http_tfs_dedup_set(ngx_http_tfs_dedup_ctx_t *ctx,
     data_len = 0;
 
     if (!ctx->md5_sumed) {
-        rc = ngx_http_tfs_sum_md5(ctx->file_data, ctx->tair_key, &data_len, log);
+        rc = ngx_http_tfs_sum_md5(ctx->file_data, ctx->tair_key, &data_len,
+                                  log);
         if (rc == NGX_ERROR) {
             return NGX_ERROR;
         }
@@ -192,7 +193,8 @@ ngx_http_tfs_dedup_remove(ngx_http_tfs_dedup_ctx_t *ctx,
     data_len = 0;
 
     if (!ctx->md5_sumed) {
-        rc = ngx_http_tfs_sum_md5(ctx->file_data, ctx->tair_key, &data_len, log);
+        rc = ngx_http_tfs_sum_md5(ctx->file_data, ctx->tair_key, &data_len,
+                                  log);
         if (rc == NGX_ERROR) {
             return NGX_ERROR;
         }
