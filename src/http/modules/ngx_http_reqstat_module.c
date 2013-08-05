@@ -435,7 +435,7 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 
         if (ngx_http_complex_value(r, &ctx->value, &val) != NGX_OK) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "failed to reap value of \"%V\"", ctx->val);
+                          "failed to reap the key \"%V\"", ctx->val);
             continue;
         }
 
@@ -446,9 +446,8 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
                           "failed to alloc node in zone \"%V\", "
                           "enlarge it please",
                           &z->shm.name);
-        }
 
-        if (fnode) {
+        } else {
             if (r->connection->requests == 1) {
                 ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_CONN_TOTAL, 1);
             }
