@@ -53,7 +53,7 @@ consistent_hash
 
 **Context**: *upstream*
 
-This directive causes requests to be distributed between upstreams based on consistent hashing alogrithm. And it use variable_name as input data of hash function.
+This directive causes requests to be distributed between upstreams based on consistent hashing alogrithm. And it uses nginx variables, specified by variable_name, as input data of hash function.
 
 
 Installation
