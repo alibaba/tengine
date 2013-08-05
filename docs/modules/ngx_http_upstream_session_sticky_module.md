@@ -1,0 +1,77 @@
+# Name
+**ngx\_http\_upstream\_session\_sticky\_module**
+
+This module is a load balancing module. It keeps the session between client and backend server via cookie. In such case, it guarantees that requests from the same client are distributed to the same server.
+
+# Example 1#
+
+    # default: cookie=route mode=insert fallback=on
+    upstream foo {
+       server 192.168.0.1;
+       server 192.168.0.2;
+       session_sticky;
+    }
+
+    server {
+        location / {
+            proxy_pass http://foo;
+        }
+    }
+
+# Example 2#
+
+    # insert + indirect mode:
+    upstream test {
+      session_sticky session_sticky cookie=uid domain=www.xxx.com fallback=on path=/ mode=insert option=indirect;
+      server  127.0.0.1:8080;
+    }
+
+    server {
+      location / {
+        # You need configure session_sticky_hide_cookie in insert + indirect mode or prefix mode.
+        # It hides cookie from backend server, in which case the session is transparent to backend server.
+        session_sticky_hide_cookie upstream=test;
+        proxy_pass http://test;
+      }
+    }
+
+# Directive #
+
+## session_sticky ##
+
+Syntax: **session_sticky** `[cookie=name] [domain=your_domain] [path=your_path] [maxage=time] [mode=insert|rewrite|prefix] [option=indirect] [maxidle=time] [maxlife=time] [fallback=on|off] [hash=plain|md5]`
+
+Default: `session_sticky cookie=route mode=insert fallback=on`
+
+Context: `upstream`
+
+Description:
+
+This directive will keep session alive. Specific parameters are as follows:
+
++ `cookie` sets name of session cookie.
++ `domain` sets domain of cookie. It is not set by default.
++ `path` sets url path of cookie. It is not set by default.
++ `maxage` set lifetime of cookie. If not set, it is lifetime of session cookie by default. In that case cookie will become invalid when client(browser) closes the connection.
++ `mode` sets mode of cookie:
+    - **insert**: This mode inserts cookie into http response via Set-Cookie header.
+    - **prefix**: This mode generates no cookie, but it inserts specific prefix ahead of cookie value of http response. When cliet(browser) requests with this specific cookie next time, it will delete inserted prefix and then pass it to backend server. The operation is transparent to backend server which will get origin cookie (e.g. "Cookie: NAME=SRV~VALUE").
+    - **rewrite**: In this mode, backend server can set cookie of session sticky itself. If backend server doesnt set this cookie in response, it disables session sticky for this request. In this mode, backend server manages which request needs sesstion sticky.
+
++ `option` sets option value(indirect and direct) for cookie of session stickyt. If setting indirect, it hides cookie of session sticky from backend server, otherwise the opposite.
++ `maxidle` sets max idle time of session cookie.
++ `maxlife` sets max lifetime of session cookie.
++ `fallback` sets whether it can retry others when backend server is down.
++ `hash` sets whether server flag in cookie is passed through plaintext or md5. By default, md5 is used.
+
+## session\_sticky\_hide\_cookie ##
+
+Syntax: **session\_sticky\_hide\_cookie** upstream=name;
+
+Default: none
+
+Context： server, location
+
+Description：
+
+This directive works with proxy_pass directive. It deletes cookie used as session sticky in insert+indirect and prefix mode, in which case cookie will be hidden from backend server. Upstream ame specifies which upstream this directive takes effect in.
