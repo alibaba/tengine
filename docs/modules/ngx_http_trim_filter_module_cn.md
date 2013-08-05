@@ -40,7 +40,9 @@
 
 **上下文:** `http, server, location`
 
-定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。
+定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。  
+目前只能处理html格式的页面，js和css只针对于html内嵌的代码，不支持处理单独的js和css页面。  
+如果这样配置 `trim_type text/javascript;`，js代码将被作为html代码来处理而出错。
 <br/>
 
 ## 调试
@@ -57,7 +59,6 @@
 + 正文中的 '\r' 直接删除。  
 + 正文中的 '\n' 替换为 '空格', 然后重复 \t' 和 '空格' 保留第一个。 
 + 标签中的 '\r'，'\n'，'\t'，'空格' 保留第一个。  
-+ '>' 后的 '\n' 直接删除。  
 + 标签的双引号和单引号内的空白符不做删除。 
 \<div class="no &nbsp; &nbsp; &nbsp;  trim"\>
 + 保留第一行DTD声明的 '\n'。  
