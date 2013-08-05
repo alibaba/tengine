@@ -757,6 +757,7 @@ cat << END
                                      enable ngx_http_upstream_least_conn_module (shared)
   --with-http_upstream_session_sticky_module=shared
                                      enable ngx_http_upstream_session_sticky_module (shared)
+  --with-http_reqstat_module=shared  enable ngx_http_reqstat_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -797,6 +798,7 @@ cat << END
                                      disable ngx_http_upstream_consistent_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path

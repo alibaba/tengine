@@ -14,6 +14,11 @@ struct ngx_http_reqstat_rbnode_s {
     ngx_atomic_t                 bytes_out;
     ngx_atomic_t                 conn_total;
     ngx_atomic_t                 req_total;
+    ngx_atomic_t                 http_2xx;
+    ngx_atomic_t                 http_3xx;
+    ngx_atomic_t                 http_4xx;
+    ngx_atomic_t                 http_5xx;
+    ngx_atomic_t                 other_status;
     u_char                       data[1];
 };
 
@@ -51,15 +56,34 @@ typedef struct {
 #define NGX_HTTP_REQSTAT_REQ_TOTAL                                      \
     offsetof(ngx_http_reqstat_rbnode_t, req_total)
 
+#define NGX_HTTP_REQSTAT_2XX                                            \
+    offsetof(ngx_http_reqstat_rbnode_t, http_2xx)
+
+#define NGX_HTTP_REQSTAT_3XX                                            \
+    offsetof(ngx_http_reqstat_rbnode_t, http_3xx)
+
+#define NGX_HTTP_REQSTAT_4XX                                            \
+    offsetof(ngx_http_reqstat_rbnode_t, http_4xx)
+
+#define NGX_HTTP_REQSTAT_5XX                                            \
+    offsetof(ngx_http_reqstat_rbnode_t, http_5xx)
+
+#define NGX_HTTP_REQSTAT_OTHER_STATUS                                   \
+    offsetof(ngx_http_reqstat_rbnode_t, other_status)
+
 #define REQ_FIELD(node, offset)                                         \
     ((ngx_atomic_t *) ((char *) node + offset))
 
-
-static off_t               fields[4] = {
+static off_t               fields[9] = {
     NGX_HTTP_REQSTAT_BYTES_IN,
     NGX_HTTP_REQSTAT_BYTES_OUT,
     NGX_HTTP_REQSTAT_CONN_TOTAL,
-    NGX_HTTP_REQSTAT_REQ_TOTAL
+    NGX_HTTP_REQSTAT_REQ_TOTAL,
+    NGX_HTTP_REQSTAT_2XX,
+    NGX_HTTP_REQSTAT_3XX,
+    NGX_HTTP_REQSTAT_4XX,
+    NGX_HTTP_REQSTAT_5XX,
+    NGX_HTTP_REQSTAT_OTHER_STATUS
 };
 
 
@@ -390,7 +414,7 @@ static ngx_int_t
 ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 {
     ngx_str_t                     val;
-    ngx_uint_t                    i;
+    ngx_uint_t                    i, status;
     ngx_shm_zone_t              **shm_zone, *z;
     ngx_http_reqstat_ctx_t       *ctx;
     ngx_http_reqstat_conf_t      *slcf;
@@ -434,6 +458,35 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
                                    r->connection->received);
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT,
                                    r->connection->sent);
+
+            if (r->err_status) {
+                status = r->err_status;
+
+            } else if (r->headers_out.status) {
+                status = r->headers_out.status;
+
+            } else if (r->http_version == NGX_HTTP_VERSION_9) {
+                status = 9;
+
+            } else {
+                status = 0;
+            }
+
+            if (status >= 200 && status < 300) {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_2XX, 1);
+
+            } else if (status >= 300 && status < 400) {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_3XX, 1);
+
+            } else if (status >= 400 && status < 500) {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_4XX, 1);
+
+            } else if (status >= 500 && status < 600) {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_5XX, 1);
+
+            } else {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_OTHER_STATUS, 1);
+            }
         }
     }
 
