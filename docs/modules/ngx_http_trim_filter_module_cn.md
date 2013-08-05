@@ -41,7 +41,7 @@
 **上下文:** `http, server, location`
 
 定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。  
-只能处理html格式的页面，js和css只针对于html内嵌的代码，目前不支持处理单独的js和css页面。  
+目前只能处理html格式的页面，js和css只针对于html内嵌的代码，不支持处理单独的js和css页面。  
 如果这样配置 `trim_type text/javascript;`，js代码将被作为html代码来处理而出错。
 <br/>
 
