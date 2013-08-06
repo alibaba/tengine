@@ -413,6 +413,12 @@ ngx_conf_limit_tcp(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (concurrent == 0 && rate == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "you need to set concurrent or rate");
+        return NGX_CONF_ERROR;
+    }
+
     shm_zone = ngx_shared_memory_add(cf, &name, size, &ngx_limit_tcp_module);
     if (shm_zone == NULL) {
         return NGX_CONF_ERROR;
