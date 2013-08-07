@@ -12,11 +12,11 @@ Description
 
 * `server` *id* field: Id field can be used as server flag. If id field is not set, ip address and port are used to identify server. You can use id field to set server flag mannually. In that case, although ip address or port of a server is changed, id can still identify the server. BTW, it can reduce remapping keys effectively to use id field.
 
-* `server` *wegiht* field: server weight, the number of virtual peers
+* `server` *weight* field: server weight, the number of virtual peers
 
 * Algorithm: It thinks of 1 server as m virtual peers, so n servers correspond to n*m virtual peers. All these peers will be mapped to hash ring on average. Every time request comes, it calculates a hash key via configuration parameter, and finds a peer on the hash ring nearest to the location specified by the hash key.
 
-* It can distribute requests to backend servers on average according to nginx configuration parameter.
+* It can dispatch requests to backend servers on average according to nginx configuration parameter.
 
     `consistent_hash $remote_addr`: mapping via client ip address
 
