@@ -735,8 +735,9 @@ fi
 
 
 if [ $NGX_DSO = YES ] ; then
-
     have=NGX_DSO_ABI_COMPATIBILITY value="$NGX_DSO_ABI_COMPATIBILITY" . auto/define
+else
+    have=NGX_DSO_ABI_COMPATIBILITY value="0" . auto/define
 fi
 
 
