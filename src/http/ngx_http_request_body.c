@@ -514,9 +514,6 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r,
     ngx_buf_t                 *b, buf;
     ngx_int_t                  rc;
     ngx_http_request_body_t   *rb;
-    ngx_http_core_loc_conf_t  *clcf;
-
-    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->headers_in.content_length_n == 0) {
         post_handler(r);
