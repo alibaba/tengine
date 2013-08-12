@@ -14,7 +14,7 @@ Description
 
 * `server` *weight* field: server weight, the number of virtual peers
 
-* Algorithm: It thinks of 1 server as m virtual peers, so n servers correspond to n*m virtual peers. All these peers will be mapped to hash ring on average. Every time request comes, it calculates a hash key via configuration parameter, and finds a peer on the hash ring nearest to the location specified by the hash key.
+* Algorithm: It supposes that 1 server is mapped to m virtual peers, so n servers correspond to n*m virtual peers. All these peers will be mapped to hash ring on average. Every time request comes, it calculates a hash key via configuration parameter, and finds a peer on the hash ring nearest to the location specified by the hash key.
 
 * It can dispatch requests to backend servers on average according to nginx configuration parameter.
 
