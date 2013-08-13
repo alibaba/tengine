@@ -1110,12 +1110,11 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
             ngx_queue_remove(&lr->queue);
             ngx_queue_insert_head(&ctx->sh->queue, &lr->queue);
 
-            ngx_log_debug3(NGX_LOG_DEBUG_CORE, c->log, 0,
-                           "limit tcp count %ui %ui %p",
-                           lr->count, addr.len, addr.data);
+            ngx_log_debug2(NGX_LOG_DEBUG_CORE, c->log, 0,
+                           "limit tcp count %ui %p", lr->count, c);
 
-            if (ctx->concurrent && lr->count > ctx->concurrent) {
-                ngx_log_error(NGX_LOG_INFO, c->log, 0,
+            if (ctx->concurrent && lr->count >= ctx->concurrent) {
+                ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "limit tcp %V over concurrent: %ui",
                               &c->addr_text, lr->count);
 
@@ -1142,7 +1141,7 @@ ngx_limit_tcp_lookup(ngx_connection_t *c, ngx_limit_tcp_ctx_t *ctx,
             *ep = excess;
 
             if ((ngx_uint_t) excess > ctx->burst) {
-                ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "limit %V over rate: %i", &c->addr_text, excess);
                 (void) ngx_atomic_fetch_add(&lr->count, -1);
                 return NGX_BUSY;
@@ -1397,8 +1396,9 @@ ngx_limit_tcp_cleanup(void *data)
         ngx_del_timer(c->write);
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
-                   "limit tcp cleanup connection count: [%ui]", node->count);
+    ngx_log_debug2(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "limit tcp cleanup connection count: [%ui] %p",
+                   node->count, c);
 
     (void) ngx_atomic_fetch_add(&node->count, -1);
 }
