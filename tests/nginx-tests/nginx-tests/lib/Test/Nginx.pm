@@ -258,7 +258,7 @@ sub reload() {
         kill 'HUP', `cat $self->{_testdir}/nginx.pid`;
     }   
 
-    sleep(3);
+    sleep(1);
 
     return $self;
 }
