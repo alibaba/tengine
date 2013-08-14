@@ -731,11 +731,12 @@ ngx_limit_tcp_http_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
             for (i = 0; i < port->naddrs; i++) {
 
 #if NGX_DEBUG
-                u_char                     ip_str[80];
+                u_char                     ip_str[NGX_INET6_ADDRSTRLEN];
 
-                ngx_memzero(ip_str, 80);
+                ngx_memzero(ip_str, NGX_INET6_ADDRSTRLEN);
 
-                (void) ngx_inet_ntop(AF_INET, &sin->sin_addr, ip_str, 80);
+                (void) ngx_inet_ntop(AF_INET, &sin->sin_addr, ip_str,
+                                     NGX_INET6_ADDRSTRLEN);
 
                 ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
                                "%s", ip_str);
