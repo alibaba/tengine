@@ -621,17 +621,18 @@ ngx_limit_tcp_mail_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
             }
         }
 
-        if (port->naddrs > 1) {
-            for (i = 0; i < port->naddrs; i++) {
-                if (ngx_memcmp(&maddr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
-                    return i;
-                }
+        for (i = 0; i < port->naddrs; i++) {
+            if (ngx_memcmp(&maddr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
+                return i;
             }
-        } else {
-            return 0;
         }
 
-        break;
+        if (type) {
+            break;
+        } else {
+            return i - 1;
+        }
+
 #endif
 
     default:
@@ -645,19 +646,17 @@ ngx_limit_tcp_mail_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
             }
         }
 
-        if (port->naddrs > 1) {
-
-            for (i = 0; i < port->naddrs; i++) {
-                if (maddr[i].addr == sin->sin_addr.s_addr) {
-                    return i;
-                }
+        for (i = 0; i < port->naddrs; i++) {
+            if (maddr[i].addr == sin->sin_addr.s_addr) {
+                return i;
             }
-        } else {
-            return 0;
         }
 
-        break;
-
+        if (type) {
+            break;
+        } else {
+            return i - 1;
+        }
     }
 
     return NGX_ERROR;
@@ -700,19 +699,18 @@ ngx_limit_tcp_http_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
             }
         }
 
-        if (port->naddrs > 1) {
-
-            for (i = 0; i < port->naddrs; i++) {
-                if (ngx_memcmp(&haddr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
-                    return i;
-                }
+        for (i = 0; i < port->naddrs; i++) {
+            if (ngx_memcmp(&haddr6[i].addr6, &sin6->sin6_addr, 16) == 0) {
+                return i;
             }
-
-        } else {
-            return 0;
         }
 
-        break;
+        if (type) {
+            break;
+        } else {
+            return i - 1;
+        }
+
 #endif
 
     default:
@@ -726,33 +724,36 @@ ngx_limit_tcp_http_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
             }
         }
 
-        if (port->naddrs > 1) {
 
-            for (i = 0; i < port->naddrs; i++) {
+        for (i = 0; i < port->naddrs; i++) {
 
 #if NGX_DEBUG
-                u_char                     ip_str[NGX_INET6_ADDRSTRLEN];
+            u_char  ip1[NGX_INET6_ADDRSTRLEN], ip2[NGX_INET6_ADDRSTRLEN];
 
-                ngx_memzero(ip_str, NGX_INET6_ADDRSTRLEN);
+            ngx_memzero(ip1, NGX_INET6_ADDRSTRLEN);
+            ngx_memzero(ip2, NGX_INET6_ADDRSTRLEN);
 
-                (void) ngx_inet_ntop(AF_INET, &sin->sin_addr, ip_str,
-                                     NGX_INET6_ADDRSTRLEN);
+            (void) ngx_inet_ntop(AF_INET, &sin->sin_addr, ip1,
+                                 NGX_INET6_ADDRSTRLEN);
 
-                ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
-                               "%s", ip_str);
+            (void) ngx_inet_ntop(AF_INET, &haddr[i].addr, ip2,
+                                 NGX_INET6_ADDRSTRLEN);
+
+            ngx_log_debug2(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                           "limit %s to %s", ip1, ip2);
 #endif
 
-                if (haddr[i].addr == sin->sin_addr.s_addr) {
-                    return i;
-                }
+            if (haddr[i].addr == sin->sin_addr.s_addr) {
+                return i;
             }
 
-        } else {
-            return 0;
         }
 
-        break;
-
+        if (type) {
+            break;
+        } else {
+            return i - 1;
+        }
     }
 
     return NGX_ERROR;
@@ -797,7 +798,8 @@ ngx_limit_tcp_init_process(ngx_cycle_t *cycle)
 
         if (!c) {
             ngx_log_debug1(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                           "listen %V has no connection", &ls[i].addr_text);
+                           "limit listen %V has no connection",
+                           &ls[i].addr_text);
             continue;
         }
 
@@ -817,7 +819,7 @@ ngx_limit_tcp_init_process(ngx_cycle_t *cycle)
             idx = ngx_limit_tcp_get_addr_index(&ls[i], &paddr[j]->sockaddr, 1);
 
             ngx_log_debug3(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                           "listen %V %V matched idx: %i",
+                           "limit listen %V %V matched idx: %i",
                            &ls[i].addr_text, &paddr[j]->addr_text, idx);
 
             if (idx == NGX_ERROR) {
