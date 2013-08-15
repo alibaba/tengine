@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
@@ -340,10 +339,11 @@ ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_sysguard_conf_t  *glcf = conf;
 
     ngx_str_t  *value;
-    ngx_uint_t  i;
+    ngx_uint_t  i, scale;
 
     value = cf->args->elts;
     i = 1;
+    scale = 1;
 
     if (ngx_strncmp(value[i].data, "load=", 5) == 0) {
 
@@ -355,10 +355,21 @@ ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             goto invalid;
         }
 
-        glcf->load = ngx_atofp(value[i].data + 5, value[i].len - 5, 3);
+        value[i].data += 5;
+        value[i].len -= 5;
+
+        if (ngx_strncmp(value[i].data, "ncpu*", 5) == 0) {
+            value[i].data += 5;
+            value[i].len -= 5;
+            scale = ngx_ncpu;
+        }
+
+        glcf->load = ngx_atofp(value[i].data, value[i].len, 3);
         if (glcf->load == NGX_ERROR) {
             goto invalid;
         }
+
+        glcf->load = glcf->load * scale;
 
         if (cf->args->nelts == 2) {
             return NGX_CONF_OK;
