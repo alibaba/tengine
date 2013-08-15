@@ -180,3 +180,29 @@ GET /
 --- error_code: 502
 --- response_body_like: ^.*$
 
+=== TEST 5: the tcp_check test with check_keepalive_requests configured
+--- http_config
+    upstream test{
+        server 127.0.0.1:1970;
+
+        check_keepalive_requests 10;
+        check interval=2000 rise=1 fall=1 timeout=1000 type=tcp;
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / { 
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$
