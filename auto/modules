@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -761,6 +760,20 @@ if [ $MAIL = YES ]; then
 
     modules="$modules $MAIL_PROXY_MODULE"
     MAIL_SRCS="$MAIL_SRCS $MAIL_PROXY_SRCS"
+fi
+
+
+if [ $NGX_LIMIT_TCP = YES ]; then
+    modules="$modules $LIMIT_TCP_MODULE"
+    CORE_SRCS="$CORE_SRCS $LIMIT_TCP_SRCS"
+    CORE_DEPS="$CORE_DEPS $HTTP_DEPS"
+    CORE_INCS="$CORE_INCS $HTTP_INCS"
+
+    if [ $MAIL = YES ]; then
+        have=NGX_LIMIT_TCP_WITH_MAIL . auto/have
+        CORE_DEPS="$CORE_DEPS $MAIL_DEPS"
+        CORE_INCS="$CORE_INCS $MAIL_INCS"
+    fi
 fi
 
 
