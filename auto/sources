@@ -141,7 +141,6 @@ PROCS_DEPS="src/proc/ngx_proc.h"
 PROCS_INCS="src/proc"
 PROCS_SRCS="src/proc/ngx_proc.c"
 
-
 AIO_MODULE=ngx_aio_module
 AIO_SRCS="src/event/modules/ngx_aio_module.c \
           src/os/unix/ngx_aio_read.c \
@@ -735,4 +734,6 @@ NGX_HTTP_TFS_MODULE_SRCS="src/http/modules/tfs/ngx_tfs_common.c \
                           src/http/modules/tfs/ngx_http_tfs_peer_connection.c \
                           src/http/modules/tfs/ngx_http_tfs_server_handler.c "
 
+LIMIT_TCP_MODULE=ngx_limit_tcp_module
+LIMIT_TCP_SRCS=src/event/ngx_limit_tcp_module.c
 
