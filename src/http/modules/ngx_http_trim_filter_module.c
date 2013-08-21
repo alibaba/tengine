@@ -339,6 +339,12 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
                 cl->buf->last_buf = 1;
 
                 *ll = cl;
+                ll = &cl->next;
+
+            }  else {
+                if (ln->next == NULL) {
+                    *ll = NULL;
+                }
             }
 
         } else {
