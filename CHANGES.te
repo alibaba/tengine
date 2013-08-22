@@ -1,4 +1,26 @@
 
+Changes with Tengine 1.5.1                                       23 Aug 2013
+
+    *) Feature: added the directive retry_cached_connection which could
+       disable the unconditional retry with the cached backend connection.       
+       (yaoweibin)
+
+    *) Feature: added the argument of ncpu to directive sysguard_load.
+       (yzprofile)
+
+    *) Bugfix: fixed the regrex rule in referer module might be invalid
+       with https request. (Liangbin Li)
+
+    *) Bugfix: fixed a bug that the trim module might issue zero size buffer.
+       (taoyuanyuan)
+
+    *) Bugfix: fixed a compile error when using the configure option
+       --without-dso. (zhuzhaoyuan)
+
+    *) Bugfix: fixed the compile warning above GCC-4.6. (zzjin)
+      
+
+
 Changes with Tengine 1.5.0                                       31 Jul 2013
 
     *) Feature: added ABI compatibility verification for DSO modules.
