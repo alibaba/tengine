@@ -10,6 +10,7 @@ Features
 --------
 * All features of nginx-1.2.9 are inherited, i.e., it is 100% compatible with nginx.
 * Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
+* Sends unbuffered upload directly to HTTP and FastCGI backend servers, which saves disk I/Os.
 * More load balancing methods, e.g., consistent hashing, and session persistence.
 * Input body filter support. It's quite handy to write Web Application Firewalls using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and makes it easy to extend core functionalities.
@@ -17,6 +18,7 @@ Features
 * Includes a mechanism to support standalone processes.
 * Protects the server in case system load or memory use goes too high.
 * Multiple CSS or JavaScript requests can be combined into one request to reduce download time.
+* Removes unnecessary white spaces and comments to reduce the size of a page.
 * Proactive health checks of upstream servers can be performed.
 * The number of worker processes and CPU affinities can be set automatically.
 * The limit_req module is enhanced with whitelist support and more conditions are allowed in a single location.
