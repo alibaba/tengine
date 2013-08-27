@@ -1,5 +1,5 @@
 
-Changes with Tengine 1.5.1                                       26 Aug 2013
+Changes with Tengine 1.5.1                                       28 Aug 2013
 
     *) Feature: added the directive retry_cached_connection which could
        disable the unconditional retry with the cached backend connection.       
@@ -18,6 +18,8 @@ Changes with Tengine 1.5.1                                       26 Aug 2013
        --without-dso. (zhuzhaoyuan)
 
     *) Bugfix: fixed the compile warning in GCC-4.6+. (zzjin)
+
+    *) Bugfix: fixed a compile warning in lua module. (diwayou)
       
 
 

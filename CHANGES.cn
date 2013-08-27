@@ -1,11 +1,12 @@
 
-Tengine-1.5.1 [2013-08-26]
+Tengine-1.5.1 [2013-08-28]
 * Feature: 增加retry_cached_connection指令，可以关闭对后端长连接的无条件重试 [yaoweibin]
 * Feature: sysguard模块的sysguard_load指令中加入ncpu参数 [yzprofile]
 * Bugfix：修复referer模块在https协议时正则匹配失效的问题 [lilbedwin]
 * Bugfix：修复trim模块可能生产0长度块的问题 [taoyuanyuan]
 * Bugfix：修复在使用--without-dso选项时出现的编译错误 [zhuzhaoyuan]
 * Bugfix：修复在GCC-4.6以上版本出现的一个编译警告 [zzjin]
+* Bugfix：修复lua模块的一个编译警告 [diwayou]
 
 Tengine-1.5.0 [2013-07-31]
 * Feature: 增加DSO（动态模块加载）兼容性校验机制 [monadbobo]
