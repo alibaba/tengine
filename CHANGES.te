@@ -1,27 +1,24 @@
 
-Changes with Tengine 1.5.1                                       28 Aug 2013
+Changes with Tengine 1.5.1                                       29 Aug 2013
 
-    *) Feature: added the directive retry_cached_connection which could
-       disable the unconditional retry with the cached backend connection.       
+    *) Feature: added the directive 'retry_cached_connection' which could
+       disable unconditional retries with a cached backend connection.
        (yaoweibin)
 
-    *) Feature: added the argument of ncpu to directive sysguard_load.
+    *) Feature: added the argument of 'ncpu' to 'sysguard_load' directive.
        (yzprofile)
 
-    *) Bugfix: fixed the regrex rule in referer module might be invalid
-       with https request. (lilbedwin)
+    *) Bugfix: fixed a bug in referer module that regex rules might be
+       invalid with https requests. (lilbedwin)
 
-    *) Bugfix: fixed a bug that the trim module might issue zero size buffer.
-       (taoyuanyuan)
+    *) Bugfix: fixed a bug that the trim module might send a zero-size
+       buffer. (taoyuanyuan)
 
     *) Bugfix: fixed a compile error when using the configure option
-       --without-dso. (zhuzhaoyuan)
+       '--without-dso'. (zhuzhaoyuan)
 
-    *) Bugfix: fixed the compile warning in GCC-4.6+. (zzjin)
-
-    *) Bugfix: fixed a compile warning in lua module. (diwayou)
+    *) Bugfix: fixed two compile warnings. (zzjin, diwayou) 
       
-
 
 Changes with Tengine 1.5.0                                       31 Jul 2013
 
