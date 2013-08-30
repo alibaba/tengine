@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -485,6 +484,13 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_proxy_loc_conf_t, upstream.next_upstream),
       &ngx_http_proxy_next_upstream_masks },
+
+    { ngx_string("proxy_upstream_tries"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.tries),
+      NULL },
 
     { ngx_string("proxy_pass_header"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -2725,6 +2731,8 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->redirect = NGX_CONF_UNSET;
     conf->upstream.change_buffering = 1;
 
+    conf->upstream.tries = NGX_CONF_UNSET_UINT;
+
     conf->cookie_domains = NGX_CONF_UNSET_PTR;
     conf->cookie_paths = NGX_CONF_UNSET_PTR;
 
@@ -2984,6 +2992,9 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->method.data[conf->method.len] = ' ';
         conf->method.len++;
     }
+
+    ngx_conf_merge_uint_value(conf->upstream.tries,
+                              prev->upstream.tries, NGX_CONF_UNSET_UINT);
 
     ngx_conf_merge_value(conf->upstream.pass_request_headers,
                               prev->upstream.pass_request_headers, 1);
