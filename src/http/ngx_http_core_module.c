@@ -2448,6 +2448,8 @@ ngx_http_subrequest(ngx_http_request_t *r,
     c = r->connection;
     sr->connection = c;
 
+    sr->us_tries = 1;
+
     sr->ctx = ngx_pcalloc(r->pool, sizeof(void *) * ngx_http_max_module);
     if (sr->ctx == NULL) {
         return NGX_ERROR;

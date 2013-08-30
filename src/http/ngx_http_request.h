@@ -439,6 +439,8 @@ struct ngx_http_request_s {
 
     ngx_uint_t                        err_status;
 
+    ngx_uint_t                        us_tries;
+
     ngx_http_connection_t            *http_connection;
 
     ngx_http_log_handler_pt           log_handler;
