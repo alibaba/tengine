@@ -3307,10 +3307,9 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     uscf = u->conf->upstream;
 
-    if (uscf->next_upstream_tries != NGX_CONF_UNSET_UINT
-        && uscf->next_upstream_tries <= ++u->tries)
+    if (uscf->next_upstream_tries != 0
+        && ++u->tries >= uscf->next_upstream_tries)
     {
-
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "next upstream tries is more than %ui",
                       uscf->next_upstream_tries);
@@ -5167,6 +5166,10 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 
         if (init(cf, uscfp[i]) != NGX_OK) {
             return NGX_CONF_ERROR;
+        }
+
+        if (uscfp[i]->next_upstream_tries == NGX_CONF_UNSET_UINT) {
+            uscfp[i]->next_upstream_tries = 0;
         }
     }
 
