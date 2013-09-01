@@ -3178,9 +3178,8 @@ static void
 ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t ft_type)
 {
-    ngx_uint_t                      status, state, i, n;
+    ngx_uint_t                      status, state;
     ngx_http_core_loc_conf_t       *clcf;
-    ngx_http_upstream_server_t     *server;
     ngx_http_upstream_srv_conf_t   *uscf;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -3308,22 +3307,16 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     uscf = u->conf->upstream;
 
-    if (uscf->next_upstream_tries != NGX_CONF_UNSET_UINT) {
-        server = uscf->servers->elts;
+    if (uscf->next_upstream_tries != NGX_CONF_UNSET_UINT
+        && uscf->next_upstream_tries <= ++u->tries)
+    {
 
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "next upstream tries is more than %ui",
+                      uscf->next_upstream_tries);
 
-        for (n = 0, i = 0; i < uscf->servers->nelts; i++) {
-            n += server[i].naddrs;
-        }
-
-        if (uscf->next_upstream_tries + u->peer.tries <= n) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "next upstream tries is more than %ui",
-                          uscf->next_upstream_tries);
-
-            ngx_http_upstream_finalize_request(r, u, status);
-            return;
-        }
+        ngx_http_upstream_finalize_request(r, u, status);
+        return;
     }
 
     ngx_http_upstream_connect(r, u);

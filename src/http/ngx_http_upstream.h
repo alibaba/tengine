@@ -333,6 +333,8 @@ struct ngx_http_upstream_s {
     ngx_str_t                        schema;
     ngx_str_t                        uri;
 
+    ngx_uint_t                       tries;
+
     ngx_http_cleanup_pt             *cleanup;
 
     unsigned                         store:1;
