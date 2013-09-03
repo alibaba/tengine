@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(8)
+my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(58)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -114,5 +114,166 @@ like(http_get('/t6?a=123456&b=123456'), qr/^HTTP.*516/,
 
 like(http_get('/t6?a=123456&b=654321'), qr/^HTTP.*516/,
     "arg_a less than or equal arg_b");
+
+###############################################################################
+
+like(http_get('/t1?a=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t2?a=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t3?a=9223372036854775808&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t3?a=1&b=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t4?a=9223372036854775808&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t4?a=1&b=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t5?a=9223372036854775808&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t5?a=1&b=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t6?a=9223372036854775808&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+like(http_get('/t6?a=1&b=9223372036854775808'), qr/^HTTP.*200/,
+    "ngx_atoi error due to beyond the max ngx_int_t, get false");
+
+###############################################################################
+
+like(http_get('/t1?a=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t2?a=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t3?a=-123&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t3?a=1&b=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t4?a=-123&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t4?a=1&b=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t5?a=-123&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t5?a=1&b=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t6?a=-123&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+like(http_get('/t6?a=1&b=-123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to negative, get false");
+
+###############################################################################
+
+like(http_get('/t1?a=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t2?a=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t3?a=123abc&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t3?a=1&b=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t4?a=123abc&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t4?a=1&b=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t5?a=123abc&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t5?a=1&b=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t6?a=123abc&b=1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+like(http_get('/t6?a=1&b=123abc'), qr/^HTTP.*200/,
+    "ngx_atoi error due to invalid number, get false");
+
+###############################################################################
+
+like(http_get('/t1'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t2'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t3?a=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t3?b=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t4?a=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t4?b=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t5?a=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t5?b=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t6?a=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+like(http_get('/t6?b=123'), qr/^HTTP.*200/,
+    "ngx_atoi error due to empty variable, get false");
+
+###############################################################################
+
+like(http_get('/t1?a=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t2?a=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t3?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t3?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t4?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t4?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t5?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t5?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t6?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
+like(http_get('/t6?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+    "ngx_atoi error due to space, get false");
+
 
 ###############################################################################
