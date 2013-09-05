@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -36,6 +35,9 @@ static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_decode_base64(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+
 #if (NGX_HAVE_TCP_INFO)
 static ngx_int_t ngx_http_variable_tcpinfo(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -376,6 +378,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("time_local"), NULL, ngx_http_variable_time_local,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
+    { ngx_string("decode_base64_"), NULL, ngx_http_variable_decode_base64,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
 #if (NGX_HAVE_TCP_INFO)
     { ngx_string("tcpinfo_rtt"), NULL, ngx_http_variable_tcpinfo,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
@@ -674,6 +679,16 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
     if (ngx_strncmp(name->data, "sent_cookie_", 12) == 0) {
 
         if (ngx_http_variable_sent_cookie(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
+    if (ngx_strncmp(name->data, "decode_base64_", 14) == 0) {
+
+        if (ngx_http_variable_decode_base64(r, vv, (uintptr_t) name) == NGX_OK)
+        {
             return vv;
         }
 
@@ -1101,6 +1116,69 @@ ngx_http_variable_argument(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
     v->data = value.data;
     v->len = value.len;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_decode_base64(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_str_t *name = (ngx_str_t *) data;
+
+    size_t                      len;
+    u_char                     *low, *p;
+    ngx_str_t                   var, src;
+    ngx_uint_t                  hash;
+    ngx_http_variable_value_t  *vv;
+
+    len = name->len - (sizeof("decode_base64_") - 1);
+
+    low = ngx_pnalloc(r->pool, len);
+    if (low == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = name->data + sizeof("decode_base64_") - 1;
+
+    hash = ngx_hash_strlow(low, p, len);
+
+    var.len = len;
+    var.data = low;
+
+    vv = ngx_http_get_variable(r, &var, hash);
+
+    if (vv == NULL || vv->not_found) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    src.data = vv->data;
+    src.len = vv->len;
+
+    var.len = ngx_base64_decoded_length(src.len);
+    var.data = ngx_palloc(r->pool, var.len);
+    if (var.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_decode_base64(&var, &src) != NGX_OK) {
+
+        v->data = src.data;
+        v->len = src.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+
+    v->data = var.data;
+    v->len = var.len;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
@@ -2759,6 +2837,13 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
         if (ngx_strncmp(v[i].name.data, "sent_cookie_", 12) == 0) {
             v[i].get_handler = ngx_http_variable_sent_cookie;
+            v[i].data = (uintptr_t) &v[i].name;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "decode_base64_", 14) == 0) {
+            v[i].get_handler = ngx_http_variable_decode_base64;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
