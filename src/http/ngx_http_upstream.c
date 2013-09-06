@@ -295,6 +295,13 @@ static ngx_command_t  ngx_http_upstream_commands[] = {
       0,
       NULL },
 
+    { ngx_string("next_upstream_tries"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_srv_conf_t, next_upstream_tries),
+      NULL },
+
       ngx_null_command
 };
 
@@ -3171,8 +3178,9 @@ static void
 ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t ft_type)
 {
-    ngx_uint_t                 status, state;
-    ngx_http_core_loc_conf_t  *clcf;
+    ngx_uint_t                      status, state;
+    ngx_http_core_loc_conf_t       *clcf;
+    ngx_http_upstream_srv_conf_t   *uscf;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http next upstream, %xi", ft_type);
@@ -3296,6 +3304,19 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         return;
     }
 #endif
+
+    uscf = u->conf->upstream;
+
+    if (uscf->next_upstream_tries != 0
+        && ++u->tries >= uscf->next_upstream_tries)
+    {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "next upstream tries is more than %ui",
+                      uscf->next_upstream_tries);
+
+        ngx_http_upstream_finalize_request(r, u, status);
+        return;
+    }
 
     ngx_http_upstream_connect(r, u);
 }
@@ -4792,6 +4813,8 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
     uscf->port = u->port;
     uscf->default_port = u->default_port;
 
+    uscf->next_upstream_tries = NGX_CONF_UNSET_UINT;
+
     if (u->naddrs == 1) {
         uscf->servers = ngx_array_create(cf->pool, 1,
                                          sizeof(ngx_http_upstream_server_t));
@@ -5143,6 +5166,10 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 
         if (init(cf, uscfp[i]) != NGX_OK) {
             return NGX_CONF_ERROR;
+        }
+
+        if (uscfp[i]->next_upstream_tries == NGX_CONF_UNSET_UINT) {
+            uscfp[i]->next_upstream_tries = 0;
         }
     }
 

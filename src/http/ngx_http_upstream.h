@@ -124,6 +124,7 @@ struct ngx_http_upstream_srv_conf_s {
     ngx_uint_t                       line;
     in_port_t                        port;
     in_port_t                        default_port;
+    ngx_uint_t                       next_upstream_tries;
 };
 
 
@@ -331,6 +332,8 @@ struct ngx_http_upstream_s {
     ngx_str_t                        method;
     ngx_str_t                        schema;
     ngx_str_t                        uri;
+
+    ngx_uint_t                       tries;
 
     ngx_http_cleanup_pt             *cleanup;
 
