@@ -603,6 +603,8 @@ ngx_limit_tcp_mail_get_addr_index(ngx_listening_t *ls, struct sockaddr *addr,
     ngx_mail_in6_addr_t  *maddr6;
 #endif
 
+    port = ls->servers;
+
     switch (ls->sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)

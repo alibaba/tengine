@@ -1,7 +1,7 @@
-## Description
-This module can limit the concurrent number and frequency with each ip address when accepting new connections. And you can add black and white lists for specific IPs. It's flexible and useful to protect https and mail applications.
+## 描述
+这个模块用来限制用户的并发数以及针对每个用户源ip创建新连接的频率。你也可以通过添加黑白名单的方式来指定IP进行控制。这个模块对于保护HTTPS服务和MAIL服务很有效。
 
-### Config Sample
+### 配置示例
 
     error_log logs/error.log debug;
     worker_processes 1;
@@ -41,7 +41,7 @@ This module can limit the concurrent number and frequency with each ip address w
     }
 
 
-## Directives
+## 指令
 
 Syntax: **limit_tcp name:size addr:port [rate= burst= nodelay] [concurrent=]**
 
@@ -49,9 +49,9 @@ Default: `none`
 
 Context: `main`
 
-Sets a shared memory zone and the maximum burst size of requests. If the rate of requests exceeds the rate configured for a zone, their processing is delayed such that requests are processed at a defined rate. Excessive requests are delayed until their number exceeds the maximum burst size or out of maximum concurrent in which case the request is closed after accepted.
+设置一个共享内存空间和它最大能允许通过的请求频率。如果请求的频率超出了配置的值，那么它将会被延迟处理。如果被延迟的请求数目也超出了burst的配置，那么这个连接将会在创建之后立刻被关闭。
 
-For example, the directives
+例子:
 
     limit_tcp 8080 8081 rate=1r/m burst=100 name=share_mem:10M concurrent=10;
 
@@ -62,7 +62,7 @@ Default: `none`
 
 Context: `main`
 
-Allows access for the specified network or address.
+允许指定的网段或者ip通过。
 
 
 Syntax: **limit_tcp_deny address | CIDR | all**
@@ -71,4 +71,4 @@ Default: `none`
 
 Context: `main`
 
-Denies access for the specified network or address.
+拒绝指定的网段或者ip。
