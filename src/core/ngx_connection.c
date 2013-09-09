@@ -82,6 +82,10 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     ls->setfib = -1;
 #endif
 
+#if (NGX_HAVE_REUSEPORT)
+    ls->reuse_port = 0;
+#endif
+
     return ls;
 }
 
@@ -342,25 +346,29 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
             if (ecf->reuse_port) {
 
-                if ((ngx_process == NGX_PROCESS_SIGNALLER
-                    || ngx_process == NGX_PROCESS_WORKER
-                    || !ngx_is_init_cycle(cycle->old_cycle))
-                    && setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
-                                  (const void *) &reuse, sizeof(int))
-                    == -1)
+                if (ngx_process == NGX_PROCESS_SIGNALLER
+                    || !ngx_is_init_cycle(cycle->old_cycle) || ls[i].reuse_port)
                 {
-                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  "setsockopt(SO_REUSEPORT) %V failed",
-                                  &ls[i].addr_text);
-
-                    if (ngx_close_socket(s) == -1) {
+                    if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                                  (const void *) &reuse, sizeof(int))
+                       == -1)
+                    {
                         ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                      ngx_close_socket_n " %V failed",
-                                      &ls[i].addr_text);
+                            "setsockopt(SO_REUSEPORT) %V failed",
+                                     &ls[i].addr_text);
+
+                        if (ngx_close_socket(s) == -1) {
+                            ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                ngx_close_socket_n " %V failed",
+                                         &ls[i].addr_text);
+                        }
+
+                        return NGX_ERROR;
                     }
 
-                    return NGX_ERROR;
+                    ls[i].reuse_port = 1;
                 }
+
             }
 #endif
 
@@ -465,6 +473,21 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ecf->reuse_port && !ls[i].reuse_port) {
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                failed = 1;
+                ls[i].reuse_port = 1;
+                continue;
+            }
+#endif
 
             ls[i].listen = 1;
 
