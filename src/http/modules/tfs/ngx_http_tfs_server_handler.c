@@ -49,8 +49,8 @@ ngx_http_tfs_process_rs(ngx_http_tfs_t *t)
     }
 
     rc = ngx_http_tfs_root_server_parse_message(t);
-    if (rc == NGX_ERROR) {
-        return NGX_ERROR;
+    if (rc != NGX_OK) {
+        return rc;
     }
 
     t->state += 1;
@@ -593,6 +593,9 @@ ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
             if (t->is_stat_dup_file) {
                 t->state = NGX_HTTP_TFS_STATE_WRITE_STAT_DUP_FILE;
 
+            } else if (t->is_rolling_back) {
+                t->state = NGX_HTTP_TFS_STATE_WRITE_DELETE_DATA;
+
             } else {
                 if (!t->parent
                     && (t->r_ctx.version == 2
@@ -937,6 +940,14 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
 
             /* small file or large_file meta segment */
             if (t->r_ctx.version == 1) {
+                /* client abort need roll back, remove all segments written */
+                if (t->client_abort) {
+                    t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+                    t->is_rolling_back = NGX_HTTP_TFS_YES;
+                    t->file.segment_index = 0;
+                    return NGX_OK;
+                }
+
                 t->state = NGX_HTTP_TFS_STATE_WRITE_DONE;
                 rc = ngx_http_tfs_set_output_file_name(t);
                 if (rc == NGX_ERROR) {
@@ -954,6 +965,25 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
                 }
                 return NGX_DONE;
             }
+            break;
+
+         /* is rolling back */
+         case NGX_HTTP_TFS_STATE_WRITE_DELETE_DATA:
+             t->file.segment_index++;
+             if (t->file.segment_index >= t->file.segment_count) {
+                 if (t->client_abort) {
+                     return NGX_HTTP_CLIENT_CLOSED_REQUEST;
+                 }
+
+                 if (t->request_timeout) {
+                     return NGX_HTTP_REQUEST_TIME_OUT;
+                 }
+
+                 return NGX_ERROR;
+             }
+
+             t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+             return NGX_OK;
         }
         break;
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
@@ -1147,7 +1177,16 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
                 /* large_file meta segment */
                 if (t->is_large_file && t->is_process_meta_seg) {
                     /* ready to read data segments */
+                    *(t->meta_segment_data->buf) = *b;
+                    /* reset buf pos to get whole file data */
+                    t->meta_segment_data->buf->pos = t->meta_segment_data->buf->start;
                     rc = ngx_http_tfs_get_segment_for_read(t);
+                    if (rc == NGX_ERROR) {
+                        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                                      "get segment for read failed");
+                        return NGX_ERROR;
+                    }
+
                     if (rc == NGX_DONE) {
                         /* pread and start_offset > file size */
                         t->state = NGX_HTTP_TFS_STATE_READ_DONE;
@@ -1219,9 +1258,16 @@ ngx_http_tfs_process_ds_read(ngx_http_tfs_t *t)
                     return NGX_DECLINED;
                 }
                 if (t->is_large_file) {
+                    *(t->meta_segment_data->buf) = t->tfs_peer->body_buffer;
+                    /* reset buf pos to get whole file data */
+                    t->meta_segment_data->buf->pos = t->meta_segment_data->buf->start;
                     rc = ngx_http_tfs_get_segment_for_delete(t);
+                    if (rc == NGX_ERROR) {
+                        ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                                      "get segment for delete failed");
+                        return NGX_ERROR;
+                    }
                     t->is_process_meta_seg = NGX_HTTP_TFS_NO;
-
                     /* later will be alloc */
                     ngx_memzero(&t->tfs_peer->body_buffer, sizeof(ngx_buf_t));
                     t->state = NGX_HTTP_TFS_STATE_REMOVE_DELETE_DATA;

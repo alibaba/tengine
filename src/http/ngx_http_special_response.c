@@ -69,15 +69,19 @@ static u_char ngx_http_server_info_tail[] =
 ;
 
 
-static u_char ngx_http_error_full_tail[] =
-"<hr/>Powered by " TENGINE_VER CRLF
-"</body>" CRLF
-"</html>" CRLF
-;
+static u_char ngx_http_error_banner[] =
+"<hr/>Powered by " TENGINE;
+
+
+static u_char ngx_http_error_full_banner[] =
+"<hr/>Powered by " TENGINE_VER;
+
+
+static u_char ngx_http_error_powered_by[] =
+"<hr/>Powered by ";
 
 
 static u_char ngx_http_error_tail[] =
-"<hr/>Powered by Tengine" CRLF
 "</body>" CRLF
 "</html>" CRLF
 ;
@@ -699,37 +703,40 @@ static ngx_int_t
 ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err)
 {
-    u_char       *tail;
-    size_t        len;
     ngx_int_t     rc;
     ngx_buf_t    *b, *ib;
     ngx_uint_t    i, msie_padding;
-    ngx_chain_t   out[5];
-
-    ib = NULL;
+    ngx_chain_t   out[7];
 
     if (clcf->server_info && err >= NGX_HTTP_OFF_4XX) {
         ib = ngx_http_set_server_info(r);
         if (ib == NULL) {
             return NGX_ERROR;
         }
-    }
-
-    if (clcf->server_tokens) {
-        len = sizeof(ngx_http_error_full_tail) - 1;
-        tail = ngx_http_error_full_tail;
 
     } else {
-        len = sizeof(ngx_http_error_tail) - 1;
-        tail = ngx_http_error_tail;
+        ib = NULL;
     }
 
     msie_padding = 0;
 
     if (ngx_http_error_pages[err].len) {
         r->headers_out.content_length_n = sizeof(ngx_http_error_doctype) - 1
-                                          + ngx_http_error_pages[err].len + len
-                                          + (ib ? (ib->last - ib->pos) : 0);
+                                          + ngx_http_error_pages[err].len
+                                          + (ib ? (ib->last - ib->pos) : 0)
+                                          + sizeof(ngx_http_error_tail) - 1;
+
+        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+            r->headers_out.content_length_n += clcf->server_tokens
+                ? sizeof(ngx_http_error_full_banner) - 1
+                : sizeof(ngx_http_error_banner) - 1;
+
+        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+            r->headers_out.content_length_n += sizeof(ngx_http_error_powered_by)
+                                               - 1;
+            r->headers_out.content_length_n += clcf->server_tag.len;
+        }
+
         if (clcf->msie_padding
             && (r->headers_in.msie || r->headers_in.chrome)
             && r->http_version >= NGX_HTTP_VERSION_10
@@ -800,6 +807,57 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         i++;
     }
 
+    if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+        b = ngx_calloc_buf(r->pool);
+        if (b == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->memory = 1;
+
+        if (clcf->server_tokens) {
+            b->pos = ngx_http_error_full_banner;
+            b->last = ngx_http_error_full_banner
+                      + sizeof(ngx_http_error_full_banner) - 1;
+
+        } else {
+            b->pos = ngx_http_error_banner;
+            b->last = ngx_http_error_banner + sizeof(ngx_http_error_banner) - 1;
+        }
+
+        out[i].buf = b;
+        out[i].next = &out[i + 1];
+        i++;
+
+    } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+        b = ngx_calloc_buf(r->pool);
+        if (b == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->memory = 1;
+        b->pos = ngx_http_error_powered_by;
+        b->last = ngx_http_error_powered_by
+                  + sizeof(ngx_http_error_powered_by) - 1;
+
+        out[i].buf = b;
+        out[i].next = &out[i + 1];
+        i++;
+
+        b = ngx_calloc_buf(r->pool);
+        if (b == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->memory = 1;
+        b->pos = clcf->server_tag.data;
+        b->last = clcf->server_tag.data + clcf->server_tag.len;
+
+        out[i].buf = b;
+        out[i].next = &out[i + 1];
+        i++;
+    }
+
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
         return NGX_ERROR;
@@ -807,8 +865,8 @@ ngx_http_send_special_response(ngx_http_request_t *r,
 
     b->memory = 1;
 
-    b->pos = tail;
-    b->last = tail + len;
+    b->pos = ngx_http_error_tail;
+    b->last = ngx_http_error_tail + sizeof(ngx_http_error_tail) - 1;
 
     out[i].buf = b;
     out[i].next = NULL;

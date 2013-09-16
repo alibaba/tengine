@@ -106,10 +106,13 @@ NGX_ALL_MODULES="
     ngx_http_mp4_module
     ngx_http_slice_module
     ngx_http_concat_module
+    ngx_http_tfs_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
-    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_keepalive_module
+    ngx_http_upstream_check_module
+    ngx_http_upstream_session_sticky_module
+    ngx_http_upstream_consistent_hash_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
     ngx_http_header_filter_module
@@ -125,6 +128,7 @@ NGX_ALL_MODULES="
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
     ngx_http_footer_filter_module
+    ngx_http_trim_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -146,6 +150,45 @@ NGX_SHARED_SRCS=
 NGX_SHARED_LIBS=
 NGX_SHARED_PATH=
 NGX_DSO_ALL_TARGETS=
+
+
+NGX_DSO_ABI_ALL_TAG="
+    with-debug
+    with-http
+    with-http-cache
+    with-ipv6
+    with-syslog
+    with-http-gzip
+    with-http-gzip-satic
+    with-http-ssi
+    with-http-dav
+    with-http-realip
+    with-http-geoip
+    with-http-geo
+    with-http-ssl
+    with-http-proxy
+    with-http-degradation
+    with-http-upstream-check
+    with-http-stat-stub"
+
+NGX_DSO_ABI_COMPATIBILITY=0x00000000
+NGX_DSO_DEBUG_TAG=0x00000001
+NGX_DSO_HTTP_TAG=0x00000002
+NGX_DSO_CACHE_TAG=0x00000004
+NGX_DSO_IPV6_TAG=0x00000008
+NGX_DSO_SYSLOG_TAG=0x00000010
+NGX_DSO_GZIP_TAG=0x00000020
+NGX_DSO_GZIP_STATIC_TAG=0x00000040
+NGX_DSO_SSI_TAG=0x00000080
+NGX_DSO_DAV_TAG=0x00000100
+NGX_DSO_REALIP_TAG=0x00000200
+NGX_DSO_GEOIP_TAG=0x00000400
+NGX_DSO_GEO_TAG=0x00000800
+NGX_DSO_SSL_TAG=0x00001000
+NGX_DSO_PROXY_TAG=0x00002000
+NGX_DSO_DEGRADATION_TAG=0x00004000
+NGX_DSO_UPSTREAM_CHECK_TAG=0x00008000
+NGX_DSO_STAT_STUB_TAG=0x00010000
 
 
 HTTP=YES
@@ -203,6 +246,7 @@ HTTP_MP4=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
+HTTP_TRIM=YES
 HTTP_USER_AGENT=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
@@ -232,6 +276,7 @@ HTTP_MP4_SHARED=NO
 HTTP_CHARSET_SHARED=NO
 HTTP_USERID_SHARED=NO
 HTTP_FOOTER_SHARED=NO
+HTTP_TRIM_SHARED=NO
 HTTP_ACCESS_SHARED=NO
 HTTP_AUTOINDEX_SHARED=NO
 HTTP_STATUS_SHARED=NO
@@ -446,6 +491,8 @@ do
                                                    HTTP_USERID=NO                    ;;
         --with-http_footer_filter_module=shared)   HTTP_FOOTER_SHARED=YES
                                                    HTTP_FOOTER=NO                    ;;
+        --with-http_trim_filter_module=shared)     HTTP_TRIM_SHARED=YES
+                                                   HTTP_TRIM=NO                    ;;
         --with-http_access_module=shared)          HTTP_ACCESS_SHARED=YES
                                                    HTTP_ACCESS=NO                    ;;
         --with-http_autoindex_module=shared)       HTTP_AUTOINDEX_SHARED=YES
@@ -496,8 +543,10 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO
                                          HTTP_USERID_SHARED=NO      ;;
-        --without-http_footer_module)    HTTP_FOOTER=NO
-                                         HTTP_FOOTER_SHARED=NO      ;;
+        --without-http_footer_filter_module) HTTP_FOOTER=NO
+                                             HTTP_FOOTER_SHARED=NO  ;;
+        --without-http_trim_filter_module) HTTP_TRIM=NO
+                                           HTTP_TRIM_SHARED=NO  ;;
         --without-http_access_module)    HTTP_ACCESS=NO
                                          HTTP_ACCESS_SHARED=NO      ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
@@ -719,6 +768,8 @@ cat << END
                                      enable ngx_http_userid_filter_module (shared)
   --with-http_footer_filter_module=shared
                                      enable ngx_http_footer_filter_module (shared)
+  --with-http_trim_filter_module=shared
+                                     enable ngx_http_trim_filter_module (shared)
   --with-http_access_module=shared   enable ngx_http_access_module (shared)
   --with-http_autoindex_module=shared
                                      enable ngx_http_autoindex_module (shared)
@@ -755,6 +806,7 @@ cat << END
   --without-http_userid_module       disable ngx_http_userid_filter_module
   --without-http_footer_filter_module
                                      disable ngx_http_footer_filter_module
+  --without-http_trim_filter_module  disable ngx_http_trim_filter_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
@@ -894,6 +946,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_CHARSET_SHARED=YES
     HTTP_USERID_SHARED=YES
     HTTP_FOOTER_SHARED=YES
+    HTTP_TRIM_SHARED=YES
     HTTP_ACCESS_SHARED=YES
     HTTP_AUTOINDEX_SHARED=YES
     HTTP_MAP_SHARED=YES
@@ -929,6 +982,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_CHARSET=NO
     HTTP_USERID=NO
     HTTP_FOOTER=NO
+    HTTP_TRIM=NO
     HTTP_ACCESS=NO
     HTTP_AUTOINDEX=NO
     HTTP_MAP=NO
@@ -994,6 +1048,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_GZIP_STATIC=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
+    HTTP_TRIM=YES
     HTTP_USER_AGENT=YES
     HTTP_UPSTREAM_CHECK=YES
     HTTP_UPSTREAM_LEAST_CONN=YES
@@ -1016,6 +1071,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CHARSET_SHARED=NO
     HTTP_USERID_SHARED=NO
     HTTP_FOOTER_SHARED=NO
+    HTTP_TRIM_SHARED=NO
     HTTP_ACCESS_SHARED=NO
     HTTP_AUTOINDEX_SHARED=NO
     HTTP_STATUS_SHARED=NO
@@ -1054,6 +1110,17 @@ if [ $HTTP = NO ]; then
     HTTP_PROXY=NO
     HTTP_FASTCGI=NO
     HTTP_FASTCGI_SHARED=NO
+
+fi
+
+
+if [ $NGX_DEBUG = YES ]; then
+    NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_DEBUG_TAG))
+fi
+
+
+if [ $NGX_IPV6 = YES ]; then
+    NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_IPV6_TAG))
 fi
 
 

@@ -153,7 +153,7 @@ struct  ngx_http_tfs_main_conf_s {
     ngx_msec_t                     tfs_read_timeout;
 
     ngx_msec_t                     tair_timeout;
-    ngx_http_tfs_tair_instance_t   dup_instances[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
+    ngx_http_tfs_tair_instance_t  dup_instances[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
 
     size_t                         send_lowat;
     size_t                         buffer_size;
@@ -348,6 +348,8 @@ struct ngx_http_tfs_s {
     unsigned                       is_process_meta_seg:1;
     unsigned                       retry_curr_ns:1;
     unsigned                       request_timeout:1;
+    unsigned                       client_abort:1;
+    unsigned                       is_rolling_back:1;
 };
 
 

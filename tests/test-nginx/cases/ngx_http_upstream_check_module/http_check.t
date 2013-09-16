@@ -16,7 +16,7 @@ __DATA__
     upstream test{
         server 127.0.0.1:1970;
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -45,7 +45,7 @@ GET /
         server 127.0.0.1:1971;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -54,7 +54,7 @@ GET /
         server www.taobao.com:81;
 
         check interval=3000 rise=1 fall=5 timeout=2000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -83,7 +83,7 @@ GET /
         server 127.0.0.1:1971;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET /foo HTTP/1.0\r\n\r\n";
+        check_http_send "GET /foo HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -138,7 +138,7 @@ GET /
         server 127.0.0.1:1971;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -167,7 +167,7 @@ GET /
         ip_hash;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -197,7 +197,7 @@ GET /
         ip_hash;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -227,7 +227,7 @@ GET /
         ip_hash;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET /foo HTTP/1.0\r\n\r\n";
+        check_http_send "GET /foo HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -284,7 +284,7 @@ GET /
         ip_hash;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -314,7 +314,7 @@ GET /
         ip_hash;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -332,7 +332,7 @@ GET /
 --- config
     location / {
         set $test "/";
-        proxy_pass http://blog.163.com$test;
+        proxy_pass http://www.taobao.com$test;
     }
 
 --- request
@@ -346,7 +346,7 @@ GET /
         least_conn;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -376,7 +376,7 @@ GET /
         least_conn;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -406,7 +406,7 @@ GET /
         least_conn;
 
         check interval=3000 rise=1 fall=1 timeout=1000 type=http;
-        check_http_send "GET /foo HTTP/1.0\r\n\r\n";
+        check_http_send "GET /foo HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -460,7 +460,7 @@ GET /
     upstream test{
         server 127.0.0.1:1970;
         check interval=2000 rise=1 fall=1 timeout=1000 type=http port=1971;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -488,7 +488,7 @@ GET /
     upstream test{
         server 127.0.0.1:1971;
         check interval=3000 rise=1 fall=1 timeout=1000 type=http port=1970;
-        check_http_send "GET / HTTP/1.0\r\n\r\n";
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
@@ -511,3 +511,30 @@ GET /
 --- error_code: 502
 --- response_body_like: ^.*$
 
+=== TEST 18: the http_check with check_keepalive_requests configured
+--- http_config
+    upstream test{
+        server 127.0.0.1:1970;
+        check_keepalive_requests 10;
+        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$

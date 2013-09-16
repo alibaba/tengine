@@ -567,7 +567,8 @@ invalid:
 
 
 static char *
-ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
 {
     ngx_http_upstream_srv_conf_t            *uscf;
     ngx_http_upstream_keepalive_srv_conf_t  *kcf;

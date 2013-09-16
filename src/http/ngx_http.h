@@ -27,11 +27,11 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 
 #include <ngx_http_variables.h>
 #include <ngx_http_request.h>
+#include <ngx_http_script.h>
 #include <ngx_http_upstream.h>
 #include <ngx_http_upstream_round_robin.h>
 #include <ngx_http_config.h>
 #include <ngx_http_busy_lock.h>
-#include <ngx_http_script.h>
 #include <ngx_http_core_module.h>
 
 #if (NGX_HTTP_CACHE)
@@ -120,6 +120,8 @@ ngx_int_t ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags);
 
 ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
+ngx_int_t ngx_http_do_read_non_buffered_client_request_body(
+    ngx_http_request_t *r);
 
 ngx_int_t ngx_http_send_header(ngx_http_request_t *r);
 ngx_int_t ngx_http_special_response_handler(ngx_http_request_t *r,

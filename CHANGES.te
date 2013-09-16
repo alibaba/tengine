@@ -1,4 +1,55 @@
 
+Changes with Tengine 1.5.1                                       29 Aug 2013
+
+    *) Feature: added the directive 'retry_cached_connection' which could
+       disable unconditional retries with a cached backend connection.
+       (yaoweibin)
+
+    *) Feature: added the argument of 'ncpu' to 'sysguard_load' directive.
+       (yzprofile)
+
+    *) Bugfix: fixed a bug in referer module that regex rules might be
+       invalid with https requests. (lilbedwin)
+
+    *) Bugfix: fixed a bug that the trim module might send a zero-size
+       buffer. (taoyuanyuan)
+
+    *) Bugfix: fixed a compile error when using the configure option
+       '--without-dso'. (zhuzhaoyuan)
+
+    *) Bugfix: fixed two compile warnings. (zzjin, diwayou) 
+      
+
+Changes with Tengine 1.5.0                                       31 Jul 2013
+
+    *) Feature: added ABI compatibility verification for DSO modules.
+       (monadbobo)
+
+    *) Feature: added non-buffering request body mechanism. Now the http proxy
+       and fastcgi module can send requests to backend servers when it receives
+       part of a request body. (yaoweibin)
+
+    *) Feature: added trim module which can remove unnecessary white spaces and
+       comments to reduce the size of a page. (taoyuanyuan)
+
+    *) Feature: added the accept filter mechanism which supports to do some
+       filter processing after accepting a new connection. (yzprofile)
+
+    *) Feature: Now the server banner in a default error page can be replaced
+       by the string specified in server_tag. (zhuzhaoyuan)
+
+    *) Bugfix: fixed the bug of the 'buffer' argument might be ignored in the
+       'access_log' directive. (cfsego)
+
+    *) Bugfix: fixed the session_sticky module didn't issue the session cookie
+       in the direct mode. (dinic)
+
+
+Changes with Tengine 1.4.6                                       14 May 2013
+
+    *) Bugfix: merged the changes of Nginx-1.2.9 and fixed the security problem
+       CVE-2013-2070. This bug had appeared in 1.4.0. (yaoweibin)
+
 Changes with Tengine 1.4.5                                       1 May 2013
 
     *) Feature: added the consistent_hash module which dispatches requests
