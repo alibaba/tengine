@@ -795,6 +795,15 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
 
 
+            if (r->args_start) {
+                r->raw_uri.len = r->args_start - 1 - r->uri_start;
+
+            } else {
+                r->raw_uri.len = r->uri_end - r->uri_start;
+            }
+            r->raw_uri.data = r->uri_start;
+
+
             r->unparsed_uri.len = r->uri_end - r->uri_start;
             r->unparsed_uri.data = r->uri_start;
 
