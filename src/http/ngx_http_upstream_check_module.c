@@ -586,7 +586,17 @@ static ngx_check_conf_t  ngx_check_types[] = {
       1,
       0 },
 
-    { 0, ngx_null_string, ngx_null_string, 0, NULL, NULL, NULL, NULL, NULL, 0, 0 }
+    { 0,
+      ngx_null_string,
+      ngx_null_string,
+      0,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      0,
+      0 }
 };
 
 
