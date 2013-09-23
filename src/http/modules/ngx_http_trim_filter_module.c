@@ -1193,7 +1193,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->state = trim_state_tag_style_css_text;
 
                 if ((size_t) (read - buf->pos)
-                     >= ngx_http_trim_saved_jscss.len) {
+                    >= ngx_http_trim_saved_jscss.len)
+                {
 
                     write = ngx_cpymem(write, ngx_http_trim_saved_jscss.data,
                                        ngx_http_trim_saved_jscss.len);
@@ -1231,8 +1232,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->state = trim_state_tag_style_css_comment_hack_text;
 
                 if ((size_t) (read - buf->pos)
-                     >= ngx_http_trim_saved_css_hack.len) {
-
+                    >= ngx_http_trim_saved_css_hack.len)
+                {
                     write = ngx_cpymem(write, ngx_http_trim_saved_css_hack.data,
                                        ngx_http_trim_saved_css_hack.len);
 
