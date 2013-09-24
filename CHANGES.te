@@ -17,8 +17,8 @@ Changes with Tengine 1.5.1                                       29 Aug 2013
     *) Bugfix: fixed a compile error when using the configure option
        '--without-dso'. (zhuzhaoyuan)
 
-    *) Bugfix: fixed two compile warnings. (zzjin, diwayou) 
-      
+    *) Bugfix: fixed two compile warnings. (zzjin, diwayou)
+
 
 Changes with Tengine 1.5.0                                       31 Jul 2013
 
@@ -76,7 +76,7 @@ Changes with Tengine 1.4.4                                       21 Mar 2013
        can be always served by the same upstream server. (dinic)
 
     *) Feature: now the sysguard module can protect the server based on
-       the amount of free memory. (lifeibo) 
+       the amount of free memory. (lifeibo)
 
     *) Feature: added support for geoip regional database in geoip module.
        (jasonlfunk)
@@ -97,7 +97,7 @@ Changes with Tengine 1.4.4                                       21 Mar 2013
     *) Bugfix: fixed a bug with TFS module that it might corrupt large files.
        (zhcn381)
 
- 
+
 Changes with Tengine 1.4.3                                       21 Jan 2013
 
     *) Feature: added the TFS module which provides a RESTful API to Taobao
@@ -123,7 +123,7 @@ Changes with Tengine 1.4.3                                       21 Jan 2013
 
     *) Bugfix: fixed the bug that sysguard module didn't work on Mac OS. (lizi)
 
- 
+
 Changes with Tengine 1.4.2                                         22 Nov 2012
 
     *) Feature: added the option '--dso-tool-path' to configure script, which
@@ -158,7 +158,7 @@ Changes with Tengine 1.4.2                                         22 Nov 2012
     *) Bugfix: fixed the installation directory error with the DSO module
        when creating the RPM package. (monadbobo)
        Thanks to Jianbin Xiao and Ren Xiaolei.
-      
+
 
 Changes with Tengine 1.4.1                                         10 Oct 2012
 
