@@ -219,8 +219,7 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
       offsetof(ngx_http_request_t, unparsed_uri), 0, 0 },
 
     { ngx_string("raw_uri"), NULL, ngx_http_variable_request,
-      offsetof(ngx_http_request_t, raw_uri),
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+      offsetof(ngx_http_request_t, raw_uri), 0, 0 },
 
     { ngx_string("uri"), NULL, ngx_http_variable_request,
       offsetof(ngx_http_request_t, uri),
