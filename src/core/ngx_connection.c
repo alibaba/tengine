@@ -347,7 +347,8 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             if (ecf->reuse_port) {
 
                 if (ngx_process == NGX_PROCESS_SIGNALLER
-                    || !ngx_is_init_cycle(cycle->old_cycle) || ls[i].reuse_port)
+                    || (cycle->old_cycle != NULL && !ngx_is_init_cycle(cycle->old_cycle))
+                    || ls[i].reuse_port)
                 {
                     if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
                                   (const void *) &reuse, sizeof(int))
