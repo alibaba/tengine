@@ -3243,6 +3243,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->state->status = status;
 
         if (u->conf->upstream_tries != NGX_CONF_UNSET_UINT
+            && u->conf->upstream_tries != 0
             && r->us_tries++ >= u->conf->upstream_tries)
         {
             ngx_http_upstream_finalize_request(r, u, status);
