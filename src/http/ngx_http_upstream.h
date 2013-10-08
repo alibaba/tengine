@@ -156,6 +156,7 @@ typedef struct {
 
     ngx_uint_t                       ignore_headers;
     ngx_uint_t                       next_upstream;
+    ngx_uint_t                       upstream_tries;
     ngx_uint_t                       store_access;
     ngx_flag_t                       request_buffering;
     ngx_flag_t                       buffering;

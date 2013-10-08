@@ -3242,6 +3242,14 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     if (status) {
         u->state->status = status;
 
+        if (u->conf->upstream_tries != NGX_CONF_UNSET_UINT
+            && u->conf->upstream_tries != 0
+            && r->us_tries++ >= u->conf->upstream_tries)
+        {
+            ngx_http_upstream_finalize_request(r, u, status);
+            return;
+        }
+
         if (u->peer.tries == 0 || !(u->conf->next_upstream & ft_type)) {
 
 #if (NGX_HTTP_CACHE)
