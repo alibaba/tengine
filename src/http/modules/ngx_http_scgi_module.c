@@ -291,6 +291,13 @@ static ngx_command_t ngx_http_scgi_commands[] = {
       offsetof(ngx_http_scgi_loc_conf_t, upstream.next_upstream),
       &ngx_http_scgi_next_upstream_masks },
 
+    { ngx_string("scgi_upstream_tries"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.upstream_tries),
+      NULL },
+
     { ngx_string("scgi_param"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_upstream_param_set_slot,
@@ -1074,6 +1081,8 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.max_temp_file_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.temp_file_write_size_conf = NGX_CONF_UNSET_SIZE;
 
+    conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
+
     conf->upstream.pass_request_headers = NGX_CONF_UNSET;
     conf->upstream.pass_request_body = NGX_CONF_UNSET;
 
@@ -1252,6 +1261,10 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                  (NGX_CONF_BITMASK_SET
                                   |NGX_HTTP_UPSTREAM_FT_ERROR
                                   |NGX_HTTP_UPSTREAM_FT_TIMEOUT));
+
+    ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
+                              prev->upstream.upstream_tries,
+                              NGX_CONF_UNSET_UINT);
 
     if (conf->upstream.next_upstream & NGX_HTTP_UPSTREAM_FT_OFF) {
         conf->upstream.next_upstream = NGX_CONF_BITMASK_SET
