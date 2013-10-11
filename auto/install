@@ -326,6 +326,13 @@ END
 done
 
 
+cat << END                                                       >> $NGX_MAKEFILE
+
+	test -f '$NGX_OBJS/ngx_auto_headers.h'  && cp '$NGX_OBJS/ngx_auto_headers.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+	test -f '$NGX_OBJS/ngx_auto_config.h' && cp '$NGX_OBJS/ngx_auto_config.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+
+END
+
 # create Makefile
 
 cat << END >> Makefile
