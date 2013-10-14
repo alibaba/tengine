@@ -69,7 +69,8 @@ ngx_int_t
 ngx_http_tfs_add_rcs_timers(ngx_cycle_t *cycle,
     ngx_http_tfs_timers_data_t *data)
 {
-    ngx_event_t  *ev;
+    ngx_event_t         *ev;
+    ngx_connection_t    *dummy;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
                    "http check tfs rc servers");
@@ -79,9 +80,15 @@ ngx_http_tfs_add_rcs_timers(ngx_cycle_t *cycle,
         return NGX_ERROR;
     }
 
+    dummy = ngx_pcalloc(cycle->pool, sizeof(ngx_connection_t));
+    if (dummy == NULL) {
+        return NGX_ERROR;
+    }
+
+    dummy->data = data;
     ev->handler = ngx_http_tfs_timeout_handler;
     ev->log = cycle->log;
-    ev->data = data;
+    ev->data = dummy;
     ev->timer_set = 0;
 
     ngx_add_timer(ev, data->upstream->rcs_interval);
@@ -94,12 +101,14 @@ ngx_int_t
 ngx_http_tfs_timers_finalize_request_handler(ngx_http_tfs_t *t)
 {
     ngx_event_t                 *event;
+    ngx_connection_t            *dummy;
     ngx_http_tfs_timers_data_t  *data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0, "http tfs timers finalize");
 
     event = t->finalize_data;
-    data = event->data;
+    dummy = event->data;
+    data = dummy->data;
 
     ngx_destroy_pool(t->pool);
     ngx_shmtx_unlock(&data->lock->ngx_http_tfs_kp_mutex);
@@ -114,11 +123,15 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
     ngx_int_t                   rc;
     ngx_pool_t                  *pool;
     ngx_http_tfs_t              *t;
+    ngx_connection_t            *dummy;
     ngx_http_request_t          *r;
     ngx_http_tfs_timers_data_t  *data;
 
-    data = event->data;
+    data = NULL;
     if (ngx_shmtx_trylock(&data->lock->ngx_http_tfs_kp_mutex)) {
+
+        dummy = event->data;
+        data = dummy->data;
         if (ngx_queue_empty(&data->upstream->rc_ctx->sh->kp_queue)) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, event->log, 0,
                            "empty rc keepalive queue");
@@ -143,6 +156,7 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
         r->pool = pool;
         r->connection = ngx_pcalloc(pool, sizeof(ngx_connection_t));
         if (r->connection == NULL) {
+            ngx_destroy_pool(pool);
             ngx_shmtx_unlock(&data->lock->ngx_http_tfs_kp_mutex);
             return;
         }
@@ -152,6 +166,7 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
 
         t = ngx_pcalloc(pool, sizeof(ngx_http_tfs_t));
         if (t == NULL) {
+            ngx_destroy_pool(pool);
             ngx_shmtx_unlock(&data->lock->ngx_http_tfs_kp_mutex);
             return;
         }
@@ -166,6 +181,7 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
         t->r_ctx.version = 1;
         t->loc_conf = ngx_pcalloc(pool, sizeof(ngx_http_tfs_loc_conf_t));
         if (t->loc_conf == NULL) {
+            ngx_destroy_pool(pool);
             ngx_shmtx_unlock(&data->lock->ngx_http_tfs_kp_mutex);
             return;
         }
@@ -176,6 +192,7 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
         if (rc == NGX_ERROR) {
             ngx_destroy_pool(pool);
             ngx_shmtx_unlock(&data->lock->ngx_http_tfs_kp_mutex);
+            return;
         }
 
     } else {

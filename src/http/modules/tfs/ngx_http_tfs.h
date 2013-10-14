@@ -74,8 +74,6 @@ struct ngx_http_tfs_segment_data_s {
     uint32_t                       oper_offset;
     /* read/write size inside this segment */
     uint32_t                       oper_size;
-    /* current writing data's crc */
-    uint32_t                       curr_crc;
     union {
         uint64_t                   write_file_number;
     };
@@ -83,6 +81,7 @@ struct ngx_http_tfs_segment_data_s {
     ngx_uint_t                     ds_retry;
     ngx_uint_t                     ds_index;
     ngx_chain_t                   *data;
+    ngx_chain_t                   *orig_data; /* for write retry */
 } NGX_PACKED;
 
 
@@ -321,9 +320,13 @@ struct ngx_http_tfs_s {
     ngx_http_tfs_raw_file_info_t   file_info;
     ngx_buf_t                     *readv2_rsp_tail_buf;
     uint8_t                        read_ver;
+    uint8_t                        retry_count;
 
     /* block cache */
     ngx_http_tfs_block_cache_ctx_t block_cache_ctx;
+
+    /* read index */
+    uint16_t                       index;
 
     /* for parallel write segments */
     ngx_http_tfs_t                *parent;
@@ -350,6 +353,7 @@ struct ngx_http_tfs_s {
     unsigned                       request_timeout:1;
     unsigned                       client_abort:1;
     unsigned                       is_rolling_back:1;
+    unsigned                       header_sent:1;
 };
 
 
