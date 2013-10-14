@@ -308,16 +308,59 @@ ngx_http_tfs_rcs_set_group_info_by_addr(ngx_http_tfs_rcs_info_t *rc_info,
 
         for (j = 0; j < cluster_group_info[i].info_count; j++) {
 
-            if (group_info[j].group_seq >= 0) {
-                continue;
-            }
-
             if (ngx_memcmp(&group_info[j].ns_vip, &addr,
                            sizeof(ngx_http_tfs_inet_t)) == 0)
             {
                 group_info[j].group_seq = group_seq;
                 cluster_group_info[i].group_count = group_count;
                 return;
+            }
+        }
+    }
+}
+
+
+void
+ngx_http_tfs_dump_rc_info(ngx_http_tfs_rcs_info_t *rc_info, ngx_log_t *log)
+{
+    uint32_t                            i, j, k;
+    ngx_http_tfs_group_info_t          *group_info;
+    ngx_http_tfs_logical_cluster_t     *logical_clusters;
+    ngx_http_tfs_physical_cluster_t    *physical_clusters;
+    ngx_http_tfs_cluster_group_info_t  *unlink_clusters;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "=========dump rc info for appkey: %V =========",
+                   &rc_info->appkey);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0, "appid: %uL, logical_cluster_count: %uD",
+                   rc_info->app_id, rc_info->logical_cluster_count);
+    logical_clusters = rc_info->logical_clusters;
+    for (i = 0; i < rc_info->logical_cluster_count; i++) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "need_duplicate: %ud",
+                       logical_clusters[i].need_duplicate);
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "rw_cluster_count: %uD",
+                       logical_clusters[i].rw_cluster_count);
+        physical_clusters = logical_clusters[i].rw_clusters;
+        for (j = 0; j < logical_clusters[i].rw_cluster_count; j++) {
+            ngx_log_debug4(NGX_LOG_DEBUG_HTTP, log, 0,
+                           "cluster_stat: %uD, access_type: %uD, cluster_id: %V, ns_vip: %V",
+                           physical_clusters[j].cluster_stat,
+                           physical_clusters[j].access_type,
+                           &physical_clusters[j].cluster_id_text,
+                           &physical_clusters[j].ns_vip_text);
+        }
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "unlink_cluster_count: %ud",
+                       rc_info->unlink_cluster_count);
+        unlink_clusters = rc_info->unlink_clusters;
+        for (j = 0; j < rc_info->unlink_cluster_count; j++) {
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, log, 0, "cluster_id: %ud, info_count: %uD, group_count: %D",
+                           unlink_clusters[j].cluster_id,
+                           unlink_clusters[j].info_count,
+                           unlink_clusters[j].group_count);
+            group_info = unlink_clusters[j].group_info;
+            for (k = 0; k < unlink_clusters[j].info_count; k++) {
+                ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0, "group_seq: %D, ns_vip: %V",
+                               group_info[k].group_seq,
+                               &group_info[k].ns_vip_text);
             }
         }
     }

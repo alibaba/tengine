@@ -119,6 +119,7 @@ void ngx_http_tfs_rc_server_destroy_node(ngx_http_tfs_rc_ctx_t *ctx,
     ngx_http_tfs_rcs_info_t *rc_info_node);
 void ngx_http_tfs_rcs_set_group_info_by_addr(ngx_http_tfs_rcs_info_t *rc_info,
     ngx_int_t group_count, ngx_int_t seq_id, ngx_http_tfs_inet_t addr);
+void ngx_http_tfs_dump_rc_info(ngx_http_tfs_rcs_info_t *rc_info, ngx_log_t *log);
 
 
 #endif  /* _NGX_HTTP_TFS_RC_SERVER_INFO_H_INCLUDED_ */

@@ -195,6 +195,8 @@ ngx_http_tfs_select_peer_v1(ngx_http_tfs_t *t)
             t->input_filter = NULL;
             return &t->tfs_peer_servers[NGX_HTTP_TFS_RC_SERVER];
 
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT:
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ:
         case NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS:
         case NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO:
             t->create_request = ngx_http_tfs_create_ns_request;
@@ -211,7 +213,6 @@ ngx_http_tfs_select_peer_v1(ngx_http_tfs_t *t)
             t->create_request = ngx_http_tfs_create_ds_request;
             t->process_request_body = ngx_http_tfs_process_ds;
             t->input_filter = NULL;
-            /* FIXME: it's better to retry_ns instead of ds when write failed */
             t->retry_handler = ngx_http_tfs_retry_ds;
             return &t->tfs_peer_servers[NGX_HTTP_TFS_DATA_SERVER];
 

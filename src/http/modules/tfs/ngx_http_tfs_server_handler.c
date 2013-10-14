@@ -589,6 +589,46 @@ ngx_http_tfs_process_ns(ngx_http_tfs_t *t)
             }
             t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
             return rc;
+
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT:
+            if (t->group_count != 1) {
+                t->state = NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ;
+                return rc;
+            }
+            /* group_count == 1, maybe able to make choice */
+            t->group_seq = 0;
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ:
+            rc_info = t->rc_info_node;
+            ngx_http_tfs_rcs_set_group_info_by_addr(rc_info,
+                                                    t->group_count,
+                                                    t->group_seq,
+                                                    t->name_server_addr);
+            rc = ngx_http_tfs_select_name_server(t, rc_info,
+                                                 &t->name_server_addr,
+                                                 &t->name_server_addr_text);
+            if (rc == NGX_ERROR) {
+                return NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND;
+            }
+
+            tp->peer.free(&tp->peer, tp->peer.data, 0);
+
+            ngx_http_tfs_peer_set_addr(t->pool,
+                                       &t->tfs_peer_servers[NGX_HTTP_TFS_NAME_SERVER],
+                                       &t->name_server_addr);
+
+            /* check if need get cluster id from ns */
+            logical_cluster = &rc_info->logical_clusters[t->logical_cluster_index];
+            physical_cluster = &logical_cluster->rw_clusters[t->rw_cluster_index];
+            if (t->state == NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO) {
+                if (physical_cluster->cluster_id > 0) {
+                    t->file.cluster_id = physical_cluster->cluster_id;
+
+                } else {
+                    t->state = NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS;
+                }
+            }
+            return rc;
+
         case NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO:
             if (t->is_stat_dup_file) {
                 t->state = NGX_HTTP_TFS_STATE_WRITE_STAT_DUP_FILE;
@@ -690,6 +730,8 @@ ngx_http_tfs_reset_segment_data(ngx_http_tfs_t *t)
         segment_data->ds_retry = 0;
         segment_data->ds_index = 0;
     }
+
+    t->file.curr_batch_count = 0;
 }
 
 
@@ -741,6 +783,11 @@ ngx_http_tfs_retry_ns(ngx_http_tfs_t *t)
         }
         break;
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
+        /* update not allow retry */
+        if (t->r_ctx.is_raw_update) {
+            return NGX_ERROR;
+        }
+
         /* stat failed, do not dedup, save new tfs file and do not save tair */
         if (t->is_stat_dup_file) {
             t->is_stat_dup_file = NGX_HTTP_TFS_NO;
@@ -880,11 +927,16 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
         case NGX_HTTP_TFS_STATE_WRITE_CREATE_FILE_NAME:
             if (rc == NGX_OK) {
                 t->state = NGX_HTTP_TFS_STATE_WRITE_WRITE_DATA;
+
+            } else {
+                /* create failed retry */
+                return NGX_HTTP_TFS_AGAIN;
             }
             break;
         case NGX_HTTP_TFS_STATE_WRITE_WRITE_DATA:
+            /* write failed retry */
             if (rc != NGX_OK) {
-                return rc;
+                return NGX_HTTP_TFS_AGAIN;
             }
 
             /* write success, update data buf, offset and crc */
@@ -916,7 +968,6 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
             segment_data->oper_offset += segment_data->oper_size;
             segment_data->oper_size = ngx_min(t->file.left_length,
                                               NGX_HTTP_TFS_MAX_FRAGMENT_SIZE);
-            segment_data->segment_info.crc = segment_data->curr_crc;
 
             if (t->r_ctx.version == 1) {
                 if (t->file.left_length > 0 && !t->is_large_file) {
@@ -927,8 +978,9 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
             t->state = NGX_HTTP_TFS_STATE_WRITE_CLOSE_FILE;
             break;
         case NGX_HTTP_TFS_STATE_WRITE_CLOSE_FILE:
+            /* close failed retry */
             if (rc != NGX_OK) {
-                return rc;
+                return NGX_HTTP_TFS_AGAIN;
             }
 
             /* sub process return here */
@@ -1057,6 +1109,7 @@ ngx_http_tfs_process_ds(ngx_http_tfs_t *t)
 ngx_int_t
 ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
 {
+    ngx_int_t                       rc;
     ngx_http_tfs_inet_t             *addr;
     ngx_http_tfs_segment_data_t     *segment_data;
     ngx_http_tfs_peer_connection_t  *tp;
@@ -1082,6 +1135,11 @@ ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
             /* TODO: dedup */
             return NGX_ERROR;
         case NGX_HTTP_TFS_ACTION_WRITE_FILE:
+            /* update not allow retry */
+            if (t->r_ctx.is_raw_update) {
+                return NGX_ERROR;
+            }
+
             /* stat retry_ds failed, do not dedup,
              * save new tfs file and do not save tair
              */
@@ -1092,8 +1150,31 @@ ngx_http_tfs_retry_ds(ngx_http_tfs_t *t)
                 t->file.segment_data[0].segment_info.block_id = 0;
                 t->file.segment_data[0].segment_info.file_id = 0;
                 t->retry_curr_ns = NGX_HTTP_TFS_YES;
-                break;
+
+            } else {
+                /* allow retry other writable clusters */
+                if (++t->retry_count <= NGX_HTTP_TFS_MAX_RETRY_COUNT) {
+                    t->retry_curr_ns = NGX_HTTP_TFS_YES;
+                }
+                t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+                segment_data->segment_info.block_id = 0;
+                segment_data->segment_info.file_id = 0;
+                segment_data->write_file_number = 0;
+                segment_data->segment_info.crc = 0;
+                /* reset all write data from orig_data */
+                segment_data->data = NULL;
+                rc = ngx_chain_add_copy_with_buf(t->pool,
+                    &segment_data->data, segment_data->orig_data);
+                if (rc == NGX_ERROR) {
+                    return NGX_ERROR;
+                }
+
+                t->file.left_length = segment_data->segment_info.size;
+                segment_data->oper_offset = 0;
+                segment_data->oper_size = ngx_min(t->file.left_length,
+                                                  NGX_HTTP_TFS_MAX_FRAGMENT_SIZE);
             }
+            break;
         default:
             return NGX_ERROR;
         }
@@ -1292,11 +1373,12 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
 {
     int16_t                           msg_type;
     uint32_t                          body_len;
+    ngx_int_t                         rc;
+    ngx_buf_t                        *b;
     ngx_http_tfs_segment_data_t      *segment_data;
     ngx_http_tfs_peer_connection_t   *tp;
     ngx_http_tfs_ds_read_response_t  *resp;
 
-    tp = t->tfs_peer;
     resp = (ngx_http_tfs_ds_read_response_t *) t->header;
     msg_type = resp->header.type;
     if (msg_type == NGX_HTTP_TFS_STATUS_MESSAGE) {
@@ -1305,6 +1387,9 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
     }
 
     segment_data = &t->file.segment_data[t->file.segment_index];
+    tp = t->tfs_peer;
+    b = &tp->body_buffer;
+
     if (resp->data_len < 0) {
         if (resp->data_len == NGX_HTTP_TFS_EXIT_NO_LOGICBLOCK_ERROR) {
             ngx_http_tfs_remove_block_cache(t, segment_data);
@@ -1329,6 +1414,7 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
                       segment_data->segment_info.block_id,
                       segment_data->segment_info.file_id,
                       tp->peer_addr_text, resp->data_len);
+        ngx_http_tfs_clear_buf(b);
         return NGX_HTTP_TFS_AGAIN;
     }
 
@@ -1336,6 +1422,29 @@ ngx_http_tfs_process_ds_input_filter(ngx_http_tfs_t *t)
         t->state = NGX_HTTP_TFS_STATE_READ_DONE;
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0, "read len is 0");
         return NGX_DONE;
+    }
+
+    if (resp->data_len >= NGX_HTTP_TFS_IMAGE_TYPE_SIZE) {
+        /* we need to check small file or large file's first data segment */
+        /* or custom file's first segment */
+        if (((t->parent == NULL && !t->is_process_meta_seg)
+             || (t->parent && t->index == 0))
+            && t->headers_in.content_type == NULL)
+        {
+            if (ngx_buf_size(b) < NGX_HTTP_TFS_IMAGE_TYPE_SIZE) {
+                return NGX_AGAIN;
+            }
+
+            t->headers_in.content_type = ngx_pcalloc(t->pool, sizeof(ngx_table_elt_t));
+            if (t->headers_in.content_type == NULL) {
+                return NGX_ERROR;
+            }
+
+            rc = ngx_http_tfs_get_content_type(b->pos, &t->headers_in.content_type->value);
+            if (rc != NGX_OK) {
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, t->log, 0, "unknown content type");
+            }
+        }
     }
 
     body_len = resp->header.len - sizeof(uint32_t);
