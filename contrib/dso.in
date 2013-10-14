@@ -56,8 +56,8 @@ cat << END
 
     -h, --help                 display this help and exit
     -d, --dst=PATH             set module installation path
-    -a, --add-module=PATH      external module which will be compiled
-    -s, --nginx-include=SOURCE set nginx include path
+    -a, --add-module=PATH      external module which will be compiled(absolute path)
+    -s, --nginx-include=SOURCE set nginx include path(absolute path)
 
 END
 
