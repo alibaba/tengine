@@ -74,6 +74,10 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
             }
 
         } else {
+            /* write retry ns */
+            if (segment_data->ds_retry > 0) {
+                return NULL;
+            }
             segment_data->ds_index = 0;
         }
         break;
@@ -142,10 +146,8 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
             }
         }
 
-        /* use readv2 to get file size if we do not know
-         * readv2 require read offset is 0 */
+        /* use readv2 if read from start */
         if (t->r_ctx.version == 1
-            && t->file.left_length == NGX_HTTP_TFS_MAX_SIZE
             && t->file.file_offset == 0)
         {
             t->read_ver = NGX_HTTP_TFS_READ_V2;
@@ -459,8 +461,7 @@ ngx_http_tfs_create_write_message(ngx_http_tfs_t *t,
                   segment_data->segment_info.file_id, req->offset,
                   req->length, t_crc.data_crc);
 
-    /* save here to update segment_info->crc after write success */
-    segment_data->curr_crc = t_crc.data_crc;
+    segment_data->segment_info.crc = t_crc.data_crc;
     req->header.base_header.len = size - sizeof(ngx_http_tfs_header_t)
                                    + req->length;
     req->header.base_header.crc = t_crc.crc;
@@ -903,9 +904,7 @@ ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
                     return NGX_ERROR;
                 }
                 t->file_info = readv2_rsp_tail->file_info;
-                if (t->file.left_length == NGX_HTTP_TFS_MAX_SIZE) {
-                    t->file.left_length = t->file_info.size;
-                }
+                t->file.left_length = ngx_min(t->file.left_length, (uint32_t)t->file_info.size);
             }
             return NGX_OK;
         }
@@ -927,9 +926,7 @@ ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
                     return NGX_ERROR;
                 }
                 t->file_info = readv2_rsp_tail->file_info;
-                if (t->file.left_length == NGX_HTTP_TFS_MAX_SIZE) {
-                    t->file.left_length = t->file_info.size;
-                }
+                t->file.left_length = ngx_min(t->file.left_length, (uint32_t)t->file_info.size);
 
             /* all data and partial file_info recvd */
             } else if (left_len > 0) {
@@ -1069,6 +1066,11 @@ ngx_http_tfs_parse_statfile_message(ngx_http_tfs_t *t,
 
     } else {
         resp2 = (ngx_http_tfs_ds_sp_readv2_response_t *) tp->body_buffer.pos;
+        if (resp2->data_len == NGX_HTTP_TFS_EXIT_NO_LOGICBLOCK_ERROR) {
+            ngx_http_tfs_remove_block_cache(t, segment_data);
+            return NGX_HTTP_TFS_AGAIN;
+        }
+
         /* file deleted */
         if (resp2->data_len == NGX_HTTP_TFS_EXIT_FILE_INFO_ERROR) {
             resp2->file_info.id =
@@ -1138,6 +1140,7 @@ ngx_http_tfs_set_meta_segment_data(ngx_http_tfs_t *t)
 {
     uint32_t                      i, segment_count;
     uint64_t                      size;
+    ngx_int_t                     rc;
     ngx_buf_t                    *b;
     ngx_chain_t                  *cl;
     ngx_http_tfs_segment_info_t  *seg_info;
@@ -1171,8 +1174,17 @@ ngx_http_tfs_set_meta_segment_data(ngx_http_tfs_t *t)
        which we pre-alloc in ngx_http_tfs_get_segment_for_write */
     t->file.segment_count += 1;
     segment_data = &t->file.segment_data[t->file.segment_index];
+
     segment_data->data = cl;
+    /* copy data to orig_data so that we can retry write */
+    rc = ngx_chain_add_copy_with_buf(t->pool,
+        &segment_data->orig_data, segment_data->data);
+    if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
     segment_data->oper_size = size;
+    segment_data->segment_info.size = size;
 
     t->file.left_length = size;
     t->is_process_meta_seg = NGX_HTTP_TFS_YES;
@@ -1413,7 +1425,7 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
     first_segment = &t->file.segment_data[0];
     first_segment->oper_offset = t->r_ctx.offset;
     if (first_segment->segment_info.offset > 0) {
-        first_segment->oper_offset %= first_segment->segment_info.offset;
+        first_segment->oper_offset -= first_segment->segment_info.offset;
     }
     first_segment->oper_size =
         first_segment->segment_info.size - first_segment->oper_offset;
@@ -1447,7 +1459,7 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
     size_t        data_size, buf_size, size;
     int64_t       offset;
     uint32_t      left_size;
-    ngx_uint_t    seg_count, i;
+    ngx_int_t     seg_count, i, rc;
     ngx_buf_t    *b;
     ngx_chain_t  *body, *cl, **ll;
 
@@ -1558,6 +1570,12 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
             }
 
             left_size -= buf_size;
+        }
+        /* copy data to orig_data so that we can retry write */
+        rc = ngx_chain_add_copy_with_buf(t->pool,
+            &t->file.segment_data[i].orig_data, t->file.segment_data[i].data);
+        if (rc == NGX_ERROR) {
+            return NGX_ERROR;
         }
     }
 

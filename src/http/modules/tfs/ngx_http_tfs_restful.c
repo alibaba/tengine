@@ -731,6 +731,11 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
             return NGX_HTTP_BAD_REQUEST;
         }
 
+        /* large file not support update */
+        if (ngx_http_arg(r, (u_char *) "large_file", 10, &arg_value) == NGX_OK) {
+            return NGX_HTTP_BAD_REQUEST;
+        }
+
         rc = ngx_http_tfs_raw_fsname_parse(&ctx->file_path_s, &ctx->file_suffix,
                                            &ctx->fsname);
         /* large file not support update */
@@ -740,6 +745,7 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
             return NGX_HTTP_BAD_REQUEST;
         }
 
+        ctx->is_raw_update = NGX_HTTP_TFS_YES;
         ngx_str_set(&ctx->action.msg, "write_file");
         return NGX_OK;
     default:
