@@ -142,6 +142,23 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
     ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_uint_t           listen_nelt;
+    ngx_event_conf_t    *ecf;
+
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+    if (ecf->reuse_port) {
+        listen_nelt = cycle->listening.nelts;
+        ngx_close_listening_sockets(cycle);
+        cycle->listening.nelts = listen_nelt;
+    }
+
+#endif
+
     ngx_start_cache_manager_processes(cycle, 0);
 
 #if (NGX_PROCS)
@@ -595,6 +612,24 @@ ngx_reap_children(ngx_cycle_t *cycle)
     ch.fd = -1;
 
     live = 0;
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+    if (!ngx_terminate
+        && !ngx_quit
+        && ecf->reuse_port)
+    {
+        if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+            return live;
+        }
+    }
+
+#endif
+
     for (i = 0; i < ngx_last_process; i++) {
 
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
@@ -646,6 +681,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 && !ngx_terminate
                 && !ngx_quit)
             {
+
                 if (ngx_spawn_process(cycle, ngx_processes[i].proc,
                                       ngx_processes[i].data,
                                       ngx_processes[i].name, i)
@@ -656,7 +692,6 @@ ngx_reap_children(ngx_cycle_t *cycle)
                                   ngx_processes[i].name);
                     continue;
                 }
-
 
                 ch.command = NGX_CMD_OPEN_CHANNEL;
                 ch.pid = ngx_processes[ngx_process_slot].pid;
@@ -707,6 +742,21 @@ ngx_reap_children(ngx_cycle_t *cycle)
             }
         }
     }
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_uint_t           listen_nelt;
+
+    if (!ngx_terminate
+        && !ngx_quit
+        && ecf->reuse_port)
+    {
+        listen_nelt = cycle->listening.nelts;
+        ngx_close_listening_sockets(cycle);
+        cycle->listening.nelts = listen_nelt;
+    }
+
+#endif
 
     return live;
 }

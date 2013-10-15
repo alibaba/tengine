@@ -148,6 +148,19 @@ ngx_feature_test="struct crypt_data  cd;
 . auto/feature
 
 
+# reuseport
+ngx_feature="SO_REUSEPORT"
+ngx_feature_name="NGX_HAVE_REUSEPORT"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, SOL_SOCKET, SO_REUSEPORT, NULL, 0)"
+. auto/feature
+
+
 ngx_include="sys/vfs.h";     . auto/include
 
 

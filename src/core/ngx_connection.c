@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_event.h>
+#include <nginx.h>
 
 
 ngx_os_io_t  ngx_io;
@@ -80,6 +81,10 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 
 #if (NGX_HAVE_SETFIB)
     ls->setfib = -1;
+#endif
+
+#if (NGX_HAVE_REUSEPORT)
+    ls->reuse_port = 0;
 #endif
 
     return ls;
@@ -268,14 +273,14 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
-    int               reuseaddr;
+    int               reuse;
     ngx_uint_t        i, tries, failed;
     ngx_err_t         err;
     ngx_log_t        *log;
     ngx_socket_t      s;
     ngx_listening_t  *ls;
 
-    reuseaddr = 1;
+    reuse = 1;
 #if (NGX_SUPPRESS_WARN)
     failed = 0;
 #endif
@@ -318,7 +323,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 
             if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-                           (const void *) &reuseaddr, sizeof(int))
+                           (const void *) &reuse, sizeof(int))
                 == -1)
             {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -333,6 +338,46 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            u_char              *onfly;
+            ngx_event_conf_t    *ecf;
+
+            ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+            if (ecf->reuse_port) {
+
+                onfly = (u_char *) getenv(NGINX_VAR);
+
+                if (ngx_process == NGX_PROCESS_SIGNALLER
+                    || (cycle->old_cycle != NULL && !ngx_is_init_cycle(cycle->old_cycle))
+                    || ls[i].reuse_port
+                    || onfly != NULL)
+                {
+
+                    if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                                  (const void *) &reuse, sizeof(int))
+                       == -1)
+                    {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                            "setsockopt(SO_REUSEPORT) %V failed",
+                                     &ls[i].addr_text);
+
+                        if (ngx_close_socket(s) == -1) {
+                            ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                ngx_close_socket_n " %V failed",
+                                         &ls[i].addr_text);
+                        }
+
+                        return NGX_ERROR;
+                    }
+
+                    ls[i].reuse_port = 1;
+                }
+
+            }
+#endif
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 
@@ -435,6 +480,21 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ecf->reuse_port && !ls[i].reuse_port) {
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                failed = 1;
+                ls[i].reuse_port = 1;
+                continue;
+            }
+#endif
 
             ls[i].listen = 1;
 
