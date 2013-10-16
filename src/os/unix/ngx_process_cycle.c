@@ -958,6 +958,22 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
     }
 #endif
 
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+    if (ecf->reuse_port) {
+        if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+            /* fatal */
+            exit(2);
+        }
+
+        ngx_configure_listening_sockets(cycle);
+    }
+
+#endif
+
     if (geteuid() == 0) {
         if (setgid(ccf->group) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -1031,22 +1047,6 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "sigprocmask() failed");
     }
-
-#if (NGX_HAVE_REUSEPORT)
-
-    ngx_event_conf_t    *ecf;
-
-    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
-    if (ecf->reuse_port) {
-        if (ngx_open_listening_sockets(cycle) != NGX_OK) {
-            /* fatal */
-            exit(2);
-        }
-
-        ngx_configure_listening_sockets(cycle);
-    }
-
-#endif
 
     /*
      * disable deleting previous events for the listening sockets because
