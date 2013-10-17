@@ -401,6 +401,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        http_version;
 
     ngx_str_t                         request_line;
+    ngx_str_t                         raw_uri;
     ngx_str_t                         uri;
     ngx_str_t                         args;
     ngx_str_t                         exten;
