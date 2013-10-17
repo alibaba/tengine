@@ -381,12 +381,6 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("time_local"), NULL, ngx_http_variable_time_local,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
-    { ngx_string("decode_base64_"), NULL, ngx_http_variable_decode_base64,
-      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
-
-    { ngx_string("encode_md5_"), NULL, ngx_http_variable_md5,
-      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
-
 #if (NGX_HAVE_TCP_INFO)
     { ngx_string("tcpinfo_rtt"), NULL, ngx_http_variable_tcpinfo,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
@@ -691,7 +685,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
-    if (ngx_strncmp(name->data, "decode_base64_", 14) == 0) {
+    if (ngx_strncmp(name->data, "base64_decode_", 14) == 0) {
 
         if (ngx_http_variable_decode_base64(r, vv, (uintptr_t) name) == NGX_OK)
         {
@@ -701,7 +695,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
-    if (ngx_strncmp(name->data, "encode_md5_", 11) == 0) {
+    if (ngx_strncmp(name->data, "md5_encode_", 11) == 0) {
 
         if (ngx_http_variable_md5(r, vv, (uintptr_t) name) == NGX_OK)
         {
@@ -1152,14 +1146,14 @@ ngx_http_variable_decode_base64(ngx_http_request_t *r,
     ngx_uint_t                  hash;
     ngx_http_variable_value_t  *vv;
 
-    len = name->len - (sizeof("decode_base64_") - 1);
+    len = name->len - (sizeof("base64_decode_") - 1);
 
     low = ngx_pnalloc(r->pool, len);
     if (low == NULL) {
         return NGX_ERROR;
     }
 
-    p = name->data + sizeof("decode_base64_") - 1;
+    p = name->data + sizeof("base64_decode_") - 1;
 
     hash = ngx_hash_strlow(low, p, len);
 
@@ -1216,14 +1210,14 @@ ngx_http_variable_md5(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     ngx_uint_t                  hash;
     ngx_http_variable_value_t  *vv;
 
-    len = name->len - (sizeof("encode_md5_") - 1);
+    len = name->len - (sizeof("md5_encode_") - 1);
 
     low = ngx_pnalloc(r->pool, len);
     if (low == NULL) {
         return NGX_ERROR;
     }
 
-    p = name->data + sizeof("encode_md5_") - 1;
+    p = name->data + sizeof("md5_encode_") - 1;
 
     hash = ngx_hash_strlow(low, p, len);
 
@@ -2917,14 +2911,14 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
             continue;
         }
 
-        if (ngx_strncmp(v[i].name.data, "decode_base64_", 14) == 0) {
+        if (ngx_strncmp(v[i].name.data, "base64_decode_", 14) == 0) {
             v[i].get_handler = ngx_http_variable_decode_base64;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
         }
 
-        if (ngx_strncmp(v[i].name.data, "encode_md5_", 4) == 0) {
+        if (ngx_strncmp(v[i].name.data, "md5_encode_", 4) == 0) {
             v[i].get_handler = ngx_http_variable_md5;
             v[i].data = (uintptr_t) &v[i].name;
 
