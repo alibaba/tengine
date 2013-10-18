@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -9,6 +8,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <nginx.h>
+#include <ngx_md5.h>
 
 
 static ngx_int_t ngx_http_variable_request(ngx_http_request_t *r,
@@ -36,6 +36,11 @@ static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_decode_base64(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_md5(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+
 #if (NGX_HAVE_TCP_INFO)
 static ngx_int_t ngx_http_variable_tcpinfo(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -683,6 +688,26 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    if (ngx_strncmp(name->data, "base64_decode_", 14) == 0) {
+
+        if (ngx_http_variable_decode_base64(r, vv, (uintptr_t) name) == NGX_OK)
+        {
+            return vv;
+        }
+
+        return NULL;
+    }
+
+    if (ngx_strncmp(name->data, "md5_encode_", 11) == 0) {
+
+        if (ngx_http_variable_md5(r, vv, (uintptr_t) name) == NGX_OK)
+        {
+            return vv;
+        }
+
+        return NULL;
+    }
+
     vv->not_found = 1;
 
     return vv;
@@ -1104,6 +1129,128 @@ ngx_http_variable_argument(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
     v->data = value.data;
     v->len = value.len;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_decode_base64(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_str_t *name = (ngx_str_t *) data;
+
+    size_t                      len;
+    u_char                     *low, *p;
+    ngx_str_t                   var, src;
+    ngx_uint_t                  hash;
+    ngx_http_variable_value_t  *vv;
+
+    len = name->len - (sizeof("base64_decode_") - 1);
+
+    low = ngx_pnalloc(r->pool, len);
+    if (low == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = name->data + sizeof("base64_decode_") - 1;
+
+    hash = ngx_hash_strlow(low, p, len);
+
+    var.len = len;
+    var.data = low;
+
+    vv = ngx_http_get_variable(r, &var, hash);
+
+    if (vv == NULL || vv->not_found) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    src.data = vv->data;
+    src.len = vv->len;
+
+    var.len = ngx_base64_decoded_length(src.len);
+    var.data = ngx_palloc(r->pool, var.len);
+    if (var.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_decode_base64(&var, &src) != NGX_OK) {
+
+        v->data = src.data;
+        v->len = src.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+
+    v->data = var.data;
+    v->len = var.len;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_md5(ngx_http_request_t *r, ngx_http_variable_value_t *v,
+    uintptr_t data)
+{
+    ngx_str_t *name = (ngx_str_t *) data;
+
+    size_t                      len;
+    u_char                     *low, *p, md5_final[16];
+    ngx_md5_t                   md5;
+    ngx_str_t                   var, src;
+    ngx_uint_t                  hash;
+    ngx_http_variable_value_t  *vv;
+
+    len = name->len - (sizeof("md5_encode_") - 1);
+
+    low = ngx_pnalloc(r->pool, len);
+    if (low == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = name->data + sizeof("md5_encode_") - 1;
+
+    hash = ngx_hash_strlow(low, p, len);
+
+    var.len = len;
+    var.data = low;
+
+    vv = ngx_http_get_variable(r, &var, hash);
+
+    if (vv == NULL || vv->not_found) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    src.data = vv->data;
+    src.len = vv->len;
+
+    ngx_md5_init(&md5);
+    ngx_md5_update(&md5, src.data, src.len);
+    ngx_md5_final(md5_final, &md5);
+
+    var.len = 32;
+    var.data = ngx_palloc(r->pool, var.len);
+    if (var.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(var.data, md5_final, sizeof(md5_final));
+
+    v->data = var.data;
+    v->len = var.len;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
@@ -2762,6 +2909,20 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
         if (ngx_strncmp(v[i].name.data, "sent_cookie_", 12) == 0) {
             v[i].get_handler = ngx_http_variable_sent_cookie;
+            v[i].data = (uintptr_t) &v[i].name;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "base64_decode_", 14) == 0) {
+            v[i].get_handler = ngx_http_variable_decode_base64;
+            v[i].data = (uintptr_t) &v[i].name;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "md5_encode_", 4) == 0) {
+            v[i].get_handler = ngx_http_variable_md5;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
