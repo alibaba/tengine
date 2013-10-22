@@ -19,6 +19,7 @@ struct ngx_http_reqstat_rbnode_s {
     ngx_atomic_t                 http_4xx;
     ngx_atomic_t                 http_5xx;
     ngx_atomic_t                 other_status;
+    ngx_atomic_t                 rt;
     u_char                       data[1];
 };
 
@@ -71,6 +72,9 @@ typedef struct {
 #define NGX_HTTP_REQSTAT_OTHER_STATUS                                   \
     offsetof(ngx_http_reqstat_rbnode_t, other_status)
 
+#define NGX_HTTP_REQSTAT_RT                                             \
+    offsetof(ngx_http_reqstat_rbnode_t, rt)
+
 #define REQ_FIELD(node, offset)                                         \
     ((ngx_atomic_t *) ((char *) node + offset))
 
@@ -83,7 +87,8 @@ static off_t               fields[9] = {
     NGX_HTTP_REQSTAT_3XX,
     NGX_HTTP_REQSTAT_4XX,
     NGX_HTTP_REQSTAT_5XX,
-    NGX_HTTP_REQSTAT_OTHER_STATUS
+    NGX_HTTP_REQSTAT_OTHER_STATUS,
+    NGX_HTTP_REQSTAT_RT
 };
 
 
@@ -372,12 +377,6 @@ ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (smcf->monitor == NULL) {
             return NGX_CONF_ERROR;
         }
-    }
-
-    slcf->monitor = ngx_array_create(cf->pool, cf->args->nelts - 1,
-                                     sizeof(ngx_shm_zone_t *));
-    if (slcf->monitor == NULL) {
-        return NGX_CONF_ERROR;
     }
 
     for (i = 1; i < cf->args->nelts; i++) {
