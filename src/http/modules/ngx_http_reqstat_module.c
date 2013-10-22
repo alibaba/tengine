@@ -379,6 +379,12 @@ ngx_http_reqstat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    slcf->monitor = ngx_array_create(cf->pool, cf->args->nelts - 1,
+                                     sizeof(ngx_shm_zone_t *));
+    if (slcf->monitor == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
     for (i = 1; i < cf->args->nelts; i++) {
         shm_zone = ngx_shared_memory_add(cf, &value[i], 0,
                                          &ngx_http_reqstat_module);
@@ -414,6 +420,8 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 {
     ngx_str_t                     val;
     ngx_uint_t                    i, status;
+    ngx_time_t                   *tp;
+    ngx_msec_int_t                ms;
     ngx_shm_zone_t              **shm_zone, *z;
     ngx_http_reqstat_ctx_t       *ctx;
     ngx_http_reqstat_conf_t      *slcf;
@@ -485,6 +493,13 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
             } else {
                 ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_OTHER_STATUS, 1);
             }
+
+            tp = ngx_timeofday();
+
+            ms = (ngx_msec_int_t)
+                 ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+            ms = ngx_max(ms, 0);
+            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_RT, ms);
         }
     }
 
