@@ -78,7 +78,7 @@ typedef struct {
 #define REQ_FIELD(node, offset)                                         \
     ((ngx_atomic_t *) ((char *) node + offset))
 
-static off_t               fields[9] = {
+static off_t               fields[10] = {
     NGX_HTTP_REQSTAT_BYTES_IN,
     NGX_HTTP_REQSTAT_BYTES_OUT,
     NGX_HTTP_REQSTAT_CONN_TOTAL,
