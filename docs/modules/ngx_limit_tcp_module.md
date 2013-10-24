@@ -1,6 +1,5 @@
 ## Description
-This module can limit the concurrent number and frequency with each ip address when accepting new connections. And you can add black and white lists for specific IPs. It's flexible and useful to protect https and mail applications.
-
+This module is able to limit the concurrent number and frequency with each ip address when accepting new connections, and supports black and white lists for specific IPs. It's useful and flexible to protect https or mail applications.
 ### Config Sample
 
     error_log logs/error.log debug;
@@ -49,7 +48,7 @@ Default: `none`
 
 Context: `main`
 
-Sets a shared memory zone and the maximum burst size of requests. If the rate of requests exceeds the rate configured for a zone, their processing is delayed such that requests are processed at a defined rate. Excessive requests are delayed until their number exceeds the maximum burst size or out of maximum concurrent in which case the request is closed after accepted.
+Sets a shared memory zone and the maximum of requests' rate. If the rate exceeds the configured value, excessive requests are delayed so that server is able to process at defined rate. If the number of delayed requests exceeds "burst" value, requests will be closed immediately after accepted.
 
 For example, the directives
 
