@@ -1,3 +1,4 @@
+#include <nginx.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
@@ -584,8 +585,13 @@ ngx_http_reqstat_show_handler(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
+#if nginx_version >= 1002000
             ngx_chain_update_chains(r->pool, &free, &busy, &tl,
                                     (ngx_buf_tag_t) &ngx_http_reqstat_module);
+#else
+            ngx_chain_update_chains(&free, &busy, &tl,
+                                    (ngx_buf_tag_t) &ngx_http_reqstat_module);
+#endif
         }
     }
 
