@@ -42,7 +42,7 @@ This module is able to limit the concurrent number and frequency with each ip ad
 
 ## Directives
 
-Syntax: **limit_tcp name:size addr:port [rate= burst= nodelay] [concurrent=]**
+Syntax: **limit_tcp addr:port [name=name:size] [rate= burst= nodelay] [concurrent=]**
 
 Default: `none`
 
