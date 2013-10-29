@@ -44,6 +44,7 @@ typedef struct {
     unsigned                     meta:1;
     unsigned                     get_appid:1;
     unsigned                     chk_exist:1;
+    unsigned                     is_raw_update:1;
 } ngx_http_tfs_restful_ctx_t;
 
 

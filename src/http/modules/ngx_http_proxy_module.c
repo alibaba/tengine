@@ -98,6 +98,8 @@ static ngx_int_t ngx_http_proxy_create_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_reinit_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_process_status_line(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_process_header(ngx_http_request_t *r);
+static ngx_int_t ngx_http_proxy_output_filter_init(void *data);
+static ngx_int_t ngx_http_proxy_output_filter(void *data, ngx_chain_t *in);
 static ngx_int_t ngx_http_proxy_input_filter_init(void *data);
 static ngx_int_t ngx_http_proxy_copy_filter(ngx_event_pipe_t *p,
     ngx_buf_t *buf);
@@ -237,6 +239,13 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       ngx_conf_set_access_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_proxy_loc_conf_t, upstream.store_access),
+      NULL },
+
+    { ngx_string("proxy_request_buffering"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.request_buffering),
       NULL },
 
     { ngx_string("proxy_buffering"),
@@ -474,6 +483,13 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       offsetof(ngx_http_proxy_loc_conf_t, upstream.next_upstream),
       &ngx_http_proxy_next_upstream_masks },
 
+    { ngx_string("proxy_upstream_tries"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.upstream_tries),
+      NULL },
+
     { ngx_string("proxy_pass_header"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_array_slot,
@@ -682,6 +698,17 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
 
     if (plcf->cookie_domains || plcf->cookie_paths) {
         u->rewrite_cookie = ngx_http_proxy_rewrite_cookie;
+    }
+
+    r->request_buffering = plcf->upstream.request_buffering;
+    if (r->headers_in.content_length_n <= 0) {
+        r->request_buffering = 1;
+    }
+
+    if (!r->request_buffering) {
+        u->output_filter_init = ngx_http_proxy_output_filter_init;
+        u->output_filter = ngx_http_proxy_output_filter;
+        u->output_filter_ctx = r;
     }
 
     u->buffering = plcf->upstream.buffering;
@@ -1262,6 +1289,42 @@ ngx_http_proxy_reinit_request(ngx_http_request_t *r)
     r->upstream->pipe->input_filter = ngx_http_proxy_copy_filter;
     r->upstream->input_filter = ngx_http_proxy_non_buffered_copy_filter;
     r->state = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_proxy_output_filter_init(void *data)
+{
+    ngx_http_request_t  *r = data;
+
+    r->upstream->request_bufs = NULL;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_proxy_output_filter(void *data, ngx_chain_t *in)
+{
+    ngx_chain_t         *cl;
+    ngx_http_request_t  *r = data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http proxy output filter");
+
+    if (r->upstream->request_bufs == NULL) {
+        r->upstream->request_bufs = in;
+    } else {
+        cl = r->upstream->request_bufs;
+
+        while (cl->next) {
+            cl = cl->next;
+        }
+
+        cl->next = in;
+    }
 
     return NGX_OK;
 }
@@ -2386,6 +2449,7 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.store = NGX_CONF_UNSET;
     conf->upstream.store_access = NGX_CONF_UNSET_UINT;
+    conf->upstream.request_buffering = NGX_CONF_UNSET;
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
 
@@ -2403,6 +2467,8 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.busy_buffers_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.max_temp_file_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.temp_file_write_size_conf = NGX_CONF_UNSET_SIZE;
+
+    conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
 
     conf->upstream.pass_request_headers = NGX_CONF_UNSET;
     conf->upstream.pass_request_body = NGX_CONF_UNSET;
@@ -2470,6 +2536,9 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->upstream.store_access,
                               prev->upstream.store_access, 0600);
+
+    ngx_conf_merge_value(conf->upstream.request_buffering,
+                         prev->upstream.request_buffering, 1);
 
     ngx_conf_merge_value(conf->upstream.buffering,
                               prev->upstream.buffering, 1);
@@ -2605,6 +2674,10 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->upstream.next_upstream = NGX_CONF_BITMASK_SET
                                        |NGX_HTTP_UPSTREAM_FT_OFF;
     }
+
+    ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
+                              prev->upstream.upstream_tries,
+                              NGX_CONF_UNSET_UINT);
 
     if (ngx_conf_merge_path_value(cf, &conf->upstream.temp_path,
                               prev->upstream.temp_path,

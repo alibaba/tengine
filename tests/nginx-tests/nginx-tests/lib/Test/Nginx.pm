@@ -240,6 +240,29 @@ sub stop() {
 	return $self;
 }
 
+sub reload() {
+    my ($self) = @_; 
+
+    return $self unless $self->{_started};
+
+    if ($^O eq 'MSWin32') {
+        my $testdir = $self->{_testdir};
+        my @globals = $self->{_test_globals} ?
+            () : ('-g', "pid $testdir/nginx.pid; "
+		  . "error_log $testdir/error.log debug;");
+        system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'reload',
+            @globals) == 0
+		or die "system() failed: $?\n";
+
+    } else {
+        kill 'HUP', `cat $self->{_testdir}/nginx.pid`;
+    }   
+
+    sleep(1);
+
+    return $self;
+}
+
 sub stop_daemons() {
 	my ($self) = @_;
 

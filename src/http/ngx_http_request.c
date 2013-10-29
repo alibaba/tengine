@@ -567,6 +567,8 @@ ngx_http_create_request(ngx_connection_t *c)
     r->main = r;
     r->count = 1;
 
+    r->us_tries = 1;
+
     if (clcf->request_time_cache) {
         tp = ngx_timeofday();
         r->start_sec = tp->sec;
@@ -580,6 +582,8 @@ ngx_http_create_request(ngx_connection_t *c)
     }
 
     r->method = NGX_HTTP_UNKNOWN;
+
+    r->request_buffering = 1;
 
     r->headers_in.content_length_n = -1;
     r->headers_in.keep_alive_n = -1;
@@ -1040,6 +1044,14 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
     } else {
         r->uri.data = r->uri_start;
     }
+
+    if (r->args_start) {
+        r->raw_uri.len = r->args_start - 1 - r->uri_start;
+
+    } else {
+        r->raw_uri.len = r->uri_end - r->uri_start;
+    }
+    r->raw_uri.data = r->uri_start;
 
     r->unparsed_uri.len = r->uri_end - r->uri_start;
     r->unparsed_uri.data = r->uri_start;

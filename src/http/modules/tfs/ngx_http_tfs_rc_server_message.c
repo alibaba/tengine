@@ -269,6 +269,10 @@ ngx_http_tfs_parse_login_message(ngx_http_tfs_t *t)
     }
     ngx_shmtx_unlock(&rc_ctx->shpool->mutex);
 
+#if (NGX_DEBUG)
+    ngx_http_tfs_dump_rc_info(t->rc_info_node, t->log);
+#endif
+
     if (rc == NGX_OK) {
         rc = ngx_http_tfs_parse_session_id(&t->rc_info_node->session_id,
                                            &t->rc_info_node->app_id);
@@ -358,6 +362,10 @@ ngx_http_tfs_parse_keepalive_message(ngx_http_tfs_t *t)
         ngx_http_tfs_rc_server_destroy_node(rc_ctx, rc_info);
     }
     ngx_shmtx_unlock(&rc_ctx->shpool->mutex);
+
+#if (NGX_DEBUG)
+    ngx_http_tfs_dump_rc_info(rc_info, t->log);
+#endif
 
     return rc;
 }

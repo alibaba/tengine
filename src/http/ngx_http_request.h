@@ -286,6 +286,16 @@ typedef struct {
     ngx_chain_t                      *busy;
     ngx_http_chunked_t               *chunked;
     ngx_http_client_body_handler_pt   post_handler;
+
+    /* For non buffered request body */
+    ngx_chain_t                      *out;
+    ngx_chain_t                      *last;
+    ngx_chain_t                     **last_out;
+    off_t                             postpone_size;
+    ngx_int_t                         num;
+    unsigned                          buffered:1;
+    unsigned                          flush:1;
+    unsigned                          nomem:1;
 } ngx_http_request_body_t;
 
 
@@ -393,6 +403,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        http_version;
 
     ngx_str_t                         request_line;
+    ngx_str_t                         raw_uri;
     ngx_str_t                         uri;
     ngx_str_t                         args;
     ngx_str_t                         exten;
@@ -428,6 +439,8 @@ struct ngx_http_request_s {
     off_t                             request_length;
 
     ngx_uint_t                        err_status;
+
+    ngx_uint_t                        us_tries;
 
     ngx_http_connection_t            *http_connection;
 #if (NGX_HTTP_SPDY)
@@ -466,6 +479,7 @@ struct ngx_http_request_s {
     unsigned                          uri_changed:1;
     unsigned                          uri_changes:4;
 
+    unsigned                          request_buffering:1;
     unsigned                          request_body_in_single_buf:1;
     unsigned                          request_body_in_file_only:1;
     unsigned                          request_body_in_persistent_file:1;

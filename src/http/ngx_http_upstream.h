@@ -157,7 +157,9 @@ typedef struct {
 
     ngx_uint_t                       ignore_headers;
     ngx_uint_t                       next_upstream;
+    ngx_uint_t                       upstream_tries;
     ngx_uint_t                       store_access;
+    ngx_flag_t                       request_buffering;
     ngx_flag_t                       buffering;
     ngx_flag_t                       pass_request_headers;
     ngx_flag_t                       pass_request_body;
@@ -301,6 +303,13 @@ struct ngx_http_upstream_s {
     ngx_chain_t                     *busy_bufs;
     ngx_chain_t                     *free_bufs;
 
+    /* Nginx => Upstream */
+    ngx_int_t                      (*output_filter_init)(void *data);
+    ngx_int_t                      (*output_filter)(void *data,
+                                         ngx_chain_t *in);
+    void                            *output_filter_ctx;
+
+    /* Upstream => Nginx */
     ngx_int_t                      (*input_filter_init)(void *data);
     ngx_int_t                      (*input_filter)(void *data, ssize_t bytes);
     void                            *input_filter_ctx;

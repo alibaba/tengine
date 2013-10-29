@@ -14,6 +14,7 @@
 #define NGX_HTTP_TRIM_SAVE_SLASH        -1
 #define NGX_HTTP_TRIM_SAVE_JSCSS        -2
 #define NGX_HTTP_TRIM_SAVE_HACKCSS      -3
+#define NGX_HTTP_TRIM_SAVE_JAVASCRIPT   -4
 
 
 typedef struct {
@@ -42,8 +43,7 @@ typedef struct {
 
 
 typedef enum {
-    trim_state_start = 0,
-    trim_state_text,
+    trim_state_text = 0,
     trim_state_text_whitespace,         /* \r \t ' ' */
     trim_state_tag,                     /* <  */
     trim_state_tag_text,
@@ -91,6 +91,7 @@ typedef enum {
     trim_state_tag_script_js_whitespace,
     trim_state_tag_script_js_comment_begin,
     trim_state_tag_script_js_single_comment,
+    trim_state_tag_script_js_single_comment_end,
     trim_state_tag_script_js_multi_comment,
     trim_state_tag_script_js_multi_comment_end,
     trim_state_comment_begin,           /* <!-- */
@@ -312,6 +313,10 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             } else if (ctx->saved == NGX_HTTP_TRIM_SAVE_HACKCSS) {
                 cl->buf->pos = ngx_http_trim_saved_css_hack.data;
                 cl->buf->last = cl->buf->pos + ngx_http_trim_saved_css_hack.len;
+
+            } else if (ctx->saved == NGX_HTTP_TRIM_SAVE_JAVASCRIPT) {
+                cl->buf->pos = ngx_http_trim_script.data;
+                cl->buf->last = cl->buf->pos + ngx_http_trim_script.len - 1;
             }
 
             *ll = cl;
@@ -339,6 +344,12 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
                 cl->buf->last_buf = 1;
 
                 *ll = cl;
+                ll = &cl->next;
+
+            }  else {
+                if (ln->next == NULL) {
+                    *ll = NULL;
+                }
             }
 
         } else {
@@ -376,23 +387,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
         switch (ctx->state) {
 
-        case trim_state_start:
-            switch (ch) {
-            case '\r':
-            case '\n':
-            case '\t':
-            case ' ':
-                continue;
-            case '<':
-                ctx->state = trim_state_tag;
-                ctx->saved_comment = 1;
-                continue;
-            default:
-                ctx->state = trim_state_text;
-                break;
-            }
-            break;
-
         case trim_state_text:
             switch (ch) {
             case '\r':
@@ -407,7 +401,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 }
 
                 ctx->state = trim_state_text_whitespace;
-                if (ctx->prev == ch || ctx->prev == ' ' || ctx->prev == '>') {
+                if (ctx->prev == ch || ctx->prev == ' ') {
                     continue;
 
                 } else {
@@ -636,7 +630,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             break;
 
         case trim_state_tag_textarea_begin:
-            look = ngx_http_trim_textarea.data[ctx->looked++];    /* <textarea> */
+            look = ngx_http_trim_textarea.data[ctx->looked++]; /* <textarea> */
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_textarea.len) {
                     ctx->state = trim_state_tag_textarea_end;
@@ -875,6 +869,10 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
         case trim_state_tag_script_js_single_comment:
             switch (ch) {
+            case '<':
+                ctx->looked = 1;
+                ctx->state = trim_state_tag_script_js_single_comment_end;
+                continue;
             case '\n':
                 ctx->state = trim_state_tag_script_js_text;
                 if (trim_js_prefix[ctx->prev >> 5] & (1 << (ctx->prev & 0x1f))
@@ -889,6 +887,41 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 continue;
             }
             break;
+
+        case trim_state_tag_script_js_single_comment_end:
+            look = ngx_http_trim_script.data[ctx->looked++];
+            if (ch == look) {
+                if (ctx->looked == ngx_http_trim_script.len) {
+                    ctx->state = trim_state_text;
+                    ctx->looked = 0;
+
+                    if ((size_t) (read - buf->pos)
+                        >= ngx_http_trim_script.len - 1)
+                    {
+                        write = ngx_cpymem(write, ngx_http_trim_script.data,
+                                           ngx_http_trim_script.len - 1);
+
+                    } else {
+                        ctx->saved = NGX_HTTP_TRIM_SAVE_JAVASCRIPT;
+                    }
+
+                    break;
+                }
+
+                continue;
+            }
+
+            switch (ch) {
+            case '<':
+                ctx->looked = 1;
+                break;
+            default:
+                ctx->state = trim_state_tag_script_js_single_comment;
+                ctx->looked = 0;
+                break;
+            }
+
+            continue;
 
         case trim_state_tag_script_js_multi_comment:
             switch (ch) {
@@ -1003,7 +1036,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                     } else {
                         ctx->state = trim_state_tag_style_end;
-                    } 
+                    }
 
                     ctx->looked = 0;
                 }
@@ -1186,7 +1219,9 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '/':
                 ctx->state = trim_state_tag_style_css_text;
 
-                if ((size_t) (read - buf->pos) >= ngx_http_trim_saved_jscss.len) {
+                if ((size_t) (read - buf->pos)
+                    >= ngx_http_trim_saved_jscss.len)
+                {
                     write = ngx_cpymem(write, ngx_http_trim_saved_jscss.data,
                                        ngx_http_trim_saved_jscss.len);
 
@@ -1222,7 +1257,9 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '/':
                 ctx->state = trim_state_tag_style_css_comment_hack_text;
 
-                if ((size_t) (read - buf->pos) >= ngx_http_trim_saved_css_hack.len) {
+                if ((size_t) (read - buf->pos)
+                    >= ngx_http_trim_saved_css_hack.len)
+                {
                     write = ngx_cpymem(write, ngx_http_trim_saved_css_hack.data,
                                        ngx_http_trim_saved_css_hack.len);
 

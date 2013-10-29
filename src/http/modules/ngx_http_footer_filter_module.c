@@ -97,6 +97,9 @@ ngx_http_footer_header_filter(ngx_http_request_t *r)
         || (r->method & NGX_HTTP_HEAD)
         || r != r->main
         || r->headers_out.status == NGX_HTTP_NO_CONTENT
+        || r->headers_out.content_length_n == 0
+        || (r->headers_out.content_encoding
+            && r->headers_out.content_encoding->value.len)
         || ngx_http_test_content_type(r, &lcf->types) == NULL)
     {
         return ngx_http_next_header_filter(r);

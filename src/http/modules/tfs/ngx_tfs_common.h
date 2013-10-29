@@ -17,6 +17,7 @@
 #define NGX_HTTP_TFS_YES                              1
 #define NGX_HTTP_TFS_NO                               0
 #define NGX_HTTP_TFS_AGAIN                            -20
+#define NGX_HTTP_TFS_MAX_RETRY_COUNT                  2
 
 #define NGX_HTTP_TFS_NGINX_APPKEY                     "tfs"
 #define NGX_HTTP_TFS_DEFAULT_APPID                    1
@@ -80,6 +81,8 @@
 
 #define NGX_HTTP_TFS_READ_STAT_NORMAL                   0
 #define NGX_HTTP_TFS_READ_STAT_FORCE                    1
+
+#define NGX_HTTP_TFS_IMAGE_TYPE_SIZE                    8
 
 #define NGX_BSWAP_64(x)                         \
     ((((x) & 0xff00000000000000ull) >> 56)      \
@@ -174,6 +177,8 @@ typedef enum {
     NGX_HTTP_TFS_STATE_WRITE_START = 0,
     NGX_HTTP_TFS_STATE_WRITE_GET_META_TABLE,
     NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_MS,
+    NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT,
+    NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ,
     NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS,
     NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO,
     NGX_HTTP_TFS_STATE_WRITE_STAT_DUP_FILE,
@@ -283,6 +288,11 @@ ngx_http_tfs_t *ngx_http_tfs_alloc_st(ngx_http_tfs_t *t);
 #define ngx_http_tfs_free_st(t)           \
         t->next = t->parent->free_sts;   \
         t->parent->free_sts = t;         \
+
+
+ngx_int_t ngx_http_tfs_get_content_type(u_char *data, ngx_str_t *type);
+ngx_int_t ngx_chain_add_copy_with_buf(ngx_pool_t *pool, ngx_chain_t **chain,
+    ngx_chain_t *in);
 
 
 #endif  /* _NGX_HTTP_TFS_COMMON_H_INCLUDED_ */

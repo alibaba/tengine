@@ -41,9 +41,9 @@ __DATA__
 <textarea>
    hello
         world!
-</textarea><pre>
+</textarea> <pre>
   hello     world!
-    </pre><!--[if IE]> hello    world    ! <![endif]--><!--[if !IE ]>--> hello    world  ! <!--<![endif]-->'
+    </pre> <!--[if IE]> hello    world    ! <![endif]--> <!--[if !IE ]>--> hello    world  ! <!--<![endif]--> '
 
 === TEST 2: trim within other tags
 --- config
@@ -63,7 +63,7 @@ is good  to     see you   </body>
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<body>hello world, it is good to see you </body><body>hello world, it is good to see you </body>'
+<body>hello world, it is good to see you </body> <body>hello world, it is good to see you </body> '
 
 === TEST 3: trim within non-ie comment
 --- config
@@ -83,7 +83,7 @@ is good  to     see you   </body>
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<body>hello </body><!--[if IE]> hello    world    ! <![endif]--><!--[if !IE ]>--> hello    world  ! <!--<![endif]-->'
+<body>hello </body> <!--[if IE]> hello    world    ! <![endif]--> <!--[if !IE ]>--> hello    world  ! <!--<![endif]--> '
 
 === TEST 4: do not trim within tag quote
 --- config
@@ -101,7 +101,7 @@ style="text-align:   center;">hello   world,   it
 --- response_body eval
 '<!DOCTYPE html>
 <body
-style="text-align:   center;">hello world, it is good to see you </body>'
+style="text-align:   center;">hello world, it is good to see you </body> '
 
 === TEST 5: trim newline
 --- config
@@ -130,8 +130,8 @@ style="text-align:   center;">hello world, it is good to see you </body>'
 --- request
     GET /t/trim.html
 --- response_body eval
-'<!DOCTYPE html>
-<html><body>hello world!<body> <html>'
+'
+<!DOCTYPE html> <html> <body>hello world!<body> <html> '
 
 === TEST 6: return zero size 
 --- config
@@ -156,8 +156,6 @@ style="text-align:   center;">hello world, it is good to see you </body>'
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
-
-
 <!DOCTYPE html>
 <      <PRE>hello     world  ! </pre>
 <2     <pre>hello     world  ! </pre>
@@ -171,7 +169,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-< <PRE>hello     world  ! </pre><2 <pre>hello     world  ! </pre><<< <pre>hello     world  ! </pre>< < <pre>hello     world  ! </pre>< <<pre>hello     world  ! </pre><x <<pre>hello world ! </pre>< <<<!doctype html>'
+< <PRE>hello     world  ! </pre> <2 <pre>hello     world  ! </pre> <<< <pre>hello     world  ! </pre> < < <pre>hello     world  ! </pre> < <<pre>hello     world  ! </pre> <x <<pre>hello world ! </pre> < <<<!doctype html> '
 
 === TEST 8: trim Chinese characters
 --- config
@@ -204,7 +202,7 @@ style="text-align:   center;">hello world, it is good to see you </body>'
     GET /trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<body>hello world, it is good to see you </body>'
+<body>hello world, it is good to see you </body> '
 
 === TEST 10: if $arg_http_trim is off, trim off.
 --- config
@@ -251,9 +249,9 @@ document.write("hello world");
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<script>document.write("hello world");</script><script type="text/javascript"></script><script type="text/vbscript">
+<script>document.write("hello world");</script> <script type="text/javascript"></script> <script type="text/vbscript">
 /* no javscript code !*/
-</script>'
+</script> '
 
 === TEST 12: do not tirm javascript quote and RE 
 --- config
@@ -277,7 +275,7 @@ str.replace(  /    /,"hello");
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<script>document.write("hello      world");document.write("hello  \"  world");var reg=/hello  \/   world /g;var reg=/hello  \/   world /g;str.replace(/    /,"hello");str.replace(/    /,"hello");</script>'
+<script>document.write("hello      world");document.write("hello  \"  world");var reg=/hello  \/   world /g;var reg=/hello  \/   world /g;str.replace(/    /,"hello");str.replace(/    /,"hello");</script> '
 
 === TEST 13: trim css comment
 --- config
@@ -299,7 +297,7 @@ body {
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<style type="text/css">body {background-color:black;}</style>'
+<style type="text/css">body {background-color:black;}</style> '
 
 === TEST 14: do not trim css quote
 --- config
@@ -319,7 +317,7 @@ body {
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<style type="text/css">"hello      world");"hello  \"  world");"hello  \\\\\"  world");</style>'
+<style type="text/css">"hello      world");"hello  \"  world");"hello  \\\\\"  world");</style> '
 
 === TEST 15 trim aplus.js
 --- config
@@ -343,7 +341,7 @@ d.getElementsByTagName("head")[0].appendChild(t);
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<script type="text/javascript">(function (d) {var t=d.createElement("script");t.type="text/javascript";t.async=true;t.id="tb-beacon-aplus";t.setAttribute("exparams","category=&userid=&aplus");t.src=("https:"==d.location.protocol?"https://s":"http://a")+".tbcdn.cn/s/aplus_v2.js";d.getElementsByTagName("head")[0].appendChild(t);})(document);</script>'
+<script type="text/javascript">(function (d) {var t=d.createElement("script");t.type="text/javascript";t.async=true;t.id="tb-beacon-aplus";t.setAttribute("exparams","category=&userid=&aplus");t.src=("https:"==d.location.protocol?"https://s":"http://a")+".tbcdn.cn/s/aplus_v2.js";d.getElementsByTagName("head")[0].appendChild(t);})(document);</script> '
 
 === TEST 15: do not trim css comment of child selector hack
 --- config
@@ -363,7 +361,7 @@ html >/**/ body p {
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<style type="text/css">html >/**/ body p {color:blue;}</style>'
+<style type="text/css">html >/**/ body p {color:blue;}</style> '
 
 === TEST 16: do not trim css comment of IE5/Mac hack
 --- config
@@ -390,4 +388,22 @@ html >/**/ body p {
     color: khaki;
 }
 /**/
-</style>'
+</style> '
+
+=== TEST 17: comment of javascript
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<script type="text/javascript">// <![CDATA[
+   return   true;
+// ]]></script></head><body id="loginform"><div id="page_content">
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content"> '
