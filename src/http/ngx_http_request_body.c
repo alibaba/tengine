@@ -704,6 +704,17 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                            n);
 
             if (n == NGX_AGAIN) {
+
+                if (rb->postpone_size
+                    >= (off_t) clcf->client_body_postpone_size)
+                {
+
+                    if (rb->buffered) {
+                        rb->flush = 1;
+                        goto read_ok;
+                    }
+                }
+
                 break;
             }
 
