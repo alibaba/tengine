@@ -474,6 +474,10 @@ HTTP_MEMCACHED_MODULE=ngx_http_memcached_module
 HTTP_MEMCACHED_SRCS=src/http/modules/ngx_http_memcached_module.c
 
 
+HTTP_PROXY_CONNECT_MODULE=ngx_http_proxy_connect_module
+HTTP_PROXY_CONNECT_SRCS=src/http/modules/ngx_http_proxy_connect_module.c
+
+
 HTTP_LIMIT_CONN_MODULE=ngx_http_limit_conn_module
 HTTP_LIMIT_CONN_SRCS=src/http/modules/ngx_http_limit_conn_module.c
 

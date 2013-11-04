@@ -725,7 +725,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
 {
     u_char                    *host;
     ssize_t                    n;
-    ngx_int_t                  rc, rv;
+    ngx_int_t                  rc, rv, port;
     ngx_connection_t          *c;
     ngx_http_request_t        *r;
     ngx_http_core_srv_conf_t  *cscf;
@@ -897,6 +897,50 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http exten: \"%V\"", &r->exten);
+
+            if (r->connect_host_start && r->connect_host_end) {
+
+                host = r->connect_host_start;
+                n = ngx_http_validate_host(r, &host,
+                                           r->connect_host_end -
+                                           r->connect_host_start, 0);
+
+                if (n == 0) {
+                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent invalid host in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                if (n < 0) {
+                    ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                    return;
+                }
+
+                r->connect_host.len = n;
+                r->connect_host.data = host;
+
+                if (!r->connect_port_end) {
+                   ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent no port in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                r->connect_port.data = r->connect_host_end + 1;
+                r->connect_port.len = r->connect_port_end
+                                      - r->connect_host_end - 1;
+
+                port = ngx_atoi(r->connect_port.data, r->connect_port.len);
+                if (port == NGX_ERROR || port < 1 || port > 65535) {
+                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent invalid port in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                r->connect_port_n = port;
+            }
 
             if (r->host_start && r->host_end) {
 
@@ -1345,6 +1389,17 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
             r->schema_end = new + (r->schema_end - old);
         }
 
+        if (r->connect_host_start) {
+            r->connect_host_start = new + (r->connect_host_start - old);
+            if (r->connect_host_end) {
+                r->connect_host_end = new + (r->connect_host_end - old);
+            }
+
+            if (r->connect_port_end) {
+                r->connect_port_end = new + (r->connect_port_end - old);
+            }
+        }
+
         if (r->host_start) {
             r->host_start = new + (r->host_start - old);
             if (r->host_end) {
@@ -1631,7 +1686,8 @@ ngx_http_process_request_header(ngx_http_request_t *r)
 static void
 ngx_http_process_request(ngx_http_request_t *r)
 {
-    ngx_connection_t  *c;
+    ngx_connection_t            *c;
+    ngx_http_core_loc_conf_t    *clcf;
 
     c = r->connection;
 
@@ -1639,6 +1695,14 @@ ngx_http_process_request(ngx_http_request_t *r)
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "client sent plain HTTP request to HTTPS port");
         ngx_http_finalize_request(r, NGX_HTTP_TO_HTTPS);
+        return;
+    }
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (r->method == NGX_HTTP_CONNECT && !clcf->accept_connect) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "client sent connect method");
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
         return;
     }
 

@@ -98,6 +98,7 @@ NGX_ALL_MODULES="
     ngx_http_scgi_module
     ngx_http_perl_module
     ngx_http_memcached_module
+    ngx_http_proxy_connect_module
     ngx_http_empty_gif_module
     ngx_http_browser_module
     ngx_http_secure_link_module
@@ -233,6 +234,7 @@ HTTP_PERL=NO
 HTTP_LUA=NO
 HTTP_TFS=NO
 HTTP_MEMCACHED=YES
+HTTP_PROXY_CONNECT=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
 HTTP_EMPTY_GIF=YES
@@ -288,6 +290,7 @@ HTTP_FASTCGI_SHARED=NO
 HTTP_UWSGI_SHARED=NO
 HTTP_SCGI_SHARED=NO
 HTTP_MEMCACHED_SHARED=NO
+HTTP_PROXY_CONNECT_SHARED=NO
 HTTP_LIMIT_CONN_SHARED=NO
 HTTP_LIMIT_REQ_SHARED=NO
 HTTP_EMPTY_GIF_SHARED=NO
@@ -513,6 +516,8 @@ do
                                                    HTTP_SCGI=NO                      ;;
         --with-http_memcached_module=shared)       HTTP_MEMCACHED_SHARED=YES
                                                    HTTP_MEMCACHED=NO                 ;;
+        --with-http_proxy_connect_module=shared)   HTTP_PROXY_CONNECT_SHARED=YES
+                                                   HTTP_PROXY_CONNECT=NO             ;;
         --with-http_limit_conn_module=shared)      HTTP_LIMIT_CONN_SHARED=YES
                                                    HTTP_LIMIT_CONN=NO                ;;
         --with-http_limit_req_module=shared)       HTTP_LIMIT_REQ_SHARED=YES
@@ -571,6 +576,8 @@ do
                                          HTTP_SCGI_SHARED=NO        ;;
         --without-http_memcached_module) HTTP_MEMCACHED=NO
                                          HTTP_MEMCACHED_SHARED=NO   ;;
+        --without-http_proxy_connect_module) HTTP_PROXY_CONNECT=NO
+                                             HTTP_PROXY_CONNECT_SHARED=NO   ;;
         --without-http_limit_zone_module)
             HTTP_LIMIT_CONN=NO
             HTTP_LIMIT_CONN_SHARED=NO
@@ -783,6 +790,8 @@ cat << END
   --with-http_scgi_module=shared     enable ngx_http_scgi_module (shared)
   --with-http_memcached_module=shared
                                      enable ngx_http_memcached_module (shared)
+  --with-http_proxy_connect_module=shared
+                                     enable ngx_http_proxy_connect_module (shared)
   --with-http_limit_conn_module=shared
                                      enable ngx_http_limit_conn_module (shared)
   --with-http_limit_req_module=shared
@@ -821,6 +830,8 @@ cat << END
   --without-http_uwsgi_module        disable ngx_http_uwsgi_module
   --without-http_scgi_module         disable ngx_http_scgi_module
   --without-http_memcached_module    disable ngx_http_memcached_module
+  --without-http_proxy_connect_module
+                                     disable ngx_http_proxy_connect_module
   --without-http_limit_conn_module   disable ngx_http_limit_conn_module
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
@@ -957,6 +968,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UWSGI_SHARED=YES
     HTTP_SCGI_SHARED=YES
     HTTP_MEMCACHED_SHARED=YES
+    HTTP_PROXY_CONNECT_SHARED=YES
     HTTP_LIMIT_CONN_SHARED=YES
     HTTP_LIMIT_REQ_SHARED=YES
     HTTP_EMPTY_GIF_SHARED=YES
@@ -993,6 +1005,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UWSGI=NO
     HTTP_SCGI=NO
     HTTP_MEMCACHED=NO
+    HTTP_PROXY_CONNECT=NO
     HTTP_LIMIT_CONN=NO
     HTTP_LIMIT_REQ=NO
     HTTP_EMPTY_GIF=NO
@@ -1029,12 +1042,14 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_REFERER=YES
     HTTP_REWRITE=YES
     HTTP_PROXY=YES
+    HTTP_PROXY_CONNECT=YES
     HTTP_FASTCGI=YES
     HTTP_UWSGI=YES
     HTTP_SCGI=YES
     HTTP_PERL=YES
     HTTP_LUA=YES
     HTTP_MEMCACHED=YES
+    HTTP_PROXY_CONNECT=YES
     HTTP_LIMIT_CONN=YES
     HTTP_LIMIT_REQ=YES
     HTTP_EMPTY_GIF=YES
@@ -1083,6 +1098,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UWSGI_SHARED=NO
     HTTP_SCGI_SHARED=NO
     HTTP_MEMCACHED_SHARED=NO
+    HTTP_PROXY_CONNECT_SHARED=NO
     HTTP_LIMIT_CONN_SHARED=NO
     HTTP_LIMIT_REQ_SHARED=NO
     HTTP_EMPTY_GIF_SHARED=NO

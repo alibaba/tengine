@@ -172,6 +172,12 @@ static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
 
 static ngx_http_variable_t  ngx_http_core_variables[] = {
 
+    { ngx_string("connect_host"), NULL, ngx_http_variable_request,
+      offsetof(ngx_http_request_t, connect_host), 0, 0 },
+
+    { ngx_string("connect_port"), NULL, ngx_http_variable_request,
+      offsetof(ngx_http_request_t, connect_port), 0, 0 },
+
     { ngx_string("http_host"), NULL, ngx_http_variable_header,
       offsetof(ngx_http_request_t, headers_in.host), 0, 0 },
 

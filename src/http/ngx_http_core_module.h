@@ -326,6 +326,8 @@ struct ngx_http_core_loc_conf_s {
 #endif
 #endif
 
+    unsigned      accept_connect:1;
+
     ngx_http_location_tree_node_t   *static_locations;
 #if (NGX_PCRE)
     ngx_http_core_loc_conf_t       **regex_locations;
