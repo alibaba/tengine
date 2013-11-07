@@ -73,32 +73,9 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
     r->request_body = rb;
 
-    if (r->headers_in.content_length_n < 0) {
-        post_handler(r);
-        return NGX_OK;
-    }
-
     if (!r->request_buffering) {
         return ngx_http_read_non_buffered_client_request_body(r, post_handler);
     }
-
-    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
-    if (r->headers_in.content_length_n == 0) {
-
-        if (r->request_body_in_file_only) {
-            if (ngx_http_write_request_body(r) != NGX_OK) {
-                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                goto done;
-            }
-        }
-
-        post_handler(r);
-
-        return NGX_OK;
-    }
-
-    rb->post_handler = post_handler;
 
     /*
      * set by ngx_pcalloc():

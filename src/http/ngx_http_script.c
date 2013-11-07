@@ -1441,8 +1441,8 @@ ngx_http_script_equal_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script greater");
@@ -1480,8 +1480,8 @@ ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_less_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script less");
@@ -1519,8 +1519,8 @@ ngx_http_script_less_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script greater or equal");
@@ -1558,8 +1558,8 @@ ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script less or equal");

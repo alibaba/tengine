@@ -21,13 +21,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http charset/)->plan(31);
+my $t = Test::Nginx->new()->has(qw/http charset/)->plan(41);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -47,6 +47,14 @@ http {
             charset A;
             source_charset B;
         }
+
+        location /t3.html {
+            max_ranges 2;
+        }
+
+        location /t4.html {
+            max_ranges 0;
+        }
     }
 }
 
@@ -55,6 +63,10 @@ EOF
 $t->write_file('t1.html',
 	join('', map { sprintf "X%03dXXXXXX", $_ } (0 .. 99)));
 $t->write_file('t2.html',
+	join('', map { sprintf "X%03dXXXXXX", $_ } (0 .. 99)));
+$t->write_file('t3.html',
+	join('', map { sprintf "X%03dXXXXXX", $_ } (0 .. 99)));
+$t->write_file('t4.html',
 	join('', map { sprintf "X%03dXXXXXX", $_ } (0 .. 99)));
 $t->run();
 
@@ -112,7 +124,35 @@ like($t1, qr/^X099XXXXXX\x0d?$/m, 'multipart big - content -10 aka 990-999');
 like($t1, qr/X001XXXXXX\x0d?$/m, 'multipart big - content 10-19');
 
 like(http_get_range('/t1.html', 'Range: bytes=100000-'), qr/416/,
-	'not satisfiable');
+	'not satisfiable - too big first byte pos');
+like(http_get_range('/t1.html', 'Range: bytes=alpha'), qr/416/,
+	'not satisfiable - alpha in first byte pos');
+like(http_get_range('/t1.html', 'Range: bytes=10-alpha'), qr/416/,
+	'not satisfiable - alpha in last byte pos');
+like(http_get_range('/t1.html', 'Range: bytes=10'), qr/416/,
+	'not satisfiable - no hyphen');
+like(http_get_range('/t1.html', 'Range: bytes=10-11 12-'), qr/416/,
+	'not satisfiable - no comma');
+
+# last-byte-pos is taken to be equal to one less than the current length
+# of the entity-body in bytes -- rfc2616 sec 14.35.
+
+like(http_get_range('/t1.html', 'Range: bytes=0-10001'), qr/206/,
+	'satisfiable - last byte pos adjusted');
+
+# total size of all ranges is greater than source response size
+
+like(http_get_range('/t1.html', 'Range: bytes=0-10001, 0-0'), qr/200/,
+	'not satisfiable - malicious byte ranges');
+
+like(http_get_range('/t3.html', 'Range: bytes=0-9, -10'), qr/206/,
+	'max_ranges not reached');
+like(http_get_range('/t3.html', 'Range: bytes=0-9, -10, 10000-'), qr/206/,
+	'max_ranges not reached bad range');
+unlike(http_get_range('/t3.html', 'Range: bytes=0-9, -10, 10-19'),
+	qr/206/, 'max_ranges reached');
+unlike(http_get_range('/t4.html', 'Range: bytes=0-9'), qr/206/,
+	'max_ranges zero');
 
 ###############################################################################
 
