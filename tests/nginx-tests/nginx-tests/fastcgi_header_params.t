@@ -30,7 +30,7 @@ my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(1)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -52,19 +52,12 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
 
-SKIP: {
-skip 'unsafe', 1 unless $ENV{TEST_NGINX_UNSAFE};
-
-local $TODO = 'not yet';
-
 like(http_get_headers('/'), qr/SEE-THIS/,
 	'fastcgi request with many ignored headers');
-
-}
 
 ###############################################################################
 

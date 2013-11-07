@@ -27,7 +27,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -39,7 +39,7 @@ http {
         listen       127.0.0.1:8080;
         server_name  localhost;
         location / {
-            proxy_pass http://localhost:8080/local;
+            proxy_pass http://127.0.0.1:8080/local;
         }
         location /local {
         }

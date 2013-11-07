@@ -306,6 +306,7 @@ ngx_http_gzip_header_filter(ngx_http_request_t *r)
 
     ngx_http_clear_content_length(r);
     ngx_http_clear_accept_ranges(r);
+    ngx_http_clear_etag(r);
 
     return ngx_http_next_header_filter(r);
 }
@@ -618,6 +619,8 @@ ngx_http_gzip_filter_deflate_start(ngx_http_request_t *r,
                       "deflateInit2() failed: %d", rc);
         return NGX_ERROR;
     }
+
+    r->connection->buffered |= NGX_HTTP_GZIP_BUFFERED;
 
     ctx->last_out = &ctx->out;
     ctx->crc32 = crc32(0L, Z_NULL, 0);

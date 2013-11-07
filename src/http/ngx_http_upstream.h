@@ -124,6 +124,7 @@ struct ngx_http_upstream_srv_conf_s {
     ngx_uint_t                       line;
     in_port_t                        port;
     in_port_t                        default_port;
+    ngx_uint_t                       no_port;  /* unsigned no_port:1 */
 };
 
 
@@ -293,6 +294,8 @@ struct ngx_http_upstream_s {
 
     ngx_http_upstream_resolved_t    *resolved;
 
+    ngx_buf_t                        from_client;
+
     ngx_buf_t                        buffer;
     off_t                            length;
 
@@ -345,6 +348,7 @@ struct ngx_http_upstream_s {
 
     unsigned                         buffering:1;
     unsigned                         keepalive:1;
+    unsigned                         upgrade:1;
 
     unsigned                         request_sent:1;
     unsigned                         header_sent:1;

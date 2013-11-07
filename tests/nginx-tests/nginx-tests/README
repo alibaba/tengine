@@ -25,12 +25,12 @@ TEST_NGINX_VERBOSE
 
 TEST_NGINX_LEAVE
 
-    If set temporary directory with configs and logs won't be deleted on test
-    completion.  Usefull for debugging.
+    If set, temporary directory with configs and logs won't be deleted on test
+    completion.  Useful for debugging.
 
 TEST_NGINX_CATLOG
 
-    Cat error log to stdout after test completion.  Usefull for debugging.
+    Cat error log to stdout after test completion.  Useful for debugging.
 
 TEST_NGINX_UNSAFE
 

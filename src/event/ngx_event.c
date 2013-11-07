@@ -76,6 +76,8 @@ ngx_atomic_t   ngx_stat_reading0;
 ngx_atomic_t  *ngx_stat_reading = &ngx_stat_reading0;
 ngx_atomic_t   ngx_stat_writing0;
 ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
+ngx_atomic_t   ngx_stat_waiting0;
+ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
 ngx_atomic_t   ngx_stat_request_time0;
 ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
 
@@ -517,6 +519,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
            + cl          /* ngx_stat_active */
            + cl          /* ngx_stat_reading */
            + cl          /* ngx_stat_writing */
+           + cl          /* ngx_stat_waiting */
            + cl;         /* ngx_stat_request_time */
 
 #endif
@@ -564,7 +567,8 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_stat_active = (ngx_atomic_t *) (shared + 6 * cl);
     ngx_stat_reading = (ngx_atomic_t *) (shared + 7 * cl);
     ngx_stat_writing = (ngx_atomic_t *) (shared + 8 * cl);
-    ngx_stat_request_time = (ngx_atomic_t *) (shared + 9 * cl);
+    ngx_stat_waiting = (ngx_atomic_t *) (shared + 9 * cl);
+    ngx_stat_request_time = (ngx_atomic_t *) (shared + 10 * cl);
 
 #endif
 
@@ -609,6 +613,17 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     } else {
         ngx_use_accept_mutex = 0;
     }
+
+#if (NGX_WIN32)
+
+    /*
+     * disable accept mutex on win32 as it may cause deadlock if
+     * grabbed by a process which can't accept connections
+     */
+
+    ngx_use_accept_mutex = 0;
+
+#endif
 
 #if (NGX_THREADS)
     ngx_posted_events_mutex = ngx_mutex_init(cycle->log, 0);
