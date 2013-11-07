@@ -39,10 +39,13 @@ sub new {
 
 	$self->{_testdir} = tempdir(
 		'nginx-test-XXXXXXXXXX',
-		TMPDIR => 1
+		TMPDIR => 1,
+		CLEANUP => not $ENV{TEST_NGINX_LEAVE}
 	)
 		or die "Can't create temp directory: $!\n";
 	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
+	$self->{_dso_module} = ();
+	mkdir("$self->{_testdir}/logs");
 
 	return $self;
 }
@@ -69,6 +72,12 @@ sub has($;) {
 	}
 
 	return $self;
+}
+
+sub set_dso($;) {
+	my ($self, $module_name, $module_path) = @_;
+
+	$self->{_dso_module}{$module_name} = $module_path;
 }
 
 sub has_module($) {
@@ -246,6 +255,35 @@ sub waitforsocket($) {
 	return undef;
 }
 
+sub reload() {
+	my ($self) = @_; 
+
+	return $self unless $self->{_started};
+
+	local $/;
+	open F, '<' . $self->{_testdir} . '/nginx.pid'
+		or die "Can't open nginx.pid: $!";
+	my $pid = <F>;
+	close F;
+
+	if ($^O eq 'MSWin32') {
+		my $testdir = $self->{_testdir};
+		my @globals = $self->{_test_globals} ?
+			() : ('-g', "pid $testdir/nginx.pid; "
+			. "error_log $testdir/error.log debug;");
+		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'reload',
+			@globals) == 0
+			or die "system() failed: $?\n";
+
+	} else {
+		kill 'HUP', $pid;
+	}
+
+	sleep(1);
+
+	return $self;
+}
+
 sub stop() {
 	my ($self) = @_;
 
@@ -304,6 +342,7 @@ sub write_file_expand($$) {
 	my ($self, $name, $content) = @_;
 
 	$content =~ s/%%TEST_GLOBALS%%/$self->test_globals()/gmse;
+	$content =~ s/%%TEST_GLOBALS_DSO%%/$self->test_globals_dso()/gmse;
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
 
@@ -349,6 +388,28 @@ sub test_globals() {
 	$s .= "error_log $self->{_testdir}/error.log debug;\n";
 
 	$self->{_test_globals} = $s;
+}
+
+sub test_globals_dso() {
+	my ($self) = @_;
+
+	return "" unless defined $ENV{TEST_NGINX_DSO};
+
+	return $self->{_test_globals_dso} if defined $self->{_test_globals_dso};
+
+	my $s = '';
+
+	$s .= "dso {\n";
+	if (defined $ENV{NGINX_DSO_PATH}) {
+		$s .= "path $ENV{NGINX_DSO_PATH};\n";
+	}
+
+	while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
+		$s .= "load $key $value;\n";
+	}
+	$s .= "}\n";
+
+	$self->{_test_globals_dso} = $s;
 }
 
 sub test_globals_http() {
