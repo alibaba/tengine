@@ -1441,8 +1441,8 @@ ngx_http_script_equal_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script greater");
@@ -1453,13 +1453,13 @@ ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 
     e->ip += sizeof(uintptr_t);
 
-    val_n = ngx_atoi(val->data, val->len);
+    val_n = ngx_atoll(val->data, val->len);
     if (val_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
     }
 
-    res_n = ngx_atoi(res->data, res->len);
+    res_n = ngx_atoll(res->data, res->len);
     if (res_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
@@ -1480,8 +1480,8 @@ ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_less_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script less");
@@ -1492,13 +1492,13 @@ ngx_http_script_less_code(ngx_http_script_engine_t *e)
 
     e->ip += sizeof(uintptr_t);
 
-    val_n = ngx_atoi(val->data, val->len);
+    val_n = ngx_atoll(val->data, val->len);
     if (val_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
     }
 
-    res_n = ngx_atoi(res->data, res->len);
+    res_n = ngx_atoll(res->data, res->len);
     if (res_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
@@ -1519,8 +1519,8 @@ ngx_http_script_less_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script greater or equal");
@@ -1531,13 +1531,13 @@ ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
 
     e->ip += sizeof(uintptr_t);
 
-    val_n = ngx_atoi(val->data, val->len);
+    val_n = ngx_atoll(val->data, val->len);
     if (val_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
     }
 
-    res_n = ngx_atoi(res->data, res->len);
+    res_n = ngx_atoll(res->data, res->len);
     if (res_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
@@ -1558,8 +1558,8 @@ ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e)
 {
+    int64_t                     val_n, res_n;
     ngx_http_variable_value_t  *val, *res;
-    ngx_int_t                   val_n, res_n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script less or equal");
@@ -1570,13 +1570,13 @@ ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e)
 
     e->ip += sizeof(uintptr_t);
 
-    val_n = ngx_atoi(val->data, val->len);
+    val_n = ngx_atoll(val->data, val->len);
     if (val_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;
     }
 
-    res_n = ngx_atoi(res->data, res->len);
+    res_n = ngx_atoll(res->data, res->len);
     if (res_n == NGX_ERROR) {
         *res = ngx_http_variable_null_value;
         return;

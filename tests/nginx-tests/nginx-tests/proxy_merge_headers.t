@@ -28,7 +28,7 @@ my $t = Test::Nginx->new()->has(qw/http proxy cache rewrite/)->plan(7)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -98,12 +98,7 @@ like(http_get_ims('/setbody/'), qr/blah=blah;/,
 unlike(http_get('/'), qr/X-Pad/, 'proxy_pass_header default');
 like(http_get('/nested/'), qr/X-Pad/, 'proxy_pass_header nested');
 unlike(http_get('/'), qr/X-Hidden/, 'proxy_hide_header inherited');
-
-TODO: {
-local $TODO = 'not yet';
-
 unlike(http_get('/nested/'), qr/X-Hidden/, 'proxy_hide_header nested');
-}
 
 ###############################################################################
 

@@ -27,7 +27,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -68,12 +68,6 @@ like(http_get('/?1'), qr/x:0 y:0/, 'map default');
 like(http_get('/?foo'), qr/x:bar y:0/, 'map foo bar');
 like(http_get('/?example.com'), qr/x:0 y:foo/, 'map example.com foo');
 like(http_get('/?example.org'), qr/x:0 y:wild/, 'map example.org wildcard');
-
-TODO: {
-local $TODO = 'not yet';
-
 like(http_get('/?example.com.'), qr/x:0 y:foo/, 'map example.com. foo');
-
-}
 
 ###############################################################################

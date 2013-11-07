@@ -27,7 +27,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -50,9 +50,17 @@ http {
 
     geo $geo_proxy {
         default      default;
-        proxy        127.0.0.1/32;
+        proxy        127.0.0.1;
         127.0.0.0/8  loopback;
         192.0.2.0/24 test;
+    }
+
+    geo $geo_proxy_recursive {
+        default      default;
+        proxy        127.0.0.1;
+        127.0.0.0/8  loopback;
+        192.0.2.0/24 test;
+        proxy_recursive;
     }
 
     geo $geo_ranges {
@@ -71,6 +79,7 @@ http {
             add_header X-Geo $geo;
             add_header X-Arg $geo_from_arg;
             add_header X-XFF $geo_proxy;
+            add_header X-XFR $geo_proxy_recursive;
             add_header X-Ran $geo_ranges;
         }
     }
@@ -84,7 +93,7 @@ $t->run();
 plan(skip_all => 'no 127.0.0.1 on host')
 	if http_get('/1') !~ /X-IP: 127.0.0.1/m;
 
-$t->plan(7);
+$t->plan(9);
 
 ###############################################################################
 
@@ -96,6 +105,11 @@ like(http_get('/1?ip=10.0.0.1'), qr/^X-Arg: default/m, 'geo default');
 like(http_xff('192.0.2.1'), qr/^X-XFF: test/m, 'geo proxy');
 like(http_xff('10.0.0.1'), qr/^X-XFF: default/m, 'geo proxy default');
 like(http_xff('10.0.0.1, 192.0.2.1'), qr/^X-XFF: test/m, 'geo proxy long');
+
+like(http_xff('192.0.2.1, 127.0.0.1'), qr/^X-XFF: loopback/m,
+	'geo proxy_recursive off');
+like(http_xff('192.0.2.1, 127.0.0.1'), qr/^X-XFR: test/m,
+	'geo proxy_recursive on');
 
 like(http_get('/1'), qr/^X-Ran: loopback/m, 'geo ranges');
 

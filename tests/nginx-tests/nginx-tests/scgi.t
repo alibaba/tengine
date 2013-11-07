@@ -29,7 +29,7 @@ my $t = Test::Nginx->new()->has(qw/http scgi/)->plan(5)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -63,14 +63,8 @@ like(http_get('/'), qr/^3$/m, 'scgi third request');
 
 unlike(http_head('/'), qr/SEE-THIS/, 'no data in HEAD');
 
-SKIP: {
-skip 'unsafe', 1 unless $ENV{TEST_NGINX_UNSAFE};
-local $TODO = 'not yet';
-
 like(http_get_headers('/headers'), qr/SEE-THIS/,
 	'scgi request with many ignored headers');
-
-}
 
 ###############################################################################
 

@@ -27,7 +27,7 @@ my $t = Test::Nginx->new()->has(qw/http rewrite memcached ssi/)->plan(3)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -57,6 +57,9 @@ $t->write_file('ssi.html', '<!--#include virtual="/" set="blah" -->blah: <!--#ec
 $t->run_daemon(\&memcached_fake_daemon);
 $t->run();
 
+$t->waitforsocket('127.0.0.1:8081')
+	or die "Can't start fake memcached";
+
 ###############################################################################
 
 like(http_get('/'), qr/SEE-THIS/, 'memcached split trailer');
@@ -75,6 +78,8 @@ sub memcached_fake_daemon {
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
+
+	local $SIG{PIPE} = 'IGNORE';
 
 	while (my $client = $server->accept()) {
 		$client->autoflush(1);
