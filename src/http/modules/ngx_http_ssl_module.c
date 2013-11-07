@@ -18,6 +18,11 @@ typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
 #define NGX_DEFAULT_ECDH_CURVE  "prime256v1"
 
 
+#ifdef TLSEXT_TYPE_next_proto_neg
+static int ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
+    const unsigned char **out, unsigned int *outlen, void *arg);
+#endif
+
 static ngx_int_t ngx_http_ssl_static_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_ssl_variable(ngx_http_request_t *r,
@@ -32,6 +37,8 @@ static char *ngx_http_ssl_enable(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+static ngx_int_t ngx_http_ssl_init(ngx_conf_t *cf);
 
 
 static ngx_conf_bitmask_t  ngx_http_ssl_protocols[] = {
@@ -135,6 +142,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, client_certificate),
       NULL },
 
+    { ngx_string("ssl_trusted_certificate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, trusted_certificate),
+      NULL },
+
     { ngx_string("ssl_prefer_server_ciphers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -163,13 +177,41 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, crl),
       NULL },
 
+    { ngx_string("ssl_stapling"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, stapling),
+      NULL },
+
+    { ngx_string("ssl_stapling_file"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, stapling_file),
+      NULL },
+
+    { ngx_string("ssl_stapling_responder"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, stapling_responder),
+      NULL },
+
+    { ngx_string("ssl_stapling_verify"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, stapling_verify),
+      NULL },
+
       ngx_null_command
 };
 
 
 static ngx_http_module_t  ngx_http_ssl_module_ctx = {
     ngx_http_ssl_add_variables,            /* preconfiguration */
-    NULL,                                  /* postconfiguration */
+    ngx_http_ssl_init,                     /* postconfiguration */
 
     NULL,                                  /* create main configuration */
     NULL,                                  /* init main configuration */
@@ -233,6 +275,45 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
 
 
 static ngx_str_t ngx_http_ssl_sess_id_ctx = ngx_string("HTTP");
+
+
+#ifdef TLSEXT_TYPE_next_proto_neg
+
+#define NGX_HTTP_NPN_ADVERTISE  "\x08http/1.1"
+
+static int
+ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
+    const unsigned char **out, unsigned int *outlen, void *arg)
+{
+#if (NGX_HTTP_SPDY || NGX_DEBUG)
+    ngx_connection_t  *c;
+
+    c = ngx_ssl_get_connection(ssl_conn);
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "SSL NPN advertised");
+#endif
+
+#if (NGX_HTTP_SPDY)
+    {
+    ngx_http_connection_t  *hc;
+
+    hc = c->data;
+
+    if (hc->addr_conf->spdy) {
+        *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
+        *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
+
+        return SSL_TLSEXT_ERR_OK;
+    }
+    }
+#endif
+
+    *out = (unsigned char *) NGX_HTTP_NPN_ADVERTISE;
+    *outlen = sizeof(NGX_HTTP_NPN_ADVERTISE) - 1;
+
+    return SSL_TLSEXT_ERR_OK;
+}
+
+#endif
 
 
 static ngx_int_t
@@ -336,9 +417,12 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
      *     sscf->dhparam = { 0, NULL };
      *     sscf->ecdh_curve = { 0, NULL };
      *     sscf->client_certificate = { 0, NULL };
+     *     sscf->trusted_certificate = { 0, NULL };
      *     sscf->crl = { 0, NULL };
      *     sscf->ciphers = { 0, NULL };
      *     sscf->shm_zone = NULL;
+     *     sscf->stapling_file = { 0, NULL };
+     *     sscf->stapling_responder = { 0, NULL };
      */
 
     sscf->enable = NGX_CONF_UNSET;
@@ -347,6 +431,8 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->verify_depth = NGX_CONF_UNSET_UINT;
     sscf->builtin_session_cache = NGX_CONF_UNSET;
     sscf->session_timeout = NGX_CONF_UNSET;
+    sscf->stapling = NGX_CONF_UNSET;
+    sscf->stapling_verify = NGX_CONF_UNSET;
 
     return sscf;
 }
@@ -393,6 +479,8 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->client_certificate, prev->client_certificate,
                          "");
+    ngx_conf_merge_str_value(conf->trusted_certificate,
+                         prev->trusted_certificate, "");
     ngx_conf_merge_str_value(conf->crl, prev->crl, "");
 
     ngx_conf_merge_str_value(conf->ecdh_curve, prev->ecdh_curve,
@@ -403,6 +491,11 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->pass_phrase_dialog, prev->pass_phrase_dialog,
                          "builtin");
 
+    ngx_conf_merge_value(conf->stapling, prev->stapling, 0);
+    ngx_conf_merge_value(conf->stapling_verify, prev->stapling_verify, 0);
+    ngx_conf_merge_str_value(conf->stapling_file, prev->stapling_file, "");
+    ngx_conf_merge_str_value(conf->stapling_responder,
+                         prev->stapling_responder, "");
 
     conf->ssl.log = cf->log;
 
@@ -456,6 +549,11 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #endif
 
+#ifdef TLSEXT_TYPE_next_proto_neg
+    SSL_CTX_set_next_protos_advertised_cb(conf->ssl.ctx,
+                                          ngx_http_ssl_npn_advertised, NULL);
+#endif
+
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
         return NGX_CONF_ERROR;
@@ -504,10 +602,18 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         {
             return NGX_CONF_ERROR;
         }
+    }
 
-        if (ngx_ssl_crl(cf, &conf->ssl, &conf->crl) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
+    if (ngx_ssl_trusted_certificate(cf, &conf->ssl,
+                                    &conf->trusted_certificate,
+                                    conf->verify_depth)
+        != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_ssl_crl(cf, &conf->ssl, &conf->crl) != NGX_OK) {
+        return NGX_CONF_ERROR;
     }
 
     if (conf->prefer_server_ciphers) {
@@ -538,6 +644,17 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
+    }
+
+    if (conf->stapling) {
+
+        if (ngx_ssl_stapling(cf, &conf->ssl, &conf->stapling_file,
+                             &conf->stapling_responder, conf->stapling_verify)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+
     }
 
     return NGX_CONF_OK;
@@ -673,4 +790,38 @@ invalid:
                        "invalid session cache \"%V\"", &value[i]);
 
     return NGX_CONF_ERROR;
+}
+
+
+static ngx_int_t
+ngx_http_ssl_init(ngx_conf_t *cf)
+{
+    ngx_uint_t                   s;
+    ngx_http_ssl_srv_conf_t     *sscf;
+    ngx_http_core_loc_conf_t    *clcf;
+    ngx_http_core_srv_conf_t   **cscfp;
+    ngx_http_core_main_conf_t   *cmcf;
+
+    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+    cscfp = cmcf->servers.elts;
+
+    for (s = 0; s < cmcf->servers.nelts; s++) {
+
+        sscf = cscfp[s]->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
+
+        if (sscf->ssl.ctx == NULL || !sscf->stapling) {
+            continue;
+        }
+
+        clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
+
+        if (ngx_ssl_stapling_resolver(cf, &sscf->ssl, clcf->resolver,
+                                      clcf->resolver_timeout)
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
 }
