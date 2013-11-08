@@ -36,11 +36,17 @@ typedef struct {
     ngx_str_t                       dhparam;
     ngx_str_t                       ecdh_curve;
     ngx_str_t                       client_certificate;
+    ngx_str_t                       trusted_certificate;
     ngx_str_t                       crl;
 
     ngx_str_t                       ciphers;
 
     ngx_shm_zone_t                 *shm_zone;
+
+    ngx_flag_t                      stapling;
+    ngx_flag_t                      stapling_verify;
+    ngx_str_t                       stapling_file;
+    ngx_str_t                       stapling_responder;
 
     u_char                         *file;
     ngx_uint_t                      line;

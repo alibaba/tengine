@@ -84,7 +84,7 @@ my $log;
 }
 
 like($log, qr!^/: -$!m, 'no header');
-like($log, qr!^/set: max-age=3600; private; must-revalidate$!m,
+like($log, qr!^/set: max-age=3600[,;] private[,;] must-revalidate$!m,
 	'multi headers');
 
 like($log, qr!^/redefine: no-cache$!m, 'ignoring headers with (hash == 0)');

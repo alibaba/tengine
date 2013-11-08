@@ -69,6 +69,8 @@ static ngx_int_t ngx_http_add_header(ngx_http_request_t *r,
     ngx_http_header_val_t *hv, ngx_str_t *value);
 static ngx_int_t ngx_http_set_last_modified(ngx_http_request_t *r,
     ngx_http_header_val_t *hv, ngx_str_t *value);
+static ngx_int_t ngx_http_set_response_header(ngx_http_request_t *r,
+    ngx_http_header_val_t *hv, ngx_str_t *value);
 
 static void *ngx_http_headers_create_conf(ngx_conf_t *cf);
 static char *ngx_http_headers_merge_conf(ngx_conf_t *cf,
@@ -89,6 +91,10 @@ static ngx_http_set_header_t  ngx_http_set_headers[] = {
     { ngx_string("Last-Modified"),
                  offsetof(ngx_http_headers_out_t, last_modified),
                  ngx_http_set_last_modified },
+
+    { ngx_string("ETag"),
+                 offsetof(ngx_http_headers_out_t, etag),
+                 ngx_http_set_response_header },
 
     { ngx_null_string, 0, NULL }
 };
@@ -421,32 +427,44 @@ static ngx_int_t
 ngx_http_set_last_modified(ngx_http_request_t *r, ngx_http_header_val_t *hv,
     ngx_str_t *value)
 {
+    if (ngx_http_set_response_header(r, hv, value) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    r->headers_out.last_modified_time =
+        (value->len) ? ngx_http_parse_time(value->data, value->len) : -1;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_set_response_header(ngx_http_request_t *r, ngx_http_header_val_t *hv,
+    ngx_str_t *value)
+{
     ngx_table_elt_t  *h, **old;
 
     old = (ngx_table_elt_t **) ((char *) &r->headers_out + hv->offset);
 
-    r->headers_out.last_modified_time = -1;
-
-    if (*old == NULL) {
-
-        if (value->len == 0) {
-            return NGX_OK;
+    if (value->len == 0) {
+        if (*old) {
+            (*old)->hash = 0;
+            *old = NULL;
         }
 
+        return NGX_OK;
+    }
+
+    if (*old) {
+        h = *old;
+
+    } else {
         h = ngx_list_push(&r->headers_out.headers);
         if (h == NULL) {
             return NGX_ERROR;
         }
 
         *old = h;
-
-    } else {
-        h = *old;
-
-        if (value->len == 0) {
-            h->hash = 0;
-            return NGX_OK;
-        }
     }
 
     h->hash = 1;
