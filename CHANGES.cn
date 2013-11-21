@@ -1,3 +1,5 @@
+Tengine-1.5.2 [2013-11-21]
+* Security: 修复CVE-2013-4547安全漏洞
 
 Tengine-1.5.1 [2013-08-29]
 * Feature: 增加retry_cached_connection指令，可以关闭对后端长连接的无条件重试 [yaoweibin]

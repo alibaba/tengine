@@ -1,3 +1,8 @@
+Changes with Tengine 1.5.2                                       21 Nov 2013
+    *) Security: a character following an unescaped space in a request line
+       was handled incorrectly (CVE-2013-4547); the bug had appeared in
+       0.8.41.
+       Thanks to Ivan Fratric of the Google Security Team.
 
 Changes with Tengine 1.5.1                                       29 Aug 2013
 
