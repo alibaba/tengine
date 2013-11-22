@@ -1,5 +1,8 @@
-Tengine-1.5.2 [2013-11-21]
+
+Tengine-1.5.2 [2013-11-22]
 * Security: 修复CVE-2013-4547安全漏洞
+* Bugfix: 修复limit_req模块中nodelay无效的问题 [cfsego]
+* Bugfix: 修复trim模块在替换javascript异常的问题 [taoyuanyuan]
 
 Tengine-1.5.1 [2013-08-29]
 * Feature: 增加retry_cached_connection指令，可以关闭对后端长连接的无条件重试 [yaoweibin]
