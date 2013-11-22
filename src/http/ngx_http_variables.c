@@ -69,6 +69,8 @@ static ngx_int_t ngx_http_variable_scheme(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_https(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_full_request(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_is_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_document_root(ngx_http_request_t *r,
@@ -226,6 +228,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("scheme"), NULL, ngx_http_variable_scheme, 0, 0, 0 },
 
     { ngx_string("https"), NULL, ngx_http_variable_https, 0, 0, 0 },
+
+    { ngx_string("full_request"), NULL, ngx_http_variable_full_request,
+      0, 0, 0 },
 
     { ngx_string("request_uri"), NULL, ngx_http_variable_request,
       offsetof(ngx_http_request_t, unparsed_uri), 0, 0 },
@@ -1618,6 +1623,116 @@ ngx_http_variable_https(ngx_http_request_t *r,
 
     *v = ngx_http_variable_null_value;
 
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_full_request(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    size_t                     size;
+    u_char                    *last;
+    ngx_str_t                 *host, scheme, port;
+    ngx_uint_t                 p;
+    struct sockaddr_in        *sin;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6       *sin6;
+#endif
+    ngx_http_core_srv_conf_t  *cscf;
+
+    cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
+
+    ngx_str_null(&scheme);
+
+#if (NGX_HTTP_SSL)
+
+    if (r->connection->ssl) {
+        ngx_str_set(&scheme, "https://");
+    }
+
+#endif
+
+    if (scheme.len == 0) {
+        ngx_str_set(&scheme, "http://");
+    }
+
+    if (r->headers_in.server.len) {
+        host = &r->headers_in.server;
+
+    } else {
+        host = &cscf->server_name;
+    }
+
+    if (ngx_connection_local_sockaddr(r->connection, NULL, 0) != NGX_OK) {
+        goto failed;
+    }
+
+    ngx_str_null(&port);
+
+    switch (r->connection->local_sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        sin6 = (struct sockaddr_in6 *) r->connection->local_sockaddr;
+        p = ntohs(sin6->sin6_port);
+        break;
+#endif
+
+    default:
+        sin = (struct sockaddr_in *) r->connection->local_sockaddr;
+        p = ntohs(sin->sin_port);
+        break;
+    }
+
+    if (p > 0 && p < 65536 && p != 80 && p != 443) {
+        port.data = ngx_pnalloc(r->pool, sizeof(":65535") - 1);
+        if (port.data == NULL) {
+            goto failed;
+        }
+
+        port.len = ngx_sprintf(port.data, ":%ui", p) - port.data;
+    }
+
+    if (p > 0 && p < 65536 && p != 80 && p != 443) {
+        port.data = ngx_pnalloc(r->pool, sizeof(":65535") - 1);
+        if (port.data == NULL) {
+            goto failed;
+        }
+
+        port.len = ngx_sprintf(port.data, ":%ui", p) - port.data;
+    }
+
+    size = scheme.len + host->len + port.len + r->unparsed_uri.len;
+
+    v->data = ngx_pnalloc(r->pool, size);
+    if (v->data == NULL) {
+        goto failed;
+    }
+
+    last = v->data;
+
+    last = ngx_cpymem(last, scheme.data, scheme.len);
+
+    last = ngx_cpymem(last, host->data, host->len);
+
+    if (port.len) {
+        last = ngx_cpymem(last, port.data, port.len);
+    }
+
+    last = ngx_cpymem(last, r->unparsed_uri.data, r->unparsed_uri.len);
+
+    v->len = size;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+
+failed:
+
+    v->len = 0;
+    v->data = NULL;
     return NGX_OK;
 }
 
