@@ -45,6 +45,9 @@ static ngx_int_t ngx_http_variable_decode_base64(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_md5(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_escape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+
 
 #if (NGX_HAVE_TCP_INFO)
 static ngx_int_t ngx_http_variable_tcpinfo(ngx_http_request_t *r,
@@ -712,8 +715,16 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
     if (ngx_strncmp(name->data, "md5_encode_", 11) == 0) {
 
-        if (ngx_http_variable_md5(r, vv, (uintptr_t) name) == NGX_OK)
-        {
+        if (ngx_http_variable_md5(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
+    if (ngx_strncmp(name->data, "escape_uri_", 11) == 0) {
+
+        if (ngx_http_variable_escape_uri(r, vv, (uintptr_t) name) == NGX_OK) {
             return vv;
         }
 
@@ -1285,6 +1296,64 @@ ngx_http_variable_md5(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
     return NGX_OK;
 }
+
+
+static ngx_int_t
+ngx_http_variable_escape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_str_t *name = (ngx_str_t *) data;
+
+    size_t                      len, size;
+    u_char                     *low, *p;
+    ngx_str_t                   var, src;
+    uintptr_t                   escape;
+    ngx_uint_t                  hash;
+    ngx_http_variable_value_t  *vv;
+
+    len = name->len - (sizeof("escape_uri_") - 1);
+
+    low = ngx_pnalloc(r->pool, len);
+    if (low == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = name->data + sizeof("escape_uri_") - 1;
+
+    hash = ngx_hash_strlow(low, p, len);
+
+    var.len = len;
+    var.data = low;
+
+    vv = ngx_http_get_variable(r, &var, hash);
+
+    if (vv == NULL || vv->not_found) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    src.data = vv->data;
+    src.len = vv->len;
+
+    escape = 2 * ngx_escape_uri(NULL, src.data, src.len, NGX_ESCAPE_URI);
+
+    size = escape + src.len;
+
+    v->data = ngx_pnalloc(r->pool, size);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = (u_char *) ngx_escape_uri(v->data, src.data, src.len, NGX_ESCAPE_URI);
+    v->len = p - v->data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
 
 
 #if (NGX_HAVE_TCP_INFO)
@@ -3096,8 +3165,15 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
             continue;
         }
 
-        if (ngx_strncmp(v[i].name.data, "md5_encode_", 4) == 0) {
+        if (ngx_strncmp(v[i].name.data, "md5_encode_", 11) == 0) {
             v[i].get_handler = ngx_http_variable_md5;
+            v[i].data = (uintptr_t) &v[i].name;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "escape_uri_", 11) == 0) {
+            v[i].get_handler = ngx_http_variable_escape_uri;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
