@@ -20,7 +20,7 @@ use Time::Parse;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(72);
+my $t = Test::Nginx->new()->plan(75);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -687,6 +687,62 @@ EOF
 $t->run();
 
 ok(checkexpire(http_get("/path1/test.html"), 3), "http server location");
+
+$t->stop();
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+master_process off;
+daemon         off;
+
+%%TEST_GLOBALS_DSO%%
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+    access_log    off;
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        text/xml                              xml;
+        image/gif                             gif;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+        application/rss+xml                   rss;
+    }
+
+    server {
+        listen       127.0.0.1:8080;
+        server_name  localhost;
+
+        expires_by_types 8s image/*;
+
+        location /path1 {
+            root %%TESTDIR%%;
+            expires_by_types 3s text/*;
+            expires_by_types 5s text/html;
+        }
+
+        location /path2 {
+            root %%TESTDIR%%;
+        }
+ 
+    }
+}
+
+EOF
+
+$t->run();
+
+ok(checkexpire(http_get("/path1/test.html"), 5), "");
+ok(checkexpire(http_get("/path1/test.xml"), 3), "");
+
+ok(checkexpire(http_get("/path2/test.jpg"), 8), "");
 
 $t->stop();
 
