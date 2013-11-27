@@ -926,16 +926,16 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
                 host.len = r->connect_host_end - r->connect_host_start;
                 host.data = r->connect_host_start;
-                n = ngx_http_validate_host(&host, r->pool, 0);
+                rc = ngx_http_validate_host(&host, r->pool, 0);
 
-                if (n == 0) {
+                if (rc == NGX_DECLINED) {
                     ngx_log_error(NGX_LOG_INFO, c->log, 0,
                                   "client sent invalid host in request line");
                     ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
                     return;
                 }
 
-                if (n < 0) {
+                if (rc == NGX_ERROR) {
                     ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
                     return;
                 }
