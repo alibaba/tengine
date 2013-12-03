@@ -1355,7 +1355,6 @@ ngx_http_variable_escape_uri(ngx_http_request_t *r,
 }
 
 
-
 #if (NGX_HAVE_TCP_INFO)
 
 static ngx_int_t
@@ -1763,15 +1762,6 @@ ngx_http_variable_full_request(ngx_http_request_t *r,
         port.len = ngx_sprintf(port.data, ":%ui", p) - port.data;
     }
 
-    if (p > 0 && p < 65536 && p != 80 && p != 443) {
-        port.data = ngx_pnalloc(r->pool, sizeof(":65535") - 1);
-        if (port.data == NULL) {
-            goto failed;
-        }
-
-        port.len = ngx_sprintf(port.data, ":%ui", p) - port.data;
-    }
-
     size = scheme.len + host->len + port.len + r->unparsed_uri.len;
 
     v->data = ngx_pnalloc(r->pool, size);
@@ -1802,6 +1792,8 @@ failed:
 
     v->len = 0;
     v->data = NULL;
+    v->valid = 0;
+
     return NGX_OK;
 }
 
