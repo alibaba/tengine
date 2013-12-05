@@ -294,6 +294,43 @@ END
 	chmod 0755 '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
 END
 
+
+# nginx c header
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test -d '\$(DESTDIR)$NGX_INCLUDE_PATH' \
+		|| mkdir -p '\$(DESTDIR)$NGX_INCLUDE_PATH'
+END
+
+    for dep in $CORE_DEPS
+    do
+        if test -n "$dep"; then
+            cat << END                                                >> $NGX_MAKEFILE
+		test -f '$dep' && cp '$dep' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+END
+        fi
+    done
+
+    for hdep in $HTTP_DEPS
+    do
+        if test -n "$hdep"; then
+
+            cat << END                                                       >> $NGX_MAKEFILE
+
+		test -f '$hdep' && cp '$hdep' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+END
+        fi
+    done
+
+
+    cat << END                                                       >> $NGX_MAKEFILE
+
+	test -f '$NGX_OBJS/ngx_auto_headers.h'  && cp '$NGX_OBJS/ngx_auto_headers.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+	test -f '$NGX_OBJS/ngx_auto_config.h' && cp '$NGX_OBJS/ngx_auto_config.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
+
+END
+
 fi
 
 
