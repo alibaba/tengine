@@ -17,6 +17,7 @@ NGX_GROUP=
 
 NGX_DSO_PATH=
 NGX_DSO_TOOL_PATH=
+NGX_INCLUDE_PATH=
 
 CC=${CC:-cc}
 CPP=
@@ -391,6 +392,7 @@ do
 
         --dso-path=*)                              NGX_DSO_PATH="$value"      ;;
         --dso-tool-path=*)                         NGX_DSO_TOOL_PATH="$value" ;;
+        --includedir=*)                            NGX_INCLUDE_PATH="$value"  ;;
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
@@ -716,8 +718,9 @@ cat << END
   --enable-mods-shared=all           enable all the modules to be shared
   --enable-mods-static=all           enable all the modules to be static
 
-  --dso-path=*)                      set dso default load path
-  --dso-tool-path=*)                 set dso_tool pathname
+  --dso-path=DIR                     set dso default load path
+  --dso-tool-path=DIR                set dso_tool pathname
+  --includedir=DIR                   set C header files[PREFIX/include]
 
   --with-rtsig_module                enable rtsig module
   --with-select_module               enable select module
