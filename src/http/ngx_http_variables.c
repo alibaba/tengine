@@ -1752,8 +1752,8 @@ ngx_http_variable_full_request(ngx_http_request_t *r,
         p = ntohs(sin->sin_port);
         break;
     }
-    if (p > 0 && p < 65536 && ((p != 80 && scheme.len==7)
-                               || (p != 443 && scheme.len==8)))
+    if (p > 0 && p < 65536 && ((p != 80 && scheme.len == 7)
+                               || (p != 443 && scheme.len == 8)))
     {
         port.data = ngx_pnalloc(r->pool, sizeof(":65535") - 1);
         if (port.data == NULL) {

@@ -19,13 +19,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(4);
-
-$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
-$t->set_dso("ngx_http_upstream_ip_hash_module", "ngx_http_upstream_ip_hash_module.so");
-$t->set_dso("ngx_http_upstream_least_conn_module", "ngx_http_upstream_least_conn_module.so");
+my $t = Test::Nginx->new()->plan(6);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -68,6 +62,11 @@ http {
             rewrite .* http://127.0.0.1/$full_request;
         }
 
+        location /full_request_escape {
+            #output: te%20st
+            rewrite .* http://127.0.0.1/$escape_uri_full_request?;
+        }
+
     }
 }
 
@@ -81,5 +80,7 @@ like(http_get('/base64_decode'), qr/test/, 'base64_decode');
 like(http_get('/md5_encode'), qr/4621d373cade4e83/, 'md5_encode');
 like(http_get('/escape_uri'), qr/te%20st/, 'escape_uri');
 like(http_get('/full_request'), qr/http:\/\/localhost:8080\/full_request/, 'full_reqeust');
+like(http_get('/full_request_escape/<>'), qr/http:\/\/localhost:8080\/full_request_escape\/<>/, 'full_reqeust_escape');
+like(http_get('/full_request_escape/??'), qr/http:\/\/localhost:8080\/full_request_escape\/\?%3f/, 'full_reqeust_escape');
 
 ###############################################################################
