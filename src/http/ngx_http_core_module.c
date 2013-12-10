@@ -2471,9 +2471,11 @@ ngx_http_subrequest(ngx_http_request_t *r,
     ngx_http_post_subrequest_t *ps, ngx_uint_t flags)
 {
     ngx_time_t                    *tp;
+    struct timeval                 tv;
     ngx_connection_t              *c;
     ngx_http_request_t            *sr;
     ngx_http_core_srv_conf_t      *cscf;
+    ngx_http_core_loc_conf_t      *clcf;
     ngx_http_postponed_request_t  *pr, *p;
 
     r->main->subrequests--;
@@ -2590,9 +2592,20 @@ ngx_http_subrequest(ngx_http_request_t *r,
 
     sr->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
 
-    tp = ngx_timeofday();
-    sr->start_sec = tp->sec;
-    sr->start_msec = tp->msec;
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->request_time_cache) {
+        tp = ngx_timeofday();
+        sr->start_sec = tp->sec;
+        sr->start_msec = tp->msec;
+        sr->start_usec = tp->usec;
+
+    } else {
+        ngx_gettimeofday(&tv);
+        sr->start_sec = tv.tv_sec;
+        sr->start_msec = tv.tv_usec / 1000;
+        sr->start_usec = tv.tv_usec % 1000;
+    }
 
     r->main->count++;
 

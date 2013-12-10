@@ -574,6 +574,7 @@ ngx_http_create_request(ngx_connection_t *c)
         r->start_sec = tp->sec;
         r->start_msec = tp->msec;
         r->start_usec = tp->usec;
+
     } else {
         ngx_gettimeofday(&tv);
         r->start_sec = tv.tv_sec;
