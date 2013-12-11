@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -166,6 +165,8 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 n++;
             }
         }
+        
+        if (peers->number==1&&backup->number>1) { backup->isstandby=1; }
 
         peers->next = backup;
 
@@ -547,6 +548,8 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
         {
             continue;
         }
+        
+        if (peer->isstandby) { best = peer; break; }
 
         peer->current_weight += peer->effective_weight;
         total += peer->effective_weight;
