@@ -1787,6 +1787,64 @@ ngx_http_test_content_type(ngx_http_request_t *r, ngx_hash_t *types_hash)
 }
 
 
+void *
+ngx_http_test_content_type_wildcard(ngx_http_request_t *r, ngx_hash_t *types_hash)
+{
+    u_char      c, *lowcase, *slash, *range;
+    size_t      len;
+    ngx_uint_t  i, hash;
+
+    if (types_hash->size == 0) {
+        return (void *) 4;
+    }
+
+    if (r->headers_out.content_type.len == 0) {
+        return NULL;
+    }
+
+    len = r->headers_out.content_type_len;
+
+    if (r->headers_out.content_type_lowcase == NULL) {
+
+        lowcase = ngx_pnalloc(r->pool, len);
+        if (lowcase == NULL) {
+            return NULL;
+        }
+
+        r->headers_out.content_type_lowcase = lowcase;
+
+        for (i = 0; i < len; i++) {
+            c = ngx_tolower(r->headers_out.content_type.data[i]);
+            lowcase[i] = c;
+        }
+
+    }
+
+    slash = ngx_strlchr(r->headers_out.content_type_lowcase,
+                        r->headers_out.content_type_lowcase + len, '/');
+    if (slash == NULL) {
+        return NULL;
+    }
+
+    len = slash - r->headers_out.content_type_lowcase + 2;
+    range = ngx_pnalloc(r->pool, len);
+    if (range == NULL) {
+        return NULL;
+    }
+    ngx_memcpy(range, r->headers_out.content_type_lowcase, len - 1);
+    range[len - 1] = '*';
+
+    hash = 0;
+
+    for (i = 0; i < len; i++) {
+        c = range[i];
+        hash = ngx_hash(hash, c);
+    }
+
+    return ngx_hash_find(types_hash, hash, range, len);
+}
+
+
 ngx_int_t
 ngx_http_set_content_type(ngx_http_request_t *r)
 {
