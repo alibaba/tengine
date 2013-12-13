@@ -1558,11 +1558,12 @@ static void
 ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u)
 {
-    int                        tcp_nodelay;
-    ngx_int_t                  rc;
-    ngx_connection_t          *c;
-    ngx_http_request_body_t   *rb;
-    ngx_http_core_loc_conf_t  *clcf;
+    int                                   tcp_nodelay;
+    ngx_int_t                             rc;
+    ngx_connection_t                     *c;
+    ngx_http_request_body_t              *rb;
+    ngx_http_core_loc_conf_t             *clcf;
+    ngx_http_request_body_non_buffered_t *nb;
 
     c = u->peer.connection;
 
@@ -1577,13 +1578,15 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (clcf->tcp_nodelay && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "upstream tcp_nodelay");
+
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "upstream tcp_nodelay");
 
         tcp_nodelay = 1;
 
         if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
-                           (const void *) &tcp_nodelay, sizeof(int)) == -1)
-        {
+                       (const void *) &tcp_nodelay, sizeof(int)) == -1) {
+
             ngx_connection_error(c, ngx_socket_errno,
                                  "setsockopt(TCP_NODELAY) failed");
             ngx_http_upstream_finalize_request(r, u, 0);
@@ -1607,6 +1610,8 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
             goto send_done;
         }
 
+        nb = rb->non_buffered;
+
         if (u->request_sent && rb->rest) {
             c->log->action = "reading no buffered request body from client";
 
@@ -1617,7 +1622,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 return;
             }
 
-            if (!(rb->busy || rb->flush || rb->nomem || rb->rest == 0)) {
+            if (!(nb->busy || nb->flush || nb->nomem || rb->rest == 0)) {
 
                 if (c->write->timer_set) {
                     ngx_del_timer(c->write);
@@ -1654,29 +1659,22 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 
-        for (cl = rb->bufs; cl; cl = cl->next) {
+        for (cl = nb->bufs; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                          "http upstream before rb->bufs: p=%p, s=%d, size=%uO",
+                          "http upstream before nb->bufs: p=%p, s=%d, size=%uO",
                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 
 #endif
-        if (u->output_filter(u->output_filter_ctx, rb->bufs) != NGX_OK) {
+
+        /* copy buffers from nb->bufs to u->request_bufs */
+        if (u->output_filter(u->output_filter_ctx, nb->bufs) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
 
             return;
         }
-
-#if (NGX_DEBUG)
-        for (cl = u->request_bufs; cl; cl = cl->next) {
-            buf = cl->buf;
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "http upstream send out bufs: p=%p, s=%d, size=%uO",
-                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
-        }
-#endif
 
         rc = ngx_output_chain(&u->output, u->request_bufs);
 
@@ -1688,18 +1686,18 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http upstream send no buffered request: rc=%i", rc);
 
-        ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &u->request_bufs,
-                               (ngx_buf_tag_t) &ngx_http_core_module);
+        ngx_chain_update_chains(r->pool, &nb->free, &nb->busy, &u->request_bufs,
+            (ngx_buf_tag_t) &ngx_http_do_read_non_buffered_client_request_body);
 
 #if (NGX_DEBUG)
-        for (cl = rb->busy; cl; cl = cl->next) {
+        for (cl = nb->busy; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http upstream send busy bufs: p=%p, s=%d, size=%uO",
                            buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 
-        for (cl = rb->free; cl; cl = cl->next) {
+        for (cl = nb->free; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http upstream send free bufs: p=%p, s=%d, size=%uO",
@@ -1707,12 +1705,12 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         }
 #endif
 
-        rb->bufs = NULL;
-        rb->buf = NULL;
-        rb->last_out = &rb->bufs;
-        rb->postpone_size = 0;
-        rb->nomem = 0;
-        rb->flush = 0;
+        nb->bufs = NULL;
+        nb->buf = NULL;
+        nb->last_out = &nb->bufs;
+        nb->postpone_size = 0;
+        nb->nomem = 0;
+        nb->flush = 0;
         u->request_bufs = NULL;
 
 send_done:

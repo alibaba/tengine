@@ -702,7 +702,7 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
     }
 
     r->request_buffering = plcf->upstream.request_buffering;
-    if (r->headers_in.content_length_n <= 0) {
+    if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         r->request_buffering = 1;
     }
 
@@ -1309,14 +1309,18 @@ ngx_http_proxy_output_filter_init(void *data)
 static ngx_int_t
 ngx_http_proxy_output_filter(void *data, ngx_chain_t *in)
 {
-    ngx_chain_t         *cl;
+    ngx_chain_t         *cl, *out;
     ngx_http_request_t  *r = data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http proxy output filter");
 
+    if (ngx_http_chunked_output_filter(r, in, &out) != NGX_OK) {
+        return NGX_OK;
+    }
+
     if (r->upstream->request_bufs == NULL) {
-        r->upstream->request_bufs = in;
+        r->upstream->request_bufs = out;
     } else {
         cl = r->upstream->request_bufs;
 
@@ -1324,7 +1328,7 @@ ngx_http_proxy_output_filter(void *data, ngx_chain_t *in)
             cl = cl->next;
         }
 
-        cl->next = in;
+        cl->next = out;
     }
 
     return NGX_OK;
