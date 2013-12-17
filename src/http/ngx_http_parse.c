@@ -2285,11 +2285,11 @@ invalid:
 }
 
 
-/* TODO: buffer recycle */
 ngx_int_t
-ngx_http_chunked_output_filter(ngx_http_request_t *r,
-    ngx_chain_t *in, ngx_chain_t **output)
+ngx_http_chunked_output_filter(ngx_http_request_t *r, ngx_chain_t *in,
+    ngx_chain_t **output, ngx_chain_t **free, ngx_buf_tag_t tag)
 {
+    u_char      *chunk;
     off_t        size;
     ngx_buf_t   *b;
     ngx_chain_t *out, *cl, *tl, **ll;
@@ -2333,38 +2333,45 @@ ngx_http_chunked_output_filter(ngx_http_request_t *r,
     }
 
     if (size) {
-        tl = ngx_alloc_chain_link(r->pool);
+        tl = ngx_chain_get_free_buf(r->pool, free);
         if (tl == NULL) {
             return NGX_ERROR;
         }
 
-        /* the "0000000000000000" is 64-bit hexadecimal string */
-        b = ngx_create_temp_buf(r->pool, sizeof("0000000000000000" CRLF) - 1);
-        if (b == NULL) {
-            return NGX_ERROR;
+        b = tl->buf;
+        chunk = b->start;
+
+        if (chunk == NULL) {
+            /* the "0000000000000000" is 64-bit hexadecimal string */
+
+            chunk = ngx_palloc(r->pool, sizeof("0000000000000000" CRLF) - 1);
+            if (chunk == NULL) {
+                return NGX_ERROR;
+            }
+
+            b->start = chunk;
+            b->end = chunk + sizeof("0000000000000000" CRLF) - 1;
         }
 
-        b->tag = (ngx_buf_tag_t) &ngx_http_chunked_output_filter;
-        b->last = ngx_sprintf(b->pos, "%xO" CRLF, size);
+        b->tag = tag;
+        b->memory = 0;
+        b->temporary = 1;
+        b->pos = chunk;
+        b->last = ngx_sprintf(chunk, "%xO" CRLF, size);
 
-        tl->buf = b;
         tl->next = out;
         out = tl;
     }
 
     if (cl->buf->last_buf) {
-        tl = ngx_alloc_chain_link(r->pool);
+        tl = ngx_chain_get_free_buf(r->pool, free);
         if (tl == NULL) {
             return NGX_ERROR;
         }
 
-        /* TODO: buffer recycle */
-        b = ngx_calloc_buf(r->pool);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
+        b = tl->buf;
 
-        b->tag = (ngx_buf_tag_t) &ngx_http_chunked_output_filter;
+        b->tag = tag;
         b->memory = 0;
         b->temporary = 1;
         b->last_buf = 1;
@@ -2373,8 +2380,6 @@ ngx_http_chunked_output_filter(ngx_http_request_t *r,
 
         cl->buf->last_buf = 0;
 
-        tl->next = NULL;
-        tl->buf = b;
         *ll = tl;
 
         if (size == 0) {
@@ -2382,25 +2387,19 @@ ngx_http_chunked_output_filter(ngx_http_request_t *r,
         }
 
     } else if (size > 0) {
-        tl = ngx_alloc_chain_link(r->pool);
+        tl = ngx_chain_get_free_buf(r->pool, free);
         if (tl == NULL) {
             return NGX_ERROR;
         }
 
-        /* TODO: buffer recycle */
-        b = ngx_calloc_buf(r->pool);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
+        b = tl->buf;
 
-        b->tag = (ngx_buf_tag_t) &ngx_http_chunked_output_filter;
+        b->tag = tag;
         b->temporary = 0;
         b->memory = 1;
         b->start = b->pos = (u_char *) CRLF;
         b->end = b->last = b->pos + 2;
 
-        tl->next = NULL;
-        tl->buf = b;
         *ll = tl;
 
     } else {

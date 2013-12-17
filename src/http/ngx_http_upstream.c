@@ -31,9 +31,12 @@ static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_send_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
-static ngx_int_t ngx_http_upstream_output_filter_init(void *data);
-static ngx_int_t ngx_http_upstream_output_filter(void *data,
-    ngx_chain_t *in);
+static ngx_int_t ngx_http_upstream_output_filter_init(
+    ngx_http_upstream_output_filter_ctx_t *ctx);
+static ngx_int_t ngx_http_upstream_output_filter(
+    ngx_http_upstream_output_filter_ctx_t *ctx, ngx_chain_t *in);
+static void ngx_http_upstream_output_filter_update(
+    ngx_http_upstream_output_filter_ctx_t *ctx);
 static void ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
@@ -534,8 +537,18 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
     if (!u->output_filter) {
         u->output_filter_init = ngx_http_upstream_output_filter_init;
         u->output_filter = ngx_http_upstream_output_filter;
-        u->output_filter_ctx = r;
+        u->output_filter_update = ngx_http_upstream_output_filter_update;
     }
+
+    u->output_filter_ctx = ngx_pcalloc(r->pool,
+                           sizeof(ngx_http_upstream_output_filter_ctx_t));
+    if (u->output_filter_ctx == NULL) {
+        ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
+    u->output_filter_ctx->request = r;
+    u->output_filter_ctx->tag = (ngx_buf_tag_t) &u->output_filter;
 
     if (u->output_filter_init && u->output_filter_init(u->output_filter_ctx)
        != NGX_OK) {
@@ -1541,16 +1554,27 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
 
 static ngx_int_t
-ngx_http_upstream_output_filter_init(void *data)
+ngx_http_upstream_output_filter_init(ngx_http_upstream_output_filter_ctx_t *ctx)
 {
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_http_upstream_output_filter(void *data, ngx_chain_t *in)
+ngx_http_upstream_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
+    ngx_chain_t *in)
 {
     return NGX_OK;
+}
+
+
+static void
+ngx_http_upstream_output_filter_update(ngx_http_upstream_output_filter_ctx_t *ctx)
+{
+    ngx_http_request_t *r = ctx->request;
+
+    ngx_chain_update_chains(r->pool, &ctx->free, &ctx->busy,
+                            &ctx->out, ctx->tag);
 }
 
 
@@ -1612,6 +1636,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         nb = rb->non_buffered;
 
+        /* TODO: refactor this part of code, move it to the request_body.c */
         if (u->request_sent && rb->rest) {
             c->log->action = "reading no buffered request body from client";
 
@@ -1686,8 +1711,10 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http upstream send no buffered request: rc=%i", rc);
 
-        ngx_chain_update_chains(r->pool, &nb->free, &nb->busy, &u->request_bufs,
-            (ngx_buf_tag_t) &ngx_http_do_read_non_buffered_client_request_body);
+        u->output_filter_update(u->output_filter_ctx);
+
+        ngx_chain_update_chains(r->pool, &nb->free, &nb->busy,
+                &nb->bufs, nb->buf->tag);
 
 #if (NGX_DEBUG)
         for (cl = nb->busy; cl; cl = cl->next) {
