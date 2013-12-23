@@ -2375,8 +2375,8 @@ ngx_http_chunked_output_filter(ngx_http_request_t *r, ngx_chain_t *in,
         b->memory = 0;
         b->temporary = 1;
         b->last_buf = 1;
-        b->start = b->pos = (u_char *) CRLF "0" CRLF CRLF;
-        b->end = b->last = b->pos + 7;
+        b->pos = (u_char *) CRLF "0" CRLF CRLF;
+        b->last = b->pos + 7;
 
         cl->buf->last_buf = 0;
 
@@ -2397,8 +2397,8 @@ ngx_http_chunked_output_filter(ngx_http_request_t *r, ngx_chain_t *in,
         b->tag = tag;
         b->temporary = 0;
         b->memory = 1;
-        b->start = b->pos = (u_char *) CRLF;
-        b->end = b->last = b->pos + 2;
+        b->pos = (u_char *) CRLF;
+        b->last = b->pos + 2;
 
         *ll = tl;
 

@@ -1311,19 +1311,27 @@ static ngx_int_t
 ngx_http_proxy_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
     ngx_chain_t *in)
 {
-    ngx_chain_t         *cl;
+    ngx_chain_t         *cl, *out;
     ngx_http_request_t  *r = ctx->request;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http proxy output filter");
+
+    if (in == NULL || !r->headers_in.chunked) {
+        out = in;
+        goto filter_done;
+    }
 
     if (ngx_http_chunked_output_filter(r, in, &ctx->out,
                                        &ctx->free, ctx->tag) != NGX_OK) {
         return NGX_ERROR;
     }
 
+    out = ctx->out;
+
+filter_done:
     if (r->upstream->request_bufs == NULL) {
-        r->upstream->request_bufs = ctx->out;
+        r->upstream->request_bufs = out;
     } else {
         cl = r->upstream->request_bufs;
 
@@ -1331,7 +1339,7 @@ ngx_http_proxy_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
             cl = cl->next;
         }
 
-        cl->next = ctx->out;
+        cl->next = out;
     }
 
     return NGX_OK;

@@ -283,6 +283,9 @@ typedef struct {
     ngx_chain_t                      *busy;
     ngx_chain_t                      *free;
     ngx_chain_t                     **last_out;
+    ngx_int_t                       (*read_handler)(ngx_http_request_t *r);
+    void                            (*update_handler)(ngx_http_request_t *r);
+    ngx_buf_tag_t                     tag;
     off_t                             postpone_size;
     ngx_int_t                         num;
     unsigned                          buffered:1;

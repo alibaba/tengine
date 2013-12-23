@@ -534,10 +534,11 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         u->request_bufs = r->request_body->bufs;
     }
 
+    u->output_filter_update = ngx_http_upstream_output_filter_update;
+
     if (!u->output_filter) {
         u->output_filter_init = ngx_http_upstream_output_filter_init;
         u->output_filter = ngx_http_upstream_output_filter;
-        u->output_filter_update = ngx_http_upstream_output_filter_update;
     }
 
     u->output_filter_ctx = ngx_pcalloc(r->pool,
@@ -1573,6 +1574,9 @@ ngx_http_upstream_output_filter_update(ngx_http_upstream_output_filter_ctx_t *ct
 {
     ngx_http_request_t *r = ctx->request;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "upstream output filter update");
+
     ngx_chain_update_chains(r->pool, &ctx->free, &ctx->busy,
                             &ctx->out, ctx->tag);
 }
@@ -1640,7 +1644,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         if (u->request_sent && rb->rest) {
             c->log->action = "reading no buffered request body from client";
 
-            rc = ngx_http_do_read_non_buffered_client_request_body(r);
+            rc = nb->read_handler(r);
 
             if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
                 ngx_http_upstream_finalize_request(r, u, rc);
@@ -1652,12 +1656,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 if (c->write->timer_set) {
                     ngx_del_timer(c->write);
                 }
-
-                /*
-                 * the read timer has been added in the above
-                 * ngx_http_do_read_non_buffered_client_request_body()
-                 * function
-                 */
 
                 r->read_event_handler =
                     ngx_http_upstream_read_non_buffered_request;
@@ -1713,10 +1711,27 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         u->output_filter_update(u->output_filter_ctx);
 
-        ngx_chain_update_chains(r->pool, &nb->free, &nb->busy,
-                &nb->bufs, nb->buf->tag);
+        nb->update_handler(r);
 
 #if (NGX_DEBUG)
+        for (cl = u->output_filter_ctx->busy; cl; cl = cl->next) {
+            buf = cl->buf;
+            ngx_log_debug4(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream ctx busy bufs: p=%p, s=%d, "
+                           "size=%uO, capcity=%d",
+                           buf, ngx_buf_special(buf),
+                           ngx_buf_size(buf), buf->end - buf->start);
+        }
+
+        for (cl = u->output_filter_ctx->free; cl; cl = cl->next) {
+            buf = cl->buf;
+            ngx_log_debug4(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream ctx free bufs: p=%p, s=%d, "
+                           "size=%uO, capcity=%d",
+                           buf, ngx_buf_special(buf),
+                           ngx_buf_size(buf), buf->end - buf->start);
+        }
+
         for (cl = nb->busy; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,

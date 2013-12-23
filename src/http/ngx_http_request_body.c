@@ -14,12 +14,15 @@ static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r);
 
+static ngx_int_t ngx_http_do_read_non_buffered_client_request_body(
+    ngx_http_request_t *r);
 static ngx_int_t ngx_http_copy_non_buffered_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_read_non_buffered_client_request_body(
     ngx_http_request_t *r, ngx_http_client_body_handler_pt post_handler);
 static void ngx_http_read_non_buffered_client_request_body_handler(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_request_body_get_buf(ngx_http_request_t *r);
+static void ngx_http_request_body_update_chains(ngx_http_request_t *r);
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_discard_request_body_filter(ngx_http_request_t *r,
     ngx_buf_t *b);
@@ -512,6 +515,9 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r,
 
     rb->non_buffered = nb;
     nb->last_out = &nb->bufs;
+    nb->read_handler = ngx_http_do_read_non_buffered_client_request_body;
+    nb->update_handler = ngx_http_request_body_update_chains;
+    nb->tag = (ngx_buf_tag_t *) nb->read_handler;
 
     preread = r->header_in->last - r->header_in->pos;
 
@@ -649,7 +655,7 @@ ngx_http_read_non_buffered_client_request_body_handler(ngx_http_request_t *r)
 }
 
 
-ngx_int_t
+static ngx_int_t
 ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 {
     off_t                                  rest;
@@ -985,8 +991,7 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
             return NGX_ERROR;
         }
 
-        cl->buf->tag =
-            (ngx_buf_tag_t) &ngx_http_do_read_non_buffered_client_request_body;
+        cl->buf->tag = nb->tag;
         cl->buf->recycled = 1;
 
         nb->num++;
@@ -999,6 +1004,22 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
     nb->last_out = &cl->next;
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_request_body_update_chains(ngx_http_request_t *r)
+{
+    ngx_http_request_body_non_buffered_t  *nb;
+
+    if (r->request_body == NULL || r->request_body->non_buffered == NULL) {
+        return;
+    }
+
+    nb = r->request_body->non_buffered;
+
+    ngx_chain_update_chains(r->pool, &nb->free, &nb->busy,
+                            &nb->bufs, nb->tag);
 }
 
 

@@ -1296,6 +1296,8 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
         last_out = &cl->next;
     }
 
+    in = NULL;
+
     if (raw_in == NULL) {
 
         if (!f->output_done && rb->rest == 0) {
