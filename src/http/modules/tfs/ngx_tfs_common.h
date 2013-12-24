@@ -11,6 +11,8 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#define NGX_PACKED __attribute__ ((__packed__))
+
 #define NGX_HTTP_TFS_HEADER                           0
 #define NGX_HTTP_TFS_BODY                             1
 
@@ -58,9 +60,9 @@
 #define NGX_HTTP_TFS_MAX_FILE_NAME_LEN                 256
 #define NGX_HTTP_TFS_MAX_SUFFIX_LEN                    109 /* 128 - 19 */
 
-
+#define NGX_HTTP_TFS_MAX_RCSERVER_COUNT                5
 #define NGX_HTTP_TFS_MAX_CLUSTER_COUNT                 10
-#define NGX_HTTP_TFS_MAX_CLUSTER_ID_COUNT              5
+#define NGX_HTTP_TFS_MAX_CLUSTER_ID_COUNT              10
 
 #define NGX_HTTP_TFS_CMD_GET_CLUSTER_ID_NS             20
 #define NGX_HTTP_TFS_CMD_GET_GROUP_COUNT               22
@@ -164,6 +166,40 @@ typedef struct {
 } ngx_http_tfs_meta_table_t;
 
 
+typedef struct {
+    uint64_t                   id;
+    int32_t                    offset;
+    int64_t                    size;
+    int64_t                    u_size;
+    int32_t                    modify_time;
+    int32_t                    create_time;
+    int32_t                    flag;
+    uint32_t                   crc;
+} NGX_PACKED ngx_http_tfs_raw_file_stat_t;
+
+
+typedef struct {
+    uint64_t                   id;
+    int32_t                    offset;
+    int32_t                    size;
+    int32_t                    u_size;
+    int32_t                    modify_time;
+    int32_t                    create_time;
+    int32_t                    flag;
+    uint32_t                   crc;
+} NGX_PACKED ngx_http_tfs_raw_file_info_t;
+
+
+typedef struct {
+    int64_t                    pid;
+    int64_t                    id;
+    uint32_t                   create_time;
+    uint32_t                   modify_time;
+    uint64_t                   size;
+    uint16_t                   ver_no;
+} NGX_PACKED ngx_http_tfs_custom_file_info_t;
+
+
 typedef enum {
     NGX_HTTP_TFS_RC_SERVER = 0,
     NGX_HTTP_TFS_NAME_SERVER,
@@ -245,6 +281,8 @@ ngx_http_tfs_crc(uint32_t crc, const char *data, size_t len)
 }
 
 ngx_chain_t *ngx_http_tfs_alloc_chains(ngx_pool_t *pool, size_t count);
+ngx_chain_t *ngx_http_tfs_chain_get_free_buf(ngx_pool_t *p,
+    ngx_chain_t **free, size_t size);
 void ngx_http_tfs_free_chains(ngx_chain_t **free, ngx_chain_t **out);
 
 ngx_int_t ngx_http_tfs_test_connect(ngx_connection_t *c);
@@ -291,8 +329,11 @@ ngx_http_tfs_t *ngx_http_tfs_alloc_st(ngx_http_tfs_t *t);
 
 
 ngx_int_t ngx_http_tfs_get_content_type(u_char *data, ngx_str_t *type);
+ngx_msec_int_t ngx_http_tfs_get_request_time(ngx_http_tfs_t *t);
 ngx_int_t ngx_chain_add_copy_with_buf(ngx_pool_t *pool, ngx_chain_t **chain,
     ngx_chain_t *in);
+void ngx_http_tfs_wrap_raw_file_info(ngx_http_tfs_raw_file_info_t *file_info,
+    ngx_http_tfs_raw_file_stat_t *file_stat);
 
 
 #endif  /* _NGX_HTTP_TFS_COMMON_H_INCLUDED_ */

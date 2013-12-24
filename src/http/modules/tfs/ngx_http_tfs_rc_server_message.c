@@ -4,6 +4,7 @@
  */
 
 
+#include <ngx_http_tfs_serialization.h>
 #include <ngx_http_tfs_rc_server_message.h>
 
 #define ngx_http_tfs_expire_and_alloc(data, len) do {                   \
@@ -35,6 +36,8 @@ ngx_http_tfs_update_info_node(ngx_http_tfs_t *t, ngx_http_tfs_rc_ctx_t *rc_ctx,
 
 static ngx_int_t ngx_http_tfs_parse_session_id(ngx_str_t *session_id,
     uint64_t *app_id);
+static void ngx_http_tfs_update_rc_servers(ngx_http_tfs_t *t,
+    const ngx_http_tfs_rcs_info_t *rc_info_node);
 
 
 ngx_chain_t *
@@ -121,8 +124,10 @@ ngx_http_tfs_create_login_message(ngx_http_tfs_t *t)
 ngx_chain_t *
 ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
 {
-    u_char                   *p;
-    ssize_t                   size, base_size;
+    u_char                   *p, *tmp_ptr;
+    ssize_t                  size, base_size;
+    uint32_t                 rc_stat_size;
+    ngx_int_t                rc, count;
     ngx_buf_t                *b;
     ngx_queue_t              *q, *queue;
     ngx_chain_t              *cl, **ll;
@@ -166,7 +171,14 @@ ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
     ngx_log_error(NGX_LOG_INFO, t->log, 0,
                   "will do keepalive for appkey: %V", &rc_info->appkey);
 
-    size = base_size + rc_info->session_id.len + 1;
+    /* rc_stat_size = oper_count * (key_size + value_size)
+     * key_size = sizeof(oper_type)
+     * vlaue_size = sizeof(ngx_http_tfs_stat_rcs_t) - sizeof(oper_app_id) */
+    rc_stat_size = NGX_HTTP_TFS_OPER_COUNT * (sizeof(uint32_t) + sizeof(ngx_http_tfs_stat_rcs_t) - sizeof(uint32_t));
+
+    size = base_size + rc_info->session_id.len + 1 + rc_stat_size;
+    /*size = base_size + rc_info->session_id.len + 1;*/
+
     b = ngx_create_temp_buf(t->pool, size);
     if (b == NULL) {
         goto keepalive_create_error;
@@ -195,12 +207,35 @@ ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
     p = ngx_cpymem(p, NGX_HTTP_TFS_CLIENT_VERSION,
                    sizeof(NGX_HTTP_TFS_CLIENT_VERSION));
 
-    ngx_memzero(p, sizeof(uint64_t) * 4 + sizeof(uint32_t) + sizeof(uint8_t));
+    ngx_memzero(p, sizeof(uint64_t) * 3 + sizeof(uint32_t) + sizeof(uint8_t));
 
     /* cache_size cache_time */
     p += sizeof(uint64_t) * 2;
 
     *((uint64_t *) p) = rc_info->modify_time;
+    /* modify_time and is_logout */
+    p += sizeof(uint64_t) + sizeof(uint8_t);
+
+    /* stat size */
+    tmp_ptr = p;
+    /**((uint32_t *)p) = NGX_HTTP_TFS_OPER_COUNT;*/
+    p += sizeof(uint32_t);
+
+    /* set rcs stat */
+    rc = ngx_http_tfs_serialize_rcs_stat(&p, rc_info, &count);
+    if (rc != NGX_OK) {
+        goto keepalive_create_error;
+    }
+    *((uint32_t *)tmp_ptr) = count;
+
+    /* cache hit_ratio and last_report_time */
+    /*p += sizeof(uint64_t) * 2;*/
+    p += sizeof(uint64_t);
+    (*(uint64_t *)p) = time(NULL);
+    p += sizeof(uint64_t);
+
+    /* modify_time is_logout stat_info */
+    /*p += sizeof(uint64_t) * 3 + sizeof(uint32_t) + sizeof(uint8_t);*/
 
     header->crc = ngx_http_tfs_crc(NGX_HTTP_TFS_PACKET_FLAG,
         (const char *) (header + 1), header->len);
@@ -256,7 +291,7 @@ ngx_http_tfs_parse_login_message(ngx_http_tfs_t *t)
     }
 
     ngx_shmtx_lock(&rc_ctx->shpool->mutex);
-    rc_info = ngx_http_tfs_rcs_lookup(t->data, rc_ctx, t->r_ctx.appkey);
+    rc_info = ngx_http_tfs_rcs_lookup(rc_ctx, t->r_ctx.appkey);
 
     rc = NGX_OK;
 
@@ -292,11 +327,12 @@ ngx_http_tfs_parse_keepalive_message(ngx_http_tfs_t *t)
     u_char                          *p, update;
     uint16_t                         type;
     ngx_str_t                        err_msg;
-    ngx_int_t                        rc;
+    ngx_int_t                        i, rc;
     ngx_queue_t                     *q, *queue;
     ngx_rbtree_node_t               *node;
     ngx_http_tfs_header_t           *header;
     ngx_http_tfs_rc_ctx_t           *rc_ctx;
+    ngx_http_tfs_stat_rcs_t         *stat_rcs;
     ngx_http_tfs_rcs_info_t         *rc_info;
     ngx_http_tfs_peer_connection_t  *tp;
 
@@ -335,7 +371,16 @@ ngx_http_tfs_parse_keepalive_message(ngx_http_tfs_t *t)
     }
     t->curr_ka_queue = ngx_queue_next(q);
 
+    ngx_shmtx_lock(&rc_ctx->shpool->mutex);
+    rc_info = ngx_queue_data(q, ngx_http_tfs_rcs_info_t, kp_queue);
+
+    stat_rcs = rc_info->stat_rcs;
+    for (i = 0;i < NGX_HTTP_TFS_OPER_COUNT; i++) {
+        ngx_memzero(&stat_rcs[i], sizeof(ngx_http_tfs_stat_rcs_t));
+    }
+
     if (update == NGX_HTTP_TFS_NO) {
+        ngx_shmtx_unlock(&rc_ctx->shpool->mutex);
         return NGX_OK;
     }
 
@@ -343,12 +388,10 @@ ngx_http_tfs_parse_keepalive_message(ngx_http_tfs_t *t)
      * e.g. a single rc_info_node occupys nearly 2KB space,
      * 10MB for tfs_rcs_zone can hold at least 5000 rc_infos.
      */
-    rc_info = ngx_queue_data(q, ngx_http_tfs_rcs_info_t, kp_queue);
 
     /* update info node */
     /* FIXME: sth terrible may happen here
      * if someone has get the rc_info before lock */
-    ngx_shmtx_lock(&rc_ctx->shpool->mutex);
     rc = ngx_http_tfs_update_info_node(t, rc_ctx, rc_info, p);
     /* rc_info has been destroyed, remove from queue and rbtree */
     if (rc == NGX_ERROR) {
@@ -376,15 +419,14 @@ ngx_http_tfs_parse_rc_info(ngx_http_tfs_rcs_info_t *rc_info_node,
     ngx_http_tfs_rc_ctx_t *rc_ctx,  u_char *data)
 {
     u_char                                *p;
-    uint8_t                                is_master;
-    uint32_t                               cluster_id, cluster_id_len, len;
+    uint32_t                               cluster_id, cluster_id_len;
+    uint32_t                               len, unlink_cluster_count;
     ngx_int_t                              dup_info_size, rc;
     ngx_uint_t                             i, j;
     ngx_http_tfs_group_info_t             *group_info;
     ngx_http_tfs_logical_cluster_t        *logical_cluster;
     ngx_http_tfs_physical_cluster_t       *physical_cluster;
     ngx_http_tfs_cluster_group_info_t     *cluster_group_info;
-    ngx_http_tfs_cluster_group_info_t     *cluster_group_info2;
     ngx_http_tfs_tair_server_addr_info_t  *dup_server_info;
 
     p = data;
@@ -546,12 +588,13 @@ ngx_http_tfs_parse_rc_info(ngx_http_tfs_rcs_info_t *rc_info_node,
     }
 
     /* unlink & update cluster */
-    rc_info_node->unlink_cluster_count = *((uint32_t *) p);
+    /* this count is physical cluster count */
+    unlink_cluster_count = *((uint32_t *) p);
     p += sizeof(uint32_t);
 
-    cluster_group_info = rc_info_node->unlink_clusters;
+    rc_info_node->unlink_cluster_group_count = 0;
 
-    for (i = 0; i < rc_info_node->unlink_cluster_count; i++) {
+    for (i = 0; i < unlink_cluster_count; i++) {
         /* skip cluster_stat */
         p += sizeof(uint32_t);
         /* skip access type */
@@ -561,29 +604,25 @@ ngx_http_tfs_parse_rc_info(ngx_http_tfs_rcs_info_t *rc_info_node,
         p += sizeof(uint32_t);
 
         cluster_id = ngx_http_tfs_get_cluster_id(p);
-        is_master = ngx_http_tfs_cluster_is_master(p);
         p += cluster_id_len;
 
-        for (j = 0; j < i; j++) {
-            cluster_group_info2 = &rc_info_node->unlink_clusters[j];
-            if (cluster_group_info2->cluster_id == cluster_id) {
+        for (j = 0; j < rc_info_node->unlink_cluster_group_count; j++) {
+            /* find exist cluster_group_info */
+            if (rc_info_node->unlink_cluster_groups[j].cluster_id == cluster_id) {
+                cluster_group_info = &rc_info_node->unlink_cluster_groups[j];
                 break;
             }
         }
 
-        if (j >= i) {
-            group_info = &cluster_group_info[i].group_info[0];
-            cluster_group_info[i].info_count = 1;
-            cluster_group_info[i].group_count = 0;
-            cluster_group_info[i].cluster_id = cluster_id;
-            group_info->is_master = is_master;
-
-        } else {
-            group_info =
-              &cluster_group_info2->group_info[cluster_group_info2->info_count];
-            cluster_group_info2->info_count++;
-            group_info->is_master = is_master;
+        /* new cluster_group_info */
+        if (j >= rc_info_node->unlink_cluster_group_count) {
+            cluster_group_info = &rc_info_node->unlink_cluster_groups[rc_info_node->unlink_cluster_group_count++];
+            cluster_group_info->info_count = 0;
+            cluster_group_info->group_count = 0;
+            cluster_group_info->cluster_id = cluster_id;
         }
+
+        group_info = &cluster_group_info->group_info[cluster_group_info->info_count++];
 
         /* name server vip */
         len = *((uint32_t *) p);
@@ -613,6 +652,24 @@ ngx_http_tfs_parse_rc_info(ngx_http_tfs_rcs_info_t *rc_info_node,
     /* use remote cache flag */
     rc_info_node->use_remote_block_cache = *((uint32_t *) p);
     return NGX_OK;
+}
+
+
+static void
+ngx_http_tfs_update_rc_servers(ngx_http_tfs_t *t, const ngx_http_tfs_rcs_info_t *rc_info_node)
+{
+    ngx_http_tfs_upstream_t       *upstream;
+
+    upstream = t->loc_conf->upstream;
+    if (rc_info_node->rc_servers_count > NGX_HTTP_TFS_MAX_RCSERVER_COUNT) {
+        upstream->rc_servers_count = NGX_HTTP_TFS_MAX_RCSERVER_COUNT;
+
+    } else {
+        upstream->rc_servers_count = rc_info_node->rc_servers_count;
+    }
+
+    ngx_memcpy(upstream->rc_servers, rc_info_node->rc_servers, upstream->rc_servers_count * sizeof(uint64_t));
+    upstream->rcserver_index = 0;
 }
 
 
@@ -699,8 +756,8 @@ ngx_http_tfs_update_info_node(ngx_http_tfs_t *t, ngx_http_tfs_rc_ctx_t *rc_ctx,
     rc_info_node->remote_block_cache_info.len = 0;
 
     /* free old unlink cluster */
-    cluster_group_info = rc_info_node->unlink_clusters;
-    for (i = 0; i < rc_info_node->unlink_cluster_count; i++) {
+    cluster_group_info = rc_info_node->unlink_cluster_groups;
+    for (i = 0; i < rc_info_node->unlink_cluster_group_count; i++) {
         for (j = 0; j < cluster_group_info[i].info_count; j++) {
             group_info = &cluster_group_info[i].group_info[j];
             if (group_info->ns_vip_text.len <= 0
@@ -712,7 +769,7 @@ ngx_http_tfs_update_info_node(ngx_http_tfs_t *t, ngx_http_tfs_rc_ctx_t *rc_ctx,
             ngx_str_null(&group_info->ns_vip_text);
         }
     }
-    rc_info_node->unlink_cluster_count = 0;
+    rc_info_node->unlink_cluster_group_count = 0;
 
     /* parse rc info */
     rc = ngx_http_tfs_parse_rc_info(rc_info_node, rc_ctx, p);
@@ -721,6 +778,7 @@ ngx_http_tfs_update_info_node(ngx_http_tfs_t *t, ngx_http_tfs_rc_ctx_t *rc_ctx,
     }
 
     t->rc_info_node = rc_info_node;
+    ngx_http_tfs_update_rc_servers(t, rc_info_node);
 
     return NGX_OK;
 }
@@ -795,6 +853,8 @@ ngx_http_tfs_create_info_node(ngx_http_tfs_t *t,
         goto login_error;
     }
 
+    ngx_http_tfs_update_rc_servers(t, rc_info_node);
+
     t->rc_info_node = rc_info_node;
     ngx_rbtree_insert(&rc_ctx->sh->rbtree, node);
     ngx_queue_insert_head(&rc_ctx->sh->queue, &rc_info_node->queue);
@@ -826,3 +886,26 @@ ngx_http_tfs_parse_session_id(ngx_str_t *session_id, uint64_t *app_id)
                              (unsigned long long *) app_id);
 }
 
+
+void
+ngx_http_tfs_select_rc_server(ngx_http_tfs_t *t)
+{
+    struct sockaddr_in       *addr_in;
+    ngx_http_tfs_inet_t      *addr;
+    ngx_http_tfs_upstream_t  *upstream;
+
+    upstream = t->loc_conf->upstream;
+
+    if (upstream->rc_servers_count == 0) {
+        return;
+    }
+
+    if (++upstream->rcserver_index >= upstream->rc_servers_count) {
+        upstream->rcserver_index = 0;
+    }
+
+    addr_in = (struct sockaddr_in *)upstream->ups_addr->sockaddr;
+    addr = (ngx_http_tfs_inet_t*)&upstream->rc_servers[upstream->rcserver_index];
+    addr_in->sin_addr.s_addr = addr->ip;
+    addr_in->sin_port = htons(addr->port);
+}
