@@ -407,3 +407,26 @@ html >/**/ body p {
 --- response_body eval
 '<!DOCTYPE html>
 <script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content"> '
+
+=== TEST 18: do not trim html comment of ssi/esi
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<!-- hello -->
+<!--# ssi  -->
+<!--esi    -->
+<!-- world -->
+<!---->
+<!--e    -->
+<!-------->
+<!--[if  ie  <![endif]-->
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<!--# ssi  --> <!--esi    --> <!--e    --> <!--[if  ie  <![endif]--> '
