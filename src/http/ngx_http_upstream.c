@@ -3554,10 +3554,18 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
             && u->conf->upstream_tries != 0
             && r->us_tries++ >= u->conf->upstream_tries)
         {
+               ngx_http_upstream_srv_conf_t *us=u->conf->upstream;
+               ngx_http_upstream_server_t    *server = us->servers->elts;
+               ngx_uint_t                     i;
+               for (i = 0; i < us->servers->nelts; i++) {
+                               if (server[i].backup) {
+                               goto backup_server;
+                       }
+               }
             ngx_http_upstream_finalize_request(r, u, status);
             return;
         }
-
+backup_server:
         if (u->peer.tries == 0 || !(u->conf->next_upstream & ft_type)) {
 
 #if (NGX_HTTP_CACHE)
