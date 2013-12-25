@@ -3994,9 +3994,10 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->client_body_postpone_size,
                               64 * 1024);
 
-    if (conf->client_max_body_size <
+    if (conf->client_max_body_size &&
+         (conf->client_max_body_size <
         (off_t)(conf->client_body_buffers.num *
-                conf->client_body_buffers.size)) {
+                conf->client_body_buffers.size))) {
 
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "client_max_body_size %O should be greater than "
@@ -4009,7 +4010,9 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                              conf->client_body_buffers.size);
     }
 
-    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size) {
+    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size
+         && conf->client_max_body_size != 0)
+    {
         conf->client_body_postpone_size = conf->client_max_body_size;
     }
 

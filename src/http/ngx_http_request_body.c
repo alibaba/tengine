@@ -704,8 +704,13 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
                 if (rc == NGX_DECLINED) {
 
-                    if (nb->buffered) {
-                        goto read_ok;
+                    if (nb->postpone_size
+                        >= (off_t) clcf->client_body_postpone_size)
+                    {
+                        if (nb->buffered) {
+                            nb->flush = 1;
+                            goto read_ok;
+                        }
                     }
 
                     return NGX_DECLINED;
