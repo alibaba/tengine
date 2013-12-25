@@ -4005,7 +4005,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                            (off_t)(conf->client_body_buffers.num *
                                    conf->client_body_buffers.size));
 
-        conf->client_body_buffers.num = 1 + (conf->client_max_body_size /
+        conf->client_body_buffers.num = 2 + (conf->client_max_body_size /
                                              conf->client_body_buffers.size);
     }
 
@@ -4023,7 +4023,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                            (off_t)(conf->client_body_buffers.num *
                                    conf->client_body_buffers.size));
 
-        conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
+        conf->client_body_buffers.num = 2 + (conf->client_body_postpone_size /
                                              conf->client_body_buffers.size);
     }
 
