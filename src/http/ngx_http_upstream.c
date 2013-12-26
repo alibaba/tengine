@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -152,6 +151,14 @@ static void ngx_http_upstream_ssl_init_connection(ngx_http_request_t *,
 static void ngx_http_upstream_ssl_handshake(ngx_connection_t *c);
 #endif
 
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+static void ngx_http_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+
+static ngx_http_upstream_srv_conf_t *
+ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
+    ngx_str_t *host);
+#endif
 
 ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
@@ -596,6 +603,16 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         host = &u->resolved->host;
 
         umcf = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+        uscf = ngx_http_upstream_rbtree_lookup(umcf, host);
+
+        if (uscf != NULL && ((uscf->port == 0 && u->resolved->no_port)
+            || uscf->port == u->resolved->port))
+        {
+            goto found;
+        }
+#endif
 
         uscfp = umcf->upstreams.elts;
 
@@ -4771,6 +4788,9 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 
         if (flags & NGX_HTTP_UPSTREAM_CREATE) {
             uscfp[i]->flags = flags;
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+            ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
+#endif
         }
 
         return uscfp[i];
@@ -4813,9 +4833,111 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 
     *uscfp = uscf;
 
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    uscf->node.key = ngx_crc32_short(uscf->host.data, uscf->host.len);
+
+    if (flags & NGX_HTTP_UPSTREAM_CREATE) {
+        ngx_rbtree_insert(&umcf->rbtree, &uscf->node);
+    }
+#endif
+
     return uscf;
 }
 
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+
+static void
+ngx_http_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel)
+{
+    ngx_int_t                      n;
+    ngx_rbtree_node_t            **p;
+    ngx_http_upstream_srv_conf_t  *urn, *urnt;
+
+    for ( ;; ) {
+
+        if (node->key < temp->key) {
+
+            p = &temp->left;
+
+        } else if (node->key > temp->key) {
+
+            p = &temp->right;
+
+        } else { /* node->key == temp->key */
+
+            urn = (ngx_http_upstream_srv_conf_t *) node;
+            urnt = (ngx_http_upstream_srv_conf_t *) temp;
+
+            n = ngx_memn2cmp(urn->host.data, urnt->host.data, urn->host.len,
+                             urnt->host.len);
+
+            p = n < 0 ? &temp->left : &temp->right;
+
+        }
+
+        if (*p == sentinel) {
+            break;
+        }
+
+        temp = *p;
+    }
+
+    *p = node;
+    node->parent = temp;
+    node->left = sentinel;
+    node->right = sentinel;
+    ngx_rbt_red(node);
+}
+
+
+static ngx_http_upstream_srv_conf_t *
+ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
+    ngx_str_t *host)
+{
+    uint32_t                        hash;
+    ngx_int_t                       rc;
+    ngx_rbtree_node_t              *node, *sentinel;
+    ngx_http_upstream_srv_conf_t   *uscf;
+
+    node = umcf->rbtree.root;
+    sentinel = umcf->rbtree.sentinel;
+
+    hash = ngx_crc32_short(host->data, host->len);
+
+    while (node != sentinel) {
+
+        if (hash < node->key) {
+            node = node->left;
+            continue;
+        }
+
+        if (hash > node->key) {
+            node = node->right;
+            continue;
+        }
+
+        /* node_key == node->key */
+
+        uscf = (ngx_http_upstream_srv_conf_t *) node;
+
+        rc = ngx_memn2cmp(host->data, uscf->host.data,
+                          host->len, uscf->host.len);
+
+        if (rc == 0) {
+            return uscf;
+        }
+
+        node = (rc < 0) ? node->left : node->right;
+    }
+
+    /* not found */
+
+    return NULL;
+}
+
+#endif
 
 char *
 ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -5112,6 +5234,11 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
     {
         return NULL;
     }
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    ngx_rbtree_init(&umcf->rbtree, &umcf->sentinel,
+                    ngx_http_upstream_rbtree_insert_value);
+#endif
 
     return umcf;
 }
