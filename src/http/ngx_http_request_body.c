@@ -834,6 +834,10 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
     /* save the last part */
 
     rc = ngx_http_copy_non_buffered_request_body(r);
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "http no buffered client request body "
+                   "request_length: %O, rest: %uz, postpone_size: %O",
+                   r->request_length, rb->rest, nb->postpone_size);
 
     if (rc == NGX_DECLINED) {
         return NGX_DECLINED;
