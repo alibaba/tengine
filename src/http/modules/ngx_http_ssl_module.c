@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if NGX_HTTP_SPDY
+#include <ngx_http_spdy_module.h>
+#endif
 
 typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
     ngx_pool_t *pool, ngx_str_t *s);
@@ -294,13 +297,20 @@ ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
 
 #if (NGX_HTTP_SPDY)
     {
-    ngx_http_connection_t  *hc;
+    ngx_http_connection_t      *hc;
+    ngx_http_spdy_srv_conf_t   *sscf;
 
     hc = c->data;
+    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_spdy_module);
 
     if (hc->addr_conf->spdy) {
-        *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-        *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
+        if (sscf->version == NGX_SPDY_VERSION_V3) {
+            *out = (unsigned char *) NGX_SPDY_V3_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
+            *outlen = sizeof(NGX_SPDY_V3_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
+        } else {
+            *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
+            *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
+        }
 
         return SSL_TLSEXT_ERR_OK;
     }
