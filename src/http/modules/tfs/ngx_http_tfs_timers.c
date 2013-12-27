@@ -127,11 +127,10 @@ ngx_http_tfs_timeout_handler(ngx_event_t *event)
     ngx_http_request_t          *r;
     ngx_http_tfs_timers_data_t  *data;
 
-    data = NULL;
+    dummy = event->data;
+    data = dummy->data;
     if (ngx_shmtx_trylock(&data->lock->ngx_http_tfs_kp_mutex)) {
 
-        dummy = event->data;
-        data = dummy->data;
         if (ngx_queue_empty(&data->upstream->rc_ctx->sh->kp_queue)) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, event->log, 0,
                            "empty rc keepalive queue");
