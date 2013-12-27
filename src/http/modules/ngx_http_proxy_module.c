@@ -574,7 +574,7 @@ static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("") },
+    { ngx_string("Transfer-Encoding"), ngx_string("$http_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -601,7 +601,7 @@ static ngx_keyval_t  ngx_http_proxy_cache_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("") },
+    { ngx_string("Transfer-Encoding"), ngx_string("$http_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -1038,7 +1038,11 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
         len += body_len;
 
     } else {
-        ctx->internal_body_length = r->headers_in.content_length_n;
+        if (r->headers_in.chunked) {
+            ctx->internal_body_length = -1;
+        } else {
+            ctx->internal_body_length = r->headers_in.content_length_n;
+        }
     }
 
     le.ip = plcf->headers_set_len->elts;
