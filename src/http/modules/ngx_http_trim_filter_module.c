@@ -96,8 +96,10 @@ typedef enum {
     trim_state_tag_script_js_multi_comment_end,
     trim_state_comment_begin,           /* <!-- */
     trim_state_comment_ie_begin,        /* <!--[if */
+    trim_state_comment_hack_begin,
     trim_state_comment_end,             /* <!--  --> */
     trim_state_comment_ie_end,          /* <!--[if  <![endif]--> */
+    trim_state_comment_hack_end,
 } ngx_http_trim_state_e;
 
 
@@ -529,7 +531,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             look = ngx_http_trim_comment.data[ctx->looked++];
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_comment.len - 1) { /* --> */
-                    ctx->state = trim_state_comment_ie_begin;
+                    ctx->state = trim_state_comment_hack_begin;
                     ctx->looked = 0;
                 }
 
@@ -551,6 +553,42 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->state = trim_state_tag_text;
                 break;
             }
+
+            if ((size_t) (read - buf->pos) >= ctx->saved_comment) {
+                write = ngx_cpymem(write, ngx_http_trim_saved_html.data,
+                                   ctx->saved_comment);
+
+            } else {
+                ctx->saved = ctx->saved_comment;
+            }
+
+            break;
+
+        case trim_state_comment_hack_begin:
+            switch (ch) {
+            case '#':
+                ctx->state = trim_state_comment_hack_end;
+                ctx->looked = 0;
+                break;
+            case 'e':
+                ctx->state = trim_state_comment_hack_end;
+                ctx->looked = 0;
+                break;
+            case '[':
+                ctx->state = trim_state_comment_ie_begin;
+                ctx->looked = 1;
+                ctx->saved_comment++;
+                continue;
+            case '-':
+                ctx->state = trim_state_comment_end;
+                ctx->looked = 1;
+                continue;
+            default:
+                ctx->state = trim_state_comment_end;
+                ctx->looked = 0;
+                continue;
+            }
+
 
             if ((size_t) (read - buf->pos) >= ctx->saved_comment) {
                 write = ngx_cpymem(write, ngx_http_trim_saved_html.data,
@@ -1443,6 +1481,26 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->looked = 0;
                 break;
             }
+            break;
+
+        case trim_state_comment_hack_end:
+            look = ngx_http_trim_comment.data[ctx->looked++];  /* --> */
+            if (ch == look) {
+                if (ctx->looked == ngx_http_trim_comment.len) {
+                    ctx->state = trim_state_text;
+                }
+                break;
+            }
+
+            switch (ch) {
+            case '-':
+                ctx->looked--;
+                break;
+            default:
+                ctx->looked = 0;
+                break;
+            }
+
             break;
 
         case trim_state_tag_pre_end:

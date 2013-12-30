@@ -574,7 +574,9 @@ ngx_http_tfs_set_output_file_name(ngx_http_tfs_t *t)
     }
 
     /* set final return file name */
-    t->r_ctx.fsname.cluster_id = t->file.cluster_id;
+    if (t->r_ctx.fsname.cluster_id == 0) {
+        t->r_ctx.fsname.cluster_id = t->file.cluster_id;
+    }
     t->file_name.len = NGX_HTTP_TFS_FILE_NAME_LEN;
     if (t->r_ctx.simple_name) {
         t->file_name.len += t->r_ctx.file_suffix.len;
@@ -884,6 +886,33 @@ ngx_http_tfs_get_content_type(u_char *data, ngx_str_t *type)
 }
 
 
+ngx_msec_int_t
+ngx_http_tfs_get_request_time(ngx_http_tfs_t *t)
+{
+    ngx_time_t                *tp;
+    ngx_msec_int_t             ms;
+    struct timeval             tv;
+    ngx_http_request_t        *r;
+    ngx_http_core_loc_conf_t  *clcf;
+
+    r = t->data;
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (clcf->request_time_cache) {
+        tp = ngx_timeofday();
+        ms = (ngx_msec_int_t)
+                 ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+    } else {
+        ngx_gettimeofday(&tv);
+        ms = (tv.tv_sec - r->start_sec) * 1000
+                 + (tv.tv_usec / 1000 - r->start_msec);
+    }
+
+    ms = ngx_max(ms, 0);
+
+    return ms;
+}
+
+
 ngx_int_t
 ngx_chain_add_copy_with_buf(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
 {
@@ -914,4 +943,21 @@ ngx_chain_add_copy_with_buf(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *
     *ll = NULL;
 
     return NGX_OK;
+}
+
+
+void
+ngx_http_tfs_wrap_raw_file_info(ngx_http_tfs_raw_file_info_t *file_info,
+    ngx_http_tfs_raw_file_stat_t *file_stat)
+{
+    if (file_info != NULL && file_stat != NULL) {
+        file_stat->id = file_info->id;
+        file_stat->offset = file_info->offset;
+        file_stat->size = file_info->size;
+        file_stat->u_size = file_info->u_size;
+        file_stat->modify_time = file_info->modify_time;
+        file_stat->create_time = file_info->create_time;
+        file_stat->flag = file_info->flag;
+        file_stat->crc = file_info->crc;
+    }
 }
