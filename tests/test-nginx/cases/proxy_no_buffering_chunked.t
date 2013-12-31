@@ -14,8 +14,6 @@ __DATA__
 --- config
     location /main {
         client_max_body_size 200M;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -36,8 +34,6 @@ POST /main
 --- config
     location /main {
         client_max_body_size 200M;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -58,8 +54,6 @@ POST /main
 --- config
     location /main {
         client_max_body_size 200M;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -74,14 +68,12 @@ POST /main
 POST /main
 --- chunked_body eval
 ["a"]
---- response_body: a 
+--- response_body: a
 
 === TEST 38: POST chunked in "helloworld" delay
 --- config
     location /main {
         client_max_body_size 200M;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -104,8 +96,6 @@ POST /main
     location /main {
         client_max_body_size 200M;
         client_body_buffer_size 2;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -129,8 +119,6 @@ POST /main
     location /main {
         client_max_body_size 200M;
         client_body_buffer_size 1;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -154,8 +142,6 @@ POST /main
     location /main {
         client_max_body_size 200M;
         client_body_buffer_size 3;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -179,8 +165,6 @@ POST /main
     location /main {
         client_max_body_size 200M;
         client_body_buffer_size 3;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -205,8 +189,6 @@ POST /main
     location /main {
         client_max_body_size 200M;
         client_body_buffer_size 3;
-        proxy_set_header Transfer-Encoding "chunked";
-        proxy_set_header Content-length "";
         proxy_request_buffering off;
         proxy_pass http://127.0.0.1:1984/upload;
     }
@@ -250,4 +232,3 @@ PUT /main
 ["hello", "world" x 1024, "!" x 1024]
 --- response_body eval
 "hello" . ("world" x 1024) . ('!' x 1024)
-

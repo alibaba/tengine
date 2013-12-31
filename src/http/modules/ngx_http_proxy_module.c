@@ -125,6 +125,9 @@ static ngx_int_t
 static ngx_int_t
     ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t
+    ngx_http_proxy_internal_transfer_encoding_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_proxy_rewrite_redirect(ngx_http_request_t *r,
     ngx_table_elt_t *h, size_t prefix);
 static ngx_int_t ngx_http_proxy_rewrite_cookie(ngx_http_request_t *r,
@@ -574,7 +577,8 @@ static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("$http_transfer_encoding") },
+    { ngx_string("Transfer-Encoding"),
+      ngx_string("$proxy_internal_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -601,7 +605,8 @@ static ngx_keyval_t  ngx_http_proxy_cache_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("$http_transfer_encoding") },
+    { ngx_string("Transfer-Encoding"),
+      ngx_string("$proxy_internal_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -634,6 +639,10 @@ static ngx_http_variable_t  ngx_http_proxy_vars[] = {
 
     { ngx_string("proxy_internal_body_length"), NULL,
       ngx_http_proxy_internal_body_length_variable, 0,
+      NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+
+    { ngx_string("proxy_internal_transfer_encoding"), NULL,
+      ngx_http_proxy_internal_transfer_encoding_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
@@ -1038,7 +1047,7 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
         len += body_len;
 
     } else {
-        if (r->headers_in.chunked) {
+        if (r->headers_in.chunked && !r->request_buffering) {
             ctx->internal_body_length = -1;
         } else {
             ctx->internal_body_length = r->headers_in.content_length_n;
@@ -2167,6 +2176,33 @@ ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
     }
 
     v->len = ngx_sprintf(v->data, "%O", ctx->internal_body_length) - v->data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_proxy_internal_transfer_encoding_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_proxy_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_proxy_module);
+
+    if (ctx == NULL
+        || ctx->internal_body_length > 0
+        || !r->headers_in.chunked
+        || r->request_buffering)
+    {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = sizeof("chunked") - 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = (u_char *) "chunked";
 
     return NGX_OK;
 }
