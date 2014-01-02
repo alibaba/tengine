@@ -651,14 +651,14 @@ ngx_http_tfs_serialize_rcs_stat(u_char **p,
     ngx_int_t                    i;
     ngx_http_tfs_stat_rcs_t     *stat_rcs;
 
-    if (p == NULL || rc_info == NULL) {
+    if (p == NULL || rc_info == NULL || count == NULL) {
         return NGX_ERROR;
     }
 
+    *count = 0;
     stat_rcs = rc_info->stat_rcs;
 
     for (i = 0; i < NGX_HTTP_TFS_OPER_COUNT; ++i) {
-
         if (stat_rcs[i].oper_app_id == 0) {
             continue;
         }
