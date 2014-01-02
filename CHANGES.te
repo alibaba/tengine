@@ -1,7 +1,6 @@
 Changes with Tengine 2.0.0                                       03 Jan 2014
 
-    *) Feature: merged changes between nginx 1.2.9 and 1.4.3, and fixed the
-       security problem CVE-2013-4547. (cfsego)
+    *) Change: merged changes between nginx 1.2.9 and 1.4.4. (cfsego)
 
     *) Feature: enhanced dso module, building dynamic module should not
        rely on the original codes or compiler options. (monadbobo)

@@ -1,5 +1,5 @@
 Tengine 2.0.0 [2014-01-03]
-* Feature: 合并nginx 1.4.3版本的修改和对应的CVE-2013-4547安全漏洞补丁 [cfsego]
+* Change: 合并nginx 1.4.4版本的修改 [cfsego]
 * Feature: 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
 * Feature: 支持spdy v3，自动检测同一端口的spdy请求和http请求 [lilbedwin、chobits]
 * Feature: 增强ngx_tfs模块，在RcServer心跳时汇报访问统计 [mingyan]
