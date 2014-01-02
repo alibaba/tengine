@@ -1,3 +1,87 @@
+Changes with Tengine 2.0.0                                       03 Jan 2014
+
+    *) Feature: merged changes between nginx 1.2.9 and 1.4.3, and fixed the
+       security problem CVE-2013-4547. (cfsego)
+
+    *) Feature: enhanced dso module, building dynamic module should not
+       rely on the original codes or compiler options. (monadbobo)
+
+    *) Feature: spdy v3 had been supported, distinguishing spdy request
+       or http request on the same port had been supported.
+       (lilbedwin、chobits)
+
+    *) Feature: enhanced module ngx_tfs, adding reporting access status to
+       rcs while keepalive. (mingyan)
+
+    *) Feature: added module limit_upstream_tries，by using which upstream
+       retrys for proxy, memcached, fastcgi, scgi can be limited.
+       (supertcy)
+
+    *) Feature: enhanced directive "if", adding ">", "<", ">=", "<=" for
+       numberic comparison. (flygoast)
+
+    *) Feature: enhanced upstream health check module, checking with
+       keepalived connections. (lilbedwin)
+
+    *) Feature: enhanced module ngx_trim, which shold process comments within
+       ssi or esi correctly. (taoyuanyuan)
+
+    *) Feature: enhanced directive "expires_by_types", supporting wildcard
+       such as "text/*" for match. (mingyan)
+
+    *) Feature: added variable prefix "$base64_decode_", decoding variables
+       with base64. (yuanzhuo)
+
+    *) Feature: added variable prefix "$md5_encode_", evaluating md5 hash
+       for variables. (yuanzhuo)
+
+    *) Feature: added variable "$time_http"，rendering current time on http
+       pattern. (flygoast)
+
+    *) Feature: added variable "$full_request"，retrieving the original
+       request url with scheme and host. (yuanzhuo)
+
+    *) Feature: added variable prefix "$escape_uri_"，escaping variables
+       with url syntax. (yuanzhuo)
+
+    *) Feature: added variable "$raw_uri", retrieving the original uri
+       without args. (flygoast)
+
+    *) Feature: supported logging subrequest in nanoseconds. (jinglong)
+
+    *) Feature: added nginx api，for encoding url with base64. (lilbedwin)
+
+    *) Change: updated module ngx_http_stub_status, no logging for
+       subrequest. (jinglong)
+
+    *) Bugfix: fixed module ngx_footer, so that it should not process
+       response with "Content-Encoding" header. (yaoweibin)
+
+    *) Bugfix: fixed a bug that module ngx_http_proxy_no_buffer would hold
+       back the header of a request before it received the content of the
+       request, when setting directive "client_body_postpone_size" to 0.
+       (yaoweibin)
+
+    *) Bugfix: fixed a compilation warning of module ngx_lua with
+       '-Werror=clobbered'. (diwayou)
+
+    *) Bugfix: fixed a bug that nginx failed to check connection setup
+       with kqueue. (chobits)
+
+
+Changes with Tengine 1.5.2                                       22 Nov 2013
+
+    *) Security: a character following an unescaped space in a request line
+       was handled incorrectly (CVE-2013-4547); the bug had appeared in
+       0.8.41.
+       Thanks to Ivan Fratric of the Google Security Team.
+
+    *) Bugfix: fix a bug of 'nodelay' might be ignored in limit_req module.
+       (cfsego)
+
+    *) Bugfix: fix a bug in trim module when processing javascript comment.
+       (taoyuanyuan)
+
 
 Changes with Tengine 1.5.1                                       29 Aug 2013
 
