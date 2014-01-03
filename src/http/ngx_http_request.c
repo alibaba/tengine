@@ -9,6 +9,17 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_HTTP_SPDY && defined TLSEXT_TYPE_next_proto_neg)
+#include <ngx_http_spdy_module.h>
+#endif
+
+#if (NGX_HTTP_SPDY)
+#define NGX_HTTP_SPDY_CTL_MAGIC_NUM    0x80
+#define NGX_HTTP_SPDY_DATA_MAGIC_NUM   0x00
+
+static void ngx_http_spdy_detect(ngx_event_t *rev);
+#endif
+
 
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
 static void ngx_http_process_request_line(ngx_event_t *rev);
@@ -316,6 +327,10 @@ ngx_http_init_connection(ngx_connection_t *c)
     if (hc->addr_conf->spdy) {
         rev->handler = ngx_http_spdy_init;
     }
+
+    if (hc->addr_conf->spdy_detect) {
+        rev->handler = ngx_http_spdy_detect;
+    }
 #endif
 
 #if (NGX_HTTP_SSL)
@@ -363,6 +378,101 @@ ngx_http_init_connection(ngx_connection_t *c)
         return;
     }
 }
+
+
+#if (NGX_HTTP_SPDY)
+static void
+ngx_http_spdy_detect(ngx_event_t *rev)
+{
+    int                  n;
+    u_char               buf[1];
+    ngx_err_t            err;
+    ngx_connection_t     *c;
+    ngx_http_connection_t *hc;
+
+    c = rev->data;
+    hc = c->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http spdy detect handler");
+
+    if (rev->timedout) {
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
+        ngx_http_close_connection(c);
+        return;
+    }
+
+    if (c->close) {
+        ngx_http_close_connection(c);
+        return;
+    }
+
+    err = 0;
+    do {
+#if (NGX_HTTP_SSL)
+        if (hc->ssl) {
+            int sslerr;
+            n = SSL_peek(c->ssl->connection, buf, 1);
+            if (n < 0) {
+                sslerr = SSL_get_error(c->ssl->connection, n);
+                err = (sslerr == SSL_ERROR_SYSCALL) ? ngx_errno : 0;
+                if (sslerr == SSL_ERROR_WANT_READ) {
+                    err = NGX_EAGAIN;
+                }
+            }
+
+        } else {
+#endif
+        n = recv(c->fd, buf, 1, MSG_PEEK);
+        err = ngx_socket_errno;
+#if (NGX_HTTP_SSL)
+        }
+#endif
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, rev->log, err,
+                       "http spdy detect recv(): %d", n);
+
+        if (n > 0) {
+            if (*buf == NGX_HTTP_SPDY_CTL_MAGIC_NUM
+                || *buf == NGX_HTTP_SPDY_DATA_MAGIC_NUM)
+            {
+                rev->handler = ngx_http_spdy_init;
+
+            } else {
+                rev->handler = ngx_http_wait_request_handler;
+            }
+
+            rev->handler(rev);
+            return;
+        }
+
+        if (n < 0) {
+            if (err == NGX_EAGAIN) {
+                return;
+            }
+
+            if (err == NGX_EINTR) {
+                continue;
+            }
+
+            rev->error = 1;
+
+            break;
+
+        } else { /* n == 0 */
+            rev->eof = 1;
+            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                          "client closed connection");
+            break;
+        }
+
+    } while (1);
+
+    rev->ready = 0;
+    ngx_http_close_connection(c);
+
+    return;
+}
+#endif
 
 
 static void
@@ -741,11 +851,34 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 
         c->ssl->no_wait_shutdown = 1;
 
+#if (NGX_HTTP_SPDY)
+        {
+            ngx_http_connection_t     *hc = c->data;
+
+            if (hc->addr_conf->spdy_detect) {
+                c->read->handler = ngx_http_spdy_detect;
+                ngx_http_spdy_detect(c->read);
+                return;
+            }
+        }
+#endif
+
 #if (NGX_HTTP_SPDY && defined TLSEXT_TYPE_next_proto_neg)
         {
-        unsigned int             len;
-        const unsigned char     *data;
-        static const ngx_str_t   spdy = ngx_string(NGX_SPDY_NPN_NEGOTIATED);
+        ngx_http_connection_t       *hc;
+        ngx_http_spdy_srv_conf_t    *sscf;
+        unsigned int                 len;
+        const unsigned char         *data;
+        ngx_str_t                    spdy;
+
+        hc = c->data;
+        sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_spdy_module);
+
+        if (sscf->version == NGX_SPDY_VERSION_V3) {
+            ngx_str_set(&spdy, NGX_SPDY_V3_NPN_NEGOTIATED);
+        } else {
+            ngx_str_set(&spdy, NGX_SPDY_NPN_NEGOTIATED);
+        }
 
         SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
 

@@ -15,11 +15,17 @@
 #include <zlib.h>
 
 
-#define NGX_SPDY_VERSION              2
+#define NGX_SPDY_VERSION              2     /* default version */
+#define NGX_SPDY_VERSION_V2           2
+#define NGX_SPDY_VERSION_V3           3
+#define NGX_SPDY_VERSION_V31          31    /* reserved */
+#define NGX_SPDY_VERSION_V4           4     /* reserved */
 
 #ifdef TLSEXT_TYPE_next_proto_neg
 #define NGX_SPDY_NPN_ADVERTISE        "\x06spdy/2"
 #define NGX_SPDY_NPN_NEGOTIATED       "spdy/2"
+#define NGX_SPDY_V3_NPN_ADVERTISE     "\x06spdy/3"
+#define NGX_SPDY_V3_NPN_NEGOTIATED    "spdy/3"
 #endif
 
 #define NGX_SPDY_STATE_BUFFER_SIZE    16
@@ -30,10 +36,11 @@
 #define NGX_SPDY_SYN_REPLY            2
 #define NGX_SPDY_RST_STREAM           3
 #define NGX_SPDY_SETTINGS             4
-#define NGX_SPDY_NOOP                 5
+#define NGX_SPDY_NOOP                 5	    /* only used by spdy/2 */
 #define NGX_SPDY_PING                 6
 #define NGX_SPDY_GOAWAY               7
 #define NGX_SPDY_HEADERS              8
+#define NGX_SPDY_WINDOW_UPDATE        9
 
 #define NGX_SPDY_FRAME_HEADER_SIZE    8
 
@@ -41,21 +48,29 @@
 
 #define NGX_SPDY_SYN_STREAM_SIZE      10
 #define NGX_SPDY_SYN_REPLY_SIZE       6
+#define NGX_SPDY_V3_SYN_REPLY_SIZE    4
 #define NGX_SPDY_RST_STREAM_SIZE      8
 #define NGX_SPDY_PING_SIZE            4
 #define NGX_SPDY_GOAWAY_SIZE          4
 #define NGX_SPDY_NV_NUM_SIZE          2
 #define NGX_SPDY_NV_NLEN_SIZE         2
 #define NGX_SPDY_NV_VLEN_SIZE         2
+#define NGX_SPDY_V3_NV_NUM_SIZE       4
+#define NGX_SPDY_V3_NV_NLEN_SIZE      4
+#define NGX_SPDY_V3_NV_VLEN_SIZE      4
 #define NGX_SPDY_SETTINGS_NUM_SIZE    4
 #define NGX_SPDY_SETTINGS_IDF_SIZE    4
 #define NGX_SPDY_SETTINGS_VAL_SIZE    4
+#define NGX_SPDY_WINDOW_UPDATE_SIZE   8
 
 #define NGX_SPDY_SETTINGS_PAIR_SIZE                                           \
     (NGX_SPDY_SETTINGS_IDF_SIZE + NGX_SPDY_SETTINGS_VAL_SIZE)
 
 #define NGX_SPDY_HIGHEST_PRIORITY     0
 #define NGX_SPDY_LOWEST_PRIORITY      3
+
+#define NGX_SPDY_V3_HIGHEST_PRIORITY  0
+#define NGX_SPDY_V3_LOWEST_PRIORITY   7
 
 #define NGX_SPDY_FLAG_FIN             0x01
 #define NGX_SPDY_FLAG_UNIDIRECTIONAL  0x02
@@ -67,6 +82,10 @@
 #define NGX_SPDY_DATA_ERROR           2
 #define NGX_SPDY_DATA_INTERNAL_ERROR  3
 
+#define NGX_SPDY_TMP_WINDOW_SIZE           (1 << 30)
+#define NGX_SPDY_INIT_SEND_WINDOW_SIZE     (1 << 16)
+#define NGX_SPDY_INIT_RECV_WINDOW_SIZE     (1 << 16)
+#define NGX_SPDY_DELTA_WINDOW_SIZE_SIZE    4
 
 typedef struct ngx_http_spdy_connection_s   ngx_http_spdy_connection_t;
 typedef struct ngx_http_spdy_out_frame_s    ngx_http_spdy_out_frame_t;
@@ -106,8 +125,13 @@ struct ngx_http_spdy_connection_s {
 
     ngx_uint_t                       last_sid;
 
+    ngx_uint_t                       version;
+    ngx_int_t                        init_send_window_size;
+    ngx_int_t                        init_recv_window_size;
+
     unsigned                         blocked:2;
     unsigned                         waiting:1; /* FIXME better name */
+    unsigned                         need_settings:1;
 };
 
 
@@ -123,7 +147,12 @@ struct ngx_http_spdy_stream_s {
     ngx_http_spdy_out_frame_t       *free_frames;
     ngx_chain_t                     *free_data_headers;
 
-    unsigned                         priority:2;
+    /* spdy/3: flow control */
+    ngx_chain_t                     *pending;
+    ngx_int_t                        send_window_size;
+    ngx_int_t                        recv_window_size;
+
+    unsigned                         priority:3;
     unsigned                         handled:1;
     unsigned                         in_closed:1;
     unsigned                         out_closed:1;
@@ -173,9 +202,9 @@ ngx_http_spdy_queue_blocked_frame(ngx_http_spdy_connection_t *sc,
 {
     ngx_http_spdy_out_frame_t  **out;
 
-    for (out = &sc->last_out; *out && !(*out)->blocked; out = &(*out)->next)
+    for (out = &sc->last_out; *out; out = &(*out)->next)
     {
-        if (frame->priority >= (*out)->priority) {
+        if ((*out)->blocked) {
             break;
         }
     }
@@ -184,14 +213,19 @@ ngx_http_spdy_queue_blocked_frame(ngx_http_spdy_connection_t *sc,
     *out = frame;
 }
 
-
 void ngx_http_spdy_init(ngx_event_t *rev);
-void ngx_http_spdy_request_headers_init();
+void ngx_http_spdy_request_headers_init(void);
+
+void ngx_http_spdy_v3_init(ngx_event_t *rev);
+void ngx_http_spdy_v3_request_headers_init(void);
 
 ngx_int_t ngx_http_spdy_read_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
 
 void ngx_http_spdy_close_stream(ngx_http_spdy_stream_t *stream, ngx_int_t rc);
+void ngx_http_spdy_v3_close_stream(ngx_http_spdy_stream_t *stream, ngx_int_t rc);
+
+void ngx_http_spdy_close_stream_handler(ngx_event_t *ev);
 
 ngx_int_t ngx_http_spdy_send_output_queue(ngx_http_spdy_connection_t *sc);
 
@@ -220,16 +254,22 @@ ngx_int_t ngx_http_spdy_send_output_queue(ngx_http_spdy_connection_t *sc);
 
 #endif
 
-
 #define ngx_spdy_ctl_frame_head(t)                                            \
     ((uint32_t) NGX_SPDY_CTL_BIT << 31 | NGX_SPDY_VERSION << 16 | (t))
 
 #define ngx_spdy_frame_write_head(p, t)                                       \
     ngx_spdy_frame_aligned_write_uint32(p, ngx_spdy_ctl_frame_head(t))
 
+#define ngx_spdy_v3_ctl_frame_head(t)                                         \
+        ((uint32_t) NGX_SPDY_CTL_BIT << 31 | NGX_SPDY_VERSION_V3 << 16 | (t))
+
+#define ngx_spdy_v3_frame_write_head(p, t)                                    \
+        ngx_spdy_frame_aligned_write_uint32(p, ngx_spdy_v3_ctl_frame_head(t))
+
 #define ngx_spdy_frame_write_flags_and_len(p, f, l)                           \
     ngx_spdy_frame_aligned_write_uint32(p, (f) << 24 | (l))
 
 #define ngx_spdy_frame_write_sid  ngx_spdy_frame_aligned_write_uint32
+#define ngx_spdy_frame_write_delta_window_size  ngx_spdy_frame_aligned_write_uint32
 
 #endif /* _NGX_HTTP_SPDY_H_INCLUDED_ */
