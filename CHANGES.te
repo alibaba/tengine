@@ -8,7 +8,7 @@ Changes with Tengine 2.0.0                                       03 Jan 2014
        (lilbedwin、chobits)
 
     *) Feature: enhanced module ngx_tfs, adding reporting access status to
-       rcs while keepalive. (mingyan)
+       rcs while keepalive. (zhcn381)
 
     *) Feature: added module limit_upstream_tries，by using which upstream
        retrys for proxy, memcached, fastcgi, scgi can be limited.
@@ -24,22 +24,22 @@ Changes with Tengine 2.0.0                                       03 Jan 2014
        ssi or esi correctly. (taoyuanyuan)
 
     *) Feature: enhanced directive "expires_by_types", supporting wildcard
-       such as "text/*" for match. (mingyan)
+       such as "text/*" for match. (zhcn381)
 
     *) Feature: added variable prefix "$base64_decode_", decoding variables
-       with base64. (yuanzhuo)
+       with base64. (yzprofile)
 
     *) Feature: added variable prefix "$md5_encode_", evaluating md5 hash
-       for variables. (yuanzhuo)
+       for variables. (yzprofile)
 
     *) Feature: added variable "$time_http"，rendering current time on http
        pattern. (flygoast)
 
     *) Feature: added variable "$full_request"，retrieving the original
-       request url with scheme and host. (yuanzhuo)
+       request url with scheme and host. (yzprofile)
 
     *) Feature: added variable prefix "$escape_uri_"，escaping variables
-       with url syntax. (yuanzhuo)
+       with url syntax. (yzprofile)
 
     *) Feature: added variable "$raw_uri", retrieving the original uri
        without args. (flygoast)
