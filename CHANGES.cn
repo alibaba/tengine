@@ -1,5 +1,4 @@
 Tengine 2.0.0 [2014-01-03]
-* Change: 合并nginx 1.4.4版本的修改 [cfsego]
 * Feature: 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
 * Feature: 支持spdy v3，自动检测同一端口的spdy请求和http请求 [lilbedwin、chobits]
 * Feature: 增强ngx_tfs模块，在RcServer心跳时汇报访问统计 [mingyan]
@@ -16,6 +15,7 @@ Tengine 2.0.0 [2014-01-03]
 * Feature: 增加$raw_uri变量，支持取得不含参数的原始uri [flygoast]
 * Feature: 支持按微秒记录子请求的请求时间 [jinglong]
 * Feature: 增加nginx API，支持对url进行base64编码 [lilbedwin]
+* Change: 合并nginx 1.4.4版本的修改 [cfsego]
 * Change: 修改stub status模块，不对子请求进行统计 [jinglong]
 * Bugfix: 修正footer模块，不处理含有Content-Encoding头的响应 [wenjing]
 * Bugfix: 修正proxy_no_buffer模块在client_body_postpone_size指令设置为0时，

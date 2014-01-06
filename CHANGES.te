@@ -1,7 +1,5 @@
 Changes with Tengine 2.0.0                                       03 Jan 2014
 
-    *) Change: merged changes between nginx 1.2.9 and 1.4.4. (cfsego)
-
     *) Feature: enhanced dso module, building dynamic module should not
        rely on the original codes or compiler options. (monadbobo)
 
@@ -49,6 +47,8 @@ Changes with Tengine 2.0.0                                       03 Jan 2014
     *) Feature: supported logging subrequest in nanoseconds. (jinglong)
 
     *) Feature: added nginx api，for encoding url with base64. (lilbedwin)
+
+    *) Change: merged changes between nginx 1.2.9 and 1.4.4. (cfsego)
 
     *) Change: updated module ngx_http_stub_status, no logging for
        subrequest. (jinglong)
