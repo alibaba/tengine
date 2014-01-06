@@ -21,7 +21,6 @@ Tengine 2.0.0 [2014-01-03]
 * Bugfix: 修正proxy_no_buffer模块在client_body_postpone_size指令设置为0时，
 收到请求body前不会将请求头发送给源服务器 [yaoweibin]
 * Bugfix: 修正ngx_lua模块在'-Werror=clobbered'编译条件出现警告 [diwayou]
-* Bugfix: 修正使用kqueue时nginx错误判断连接是否建立 [chobits]
 
 Tengine-1.5.2 [2013-11-22]
 * Security: 修复CVE-2013-4547安全漏洞

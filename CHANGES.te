@@ -64,9 +64,6 @@ Changes with Tengine 2.0.0                                       03 Jan 2014
     *) Bugfix: fixed a compilation warning of module ngx_lua with
        '-Werror=clobbered'. (diwayou)
 
-    *) Bugfix: fixed a bug that nginx failed to check connection setup
-       with kqueue. (chobits)
-
 
 Changes with Tengine 1.5.2                                       22 Nov 2013
 
