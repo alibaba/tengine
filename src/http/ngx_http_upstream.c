@@ -2191,7 +2191,7 @@ ngx_http_upstream_test_connect(ngx_connection_t *c)
             return NGX_ERROR;
         }
 
-    }
+    } else
 #endif
     {
         err = 0;
