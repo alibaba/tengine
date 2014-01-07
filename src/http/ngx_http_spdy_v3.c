@@ -1361,10 +1361,8 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
 
     if (sscf->flow_control) {
 
-        stream->recv_window_size -= (ngx_int_t) sc->length;
-
         /* recv window over used */
-        if (stream->recv_window_size < 0) {
+        if ((ngx_uint_t) stream->recv_window_size < sc->length) {
             if (ngx_http_spdy_send_rst_stream(sc, stream->id, NGX_SPDY_FLOW_CONTROL_ERROR,
                                               stream->priority)
                 != NGX_OK)
@@ -1383,7 +1381,9 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
             return ngx_http_spdy_state_complete(sc, pos, end);
         }
 
-        if (stream->recv_window_size < (sc->init_recv_window_size) >> 1) {
+        stream->recv_window_size -= ngx_min(sc->length, (size_t)(end - pos));
+
+        if (stream->recv_window_size < (sc->init_recv_window_size >> 1)) {
 
             if (ngx_http_spdy_send_window_update(sc, stream,
                                                  (ngx_uint_t) sc->init_recv_window_size
