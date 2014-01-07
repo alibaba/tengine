@@ -1,68 +1,62 @@
-Changes with Tengine 2.0.0                                       03 Jan 2014
+Changes with Tengine 2.0.0                                       08 Jan 2014
 
-    *) Feature: enhanced dso module, building dynamic module should not
-       rely on the original codes or compiler options. (monadbobo)
+    *) Feature: now compiling the DSO module does not need the original source
+       code or compiler options. (monadbobo)
 
-    *) Feature: spdy v3 had been supported, distinguishing spdy request
-       or http request on the same port had been supported.
-       (lilbedwin、chobits)
+    *) Feature: added support for SPDY v3, and SPDY/HTTP servers can listen on
+       the same port. (lilbedwin、chobits)
 
-    *) Feature: enhanced module ngx_tfs, adding reporting access status to
-       rcs while keepalive. (zhcn381)
+    *) Feature: added support for setting retries for upstream servers (proxy,
+       memcached, fastcgi, scgi, uwsgi). (supertcy)
 
-    *) Feature: added module limit_upstream_tries，by using which upstream
-       retrys for proxy, memcached, fastcgi, scgi can be limited.
-       (supertcy)
+    *) Feature: now tfs module can report access status to rcs while keepalive.
+       (zhcn381)
 
-    *) Feature: enhanced directive "if", adding ">", "<", ">=", "<=" for
-       numberic comparison. (flygoast)
+    *) Feature: now the directive "if" supports ">", "<", ">=", "<=" operators
+       for numeric comparison. (flygoast)
 
-    *) Feature: enhanced upstream health check module, checking with
-       keepalived connections. (lilbedwin)
+    *) Feature: now upstream health check module uses keep-alive connections.
+       (lilbedwin)
 
-    *) Feature: enhanced module ngx_trim, which shold process comments within
-       ssi or esi correctly. (taoyuanyuan)
+    *) Feature: now trim module can handle SSI and ESI comments properly.
+       (taoyuanyuan)
 
-    *) Feature: enhanced directive "expires_by_types", supporting wildcard
-       such as "text/*" for match. (zhcn381)
+    *) Feature: now directive "expires_by_types" supports wildcard such as
+       "text/*". (zhcn381)
 
-    *) Feature: added variable prefix "$base64_decode_", decoding variables
-       with base64. (yzprofile)
+    *) Feature: added variables starting with "$base64_decode_" to encode
+       variables in base64. (yzprofile)
 
-    *) Feature: added variable prefix "$md5_encode_", evaluating md5 hash
-       for variables. (yzprofile)
+    *) Feature: added variables starting with "$md5_encode_" to encode variables
+       in md5. (yzprofile)
 
-    *) Feature: added variable "$time_http"，rendering current time on http
-       pattern. (flygoast)
+    *) Feature: added a variable "$time_http" to get the current HTTP time.
+       (flygoast)
 
-    *) Feature: added variable "$full_request"，retrieving the original
-       request url with scheme and host. (yzprofile)
+    *) Feature: added a variable "$full_request" to get the original request
+       URL with scheme and host. (yzprofile)
 
-    *) Feature: added variable prefix "$escape_uri_"，escaping variables
-       with url syntax. (yzprofile)
+    *) Feature: added variables starting with "$escape_uri_" to escape variables
+       into formal URL syntax. (yzprofile)
 
-    *) Feature: added variable "$raw_uri", retrieving the original uri
-       without args. (flygoast)
+    *) Feature: added a variable "$raw_uri" to get the original URI without
+       arguments. (flygoast)
 
-    *) Feature: supported logging subrequest in nanoseconds. (jinglong)
+    *) Feature: added support for logging subrequests in nanoseconds. (jinglong)
 
-    *) Feature: added nginx api，for encoding url with base64. (lilbedwin)
+    *) Feature: added a new API function to encode URL into base64. (lilbedwin)
 
-    *) Change: merged changes between nginx 1.2.9 and 1.4.4. (cfsego)
+    *) Change: merged changes between nginx-1.2.9 and nginx-1.4.4. (cfsego)
 
-    *) Change: updated module ngx_http_stub_status, no logging for
-       subrequest. (jinglong)
+    *) Change: now stub_status module does not log subrequests. (jinglong)
 
-    *) Bugfix: fixed module ngx_footer, so that it should not process
-       response with "Content-Encoding" header. (yaoweibin)
+    *) Bugfix: fixed a bug in footer module when reading a response with
+       a "Content-Encoding" header. (yaoweibin)
 
-    *) Bugfix: fixed a bug that module ngx_http_proxy_no_buffer would hold
-       back the header of a request before it received the content of the
-       request, when setting directive "client_body_postpone_size" to 0.
+    *) Bugfix: fixed a bug when "client_body_postpone_size" is set to 0.
        (yaoweibin)
 
-    *) Bugfix: fixed a compilation warning of module ngx_lua with
-       '-Werror=clobbered'. (diwayou)
+    *) Bugfix: fixed a compilation warning of Lua module. (diwayou)
 
 
 Changes with Tengine 1.5.2                                       22 Nov 2013
@@ -72,7 +66,7 @@ Changes with Tengine 1.5.2                                       22 Nov 2013
        0.8.41.
        Thanks to Ivan Fratric of the Google Security Team.
 
-    *) Bugfix: fix a bug of 'nodelay' might be ignored in limit_req module.
+    *) Bugfix: fix a bug that 'nodelay' might be ignored in limit_req module.
        (cfsego)
 
     *) Bugfix: fix a bug in trim module when processing javascript comment.
@@ -184,7 +178,7 @@ Changes with Tengine 1.4.3                                       21 Jan 2013
        File System. (zhcn381, monadbobo)
 
     *) Feature: added a $sent_cookie_XXX variable which could be used to get
-       the value of cookie XXX from the Set-Cookie headers. (skoo87) 
+       the value of cookie XXX from the Set-Cookie headers. (skoo87)
 
     *) Feature: now the syslog logging supports host name and domain name as
        its destination address. (cfsego)
@@ -279,7 +273,7 @@ Changes with Tengine 1.4.0                                         05 Sep 2012
        to allow adding delimiter between each file. (dinic)
 
     *) Feature: added the 'concat_ignore_file_error' directive to ignore file
-       errors and the syntax of concat is less strict now. (dinic) 
+       errors and the syntax of concat is less strict now. (dinic)
 
     *) Feature: added the 'default' option to the 'error_page' directive to
        set all error pages to default values. (jinglong)
