@@ -68,6 +68,9 @@ typedef struct {
     ngx_array_t                      upstreams;
                                              /* ngx_http_upstream_srv_conf_t */
 #if (NGX_HTTP_UPSTREAM_RBTREE)
+    ngx_array_t                      implicit_upstreams;
+                                            /* ngx_http_upstream_srv_conf_t */
+
     ngx_rbtree_t                     rbtree;
     ngx_rbtree_node_t                sentinel;
 #endif
