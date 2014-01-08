@@ -29,6 +29,7 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_rbtree.h \
            src/core/ngx_trie.h \
            src/core/ngx_segment_tree.h \
+           src/core/ngx_ebtree.h
            src/core/ngx_radix_tree.h \
            src/core/ngx_slab.h \
            src/core/ngx_times.h \
@@ -60,6 +61,7 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_rbtree.c \
            src/core/ngx_trie.c
            src/core/ngx_segment_tree.c \
+           src/core/ngx_ebtree.c \
            src/core/ngx_radix_tree.c \
            src/core/ngx_slab.c \
            src/core/ngx_times.c \
