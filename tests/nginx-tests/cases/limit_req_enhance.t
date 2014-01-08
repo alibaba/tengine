@@ -66,9 +66,9 @@ http {
         listen       127.0.0.1:8080;
         server_name  localhost;
         location / {
-            limit_req    zone=one  burst=5;
-            limit_req    zone=two forbid_action=@t;
-            limit_req    zone=thre burst=3;
+            limit_req    zone=one nodelay burst=5;
+            limit_req    zone=two nodelay forbid_action=@t;
+            limit_req    zone=thre nodelay burst=3;
         }
 
         location @t {
@@ -76,29 +76,29 @@ http {
         }
 
         location /one {
-            limit_req    zone=one;
+            limit_req    zone=one nodelay;
         }
         location /two {
-            limit_req    zone=two;
+            limit_req    zone=two nodelay;
         }
         location /thre {
-            limit_req    zone=thre;
+            limit_req    zone=thre nodelay;
         }
         location /long {
-            limit_req    zone=long  burst=5;
+            limit_req    zone=long nodelay burst=5;
         }
         location /fast {
-            limit_req    zone=fast  burst=1;
+            limit_req    zone=fast nodelay burst=1;
         }
 
         location /white {
             limit_req_whitelist  geo_var_name=white_ip2 geo_var_value=1;
-            limit_req    zone=one;
+            limit_req    zone=one nodelay;
         }
 
         location /inter {
               expires 1h;
-              limit_req    zone=inter forbid_action=/t.html;
+              limit_req    zone=inter nodelay forbid_action=/t.html;
         }
 
         location /t.html {
