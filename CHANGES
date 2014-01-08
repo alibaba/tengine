@@ -1,4 +1,12 @@
 
+Changes with nginx 1.4.4                                         19 Nov 2013
+
+    *) Security: a character following an unescaped space in a request line
+       was handled incorrectly (CVE-2013-4547); the bug had appeared in
+       0.8.41.
+       Thanks to Ivan Fratric of the Google Security Team.
+
+
 Changes with nginx 1.4.3                                         08 Oct 2013
 
     *) Bugfix: a segmentation fault might occur in a worker process if the
