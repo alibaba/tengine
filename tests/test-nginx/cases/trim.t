@@ -401,12 +401,12 @@ html >/**/ body p {
 <!DOCTYPE html>
 <script type="text/javascript">// <![CDATA[
    return   true;
-// ]]></script></head><body id="loginform"><div id="page_content">
+// ]]></script  ></head><body id="loginform"><div id="page_content">
 --- request
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content"> '
+<script type="text/javascript">return true;</script ></head><body id="loginform"><div id="page_content"> '
 
 === TEST 18: do not trim html comment of ssi/esi
 --- config
@@ -430,3 +430,86 @@ html >/**/ body p {
 --- response_body eval
 '<!DOCTYPE html>
 <!--# ssi  --> <!--esi    --> <!--e    --> <!--[if  ie  <![endif]--> '
+
+=== TEST 19: trim tag
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<html>
+<head>
+<title    >Welcome to nginx!</title    >
+<script       language="JavaScript"     type="   text/javascript"    >
+    // comment </script  > <p> hello    world
+<style    type="text/css"  language="css"   >
+   /*     */
+</style      >
+</head>
+<body>
+<pre    style="color:blue">Welcome    to    nginx!</pre  >
+<pre >Welcome    to    nginx!</pre>
+<textarea    style="color:blue">Welcome    to    nginx!</textarea  >
+<textarea >Welcome    to    nginx!</textarea>
+<!-- hello world -->
+</body>
+</html>
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<html> <head> <title >Welcome to nginx!</title > <script language="JavaScript" type="   text/javascript" ></script > <p> hello world <style type="text/css" language="css" ></style > </head> <body> <pre style="color:blue">Welcome    to    nginx!</pre > <pre >Welcome    to    nginx!</pre> <textarea style="color:blue">Welcome    to    nginx!</textarea > <textarea >Welcome    to    nginx!</textarea> </body> </html> '
+
+
+=== TEST 20: nest pre
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<pre    style="color:black">
+a     a
+
+<pre    style="color:blue"  >
+b     b
+
+<pre   style  =  "color:  red"   >
+d     d
+
+</pre    >
+
+c     c
+
+</pre   >
+
+
+</pre     >
+
+f     f
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<pre style="color:black">
+a     a
+
+<pre style="color:blue" >
+b     b
+
+<pre style = "color:  red" >
+d     d
+
+</pre >
+
+c     c
+
+</pre >
+
+
+</pre > f f '
