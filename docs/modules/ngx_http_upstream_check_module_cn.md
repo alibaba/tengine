@@ -80,9 +80,7 @@ Context: `upstream`
 Syntax: **check\_fastcgi\_params** `parameter`:`value`
 
 Default: `REQUEST_METHOD: GET`
-
          `REQUEST_URI: /`
-
          `SCRIPT_FILENAME: index.php'
 
 Context: `upstream`
