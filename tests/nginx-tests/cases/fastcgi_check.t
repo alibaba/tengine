@@ -81,8 +81,8 @@ http {
     upstream fastcgi {
         server 127.0.0.1:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi default_down=false;
-        check_fastcgi_params "REQUEST_METHOD" "GET";
-        check_fastcgi_params "REQUEST_URI" "/redir";
+        check_fastcgi_param "REQUEST_METHOD" "GET";
+        check_fastcgi_param "REQUEST_URI" "/redir";
         check_http_expect_alive http_3xx;
     }
 
@@ -135,8 +135,8 @@ http {
     upstream fastcgi {
         server 127.0.0.1:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi;
-        check_fastcgi_params "REQUEST_METHOD" "GET";
-        check_fastcgi_params "REQUEST_URI" "/redir";
+        check_fastcgi_param "REQUEST_METHOD" "GET";
+        check_fastcgi_param "REQUEST_URI" "/redir";
         check_http_expect_alive http_3xx;
     }
 
@@ -187,8 +187,8 @@ http {
     upstream fastcgi {
         server 127.0.0.1:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi;
-        check_fastcgi_params "REQUEST_METHOD" "GET";
-        check_fastcgi_params "REQUEST_URI" "/redir";
+        check_fastcgi_param "REQUEST_METHOD" "GET";
+        check_fastcgi_param "REQUEST_URI" "/redir";
         check_http_expect_alive http_3xx;
     }
 
@@ -244,8 +244,8 @@ http {
     upstream fastcgi {
         server 127.0.0.1:8081;
         check interval=1000 rise=1 fall=1 timeout=1000 type=fastcgi;
-        check_fastcgi_params "REQUEST_METHOD" "GET";
-        check_fastcgi_params "REQUEST_URI" "/404";
+        check_fastcgi_param "REQUEST_METHOD" "GET";
+        check_fastcgi_param "REQUEST_URI" "/404";
         check_http_expect_alive http_2xx;
     }
 
@@ -299,8 +299,8 @@ http {
     upstream fastcgi {
         server 127.0.0.1:8081;
         check interval=1000 rise=1 fall=1 timeout=1000 type=fastcgi;
-        check_fastcgi_params "REQUEST_METHOD" "GET";
-        check_fastcgi_params "REQUEST_URI" "/";
+        check_fastcgi_param "REQUEST_METHOD" "GET";
+        check_fastcgi_param "REQUEST_URI" "/";
         check_http_expect_alive http_4xx;
     }
 

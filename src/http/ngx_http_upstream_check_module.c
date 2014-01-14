@@ -530,7 +530,7 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
       0,
       NULL },
 
-    { ngx_string("check_fastcgi_params"),
+    { ngx_string("check_fastcgi_param"),
       NGX_HTTP_UPS_CONF|NGX_CONF_TAKE2,
       ngx_http_upstream_check_fastcgi_params,
       0,
