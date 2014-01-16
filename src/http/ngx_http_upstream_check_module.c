@@ -2904,7 +2904,7 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
             ucscf->send_keepalive.len == 0)
         {
             ucscf->send_keepalive.len = sizeof("HEAD / HTTP/1.0\r\n"
-                                               "connection: keep-alive"
+                                               "Connection: keep-alive"
                                                "\r\n\r\n") - 1;
             ucscf->send_keepalive.data = ngx_pcalloc(cf->pool,
                                                      ucscf->send_keepalive.len);
@@ -2914,7 +2914,7 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
                 return NGX_CONF_ERROR;
             }
             ngx_memcpy(ucscf->send_keepalive.data,
-                       "HEAD / HTTP/1.0\r\nconnection: keep-alive\r\n\r\n",
+                       "HEAD / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n",
                        ucscf->send_keepalive.len);
         }
 
