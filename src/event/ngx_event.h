@@ -27,6 +27,12 @@ typedef struct {
 #endif
 
 
+typedef union {
+    ngx_rbtree_node_t   rbtree;
+    ngx_minheap_node_t  minheap;
+} ngx_event_timer_node_t;
+
+
 typedef struct {
     ngx_uint_t       lock;
 
@@ -131,7 +137,7 @@ struct ngx_event_s {
 
     ngx_log_t       *log;
 
-    ngx_rbtree_node_t   timer;
+    ngx_event_timer_node_t   timer;
 
     unsigned         closed:1;
 
@@ -529,6 +535,14 @@ extern sig_atomic_t           ngx_event_timer_alarm;
 extern ngx_uint_t             ngx_event_flags;
 extern ngx_module_t           ngx_events_module;
 extern ngx_module_t           ngx_event_core_module;
+
+
+extern ngx_event_timer_init_pt ngx_event_timer_init;
+extern ngx_event_timer_is_empty_pt ngx_event_timer_empty;
+extern ngx_event_find_min_timer_pt ngx_event_find_timer;
+extern ngx_event_expire_timers_pt ngx_event_expire_timers;
+extern ngx_event_add_timer_pt ngx_event_add_timer;
+extern ngx_event_del_timer_pt ngx_event_del_timer;
 
 
 #define ngx_event_get_conf(conf_ctx, module)                                  \

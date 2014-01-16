@@ -17,6 +17,7 @@ ngx_mutex_t  *ngx_event_timer_mutex;
 
 ngx_thread_volatile ngx_rbtree_t  ngx_event_timer_rbtree;
 static ngx_rbtree_node_t          ngx_event_timer_sentinel;
+ngx_thread_volatile ngx_minheap_t ngx_event_timer_minheap;
 
 /*
  * the event timer rbtree may contain the duplicate keys, however,
@@ -25,7 +26,7 @@ static ngx_rbtree_node_t          ngx_event_timer_sentinel;
  */
 
 ngx_int_t
-ngx_event_timer_init(ngx_log_t *log)
+ngx_event_timer_init_rbtree(ngx_log_t *log)
 {
     ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel,
                     ngx_rbtree_insert_timer_value);
@@ -49,7 +50,7 @@ ngx_event_timer_init(ngx_log_t *log)
 
 
 ngx_msec_t
-ngx_event_find_timer(void)
+ngx_event_find_timer_rbtree(void)
 {
     ngx_msec_int_t      timer;
     ngx_rbtree_node_t  *node, *root, *sentinel;
@@ -74,7 +75,7 @@ ngx_event_find_timer(void)
 
 
 void
-ngx_event_expire_timers(void)
+ngx_event_expire_timers_rbtree(void)
 {
     ngx_event_t        *ev;
     ngx_rbtree_node_t  *node, *root, *sentinel;
@@ -118,17 +119,234 @@ ngx_event_expire_timers(void)
 
             ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                            "event timer del: %d: %M",
-                           ngx_event_ident(ev->data), ev->timer.key);
+                           ngx_event_ident(ev->data), ev->timer.rbtree.key);
 
-            ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
+            ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer.rbtree);
 
             ngx_mutex_unlock(ngx_event_timer_mutex);
 
 #if (NGX_DEBUG)
-            ev->timer.left = NULL;
-            ev->timer.right = NULL;
-            ev->timer.parent = NULL;
+            ev->timer.rbtree.left = NULL;
+            ev->timer.rbtree.right = NULL;
+            ev->timer.rbtree.parent = NULL;
 #endif
+
+            ev->timer_set = 0;
+
+#if (NGX_THREADS)
+            if (ngx_threaded) {
+                ev->posted_timedout = 1;
+
+                ngx_post_event(ev, &ngx_posted_events);
+
+                ngx_unlock(ev->lock);
+
+                continue;
+            }
+#endif
+
+            ev->timedout = 1;
+
+            ev->handler(ev);
+
+            continue;
+        }
+
+        break;
+    }
+
+    ngx_mutex_unlock(ngx_event_timer_mutex);
+}
+
+
+ngx_int_t
+ngx_event_timer_init_minheap(ngx_log_t *log)
+{
+    ngx_pool_t  *pool;
+
+    pool = ngx_create_pool(4096, log);
+    if (pool == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_event_timer_minheap.pool = pool;
+    ngx_event_timer_minheap.elts = ngx_palloc(pool, 
+                                              ngx_cycle->connection_n *
+                                              sizeof(ngx_minheap_node_t *));
+    if (ngx_event_timer_minheap.elts == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_event_timer_minheap.nelts = 0;
+    ngx_event_timer_minheap.nalloc = ngx_cycle->connection_n;
+
+#if (NGX_THREADS)
+
+    if (ngx_event_timer_mutex) {
+        ngx_event_timer_mutex->log = log;
+        return NGX_OK;
+    }
+
+    ngx_event_timer_mutex = ngx_mutex_init(log, 0);
+    if (ngx_event_timer_mutex == NULL) {
+        return NGX_ERROR;
+    }
+
+#endif
+
+    return NGX_OK;
+}
+
+
+ngx_msec_t
+ngx_event_find_timer_minheap(void)
+{
+    ngx_msec_int_t      timer;
+    ngx_minheap_node_t *node;
+
+    if (ngx_event_timer_minheap.nelts == 0) {
+        return NGX_TIMER_INFINITE;
+    }
+
+    ngx_mutex_lock(ngx_event_timer_mutex);
+
+    node = ngx_minheap_min(&ngx_event_timer_minheap);
+
+    ngx_mutex_unlock(ngx_event_timer_mutex);
+
+    timer = (ngx_msec_int_t) (node->key - ngx_current_msec);
+
+    return (ngx_msec_t) (timer > 0 ? timer : 0);
+}
+
+
+void
+ngx_event_expire_timers_minheap(void)
+{
+    ngx_event_t        *ev;
+    ngx_minheap_node_t *node;
+
+    for ( ;; ) {
+
+        ngx_mutex_lock(ngx_event_timer_mutex);
+
+        if (ngx_event_timer_minheap.nelts == 0) {
+            return;
+        }
+
+        node = ngx_minheap_min(&ngx_event_timer_minheap);
+
+        /* node->key <= ngx_current_time */
+
+        if ((ngx_msec_int_t) (node->key - ngx_current_msec) <= 0) {
+            ev = (ngx_event_t *) ((char *) node - offsetof(ngx_event_t, timer));
+
+#if (NGX_THREADS)
+
+            if (ngx_threaded && ngx_trylock(ev->lock) == 0) {
+
+                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                               "event %p is busy in expire timers", ev);
+                break;
+            }
+#endif
+
+            ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                           "event timer del: %d: %M",
+                           ngx_event_ident(ev->data), ev->timer.minheap.key);
+
+            ngx_minheap_delete(&ngx_event_timer_minheap, ev->timer.minheap.index);
+
+            ngx_mutex_unlock(ngx_event_timer_mutex);
+
+            ev->timer_set = 0;
+
+#if (NGX_THREADS)
+            if (ngx_threaded) {
+                ev->posted_timedout = 1;
+
+                ngx_post_event(ev, &ngx_posted_events);
+
+                ngx_unlock(ev->lock);
+
+                continue;
+            }
+#endif
+
+            ev->timedout = 1;
+
+            ev->handler(ev);
+
+            continue;
+        }
+
+        break;
+    }
+
+    ngx_mutex_unlock(ngx_event_timer_mutex);
+}
+
+
+ngx_msec_t
+ngx_event_find_timer_minheap4(void)
+{
+    ngx_msec_int_t      timer;
+    ngx_minheap_node_t *node;
+
+    if (ngx_event_timer_minheap.nelts == 0) {
+        return NGX_TIMER_INFINITE;
+    }
+
+    ngx_mutex_lock(ngx_event_timer_mutex);
+
+    node = ngx_minheap_min(&ngx_event_timer_minheap);
+
+    ngx_mutex_unlock(ngx_event_timer_mutex);
+
+    timer = (ngx_msec_int_t) (node->key - ngx_current_msec);
+
+    return (ngx_msec_t) (timer > 0 ? timer : 0);
+}
+
+
+void
+ngx_event_expire_timers_minheap4(void)
+{
+    ngx_event_t        *ev;
+    ngx_minheap_node_t *node;
+
+    for ( ;; ) {
+
+        ngx_mutex_lock(ngx_event_timer_mutex);
+
+        if (ngx_event_timer_minheap.nelts == 0) {
+            return;
+        }
+
+        node = ngx_minheap_min(&ngx_event_timer_minheap);
+
+        /* node->key <= ngx_current_time */
+
+        if ((ngx_msec_int_t) (node->key - ngx_current_msec) <= 0) {
+            ev = (ngx_event_t *) ((char *) node - offsetof(ngx_event_t, timer));
+
+#if (NGX_THREADS)
+
+            if (ngx_threaded && ngx_trylock(ev->lock) == 0) {
+
+                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                               "event %p is busy in expire timers", ev);
+                break;
+            }
+#endif
+
+            ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                           "event timer del: %d: %M",
+                           ngx_event_ident(ev->data), ev->timer.minheap.key);
+
+            ngx_minheap_delete(&ngx_event_timer_minheap, ev->timer.minheap.index);
+
+            ngx_mutex_unlock(ngx_event_timer_mutex);
 
             ev->timer_set = 0;
 

@@ -65,6 +65,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_regex.h>
 #endif
 #include <ngx_trie.h>
+#include <ngx_minheap.h>
 #include <ngx_radix_tree.h>
 #include <ngx_segment_tree.h>
 #include <ngx_times.h>
@@ -105,5 +106,12 @@ void ngx_cpuinfo(void);
 #define NGX_DISABLE_SYMLINKS_ON         1
 #define NGX_DISABLE_SYMLINKS_NOTOWNER   2
 #endif
+
+typedef ngx_int_t (*ngx_event_timer_init_pt)(ngx_log_t *log);
+typedef ngx_msec_t (*ngx_event_find_min_timer_pt)(void);
+typedef void (*ngx_event_expire_timers_pt)(void);
+typedef void (*ngx_event_del_timer_pt)(ngx_event_t *ev);
+typedef void (*ngx_event_add_timer_pt)(ngx_event_t *ev, ngx_msec_t timer);
+typedef ngx_int_t (*ngx_event_timer_is_empty_pt)(void);
 
 #endif /* _NGX_CORE_H_INCLUDED_ */

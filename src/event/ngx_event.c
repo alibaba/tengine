@@ -28,6 +28,7 @@ static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_event_timer(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -84,6 +85,13 @@ ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
 #endif
 
 
+ngx_int_t (*ngx_event_timer_init)(ngx_log_t *log);
+ngx_msec_t (*ngx_event_find_timer)(void);
+void (*ngx_event_expire_timers)(void);
+void (*ngx_event_del_timer)(ngx_event_t *ev);
+void (*ngx_event_add_timer)(ngx_event_t *ev, ngx_msec_t timer);
+ngx_int_t (*ngx_event_timer_empty)(void);
+
 
 static ngx_command_t  ngx_events_commands[] = {
 
@@ -136,6 +144,13 @@ static ngx_command_t  ngx_event_core_commands[] = {
     { ngx_string("connections"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_connections,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("timers"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_event_timer,
       0,
       0,
       NULL },
@@ -1022,6 +1037,53 @@ ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static char *
+ngx_event_timer(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_str_t   *value;
+
+    value = cf->args->elts;
+    value++;
+
+    if (value->len == 6
+        && ngx_strncmp(value->data, "rbtree", 6) == 0) {
+        ngx_event_timer_init = ngx_event_timer_init_rbtree;
+        ngx_event_timer_empty = ngx_event_timer_empty_rbtree;
+        ngx_event_find_timer = ngx_event_find_timer_rbtree;
+        ngx_event_expire_timers = ngx_event_expire_timers_rbtree;
+        ngx_event_add_timer = ngx_event_add_timer_rbtree;
+        ngx_event_del_timer = ngx_event_del_timer_rbtree;
+
+    } else if (value->len == 7
+               && ngx_strncmp(value->data, "minheap", 7) == 0)
+    {
+        ngx_event_timer_init = ngx_event_timer_init_minheap;
+        ngx_event_timer_empty = ngx_event_timer_empty_minheap;
+        ngx_event_find_timer = ngx_event_find_timer_minheap;
+        ngx_event_expire_timers = ngx_event_expire_timers_minheap;
+        ngx_event_add_timer = ngx_event_add_timer_minheap;
+        ngx_event_del_timer = ngx_event_del_timer_minheap;
+
+    } else if (value->len == 8
+               && ngx_strncmp(value->data, "minheap4", 8) == 0)
+    {
+        ngx_event_timer_init = ngx_event_timer_init_minheap;
+        ngx_event_timer_empty = ngx_event_timer_empty_minheap;
+        ngx_event_find_timer = ngx_event_find_timer_minheap4;
+        ngx_event_expire_timers = ngx_event_expire_timers_minheap4;
+        ngx_event_add_timer = ngx_event_add_timer_minheap4;
+        ngx_event_del_timer = ngx_event_del_timer_minheap4;
+
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid args");
+
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
 ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_event_conf_t  *ecf = conf;
@@ -1319,6 +1381,12 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_value(ecf->accept_mutex, 1);
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 100);
 
+    ngx_event_timer_init = ngx_event_timer_init_rbtree;
+    ngx_event_find_timer = ngx_event_find_timer_rbtree;
+    ngx_event_expire_timers = ngx_event_expire_timers_rbtree;
+    ngx_event_add_timer = ngx_event_add_timer_rbtree;
+    ngx_event_del_timer = ngx_event_del_timer_rbtree;
+    ngx_event_timer_empty = ngx_event_timer_empty_rbtree;
 
 #if (NGX_HAVE_RTSIG)
 
