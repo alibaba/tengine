@@ -2900,7 +2900,7 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
             ucscf->send_once.len = check->default_send.len;
         }
 
-        if (check->need_keepalive &&
+        if (check->type == NGX_HTTP_CHECK_HTTP &&
             ucscf->send_keepalive.len == 0)
         {
             ucscf->send_keepalive.len = sizeof("HEAD / HTTP/1.0\r\n"
