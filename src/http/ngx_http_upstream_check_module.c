@@ -75,6 +75,7 @@ typedef struct {
 
     ngx_uint_t                               state;
     ngx_http_status_t                        status;
+    ngx_uint_t                               status_done;
 } ngx_http_upstream_check_ctx_t;
 
 
@@ -236,7 +237,8 @@ struct ngx_http_upstream_check_srv_conf_s {
     ngx_uint_t                               check_keepalive_requests;
 
     ngx_check_conf_t                        *check_type_conf;
-    ngx_str_t                                send;
+    ngx_str_t                                send_once;
+    ngx_str_t                                send_keepalive;
 
     union {
         ngx_uint_t                           return_code;
@@ -540,7 +542,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
 
     { NGX_HTTP_CHECK_HTTP,
       ngx_string("http"),
-      ngx_string("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"),
+      ngx_string("GET / HTTP/1.0\r\n\r\n"),
       NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
       ngx_http_upstream_check_send_handler,
       ngx_http_upstream_check_recv_handler,
@@ -984,6 +986,7 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
             peer->pc.connection = NULL;
         }
     }
+
     ngx_memzero(&peer->pc, sizeof(ngx_peer_connection_t));
 
     peer->pc.sockaddr = peer->check_peer_addr->sockaddr;
@@ -1310,14 +1313,21 @@ check_recv_fail:
 static ngx_int_t
 ngx_http_upstream_check_http_init(ngx_http_upstream_check_peer_t *peer)
 {
+    ngx_check_conf_t                    *cf;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     ctx = peer->check_data;
     ucscf = peer->conf;
+    cf = ucscf->check_type_conf;
 
-    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send.data;
-    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send.len;
+    if (ucscf->check_keepalive_requests > 1) {
+        ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_keepalive.data;
+        ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_keepalive.len;
+    } else {
+        ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_once.data;
+        ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_once.len;
+    }
 
     ctx->recv.start = ctx->recv.pos = NULL;
     ctx->recv.end = ctx->recv.last = NULL;
@@ -1343,6 +1353,10 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 
     if ((ctx->recv.last - ctx->recv.pos) > 0) {
 
+        if (ctx->status_done) {
+            goto parse_header;
+        }
+
         rc = ngx_http_upstream_check_parse_status_line(ctx,
                                                        &ctx->recv,
                                                        &ctx->status);
@@ -1356,6 +1370,18 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
                           &peer->check_peer_addr->name);
             return rc;
         }
+
+        ctx->status_done = 1;
+
+    parse_header:
+        if (ngx_strnstr(ctx->recv.pos, "\r\n\r\n",
+                        ctx->recv.last - ctx->recv.pos) == NULL)
+        {
+            return NGX_AGAIN;
+        }
+
+        /* header recv complete */
+        ctx->status_done = 0;
 
         code = ctx->status.code;
 
@@ -1383,6 +1409,7 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
         } else {
             return NGX_ERROR;
         }
+
     } else {
         return NGX_AGAIN;
     }
@@ -1587,13 +1614,32 @@ done:
 static void
 ngx_http_upstream_check_http_reinit(ngx_http_upstream_check_peer_t *peer)
 {
-    ngx_http_upstream_check_ctx_t  *ctx;
+    ngx_connection_t                    *c;
+    ngx_http_upstream_check_ctx_t       *ctx;
+    ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     ctx = peer->check_data;
+    ucscf = peer->conf;
 
-    ctx->send.pos = ctx->send.start;
-    ctx->send.last = ctx->send.end;
+    /* so ugly logic */
+    if (peer->pc.connection != NULL) {
+        c = peer->pc.connection;
 
+        if (c->requests < ucscf->check_keepalive_requests - 1) {
+            ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_keepalive.data;
+            ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_keepalive.len;
+            goto reinit_recv;
+        }
+    } else if (ucscf->check_keepalive_requests > 1) {
+        ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_keepalive.data;
+        ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_keepalive.len;
+        goto reinit_recv;
+    }
+
+    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_once.data;
+    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_once.len;
+
+ reinit_recv:
     ctx->recv.pos = ctx->recv.last = ctx->recv.start;
 
     ctx->state = 0;
@@ -1611,8 +1657,8 @@ ngx_http_upstream_check_ssl_hello_init(ngx_http_upstream_check_peer_t *peer)
     ctx = peer->check_data;
     ucscf = peer->conf;
 
-    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send.data;
-    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send.len;
+    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_once.data;
+    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_once.len;
 
     ctx->recv.start = ctx->recv.pos = NULL;
     ctx->recv.end = ctx->recv.last = NULL;
@@ -1680,8 +1726,8 @@ ngx_http_upstream_check_mysql_init(ngx_http_upstream_check_peer_t *peer)
     ctx = peer->check_data;
     ucscf = peer->conf;
 
-    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send.data;
-    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send.len;
+    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_once.data;
+    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_once.len;
 
     ctx->recv.start = ctx->recv.pos = NULL;
     ctx->recv.end = ctx->recv.last = NULL;
@@ -1744,8 +1790,8 @@ ngx_http_upstream_check_ajp_init(ngx_http_upstream_check_peer_t *peer)
     ctx = peer->check_data;
     ucscf = peer->conf;
 
-    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send.data;
-    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send.len;
+    ctx->send.start = ctx->send.pos = (u_char *)ucscf->send_once.data;
+    ctx->send.end = ctx->send.last = ctx->send.start + ucscf->send_once.len;
 
     ctx->recv.start = ctx->recv.pos = NULL;
     ctx->recv.end = ctx->recv.last = NULL;
@@ -2539,6 +2585,7 @@ static char *
 ngx_http_upstream_check_http_send(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)
 {
+    u_char                              *p, *q;
     ngx_str_t                           *value;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
@@ -2547,7 +2594,44 @@ ngx_http_upstream_check_http_send(ngx_conf_t *cf, ngx_command_t *cmd,
     ucscf = ngx_http_conf_get_module_srv_conf(cf,
                                               ngx_http_upstream_check_module);
 
-    ucscf->send = value[1];
+    ucscf->send_once = value[1];
+
+    p = value[1].data;
+    q = ngx_strnstr(p, " ", value[1].len);
+    if (q == NULL || q == p) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid value format for dirctive: "
+                           "check_http_send %V", &value[1]);
+        return NGX_CONF_ERROR;
+    }
+
+    p = q + 1;
+    q = ngx_strnstr(p, " ", value[1].len - (p - value[1].data));
+    if (q == NULL || q == p) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid value format for dirctive: "
+                           "check_http_send %V", &value[1]);
+        return NGX_CONF_ERROR;
+    }
+
+    ucscf->send_keepalive.len = sizeof("HEAD ") - 1 + q - p
+        + sizeof(" HTTP/1.0\r\nConnection: keep-alive\r\n\r\n") - 1;
+
+    ucscf->send_keepalive.data = ngx_pcalloc(cf->pool,
+                                             ucscf->send_keepalive.len);
+
+    if (ucscf->send_keepalive.data == NULL) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "error allocate memory for send_keepalive");
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memcpy(ucscf->send_keepalive.data, "HEAD ", sizeof("HEAD ") - 1);
+    ngx_memcpy(ucscf->send_keepalive.data + sizeof("HEAD ") - 1,
+               p, q - p);
+    ngx_memcpy(ucscf->send_keepalive.data + sizeof("HEAD ") - 1 + (q - p),
+               " HTTP/1.0\r\nConnection: keep-alive\r\n\r\n",
+               sizeof(" HTTP/1.0\r\nConnection: keep-alive\r\n\r\n") - 1);
 
     return NGX_CONF_OK;
 }
@@ -2802,7 +2886,7 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
     }
 
     if (ucscf->check_keepalive_requests == NGX_CONF_UNSET_UINT) {
-        ucscf->check_keepalive_requests = 100;
+        ucscf->check_keepalive_requests = 1;
     }
 
     if (ucscf->check_type_conf == NGX_CONF_UNSET_PTR) {
@@ -2811,9 +2895,27 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
 
     check = ucscf->check_type_conf;
     if (check) {
-        if (ucscf->send.len == 0) {
-            ucscf->send.data = check->default_send.data;
-            ucscf->send.len = check->default_send.len;
+        if (ucscf->send_once.len == 0) {
+            ucscf->send_once.data = check->default_send.data;
+            ucscf->send_once.len = check->default_send.len;
+        }
+
+        if (check->type == NGX_HTTP_CHECK_HTTP &&
+            ucscf->send_keepalive.len == 0)
+        {
+            ucscf->send_keepalive.len = sizeof("HEAD / HTTP/1.0\r\n"
+                                               "Connection: keep-alive"
+                                               "\r\n\r\n") - 1;
+            ucscf->send_keepalive.data = ngx_pcalloc(cf->pool,
+                                                     ucscf->send_keepalive.len);
+            if (ucscf->send_keepalive.data == NULL) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "error allocate memory for send_keepalive");
+                return NGX_CONF_ERROR;
+            }
+            ngx_memcpy(ucscf->send_keepalive.data,
+                       "HEAD / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n",
+                       ucscf->send_keepalive.len);
         }
 
         if (ucscf->code.status_alive == 0) {
