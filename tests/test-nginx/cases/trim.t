@@ -130,8 +130,8 @@ style="text-align:   center;">hello world, it is good to see you </body> '
 --- request
     GET /t/trim.html
 --- response_body eval
-'<!DOCTYPE html>
-<html> <body>hello world!<body> <html> '
+'
+<!DOCTYPE html> <html> <body>hello world!<body> <html> '
 
 === TEST 6: return zero size 
 --- config
@@ -156,8 +156,6 @@ style="text-align:   center;">hello world, it is good to see you </body> '
     location /trim.html { trim off;}
 --- user_files
 >>> trim.html
-
-
 <!DOCTYPE html>
 <      <PRE>hello     world  ! </pre>
 <2     <pre>hello     world  ! </pre>
@@ -391,3 +389,44 @@ html >/**/ body p {
 }
 /**/
 </style> '
+
+=== TEST 17: comment of javascript
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<script type="text/javascript">// <![CDATA[
+   return   true;
+// ]]></script></head><body id="loginform"><div id="page_content">
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content"> '
+
+=== TEST 18: do not trim html comment of ssi/esi
+--- config
+    trim on;
+    trim_jscss on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<!-- hello -->
+<!--# ssi  -->
+<!--esi    -->
+<!-- world -->
+<!---->
+<!--e    -->
+<!-------->
+<!--[if  ie  <![endif]-->
+--- request
+    GET /t/trim.html
+--- response_body eval
+'<!DOCTYPE html>
+<!--# ssi  --> <!--esi    --> <!--e    --> <!--[if  ie  <![endif]--> '

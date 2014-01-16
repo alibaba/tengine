@@ -28,7 +28,7 @@ my $t = Test::Nginx->new()->has(qw/http random_index/)->plan(1)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

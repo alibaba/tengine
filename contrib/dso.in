@@ -1,17 +1,15 @@
-DSO_ALL_INCS=%%ALL_INCS%%
 DSO_CORE_DEPS=%%CORE_DEPS%%
-DSO_CORE_INCS=%%CORE_INCS%%
 DSO_HTTP_DEPS=%%HTTP_DEPS%%
-DSO_HTTP_INCS=%%HTTP_INCS%%
+DSO_ALL_INCS=%%ALL_INCS%%
 
 
 ALL_INCS=
 CORE_INCS=
-CORE_DEPS=
 HTTP_INCS=
+CORE_DEPS=
 HTTP_DEPS=
 
-NGX_SOURCE_HOME=%%NGX_SOURCE_HOME%%
+NGX_OBJS=objs
 
 opt=
 help=no
@@ -36,8 +34,8 @@ do
         --add-module=*)                  NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
         -a=*)                            NGX_DSO_ADDONS="$NGX_DSO_ADDONS $value" ;;
 
-        --nginx-source=*)                NGX_SOURCE_HOME="$value"       ;;
-        -s=*)                            NGX_SOURCE_HOME="$value"       ;;
+        --nginx-include=*)               NGX_INCLUDE_PATH="$value"       ;;
+        -s=*)                            NGX_INCLUDE_PATH="$value"       ;;
 
         *)
             echo "$0: error: invalid option \"$option\""
@@ -56,10 +54,10 @@ if [ $help = yes ]; then
 
 cat << END
 
-    -h, --help                display this help and exit
-    -d, --dst=PATH            set module installation path
-    -a, --add-module=PATH     external module which will be compiled
-    -s, --nginx-source=SOURCE set nginx source root
+    -h, --help                 display this help and exit
+    -d, --dst=PATH             set module installation path
+    -a, --add-module=PATH      external module which will be compiled(absolute path)
+    -s, --nginx-include=SOURCE set nginx include path(absolute path)
 
 END
 
@@ -78,13 +76,6 @@ generate_make () {
     dso_binout=$ngx_addon_name
     NGX_DSO_MAKEFILE=objs/Makefile
     NGX_ADDON_DEPS=$2
-    NGX_OBJS=objs
-
-    if test -d $NGX_OBJS; then
-        rm -rf $NGX_OBJS
-    fi
-
-    mkdir -p $NGX_OBJS
 
     cat << END                                                     > $NGX_DSO_MAKEFILE
 
@@ -95,6 +86,9 @@ LINK = $LINK
 
 
 CORE_LIBS = $CORE_LIBS
+CORE_INCS = $CORE_INCS
+HTTP_INCS = $HTTP_INCS
+
 CORE_LINK = $CORE_LINK
 NGX_LD_OPT = $NGX_LD_OPT
 
@@ -107,12 +101,7 @@ ALL_INCS = $ALL_INCS
 
 CORE_DEPS = $CORE_DEPS
 
-CORE_INCS = $CORE_INCS
-
 HTTP_DEPS = $HTTP_DEPS
-
-
-HTTP_INCS = $HTTP_INCS
 
 ADDON_DEPS = \$(CORE_DEPS) $NGX_ADDON_DEPS
 
@@ -181,7 +170,7 @@ END
         cat << END                                            >> $NGX_DSO_MAKEFILE
 
 $ngx_obj:	\$(ADDON_DEPS)$ngx_cont$ngx_src
-	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+	$ngx_cc\$(ALL_INCS)$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
 
 END
 
@@ -204,29 +193,14 @@ END
 
 if test -n "$NGX_DSO_ADDONS"; then
 
-    # compile nginx
-    cd $NGX_SOURCE_HOME
-    ./configure $NGX_CONFIGURE
-    cd -
-
     echo configuring additional modules
 
     for dai in $DSO_ALL_INCS
     do
-        if [ "$dai" = "-I" ]; then
-            ALL_INCS="$ALL_INCS $dai"
-        elif test -n "$dai"; then
-            case ".$dai" in
-                ./*)
-                    ALL_INCS="$ALL_INCS $dai"
-                    ;;
-
-                *)
-                    ALL_INCS="$ALL_INCS $NGX_SOURCE_HOME/$dai"
-                    ;;
-            esac
-        fi
+        ALL_INCS="$ALL_INCS $dai"
     done
+
+    ALL_INCS="$ALL_INCS -I$NGX_INCLUDE_PATH"
 
     for dcd in $DSO_CORE_DEPS
     do
@@ -237,41 +211,7 @@ if test -n "$NGX_DSO_ADDONS"; then
                     ;;
 
                 *)
-                    CORE_DEPS="$CORE_DEPS $NGX_SOURCE_HOME/$dcd"
-                    ;;
-            esac
-        fi
-    done
-
-    for dci in $DSO_CORE_INCS
-    do
-        if [ "$dci" = "-I" ]; then
-            CORE_INCS="$CORE_INCS $dci"
-        elif test -n "$dci"; then
-            case ".$dci" in
-                ./*)
-                    CORE_INCS="$CORE_INCS $dci"
-                    ;;
-
-                *)
-                    CORE_INCS="$CORE_INCS $NGX_SOURCE_HOME/$dci"
-                    ;;
-            esac
-        fi
-    done
-
-    for dhi in $DSO_HTTP_INCS
-    do
-        if [ "$dhi" = "-I" ]; then
-            HTTP_INCS="$HTTP_INCS $dhi"
-        elif test -n "$dhi"; then
-            case ".$dhi" in
-                ./*)
-                    HTTP_INCS="$HTTP_INCS $dhi"
-                    ;;
-
-                *)
-                    HTTP_INCS="$HTTP_INCS $NGX_SOURCE_HOME/$dhi"
+                    CORE_DEPS="$CORE_DEPS $NGX_INCLUDE_PATH/$dcd"
                     ;;
             esac
         fi
@@ -286,7 +226,7 @@ if test -n "$NGX_DSO_ADDONS"; then
                     ;;
 
                 *)
-                    HTTP_DEPS="$HTTP_DEPS $NGX_SOURCE_HOME/$dhd"
+                    HTTP_DEPS="$HTTP_DEPS $NGX_INCLUDE_PATH/$dhd"
                     ;;
             esac
         fi
@@ -298,18 +238,39 @@ if test -n "$NGX_DSO_ADDONS"; then
         if test -f $ngx_addon_dir/config; then
             NGX_ADDON_SRCS=
             NGX_ADDON_DEPS=
-            cd $NGX_SOURCE_HOME
 
-            CORE_INCS_TEMP=$CORE_INCS
+            CORE_LIBS_TEMP=$CORE_LIBS
+            CORE_LIBS=
+
+            cd $ngx_addon_dir
+
+	    CORE_INCS_TEMP=$CORE_INCS
             HTTP_INCS_TEMP=$HTTP_INCS
             CORE_LIBS_TEMP=$CORE_LIBS
             CORE_INCS=
             HTTP_INCS=
             CORE_LIBS=
 
+            if test -d $NGX_OBJS; then
+                rm -rf $NGX_OBJS
+            fi
+
+            mkdir -p $NGX_OBJS/auto
+            touch $NGX_AUTOCONF_ERR
+            touch $NGX_AUTOTEST
+            touch $NGX_AUTO_CONFIG_H
+
+            cat << END                                            > $NGX_OBJS/auto/feature
+            $ngx_feature_file
+END
+
+            cat << END                                            > $NGX_OBJS/auto/have
+            $ngx_have_file
+END
+	    cd $NGX_OBJS
             . $ngx_addon_dir/config
 
-            dso_core_incs=`echo $CORE_INCS \
+	    dso_core_incs=`echo $CORE_INCS \
                 | sed -e "s/  *\([^ ][^ ]*\)/$ngx_regex_cont$ngx_include_opt\1/g" \
                 -e "s/\//$ngx_regex_dirsep/g"`
 
@@ -339,6 +300,8 @@ if test -n "$NGX_DSO_ADDONS"; then
             fi
 
             cd -
+
+            cd $ngx_addon_dir
             echo " + $ngx_addon_name will be compiled"
             generate_make $ngx_addon_dir $NGX_ADDON_DEPS $NGX_ADDON_SRCS $ngx_addon_name
         else

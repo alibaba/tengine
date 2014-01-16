@@ -27,7 +27,7 @@ $t->write_file_expand('nginx.conf', <<'EOF')->has(qw/http proxy ssi/)->plan(7);
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -45,9 +45,6 @@ http {
         }
         location /ssi.html {
             ssi on;
-        }
-        location /index-nostore.html {
-            add_header  X-Accel-Expires  0;
         }
         location /index-big.html {
             limit_rate  200k;
@@ -71,14 +68,8 @@ $t->run();
 like(http_get('/store-index.html'), qr/SEE-THIS/, 'proxy request');
 ok(-e $t->testdir() . '/store-index.html', 'result stored');
 
-like(http_get('/store-index-nostore.html'), qr/SEE-THIS/,
-	'proxy request with x-accel-expires');
-
-TODO: {
-local $TODO = 'patch rejected';
-
+like(http_head('/store-index-nostore.html'), qr/200 OK/, 'head request');
 ok(!-e $t->testdir() . '/store-index-nostore.html', 'result not stored');
-}
 
 ok(scalar @{[ glob $t->testdir() . '/proxy_temp/*' ]} == 0, 'no temp files');
 

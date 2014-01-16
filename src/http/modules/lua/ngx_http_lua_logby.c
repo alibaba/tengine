@@ -43,8 +43,8 @@ ngx_http_lua_log_by_lua_env(lua_State *L, ngx_http_request_t *r)
     /**
      * we want to create empty environment for current script
      *
-	 * newt = {}
-	 * newt["_G"] = newt
+     * newt = {}
+     * newt["_G"] = newt
      * setmetatable(newt, {__index = _G})
      *
      * if a function or symbol is not defined in our env, __index will lookup

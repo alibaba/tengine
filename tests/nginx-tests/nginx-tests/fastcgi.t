@@ -30,7 +30,7 @@ my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(5)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -52,7 +52,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
 

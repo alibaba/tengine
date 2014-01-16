@@ -34,7 +34,7 @@ my $t = Test::Nginx->new()
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -141,7 +141,7 @@ $s->authok('auth login with username');
 # Try auth plain with pipelining
 
 TODO: {
-local $TODO = 'pipelining not in official nginx';
+local $TODO = 'not yet' unless $t->has_version('1.5.6');
 local $SIG{__WARN__} = sub {};
 
 $s = Test::Nginx::SMTP->new();
@@ -198,7 +198,7 @@ $s->send('MAIL FROM:<test@example.com> SIZE=100' . CRLF
 $s->ok('pipelined mail from');
 
 TODO: {
-local $TODO = 'pipelining not in official nginx';
+local $TODO = 'not yet' unless $t->has_version('1.5.6');
 local $SIG{__WARN__} = sub {};
 
 $s->ok('pipelined rcpt to');
@@ -222,7 +222,7 @@ $s->check(qr/^5.. /, "bad rcpt to");
 $s->send('RCPT TO:<test@example.com>');
 $s->ok('good rcpt to');
 
-# Make sure command splitted into many packets processed correctly
+# Make sure command split into many packets processed correctly
 
 $s = Test::Nginx::SMTP->new();
 $s->read();
@@ -230,6 +230,6 @@ $s->read();
 log_out('HEL');
 $s->print('HEL');
 $s->send('O example.com');
-$s->ok('splitted command');
+$s->ok('split command');
 
 ###############################################################################
