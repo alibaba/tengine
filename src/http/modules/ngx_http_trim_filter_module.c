@@ -13,8 +13,9 @@
 
 #define NGX_HTTP_TRIM_SAVE_SLASH        -1
 #define NGX_HTTP_TRIM_SAVE_JSCSS        -2
-#define NGX_HTTP_TRIM_SAVE_HACKCSS      -3
-#define NGX_HTTP_TRIM_SAVE_JAVASCRIPT   -4
+#define NGX_HTTP_TRIM_SAVE_SPACE        -3
+#define NGX_HTTP_TRIM_SAVE_HACKCSS      -4
+#define NGX_HTTP_TRIM_SAVE_JAVASCRIPT   -5
 
 #define NGX_HTTP_TRIM_TAG_PRE            1
 #define NGX_HTTP_TRIM_TAG_STYLE          2
@@ -260,6 +261,7 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_trim_filter_module);
 
+    r->filter_need_temporary = 1;
     r->main_filter_need_in_memory = 1;
 
     ngx_http_clear_content_length(r);
@@ -314,6 +316,10 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
             } else if (ctx->saved == NGX_HTTP_TRIM_SAVE_SLASH) {
                 cl->buf->pos = ngx_http_trim_saved_jscss.data;
+                cl->buf->last = cl->buf->pos + 1;
+
+            } else if (ctx->saved == NGX_HTTP_TRIM_SAVE_SPACE) {
+                cl->buf->pos = (u_char *) " ";
                 cl->buf->last = cl->buf->pos + 1;
 
             } else if (ctx->saved == NGX_HTTP_TRIM_SAVE_JSCSS) {
@@ -495,7 +501,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 ctx->state = trim_state_tag_whitespace;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -511,7 +517,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 ctx->state = trim_state_tag_whitespace;
-                break;
+                continue;
             case '\'':
                 ctx->state = trim_state_tag_single_quote;
                 break;
@@ -564,7 +570,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 ctx->state = trim_state_tag_whitespace;
-                break;
+                continue;
             case 't':
                 ctx->state = trim_state_tag_style_begin;
                 ctx->looked = 4;    /* </style> */
@@ -600,7 +606,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\t':
             case ' ':
                 ctx->state = trim_state_tag_whitespace;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -712,7 +718,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                 ctx->state = trim_state_tag_whitespace;
                 ctx->looked = 0;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -743,7 +749,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                 ctx->state = trim_state_tag_whitespace;
                 ctx->looked = 0;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -780,7 +786,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                 ctx->state = trim_state_tag_whitespace;
                 ctx->looked = 0;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -993,7 +999,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                         ctx->saved = NGX_HTTP_TRIM_SAVE_JAVASCRIPT;
                     }
 
-                    *write++ = ch;
+                    ctx->looked = 0;
+                    continue;
                 }
                 ctx->looked = 0;
                 break;
@@ -1047,6 +1054,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 if (ctx->looked == ngx_http_trim_script.len) {
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1076,6 +1085,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 if (ctx->looked == ngx_http_trim_script.len) {
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1158,7 +1169,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
 
                 ctx->state = trim_state_tag_whitespace;
                 ctx->looked = 0;
-                break;
+                continue;
             case '>':
                 ctx->state = trim_state_text;
                 break;
@@ -1460,6 +1471,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 if (ctx->looked == ngx_http_trim_style.len) {
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1489,6 +1502,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 if (ctx->looked == ngx_http_trim_style.len) {
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1608,6 +1623,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     ctx->count++;
                     ctx->tag = NGX_HTTP_TRIM_TAG_PRE;
                     ctx->state = trim_state_tag_whitespace;
+                    continue;
 
                 } else {
                     ctx->state = trim_state_tag_pre;
@@ -1648,6 +1664,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     }
 
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1677,6 +1695,8 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case ' ':
                 if (ctx->looked == ngx_http_trim_textarea.len) {
                     ctx->state = trim_state_tag_whitespace;
+                    ctx->looked = 0;
+                    continue;
                 }
 
                 ctx->looked = 0;
@@ -1765,6 +1785,16 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 ctx->state = trim_state_tag_attribute;
                 break;
             }
+
+            if (ch != '>') {
+                if (read > buf->pos) {
+                    *write++ = ' ';
+
+                } else {
+                    ctx->saved = NGX_HTTP_TRIM_SAVE_SPACE;
+                }
+            }
+
             break;
 
         case trim_state_tag_single_quote:

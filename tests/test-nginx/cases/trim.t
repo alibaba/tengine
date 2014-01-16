@@ -100,8 +100,7 @@ style="text-align:   center;">hello   world,   it
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<body
-style="text-align:   center;">hello world, it is good to see you </body> '
+<body style="text-align:   center;">hello world, it is good to see you </body> '
 
 === TEST 5: trim newline
 --- config
@@ -406,7 +405,7 @@ html >/**/ body p {
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<script type="text/javascript">return true;</script ></head><body id="loginform"><div id="page_content"> '
+<script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content"> '
 
 === TEST 18: do not trim html comment of ssi/esi
 --- config
@@ -461,7 +460,7 @@ html >/**/ body p {
     GET /t/trim.html
 --- response_body eval
 '<!DOCTYPE html>
-<html> <head> <title >Welcome to nginx!</title > <script language="JavaScript" type="   text/javascript" ></script > <p> hello world <style type="text/css" language="css" ></style > </head> <body> <pre style="color:blue">Welcome    to    nginx!</pre > <pre >Welcome    to    nginx!</pre> <textarea style="color:blue">Welcome    to    nginx!</textarea > <textarea >Welcome    to    nginx!</textarea> </body> </html> '
+<html> <head> <title>Welcome to nginx!</title> <script language="JavaScript" type="   text/javascript"></script> <p> hello world <style type="text/css" language="css"></style> </head> <body> <pre style="color:blue">Welcome    to    nginx!</pre> <pre>Welcome    to    nginx!</pre> <textarea style="color:blue">Welcome    to    nginx!</textarea> <textarea>Welcome    to    nginx!</textarea> </body> </html> '
 
 
 === TEST 20: nest pre
@@ -499,17 +498,17 @@ f     f
 <pre style="color:black">
 a     a
 
-<pre style="color:blue" >
+<pre style="color:blue">
 b     b
 
-<pre style = "color:  red" >
+<pre style = "color:  red">
 d     d
 
-</pre >
+</pre>
 
 c     c
 
-</pre >
+</pre>
 
 
-</pre > f f '
+</pre> f f '
