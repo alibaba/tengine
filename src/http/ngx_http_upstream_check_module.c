@@ -1079,10 +1079,9 @@ ngx_http_upstream_check_peek_handler(ngx_event_t *event)
 static void
 ngx_http_upstream_check_discard_handler(ngx_event_t *event)
 {
-    u_char                         *new_buf;
-    ssize_t                         size, n;
+    u_char                          buf[4096];
+    ssize_t                         size;
     ngx_connection_t               *c;
-    ngx_http_upstream_check_ctx_t  *ctx;
     ngx_http_upstream_check_peer_t *peer;
 
     c = event->data;
@@ -1095,49 +1094,23 @@ ngx_http_upstream_check_discard_handler(ngx_event_t *event)
     }
 
     peer = c->data;
-    ctx = peer->check_data;
-
-    n = ctx->recv.end - ctx->recv.last;
-
-    /* buffer not big enough? enlarge it by twice */
-    if (n == 0) {
-        size = ctx->recv.end - ctx->recv.start;
-        new_buf = ngx_palloc(c->pool, size * 2);
-        if (new_buf == NULL) {
-            goto check_discard_fail;
-        }
-
-        ngx_memcpy(new_buf, ctx->recv.start, size);
-
-        ctx->recv.pos = ctx->recv.start = new_buf;
-        ctx->recv.last = new_buf + size;
-        ctx->recv.end = new_buf + size * 2;
-
-        n = ctx->recv.end - ctx->recv.last;
-    }
 
     while (1) {
-        size = c->recv(c, ctx->recv.last, n);
+        size = c->recv(c, buf, 4096);
         if (size > 0) {
             continue;
-        } else if (size == 0 || size == NGX_AGAIN) {
-            break;
+        } else if (size == NGX_AGAIN) {
+            return;
         } else {
+            if (size == 0) {
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                               "peer closed its half side of the connection");
+            }
             c->error = 1;
-            goto check_discard_fail;
+            ngx_http_upstream_check_clean_event(peer);
+            return;
         }
     }
-
-    /* The peer has closed its half side of the connection. */
-    if (size == 0) {
-        c->error = 1;
-        goto check_discard_fail;
-    }
-
-    return;
-
- check_discard_fail:
-    ngx_http_upstream_check_clean_event(peer);
 }
 
 
