@@ -511,7 +511,9 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\n':
             case '\t':
             case ' ':
-                ctx->state = trim_state_tag_whitespace;
+                if (ctx->prev != '=') {
+                    ctx->state = trim_state_tag_whitespace;
+                }
                 continue;
             case '\'':
                 ctx->state = trim_state_tag_single_quote;
@@ -1795,7 +1797,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 break;
             }
 
-            if (ch != '>') {
+            if (ch != '>' && ch != '=') {
                 if (read > buf->pos) {
                     *write++ = ' ';
 

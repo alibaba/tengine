@@ -558,7 +558,7 @@ a     a
 <pre style="color:blue">
 b     b
 
-<pre style = "color:  red">
+<pre style="color:  red">
 d     d
 
 </pre>
@@ -665,3 +665,42 @@ f f
    /*     */
 </style>
 </head>
+
+
+=== TEST 24:  remove space around '=' in tag
+--- config
+    trim on;
+    trim_js on;
+    trim_css on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<html>
+<head>
+<title    >Welcome to nginx!</title    >
+<script    language  =  "JavaScript"     type=   "   text/javascript"    >
+    // comment </script  > <p> hello    world
+<style    type   ="text/css"  language  ="css"   >
+   /*     */
+</style      >
+</head>
+<pre    style  =  "color:blue"  >Welcome    to    nginx!</pre  >
+<pre    style= 
+ "color:blue"  >Welcome    to    nginx!</pre  >
+<textarea   style 
+  ="color:blue">Welcome    to    nginx!</textarea  >
+--- request
+    GET /t/trim.html
+--- response_body
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<script language="JavaScript" type="   text/javascript"></script> <p> hello world
+<style type="text/css" language="css"></style>
+</head>
+<pre style="color:blue">Welcome    to    nginx!</pre>
+<pre style="color:blue">Welcome    to    nginx!</pre>
+<textarea style="color:blue">Welcome    to    nginx!</textarea>
