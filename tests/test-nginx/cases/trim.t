@@ -331,7 +331,7 @@ body {
     GET /t/trim.html
 --- response_body
 <!DOCTYPE html>
-<style type="text/css">body {background-color:black;}</style>
+<style type="text/css">body{background-color:black;}</style>
 
 === TEST 14: do not trim css quote
 --- config
@@ -379,7 +379,7 @@ d.getElementsByTagName("head")[0].appendChild(t);
 <!DOCTYPE html>
 <script type="text/javascript">(function (d) {var t=d.createElement("script");t.type="text/javascript";t.async=true;t.id="tb-beacon-aplus";t.setAttribute("exparams","category=&userid=&aplus");t.src=("https:"==d.location.protocol?"https://s":"http://a")+".tbcdn.cn/s/aplus_v2.js";d.getElementsByTagName("head")[0].appendChild(t);})(document);</script>
 
-=== TEST 15: do not trim css comment of child selector hack
+=== TEST 16: do not trim css comment of child selector hack
 --- config
     trim on;
     trim_js on;
@@ -398,9 +398,9 @@ html >/**/ body p {
     GET /t/trim.html
 --- response_body
 <!DOCTYPE html>
-<style type="text/css">html >/**/ body p {color:blue;}</style>
+<style type="text/css">html>/**/ body p{color:blue;}</style>
 
-=== TEST 16: do not trim css comment of IE5/Mac hack
+=== TEST 17: do not trim css comment of IE5/Mac hack
 --- config
     trim on;
     trim_js on;
@@ -425,10 +425,9 @@ html >/**/ body p {
 .selector {
     color: khaki;
 }
-/**/
-</style>
+/**/ </style>
 
-=== TEST 17: comment of javascript
+=== TEST 18: comment of javascript
 --- config
     trim on;
     trim_js on;
@@ -447,7 +446,7 @@ html >/**/ body p {
 <!DOCTYPE html>
 <script type="text/javascript">return true;</script></head><body id="loginform"><div id="page_content">
 
-=== TEST 18: do not trim html comment of ssi/esi
+=== TEST 19: do not trim html comment of ssi/esi
 --- config
     trim on;
     trim_js on;
@@ -474,7 +473,7 @@ html >/**/ body p {
 <!--e    -->
 <!--[if  ie  <![endif]-->
 
-=== TEST 19: trim tag
+=== TEST 20: trim tag
 --- config
     trim on;
     trim_js on;
@@ -519,7 +518,7 @@ html >/**/ body p {
 </body>
 </html>
 
-=== TEST 20: nest pre
+=== TEST 21: nest pre
 --- config
     trim on;
     trim_js on;
@@ -571,7 +570,7 @@ c     c
 </pre>
 f f
 
-=== TEST 21: trim_js off
+=== TEST 22: trim_js off
 --- config
     trim on;
     trim_js off;
@@ -602,7 +601,7 @@ f f
 <style type="text/css" language="css"></style>
 </head>
 
-=== TEST 22: trim_css off
+=== TEST 23: trim_css off
 --- config
     trim on;
     trim_js on;
@@ -635,7 +634,7 @@ f f
 </head>
 
 
-=== TEST 23: trim_js off and trim_css off
+=== TEST 24: trim_js off and trim_css off
 --- config
     trim on;
     location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
@@ -667,7 +666,7 @@ f f
 </head>
 
 
-=== TEST 24:  remove space around '=' in tag
+=== TEST 25:  remove space around '=' in tag
 --- config
     trim on;
     trim_js on;
@@ -704,3 +703,38 @@ f f
 <pre style="color:blue">Welcome    to    nginx!</pre>
 <pre style="color:blue">Welcome    to    nginx!</pre>
 <textarea style="color:blue">Welcome    to    nginx!</textarea>
+
+
+=== TEST 26: trim css
+--- config
+    trim on;
+    trim_js on;
+    trim_css on;
+    location /t/ { proxy_buffering off; proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;}
+    location /trim.html { trim off;}
+--- user_files
+>>> trim.html
+<style>
+body{font-size:20px;line-height:150%;}
+body { font-size:20px; line-height:150%; }
+body { font-size : 20px ; line-height : 150%; }
+body
+{
+  font-size:  20px;
+  line-height: 150%;
+}
+
+
+h1 > strong {  color : red  ; }
+.skin-1388458850088 .nav .sm-item-list {
+  border-bottom: 2px solid #ee5e80;
+}
+.skin-1388458850088 .nav .search-wrap a.local,
+.skin-1388458850088 .nav .search-wrap a.local:hover {
+  background: #ee5e80;
+}
+</style>
+--- request
+    GET /t/trim.html
+--- response_body
+<style>body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}h1>strong{color:red;}.skin-1388458850088 .nav .sm-item-list{border-bottom:2px solid #ee5e80;}.skin-1388458850088 .nav .search-wrap a.local,.skin-1388458850088 .nav .search-wrap a.local:hover{background:#ee5e80;}</style>

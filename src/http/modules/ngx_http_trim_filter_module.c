@@ -112,7 +112,7 @@ typedef enum {
 
 
 
-/* "(", ",", "=", ":", "[", "!", "&", "|", "?", ";", ">", "~", "*", "{" */
+/* '(' ',' '=' ':' '[' '!' '&' '|' '?' ';' '>' '~' '*' '{' */
 
 static uint32_t   trim_js_prefix[] = {
     0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
@@ -125,6 +125,28 @@ static uint32_t   trim_js_prefix[] = {
 
                 /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
     0x58000000, /* 0101 1000 0000 0000  0000 0000 0000 0000 */
+
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+};
+
+
+
+/* ';' '>' '{' '}' ',' ':' */
+
+static uint32_t   trim_css_prefix[] = {
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+    0x4c001000, /* 0100 1100 0000 0000  0001 0000 0000 0000 */
+
+                /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+    0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+    0x28000000, /* 0010 1000 0000 0000  0000 0000 0000 0000 */
 
     0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
     0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
@@ -1184,16 +1206,10 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             case '\n':
             case '\t':
             case ' ':
-                ctx->state = trim_state_tag_style_css_whitespace;
-                if (ctx->prev == ';' || ctx->prev == '>' || ctx->prev == '{'
-                    || ctx->prev == '}' || ctx->prev == ',' || ctx->prev == ':'
-                    || ctx->prev == ch)
-                {
-                    continue;
-
-                } else {
-                    break;
+                if (!(trim_css_prefix[ctx->prev >> 5] & (1 << (ctx->prev & 0x1f)))) {
+                    ctx->state = trim_state_tag_style_css_whitespace;
                 }
+                continue;
             case '\'':
                 ctx->state = trim_state_tag_style_css_single_quote;
                 break;
@@ -1446,11 +1462,25 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 break;
             case '/':
                 ctx->state = trim_state_tag_style_css_comment_begin;
-                continue;
+                break;
             default:
                 ctx->state = trim_state_tag_style_css_text;
                 break;
             }
+
+            if (!(trim_css_prefix[ch >> 5] & (1 << (ch & 0x1f)))) {
+                if (read > buf->pos) {
+                    *write++ = ' ';
+
+                } else {
+                    ctx->saved = NGX_HTTP_TRIM_SAVE_SPACE;
+                }
+            }
+
+            if (ch == '/') {
+                continue;
+            }
+
             break;
 
         case trim_state_tag_style_end:
@@ -1824,7 +1854,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                         ctx->looked = 0;
                     }
                 }
-
             }
 
             if (conf->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
@@ -1854,7 +1883,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                         ctx->looked = 0;
                     }
                 }
-
             }
 
             if (conf->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
