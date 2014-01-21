@@ -9,7 +9,8 @@
 
     location / {
         trim on;
-        trim_jscss on;
+        trim_js on;
+        trim_css on;
     }
 
 ## 指令
