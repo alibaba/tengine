@@ -62,6 +62,56 @@
 格式如下:  
 `http://www.xxx.com/index.html?http_trim=off`
 
+
+## 例子
+原始:
+
+    <!DOCTYPE html>
+    <textarea  >
+       trim
+            module
+    </textarea  >
+    <!--remove all-->
+    <!--[if IE]> trim module <![endif]-->
+    <!--[if !IE ]>--> trim module  <!--<![endif]-->
+    <!--# ssi-->
+    <!--esi-->
+    <pre    style  =
+        "color:   blue"  >Welcome    to    nginx!</pre  >
+    <script type="text/javascript">
+    /***  muitl comment 
+                       ***/
+    //// single comment
+    str.replace(/     /,"hello");
+    </script>
+    <style   type="text/css"  >
+    /*** css comment
+                     ! ***/
+    body
+    {
+      font-size:  20px ;
+      line-height: 150% ;
+    }
+    </style>
+
+
+结果:
+
+
+    <!DOCTYPE html>
+    <textarea>
+       trim  
+            module
+    </textarea>
+    <!--[if IE]> trim module <![endif]-->
+    <!--[if !IE ]>--> trim module  <!--<![endif]-->
+    <!--# ssi-->
+    <!--esi-->
+    <pre style="color:   blue">Welcome    to    nginx!</pre>
+    <script type="text/javascript">str.replace(/     /,"hello");</script>
+    <style type="text/css">body{font-size:20px;line-height:150%;}</style>
+    
+
 ## trim规则
 
 ### html
