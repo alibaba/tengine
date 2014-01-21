@@ -1097,20 +1097,32 @@ ngx_http_upstream_check_discard_handler(ngx_event_t *event)
 
     while (1) {
         size = c->recv(c, buf, 4096);
+
         if (size > 0) {
             continue;
+
         } else if (size == NGX_AGAIN) {
-            return;
+            break;
+
         } else {
             if (size == 0) {
                 ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
                                "peer closed its half side of the connection");
             }
-            c->error = 1;
-            ngx_http_upstream_check_clean_event(peer);
-            return;
+
+            goto check_discard_fail;
         }
     }
+
+    if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+        goto check_discard_fail;
+    }
+
+    return;
+
+ check_discard_fail:
+    c->error = 1;
+    ngx_http_upstream_check_clean_event(peer);
 }
 
 
