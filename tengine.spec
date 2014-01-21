@@ -1,6 +1,6 @@
 %global  tengine_user          nobody
 %global  tengine_group         %{tengine_user}
-%global  tengine_home          /data/log/tengine
+%global  tengine_home          /var/log/tengine
 %global  tengine_home_tmp      %{tengine_home}/tmp
 %global  tengine_logdir        %{tengine_home}
 %global  tengine_confdir       %{_sysconfdir}/tengine
@@ -8,15 +8,13 @@
 %global  tengine_webroot       %{tengine_datadir}/html
 
 Name:              tengine
-Version:           1.4.4
-Release:           2%{?dist}
+Version:           1.5.2
+Release:           3%{?dist}
 
 Summary:           A high performance web server and reverse proxy server
 Group:             System Environment/Daemons
-# BSD License (two clause)
-# http://www.freebsd.org/copyright/freebsd-license.html
 License:           BSD
-URL:               http://kisops.com
+URL:               http://tengine.taobao.org
 
 %define _sourcedir %_topdir/SOURCES
 Source0:           %{name}-%{version}.tar.gz
@@ -32,13 +30,16 @@ Source100:         index.html
 Source102:         favicon.ico
 Source103:         404.html
 Source104:         50x.html
+# https://github.com/magicbear/ngx_realtime_request_module
+Source105:	   ngx_realtime_request_module-master.zip
 
 # removes -Werror in upstream build scripts.  -Werror conflicts with
 # -D_FORTIFY_SOURCE=2 causing warnings to turn into errors.
-#Patch1:     tengine-servername-1.patch
-#Patch2:     tengine-servername-2.patch
-#Patch3:     tengine-servername-3.patch
+Patch1:     tengine-mime-types.patch
+Patch2:     tengine-http-parse.patch
 
+NoSource:0
+NoSource:105
 #BuildRequires:     GeoIP-devel
 #BuildRequires:     gd-devel
 #BuildRequires:     libxslt-devel
@@ -47,8 +48,7 @@ BuildRequires:     pcre-devel
 BuildRequires:     perl-devel
 BuildRequires:     perl(ExtUtils::Embed)
 BuildRequires:     zlib-devel
-#Requires:          GeoIP
-#Requires:          gd
+BuildRequires:     jemalloc-devel
 Requires:          openssl
 Requires:          pcre
 Requires:          perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
@@ -66,9 +66,9 @@ memory usage.
 
 %prep
 %setup -q
-#%patch1 -p1
-#%patch2 -p1
-#%patch3 -p1
+%patch1 -p1
+unzip %{SOURCE105}
+# %patch2 -p1
 
 
 %build
@@ -94,13 +94,17 @@ export DESTDIR=%{buildroot}
     --group=%{tengine_group} \
     --with-http_ssl_module \
     --with-http_stub_status_module \
+    --with-jemalloc \
+    --with-http_realip_module \
+    --with-http_sysguard_module \
+    --add-module=ngx_realtime_request_module-master \
     --with-cc-opt="%{optflags} $(pcre-config --cflags)" \
     --with-ld-opt="-Wl,-E" # so the perl module finds its symbols
 
 make %{?_smp_mflags} 
 
 %install
-mkdir -pv %{tengine_home_tmp}
+mkdir -pv %{buildroot}%{tengine_home_tmp} %{buildroot}%{tengine_confdir}/vhost.d
 make install DESTDIR=%{buildroot} INSTALLDIRS=vendor
 
 find %{buildroot} -type f -name .packlist -exec rm -f '{}' \;
@@ -116,6 +120,7 @@ install -p -D -m 0644 %{SOURCE7} \
     %{buildroot}%{_sysconfdir}/sysconfig/tengine
 
 install -p -d -m 0755 %{buildroot}%{tengine_confdir}/conf.d
+install -p -d -m 0755 %{buildroot}%{tengine_confdir}/vhost.d
 install -p -d -m 0755 %{buildroot}%{tengine_home_tmp}
 install -p -d -m 0755 %{buildroot}%{tengine_logdir}
 install -p -d -m 0755 %{buildroot}%{tengine_webroot}
@@ -123,7 +128,7 @@ install -p -d -m 0755 %{buildroot}%{tengine_webroot}
 install -p -m 0644 %{SOURCE3} %{SOURCE8} \
     %{buildroot}%{tengine_confdir}
 install -p -m 0644 %{SOURCE4} %{SOURCE5} %{SOURCE6} \
-    %{buildroot}%{tengine_confdir}/conf.d
+    %{buildroot}%{tengine_confdir}/vhost.d
 install -p -m 0644 %{SOURCE100} \
     %{buildroot}%{tengine_webroot}
 install -p -m 0644 %{SOURCE102} \
@@ -168,6 +173,7 @@ fi
 %{_initrddir}/tengine
 %dir %{tengine_confdir}
 %dir %{tengine_confdir}/conf.d
+%dir %{tengine_confdir}/vhost.d
 %dir %{tengine_logdir}
 %dir %{tengine_home_tmp}
 %config(noreplace) %{tengine_confdir}/browsers
@@ -187,7 +193,7 @@ fi
 %config(noreplace) %{tengine_confdir}/uwsgi_params
 %config(noreplace) %{tengine_confdir}/uwsgi_params.default
 %config(noreplace) %{tengine_confdir}/win-utf
-%config(noreplace) %{tengine_confdir}/conf.d/*.conf
+%config(noreplace) %{tengine_confdir}/vhost.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/tengine
 %config(noreplace) %{_sysconfdir}/sysconfig/tengine
 #%dir %{perl_vendorarch}/auto/tengine
@@ -198,10 +204,26 @@ fi
 
 
 %changelog
+* Mon Jan 20 2014 @ 15:29:14 # hukai
+- 增加隐藏文件、目录的过滤，比如 .bash_history 
+- 增加vhost监控模块 https://github.com/magicbear/ngx_realtime_request_module
+- 将vhost配置文件放入vhost.d目录，其它配置放在conf.d。
+
+* Mon Jan  6 2014 @ 13:00:15 # hukai
+- 添加 http_realip_module 、http_sysguard_module 模块
+
+* Wed Nov 20 2013 @ 17:50:02 # hukai
+- 打上安全补丁，并升级最新版本 ： http://nginx.org/download/patch.2013.space.txt
+
+* Mon May 20 2013 @ 15:11:24 # hukai
+- 默认重定向到毒霸网址导航
+- Mime增加Json类型
+
+* Wed May 15 2013 @ 16:52:33  # luhuiyong
+- 升级到tengine-1.4.6
 
 * Wed Apr 03 2013 @ 11:07:52  # luhuiyong
 - 加入DSO动态加载模块的支持
 
 * Thu Dec 06 2012 @ 14:05:28 # hukai
 - Tengine 第1版本，从Nginx直接转换过来
-
