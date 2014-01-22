@@ -264,6 +264,7 @@ static void ngx_http_upstream_check_peek_handler(ngx_event_t *event);
 static void ngx_http_upstream_check_send_handler(ngx_event_t *event);
 static void ngx_http_upstream_check_recv_handler(ngx_event_t *event);
 
+static void ngx_http_upstream_check_discard_handler(ngx_event_t *event);
 static void ngx_http_upstream_check_dummy_handler(ngx_event_t *event);
 
 static ngx_int_t ngx_http_upstream_check_http_init(
@@ -540,7 +541,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
 
     { NGX_HTTP_CHECK_HTTP,
       ngx_string("http"),
-      ngx_string("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"),
+      ngx_string("GET / HTTP/1.0\r\n\r\n"),
       NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
       ngx_http_upstream_check_send_handler,
       ngx_http_upstream_check_recv_handler,
@@ -1072,6 +1073,56 @@ ngx_http_upstream_check_peek_handler(ngx_event_t *event)
     ngx_http_upstream_check_clean_event(peer);
 
     ngx_http_upstream_check_finish_handler(event);
+}
+
+
+static void
+ngx_http_upstream_check_discard_handler(ngx_event_t *event)
+{
+    u_char                          buf[4096];
+    ssize_t                         size;
+    ngx_connection_t               *c;
+    ngx_http_upstream_check_peer_t *peer;
+
+    c = event->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "upstream check discard handler");
+
+    if (ngx_http_upstream_check_need_exit()) {
+        return;
+    }
+
+    peer = c->data;
+
+    while (1) {
+        size = c->recv(c, buf, 4096);
+
+        if (size > 0) {
+            continue;
+
+        } else if (size == NGX_AGAIN) {
+            break;
+
+        } else {
+            if (size == 0) {
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                               "peer closed its half side of the connection");
+            }
+
+            goto check_discard_fail;
+        }
+    }
+
+    if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+        goto check_discard_fail;
+    }
+
+    return;
+
+ check_discard_fail:
+    c->error = 1;
+    ngx_http_upstream_check_clean_event(peer);
 }
 
 
@@ -1856,7 +1907,7 @@ ngx_http_upstream_check_clean_event(ngx_http_upstream_check_peer_t *peer)
             (c->requests < ucscf->check_keepalive_requests))
         {
             c->write->handler = ngx_http_upstream_check_dummy_handler;
-            c->read->handler = ngx_http_upstream_check_dummy_handler;
+            c->read->handler = ngx_http_upstream_check_discard_handler;
         } else {
             ngx_close_connection(c);
             peer->pc.connection = NULL;
@@ -2802,7 +2853,7 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
     }
 
     if (ucscf->check_keepalive_requests == NGX_CONF_UNSET_UINT) {
-        ucscf->check_keepalive_requests = 100;
+        ucscf->check_keepalive_requests = 1;
     }
 
     if (ucscf->check_type_conf == NGX_CONF_UNSET_PTR) {
