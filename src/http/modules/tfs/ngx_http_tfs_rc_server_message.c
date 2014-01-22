@@ -135,6 +135,7 @@ ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
     ngx_http_tfs_header_t    *header;
     ngx_http_tfs_rcs_info_t  *rc_info;
 
+    count = 0;
     rc_ctx = t->loc_conf->upstream->rc_ctx;
     ll = NULL;
     cl = NULL;
@@ -156,8 +157,7 @@ ngx_http_tfs_create_keepalive_message(ngx_http_tfs_t *t)
 
     queue = &rc_ctx->sh->kp_queue;
     if (ngx_queue_empty(queue)) {
-        ngx_shmtx_unlock(&rc_ctx->shpool->mutex);
-        return NULL;
+        goto keepalive_create_error;
     }
 
     q = t->curr_ka_queue;
