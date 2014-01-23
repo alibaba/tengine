@@ -9,7 +9,8 @@
 
     location / {
         trim on;
-        trim_jscss on;
+        trim_js on;
+        trim_css on;
     }
 
 ## 指令
@@ -20,18 +21,28 @@
 
 **上下文:** `http, server, location` 
      
-在配置的地方使模块有效（失效），删除 html 的注释以及重复的空白符（\n，\r，\t，' ')。   
-例外：对于 `pre`，`textarea`，`ie注释`，`script`，`style` 等标签内的内容不作删除操作。   
+使模块有效（失效），删除 html 的注释以及重复的空白符（\n，\r，\t，' '）。   
+例外：对于 `pre`，`textarea`，`script`，`style` 和 ie/ssi/esi注释 等标签内的内容不作删除操作。   
 <br/>
 
-**trim_jscss** `on` | `off`
+**trim_js** `on` | `off`
 
-**默认:** `trim_jscss off`
+**默认:** `trim_js off`
 
 **上下文:** `http, server, location` 
      
-在配置的地方使模块有效（失效），删除内嵌 javascript 和 css 的注释以及重复的空白符（\n，\r，\t，' ')。   
-例外：对于非javascript代码的`script`，非css代码的`style` 等标签内的内容不作删除操作。   
+使模块有效（失效），删除 html 内嵌 javascript 的注释以及重复的空白符（\n，\r，\t，' '）。   
+例外：对于非javascript代码的 `script` 标签内容不作删除操作。   
+<br/>
+
+**trim_css** `on` | `off`
+
+**默认:** `trim_css off`
+
+**上下文:** `http, server, location` 
+     
+使模块有效（失效），删除 html 内嵌 css 的注释以及重复的空白符（\n，\r，\t，' ')。   
+例外：对于非css代码的 `style` 标签内容不作删除操作。   
 <br/>
 
 **trim_types** `MIME types`
@@ -51,33 +62,87 @@
 格式如下:  
 `http://www.xxx.com/index.html?http_trim=off`
 
+
+## 例子
+原始:
+
+    <!DOCTYPE html>
+    <textarea  >
+       trim
+            module
+    </textarea  >
+    <!--remove all-->
+    <!--[if IE]> trim module <![endif]-->
+    <!--[if !IE ]>--> trim module  <!--<![endif]-->
+    <!--# ssi-->
+    <!--esi-->
+    <pre    style  =
+        "color:   blue"  >Welcome    to    nginx!</pre  >
+    <script type="text/javascript">
+    /***  muitl comment 
+                       ***/
+    //// single comment
+    str.replace(/     /,"hello");
+    </script>
+    <style   type="text/css"  >
+    /*** css comment
+                     ! ***/
+    body
+    {
+      font-size:  20px ;
+      line-height: 150% ;
+    }
+    </style>
+
+
+结果:
+
+
+    <!DOCTYPE html>
+    <textarea>
+       trim  
+            module
+    </textarea>
+    <!--[if IE]> trim module <![endif]-->
+    <!--[if !IE ]>--> trim module  <!--<![endif]-->
+    <!--# ssi-->
+    <!--esi-->
+    <pre style="color:   blue">Welcome    to    nginx!</pre>
+    <script type="text/javascript">str.replace(/     /,"hello");</script>
+    <style type="text/css">body{font-size:20px;line-height:150%;}</style>
+    
+
 ## trim规则
 
 ### html
 #####  空白符
 
 + 正文中的 '\r' 直接删除。  
-+ 正文中的 '\n' 替换为 '空格', 然后重复 \t' 和 '空格' 保留第一个。 
-+ 标签中的 '\r'，'\n'，'\t'，'空格' 保留第一个。  
++ 正文中的 '\t' 替换为空格，然后重复的空格保留一个。 
++ 正文中重复的 '\n' 保留一个。  
++ 标签中的 '\t'，'\n' 替换为空格，重复的空格保留一个，'=' 前后的空格直接删除，'>' 前面的空格直接删除。  
 + 标签的双引号和单引号内的空白符不做删除。 
 \<div class="no &nbsp; &nbsp; &nbsp;  trim"\>
-+ 保留第一行DTD声明的 '\n'。  
 + `pre` 和 `texterea` 标签的内容不做删除。  
++ 支持 `pre` 嵌套使用。   
 + `script` 和 `style` 标签的内容不做删除。  
 + ie条件注释的内容不做删除。 
++ ssi/esi注释的内容不做删除。  
 
 ##### 注释
-+ 如果是ie条件注释不做操作。
++ 如果是ie条件注释不做删除。  
    判断规则：`<!--[if <![endif]-->`  之间的内容判断为ie条件注释。
-+ 正常html注释直接删除.  `<!--  -->`
++ 如果是ssi/esi注释的内容不做删除。  
+   判断规则：`<!--# -->`  `<!--esi -->`  之间的内容分别判断为ssi和esi注释。
++ 其他正常html注释直接删除.  `<!--  -->`
     
 ### javascript  
 借鉴 jsmin 的处理规则 (http://www.crockford.com/javascript/jsmin.html)  
 `<script type="text/javascript">` 或者 `<script>` 标签认为是javascript。  
 ##### 空白符  
-+ '('，'['，'{'，';'，','，'>'，'=' 后的 '\n'，'\t'，'空格' 直接删除。
++ '('，'['，'{'，';'，','，'>'，'=' 后的 '\n'，'\t'，空格 直接删除。
 + '\r' 直接删除。 
-+ 其他情况 重复的 '\n'，'\t'，'空格' 保留第一个。  
++ 其他情况 重复的 '\n'，'\t'，空格 保留第一个。  
 + 单引号和双引号内不删除。  
      如下不做操作：  
      "hello   &nbsp;   \\\\"  &nbsp;   world"   
@@ -96,11 +161,11 @@ http://en.wikipedia.org/wiki/Conditional_comment
 
 ### css  
 借鉴 YUI Compressor 的处理规则 (http://yui.github.io/yuicompressor/css.html)   
-`<style type="text/css">` 或者 `<style>` 标签认为是css.  
+`<style type="text/css">` 或者 `<style>` 标签认为是css。  
 ##### 空白符  
-+ ';'，'>'，'{'，'}'，':'，',' 后的 '\n'，'\t'，'空格' 直接删除。  
++ ';'，'>'，'{'，'}'，':'，',' 前后的 '\n'，'\t'，空格 直接删除。  
 + '\r' 直接删除。 
-+ 其他情况 连续的 '\n'， '\t' 和 '空格'  保留第一个。  
++ 其他情况 连续的 '\n'， '\t' 和 空格 保留为一个空格。  
 + 单引号和双引号内不删除。  
      如下不做操作：  
      "hello   &nbsp;  \\\\\"  &nbsp;    world"  
