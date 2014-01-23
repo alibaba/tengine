@@ -192,7 +192,7 @@ static ngx_command_t  ngx_http_trim_commands[] = {
       ngx_http_types_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_trim_loc_conf_t, types_keys),
-      NULL },
+      &ngx_http_html_default_types[0] },
 
       ngx_null_command
 };
@@ -1760,7 +1760,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 break;
             }
 
-	    if (ch != '\n' && ctx->prev != '\n') {
+            if (ch != '\n' && ctx->prev != '\n') {
                 if (read > buf->pos) {
                     *write++ = ' ';
 
