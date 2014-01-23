@@ -1,11 +1,11 @@
-# Ngx_http_trim_filter_module
+# Ngx_http_trim_filter module
 
-The ngx_http_trim_filter_module is a filter that modifies a response by removing unnecessary whitespaces 
-(spaces, tabs, newlines) and comments from HTML (include inline javascript and css). Trim module parses 
+The ngx_http_trim_filter module is a filter that modifies a response by removing unnecessary whitespaces 
+(spaces, tabs, newlines) and comments from HTML (including inline javascript and css). Trim module parses 
 HTML with a state machine.
 
 
-## Examples Configuration
+## Example Configuration
 
     location / {
         trim on;
@@ -21,8 +21,8 @@ HTML with a state machine.
 
 **Context:** `http, server, location` 
      
-Enables or disables trim for pure HTML.  
-Disables in tabs of `pre`,`textarea`,`ie/ssi/esi comment`,`script` and `style`.  
+Enable or disable module trim for pure HTML.  
+This module will not modify contents enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
 <br/>
 
 
@@ -32,7 +32,7 @@ Disables in tabs of `pre`,`textarea`,`ie/ssi/esi comment`,`script` and `style`.
 
 **Context:** `http, server, location` 
      
-Enables or disables trim for inline javascript.  
+Enable or disable module trim for inline javascript.  
 <br/>
 
 
@@ -42,7 +42,7 @@ Enables or disables trim for inline javascript.
 
 **Context:** `http, server, location` 
      
-Enables or disables trim for inline css.  
+Enable or disable module trim for inline css.  
 <br/>
 
 
@@ -52,16 +52,16 @@ Enables or disables trim for inline css.
 
 **Context:** `http, server, location`
 
-Enables trim  with the specified MIME types in addition to “text/html”, It shound be a HTML format.  
+Enable module trim for the specified MIME types in addition to "text/html",responses with the “text/html” type are always processed.  
 <br/>
 
 
 ## Debug
 
-Add the arg "http_trim=off", return the original content.  
+Trim module will retain the original content unchanged when requested by the url with arg "http_trim=off".   
 e.g.  `http://www.xxx.com/index.html?http_trim=off`  
 
-## Examples
+## Sample
 original:
 
     <!DOCTYPE html>
@@ -91,10 +91,8 @@ original:
       line-height: 150% ;
     }
     </style>
-
-
+    
 result:
-
 
     <!DOCTYPE html>
     <textarea>
@@ -108,8 +106,4 @@ result:
     <pre style="color:   blue">Welcome    to    nginx!</pre>
     <script type="text/javascript">str.replace(/     /,"hello");</script>
     <style type="text/css">body{font-size:20px;line-height:150%;}</style>
-
-
-
-
 
