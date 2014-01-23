@@ -22,7 +22,7 @@ HTML with a state machine.
 **Context:** `http, server, location` 
      
 Enable or disable trim module for pure HTML.  
-This module will not modify contents enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
+This module will retain some contents unchanged, in case that they are enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
 <br/>
 
 
@@ -52,13 +52,13 @@ Enable or disable trim module for inline css.
 
 **Context:** `http, server, location`
 
-Enable trim module for the specified MIME types in addition to "text/html",responses with the “text/html” type are always processed.  
+Enable trim module for the specified MIME types in addition to "text/html". Responses with the “text/html” type are always processed.  
 <br/>
 
 
 ## Debug
 
-Trim module will be disabled if incoming request has `http_trim=off` parameter in url..   
+Trim module will be disabled if incoming request has `http_trim=off` parameter in url.   
 e.g.  `http://www.xxx.com/index.html?http_trim=off`  
 
 ## Sample
