@@ -70,6 +70,8 @@ static char *ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static char *ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #if (NGX_HTTP_GZIP)
@@ -772,6 +774,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
     { ngx_string("resolver"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
       ngx_http_core_resolver,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("resolver_file"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_core_resolver_file,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -5274,6 +5283,33 @@ ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     clcf->resolver = ngx_resolver_create(cf, &value[1], cf->args->nelts - 1);
+    if (clcf->resolver == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_core_loc_conf_t  *clcf = conf;
+
+    ngx_str_t  *value, *names;
+    ngx_uint_t  n;
+
+    if (clcf->resolver) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (ngx_resolver_read_resolv_file(cf, &value[1], &names, &n) != NGX_OK) {
+        return "parse failed";
+    }
+
+    clcf->resolver = ngx_resolver_create(cf, names, n);
     if (clcf->resolver == NULL) {
         return NGX_CONF_ERROR;
     }
