@@ -15,7 +15,7 @@
 			server 192.168.0.2:80;
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
-			check_http_send "GET / HTTP/1.0\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.0\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
@@ -26,7 +26,7 @@
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
 			check_keepalive_requests 100;
-			check_http_send "GET / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
@@ -97,10 +97,10 @@ Default: `"GET / HTTP/1.0\r\n\r\n"`
 
 Context: `upstream`
 
-该指令可以配置http健康检查包发送的请求内容。
+该指令可以配置http健康检查包发送的请求内容。为了减少传输数据量，推荐采用`"HEAD"`方法。
 
-当采用长连接进行健康检查时，需在该指令中添加keep-alive请求头，如：`"GET / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`。
-同时，请求uri的size不宜过大，确保可以在1个`interval`内传输完成，否则会被健康检查模块视为后端服务器或网络异常。
+当采用长连接进行健康检查时，需在该指令中添加keep-alive请求头，如：`"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`。
+同时，在采用`"GET"`方法的情况下，请求uri的size不宜过大，确保可以在1个`interval`内传输完成，否则会被健康检查模块视为后端服务器或网络异常。
 
 ## check\_http\_expect\_alive ##
 
