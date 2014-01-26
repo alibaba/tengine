@@ -15,7 +15,7 @@ This module is not built by default, it should be enabled with the `--with-http_
 			server 192.168.0.2:80;
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
-			check_http_send "GET / HTTP/1.0\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.0\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
@@ -26,7 +26,7 @@ This module is not built by default, it should be enabled with the `--with-http_
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
 			check_keepalive_requests 100;
-			check_http_send "GET / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
@@ -96,10 +96,10 @@ Default: `"GET / HTTP/1.0\r\n\r\n"`
 
 Context: `upstream`
 
-If the check type is http, the check function will send this http packet to the upstream server.
+If the check type is http, the check function will send this http packet to the upstream server. Method "HEAD" is recommended for reducing traffic.
 
-When persistant connection is used, a keep-alive request header should be added to the value of the directive, e.g. `"GET / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`.
-In addition, size of the request uri should not be too large, make sure the transmission can be finished within an `interval`, otherwise the health check will deduce a conclusion that there is something wrong with the servers or the net. 
+When persistant connection is used, a keep-alive request header should be added to the value of the directive, e.g. `"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`.
+In addition, in the case of "GET" method, size of the request uri should not be too large, make sure the transmission can be finished within an `interval`, otherwise the health check will deduce a conclusion that there is something wrong with the servers or the net. 
 
 ## check\_http\_expect\_alive ##
 
