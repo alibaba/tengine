@@ -21,6 +21,9 @@ struct ngx_http_reqstat_rbnode_s {
     ngx_atomic_t                 http_5xx;
     ngx_atomic_t                 other_status;
     ngx_atomic_t                 rt;
+    ngx_atomic_t                 ureq;
+    ngx_atomic_t                 urt;
+    ngx_atomic_t                 utries;
     u_char                       data[1];
 };
 
@@ -76,10 +79,19 @@ typedef struct {
 #define NGX_HTTP_REQSTAT_RT                                             \
     offsetof(ngx_http_reqstat_rbnode_t, rt)
 
+#define NGX_HTTP_REQSTAT_UPS_REQ                                        \
+    offsetof(ngx_http_reqstat_rbnode_t, ureq)
+
+#define NGX_HTTP_REQSTAT_UPS_RT                                         \
+    offsetof(ngx_http_reqstat_rbnode_t, urt)
+
+#define NGX_HTTP_REQSTAT_UPS_TRIES                                      \
+    offsetof(ngx_http_reqstat_rbnode_t, utries)
+
 #define REQ_FIELD(node, offset)                                         \
     ((ngx_atomic_t *) ((char *) node + offset))
 
-static off_t               fields[10] = {
+static off_t               fields[13] = {
     NGX_HTTP_REQSTAT_BYTES_IN,
     NGX_HTTP_REQSTAT_BYTES_OUT,
     NGX_HTTP_REQSTAT_CONN_TOTAL,
@@ -89,7 +101,10 @@ static off_t               fields[10] = {
     NGX_HTTP_REQSTAT_4XX,
     NGX_HTTP_REQSTAT_5XX,
     NGX_HTTP_REQSTAT_OTHER_STATUS,
-    NGX_HTTP_REQSTAT_RT
+    NGX_HTTP_REQSTAT_RT,
+    NGX_HTTP_REQSTAT_UPS_REQ,
+    NGX_HTTP_REQSTAT_UPS_RT,
+    NGX_HTTP_REQSTAT_UPS_TRIES
 };
 
 
@@ -420,13 +435,14 @@ static ngx_int_t
 ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 {
     ngx_str_t                     val;
-    ngx_uint_t                    i, status;
+    ngx_uint_t                    i, j, status, utries;
     ngx_time_t                   *tp;
-    ngx_msec_int_t                ms;
+    ngx_msec_int_t                ms, total_ms;
     ngx_shm_zone_t              **shm_zone, *z;
     ngx_http_reqstat_ctx_t       *ctx;
     ngx_http_reqstat_conf_t      *slcf;
     ngx_http_reqstat_rbnode_t    *fnode;
+    ngx_http_upstream_state_t    *state;
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
 
@@ -501,6 +517,40 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
                  ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
             ms = ngx_max(ms, 0);
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_RT, ms);
+
+            if (r->upstream_states != NULL && r->upstream_states->nelts > 0) {
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_UPS_REQ, 1);
+
+                j = 0;
+                total_ms = 0;
+                utries = 0;
+                state = r->upstream_states->elts;
+
+                for ( ;; ) {
+
+                    utries++;
+
+                    ms = (ngx_msec_int_t) (state[j].response_sec * 1000
+                                                   + state[j].response_msec);
+                    ms = ngx_max(ms, 0);
+                    total_ms += ms;
+
+                    if (++j == r->upstream_states->nelts) {
+                        break;
+                    }
+
+                    if (state[j].peer == NULL) {
+                        if (++j == r->upstream_states->nelts) {
+                            break;
+                        }
+                    }
+                }
+
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_UPS_RT,
+                                       total_ms);
+                ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_UPS_TRIES,
+                                       utries);
+            }
         }
     }
 
