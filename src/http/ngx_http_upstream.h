@@ -322,10 +322,10 @@ struct ngx_http_upstream_s {
     ngx_chain_t                     *free_bufs;
 
     /* Nginx => Upstream */
-    ngx_http_upstream_output_filter_init_pt output_filter_init;
-    ngx_http_upstream_output_filter_pt output_filter;
-    ngx_http_upstream_output_filter_update_pt output_filter_update;
-    ngx_http_upstream_output_filter_ctx_t *output_filter_ctx;
+    ngx_http_upstream_output_filter_init_pt    output_filter_init;
+    ngx_http_upstream_output_filter_pt         output_filter;
+    ngx_http_upstream_output_filter_update_pt  output_filter_update;
+    ngx_http_upstream_output_filter_ctx_t     *output_filter_ctx;
 
     /* Upstream => Nginx */
     ngx_int_t                      (*input_filter_init)(void *data);

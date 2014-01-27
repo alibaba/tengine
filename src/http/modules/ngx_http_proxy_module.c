@@ -1047,6 +1047,7 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
         len += body_len;
 
     } else {
+
         if (r->headers_in.chunked && !r->request_buffering) {
             ctx->internal_body_length = -1;
         } else {

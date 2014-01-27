@@ -141,7 +141,7 @@ static ngx_int_t ngx_http_fastcgi_process_header(ngx_http_request_t *r);
 static ngx_int_t ngx_http_fastcgi_output_filter_init(
     ngx_http_upstream_output_filter_ctx_t *ctx);
 static ngx_int_t ngx_http_fastcgi_output_filter(
-    ngx_http_upstream_output_filter_ctx_t *ctx,ngx_chain_t *in);
+    ngx_http_upstream_output_filter_ctx_t *ctx, ngx_chain_t *in);
 static ngx_int_t ngx_http_fastcgi_input_filter_init(void *data);
 static ngx_int_t ngx_http_fastcgi_input_filter(ngx_event_pipe_t *p,
     ngx_buf_t *buf);
@@ -1306,6 +1306,7 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
 
         return NGX_OK;
     } else {
+
         if (ngx_chain_add_copy(r->pool, &in, raw_in) != NGX_OK) {
             return NGX_ERROR;
         }
