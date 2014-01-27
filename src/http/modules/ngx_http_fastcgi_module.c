@@ -1305,6 +1305,7 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
         }
 
         return NGX_OK;
+
     } else {
 
         if (ngx_chain_add_copy(r->pool, &in, raw_in) != NGX_OK) {
