@@ -15,9 +15,6 @@
 #include <ngx_http_tfs_tair_helper.h>
 
 
-#define ngx_http_tfs_cluster_is_master(cluster_id)                   \
-    (cluster_id[2] == 'M' || cluster_id[2] == 'm')
-
 #define ngx_http_tfs_get_cluster_id(cluster_id_data)                 \
     (cluster_id_data[1] - '0')
 
@@ -25,7 +22,6 @@
 typedef struct {
     int32_t                      group_seq;    /* get from ns */
     ngx_str_t                    ns_vip_text;
-    uint8_t                      is_master;
     ngx_http_tfs_inet_t          ns_vip;
 } ngx_http_tfs_group_info_t;
 
@@ -59,6 +55,25 @@ typedef struct {
 } ngx_http_tfs_logical_cluster_t;
 
 
+typedef enum {
+     NGX_HTTP_TFS_OPER_INVALID = 0,
+     NGX_HTTP_TFS_OPER_READ,
+     NGX_HTTP_TFS_OPER_WRITE,
+     NGX_HTTP_TFS_OPER_UNLINK,
+     NGX_HTTP_TFS_OPER_COUNT
+} ngx_http_tfs_oper_type_e;
+
+
+typedef struct {
+    ngx_http_tfs_oper_type_e             oper_type;
+    uint32_t                             oper_app_id;
+    uint64_t                             oper_times;
+    uint64_t                             oper_size;
+    uint64_t                             oper_rt;
+    uint64_t                             oper_succ;
+} ngx_http_tfs_stat_rcs_t;
+
+
 typedef struct {
     u_char                       color;
     u_char                       dummy;
@@ -84,9 +99,11 @@ typedef struct {
     uint64_t                     meta_root_server;
     ngx_str_t                    remote_block_cache_info;
 
+    ngx_http_tfs_stat_rcs_t      stat_rcs[NGX_HTTP_TFS_OPER_COUNT];
+
     /* for unlink & update */
-    uint8_t                      unlink_cluster_count;
-    ngx_http_tfs_cluster_group_info_t unlink_clusters[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
+    uint8_t                      unlink_cluster_group_count; /* this ~= unlink_cluster_count get from rcs */
+    ngx_http_tfs_cluster_group_info_t  unlink_cluster_groups[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
 
     uint32_t                     use_remote_block_cache;
 } ngx_http_tfs_rcs_info_t;
@@ -108,19 +125,18 @@ typedef struct {
 } ngx_http_tfs_rc_ctx_t;
 
 
-ngx_int_t ngx_http_tfs_rc_server_update(ngx_http_request_t *r,
-    ngx_http_tfs_rc_ctx_t *t, ngx_http_tfs_rcs_info_t *info);
 ngx_int_t ngx_http_tfs_rc_server_init_zone(ngx_shm_zone_t *shm_zone,
     void *data);
 void ngx_http_tfs_rc_server_expire(ngx_http_tfs_rc_ctx_t *ctx);
-ngx_http_tfs_rcs_info_t *ngx_http_tfs_rcs_lookup(ngx_http_request_t *r,
-    ngx_http_tfs_rc_ctx_t *ctx, ngx_str_t appkey);
+ngx_http_tfs_rcs_info_t *ngx_http_tfs_rcs_lookup(ngx_http_tfs_rc_ctx_t *ctx,
+    ngx_str_t appkey);
 void ngx_http_tfs_rc_server_destroy_node(ngx_http_tfs_rc_ctx_t *ctx,
     ngx_http_tfs_rcs_info_t *rc_info_node);
 void ngx_http_tfs_rcs_set_group_info_by_addr(ngx_http_tfs_rcs_info_t *rc_info,
     ngx_int_t group_count, ngx_int_t seq_id, ngx_http_tfs_inet_t addr);
 void ngx_http_tfs_dump_rc_info(ngx_http_tfs_rcs_info_t *rc_info, ngx_log_t *log);
-
+ngx_int_t ngx_http_tfs_rcs_stat_update(ngx_http_tfs_t *t,
+    ngx_http_tfs_rcs_info_t *rc_info, ngx_http_tfs_oper_type_e oper_type);
 
 #endif  /* _NGX_HTTP_TFS_RC_SERVER_INFO_H_INCLUDED_ */
 
