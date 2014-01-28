@@ -114,7 +114,7 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
 
     file_size = ngx_file_size(&file->info);
 
-    buf = ngx_pnalloc(cf->pool, file_size);
+    buf = ngx_pnalloc(cf->pool, file_size + 1);
     if (buf == NULL) {
         return NGX_ERROR;
     }
@@ -136,8 +136,13 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
     end = buf + file_size;
     line = p;
 
-    for (/* void */; p != end; p++) {
+    for (/* void */; p < end; p++) {
         if (*p == CR || *p == LF || p == (end - 1)) {
+
+            while (*line == ' ' || *line == '\t') {
+                line++;
+            }
+
             if (ngx_strncmp(line, "nameserver", sizeof("nameserver") - 1)
                 == 0)
             {
@@ -147,11 +152,15 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                     line++;
                 }
 
-                line_end = p - 1;
+                line_end = p;
 
-                while (*line_end == ' ' || *line_end == '\t') {
+                while (*line_end == ' ' || *line_end == '\t'
+                       || *line_end == CR || *line_end == LF)
+                {
                     line_end--;
                 }
+                /* put a null character for string parse */
+                *++line_end = '\0';
 
                 address = ngx_array_push(&addrs);
                 if (address == NULL) {
@@ -159,12 +168,7 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                 }
 
                 address->data = line;
-                address->len = line_end - line + 1;
-
-                if (p == (end -1)) {
-                    address->len++;
-                    break;
-                }
+                address->len = line_end - line;
             }
 
             line = p + 1;
