@@ -738,3 +738,80 @@ h1 > strong {  color : red  ; }
     GET /t/trim.html
 --- response_body
 <style>body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}body{font-size:20px;line-height:150%;}h1>strong{color:red;}.skin-1388458850088 .nav .sm-item-list{border-bottom:2px solid #ee5e80;}.skin-1388458850088 .nav .search-wrap a.local,.skin-1388458850088 .nav .search-wrap a.local:hover{background:#ee5e80;}</style>
+
+
+=== TEST 27: variable value
+--- config
+    trim on;
+    trim_js on;
+    trim_css on;
+    set $trim "on";
+    if ($arg_a = 1 ) {
+        set $trim "off";
+    }
+    location /trim.html {trim off; }
+    location /t/ {
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:$TEST_NGINX_TRIM_PORT/;
+
+        trim_js $trim;
+        trim_css $trim;
+    }
+--- user_files
+>>> trim.html
+<!DOCTYPE html>
+<textarea  >
+   trim
+        module
+</textarea  >
+<!--remove all-->
+<!--[if IE]> trim module <![endif]-->
+<!--[if !IE ]>--> trim module  <!--<![endif]-->
+<!--# ssi-->
+<!--esi-->
+<pre    style  =
+    "color:   blue"  >Welcome    to    nginx!</pre  >
+<script type="text/javascript">
+/***  muitl comment
+                   ***/
+//// single comment
+str.replace(/     /,"hello");
+</script>
+<style   type="text/css"  >
+/*** css comment
+                 ! ***/
+body
+{
+  font-size:  20px ;
+  line-height: 150% ;
+}
+</style>
+--- request
+    GET /t/trim.html?a=1
+--- response_body
+<!DOCTYPE html>
+<textarea>
+   trim
+        module
+</textarea>
+<!--[if IE]> trim module <![endif]-->
+<!--[if !IE ]>--> trim module  <!--<![endif]-->
+<!--# ssi-->
+<!--esi-->
+<pre style="color:   blue">Welcome    to    nginx!</pre>
+<script type="text/javascript">
+/***  muitl comment
+                   ***/
+//// single comment
+str.replace(/     /,"hello");
+</script>
+<style type="text/css">
+/*** css comment
+                 ! ***/
+body
+{
+  font-size:  20px ;
+  line-height: 150% ;
+}
+</style>
+
