@@ -107,3 +107,50 @@ result:
     <script type="text/javascript">str.replace(/     /,"hello");</script>
     <style type="text/css">body{font-size:20px;line-height:150%;}</style>
 
+
+## Trim Rule
+
+### html
+##### whitespace
++ remove '\r'.
++ replace '\t' with space.
++ replace multiple spaces with a single space.
++ replace multiple '\n' with a single '\n'.
++ replace multiple '\n' and '\t' with a single space in tag.
++ not trim quoted strings in tag.
++ not trim the contents that enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
+
+##### comment
++ remove html comment(`<!-- -->`)  except for IE/SSI/ESI comments.  
+  IE comment: `<!--[if  <![endif]-->`  
+  SSI comment: `<!--#  -->`  
+  ESI comment: `<!--esi  -->`  
+
+
+### javascript
+`<script type="text/javascript">` or `<script>` will be identified as javascript.
+
+##### whitespace
++ remove '\r'.
++ remove '\t','\n' and space that behind '(' ',' '=' ':' '[' '!' '&' '|' '?' ';' '>' '~' '*' '{'.
++ replace multiple spaces with a single space.
++ not trim quoted strings and regular expression literals.
+
+##### comment
++ remove single comment. `//`
++ remove multi comment. `/*  */`
+
+
+### css
+`<style type="text/css">` or `<style>` will be identified as css.
+
+##### whiltespace
++ remove '\r'.
++ remove '\t','\n' and space that around ';' '>' '{' '}' ':' ','.
++ replace multiple '\n' and spaces with a single space.
++ not trim quoted strings.
+
+##### comment
++ remove css comment(`/* */`)  except for child seletor and IE5 /Mac hack comments.  
+   child seletor hack: `html>/**/body p{color:blue}`  
+   IE5 /Mac hack: `/*\*/.selector{color:khaki}/**/`  
