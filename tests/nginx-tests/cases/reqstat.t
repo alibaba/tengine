@@ -33,6 +33,8 @@ http {
 
     root %%TESTDIR%%;
 
+    error_page default;
+
     req_status_zone server "$host,$server_addr:$server_port" 40M;
 
     server {
@@ -46,9 +48,28 @@ http {
     }
 
     server {
+        listen              3130;
+        listen              3131;
+        location / {
+            rewrite_by_lua 'ngx.sleep(2);ngx.exit(500)';
+        }
+    }
+
+    upstream test {
+        server 127.0.0.1:3131 max_fails=0;
+        server 127.0.0.1:3130 max_fails=0;
+    }
+
+    server {
         listen              127.0.0.1:3129;
         server_name         www.test_app_a.com;
+        proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_next_upstream error timeout http_500;
         req_status          server;
+
+        location /proxy/ {
+            proxy_pass http://test/;
+        }
     }
 
     server {
@@ -85,6 +106,11 @@ http {
     }
 
     server {
+        listen              3130;
+        req_status          server;
+    }
+
+    server {
         listen              127.0.0.1:3129;
         server_name         www.test_app_a.com;
         proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -100,7 +126,7 @@ EOF
 
 #################################################################################
 
-$t->plan(4);
+$t->plan(5);
 $t->write_file_expand('nginx.conf', $cf_1);
 $t->write_file('B4', '1234567890');
 $t->run();
@@ -140,6 +166,13 @@ if ($s == 1) {
     pass('duplicate output');
 }
 
+my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
+
+#5
+$r = my_http_get('/usr', 'www.test_cp.com', 3128);
+warn $r;
+like($r, qr/1,400\d,2\n/, 'upstream');
+
 #################################################################################
 
 sub my_http_ip {
@@ -148,7 +181,7 @@ sub my_http_ip {
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         local $SIG{PIPE} = sub { die "sigpipe\n" };
-        alarm(2);
+        alarm(5);
         my $s = IO::Socket::INET->new(
             Proto => 'tcp',
             PeerAddr => "${ip}:${port}"
@@ -174,7 +207,7 @@ sub my_http($;%) {
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         local $SIG{PIPE} = sub { die "sigpipe\n" };
-        alarm(2);
+        alarm(5);
         my $s = IO::Socket::INET->new(
             Proto => 'tcp',
             PeerAddr => "127.0.0.1:$extra{port}"
