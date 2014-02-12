@@ -1172,6 +1172,18 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     r->connection->log->action = "connecting to upstream";
 
+    if (u->request_sent && !r->request_buffering) {
+
+        /*
+         * no buffering request can't reuse the request body when part of
+         * the body has been sent.
+         */
+        ngx_http_upstream_finalize_request(r, u,
+                                           NGX_HTTP_BAD_GATEWAY);
+
+        return;
+    }
+
     if (u->state && u->state->response_sec) {
         tp = ngx_timeofday();
         u->state->response_sec = tp->sec - u->state->response_sec;
@@ -1255,16 +1267,6 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->writer.limit = 0;
 
     if (u->request_sent) {
-
-        /*
-         * no buffering request can't reuse the request body when part of
-         * the body has been sent.
-         */
-        if (!r->request_buffering) {
-            ngx_http_upstream_finalize_request(r, u,
-                                               NGX_HTTP_BAD_GATEWAY);
-            return;
-        }
 
         if (ngx_http_upstream_reinit(r, u) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
