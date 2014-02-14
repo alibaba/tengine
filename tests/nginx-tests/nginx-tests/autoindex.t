@@ -23,12 +23,12 @@ select STDOUT; $| = 1;
 
 plan(skip_all => 'no symlinks on win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http autoindex/)->plan(16)
+my $t = Test::Nginx->new()->has(qw/http autoindex charset/)->plan(16)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

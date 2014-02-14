@@ -1,4 +1,4 @@
-﻿# Name #
+# Name #
 
 **ngx\_http\_upstream\_check\_module**
 
@@ -8,22 +8,37 @@
 
 # Examples #
 
-	http {
-		upstream cluster {
+    http {
+		upstream cluster1 {
 			# simple round-robin
 			server 192.168.0.1:80;
 			server 192.168.0.2:80;
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
-			check_http_send "GET / HTTP/1.0\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.0\r\n\r\n";
+			check_http_expect_alive http_2xx http_3xx;
+		}
+
+		upstream cluster2 {
+			# simple round-robin
+			server 192.168.0.3:80;
+			server 192.168.0.4:80;
+
+			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
+			check_keepalive_requests 100;
+			check_http_send "HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
 		server {
 			listen 80;
 
-			location / {
-				proxy_pass http://cluster;
+			location /1 {
+				proxy_pass http://cluster1;
+			}
+
+			location /2 {
+				proxy_pass http://cluster2;
 			}
 
 			location /status {
@@ -32,7 +47,7 @@
 				access_log   off;
 				allow SOME.IP.ADD.RESS;
 				deny all;
-		   }
+			}
 		}
 	}
 
@@ -64,6 +79,16 @@ Context: `upstream`
 * `port`: 指定后端服务器的检查端口。你可以指定不同于真实服务的后端服务器的端口，比如后端提供的是443端口的应用，你可以去检查80端口的状态来判断后端健康状况。默认是0，表示跟后端server提供真实服务的端口一样。该选项出现于Tengine-1.4.0。
                                                                                                                          
 
+## check\_keepalive\_requests ##
+
+Syntax: **check\_keepalive\_requests** `request_num`
+
+Default: `1`
+
+Context: `upstream`
+
+该指令可以配置一个连接发送的请求数，其默认值为1，表示Tengine完成1次请求后即关闭连接。
+
 ## check\_http\_send ##
 
 Syntax: **check\_http\_send** `http_packet`
@@ -72,7 +97,10 @@ Default: `"GET / HTTP/1.0\r\n\r\n"`
 
 Context: `upstream`
 
-该指令可以配置http健康检查包发送的请求内容。
+该指令可以配置http健康检查包发送的请求内容。为了减少传输数据量，推荐采用`"HEAD"`方法。
+
+当采用长连接进行健康检查时，需在该指令中添加keep-alive请求头，如：`"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`。
+同时，在采用`"GET"`方法的情况下，请求uri的size不宜过大，确保可以在1个`interval`内传输完成，否则会被健康检查模块视为后端服务器或网络异常。
 
 ## check\_http\_expect\_alive ##
 

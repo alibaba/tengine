@@ -29,7 +29,7 @@ my $t = Test::Nginx->new()->has(qw/http proxy cache/)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

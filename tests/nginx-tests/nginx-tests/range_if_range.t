@@ -27,7 +27,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -78,39 +78,19 @@ like($t1, qr/206/, 'if-range');
 # If-Range + add_header Last-Modified ""
 
 $t1 = http_get_range('/t2.html', "Range: bytes=0-9\nIf-Range: wrong");
-
-TODO: {
-local $TODO = 'not yet';
-
 like($t1, qr/200 OK/, 'if-range notime');
-
-}
-
 unlike($t1, qr/Last-Modified: /, 'if-range notime - no last modified');
 
 # If-Range + add_header Last-Modified "Mon, 28 Sep 1970 06:00:00 GMT"
 
 $t1 = http_get_range('/t3.html', "Range: bytes=0-9\nIf-Range: wrong");
-
-TODO: {
-local $TODO = 'not yet';
-
 like($t1, qr/200 OK/, 'if-range time wrong');
-
-}
-
 like($t1, qr/Last-Modified: Mon, 28 Sep 1970 06:00:00 GMT/,
 	'if-range time wrong - last modified');
 
 $t1 = http_get_range('/t3.html',
 	"Range: bytes=0-9\nIf-Range: Mon, 28 Sep 1970 06:00:00 GMT");
-
-TODO: {
-local $TODO = 'requires add_header changes after if-range fix';
-
 like($t1, qr/206/, 'if-range time');
-
-}
 
 ###############################################################################
 

@@ -19,17 +19,31 @@ echo "creating $NGX_MAKEFILE"
 mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
          $NGX_OBJS/src/os/unix $NGX_OBJS/src/os/win32 \
          $NGX_OBJS/src/http $NGX_OBJS/src/http/modules \
-	 $NGX_OBJS/src/http/modules/perl \
-	 $NGX_OBJS/src/http/modules/lua \
-	 $NGX_OBJS/src/http/modules/tfs \
+         $NGX_OBJS/src/http/modules/perl \
+         $NGX_OBJS/src/http/modules/lua \
+         $NGX_OBJS/src/http/modules/tfs \
          $NGX_OBJS/src/mail \
          $NGX_OBJS/src/misc \
-	 $NGX_OBJS/src/proc \
+         $NGX_OBJS/src/proc \
          $NGX_OBJS/modules
 
 
 ngx_objs_dir=$NGX_OBJS$ngx_regex_dirsep
 ngx_use_pch=`echo $NGX_USE_PCH | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+
+case ".$NGX_INCLUDE_PATH" in
+    ./*)
+    ;;
+
+    .)
+        NGX_INCLUDE_PATH=$NGX_PREFIX/include
+    ;;
+
+    *)
+        NGX_INCLUDE_PATH=$NGX_PREFIX/$NGX_INCLUDE_PATH
+    ;;
+esac
 
 
 cat << END                                                     > $NGX_MAKEFILE
@@ -470,6 +484,9 @@ if [ $NGX_DSO = YES ] ; then
             ngx_dso_link_flag="$ngx_dso_link_flag -undefined dynamic_lookup "
     esac
 
+    echo "#include<ngx_shared_config.h>" >> objs/ngx_auto_config.h
+    echo ""                              > objs/ngx_shared_config.h
+
     ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS) \$(HTTP_INCS)"
 
     for ngx_shared_modules in $NGX_SHARED_MODULES
@@ -550,19 +567,25 @@ END
 
     for dai in $dso_all_incs
     do
-        if [ "$dai" = "-I" ]; then
-            all_incs_temp="$all_incs_temp $dai"
-        elif [ "$dai" = "\\" ]; then
-            all_incs_temp="$all_incs_temp \\"
-        elif test -n "$dai"; then
-            all_incs_temp="$all_incs_temp $dai"
-        fi
+        case ".$dai" in
+            .src/*)
+                ;;
+            .\\)
+                all_incs_temp="$all_incs_temp \\"
+                ;;
+            .-I)
+                ;;
+            .*)
+                all_incs_temp="$all_incs_temp -I$dai"
+                ;;
+        esac
     done
 
     for cdep in $dso_core_deps
     do
         if test -n "$cdep"; then
-            core_deps_temp="$core_deps_temp $cdep"
+            cdep=`echo "$cdep" | awk 'BEGIN {FS="/"} {print $NF}'`
+            core_deps_temp="$core_deps_temp $NGX_INCLUDE_PATH/$cdep"
         fi
     done
 
@@ -580,6 +603,7 @@ END
     for hdep in $dso_http_deps
     do
         if test -n "$hdep"; then
+            hdep=`echo "$hdep" |  awk 'BEGIN {FS="/"} {print $NF}'`
             http_deps_temp="$http_deps_temp $hdep"
         fi
     done
@@ -595,6 +619,12 @@ END
         fi
     done
 
+    ngx_feature_file=`cat auto/feature | sed -e 's/\`/\\\`/g' | sed -e 's/\n/\\n/g'`
+    ngx_have_file=`cat auto/have | sed -e 's/\n/\\n/g'`
+
+    ngx_feature_file=\'$ngx_feature_file\'
+    ngx_have_file=\'$ngx_have_file\'
+
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
@@ -605,7 +635,9 @@ ngx_soext='$NGX_SOEXT'
 CC=$CC
 CFLAGS='$CFLAGS -fPIC'
 CPP='$CPP'
-LINK='$LINK  -fPIC $ngx_dso_link_flag'
+LINK='$LINK  -fPIC $ngx_dso_link_flag '
+
+NGX_INCLUDE_PATH=$NGX_INCLUDE_PATH
 
 
 CORE_LIBS='$CORE_LIBS'
@@ -634,18 +666,19 @@ ngx_regex_cont='$ngx_regex_cont'
 ngx_include_opt='$ngx_include_opt'
 ngx_binout='$ngx_binout'
 NGX_DSO_PATH=$NGX_DSO_PATH
-NGX_AUTOCONF_ERR=$NGX_AUTOCONF_ERR
-NGX_AUTOTEST=$NGX_AUTOTEST
-NGX_AUTO_CONFIG_H=$NGX_AUTO_CONFIG_H
+NGX_AUTOCONF_ERR=autoconf.err
+NGX_AUTOTEST=autotest
+NGX_AUTO_CONFIG_H='objs/ngx_shared_config.h'
 NGX_CONFIGURE="$NGX_CONFIGURE"
+ngx_feature_file=$ngx_feature_file
+ngx_have_file=$ngx_have_file
 
 END
 
     sed -e "s|%%ALL_INCS%%|'$all_incs_temp'|g" \
-	-e "s|%%CORE_DEPS%%|'$core_deps_temp'|g" \
-	-e "s|%%CORE_INCS%%|'$core_incs_temp'|g" \
-	-e "s|%%HTTP_DEPS%%|'$http_deps_temp'|g" \
-	-e "s|%%HTTP_INCS%%|'$http_incs_temp'|g" \
-	-e "s|%%NGX_SOURCE_HOME%%|'$(cd ${0%/*} && pwd)'|g" \
-	contrib/dso.in >> $NGX_DSO_COMPILE
+        -e "s|%%CORE_DEPS%%|'$core_deps_temp'|g" \
+        -e "s|%%CORE_INCS%%|'$core_incs_temp'|g" \
+        -e "s|%%HTTP_DEPS%%|'$http_deps_temp'|g" \
+        -e "s|%%HTTP_INCS%%|'$http_incs_temp'|g" \
+        contrib/dso.in >> $NGX_DSO_COMPILE
 fi

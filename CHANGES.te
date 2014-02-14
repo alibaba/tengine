@@ -1,3 +1,98 @@
+Changes with Tengine 2.0.0                                       08 Jan 2014
+
+    *) Feature: now DSO module does not need the original source code or
+       compiler options when compiling a new module. (monadbobo)
+
+    *) Feature: added support for SPDY v3, and SPDY/HTTP servers can listen on
+       the same port. (lilbedwin、chobits)
+
+    *) Feature: added support for setting retries for upstream servers (proxy,
+       memcached, fastcgi, scgi, uwsgi). (supertcy)
+
+    *) Feature: now tfs module can report access status to rcs while keepalive.
+       (zhcn381)
+
+    *) Feature: now the directive "if" supports ">", "<", ">=", "<=" operators
+       for numeric comparison. (flygoast)
+
+    *) Feature: now upstream health check module uses keep-alive connections.
+       (lilbedwin)
+
+    *) Feature: now trim module can handle SSI and ESI comments properly.
+       (taoyuanyuan)
+
+    *) Feature: now directive "expires_by_types" supports wildcard such as
+       "text/*". (zhcn381)
+
+    *) Feature: added variables starting with "$base64_decode_" to encode
+       variables in base64. (yzprofile)
+
+    *) Feature: added variables starting with "$md5_encode_" to encode variables
+       in md5. (yzprofile)
+
+    *) Feature: added a variable "$time_http" to get the current HTTP time.
+       (flygoast)
+
+    *) Feature: added a variable "$full_request" to get the original request
+       URL with scheme and host. (yzprofile)
+
+    *) Feature: added variables starting with "$escape_uri_" to escape variables
+       into formal URL syntax. (yzprofile)
+
+    *) Feature: added a variable "$raw_uri" to get the original URI without
+       arguments. (flygoast)
+
+    *) Feature: added support for logging subrequests in nanoseconds. (jinglong)
+
+    *) Feature: added a new API function to encode URL into base64. (lilbedwin)
+
+    *) Change: merged changes between nginx-1.2.9 and nginx-1.4.4. (cfsego)
+
+    *) Change: now stub_status module does not log subrequests. (jinglong)
+
+    *) Bugfix: fixed a bug in footer module when reading a response with
+       a "Content-Encoding" header. (yaoweibin)
+
+    *) Bugfix: fixed a bug when "client_body_postpone_size" is set to 0.
+       (yaoweibin)
+
+    *) Bugfix: fixed a compilation warning of Lua module. (diwayou)
+
+
+Changes with Tengine 1.5.2                                       22 Nov 2013
+
+    *) Security: a character following an unescaped space in a request line
+       was handled incorrectly (CVE-2013-4547); the bug had appeared in
+       0.8.41.
+       Thanks to Ivan Fratric of the Google Security Team.
+
+    *) Bugfix: fix a bug that 'nodelay' might be ignored in limit_req module.
+       (cfsego)
+
+    *) Bugfix: fix a bug in trim module when processing JavaScript comment.
+       (taoyuanyuan)
+
+
+Changes with Tengine 1.5.1                                       29 Aug 2013
+
+    *) Feature: added the directive 'retry_cached_connection' which could
+       disable unconditional retries with a cached backend connection.
+       (yaoweibin)
+
+    *) Feature: added the argument of 'ncpu' to 'sysguard_load' directive.
+       (yzprofile)
+
+    *) Bugfix: fixed a bug in referer module that regex rules might be
+       invalid with https requests. (lilbedwin)
+
+    *) Bugfix: fixed a bug that the trim module might send a zero-size
+       buffer. (taoyuanyuan)
+
+    *) Bugfix: fixed a compile error when using the configure option
+       '--without-dso'. (zhuzhaoyuan)
+
+    *) Bugfix: fixed two compile warnings. (zzjin, diwayou)
+
 
 Changes with Tengine 1.5.0                                       31 Jul 2013
 
@@ -55,7 +150,7 @@ Changes with Tengine 1.4.4                                       21 Mar 2013
        can be always served by the same upstream server. (dinic)
 
     *) Feature: now the sysguard module can protect the server based on
-       the amount of free memory. (lifeibo) 
+       the amount of free memory. (lifeibo)
 
     *) Feature: added support for geoip regional database in geoip module.
        (jasonlfunk)
@@ -76,14 +171,14 @@ Changes with Tengine 1.4.4                                       21 Mar 2013
     *) Bugfix: fixed a bug with TFS module that it might corrupt large files.
        (zhcn381)
 
- 
+
 Changes with Tengine 1.4.3                                       21 Jan 2013
 
     *) Feature: added the TFS module which provides a RESTful API to Taobao
        File System. (zhcn381, monadbobo)
 
     *) Feature: added a $sent_cookie_XXX variable which could be used to get
-       the value of cookie XXX from the Set-Cookie headers. (skoo87) 
+       the value of cookie XXX from the Set-Cookie headers. (skoo87)
 
     *) Feature: now the syslog logging supports host name and domain name as
        its destination address. (cfsego)
@@ -102,7 +197,7 @@ Changes with Tengine 1.4.3                                       21 Jan 2013
 
     *) Bugfix: fixed the bug that sysguard module didn't work on Mac OS. (lizi)
 
- 
+
 Changes with Tengine 1.4.2                                         22 Nov 2012
 
     *) Feature: added the option '--dso-tool-path' to configure script, which
@@ -137,7 +232,7 @@ Changes with Tengine 1.4.2                                         22 Nov 2012
     *) Bugfix: fixed the installation directory error with the DSO module
        when creating the RPM package. (monadbobo)
        Thanks to Jianbin Xiao and Ren Xiaolei.
-      
+
 
 Changes with Tengine 1.4.1                                         10 Oct 2012
 
@@ -178,7 +273,7 @@ Changes with Tengine 1.4.0                                         05 Sep 2012
        to allow adding delimiter between each file. (dinic)
 
     *) Feature: added the 'concat_ignore_file_error' directive to ignore file
-       errors and the syntax of concat is less strict now. (dinic) 
+       errors and the syntax of concat is less strict now. (dinic)
 
     *) Feature: added the 'default' option to the 'error_page' directive to
        set all error pages to default values. (jinglong)

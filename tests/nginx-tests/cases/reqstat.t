@@ -130,12 +130,13 @@ $t->plan(5);
 $t->write_file_expand('nginx.conf', $cf_1);
 $t->write_file('B4', '1234567890');
 $t->run();
-my_http_get('/B4', 'www.test_app_a.com', 3129);
+my $w=my_http_get('/B4', 'www.test_app_a.com', 3129);
+warn length $w;
 my $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 warn $r;
 
 #1
-like($r, qr/222/, 'length check');
+like($r, qr/242/, 'length check');
 
 #2
 $t->write_file_expand('nginx.conf', $cf_2);
@@ -147,12 +148,12 @@ $t->write_file_expand('nginx.conf', $cf_1);
 $t->reload();
 sleep 2;
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/222/, 'reload length check');
+like($r, qr/242/, 'reload length check');
 my_http_get('/B4', 'www.test_app_a.com', 3129);
 
 #3
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/444/, 'length check again');
+like($r, qr/484/, 'length check again');
 
 #4
 my %c = ();

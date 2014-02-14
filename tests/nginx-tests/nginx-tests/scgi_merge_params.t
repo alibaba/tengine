@@ -29,7 +29,7 @@ my $t = Test::Nginx->new()->has(qw/http scgi cache/)->plan(9)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
