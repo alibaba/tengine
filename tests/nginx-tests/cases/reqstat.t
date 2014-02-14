@@ -70,6 +70,10 @@ http {
         location /proxy/ {
             proxy_pass http://test/;
         }
+
+        location /302/ {
+            return 302;
+        }
     }
 
     server {
@@ -126,17 +130,21 @@ EOF
 
 #################################################################################
 
-$t->plan(5);
+$t->plan(17);
 $t->write_file_expand('nginx.conf', $cf_1);
 $t->write_file('B4', '1234567890');
 $t->run();
 my $w=my_http_get('/B4', 'www.test_app_a.com', 3129);
 warn length $w;
 my $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-warn $r;
 
 #1
 like($r, qr/242/, 'length check');
+#6
+is (field($r, 6), 1, '2xx count is 1');
+is (field($r, 7), 0, '3xx count is 0');
+is (field($r, 8), 0, '4xx count is 0');
+is (field($r, 9), 0, '5xx count is 0');
 
 #2
 $t->write_file_expand('nginx.conf', $cf_2);
@@ -154,6 +162,11 @@ my_http_get('/B4', 'www.test_app_a.com', 3129);
 #3
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 like($r, qr/484/, 'length check again');
+#7
+is (field($r, 6), 2, '2xx count is 2');
+is (field($r, 7), 0, '3xx count is 0');
+is (field($r, 8), 0, '4xx count is 0');
+is (field($r, 9), 0, '5xx count is 0');
 
 #4
 my %c = ();
@@ -171,8 +184,24 @@ my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
 
 #5
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-warn $r;
 like($r, qr/1,400\d,2\n/, 'upstream');
+
+#14
+my_http_get('/B3', 'www.test_app_a.com', 3129);
+my_http_get('/B3', 'www.test_app_a.com', 3129);
+my_http_get('/B3', 'www.test_app_a.com', 3129);
+my_http_get('/302/B3', 'www.test_app_a.com', 3129);
+my_http_get('/302/B3', 'www.test_app_a.com', 3129);
+my_http_get('/302/B3', 'www.test_app_a.com', 3129);
+my_http_get('/302/B3', 'www.test_app_a.com', 3129);
+$r = my_http_get('/usr', 'www.test_cp.com', 3128);
+is (field($r, 6), 2, '2xx count is 2');
+is (field($r, 7), 4, '3xx count is 4');
+is (field($r, 8), 3, '4xx count is 3');
+is (field($r, 9), 1, '5xx count is 1');
+
+
+
 
 #################################################################################
 
@@ -247,4 +276,12 @@ Host: $host
 Connection: close
 
 EOF
+}
+
+sub field {
+    my ($result, $index) = @_;
+    my @lines = split(m/\s/s, $result);
+    my $content = $lines[-4];
+    my @fields = split(/,/, $content);
+    return $fields[$index];
 }
