@@ -1,4 +1,28 @@
 
+Changes with nginx 1.4.5                                         11 Feb 2014
+
+    *) Bugfix: the $ssl_session_id variable contained full session
+       serialized instead of just a session id.
+       Thanks to Ivan Ristić.
+
+    *) Bugfix: client connections might be immediately closed if deferred
+       accept was used; the bug had appeared in 1.3.15.
+
+    *) Bugfix: alerts "zero size buf in output" might appear in logs while
+       proxying; the bug had appeared in 1.3.9.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       ngx_http_spdy_module was used.
+
+    *) Bugfix: proxied WebSocket connections might hang right after
+       handshake if the select, poll, or /dev/poll methods were used.
+
+    *) Bugfix: a timeout might occur while reading client request body in an
+       SSL connection using chunked transfer encoding.
+
+    *) Bugfix: memory leak in nginx/Windows.
+
+
 Changes with nginx 1.4.4                                         19 Nov 2013
 
     *) Security: a character following an unescaped space in a request line
