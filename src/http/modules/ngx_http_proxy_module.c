@@ -1144,7 +1144,9 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
 
     u->uri.len = b->last - u->uri.data;
 
-    if (plcf->http_version == NGX_HTTP_VERSION_11) {
+    if (plcf->http_version == NGX_HTTP_VERSION_11
+        || (r->headers_in.chunked && !r->request_buffering))
+    {
         b->last = ngx_cpymem(b->last, ngx_http_proxy_version_11,
                              sizeof(ngx_http_proxy_version_11) - 1);
 
