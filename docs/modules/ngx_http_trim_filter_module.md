@@ -23,6 +23,14 @@ HTML with a state machine.
      
 Enable or disable trim module for pure HTML.  
 This module will retain some contents unchanged, in case that they are enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
+Parameter value can contain variables.  
+Example:  
+
+    set $flag "off";
+    if ($condition) {
+        set $flag "on";
+    }
+    trim $flag;
 <br/>
 
 
@@ -33,6 +41,7 @@ This module will retain some contents unchanged, in case that they are enclosed 
 **Context:** `http, server, location` 
      
 Enable or disable trim module for inline javascript.  
+Parameter value can contain variables too.  
 <br/>
 
 
@@ -43,6 +52,7 @@ Enable or disable trim module for inline javascript.
 **Context:** `http, server, location` 
      
 Enable or disable trim module for inline css.  
+Parameter value can contain variables too.  
 <br/>
 
 
@@ -118,7 +128,7 @@ result:
 + Replace multiple '\n' with a single '\n'.
 + Replace multiple '\n' and '\t' in tag with a single space.
 + Do not trim quoted strings in tag.
-+ Do not trim the contents enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
++ Do not trim the contents enclosed by the tag `pre`,`textarea`,`script` and `style`.
 
 ##### Comment
 + Remove html comment(`<!-- -->`).
