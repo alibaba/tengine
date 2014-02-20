@@ -1395,11 +1395,11 @@ ngx_http_variable_ascii(ngx_http_request_t *r,
         c = ngx_atoi(p, len);
     }
 
-    if (c == NGX_ERROR) {
+    if (c == NGX_ERROR || c > 255) {
         return NGX_ERROR;
     }
 
-    v->data = ngx_palloc(r->pool, 1);
+    v->data = ngx_pnalloc(r->pool, 1);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
