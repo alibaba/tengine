@@ -47,6 +47,8 @@ static ngx_int_t ngx_http_variable_md5(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_ascii(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 
 
 #if (NGX_HAVE_TCP_INFO)
@@ -736,6 +738,15 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+    if (ngx_strncmp(name->data, "ascii_", 6) == 0) {
+
+        if (ngx_http_variable_ascii(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
     vv->not_found = 1;
 
     return vv;
@@ -1352,6 +1363,50 @@ ngx_http_variable_escape_uri(ngx_http_request_t *r,
     p = (u_char *) ngx_escape_uri(v->data, src.data, src.len, NGX_ESCAPE_URI);
     v->len = p - v->data;
 
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_ascii(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_str_t *name = (ngx_str_t *) data;
+
+    size_t     len;
+    u_char    *p;
+    ngx_int_t  c;
+
+    len = name->len - (sizeof("ascii_") - 1);
+    p = name->data + sizeof("ascii_") - 1;
+
+    if (ngx_strncasecmp(p, "0x", 2) == 0) {
+
+        p = p + 2;
+        len = len - 2;
+        c = ngx_hextoi(p, len);
+
+    } else {
+
+        c = ngx_atoi(p, len);
+    }
+
+    if (c == NGX_ERROR || c > 255) {
+        return NGX_ERROR;
+    }
+
+    v->data = ngx_pnalloc(r->pool, 1);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    (*v->data) = (u_char) c;
+
+    v->len = 1;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
@@ -3195,6 +3250,13 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
         if (ngx_strncmp(v[i].name.data, "escape_uri_", 11) == 0) {
             v[i].get_handler = ngx_http_variable_escape_uri;
+            v[i].data = (uintptr_t) &v[i].name;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "ascii_", 6) == 0) {
+            v[i].get_handler = ngx_http_variable_ascii;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
