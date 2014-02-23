@@ -1384,7 +1384,7 @@ ngx_http_variable_ascii(ngx_http_request_t *r,
     len = name->len - (sizeof("ascii_") - 1);
     p = name->data + sizeof("ascii_") - 1;
 
-    if (ngx_strncasecmp(p, "0x", 2) == 0) {
+    if (ngx_strncasecmp(p, (u_char *) "0x", 2) == 0) {
 
         p = p + 2;
         len = len - 2;
