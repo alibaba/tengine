@@ -1313,8 +1313,6 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
         }
     }
 
-    ctx->out = in;
-
     while (in) {
 
         split = 0;
@@ -1348,13 +1346,11 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
         last_out = &cl->next;
 
         b = cl->buf;
-        ngx_memzero(b, sizeof(ngx_buf_t));
         b->tag = ctx->tag;
         b->temporary = 1;
 
         if (b->start == NULL) {
-            b->start = ngx_palloc(r->pool, sizeof(ngx_http_fastcgi_header_t)
-                                            + 8);
+            b->start = ngx_palloc(r->pool, sizeof(ngx_http_fastcgi_header_t) + 8);
             if (b->start == NULL) {
                 return NGX_ERROR;
             }
@@ -1416,6 +1412,8 @@ ngx_http_fastcgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
 
         in = in->next;
     }
+
+    ctx->out = r->upstream->request_bufs;
 
     if (rb->rest) {
         *last_out = NULL;
