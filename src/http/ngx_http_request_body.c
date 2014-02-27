@@ -704,6 +704,13 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
                 if (rc == NGX_DECLINED) {
 
+                    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                                   "http no buffered client request body "
+                                   "request_length: %O, rest: %uz, "
+                                   "postpone_size: %O",
+                                   r->request_length, rb->rest,
+                                   nb->postpone_size);
+
                     if (nb->postpone_size
                         >= (off_t) clcf->client_body_postpone_size)
                     {
@@ -733,10 +740,14 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
                 ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                                "http no buffered client request body "
-                               "request_length: %O, rest: %uz, postpone_size: %O",
-                               r->request_length, rb->rest, nb->postpone_size);
+                               "request_length: %O, rest: %uz, "
+                               "postpone_size: %O",
+                               r->request_length, rb->rest,
+                               nb->postpone_size);
 
-                if (nb->postpone_size >= (off_t) clcf->client_body_postpone_size) {
+                if (nb->postpone_size
+                    >= (off_t) clcf->client_body_postpone_size)
+                {
                     nb->flush = 1;
 
                     if (nb->buffered) {
