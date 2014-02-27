@@ -458,9 +458,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
     ngx_http_trim_ctx_t *ctx)
 {
     u_char                    *read, *write, ch, look;
-    ngx_http_trim_loc_conf_t  *conf;
-
-    conf = ngx_http_get_module_loc_conf(r, ngx_http_trim_filter_module);
 
     for (write = buf->pos, read = buf->pos; read < buf->last; read++) {
 
