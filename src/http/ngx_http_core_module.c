@@ -3993,19 +3993,14 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->client_body_buffers,
                               16, ngx_pagesize);
 
-    if (conf->client_body_buffers.num < 2) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "there must be at least 2 \"client_body_buffers\"");
-        return NGX_CONF_ERROR;
-    }
-
     ngx_conf_merge_size_value(conf->client_body_postpone_size,
                               prev->client_body_postpone_size,
                               64 * 1024);
 
-    if (conf->client_max_body_size <
+    if (conf->client_max_body_size &&
+         (conf->client_max_body_size <
         (off_t)(conf->client_body_buffers.num *
-                conf->client_body_buffers.size)) {
+                conf->client_body_buffers.size))) {
 
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "client_max_body_size %O should be greater than "
@@ -4018,7 +4013,9 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                              conf->client_body_buffers.size);
     }
 
-    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size) {
+    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size
+         && conf->client_max_body_size != 0)
+    {
         conf->client_body_postpone_size = conf->client_max_body_size;
     }
 
@@ -4034,6 +4031,12 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
         conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
                                              conf->client_body_buffers.size);
+    }
+
+    if (conf->client_body_buffers.num < 2) {
+        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                           "there must be at least 2 \"client_body_buffers\"");
+        conf->client_body_buffers.num = 2;
     }
 
     ngx_conf_merge_msec_value(conf->client_body_timeout,

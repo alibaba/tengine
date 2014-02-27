@@ -604,7 +604,7 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
     ngx_chain_writer_ctx_t *ctx = data;
 
     off_t              size;
-    ngx_chain_t       *cl;
+    ngx_chain_t       *cl, *ct;
     ngx_connection_t  *c;
 
     c = ctx->connection;
@@ -653,6 +653,8 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
         return NGX_OK;
     }
 
+    cl = ctx->out;
+
     ctx->out = c->send_chain(c, ctx->out, ctx->limit);
 
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
@@ -660,6 +662,12 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
 
     if (ctx->out == NGX_CHAIN_ERROR) {
         return NGX_ERROR;
+    }
+
+    while (cl != ctx->out) {
+        ct = cl->next;
+        ngx_free_chain(ctx->pool, cl);
+        cl = ct;
     }
 
     if (ctx->out == NULL) {
