@@ -22,7 +22,15 @@
 **上下文:** `http, server, location` 
      
 使模块有效（失效），删除 html 的注释以及重复的空白符（\n，\r，\t，' '）。   
-例外：对于 `pre`，`textarea`，`script`，`style` 和 ie/ssi/esi注释 等标签内的内容不作删除操作。   
+例外：对于 `pre`，`textarea`，`script`，`style` 和 ie/ssi/esi注释 等标签内的内容不作删除操作。  
+参数值可以包含变量。  
+例如：
+
+    set $flag "off";
+    if ($condition) {
+        set $flag "on";
+    }
+    trim $flag;
 <br/>
 
 **trim_js** `on` | `off`
@@ -32,7 +40,8 @@
 **上下文:** `http, server, location` 
      
 使模块有效（失效），删除 html 内嵌 javascript 的注释以及重复的空白符（\n，\r，\t，' '）。   
-例外：对于非javascript代码的 `script` 标签内容不作删除操作。   
+例外：对于非javascript代码的 `script` 标签内容不作删除操作。  
+参数值可以包含变量。 
 <br/>
 
 **trim_css** `on` | `off`
@@ -42,7 +51,8 @@
 **上下文:** `http, server, location` 
      
 使模块有效（失效），删除 html 内嵌 css 的注释以及重复的空白符（\n，\r，\t，' ')。   
-例外：对于非css代码的 `style` 标签内容不作删除操作。   
+例外：对于非css代码的 `style` 标签内容不作删除操作。  
+参数值可以包含变量。 
 <br/>
 
 **trim_types** `MIME types`
