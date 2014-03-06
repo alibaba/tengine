@@ -469,6 +469,13 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 {
     ngx_str_t                      *host;
     ngx_uint_t                      i;
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+
+    ngx_list_part_t                *part;
+
+#endif
+
     ngx_resolver_ctx_t             *ctx, temp;
     ngx_http_cleanup_t             *cln;
     ngx_http_upstream_t            *u;
@@ -615,9 +622,20 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
             goto found;
         }
 
-        uscfp = umcf->implicit_upstreams.elts;
+        part = &umcf->implicit_upstreams.part;
+        uscfp = part->elts;
 
-        for (i = 0; i < umcf->implicit_upstreams.nelts; i++) {
+        for (i = 0; /* void */ ; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+
+                part = part->next;
+                uscfp = part->elts;
+                i = 0;
+            }
 
 #else
 
@@ -4733,6 +4751,13 @@ ngx_http_upstream_srv_conf_t *
 ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 {
     ngx_uint_t                      i;
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+
+    ngx_list_part_t                *part;
+
+#endif
+
     ngx_http_upstream_server_t     *us;
     ngx_http_upstream_srv_conf_t   *uscf, **uscfp;
     ngx_http_upstream_main_conf_t  *umcf;
@@ -4753,7 +4778,60 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 
     uscfp = umcf->upstreams.elts;
 
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+
+    uscf = ngx_http_upstream_rbtree_lookup(umcf, &u->host);
+
+    if (uscf != NULL) {
+
+        if (flags & NGX_HTTP_UPSTREAM_CREATE) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "duplicate upstream \"%V\"", &u->host);
+            return NULL;
+        }
+
+        if (u->port) {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "upstream \"%V\" may not have port %d",
+                               &u->host, u->port);
+            return NULL;
+        }
+
+        if (uscf->port != u->port) {
+            goto not_found;
+        }
+
+        if (uscf->default_port && u->default_port
+            && uscf->default_port != u->default_port)
+        {
+            goto not_found;
+        }
+
+        return uscf;
+    }
+
+not_found:
+
+    part = &umcf->implicit_upstreams.part;
+    uscfp = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            uscfp = part->elts;
+            i = 0;
+        }
+
+#else
+
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+
+#endif
 
         if (uscfp[i]->host.len != u->host.len
             || ngx_strncasecmp(uscfp[i]->host.data, u->host.data, u->host.len)
@@ -4797,8 +4875,12 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
 
         if (flags & NGX_HTTP_UPSTREAM_CREATE) {
             uscfp[i]->flags = flags;
+
 #if (NGX_HTTP_UPSTREAM_RBTREE)
+
             ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
+            ngx_list_delete(&umcf->implicit_upstreams, &uscfp[i]);
+
 #endif
         }
 
@@ -4843,11 +4925,21 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
     *uscfp = uscf;
 
 #if (NGX_HTTP_UPSTREAM_RBTREE)
+
     uscf->node.key = ngx_crc32_short(uscf->host.data, uscf->host.len);
 
     if (flags & NGX_HTTP_UPSTREAM_CREATE) {
         ngx_rbtree_insert(&umcf->rbtree, &uscf->node);
     }
+    else {
+       uscfp = ngx_list_push(&umcf->implicit_upstreams);
+       if (uscfp == NULL) {
+           return NULL;
+       }
+
+       *uscfp = uscf;
+    }
+
 #endif
 
     return uscf;
@@ -5245,7 +5337,8 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
     }
 
 #if (NGX_HTTP_UPSTREAM_RBTREE)
-    if (ngx_array_init(&umcf->implicit_upstreams, cf->pool, 4,
+
+    if (ngx_list_init(&umcf->implicit_upstreams, cf->pool, 4,
                        sizeof(ngx_http_upstream_srv_conf_t *))
         != NGX_OK)
     {
@@ -5254,6 +5347,7 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
 
     ngx_rbtree_init(&umcf->rbtree, &umcf->sentinel,
                     ngx_http_upstream_rbtree_insert_value);
+
 #endif
 
     return umcf;
@@ -5272,9 +5366,6 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
     ngx_http_upstream_init_pt       init;
     ngx_http_upstream_header_t     *header;
     ngx_http_upstream_srv_conf_t  **uscfp;
-#if (NGX_HTTP_UPSTREAM_RBTREE)
-    ngx_http_upstream_srv_conf_t  **uscfpt;
-#endif
 
     uscfp = umcf->upstreams.elts;
 
@@ -5287,16 +5378,6 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
             return NGX_CONF_ERROR;
         }
 
-#if (NGX_HTTP_UPSTREAM_RBTREE)
-        if (!(uscfp[i]->flags & NGX_HTTP_UPSTREAM_CREATE)) {
-            uscfpt = ngx_array_push(&umcf->implicit_upstreams);
-            if (uscfpt == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *uscfpt = uscfp[i];
-        }
-#endif
     }
 
     /* upstream_headers_in_hash */
