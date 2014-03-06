@@ -9,14 +9,14 @@ Changes with Tengine 2.0.1                                       06 March 2014
     *) Feature: resolver can be configured automatically from /etc/resolv.conf.
        (lifeibo, yaoweibin)
 
-    *) Feature: added variables starting with "$ascii_" to get any octet.
-       (yzprofile)
+    *) Feature: added variables starting with "$ascii_", which can represent
+       arbitrary ASCII characters. (yzprofile)
 
     *) Feature: added a new directive "image_filter_crop_offset". (lax)
 
     *) Change: merged changes between nginx-1.4.4 and nginx-1.4.6. (chobits, cfsego)
 
-    *) Bugfix: upstream health check will not fail on error when using
+    *) Bugfix: upstream health check module failed occasionally when using
        keep-alive connections. (lilbedwin)
 
     *) Bugfix: nginx crashed when upstream rejected nginx WebSocket connection.
