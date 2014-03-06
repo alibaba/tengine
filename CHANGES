@@ -1,4 +1,15 @@
 
+Changes with nginx 1.4.6                                         04 Mar 2014
+
+    *) Bugfix: the "client_max_body_size" directive might not work when
+       reading a request body using chunked transfer encoding; the bug had
+       appeared in 1.3.9.
+       Thanks to Lucas Molas.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       proxying WebSocket connections.
+
+
 Changes with nginx 1.4.5                                         11 Feb 2014
 
     *) Bugfix: the $ssl_session_id variable contained full session
