@@ -1,14 +1,15 @@
-Tengine 2.0.1 [2014-02-28]
+Tengine 2.0.1 [2014-03-06]
 * Feature: 请求体不缓存的机制支持chunked输入 [yaoweibin]
 * Feature: trim模块支持更多规则，支持根据变量启用 [taoyuanyuan]
 * Feature: 利用/etc/resolv.conf自动配置resolver [lifeibo, yaoweibin]
 * Feature: 增加$ascii_变量前缀，可以生成任意ASCII字符 [yzprofile]
 * Feature: 增加"image_filter_crop_offset"指令 [lax]
-* Change: 合并nginx-1.4.5版本的修改 [chobits]
+* Change: 合并截至nginx-1.4.6版本的所有修改 [chobits, cfsego]
 * Bugfix: 修正使用长连接进行健康检查时报错的问题 [lilbedwin]
 * Bugfix: 修正使用WebSocket时nginx崩溃的问题
           http://trac.nginx.org/nginx/ticket/503 [Hao Chen]
 * Bugfix: 减少nginx处理大文件时的内存消耗 [cfsego]
+* Bugfix: 在未设置URI时，禁用跳转到named locations的重定向
 
 Tengine 2.0.0 [2014-01-08]
 * Feature: 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
