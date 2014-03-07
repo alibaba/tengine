@@ -48,35 +48,7 @@ ngx_http_lua_set_by_chunk(lua_State *L, ngx_http_request_t *r, ngx_str_t *val,
     ngx_pool_t      *old_pool;
 #endif
 
-    ngx_http_lua_ctx_t          *ctx;
-    ngx_http_cleanup_t          *cln;
-
     dd("nargs: %d", (int) nargs);
-
-    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
-
-    if (ctx == NULL) {
-        ctx = ngx_http_lua_create_ctx(r);
-        if (ctx == NULL) {
-            return NGX_ERROR;
-        }
-
-    } else {
-        ngx_http_lua_reset_ctx(r, L, ctx);
-    }
-
-    if (ctx->cleanup == NULL) {
-        cln = ngx_http_cleanup_add(r, 0);
-        if (cln == NULL) {
-            return NGX_ERROR;
-        }
-
-        cln->handler = ngx_http_lua_request_cleanup;
-        cln->data = r;
-        ctx->cleanup = &cln->handler;
-    }
-
-    ctx->context = NGX_HTTP_LUA_CONTEXT_SET;
 
     dd("set Lua VM panic handler");
 
@@ -207,9 +179,7 @@ ngx_http_lua_set_by_lua_env(lua_State *L, ngx_http_request_t *r, size_t nargs,
     ngx_http_variable_value_t *args)
 {
     /*  set nginx request pointer to current lua thread's globals table */
-    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
-    lua_pushlightuserdata(L, r);
-    lua_rawset(L, LUA_GLOBALSINDEX);
+    ngx_http_lua_set_req(L, r);
 
     lua_pushlightuserdata(L, &ngx_http_lua_setby_nargs_key);
     lua_pushinteger(L, nargs);

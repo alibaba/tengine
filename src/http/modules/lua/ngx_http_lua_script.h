@@ -53,7 +53,7 @@ typedef struct {
 
     unsigned                    skip:1;
 
-    ngx_http_request_t         *request;
+    ngx_log_t                  *log;
 } ngx_http_lua_script_engine_t;
 
 

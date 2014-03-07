@@ -17,9 +17,6 @@ static int ngx_http_lua_report(ngx_log_t *log, lua_State *L, int status);
 static int ngx_http_lua_do_call(ngx_log_t *log, lua_State *L);
 
 
-char ngx_http_lua_cf_log_key;
-
-
 int
 ngx_http_lua_init_by_inline(ngx_log_t *log, ngx_http_lua_main_conf_t *lmcf,
     lua_State *L)
@@ -83,5 +80,6 @@ ngx_http_lua_do_call(ngx_log_t *log, lua_State *L)
 
     return status;
 }
+
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

@@ -19,8 +19,6 @@
 
 
 static void ngx_http_lua_content_phase_post_read(ngx_http_request_t *r);
-static ngx_int_t ngx_http_lua_content_run_posted_threads(lua_State *L,
-    ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx, int n);
 
 
 ngx_int_t
@@ -69,10 +67,7 @@ ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
     lua_setfenv(co, -2);
 
     /*  save nginx request in coroutine globals table */
-    lua_pushlightuserdata(co, &ngx_http_lua_request_key);
-    lua_pushlightuserdata(co, r);
-    lua_rawset(co, LUA_GLOBALSINDEX);
-    /*  }}} */
+    ngx_http_lua_set_req(co, r);
 
     ctx->cur_co_ctx = &ctx->entry_co_ctx;
     ctx->cur_co_ctx->co = co;
@@ -85,8 +80,8 @@ ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        cln->handler = ngx_http_lua_request_cleanup;
-        cln->data = r;
+        cln->handler = ngx_http_lua_request_cleanup_handler;
+        cln->data = ctx;
         ctx->cleanup = &cln->handler;
     }
     /*  }}} */
@@ -220,7 +215,7 @@ ngx_http_lua_content_phase_post_read(ngx_http_request_t *r)
 
     if (ctx->waiting_more_body) {
         ctx->waiting_more_body = 0;
-        ngx_http_finalize_request(r, ngx_http_lua_content_handler(r));
+        ngx_http_lua_finalize_request(r, ngx_http_lua_content_handler(r));
 
     } else {
         r->main->count--;
@@ -234,9 +229,7 @@ ngx_http_lua_content_handler_file(ngx_http_request_t *r)
     lua_State                       *L;
     ngx_int_t                        rc;
     u_char                          *script_path;
-    ngx_http_lua_main_conf_t        *lmcf;
     ngx_http_lua_loc_conf_t         *llcf;
-    char                            *err;
     ngx_str_t                        eval_src;
 
     llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
@@ -252,21 +245,11 @@ ngx_http_lua_content_handler_file(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
-    L = lmcf->lua;
+    L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua script file (w/ cache)        sp = 1 */
-    rc = ngx_http_lua_cache_loadfile(L, script_path, llcf->content_src_key,
-                                     &err, llcf->enable_code_cache ? 1 : 0);
-
+    rc = ngx_http_lua_cache_loadfile(L, script_path, llcf->content_src_key);
     if (rc != NGX_OK) {
-        if (err == NULL) {
-            err = "unknown error";
-        }
-
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "failed to load Lua inlined code: %s", err);
-
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -282,30 +265,18 @@ ngx_http_lua_content_handler_inline(ngx_http_request_t *r)
 {
     lua_State                   *L;
     ngx_int_t                    rc;
-    ngx_http_lua_main_conf_t    *lmcf;
     ngx_http_lua_loc_conf_t     *llcf;
-    char                        *err;
 
     llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
-    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
 
-    L = lmcf->lua;
+    L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua inline script (w/ cache) sp = 1 */
     rc = ngx_http_lua_cache_loadbuffer(L, llcf->content_src.value.data,
                                        llcf->content_src.value.len,
                                        llcf->content_src_key,
-                                       "content_by_lua", &err,
-                                       llcf->enable_code_cache ? 1 : 0);
-
+                                       "content_by_lua");
     if (rc != NGX_OK) {
-        if (err == NULL) {
-            err = "unknown error";
-        }
-
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "failed to load Lua inlined code: %s", err);
-
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -313,12 +284,14 @@ ngx_http_lua_content_handler_inline(ngx_http_request_t *r)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_http_lua_content_run_posted_threads(lua_State *L, ngx_http_request_t *r,
     ngx_http_lua_ctx_t *ctx, int n)
 {
     ngx_int_t                        rc;
     ngx_http_lua_posted_thread_t    *pt;
+
+    dd("run posted threads: %p", ctx->posted_threads);
 
     for ( ;; ) {
         pt = ctx->posted_threads;
@@ -330,6 +303,8 @@ ngx_http_lua_content_run_posted_threads(lua_State *L, ngx_http_request_t *r,
 
         ngx_http_lua_probe_run_posted_thread(r, pt->co_ctx->co,
                                              (int) pt->co_ctx->co_status);
+
+        dd("posted thread status: %d", pt->co_ctx->co_status);
 
         if (pt->co_ctx->co_status != NGX_HTTP_LUA_CO_RUNNING) {
             continue;
@@ -350,7 +325,7 @@ ngx_http_lua_content_run_posted_threads(lua_State *L, ngx_http_request_t *r,
 
         if (rc == NGX_OK) {
             while (n > 0) {
-                ngx_http_finalize_request(r, NGX_DONE);
+                ngx_http_lua_finalize_request(r, NGX_DONE);
                 n--;
             }
 
@@ -375,7 +350,7 @@ done:
     /* n > 1 */
 
     do {
-        ngx_http_finalize_request(r, NGX_DONE);
+        ngx_http_lua_finalize_request(r, NGX_DONE);
     } while (--n > 1);
 
     return NGX_DONE;

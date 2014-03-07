@@ -17,6 +17,10 @@
 
 /* Public API for other Nginx modules */
 
+
+#define ngx_http_lua_version  9004
+
+
 typedef struct {
     uint8_t         type;
 

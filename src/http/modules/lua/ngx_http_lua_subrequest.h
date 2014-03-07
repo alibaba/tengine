@@ -23,6 +23,15 @@ extern ngx_str_t  ngx_http_lua_post_method;
 extern ngx_str_t  ngx_http_lua_head_method;
 extern ngx_str_t  ngx_http_lua_delete_method;
 extern ngx_str_t  ngx_http_lua_options_method;
+extern ngx_str_t  ngx_http_lua_copy_method;
+extern ngx_str_t  ngx_http_lua_move_method;
+extern ngx_str_t  ngx_http_lua_lock_method;
+extern ngx_str_t  ngx_http_lua_mkcol_method;
+extern ngx_str_t  ngx_http_lua_propfind_method;
+extern ngx_str_t  ngx_http_lua_proppatch_method;
+extern ngx_str_t  ngx_http_lua_unlock_method;
+extern ngx_str_t  ngx_http_lua_patch_method;
+extern ngx_str_t  ngx_http_lua_trace_method;
 
 
 typedef struct ngx_http_lua_post_subrequest_data_s {
