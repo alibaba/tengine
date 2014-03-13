@@ -49,6 +49,16 @@ typedef struct {
 } ngx_http_reqstat_ctx_t;
 
 
+typedef struct {
+    ngx_uint_t                   recv;
+    ngx_uint_t                   sent;
+} ngx_http_reqstat_store_t;
+
+
+static ngx_http_input_body_filter_pt  ngx_http_next_input_body_filter;
+static ngx_http_output_body_filter_pt ngx_http_next_output_body_filter;
+
+
 #define NGX_HTTP_REQSTAT_BYTES_IN                                       \
     offsetof(ngx_http_reqstat_rbnode_t, bytes_in)
 
@@ -133,6 +143,10 @@ static ngx_http_reqstat_rbnode_t *
 static void ngx_http_reqstat_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
 
+static ngx_int_t ngx_http_reqstat_input_body_filter(ngx_http_request_t *r,
+    ngx_buf_t *buf);
+static ngx_int_t ngx_http_reqstat_output_body_filter(ngx_http_request_t *r,
+    ngx_chain_t *in);
 
 static ngx_command_t   ngx_http_reqstat_commands[] = {
 
@@ -244,6 +258,12 @@ ngx_http_reqstat_init(ngx_conf_t *cf)
     }
 
     *h = ngx_http_reqstat_log_handler;
+
+    ngx_http_next_input_body_filter = ngx_http_top_input_body_filter;
+    ngx_http_top_input_body_filter = ngx_http_reqstat_input_body_filter;
+
+    ngx_http_next_output_body_filter = ngx_http_top_body_filter;
+    ngx_http_top_body_filter = ngx_http_reqstat_output_body_filter;
 
     return NGX_OK;
 }
@@ -443,6 +463,9 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
     ngx_http_reqstat_conf_t      *slcf;
     ngx_http_reqstat_rbnode_t    *fnode;
     ngx_http_upstream_state_t    *state;
+    ngx_http_reqstat_store_t     *store;
+
+    store = ngx_http_get_module_ctx(r, ngx_http_reqstat_module);
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
 
@@ -478,9 +501,11 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_REQ_TOTAL, 1);
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN,
-                                   r->connection->received);
+                                   r->connection->received
+                                        - (store ? store->recv : 0));
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT,
-                                   r->connection->sent);
+                                   r->connection->sent
+                                        - (store ? store->sent : 0));
 
             if (r->err_status) {
                 status = r->err_status;
@@ -817,4 +842,122 @@ ngx_http_reqstat_rbtree_insert_value(ngx_rbtree_node_t *temp,
     node->left = sentinel;
     node->right = sentinel;
     ngx_rbt_red(node);
+}
+
+
+static ngx_int_t
+ngx_http_reqstat_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
+{
+    ngx_str_t                     val;
+    ngx_uint_t                    i, diff;
+    ngx_shm_zone_t              **shm_zone, *z;
+    ngx_http_reqstat_ctx_t       *ctx;
+    ngx_http_reqstat_conf_t      *slcf;
+    ngx_http_reqstat_store_t     *store;
+    ngx_http_reqstat_rbnode_t    *fnode;
+
+    store = ngx_http_get_module_ctx(r, ngx_http_reqstat_module);
+    if (store == NULL) {
+        store = ngx_pcalloc(r->pool, sizeof(ngx_http_reqstat_store_t));
+        if (store == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_http_set_ctx(r, store, ngx_http_reqstat_module);
+    }
+
+    slcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
+
+    if (slcf->monitor == NULL) {
+        return ngx_http_next_input_body_filter(r, buf);
+    }
+
+    shm_zone = slcf->monitor->elts;
+    diff = r->connection->received - store->recv;
+    store->recv = r->connection->received;
+
+    for (i = 0; i < slcf->monitor->nelts; i++) {
+
+        z = shm_zone[i];
+        ctx = z->data;
+
+        if (ngx_http_complex_value(r, &ctx->value, &val) != NGX_OK) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "failed to reap the key \"%V\"", ctx->val);
+            continue;
+        }
+
+        fnode = ngx_http_reqstat_rbtree_lookup(shm_zone[i], &val);
+
+        if (fnode == NULL) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "failed to alloc node in zone \"%V\", "
+                          "enlarge it please",
+                          &z->shm.name);
+
+        } else {
+            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN, diff);
+        }
+    }
+
+    return ngx_http_next_input_body_filter(r, buf);
+}
+
+
+static ngx_int_t
+ngx_http_reqstat_output_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
+{ 
+    ngx_str_t                     val;
+    ngx_uint_t                    i, diff;
+    ngx_shm_zone_t              **shm_zone, *z;
+    ngx_http_reqstat_ctx_t       *ctx;
+    ngx_http_reqstat_conf_t      *slcf;
+    ngx_http_reqstat_store_t     *store;
+    ngx_http_reqstat_rbnode_t    *fnode;
+
+    store = ngx_http_get_module_ctx(r, ngx_http_reqstat_module);
+    if (store == NULL) {
+        store = ngx_pcalloc(r->pool, sizeof(ngx_http_reqstat_store_t));
+        if (store == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_http_set_ctx(r, store, ngx_http_reqstat_module);
+    }
+
+    slcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
+
+    if (slcf->monitor == NULL) {
+        return ngx_http_next_output_body_filter(r, in);
+    }
+
+    shm_zone = slcf->monitor->elts;
+    diff = r->connection->sent - store->sent;
+    store->sent = r->connection->sent;
+
+    for (i = 0; i < slcf->monitor->nelts; i++) {
+
+        z = shm_zone[i];
+        ctx = z->data;
+
+        if (ngx_http_complex_value(r, &ctx->value, &val) != NGX_OK) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "failed to reap the key \"%V\"", ctx->val);
+            continue;
+        }
+
+        fnode = ngx_http_reqstat_rbtree_lookup(shm_zone[i], &val);
+
+        if (fnode == NULL) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "failed to alloc node in zone \"%V\", "
+                          "enlarge it please",
+                          &z->shm.name);
+
+        } else {
+            ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT, diff);
+        }
+    }
+
+    return ngx_http_next_output_body_filter(r, in);
 }
