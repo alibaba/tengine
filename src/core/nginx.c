@@ -9,6 +9,10 @@
 #include <ngx_core.h>
 #include <nginx.h>
 
+#ifdef NGX_UNIT_TEST
+#include <ngx_test.h>
+#endif
+
 
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
@@ -191,6 +195,11 @@ ngx_uint_t          ngx_dump_config;
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
+
+#ifdef NGX_UNIT_TEST
+static ngx_uint_t   ngx_unit_test;
+#endif
+
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -250,6 +259,7 @@ main(int argc, char *const *argv)
                                    NGX_CONF_PATH ")" NGX_LINEFEED
                 "  -g directives : set global directives out of configuration "
                                    "file" NGX_LINEFEED NGX_LINEFEED
+                "  -u unit_test  : run unit testes"
                 );
         }
 
@@ -383,13 +393,20 @@ main(int argc, char *const *argv)
         return 1;
     }
 
-    if (!ngx_inherited && ccf->daemon) {
-        if (ngx_daemon(cycle->log) != NGX_OK) {
-            return 1;
+#ifdef NGX_UNIT_TEST
+    if (!ngx_unit_test) {
+#endif
+        if (!ngx_inherited && ccf->daemon) {
+            if (ngx_daemon(cycle->log) != NGX_OK) {
+                return 1;
+            }
+
+            ngx_daemonized = 1;
         }
 
-        ngx_daemonized = 1;
+#ifdef NGX_UNIT_TEST
     }
+#endif
 
     if (ngx_inherited) {
         ngx_daemonized = 1;
@@ -405,6 +422,20 @@ main(int argc, char *const *argv)
     if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
         return 1;
     }
+
+#if !(NGX_WIN32)
+#ifdef NGX_UNIT_TEST
+
+    if (ngx_unit_test) {
+        if (ngx_test_run_cases() != NGX_OK) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                          "run unit test case failed");
+        }
+        return 0;
+    }
+
+#endif
+#endif
 
     if (cycle->log->file->fd != ngx_stderr) {
 
@@ -815,6 +846,14 @@ ngx_get_options(int argc, char *const *argv)
 
                 ngx_log_stderr(0, "invalid option: \"-s %s\"", ngx_signal);
                 return NGX_ERROR;
+
+#ifdef NGX_UNIT_TEST
+
+            case 'u':
+                ngx_unit_test = 1;
+                break;
+
+#endif
 
             default:
                 ngx_log_stderr(0, "invalid option: \"%c\"", *(p - 1));

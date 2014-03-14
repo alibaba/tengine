@@ -27,6 +27,10 @@ mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
          $NGX_OBJS/src/proc \
          $NGX_OBJS/modules
 
+if [ $NGX_UNIT_TEST = YES ]; then
+    mkdir -p $NGX_OBJS/src/test
+fi
+
 
 ngx_objs_dir=$NGX_OBJS$ngx_regex_dirsep
 ngx_use_pch=`echo $NGX_USE_PCH | sed -e "s/\//$ngx_regex_dirsep/g"`

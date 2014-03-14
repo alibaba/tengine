@@ -83,6 +83,13 @@ else
 fi
 
 
+if [ $NGX_UNIT_TEST = YES ]; then
+    CORE_INCS="$CORE_INCS $TEST_INCS"
+    CORE_SRCS="$CORE_SRCS $TEST_SRCS"
+    CORE_DEPS="$CORE_DEPS $TEST_DEPS"
+fi
+
+
 if [ $HTTP != YES ]; then
     have=NGX_CRYPT . auto/nohave
     CRYPT_LIB=

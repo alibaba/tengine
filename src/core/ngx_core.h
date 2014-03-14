@@ -89,6 +89,10 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_proc.h>
 #endif
 
+#ifdef NGX_UNIT_TEST
+#include <ngx_test.h>
+#endif
+
 #define LF     (u_char) 10
 #define CR     (u_char) 13
 #define CRLF   "\x0d\x0a"
