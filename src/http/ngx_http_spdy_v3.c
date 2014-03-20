@@ -1045,7 +1045,7 @@ ngx_http_spdy_state_headers(ngx_http_spdy_connection_t *sc, u_char *pos,
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "spdy headers count: %ui", sc->headers);
 
-        if (ngx_list_init(&r->headers_in.headers, r->pool, sc->headers + 3,
+        if (ngx_list_init(&r->headers_in.headers, r->pool, 20,
                           sizeof(ngx_table_elt_t))
             != NGX_OK)
         {
@@ -1775,7 +1775,7 @@ static u_char *
 ngx_http_spdy_state_save(ngx_http_spdy_connection_t *sc,
     u_char *pos, u_char *end, ngx_http_spdy_handler_pt handler)
 {
-#if (NGX_DEBUG)
+#if 1
     if (end - pos > NGX_SPDY_STATE_BUFFER_SIZE) {
         ngx_log_error(NGX_LOG_ALERT, sc->connection->log, 0,
                       "spdy state buffer overflow: "
