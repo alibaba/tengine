@@ -1,3 +1,7 @@
+Tengine 2.0.2 [2014-03-28]
+* Bugfix: 在读事件处理完后继续发送SPDY数据 [chobits]
+* Bugfix: CVE-2014-0133以及CVE-2014-0088 [chobits]
+
 Tengine 2.0.1 [2014-03-06]
 * Feature: 请求体不缓存的机制支持chunked输入 [yaoweibin]
 * Feature: trim模块支持更多规则，支持根据变量启用 [taoyuanyuan]
