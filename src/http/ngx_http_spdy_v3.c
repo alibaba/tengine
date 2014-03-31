@@ -2727,6 +2727,10 @@ ngx_http_spdy_parse_version(ngx_http_request_t *r)
 
         ch = *p;
 
+        if (ch == '.') {
+            break;
+        }
+
         if (ch < '0' || ch > '9') {
             return NGX_HTTP_PARSE_INVALID_REQUEST;
         }
