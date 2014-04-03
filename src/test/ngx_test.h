@@ -25,7 +25,7 @@
 
 
 #define NGX_EXPECT_EQ(a, b)                                                   \
-    if (!((ngx_int_t) (a) == (ngx_int_t) (b))) {                              \
+    if (!((a) == (b))) {                                                      \
         ngx_log_stderr(0, " ERROR at %s:%d, NGX_EXPECT_EQ("#a","#b")(a=%d,b=%d)",\
                __FILE__, __LINE__, (ngx_int_t) (a), (ngx_int_t) (b));         \
         ngx_test_res = NGX_ERROR;                                             \
@@ -33,7 +33,7 @@
 
 
 #define NGX_EXPECT_NE(a, b)                                                   \
-    if ((ngx_int_t) (a) == (ngx_int_t) (b)) {                                 \
+    if ((a) == (b)) {                                                         \
         ngx_log_stderr(0, " ERROR at %s:%d, NGX_EXPECT_NE("#a","#b")(a=%d,b=%d)", \
                 __FILE__, __LINE__, (ngx_int_t) (a), (ngx_int_t) (b));        \
         ngx_test_res = NGX_ERROR;                                             \
