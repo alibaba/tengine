@@ -122,7 +122,7 @@ static ngx_http_output_header_filter_pt ngx_http_ss_next_header_filter;
 static ngx_command_t ngx_http_session_sticky_commands[] = {
 
     { ngx_string("session_sticky"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_ANY|NGX_CONF_1MORE,
+      NGX_HTTP_UPS_CONF|NGX_CONF_ANY,
       ngx_http_upstream_session_sticky,
       NGX_HTTP_SRV_CONF_OFFSET,
       0,
