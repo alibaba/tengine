@@ -170,23 +170,26 @@ END
         cat << END                                            >> $NGX_DSO_MAKEFILE
 
 $ngx_obj:	\$(ADDON_DEPS)$ngx_cont$ngx_src
-	$ngx_cc\$(ALL_INCS)$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+	$ngx_cc$ngx_tab\$(ALL_INCS)$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
 
 END
 
      done
 
     make -f $NGX_DSO_MAKEFILE
-    if test -n "$NGX_DSO_PREFIX"; then
-        test ! -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
-            || unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
-        echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_PREFIX
-        cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
-    else
-        test ! -f $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext} \
-            || unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
-        echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
-        cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
+
+    if [ '$?' = '0' ]; then
+	if test -n "$NGX_DSO_PREFIX"; then
+            test ! -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
+		|| unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
+            echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_PREFIX
+            cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
+	else
+            test ! -f $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext} \
+		|| unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
+            echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
+            cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
+	fi
     fi
 }
 
@@ -313,4 +316,3 @@ else
     echo "please specify the module path"
     exit 1
 fi
-
