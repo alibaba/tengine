@@ -165,6 +165,13 @@ static ngx_command_t   ngx_http_reqstat_commands[] = {
       0,
       NULL },
 
+    { ngx_string("req_status_bypass"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
+      ngx_http_set_predicate_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_reqstat_conf_t, bypass),
+      NULL },
+
     { ngx_string("req_status_show"),
       NGX_HTTP_LOC_CONF|NGX_CONF_ANY,
       ngx_http_reqstat_show,
@@ -224,6 +231,7 @@ ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    conf->bypass = NGX_CONF_UNSET_PTR;
     conf->monitor = NGX_CONF_UNSET_PTR;
     conf->display = NGX_CONF_UNSET_PTR;
 
@@ -238,6 +246,7 @@ ngx_http_reqstat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_reqstat_conf_t      *conf = child;
     ngx_http_reqstat_conf_t      *prev = parent;
 
+    ngx_conf_merge_ptr_value(conf->bypass, prev->bypass, NULL);
     ngx_conf_merge_ptr_value(conf->monitor, prev->monitor, NULL);
     ngx_conf_merge_ptr_value(conf->display, prev->display, NULL);
 
@@ -340,7 +349,7 @@ ngx_http_reqstat_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                            "zone \"%V\" is too small", &value[1]);
         return NGX_CONF_ERROR;
     }
-    
+
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_reqstat_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
@@ -472,6 +481,18 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 
     if (slcf->monitor == NULL) {
         return NGX_OK;
+    }
+
+    switch (ngx_http_test_predicates(r, slcf->bypass)) {
+
+    case NGX_ERROR:
+        return NGX_ERROR;
+
+    case NGX_DECLINED:
+        return NGX_OK;
+
+    default: /* NGX_OK */
+        break;
     }
 
     shm_zone = slcf->monitor->elts;
@@ -788,7 +809,7 @@ ngx_http_reqstat_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     }
 
     ctx->shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
-    
+
     ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_reqstat_shctx_t));
     if (ctx->sh == NULL) {
         return NGX_ERROR;
@@ -907,7 +928,7 @@ ngx_http_reqstat_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
 
 static ngx_int_t
 ngx_http_reqstat_output_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
-{ 
+{
     ngx_str_t                     val;
     ngx_uint_t                    i, diff;
     ngx_shm_zone_t              **shm_zone, *z;
