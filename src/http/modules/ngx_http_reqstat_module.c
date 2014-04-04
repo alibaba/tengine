@@ -9,7 +9,8 @@ typedef struct ngx_http_reqstat_rbnode_s ngx_http_reqstat_rbnode_t;
 
 struct ngx_http_reqstat_rbnode_s {
     u_char                       color;
-    unsigned                     len:16;
+    u_char                       padding[3];
+    unsigned                     len;
     ngx_queue_t                  queue;
     ngx_atomic_t                 bytes_in;
     ngx_atomic_t                 bytes_out;
