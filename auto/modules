@@ -690,6 +690,10 @@ if [ $HTTP_STUB_STATUS = YES ]; then
     HTTP_SRCS="$HTTP_SRCS src/http/modules/ngx_http_stub_status_module.c"
 fi
 
+if [ $HTTP_UPSTREAM_RBTREE = YES ]; then
+    have=NGX_HTTP_UPSTREAM_RBTREE . auto/have
+fi
+
 #if [ -r $NGX_OBJS/auto ]; then
 #    . $NGX_OBJS/auto
 #fi
