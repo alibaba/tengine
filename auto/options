@@ -392,7 +392,7 @@ do
 
         --dso-path=*)                              NGX_DSO_PATH="$value"      ;;
         --dso-tool-path=*)                         NGX_DSO_TOOL_PATH="$value" ;;
-	--dso-max-modules=*)                       NGX_DSO_MAX=$value         ;;
+        --dso-max-modules=*)                       NGX_DSO_MAX=$value         ;;
         --includedir=*)                            NGX_INCLUDE_PATH="$value"  ;;
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
