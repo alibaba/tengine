@@ -64,6 +64,11 @@ static char *ngx_http_uwsgi_pass(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_uwsgi_store(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+static ngx_int_t ngx_http_uwsgi_output_filter_init(
+    ngx_http_upstream_output_filter_ctx_t *ctx);
+static ngx_int_t ngx_http_uwsgi_output_filter(
+    ngx_http_upstream_output_filter_ctx_t *ctx, ngx_chain_t *in);
+
 #if (NGX_HTTP_CACHE)
 static ngx_int_t ngx_http_uwsgi_create_key(ngx_http_request_t *r);
 static char *ngx_http_uwsgi_cache(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -337,6 +342,13 @@ static ngx_command_t ngx_http_uwsgi_commands[] = {
       offsetof(ngx_http_uwsgi_loc_conf_t, upstream.max_temp_file_size_conf),
       NULL },
 
+    { ngx_string("uwsgi_request_buffering"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_uwsgi_loc_conf_t, upstream.request_buffering),
+      NULL },
+
     { ngx_string("uwsgi_temp_file_write_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -541,6 +553,16 @@ ngx_http_uwsgi_handler(ngx_http_request_t *r)
     u->abort_request = ngx_http_uwsgi_abort_request;
     u->finalize_request = ngx_http_uwsgi_finalize_request;
     r->state = 0;
+
+    r->request_buffering = uwcf->upstream.request_buffering;
+    if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
+        r->request_buffering = 1;
+    }
+   
+    if (!r->request_buffering) {
+        u->output_filter_init = ngx_http_uwsgi_output_filter_init;
+        u->output_filter = ngx_http_uwsgi_output_filter;
+    }
 
     u->buffering = uwcf->upstream.buffering;
 
@@ -996,6 +1018,55 @@ ngx_http_uwsgi_reinit_request(ngx_http_request_t *r)
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_http_uwsgi_output_filter_init(ngx_http_upstream_output_filter_ctx_t *ctx)
+{
+    ngx_http_request_t  *r = ctx->request;
+
+    r->upstream->request_bufs = NULL;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_uwsgi_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
+    ngx_chain_t *in)
+{
+    ngx_chain_t         *cl, *out;
+    ngx_http_request_t  *r = ctx->request;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http uwsgi output filter");
+
+    if (in == NULL || !r->headers_in.chunked) {
+        out = in;
+        goto filter_done;
+    }
+
+    if (ngx_http_chunked_output_filter(r, in, &ctx->out,
+                                       &ctx->free, ctx->tag) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    out = ctx->out;
+
+filter_done:
+    if (r->upstream->request_bufs == NULL) {
+        r->upstream->request_bufs = out;
+    } else {
+        cl = r->upstream->request_bufs;
+
+        while (cl->next) {
+            cl = cl->next;
+        }
+
+        cl->next = out;
+    }
+
+    return NGX_OK;
+}
+
 
 static ngx_int_t
 ngx_http_uwsgi_process_status_line(ngx_http_request_t *r)
@@ -1216,6 +1287,7 @@ ngx_http_uwsgi_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.store = NGX_CONF_UNSET;
     conf->upstream.store_access = NGX_CONF_UNSET_UINT;
+    conf->upstream.request_buffering = NGX_CONF_UNSET;
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
 
@@ -1290,6 +1362,9 @@ ngx_http_uwsgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->upstream.store_access,
                               prev->upstream.store_access, 0600);
+
+    ngx_conf_merge_value(conf->upstream.request_buffering,
+                         prev->upstream.request_buffering, 1);
 
     ngx_conf_merge_value(conf->upstream.buffering,
                               prev->upstream.buffering, 1);
