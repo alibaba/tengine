@@ -117,6 +117,15 @@ ngx_dso_create_conf(ngx_cycle_t *cycle)
         return NULL;
     }
 
+    if (NGX_DSO_MAX < ngx_max_module) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log,
+                      0, "please set max dso module"
+                      "(use configure with --dso-max-modules),"
+                      "current is %ud, expect %ud",
+                      NGX_DSO_MAX, ngx_max_module + 1);
+        return NULL;
+    }
+
     if (ngx_is_init_cycle(cycle->old_cycle)) {
         ngx_memcpy(ngx_static_modules, ngx_modules,
                    sizeof(ngx_module_t *) * ngx_max_module);
