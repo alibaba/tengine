@@ -93,6 +93,127 @@ static in_addr_t *ngx_resolver_rotate(ngx_resolver_t *r, in_addr_t *src,
 static u_char *ngx_resolver_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 
+static ngx_int_t
+ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
+    ngx_str_t **names, ngx_uint_t *num)
+{
+    off_t           file_size;
+    u_char         *buf, *p, *end, *line, *line_end;
+    ssize_t         n;
+    ngx_str_t      *address;
+    ngx_array_t     addrs;
+
+    if (ngx_array_init(&addrs, cf->pool, 2, sizeof(ngx_str_t)) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_fd_info(file->fd, &file->info) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                      ngx_fd_info_n " \"%s\" failed", file->name.data);
+    }
+
+    file_size = ngx_file_size(&file->info);
+
+    buf = ngx_pnalloc(cf->pool, file_size + 1);
+    if (buf == NULL) {
+        return NGX_ERROR;
+    }
+
+    n = ngx_read_file(file, buf, file_size, 0);
+    if (n == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    if (n != file_size) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           ngx_read_file_n " returned "
+                           "only %z bytes instead of %z",
+                           n, file_size);
+        return NGX_ERROR;
+    }
+
+    p = buf;
+    end = buf + file_size;
+    line = p;
+
+    for (/* void */; p < end; p++) {
+        if (*p == CR || *p == LF || p == (end - 1)) {
+
+            while (*line == ' ' || *line == '\t') {
+                line++;
+            }
+
+            if (ngx_strncmp(line, "nameserver", sizeof("nameserver") - 1)
+                == 0)
+            {
+                line += sizeof("nameserver") - 1;
+
+                while (*line == ' ' || *line == '\t') {
+                    line++;
+                }
+
+                line_end = p;
+
+                while (*line_end == ' ' || *line_end == '\t'
+                       || *line_end == CR || *line_end == LF)
+                {
+                    line_end--;
+                }
+                /* put a null character for string parse */
+                *++line_end = '\0';
+
+                address = ngx_array_push(&addrs);
+                if (address == NULL) {
+                    return NGX_ERROR;
+                }
+
+                address->data = line;
+                address->len = line_end - line;
+            }
+
+            line = p + 1;
+        }
+    }
+
+    *names = addrs.elts;
+    *num = addrs.nelts;
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_resolver_read_resolv_file(ngx_conf_t *cf, ngx_str_t *filename, ngx_str_t **names, ngx_uint_t *n)
+{
+    ngx_int_t       rc;
+    ngx_file_t      file;
+
+    ngx_memzero(&file, sizeof(ngx_file_t));
+
+    file.name.data = filename->data;
+    file.name.len = sizeof(NGX_RESOLVER_FILE) - 1;
+    file.log = cf->log;
+
+    file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
+                            NGX_FILE_OPEN, NGX_FILE_DEFAULT_ACCESS);
+
+    if (file.fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, cf->log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", file.name.data);
+        return NGX_ERROR;
+    }
+
+    rc = ngx_resolver_parse_resolv_address(cf, &file, names, n);
+
+    if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", file.name.data);
+    }
+
+    return rc;
+}
+
+
 ngx_resolver_t *
 ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 {
@@ -102,6 +223,10 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     ngx_resolver_t        *r;
     ngx_pool_cleanup_t    *cln;
     ngx_udp_connection_t  *uc;
+
+#ifdef NGX_RESOLVER_FILE
+    ngx_str_t default_file = ngx_string(NGX_RESOLVER_FILE);
+#endif
 
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
@@ -145,6 +270,14 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 
     r->log = &cf->cycle->new_log;
     r->log_level = NGX_LOG_ERR;
+
+#ifdef NGX_RESOLVER_FILE
+    if (names == NULL) {
+        if (ngx_resolver_read_resolv_file(cf, &default_file, &names, &n) != NGX_OK) {
+            return NULL;
+        }
+    }
+#endif
 
     if (n) {
         if (ngx_array_init(&r->udp_connections, cf->pool, n,

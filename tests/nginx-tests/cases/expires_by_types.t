@@ -20,7 +20,7 @@ use Time::Parse;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(72);
+my $t = Test::Nginx->new()->plan(77);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -111,6 +111,8 @@ $t->write_file('path1/test.rss', 'test for rss');
 $t->write_file('path1/test.js', 'test for js');
 $t->write_file('path1/test.gif', 'test for gif');
 $t->write_file('path1/test.jpg', 'test for jpg');
+$t->write_file('path1/test.txt', 'test for txt');
+$t->write_file('path1/test.txt2', 'test for txt2');
 
 $t->write_file('path2/test.html', 'test for html');
 $t->write_file('path2/test.jpg', 'test for jpg');
@@ -690,6 +692,68 @@ ok(checkexpire(http_get("/path1/test.html"), 3), "http server location");
 
 $t->stop();
 
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+master_process off;
+daemon         off;
+
+%%TEST_GLOBALS_DSO%%
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+    access_log    off;
+
+    types {
+        text/html                             html htm shtml;
+        text/css                              css;
+        text/xml                              xml;
+        text                                  txt;
+        text/                                 txt2;
+        image/gif                             gif;
+        image/jpeg                            jpeg jpg;
+        application/x-javascript              js;
+        application/rss+xml                   rss;
+    }
+
+    server {
+        listen       127.0.0.1:8080;
+        server_name  localhost;
+
+        expires_by_types 8s image/*;
+
+        location /path1 {
+            root %%TESTDIR%%;
+            expires 4s;
+            expires_by_types 3s text/*;
+            expires_by_types 5s text/html;
+        }
+
+        location /path2 {
+            root %%TESTDIR%%;
+        }
+ 
+    }
+}
+
+EOF
+
+$t->run();
+
+ok(checkexpire(http_get("/path1/test.html"), 5), "");
+ok(checkexpire(http_get("/path1/test.xml"), 3), "");
+ok(checkexpire(http_get("/path1/test.txt2"), 3), "");
+ok(checkexpire(http_get("/path1/test.txt"), 4), "");
+
+ok(checkexpire(http_get("/path2/test.jpg"), 8), "");
+
+$t->stop();
+
+ 
 sub checkexpire
 {
     my($c, $t) = @_;

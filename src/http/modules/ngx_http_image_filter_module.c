@@ -32,6 +32,11 @@
 #define NGX_HTTP_IMAGE_GIF       2
 #define NGX_HTTP_IMAGE_PNG       3
 
+#define NGX_HTTP_IMAGE_OFFSET_CENTER    0
+#define NGX_HTTP_IMAGE_OFFSET_LEFT      1
+#define NGX_HTTP_IMAGE_OFFSET_RIGHT     2
+#define NGX_HTTP_IMAGE_OFFSET_TOP       3
+#define NGX_HTTP_IMAGE_OFFSET_BOTTOM    4
 
 #define NGX_HTTP_IMAGE_BUFFERED  0x08
 
@@ -43,12 +48,16 @@ typedef struct {
     ngx_uint_t                   angle;
     ngx_uint_t                   jpeg_quality;
     ngx_uint_t                   sharpen;
+    ngx_uint_t                   offset_x;
+    ngx_uint_t                   offset_y;
 
     ngx_flag_t                   transparency;
     ngx_flag_t                   interlace;
 
     ngx_http_complex_value_t    *wcv;
     ngx_http_complex_value_t    *hcv;
+    ngx_http_complex_value_t    *oxcv;
+    ngx_http_complex_value_t    *oycv;
     ngx_http_complex_value_t    *acv;
     ngx_http_complex_value_t    *jqcv;
     ngx_http_complex_value_t    *shcv;
@@ -67,6 +76,8 @@ typedef struct {
     ngx_uint_t                   height;
     ngx_uint_t                   max_width;
     ngx_uint_t                   max_height;
+    ngx_uint_t                   offset_x;
+    ngx_uint_t                   offset_y;
     ngx_uint_t                   angle;
 
     ngx_uint_t                   phase;
@@ -111,6 +122,8 @@ static char *ngx_http_image_filter_jpeg_quality(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_image_filter_sharpen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_image_filter_offset(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static ngx_int_t ngx_http_image_filter_init(ngx_conf_t *cf);
 
 
@@ -144,7 +157,7 @@ static ngx_command_t  ngx_http_image_filter_commands[] = {
       offsetof(ngx_http_image_filter_conf_t, transparency),
       NULL },
 
-   { ngx_string("image_filter_interlace"),
+    { ngx_string("image_filter_interlace"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
@@ -156,6 +169,13 @@ static ngx_command_t  ngx_http_image_filter_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_image_filter_conf_t, buffer_size),
+      NULL },
+
+    { ngx_string("image_filter_crop_offset"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
+      ngx_http_image_filter_offset,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
       NULL },
 
       ngx_null_command
@@ -745,7 +765,8 @@ ngx_http_image_resize(ngx_http_request_t *r, ngx_http_image_filter_ctx_t *ctx)
 {
     int                            sx, sy, dx, dy, ox, oy, ax, ay, size,
                                    colors, palette, transparent, sharpen,
-                                   red, green, blue, t;
+                                   red, green, blue, t,
+                                   offset_x, offset_y;
     u_char                        *out;
     ngx_buf_t                     *b;
     ngx_uint_t                     resize;
@@ -940,8 +961,24 @@ transparent:
                 return NULL;
             }
 
-            ox /= 2;
-            oy /= 2;
+            offset_x = ngx_http_image_filter_get_value(r, conf->oxcv,
+                                                       conf->offset_x);
+            offset_y = ngx_http_image_filter_get_value(r, conf->oycv,
+                                                       conf->offset_y);
+
+            if (offset_x == NGX_HTTP_IMAGE_OFFSET_LEFT) {
+                ox = 0;
+
+            } else if (offset_x == NGX_HTTP_IMAGE_OFFSET_CENTER) {
+                ox /= 2;
+            }
+
+            if (offset_y == NGX_HTTP_IMAGE_OFFSET_TOP) {
+                oy = 0;
+
+            } else if (offset_y == NGX_HTTP_IMAGE_OFFSET_CENTER) {
+                oy /= 2;
+            }
 
             ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "image crop: %d x %d @ %d x %d",
@@ -1161,7 +1198,27 @@ ngx_http_image_filter_value(ngx_str_t *value)
 
     n = ngx_atoi(value->data, value->len);
 
-    if (n > 0) {
+    if (n == NGX_ERROR) {
+        if (value->len == sizeof("left") - 1
+            && ngx_strncmp(value->data, "left", value->len) == 0)
+        {
+            return NGX_HTTP_IMAGE_OFFSET_LEFT;
+        } else if (value->len == sizeof("right") - 1
+                   && ngx_strncmp(value->data, "right", sizeof("right") - 1) == 0)
+        {
+            return NGX_HTTP_IMAGE_OFFSET_RIGHT;
+        } else if (value->len == sizeof("top") - 1
+                   && ngx_strncmp(value->data, "top", sizeof("top") - 1) == 0)
+        {
+            return NGX_HTTP_IMAGE_OFFSET_TOP;
+        } else if (value->len == sizeof("bottom") - 1
+                   && ngx_strncmp(value->data, "bottom", sizeof("bottom") - 1) == 0)
+        {
+            return NGX_HTTP_IMAGE_OFFSET_BOTTOM;
+        } else {
+            return NGX_HTTP_IMAGE_OFFSET_CENTER;
+        }
+    } else if (n > 0) {
         return (ngx_uint_t) n;
     }
 
@@ -1195,9 +1252,12 @@ ngx_http_image_filter_create_conf(ngx_conf_t *cf)
     conf->filter = NGX_CONF_UNSET_UINT;
     conf->jpeg_quality = NGX_CONF_UNSET_UINT;
     conf->sharpen = NGX_CONF_UNSET_UINT;
+    conf->angle = NGX_CONF_UNSET_UINT;
     conf->transparency = NGX_CONF_UNSET;
     conf->interlace = NGX_CONF_UNSET;
     conf->buffer_size = NGX_CONF_UNSET_SIZE;
+    conf->offset_x = NGX_CONF_UNSET_UINT;
+    conf->offset_y = NGX_CONF_UNSET_UINT;
 
     return conf;
 }
@@ -1243,12 +1303,38 @@ ngx_http_image_filter_merge_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+    if (conf->angle == NGX_CONF_UNSET_UINT) {
+        ngx_conf_merge_uint_value(conf->angle, prev->angle, 0);
+
+        if (conf->acv == NULL) {
+            conf->acv = prev->acv;
+        }
+    }
+
     ngx_conf_merge_value(conf->transparency, prev->transparency, 1);
 
     ngx_conf_merge_value(conf->interlace, prev->interlace, 0);
 
     ngx_conf_merge_size_value(conf->buffer_size, prev->buffer_size,
                               1 * 1024 * 1024);
+
+    if (conf->offset_x == NGX_CONF_UNSET_UINT) {
+        ngx_conf_merge_uint_value(conf->offset_x, prev->offset_x,
+                                  NGX_HTTP_IMAGE_OFFSET_CENTER);
+
+        if (conf->oxcv == NULL) {
+            conf->oxcv = prev->oxcv;
+        }
+    }
+
+    if (conf->offset_y == NGX_CONF_UNSET_UINT) {
+        ngx_conf_merge_uint_value(conf->offset_y, prev->offset_y,
+                                  NGX_HTTP_IMAGE_OFFSET_CENTER);
+
+        if (conf->oycv == NULL) {
+            conf->oycv = prev->oycv;
+        }
+    }
 
     return NGX_CONF_OK;
 }
@@ -1500,6 +1586,64 @@ ngx_http_image_filter_sharpen(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
+static char *
+ngx_http_image_filter_offset(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
+{
+    ngx_http_image_filter_conf_t *imcf = conf;
+
+    ngx_str_t                         *value;
+    ngx_http_complex_value_t           cv;
+    ngx_http_compile_complex_value_t   ccv;
+
+    value = cf->args->elts;
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[1];
+    ccv.complex_value = &cv;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (cv.lengths == NULL) {
+        imcf->offset_x = ngx_http_image_filter_value(&value[1]);
+
+    } else {
+        imcf->oxcv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+        if (imcf->oxcv == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *imcf->oxcv = cv;
+    }
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[2];
+    ccv.complex_value = &cv;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (cv.lengths == NULL) {
+        imcf->offset_y = ngx_http_image_filter_value(&value[2]);
+
+    } else {
+        imcf->oycv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+        if (imcf->oycv == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *imcf->oycv = cv;
+    }
+
+    return NGX_CONF_OK;
+}
 
 static ngx_int_t
 ngx_http_image_filter_init(ngx_conf_t *cf)

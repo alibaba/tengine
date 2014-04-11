@@ -5,6 +5,7 @@
 
 
 #include <ngx_http_tfs_rc_server_info.h>
+#include <ngx_http_tfs.h>
 
 
 static void ngx_http_tfs_rcs_rbtree_insert_value(ngx_rbtree_node_t *temp,
@@ -12,7 +13,7 @@ static void ngx_http_tfs_rcs_rbtree_insert_value(ngx_rbtree_node_t *temp,
 
 
 ngx_http_tfs_rcs_info_t *
-ngx_http_tfs_rcs_lookup(ngx_http_request_t *r, ngx_http_tfs_rc_ctx_t *ctx,
+ngx_http_tfs_rcs_lookup(ngx_http_tfs_rc_ctx_t *ctx,
     ngx_str_t appkey)
 {
     ngx_int_t                 rc;
@@ -141,8 +142,8 @@ ngx_http_tfs_rc_server_destroy_node(ngx_http_tfs_rc_ctx_t *rc_ctx,
     ngx_slab_free_locked(rc_ctx->shpool, block_cache_info->data);
     ngx_str_null(&rc_info_node->remote_block_cache_info);
 
-    cluster_group_info = rc_info_node->unlink_clusters;
-    for (i = 0; i < rc_info_node->unlink_cluster_count; i++) {
+    cluster_group_info = rc_info_node->unlink_cluster_groups;
+    for (i = 0; i < rc_info_node->unlink_cluster_group_count; i++) {
         for (j = 0; j < cluster_group_info[i].info_count; j++) {
             group_info = &cluster_group_info[i].group_info[j];
             if (group_info->ns_vip_text.len <= 0
@@ -301,9 +302,9 @@ ngx_http_tfs_rcs_set_group_info_by_addr(ngx_http_tfs_rcs_info_t *rc_info,
     ngx_http_tfs_group_info_t          *group_info;
     ngx_http_tfs_cluster_group_info_t  *cluster_group_info;
 
-    cluster_group_info = rc_info->unlink_clusters;
+    cluster_group_info = rc_info->unlink_cluster_groups;
 
-    for (i = 0; i < rc_info->unlink_cluster_count; i++) {
+    for (i = 0; i < rc_info->unlink_cluster_group_count; i++) {
         group_info = cluster_group_info[i].group_info;
 
         for (j = 0; j < cluster_group_info[i].info_count; j++) {
@@ -327,7 +328,7 @@ ngx_http_tfs_dump_rc_info(ngx_http_tfs_rcs_info_t *rc_info, ngx_log_t *log)
     ngx_http_tfs_group_info_t          *group_info;
     ngx_http_tfs_logical_cluster_t     *logical_clusters;
     ngx_http_tfs_physical_cluster_t    *physical_clusters;
-    ngx_http_tfs_cluster_group_info_t  *unlink_clusters;
+    ngx_http_tfs_cluster_group_info_t  *unlink_cluster_groups;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "=========dump rc info for appkey: %V =========",
                    &rc_info->appkey);
@@ -348,20 +349,44 @@ ngx_http_tfs_dump_rc_info(ngx_http_tfs_rcs_info_t *rc_info, ngx_log_t *log)
                            &physical_clusters[j].cluster_id_text,
                            &physical_clusters[j].ns_vip_text);
         }
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "unlink_cluster_count: %ud",
-                       rc_info->unlink_cluster_count);
-        unlink_clusters = rc_info->unlink_clusters;
-        for (j = 0; j < rc_info->unlink_cluster_count; j++) {
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, log, 0, "cluster_id: %ud, info_count: %uD, group_count: %D",
-                           unlink_clusters[j].cluster_id,
-                           unlink_clusters[j].info_count,
-                           unlink_clusters[j].group_count);
-            group_info = unlink_clusters[j].group_info;
-            for (k = 0; k < unlink_clusters[j].info_count; k++) {
-                ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0, "group_seq: %D, ns_vip: %V",
-                               group_info[k].group_seq,
-                               &group_info[k].ns_vip_text);
-            }
+    }
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "unlink_cluster_group_count: %ud",
+                   rc_info->unlink_cluster_group_count);
+    unlink_cluster_groups = rc_info->unlink_cluster_groups;
+    for (j = 0; j < rc_info->unlink_cluster_group_count; j++) {
+        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, log, 0, "cluster_id: %ud, info_count: %uD, group_count: %D",
+                       unlink_cluster_groups[j].cluster_id,
+                       unlink_cluster_groups[j].info_count,
+                       unlink_cluster_groups[j].group_count);
+        group_info = unlink_cluster_groups[j].group_info;
+        for (k = 0; k < unlink_cluster_groups[j].info_count; k++) {
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0, "group_seq: %D, ns_vip: %V",
+                           group_info[k].group_seq,
+                           &group_info[k].ns_vip_text);
         }
     }
+}
+
+
+ngx_int_t
+ngx_http_tfs_rcs_stat_update(ngx_http_tfs_t *t,
+    ngx_http_tfs_rcs_info_t *rc_info, ngx_http_tfs_oper_type_e oper_type)
+{
+    if (t == NULL || rc_info ==  NULL || oper_type >= NGX_HTTP_TFS_OPER_COUNT) {
+        return NGX_ERROR;
+    }
+
+    int32_t index = oper_type;
+
+    if (rc_info->stat_rcs[index].oper_app_id == 0 ) {
+        rc_info->stat_rcs[index].oper_app_id = rc_info->app_id;
+        rc_info->stat_rcs[index].oper_type = oper_type;
+    }
+
+    ++rc_info->stat_rcs[index].oper_times;
+    rc_info->stat_rcs[index].oper_size += t->stat_info.size;
+    ++rc_info->stat_rcs[index].oper_succ;
+    rc_info->stat_rcs[index].oper_rt += ngx_http_tfs_get_request_time(t);
+
+    return NGX_OK;
 }

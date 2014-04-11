@@ -347,6 +347,9 @@ ngx_http_set_expires_type(ngx_http_request_t *r, ngx_http_headers_conf_t *conf)
 
     if (conf->enable_types) {
         et = ngx_http_test_content_type(r, &conf->types);
+        if (et == NULL) {
+            et = ngx_http_test_content_type_wildcard(r, &conf->types);
+        }
         if (et != NULL) {
             if (et->expires == NGX_HTTP_EXPIRES_OFF) {
                 return NGX_OK;

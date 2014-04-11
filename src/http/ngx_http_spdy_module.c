@@ -45,6 +45,12 @@ static ngx_conf_post_t  ngx_http_spdy_pool_size_post =
 static ngx_conf_post_t  ngx_http_spdy_streams_index_mask_post =
     { ngx_http_spdy_streams_index_mask };
 
+static ngx_conf_enum_t  ngx_http_spdy_versions[] = {
+    { ngx_string("2"), NGX_SPDY_VERSION_V2 },
+    { ngx_string("3"), NGX_SPDY_VERSION_V3 },
+    { ngx_null_string, 0 }
+};
+
 
 static ngx_command_t  ngx_http_spdy_commands[] = {
 
@@ -62,11 +68,25 @@ static ngx_command_t  ngx_http_spdy_commands[] = {
       offsetof(ngx_http_spdy_srv_conf_t, pool_size),
       &ngx_http_spdy_pool_size_post },
 
+    { ngx_string("spdy_flow_control"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_spdy_srv_conf_t, flow_control),
+      NULL },
+
     { ngx_string("spdy_max_concurrent_streams"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_spdy_srv_conf_t, concurrent_streams),
+      NULL },
+
+    { ngx_string("spdy_init_recv_window_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_spdy_srv_conf_t, init_recv_window_size),
       NULL },
 
     { ngx_string("spdy_streams_index_size"),
@@ -96,6 +116,13 @@ static ngx_command_t  ngx_http_spdy_commands[] = {
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_spdy_srv_conf_t, headers_comp),
       &ngx_http_spdy_headers_comp_bounds },
+
+    { ngx_string("spdy_version"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_spdy_srv_conf_t, version),
+      &ngx_http_spdy_versions },
 
       ngx_null_command
 };
@@ -172,7 +199,11 @@ ngx_http_spdy_variable(ngx_http_request_t *r,
         v->valid = 1;
         v->no_cacheable = 0;
         v->not_found = 0;
-        v->data = (u_char *) "2";
+        if (r->spdy_stream->connection->version == NGX_SPDY_VERSION_V3) {
+            v->data = (u_char *) "3";
+        } else {
+            v->data = (u_char *) "2";
+        }
 
         return NGX_OK;
     }
@@ -212,6 +243,7 @@ ngx_http_spdy_request_priority_variable(ngx_http_request_t *r,
 static ngx_int_t
 ngx_http_spdy_module_init(ngx_cycle_t *cycle)
 {
+    ngx_http_spdy_v3_request_headers_init();
     ngx_http_spdy_request_headers_init();
 
     return NGX_OK;
@@ -267,6 +299,10 @@ ngx_http_spdy_create_srv_conf(ngx_conf_t *cf)
 
     sscf->headers_comp = NGX_CONF_UNSET;
 
+    sscf->init_recv_window_size = NGX_CONF_UNSET_UINT;
+    sscf->flow_control = NGX_CONF_UNSET;
+    sscf->version = NGX_CONF_UNSET_UINT;
+
     return sscf;
 }
 
@@ -291,6 +327,13 @@ ngx_http_spdy_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->keepalive_timeout, 180000);
 
     ngx_conf_merge_value(conf->headers_comp, prev->headers_comp, 0);
+
+    ngx_conf_merge_uint_value(conf->init_recv_window_size,
+                              prev->init_recv_window_size,
+                              NGX_SPDY_INIT_RECV_WINDOW_SIZE);
+    ngx_conf_merge_value(conf->flow_control, prev->flow_control, 1);
+    ngx_conf_merge_uint_value(conf->version,
+                              prev->version, NGX_SPDY_VERSION_V3);
 
     return NGX_CONF_OK;
 }

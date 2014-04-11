@@ -82,6 +82,7 @@ typedef struct {
 #endif
 #if (NGX_HTTP_SPDY)
     unsigned                   spdy:1;
+    unsigned                   spdy_detect:1;
 #endif
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned                   ipv6only:1;
@@ -245,6 +246,7 @@ struct ngx_http_addr_conf_s {
 #endif
 #if (NGX_HTTP_SPDY)
     unsigned                   spdy:1;
+    unsigned                   spdy_detect:1;
 #endif
 };
 
@@ -511,6 +513,7 @@ ngx_int_t ngx_http_core_content_phase(ngx_http_request_t *r,
 
 
 void *ngx_http_test_content_type(ngx_http_request_t *r, ngx_hash_t *types_hash);
+void *ngx_http_test_content_type_wildcard(ngx_http_request_t *r, ngx_hash_t *types_hash);
 ngx_int_t ngx_http_set_content_type(ngx_http_request_t *r);
 void ngx_http_set_exten(ngx_http_request_t *r);
 ngx_int_t ngx_http_set_etag(ngx_http_request_t *r);

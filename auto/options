@@ -56,7 +56,7 @@ NGX_SHARED_ALL_MODULES=NO
 NGX_STATIC_ALL_MODULES=NO
 
 NGX_DSO=YES
-NGX_DSO_MAX=128
+NGX_DSO_MAX=256
 NGX_ALL_MODULES="
     ngx_core_module
     ngx_errlog_module
@@ -392,6 +392,7 @@ do
 
         --dso-path=*)                              NGX_DSO_PATH="$value"      ;;
         --dso-tool-path=*)                         NGX_DSO_TOOL_PATH="$value" ;;
+        --dso-max-modules=*)                       NGX_DSO_MAX=$value         ;;
         --includedir=*)                            NGX_INCLUDE_PATH="$value"  ;;
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
@@ -604,7 +605,7 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_UPSTREAM_CONSISTENT_HASH=NO
                                          HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO ;;
         --without-http_upstream_session_sticky_module)
-                                         HTTP_UPSTREAM_SESSION_STICKY=NO 
+                                         HTTP_UPSTREAM_SESSION_STICKY=NO
                                          HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
 
@@ -678,7 +679,7 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
-                
+
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
         --test-build-epoll)              NGX_TEST_BUILD_EPOLL=YES   ;;
@@ -720,6 +721,7 @@ cat << END
 
   --dso-path=DIR                     set dso default load path
   --dso-tool-path=DIR                set dso_tool pathname
+  --dso-max-modules=*)               set max dso module(default is 256)
   --includedir=DIR                   set C header files[PREFIX/include]
 
   --with-rtsig_module                enable rtsig module
@@ -922,9 +924,9 @@ cat << END
 
   --with-libatomic                   force libatomic_ops library usage
   --with-libatomic=DIR               set path to libatomic_ops library sources
-  
+
   --with-jemalloc                    force jemalloc library usage
-  --with-jemalloc=DIR                set path to jemalloc library files  
+  --with-jemalloc=DIR                set path to jemalloc library files
 
   --with-openssl=DIR                 set path to OpenSSL library sources
   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL

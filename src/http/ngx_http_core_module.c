@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -69,6 +68,8 @@ static char *ngx_http_core_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -772,6 +773,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
     { ngx_string("resolver"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
       ngx_http_core_resolver,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("resolver_file"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_core_resolver_file,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -1679,6 +1687,10 @@ ngx_http_core_find_static_location(ngx_http_request_t *r,
 
     rv = NGX_DECLINED;
 
+    if (r->uri.len && r->uri.data[0] == '@') {
+        return ngx_http_named_location(r, &r->uri);
+    }
+
     for ( ;; ) {
 
         if (node == NULL) {
@@ -1784,6 +1796,64 @@ ngx_http_test_content_type(ngx_http_request_t *r, ngx_hash_t *types_hash)
 
     return ngx_hash_find(types_hash, r->headers_out.content_type_hash,
                          r->headers_out.content_type_lowcase, len);
+}
+
+
+void *
+ngx_http_test_content_type_wildcard(ngx_http_request_t *r, ngx_hash_t *types_hash)
+{
+    u_char      c, *lowcase, *slash, *range;
+    size_t      len;
+    ngx_uint_t  i, hash;
+
+    if (types_hash->size == 0) {
+        return (void *) 4;
+    }
+
+    if (r->headers_out.content_type.len == 0) {
+        return NULL;
+    }
+
+    len = r->headers_out.content_type_len;
+
+    if (r->headers_out.content_type_lowcase == NULL) {
+
+        lowcase = ngx_pnalloc(r->pool, len);
+        if (lowcase == NULL) {
+            return NULL;
+        }
+
+        r->headers_out.content_type_lowcase = lowcase;
+
+        for (i = 0; i < len; i++) {
+            c = ngx_tolower(r->headers_out.content_type.data[i]);
+            lowcase[i] = c;
+        }
+
+    }
+
+    slash = ngx_strlchr(r->headers_out.content_type_lowcase,
+                        r->headers_out.content_type_lowcase + len, '/');
+    if (slash == NULL) {
+        return NULL;
+    }
+
+    len = slash - r->headers_out.content_type_lowcase + 2;
+    range = ngx_pnalloc(r->pool, len);
+    if (range == NULL) {
+        return NULL;
+    }
+    ngx_memcpy(range, r->headers_out.content_type_lowcase, len - 1);
+    range[len - 1] = '*';
+
+    hash = 0;
+
+    for (i = 0; i < len; i++) {
+        c = range[i];
+        hash = ngx_hash(hash, c);
+    }
+
+    return ngx_hash_find(types_hash, hash, range, len);
 }
 
 
@@ -2471,9 +2541,11 @@ ngx_http_subrequest(ngx_http_request_t *r,
     ngx_http_post_subrequest_t *ps, ngx_uint_t flags)
 {
     ngx_time_t                    *tp;
+    struct timeval                 tv;
     ngx_connection_t              *c;
     ngx_http_request_t            *sr;
     ngx_http_core_srv_conf_t      *cscf;
+    ngx_http_core_loc_conf_t      *clcf;
     ngx_http_postponed_request_t  *pr, *p;
 
     r->main->subrequests--;
@@ -2590,9 +2662,20 @@ ngx_http_subrequest(ngx_http_request_t *r,
 
     sr->uri_changes = NGX_HTTP_MAX_URI_CHANGES + 1;
 
-    tp = ngx_timeofday();
-    sr->start_sec = tp->sec;
-    sr->start_msec = tp->msec;
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->request_time_cache) {
+        tp = ngx_timeofday();
+        sr->start_sec = tp->sec;
+        sr->start_msec = tp->msec;
+        sr->start_usec = tp->usec;
+
+    } else {
+        ngx_gettimeofday(&tv);
+        sr->start_sec = tv.tv_sec;
+        sr->start_msec = tv.tv_usec / 1000;
+        sr->start_usec = tv.tv_usec % 1000;
+    }
 
     r->main->count++;
 
@@ -2671,6 +2754,14 @@ ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name)
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "rewrite or internal redirection cycle "
                       "while redirect to named location \"%V\"", name);
+
+        ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return NGX_DONE;
+    }
+
+    if (r->uri.len == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "empty URI in redirect to named location \"%V\"", name);
 
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return NGX_DONE;
@@ -3913,19 +4004,14 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->client_body_buffers,
                               16, ngx_pagesize);
 
-    if (conf->client_body_buffers.num < 2) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "there must be at least 2 \"client_body_buffers\"");
-        return NGX_CONF_ERROR;
-    }
-
     ngx_conf_merge_size_value(conf->client_body_postpone_size,
                               prev->client_body_postpone_size,
                               64 * 1024);
 
-    if (conf->client_max_body_size <
+    if (conf->client_max_body_size &&
+         (conf->client_max_body_size <
         (off_t)(conf->client_body_buffers.num *
-                conf->client_body_buffers.size)) {
+                conf->client_body_buffers.size))) {
 
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "client_max_body_size %O should be greater than "
@@ -3938,7 +4024,9 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                              conf->client_body_buffers.size);
     }
 
-    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size) {
+    if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size
+         && conf->client_max_body_size != 0)
+    {
         conf->client_body_postpone_size = conf->client_max_body_size;
     }
 
@@ -3954,6 +4042,12 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
         conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
                                              conf->client_body_buffers.size);
+    }
+
+    if (conf->client_body_buffers.num < 2) {
+        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                           "there must be at least 2 \"client_body_buffers\"");
+        conf->client_body_buffers.num = 2;
     }
 
     ngx_conf_merge_msec_value(conf->client_body_timeout,
@@ -4321,6 +4415,18 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #else
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "the \"spdy\" parameter requires "
+                               "ngx_http_spdy_module");
+            return NGX_CONF_ERROR;
+#endif
+        }
+
+        if (ngx_strcmp(value[n].data, "spdy_detect") == 0) {
+#if (NGX_HTTP_SPDY)
+            lsopt.spdy_detect = 1;
+            continue;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the \"spdy_detect\" parameter requires "
                                "ngx_http_spdy_module");
             return NGX_CONF_ERROR;
 #endif
@@ -5191,6 +5297,33 @@ ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     clcf->resolver = ngx_resolver_create(cf, &value[1], cf->args->nelts - 1);
+    if (clcf->resolver == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_core_loc_conf_t  *clcf = conf;
+
+    ngx_str_t  *value, *names;
+    ngx_uint_t  n;
+
+    if (clcf->resolver) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (ngx_resolver_read_resolv_file(cf, &value[1], &names, &n) != NGX_OK) {
+        return "parse failed";
+    }
+
+    clcf->resolver = ngx_resolver_create(cf, names, n);
     if (clcf->resolver == NULL) {
         return NGX_CONF_ERROR;
     }

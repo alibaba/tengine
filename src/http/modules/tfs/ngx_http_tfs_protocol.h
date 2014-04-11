@@ -423,28 +423,6 @@ typedef struct {
 
 
 typedef struct {
-    int64_t                    pid;
-    int64_t                    id;
-    uint32_t                   create_time;
-    uint32_t                   modify_time;
-    uint64_t                   size;
-    uint16_t                   ver_no;
-} NGX_PACKED ngx_http_tfs_custom_file_info_t;
-
-
-typedef struct {
-    uint64_t                   id;
-    int32_t                    offset;
-    int32_t                    size;
-    int32_t                    u_size;
-    int32_t                    modify_time;
-    int32_t                    create_time;
-    int32_t                    flag;
-    uint32_t                   crc;
-} NGX_PACKED ngx_http_tfs_raw_file_info_t;
-
-
-typedef struct {
     ngx_http_tfs_ds_msg_header_t            header;
     uint32_t                                mode;
 } NGX_PACKED ngx_http_tfs_ds_stat_request_t;

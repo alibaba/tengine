@@ -1010,6 +1010,7 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
             size -= n;
 
             if (size == 0) {
+                c->read->ready = 1;
                 return bytes;
             }
 
@@ -1019,6 +1020,10 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
         }
 
         if (bytes) {
+            if (c->ssl->last != NGX_AGAIN) {
+                c->read->ready = 1;
+            }
+
             return bytes;
         }
 
@@ -2269,31 +2274,25 @@ ngx_int_t
 ngx_ssl_get_session_id(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
     int           len;
-    u_char       *p, *buf;
+    u_char       *buf;
     SSL_SESSION  *sess;
 
     sess = SSL_get0_session(c->ssl->connection);
-
-    len = i2d_SSL_SESSION(sess, NULL);
-
-    buf = ngx_alloc(len, c->log);
-    if (buf == NULL) {
-        return NGX_ERROR;
+    if (sess == NULL) {
+        s->len = 0;
+        return NGX_OK;
     }
+
+    buf = sess->session_id;
+    len = sess->session_id_length;
 
     s->len = 2 * len;
     s->data = ngx_pnalloc(pool, 2 * len);
     if (s->data == NULL) {
-        ngx_free(buf);
         return NGX_ERROR;
     }
 
-    p = buf;
-    i2d_SSL_SESSION(sess, &p);
-
     ngx_hex_dump(s->data, buf, len);
-
-    ngx_free(buf);
 
     return NGX_OK;
 }
