@@ -732,7 +732,7 @@ out:
 }
 
 static inline void 
-merge_pages_forward1(ngx_slab_pool_t *pool, ngx_slab_page_t *page)
+merge_pages_forward(ngx_slab_pool_t *pool, ngx_slab_page_t *page)
 {
 	ngx_uint_t page_idx = (page - pool->pages) / sizeof(ngx_slab_page_t);
 	ngx_slab_page_t *p;
@@ -783,7 +783,7 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
 	page->front = NULL;
 
 	p = merge_pages_backward(pool, page);
-	merge_pages_forward1(pool, p);
+	merge_pages_forward(pool, p);
 }
 
 
