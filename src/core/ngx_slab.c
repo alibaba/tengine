@@ -129,8 +129,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
         pool->pages->slab = pages;
     }
 
-    if (pages > 1)
-    {
+    if (pages > 1) {
         pool->pages[pages - 1].front = pool->pages;
     }
 
@@ -623,8 +622,8 @@ fail:
 static ngx_slab_page_t *
 ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 {
+    ngx_uint_t        pages_left;
     ngx_slab_page_t  *page, *p;
-    ngx_uint_t pages_left;
 
     for (page = pool->free.next; page != &pool->free; page = page->next) {
 
@@ -632,12 +631,11 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 
             if (page->slab > pages) {
                 pages_left = page->slab - pages;
-                if (pages_left > 1)
-                {
+
+                if (pages_left > 1) {
                     page[page->slab - 1].front = &page[pages];
-                }
-                else
-                {
+
+                } else {
                     page[page->slab - 1].front = NULL;
                 }
 
@@ -659,8 +657,8 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
             page->next = NULL;
             page->prev = NGX_SLAB_PAGE;
             page->front = (ngx_slab_page_t *)1;
-            if (pages > 1)
-            {
+
+            if (pages > 1) {
                 page[pages - 1].front = (ngx_slab_page_t *)((uintptr_t)page | 1);
             }
 
@@ -687,37 +685,34 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
 static inline ngx_slab_page_t *  
 merge_pages_backward(ngx_slab_pool_t *pool, ngx_slab_page_t *page)
 {
-    ngx_uint_t page_idx = (ngx_uint_t)(page - pool->pages);
-    ngx_slab_page_t *pf, *p;
+    ngx_uint_t        page_idx;
+    ngx_slab_page_t  *pf, *p;
 
-    if (page_idx == 0)
-    {
+    page_idx  = (ngx_uint_t)(page - pool->pages);
+    if (page_idx == 0) {
         pf = page;
         goto fail;
     }
 
     p = &pool->pages[page_idx - 1];
     pf = pool->pages[page_idx - 1].front;
-    if ((uintptr_t)pf & 1)
-    {
+
+    if ((uintptr_t)pf & 1) {
         pf = page;
         goto fail;
-    }
-    else if (pf == NULL)
-    {
+
+    } else if (pf == NULL) {
         pf = p;
     }
 
-    // merge page to the tail of p
     p->front = NULL;
     pf->slab += page->slab;
 
     page[page->slab - 1].front = pf;
     ngx_memzero(page, sizeof(ngx_slab_page_t));
 
-    goto out;
+    return pf;
 
-    // can't merge backward, just link page to the free head
 fail:
     page->prev = (uintptr_t) &pool->free;
     page->next = pool->free.next;
@@ -726,32 +721,28 @@ fail:
 
     pool->free.next = page;
 
-out:
     return pf;
 }
 
 static inline void 
 merge_pages_forward(ngx_slab_pool_t *pool, ngx_slab_page_t *page)
 {
-    ngx_uint_t page_idx = (page - pool->pages) / sizeof(ngx_slab_page_t);
-    ngx_slab_page_t *p;
+    ngx_uint_t        page_idx;
+    ngx_slab_page_t  *p;
 
-    if (page_idx + page->slab >= pool->total_pages)
-    {
+    page_idx = (page - pool->pages) / sizeof(ngx_slab_page_t);
+    if (page_idx + page->slab >= pool->total_pages) {
         return;
     }
 
     p = &page[page->slab];
-    if ((uintptr_t)p->front & 1)
-    {
+    if ((uintptr_t)p->front & 1) {
         return;
     }
 
-    // delink
     p->next->prev = p->prev;
     ((ngx_slab_page_t *)(p->prev))->next = p->next;
 
-    // merge p to the tail of page
     page[page->slab - 1].front = NULL;
     page->slab += p->slab;
     p[p->slab - 1].front = page;
