@@ -721,7 +721,6 @@ merge_pages_backward(ngx_slab_pool_t *pool, ngx_slab_page_t *page)
 fail:
     page->prev = (uintptr_t) &pool->free;
     page->next = pool->free.next;
-    //page->free_idx = page->next->free_idx - 1;
 
     page->next->prev = (uintptr_t) page;
 
