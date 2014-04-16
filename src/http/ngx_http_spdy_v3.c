@@ -1419,7 +1419,6 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
         complete = 1;
 
     } else {
-        sc->length -= size;
         complete = 0;
     }
 
@@ -1461,6 +1460,8 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
                 goto error;
             }
         }
+
+        sc->length -= size;
 
         if (tf) {
             buf->start = pos;
@@ -2726,6 +2727,10 @@ ngx_http_spdy_parse_version(ngx_http_request_t *r)
     for (p += 6; p != r->header_end - 2; p++) {
 
         ch = *p;
+
+        if (ch == '.') {
+            break;
+        }
 
         if (ch < '0' || ch > '9') {
             return NGX_HTTP_PARSE_INVALID_REQUEST;
