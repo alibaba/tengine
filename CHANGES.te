@@ -53,7 +53,7 @@ Changes with Tengine 2.0.0                                       08 Jan 2014
        for numeric comparison. (flygoast)
 
     *) Feature: now upstream health check module uses keep-alive connections.
-       (lilbedwin)
+       added a new directive "check_keepalive_requests". (lilbedwin)
 
     *) Feature: now trim module can handle SSI and ESI comments properly.
        (taoyuanyuan)
