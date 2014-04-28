@@ -547,6 +547,11 @@ ngx_http_spdy_read_handler(ngx_event_t *rev)
         return;
     }
 
+    if (sc->last_out && ngx_http_spdy_send_output_queue(sc) == NGX_ERROR) {
+        ngx_http_spdy_finalize_connection(sc, NGX_HTTP_CLIENT_CLOSED_REQUEST);
+        return;
+    }
+
     sc->blocked = 0;
 
     if (sc->processing) {
@@ -1040,7 +1045,7 @@ ngx_http_spdy_state_headers(ngx_http_spdy_connection_t *sc, u_char *pos,
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "spdy headers count: %ui", sc->headers);
 
-        if (ngx_list_init(&r->headers_in.headers, r->pool, sc->headers + 3,
+        if (ngx_list_init(&r->headers_in.headers, r->pool, 20,
                           sizeof(ngx_table_elt_t))
             != NGX_OK)
         {
@@ -1414,7 +1419,6 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
         complete = 1;
 
     } else {
-        sc->length -= size;
         complete = 0;
     }
 
@@ -1456,6 +1460,8 @@ ngx_http_spdy_state_data(ngx_http_spdy_connection_t *sc, u_char *pos,
                 goto error;
             }
         }
+
+        sc->length -= size;
 
         if (tf) {
             buf->start = pos;
@@ -1770,7 +1776,7 @@ static u_char *
 ngx_http_spdy_state_save(ngx_http_spdy_connection_t *sc,
     u_char *pos, u_char *end, ngx_http_spdy_handler_pt handler)
 {
-#if (NGX_DEBUG)
+#if 1
     if (end - pos > NGX_SPDY_STATE_BUFFER_SIZE) {
         ngx_log_error(NGX_LOG_ALERT, sc->connection->log, 0,
                       "spdy state buffer overflow: "
@@ -2721,6 +2727,10 @@ ngx_http_spdy_parse_version(ngx_http_request_t *r)
     for (p += 6; p != r->header_end - 2; p++) {
 
         ch = *p;
+
+        if (ch == '.') {
+            break;
+        }
 
         if (ch < '0' || ch > '9') {
             return NGX_HTTP_PARSE_INVALID_REQUEST;

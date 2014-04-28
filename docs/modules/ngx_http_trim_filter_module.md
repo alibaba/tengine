@@ -23,6 +23,14 @@ HTML with a state machine.
      
 Enable or disable trim module for pure HTML.  
 This module will retain some contents unchanged, in case that they are enclosed by the tag `pre`,`textarea`,`script` and `style`,as well as IE/SSI/ESI comments.  
+Parameter value can contain variables.  
+Example:  
+
+    set $flag "off";
+    if ($condition) {
+        set $flag "on";
+    }
+    trim $flag;
 <br/>
 
 
@@ -33,6 +41,7 @@ This module will retain some contents unchanged, in case that they are enclosed 
 **Context:** `http, server, location` 
      
 Enable or disable trim module for inline javascript.  
+Parameter value can contain variables too.  
 <br/>
 
 
@@ -43,6 +52,7 @@ Enable or disable trim module for inline javascript.
 **Context:** `http, server, location` 
      
 Enable or disable trim module for inline css.  
+Parameter value can contain variables too.  
 <br/>
 
 
@@ -107,3 +117,52 @@ result:
     <script type="text/javascript">str.replace(/     /,"hello");</script>
     <style type="text/css">body{font-size:20px;line-height:150%;}</style>
 
+
+## Trim Rule
+
+### Html
+##### Whitespace
++ Remove '\r'.
++ Replace '\t' with space.
++ Replace multiple spaces with a single space.
++ Replace multiple '\n' with a single '\n'.
++ Replace multiple '\n' and '\t' in tag with a single space.
++ Do not trim quoted strings in tag.
++ Do not trim the contents enclosed by the tag `pre`,`textarea`,`script` and `style`.
+
+##### Comment
++ Remove html comment(`<!-- -->`).
++ Do not trim IE/SSI/ESI comments.  
+  IE comment: `<!--[if  <![endif]-->`  
+  SSI comment: `<!--#  -->`  
+  ESI comment: `<!--esi  -->`  
+
+
+### Javascript
+Contents enclosed by `<script type="text/javascript">` or `<script>` will be identified as javascript.
+
+##### Whitespace
++ Remove '\r'.
++ Remove '\t','\n' and space that behind '(',',','=',':','[','!','&','|','?',';','>','~','*','{'.
++ Replace multiple spaces with a single space.
++ Do not trim quoted strings and regular expression literals.
+
+##### Comment
++ Remove single comment. `//`
++ Remove multi comment. `/*  */`
+
+
+### Css
+Contents enclosed by `<style type="text/css">` or `<style>` will be identified as css.
+
+##### Whiltespace
++ Remove '\r'.
++ Remove '\t','\n' and space that around ';','>','{','}',':',','.
++ Replace multiple '\n' and spaces with a single space.
++ Do not trim quoted strings.
+
+##### Comment
++ Remove css comment(`/* */`).
++ Do not remove child seletor and IE5 /Mac hack comments.  
+  Child seletor hack: `html>/**/body p{color:blue}`  
+  IE5 /Mac hack: `/*\*/.selector{color:khaki}/**/`  

@@ -23,11 +23,12 @@
 #define NGX_HTTP_TRIM_TAG_TEXTAREA       4
 
 typedef struct {
-    ngx_flag_t      trim_enable;
-    ngx_flag_t      js_enable;
-    ngx_flag_t      css_enable;
-    ngx_hash_t      types;
-    ngx_array_t    *types_keys;
+    ngx_hash_t                   types;
+    ngx_array_t                 *types_keys;
+
+    ngx_http_complex_value_t    *js;
+    ngx_http_complex_value_t    *css;
+    ngx_http_complex_value_t    *trim;
 } ngx_http_trim_loc_conf_t;
 
 
@@ -45,6 +46,9 @@ typedef struct {
     ngx_int_t       saved;
     ngx_int_t       count;
     ngx_uint_t      state;
+
+    unsigned        js_enable:1;
+    unsigned        css_enable:1;
 } ngx_http_trim_ctx_t;
 
 
@@ -167,24 +171,24 @@ static ngx_int_t ngx_http_trim_filter_init(ngx_conf_t *cf);
 static ngx_command_t  ngx_http_trim_commands[] = {
 
     { ngx_string("trim"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
-      ngx_conf_set_flag_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_set_complex_value_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_trim_loc_conf_t, trim_enable),
+      offsetof(ngx_http_trim_loc_conf_t, trim),
       NULL },
 
     { ngx_string("trim_js"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
-      ngx_conf_set_flag_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_set_complex_value_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_trim_loc_conf_t, js_enable),
+      offsetof(ngx_http_trim_loc_conf_t, js),
       NULL },
 
     { ngx_string("trim_css"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
-      ngx_conf_set_flag_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_set_complex_value_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_trim_loc_conf_t, css_enable),
+      offsetof(ngx_http_trim_loc_conf_t, css),
       NULL },
 
     { ngx_string("trim_types"),
@@ -258,7 +262,7 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
 
     conf = ngx_http_get_module_loc_conf(r, ngx_http_trim_filter_module);
 
-    if (!conf->trim_enable
+    if (!conf->trim
         || r->headers_out.status != NGX_HTTP_OK
         || (r->method & NGX_HTTP_HEAD)
         || r->headers_out.content_length_n == 0
@@ -279,9 +283,43 @@ ngx_http_trim_header_filter(ngx_http_request_t *r)
         return ngx_http_next_header_filter(r);
     }
 
+    if (ngx_http_complex_value(r, conf->trim, &flag) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (!(flag.len == sizeof("on") - 1
+          && ngx_strncmp(flag.data, "on", sizeof("on") - 1) == 0))
+    {
+        return ngx_http_next_header_filter(r);
+    }
+
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_trim_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
+    }
+
+    if (conf->js) {
+        if (ngx_http_complex_value(r, conf->js, &flag) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (flag.len == sizeof("on") - 1
+            && ngx_strncmp(flag.data, "on", sizeof("on") - 1) == 0)
+        {
+            ctx->js_enable = 1;
+        }
+    }
+
+    if (conf->css) {
+        if (ngx_http_complex_value(r, conf->css, &flag) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (flag.len == sizeof("on") - 1
+            && ngx_strncmp(flag.data, "on", sizeof("on") - 1) == 0)
+        {
+            ctx->css_enable = 1;
+        }
     }
 
     ctx->prev = ' ';
@@ -420,9 +458,6 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
     ngx_http_trim_ctx_t *ctx)
 {
     u_char                    *read, *write, ch, look;
-    ngx_http_trim_loc_conf_t  *conf;
-
-    conf = ngx_http_get_module_loc_conf(r, ngx_http_trim_filter_module);
 
     for (write = buf->pos, read = buf->pos; read < buf->last; read++) {
 
@@ -551,7 +586,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     ctx->state = trim_state_tag_textarea_end;
 
                 } else if (ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
-                    if (conf->js_enable
+                    if (ctx->js_enable
                         && ctx->looked == ngx_http_trim_script_js.len)
                     {
                         ctx->state = trim_state_tag_script_js_text;
@@ -561,7 +596,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     }
 
                 } else if (ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
-                    if (conf->css_enable
+                    if (ctx->css_enable
                         && ctx->looked == ngx_http_trim_style_css.len)
                     {
                         ctx->state = trim_state_tag_style_css_text;
@@ -782,7 +817,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             look = ngx_http_trim_script.data[ctx->looked++];    /* <script> */
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_script.len) {
-                    if (conf->js_enable) {
+                    if (ctx->js_enable) {
                         ctx->state = trim_state_tag_script_js_text;
 
                     } else {
@@ -1166,7 +1201,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
             look = ngx_http_trim_style.data[ctx->looked++];    /* <style> */
             if (ch == look) {
                 if (ctx->looked == ngx_http_trim_style.len) {
-                    if (conf->css_enable) {
+                    if (ctx->css_enable) {
                         ctx->state = trim_state_tag_style_css_text;
 
                     } else {
@@ -1796,7 +1831,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     ctx->state = trim_state_tag_textarea_end;
 
                 } else if (ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
-                    if (conf->js_enable
+                    if (ctx->js_enable
                         && ctx->looked == ngx_http_trim_script_js.len)
                     {
                         ctx->state = trim_state_tag_script_js_text;
@@ -1806,7 +1841,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                     }
 
                 } else if (ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
-                    if (conf->css_enable
+                    if (ctx->css_enable
                         && ctx->looked == ngx_http_trim_style_css.len)
                     {
                         ctx->state = trim_state_tag_style_css_text;
@@ -1847,7 +1882,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 break;
             }
 
-            if (conf->js_enable && ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
+            if (ctx->js_enable && ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
                 if (ctx->looked != ngx_http_trim_script_js.len) {
                     look = ngx_http_trim_script_js.data[ctx->looked++];
                     if (ch != look) {
@@ -1856,7 +1891,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 }
             }
 
-            if (conf->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
+            if (ctx->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
                 if (ctx->looked != ngx_http_trim_style_css.len) {
                     look = ngx_http_trim_style_css.data[ctx->looked++];
                     if (ch != look) {
@@ -1876,7 +1911,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 break;
             }
 
-            if (conf->js_enable && ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
+            if (ctx->js_enable && ctx->tag == NGX_HTTP_TRIM_TAG_SCRIPT) {
                 if (ctx->looked != ngx_http_trim_script_js.len) {
                     look = ngx_http_trim_script_js.data[ctx->looked++];
                     if (ch != look) {
@@ -1885,7 +1920,7 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
                 }
             }
 
-            if (conf->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
+            if (ctx->css_enable && ctx->tag == NGX_HTTP_TRIM_TAG_STYLE) {
                 if (ctx->looked != ngx_http_trim_style_css.len) {
                     look = ngx_http_trim_style_css.data[ctx->looked++];
                     if (ch != look) {
@@ -1924,11 +1959,10 @@ ngx_http_trim_create_loc_conf(ngx_conf_t *cf)
      *
      *     conf->types = { NULL };
      *     conf->types_keys = NULL;
+     *     conf->trim = NULL;
+     *     conf->js = NULL;
+     *     conf->css = NULL;
      */
-
-    conf->trim_enable = NGX_CONF_UNSET;
-    conf->js_enable = NGX_CONF_UNSET;
-    conf->css_enable = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1940,16 +1974,24 @@ ngx_http_trim_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_trim_loc_conf_t *prev = parent;
     ngx_http_trim_loc_conf_t *conf = child;
 
-    ngx_conf_merge_value(conf->js_enable, prev->js_enable, 0);
-    ngx_conf_merge_value(conf->css_enable, prev->css_enable, 0);
-    ngx_conf_merge_value(conf->trim_enable, prev->trim_enable, 0);
-
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_html_default_types)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
+    }
+
+    if (conf->trim == NULL) {
+        conf->trim = prev->trim;
+    }
+
+    if (conf->js == NULL) {
+        conf->js = prev->js;
+    }
+
+    if (conf->css == NULL) {
+        conf->css = prev->css;
     }
 
     return NGX_CONF_OK;

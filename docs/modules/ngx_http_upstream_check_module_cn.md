@@ -89,6 +89,8 @@ Context: `upstream`
 
 该指令可以配置一个连接发送的请求数，其默认值为1，表示Tengine完成1次请求后即关闭连接。
 
+该指令在Tengine-2.0.0首次被引入。
+
 ## check\_http\_send ##
 
 Syntax: **check\_http\_send** `http_packet`
