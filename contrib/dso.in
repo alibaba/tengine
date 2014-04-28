@@ -178,7 +178,7 @@ END
 
     make -f $NGX_DSO_MAKEFILE
 
-    if [ '$?' = '0' ]; then
+    if [ "$?" = '0' ]; then
 	if test -n "$NGX_DSO_PREFIX"; then
             test ! -f $NGX_DSO_PREFIX${dso_binout}${ngx_soext} \
 		|| unlink $NGX_DSO_PREFIX${dso_binout}${ngx_soext}
