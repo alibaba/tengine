@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -1687,6 +1686,10 @@ ngx_http_core_find_static_location(ngx_http_request_t *r,
     uri = r->uri.data;
 
     rv = NGX_DECLINED;
+
+    if (r->uri.len && r->uri.data[0] == '@') {
+        return ngx_http_named_location(r, &r->uri);
+    }
 
     for ( ;; ) {
 

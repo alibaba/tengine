@@ -88,6 +88,8 @@ Context: `upstream`
 
 The directive specifies the number of requests sent on a connection, the default vaule 1 indicates that tengine will certainly close the connection after a request.
 
+This directive was first introduced in Tengine-2.0.0.
+
 ## check\_http\_send ##
 
 Syntax: **check\_http\_send** `http_packet`

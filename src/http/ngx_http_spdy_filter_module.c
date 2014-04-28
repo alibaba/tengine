@@ -198,9 +198,14 @@ ngx_http_spdy_header_filter(ngx_http_request_t *r)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->headers_out.server == NULL) {
-        len += ngx_http_spdy_nv_nsize("server");
-        len += clcf->server_tokens ? ngx_http_spdy_nv_vsize(NGINX_VER)
-                                   : ngx_http_spdy_nv_vsize("nginx");
+        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+            len += ngx_http_spdy_nv_nsize("server");
+            len += clcf->server_tokens ? ngx_http_spdy_nv_vsize(TENGINE_VER)
+                                       : ngx_http_spdy_nv_vsize(TENGINE);
+        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+            len += ngx_http_spdy_nv_nsize("server");
+            len += NGX_SPDY_NV_VLEN_SIZE + clcf->server_tag.len;
+        }
     }
 
     if (r->headers_out.date == NULL) {
@@ -349,12 +354,20 @@ ngx_http_spdy_header_filter(ngx_http_request_t *r)
     count = 2;
 
     if (r->headers_out.server == NULL) {
-        last = ngx_http_spdy_nv_write_name(last, "server");
-        last = clcf->server_tokens
-               ? ngx_http_spdy_nv_write_val(last, NGINX_VER)
-               : ngx_http_spdy_nv_write_val(last, "nginx");
+        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+            last = ngx_http_spdy_nv_write_name(last, "server");
+            last = clcf->server_tokens
+                   ? ngx_http_spdy_nv_write_val(last, TENGINE_VER)
+                   : ngx_http_spdy_nv_write_val(last, TENGINE);
+            count++;
 
-        count++;
+        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+            last = ngx_http_spdy_nv_write_name(last, "server");
+            last = ngx_http_spdy_nv_write_vlen(last, clcf->server_tag.len);
+            last = ngx_cpymem(last, clcf->server_tag.data,
+                              clcf->server_tag.len);
+            count++;
+        }
     }
 
     if (r->headers_out.date == NULL) {
@@ -721,9 +734,14 @@ ngx_http_spdy_v3_header_filter(ngx_http_request_t *r)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->headers_out.server == NULL) {
-        len += ngx_http_spdy_v3_nv_nsize("server");
-        len += clcf->server_tokens ? ngx_http_spdy_v3_nv_vsize(NGINX_VER)
-                                   : ngx_http_spdy_v3_nv_vsize("nginx");
+        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+            len += ngx_http_spdy_v3_nv_nsize("server");
+            len += clcf->server_tokens ? ngx_http_spdy_v3_nv_vsize(TENGINE_VER)
+                                       : ngx_http_spdy_v3_nv_vsize(TENGINE);
+        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+            len += ngx_http_spdy_v3_nv_nsize("server");
+            len += NGX_SPDY_V3_NV_VLEN_SIZE + clcf->server_tag.len;
+        }
     }
 
     if (r->headers_out.date == NULL) {
@@ -864,12 +882,20 @@ ngx_http_spdy_v3_header_filter(ngx_http_request_t *r)
     count = 2;
 
     if (r->headers_out.server == NULL) {
-        last = ngx_http_spdy_v3_nv_write_name(last, "server");
-        last = clcf->server_tokens
-               ? ngx_http_spdy_v3_nv_write_val(last, NGINX_VER)
-               : ngx_http_spdy_v3_nv_write_val(last, "nginx");
+        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
+            last = ngx_http_spdy_v3_nv_write_name(last, "server");
+            last = clcf->server_tokens
+                   ? ngx_http_spdy_v3_nv_write_val(last, TENGINE_VER)
+                   : ngx_http_spdy_v3_nv_write_val(last, TENGINE);
+            count++;
 
-        count++;
+        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
+            last = ngx_http_spdy_v3_nv_write_name(last, "server");
+            last = ngx_http_spdy_v3_nv_write_vlen(last, clcf->server_tag.len);
+            last = ngx_cpymem(last, clcf->server_tag.data,
+                              clcf->server_tag.len);
+            count++;
+        }
     }
 
     if (r->headers_out.date == NULL) {

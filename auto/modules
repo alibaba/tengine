@@ -914,6 +914,7 @@ END
 
 END
 
+    echo ''                                      > $NGX_MODULE_STUBS
     for mod in $NGX_ALL_MODULES
     do
         echo "module_stub $mod;"                  >> $NGX_MODULE_STUBS
