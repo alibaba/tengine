@@ -118,6 +118,8 @@ sub has_module($) {
 		browser	=> '(?s)^(?!.*--without-http_browser_module)',
 		upstream_ip_hash
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
+		reqstat
+			=> '(?s)^(?!.*--without-http_reqstat_module)',
 		upstream_least_conn
 			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
 		upstream_keepalive
