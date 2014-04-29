@@ -1,0 +1,46 @@
+dh_auto_configure
+override_dh_auto_build dh_auto_build
+override_dh_auto_build dh_auto_build
+dh_auto_build
+dh_prep
+dh_installdirs
+override_dh_auto_install dh_auto_install
+dh_auto_install
+dh_install
+dh_installdocs
+dh_installchangelogs
+dh_installexamples
+dh_installman
+dh_installcatalogs
+dh_installcron
+dh_installdebconf
+dh_installemacsen
+dh_installifupdown
+dh_installinfo
+dh_installinit
+dh_installmenu
+dh_installmime
+dh_installmodules
+dh_installlogcheck
+dh_installlogrotate
+dh_installpam
+dh_installppp
+dh_installudev
+dh_installwm
+dh_installxfonts
+dh_installgsettings
+dh_bugfiles
+dh_ucf
+dh_lintian
+dh_gconf
+dh_icons
+dh_perl
+dh_usrlocal
+dh_link
+dh_compress
+dh_fixperms
+dh_installdeb
+dh_gencontrol
+dh_md5sums
+dh_builddeb
+dh_builddeb
