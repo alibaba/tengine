@@ -87,7 +87,8 @@ DSO_INCS=
 
 OPENSSL_MODULE=ngx_openssl_module
 OPENSSL_DEPS=src/event/ngx_event_openssl.h
-OPENSSL_SRCS=src/event/ngx_event_openssl.c
+OPENSSL_SRCS="src/event/ngx_event_openssl.c \
+              src/event/ngx_event_openssl_stapling.c"
 
 
 EVENT_MODULES="ngx_events_module ngx_event_core_module"
@@ -349,12 +350,26 @@ HTTP_POSTPONE_FILTER_SRCS=src/http/ngx_http_postpone_filter_module.c
 HTTP_FILE_CACHE_SRCS=src/http/ngx_http_file_cache.c
 
 
+HTTP_SPDY_MODULE=ngx_http_spdy_module
+HTTP_SPDY_FILTER_MODULE=ngx_http_spdy_filter_module
+HTTP_SPDY_DEPS="src/http/ngx_http_spdy.h \
+                src/http/ngx_http_spdy_module.h"
+HTTP_SPDY_SRCS="src/http/ngx_http_spdy.c \
+                src/http/ngx_http_spdy_module.c \
+                src/http/ngx_http_spdy_filter_module.c \
+                src/http/ngx_http_spdy_v3.c"
+
+
 HTTP_CHARSET_FILTER_MODULE=ngx_http_charset_filter_module
 HTTP_CHARSET_SRCS=src/http/modules/ngx_http_charset_filter_module.c
 
 
 HTTP_GZIP_FILTER_MODULE=ngx_http_gzip_filter_module
 HTTP_GZIP_SRCS=src/http/modules/ngx_http_gzip_filter_module.c
+
+
+HTTP_GUNZIP_FILTER_MODULE=ngx_http_gunzip_filter_module
+HTTP_GUNZIP_SRCS=src/http/modules/ngx_http_gunzip_filter_module.c
 
 
 HTTP_SSI_FILTER_MODULE=ngx_http_ssi_filter_module
@@ -387,6 +402,9 @@ HTTP_ADDITION_SRCS=src/http/modules/ngx_http_addition_filter_module.c
 
 HTTP_FOOTER_FILTER_MODULE=ngx_http_footer_filter_module
 HTTP_FOOTER_FILTER_SRCS=src/http/modules/ngx_http_footer_filter_module.c
+
+HTTP_TRIM_FILTER_MODULE=ngx_http_trim_filter_module
+HTTP_TRIM_FILTER_SRCS=src/http/modules/ngx_http_trim_filter_module.c
 
 HTTP_DAV_MODULE=ngx_http_dav_module
 HTTP_DAV_SRCS=src/http/modules/ngx_http_dav_module.c
@@ -545,6 +563,11 @@ HTTP_UPSTREAM_KEEPALIVE_SRCS=" \
     src/http/modules/ngx_http_upstream_keepalive_module.c"
 
 
+HTTP_REQ_STATUS_MODULE=ngx_http_reqstat_module
+HTTP_REQ_STATUS_SRCS=src/http/modules/ngx_http_reqstat_module.c
+HTTP_REQ_STATUS_DEPS=src/http/modules/ngx_http_reqstat.h
+
+
 MAIL_INCS="src/mail"
 
 MAIL_DEPS="src/mail/ngx_mail.h"
@@ -691,6 +714,7 @@ NGX_HTTP_TFS_MODULE_DEPS="src/http/modules/tfs/ngx_http_tfs.h \
                           src/http/modules/tfs/ngx_http_tfs_restful.h \
                           src/http/modules/tfs/ngx_http_tfs_restful.h \
                           src/http/modules/tfs/ngx_http_tfs_protocol.h \
+                          src/http/modules/tfs/ngx_http_tfs_serialization.h \
                           src/http/modules/tfs/ngx_http_connection_pool.h \
                           src/http/modules/tfs/ngx_http_tfs_json.h \
                           src/http/modules/tfs/ngx_http_tfs_rc_server_info.h \
@@ -714,6 +738,7 @@ NGX_HTTP_TFS_MODULE_SRCS="src/http/modules/tfs/ngx_tfs_common.c \
                           src/http/modules/tfs/ngx_http_tfs.c \
                           src/http/modules/tfs/ngx_http_tfs_module.c \
                           src/http/modules/tfs/ngx_http_tfs_restful.c \
+                          src/http/modules/tfs/ngx_http_tfs_serialization.c \
                           src/http/modules/tfs/ngx_http_connection_pool.c \
                           src/http/modules/tfs/ngx_http_tfs_json.c \
                           src/http/modules/tfs/ngx_http_tfs_rc_server_info.c \

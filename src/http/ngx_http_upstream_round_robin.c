@@ -10,8 +10,6 @@
 #include <ngx_http.h>
 
 
-static ngx_int_t ngx_http_upstream_cmp_servers(const void *one,
-    const void *two);
 static ngx_http_upstream_rr_peer_t *ngx_http_upstream_get_peer(
     ngx_http_upstream_rr_peer_data_t *rrp);
 
@@ -73,11 +71,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            for (j = 0; j < server[i].naddrs; j++) {
-                if (server[i].backup) {
-                    continue;
-                }
+            if (server[i].backup) {
+                continue;
+            }
 
+            for (j = 0; j < server[i].naddrs; j++) {
                 peers->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peers->peer[n].socklen = server[i].addrs[j].socklen;
                 peers->peer[n].name = server[i].addrs[j].name;
@@ -104,10 +102,6 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         }
 
         us->peer.data = peers;
-
-        ngx_sort(&peers->peer[0], (size_t) n,
-                 sizeof(ngx_http_upstream_rr_peer_t),
-                 ngx_http_upstream_cmp_servers);
 
         /* backup servers */
 
@@ -143,11 +137,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         n = 0;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            for (j = 0; j < server[i].naddrs; j++) {
-                if (!server[i].backup) {
-                    continue;
-                }
+            if (!server[i].backup) {
+                continue;
+            }
 
+            for (j = 0; j < server[i].naddrs; j++) {
                 backup->peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 backup->peer[n].socklen = server[i].addrs[j].socklen;
                 backup->peer[n].name = server[i].addrs[j].name;
@@ -175,17 +169,13 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
 
         peers->next = backup;
 
-        ngx_sort(&backup->peer[0], (size_t) n,
-                 sizeof(ngx_http_upstream_rr_peer_t),
-                 ngx_http_upstream_cmp_servers);
-
         return NGX_OK;
     }
 
 
     /* an upstream implicitly defined by proxy_pass, etc. */
 
-    if (us->port == 0 && us->default_port == 0) {
+    if (us->port == 0) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                       "no port in upstream \"%V\" in %s:%ui",
                       &us->host, us->file_name, us->line);
@@ -195,7 +185,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_memzero(&u, sizeof(ngx_url_t));
 
     u.host = us->host;
-    u.port = (in_port_t) (us->port ? us->port : us->default_port);
+    u.port = us->port;
 
     if (ngx_inet_resolve_host(cf->pool, &u) != NGX_OK) {
         if (u.err) {
@@ -242,18 +232,6 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     /* implicitly defined upstream has no backup servers */
 
     return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_upstream_cmp_servers(const void *one, const void *two)
-{
-    ngx_http_upstream_rr_peer_t  *first, *second;
-
-    first = (ngx_http_upstream_rr_peer_t *) one;
-    second = (ngx_http_upstream_rr_peer_t *) two;
-
-    return (first->weight < second->weight);
 }
 
 
@@ -434,7 +412,6 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
 
     ngx_int_t                      rc;
     ngx_uint_t                     i, n;
-    ngx_connection_t              *c;
     ngx_http_upstream_rr_peer_t   *peer;
     ngx_http_upstream_rr_peers_t  *peers;
 
@@ -442,26 +419,6 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
                    "get rr peer, try: %ui", pc->tries);
 
     /* ngx_lock_mutex(rrp->peers->mutex); */
-
-    if (rrp->peers->last_cached) {
-
-        /* cached connection */
-
-        c = rrp->peers->cached[rrp->peers->last_cached];
-        rrp->peers->last_cached--;
-
-        /* ngx_unlock_mutex(ppr->peers->mutex); */
-
-#if (NGX_THREADS)
-        c->read->lock = c->read->own_lock;
-        c->write->lock = c->write->own_lock;
-#endif
-
-        pc->connection = c;
-        pc->cached = 1;
-
-        return NGX_OK;
-    }
 
     pc->cached = 0;
     pc->connection = NULL;
@@ -617,7 +574,10 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
     rrp->tried[n] |= m;
 
     best->current_weight -= total;
-    best->checked = now;
+
+    if (now - best->checked > best->fail_timeout) {
+        best->checked = now;
+    }
 
     return best;
 }

@@ -124,7 +124,14 @@ struct ngx_http_upstream_srv_conf_s {
     ngx_uint_t                       line;
     in_port_t                        port;
     in_port_t                        default_port;
+    ngx_uint_t                       no_port;  /* unsigned no_port:1 */
 };
+
+
+typedef struct {
+    ngx_addr_t                      *addr;
+    ngx_http_complex_value_t        *value;
+} ngx_http_upstream_local_t;
 
 
 typedef struct {
@@ -150,7 +157,9 @@ typedef struct {
 
     ngx_uint_t                       ignore_headers;
     ngx_uint_t                       next_upstream;
+    ngx_uint_t                       upstream_tries;
     ngx_uint_t                       store_access;
+    ngx_flag_t                       request_buffering;
     ngx_flag_t                       buffering;
     ngx_flag_t                       pass_request_headers;
     ngx_flag_t                       pass_request_body;
@@ -165,7 +174,7 @@ typedef struct {
     ngx_array_t                     *hide_headers;
     ngx_array_t                     *pass_headers;
 
-    ngx_addr_t                      *local;
+    ngx_http_upstream_local_t       *local;
 
 #if (NGX_HTTP_CACHE)
     ngx_shm_zone_t                  *cache;
@@ -285,6 +294,8 @@ struct ngx_http_upstream_s {
 
     ngx_http_upstream_resolved_t    *resolved;
 
+    ngx_buf_t                        from_client;
+
     ngx_buf_t                        buffer;
     off_t                            length;
 
@@ -292,6 +303,13 @@ struct ngx_http_upstream_s {
     ngx_chain_t                     *busy_bufs;
     ngx_chain_t                     *free_bufs;
 
+    /* Nginx => Upstream */
+    ngx_int_t                      (*output_filter_init)(void *data);
+    ngx_int_t                      (*output_filter)(void *data,
+                                         ngx_chain_t *in);
+    void                            *output_filter_ctx;
+
+    /* Upstream => Nginx */
     ngx_int_t                      (*input_filter_init)(void *data);
     ngx_int_t                      (*input_filter)(void *data, ssize_t bytes);
     void                            *input_filter_ctx;
@@ -330,6 +348,7 @@ struct ngx_http_upstream_s {
 
     unsigned                         buffering:1;
     unsigned                         keepalive:1;
+    unsigned                         upgrade:1;
 
     unsigned                         request_sent:1;
     unsigned                         header_sent:1;

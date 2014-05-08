@@ -74,6 +74,10 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
             }
 
         } else {
+            /* write retry ns */
+            if (segment_data->ds_retry > 0) {
+                return NULL;
+            }
             segment_data->ds_index = 0;
         }
         break;
@@ -94,10 +98,9 @@ ngx_http_tfs_select_data_server(ngx_http_tfs_t *t,
 ngx_chain_t *
 ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
 {
-    int32_t                       meta_segment_size;
+    uint32_t                      meta_segment_size;
     uint16_t                      action;
     ngx_int_t                     rc;
-    ngx_buf_t                    *b;
     ngx_chain_t                  *cl;
     ngx_http_tfs_segment_data_t  *segment_data;
 
@@ -108,9 +111,11 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
 
     switch (action) {
     case NGX_HTTP_TFS_ACTION_STAT_FILE:
-        t->json_output = ngx_http_tfs_json_init(t->log, t->pool);
-        if (t->json_output == NULL) {
-            return NULL;
+        if (t->r_ctx.chk_exist == NGX_HTTP_TFS_NO) {
+            t->json_output = ngx_http_tfs_json_init(t->log, t->pool);
+            if (t->json_output == NULL) {
+                return NULL;
+            }
         }
         if (t->is_large_file) {
             segment_data->oper_size = sizeof(ngx_http_tfs_segment_head_t);
@@ -127,26 +132,21 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
         if (t->is_large_file && t->is_process_meta_seg) {
             if (t->meta_segment_data == NULL) {
                 /* for files smaller than 140GB, 2MB is fairly enough */
-                b = ngx_create_temp_buf(t->pool,NGX_HTTP_TFS_MAX_FRAGMENT_SIZE);
-                if (b == NULL) {
-                    return NULL;
-                }
-                cl = ngx_alloc_chain_link(t->pool);
+                cl = ngx_http_tfs_chain_get_free_buf(t->pool, &t->free_bufs,
+                    NGX_HTTP_TFS_MAX_FRAGMENT_SIZE);
                 if (cl == NULL) {
                     return NULL;
                 }
-                cl->buf = b;
-                cl->next = NULL;
+                t->tfs_peer->body_buffer = *(cl->buf);
                 t->meta_segment_data = cl;
-                t->tfs_peer->body_buffer = *(t->meta_segment_data->buf);
             }
         }
 
-        /* use readv2 to get file size if we do not know
-         * readv2 require read offset is 0 */
+        /* use readv2 if read from start */
+        /* unless is large file data segment */
         if (t->r_ctx.version == 1
-            && t->file.left_length == NGX_HTTP_TFS_MAX_SIZE
-            && t->file.file_offset == 0)
+            && t->file.file_offset == 0
+            && !t->parent)
         {
             t->read_ver = NGX_HTTP_TFS_READ_V2;
         }
@@ -187,8 +187,8 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
             t->read_ver = NGX_HTTP_TFS_READ;
             if (t->meta_segment_data == NULL) {
                 if (t->use_dedup) {
-                    meta_segment_size = t->file_info.size;
-                    t->file.left_length = t->file_info.size;
+                    meta_segment_size = t->file_stat.size;
+                    t->file.left_length = t->file_stat.size;
                 }
                 /* if is large file, for files smaller than 140GB,
                  * 2MB is fairly enough
@@ -197,16 +197,11 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
                     meta_segment_size = NGX_HTTP_TFS_MAX_FRAGMENT_SIZE;
                     t->file.left_length = NGX_HTTP_TFS_MAX_SIZE;
                 }
-                b = ngx_create_temp_buf(t->pool, meta_segment_size);
-                if (b == NULL) {
-                    return NULL;
-                }
-                cl = ngx_alloc_chain_link(t->pool);
+                cl = ngx_http_tfs_chain_get_free_buf(t->pool, &t->free_bufs,
+                    meta_segment_size);
                 if (cl == NULL) {
                     return NULL;
                 }
-                cl->buf = b;
-                cl->next = NULL;
                 t->meta_segment_data = cl;
 
                 /* avoid alloc body_buffer twice */
@@ -214,7 +209,7 @@ ngx_http_tfs_data_server_create_message(ngx_http_tfs_t *t)
                     t->dedup_ctx.save_body_buffer = t->tfs_peer->body_buffer;
                 }
 
-                t->tfs_peer->body_buffer = *(t->meta_segment_data->buf);
+                t->tfs_peer->body_buffer = *(cl->buf);
             }
             t->header_size = sizeof(ngx_http_tfs_ds_read_response_t);
 
@@ -459,8 +454,7 @@ ngx_http_tfs_create_write_message(ngx_http_tfs_t *t,
                   segment_data->segment_info.file_id, req->offset,
                   req->length, t_crc.data_crc);
 
-    /* save here to update segment_info->crc after write success */
-    segment_data->curr_crc = t_crc.data_crc;
+    segment_data->segment_info.crc = t_crc.data_crc;
     req->header.base_header.len = size - sizeof(ngx_http_tfs_header_t)
                                    + req->length;
     req->header.base_header.crc = t_crc.crc;
@@ -902,10 +896,8 @@ ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
                 {
                     return NGX_ERROR;
                 }
-                t->file_info = readv2_rsp_tail->file_info;
-                if (t->file.left_length == NGX_HTTP_TFS_MAX_SIZE) {
-                    t->file.left_length = t->file_info.size;
-                }
+                ngx_http_tfs_wrap_raw_file_info(&readv2_rsp_tail->file_info, &t->file_stat);
+                t->file.left_length = ngx_min(t->file.left_length, (uint64_t)t->file_stat.size);
             }
             return NGX_OK;
         }
@@ -926,10 +918,8 @@ ngx_http_tfs_parse_read_message(ngx_http_tfs_t *t)
                 {
                     return NGX_ERROR;
                 }
-                t->file_info = readv2_rsp_tail->file_info;
-                if (t->file.left_length == NGX_HTTP_TFS_MAX_SIZE) {
-                    t->file.left_length = t->file_info.size;
-                }
+                ngx_http_tfs_wrap_raw_file_info(&readv2_rsp_tail->file_info, &t->file_stat);
+                t->file.left_length = ngx_min(t->file.left_length, (uint64_t)t->file_stat.size);
 
             /* all data and partial file_info recvd */
             } else if (left_len > 0) {
@@ -1065,21 +1055,26 @@ ngx_http_tfs_parse_statfile_message(ngx_http_tfs_t *t,
         if (resp->data_len <= 0) {
             return NGX_HTTP_TFS_EXIT_GENERAL_ERROR;
         }
-        t->file_info = resp->file_info;
+        ngx_http_tfs_wrap_raw_file_info(&resp->file_info, &t->file_stat);
 
     } else {
         resp2 = (ngx_http_tfs_ds_sp_readv2_response_t *) tp->body_buffer.pos;
+        if (resp2->data_len == NGX_HTTP_TFS_EXIT_NO_LOGICBLOCK_ERROR) {
+            ngx_http_tfs_remove_block_cache(t, segment_data);
+            return NGX_HTTP_TFS_AGAIN;
+        }
+
         /* file deleted */
         if (resp2->data_len == NGX_HTTP_TFS_EXIT_FILE_INFO_ERROR) {
-            resp2->file_info.id =
-                           ngx_http_tfs_raw_fsname_get_file_id(t->r_ctx.fsname);
-            resp2->file_info.offset = -1;
-            resp2->file_info.size = -1;
-            resp2->file_info.u_size = -1;
-            resp2->file_info.modify_time = -1;
-            resp2->file_info.create_time = -1;
-            resp2->file_info.flag = NGX_HTTP_TFS_FILE_DELETED;
-            resp2->file_info.crc = 0;
+            t->file_stat.id =
+                     ngx_http_tfs_raw_fsname_get_file_id(t->r_ctx.fsname);
+            t->file_stat.offset = -1;
+            t->file_stat.size = -1;
+            t->file_stat.u_size = -1;
+            t->file_stat.modify_time = -1;
+            t->file_stat.create_time = -1;
+            t->file_stat.flag = NGX_HTTP_TFS_FILE_DELETED;
+            t->file_stat.crc = 0;
 
         } else {
             if (resp2->data_len != sizeof(ngx_http_tfs_segment_head_t)
@@ -1087,12 +1082,11 @@ ngx_http_tfs_parse_statfile_message(ngx_http_tfs_t *t,
             {
                 return NGX_HTTP_TFS_EXIT_GENERAL_ERROR;
             }
-            resp2->file_info.size = resp2->seg_head.size;
-            resp2->file_info.u_size =
+            t->file_stat.size = resp2->seg_head.size;
+            t->file_stat.u_size =
                                  resp2->file_info.u_size + resp2->seg_head.size;
         }
 
-        t->file_info = resp2->file_info;
     }
 
     return NGX_OK;
@@ -1138,6 +1132,7 @@ ngx_http_tfs_set_meta_segment_data(ngx_http_tfs_t *t)
 {
     uint32_t                      i, segment_count;
     uint64_t                      size;
+    ngx_int_t                     rc;
     ngx_buf_t                    *b;
     ngx_chain_t                  *cl;
     ngx_http_tfs_segment_info_t  *seg_info;
@@ -1171,8 +1166,17 @@ ngx_http_tfs_set_meta_segment_data(ngx_http_tfs_t *t)
        which we pre-alloc in ngx_http_tfs_get_segment_for_write */
     t->file.segment_count += 1;
     segment_data = &t->file.segment_data[t->file.segment_index];
+
     segment_data->data = cl;
+    /* copy data to orig_data so that we can retry write */
+    rc = ngx_chain_add_copy_with_buf(t->pool,
+        &segment_data->orig_data, segment_data->data);
+    if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
     segment_data->oper_size = size;
+    segment_data->segment_info.size = size;
 
     t->file.left_length = size;
     t->is_process_meta_seg = NGX_HTTP_TFS_YES;
@@ -1359,11 +1363,12 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
 
     /* find out the segment we should start with */
     seg_count = t->seg_head->count;
-    max_seg_count = (b->last - (u_char *)seg_info) / sizeof(ngx_http_tfs_segment_info_t);
+    max_seg_count = (b->last - (u_char *) seg_info)
+                     / sizeof(ngx_http_tfs_segment_info_t);
     if (t->seg_head->count > max_seg_count) {
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                      "seg_count in seg_head larger than max seg_count, %uD > %uD, "
-                      " seg_head may be corrupted.",
+                      "seg_count in seg_head larger than max seg_count, "
+                      "%uD > %uD, seg_head may be corrupted.",
                       t->seg_head->count, max_seg_count);
         seg_count = max_seg_count - 1;
     }
@@ -1412,7 +1417,7 @@ ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t)
     first_segment = &t->file.segment_data[0];
     first_segment->oper_offset = t->r_ctx.offset;
     if (first_segment->segment_info.offset > 0) {
-        first_segment->oper_offset %= first_segment->segment_info.offset;
+        first_segment->oper_offset -= first_segment->segment_info.offset;
     }
     first_segment->oper_size =
         first_segment->segment_info.size - first_segment->oper_offset;
@@ -1446,7 +1451,7 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
     size_t        data_size, buf_size, size;
     int64_t       offset;
     uint32_t      left_size;
-    ngx_uint_t    seg_count, i;
+    ngx_int_t     seg_count, i, rc;
     ngx_buf_t    *b;
     ngx_chain_t  *body, *cl, **ll;
 
@@ -1558,6 +1563,12 @@ ngx_http_tfs_get_segment_for_write(ngx_http_tfs_t *t)
 
             left_size -= buf_size;
         }
+        /* copy data to orig_data so that we can retry write */
+        rc = ngx_chain_add_copy_with_buf(t->pool,
+            &t->file.segment_data[i].orig_data, t->file.segment_data[i].data);
+        if (rc == NGX_ERROR) {
+            return NGX_ERROR;
+        }
     }
 
     return NGX_OK;
@@ -1592,11 +1603,12 @@ ngx_http_tfs_get_segment_for_delete(ngx_http_tfs_t *t)
 
     /* all data segments plus meta segment */
     seg_count = t->seg_head->count + 1;
-    max_seg_count = (b->last - (u_char *)seg_info) / sizeof(ngx_http_tfs_segment_info_t);
+    max_seg_count = (b->last - (u_char *) seg_info)
+                    / sizeof(ngx_http_tfs_segment_info_t);
     if (t->seg_head->count > max_seg_count) {
         ngx_log_error(NGX_LOG_ERR, t->log, 0,
-                      "seg_count in seg_head larger than max seg_count, %uD > %uD, "
-                      "seg_head may be corrupted",
+                      "seg_count in seg_head larger than max seg_count, "
+                      "%uD > %uD, seg_head may be corrupted",
                       t->seg_head->count, max_seg_count);
         seg_count = max_seg_count;
     }
@@ -1711,3 +1723,72 @@ ngx_http_tfs_fill_file_hole(ngx_http_tfs_t *t, size_t file_hole_size)
     return NGX_OK;
 }
 
+
+ngx_int_t
+ngx_http_tfs_check_file_hole(ngx_http_tfs_file_t *file, ngx_array_t *file_holes, ngx_log_t *log)
+{
+    int64_t                         curr_length;
+    uint32_t                        segment_count, i;
+    ngx_http_tfs_segment_data_t    *segment_data;
+    ngx_http_tfs_file_hole_info_t  *file_hole_info;
+
+    if (file == NULL || file_holes == NULL) {
+        return NGX_ERROR;
+    }
+
+    segment_data = file->segment_data;
+    if (segment_data != NULL) {
+        segment_count = file->segment_count;
+        for (i = 0; i < segment_count; i++, segment_data++) {
+            if (file->file_offset < segment_data->segment_info.offset) {
+                curr_length = ngx_min(file->left_length,
+                    (uint64_t)(segment_data->segment_info.offset - file->file_offset));
+                file_hole_info = ngx_array_push(file_holes);
+                if (file_hole_info == NULL) {
+                    return NGX_ERROR;
+                }
+
+                file_hole_info->offset = file->file_offset;
+                file_hole_info->length = curr_length;
+
+                ngx_log_error(NGX_LOG_DEBUG, log, 0,
+                              "find file hole, offset: %uL, length: %uL",
+                              file_hole_info->offset, file_hole_info->length);
+
+                file->file_offset += curr_length;
+                file->left_length -= curr_length;
+                if (file->left_length == 0) {
+                    break;
+                }
+            }
+            file->file_offset += segment_data->oper_size;
+            file->left_length -= segment_data->oper_size;
+            if (file->left_length == 0) {
+                break;
+            }
+        }
+    }
+
+    if (!file->still_have) {
+        /* left is all file hole(beyond last segment) */
+        if (file->left_length > 0) {
+            file_hole_info = ngx_array_push(file_holes);
+            if (file_hole_info == NULL) {
+                return NGX_ERROR;
+            }
+
+            file_hole_info->offset = file->file_offset;
+            file_hole_info->length = file->left_length;
+
+            ngx_log_error(NGX_LOG_DEBUG, log, 0,
+                          "find file hole, offset: %uL, length: %uL",
+                          file_hole_info->offset, file_hole_info->length);
+            file->file_offset += file->left_length;
+            file->left_length = 0;
+        }
+
+        return NGX_DONE;
+    }
+
+    return NGX_OK;
+}

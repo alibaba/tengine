@@ -17,8 +17,9 @@ NGX_GROUP=
 
 NGX_DSO_PATH=
 NGX_DSO_TOOL_PATH=
+NGX_INCLUDE_PATH=
 
-CC=${CC:-gcc}
+CC=${CC:-cc}
 CPP=
 NGX_OBJS=objs
 
@@ -89,6 +90,7 @@ NGX_ALL_MODULES="
     ngx_http_map_module
     ngx_http_split_clients_module
     ngx_http_user_agent_module
+    ngx_http_reqstat_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -128,6 +130,7 @@ NGX_ALL_MODULES="
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
     ngx_http_footer_filter_module
+    ngx_http_trim_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -151,6 +154,45 @@ NGX_SHARED_PATH=
 NGX_DSO_ALL_TARGETS=
 
 
+NGX_DSO_ABI_ALL_TAG="
+    with-debug
+    with-http
+    with-http-cache
+    with-ipv6
+    with-syslog
+    with-http-gzip
+    with-http-gzip-satic
+    with-http-ssi
+    with-http-dav
+    with-http-realip
+    with-http-geoip
+    with-http-geo
+    with-http-ssl
+    with-http-proxy
+    with-http-degradation
+    with-http-upstream-check
+    with-http-stat-stub"
+
+NGX_DSO_ABI_COMPATIBILITY=0x00000000
+NGX_DSO_DEBUG_TAG=0x00000001
+NGX_DSO_HTTP_TAG=0x00000002
+NGX_DSO_CACHE_TAG=0x00000004
+NGX_DSO_IPV6_TAG=0x00000008
+NGX_DSO_SYSLOG_TAG=0x00000010
+NGX_DSO_GZIP_TAG=0x00000020
+NGX_DSO_GZIP_STATIC_TAG=0x00000040
+NGX_DSO_SSI_TAG=0x00000080
+NGX_DSO_DAV_TAG=0x00000100
+NGX_DSO_REALIP_TAG=0x00000200
+NGX_DSO_GEOIP_TAG=0x00000400
+NGX_DSO_GEO_TAG=0x00000800
+NGX_DSO_SSL_TAG=0x00001000
+NGX_DSO_PROXY_TAG=0x00002000
+NGX_DSO_DEGRADATION_TAG=0x00004000
+NGX_DSO_UPSTREAM_CHECK_TAG=0x00008000
+NGX_DSO_STAT_STUB_TAG=0x00010000
+
+
 HTTP=YES
 
 NGX_HTTP_LOG_PATH=
@@ -164,6 +206,7 @@ HTTP_CACHE=YES
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
 HTTP_SSL=YES
+HTTP_SPDY=NO
 HTTP_SSI=YES
 HTTP_POSTPONE=NO
 HTTP_REALIP=NO
@@ -203,9 +246,11 @@ HTTP_SYSGUARD=NO
 HTTP_FLV=NO
 HTTP_SLICE=NO
 HTTP_MP4=NO
+HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
+HTTP_TRIM=YES
 HTTP_USER_AGENT=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
@@ -216,6 +261,7 @@ HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
 
 # STUB
 HTTP_STUB_STATUS=YES
+HTTP_REQ_STATUS=YES
 
 # shared modules
 HTTP_XSLT_SHARED=NO
@@ -235,6 +281,7 @@ HTTP_MP4_SHARED=NO
 HTTP_CHARSET_SHARED=NO
 HTTP_USERID_SHARED=NO
 HTTP_FOOTER_SHARED=NO
+HTTP_TRIM_SHARED=NO
 HTTP_ACCESS_SHARED=NO
 HTTP_AUTOINDEX_SHARED=NO
 HTTP_STATUS_SHARED=NO
@@ -254,6 +301,7 @@ HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+HTTP_REQ_STATUS_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -347,6 +395,7 @@ do
 
         --dso-path=*)                              NGX_DSO_PATH="$value"      ;;
         --dso-tool-path=*)                         NGX_DSO_TOOL_PATH="$value" ;;
+        --includedir=*)                            NGX_INCLUDE_PATH="$value"  ;;
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
@@ -387,6 +436,7 @@ do
         --http-scgi-temp-path=*)                   NGX_HTTP_SCGI_TEMP_PATH="$value" ;;
 
         --with-http_ssl_module)                    HTTP_SSL=YES                      ;;
+        --with-http_spdy_module)                   HTTP_SPDY=YES                     ;;
         --with-http_realip_module)                 HTTP_REALIP=YES                   ;;
         --with-http_addition_module)               HTTP_ADDITION=YES
                                                    HTTP_ADDITION_SHARED=NO           ;;
@@ -405,6 +455,7 @@ do
                                                    HTTP_SLICE_SHARED=NO              ;;
         --with-http_mp4_module)                    HTTP_MP4=YES
                                                    HTTP_MP4_SHARED=NO                ;;
+        --with-http_gunzip_module)                 HTTP_GUNZIP=YES                   ;;
         --with-http_gzip_static_module)            HTTP_GZIP_STATIC=YES              ;;
         --with-http_concat_module)                 HTTP_CONCAT=YES
                                                    HTTP_CONCAT_SHARED=NO             ;;
@@ -449,6 +500,8 @@ do
                                                    HTTP_USERID=NO                    ;;
         --with-http_footer_filter_module=shared)   HTTP_FOOTER_SHARED=YES
                                                    HTTP_FOOTER=NO                    ;;
+        --with-http_trim_filter_module=shared)     HTTP_TRIM_SHARED=YES
+                                                   HTTP_TRIM=NO                    ;;
         --with-http_access_module=shared)          HTTP_ACCESS_SHARED=YES
                                                    HTTP_ACCESS=NO                    ;;
         --with-http_autoindex_module=shared)       HTTP_AUTOINDEX_SHARED=YES
@@ -491,6 +544,8 @@ do
         --with-http_upstream_session_sticky_module=shared)
                                                    HTTP_UPSTREAM_SESSION_STICKY=NO
                                                    HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
+        --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
+                                                   HTTP_REQ_STATUS_SHARED=YES        ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
                                          HTTP_CHARSET_SHARED=NO     ;;
@@ -499,8 +554,10 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO
                                          HTTP_USERID_SHARED=NO      ;;
-        --without-http_footer_module)    HTTP_FOOTER=NO
-                                         HTTP_FOOTER_SHARED=NO      ;;
+        --without-http_footer_filter_module) HTTP_FOOTER=NO
+                                             HTTP_FOOTER_SHARED=NO  ;;
+        --without-http_trim_filter_module) HTTP_TRIM=NO
+                                           HTTP_TRIM_SHARED=NO  ;;
         --without-http_access_module)    HTTP_ACCESS=NO
                                          HTTP_ACCESS_SHARED=NO      ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
@@ -508,6 +565,8 @@ do
                                          HTTP_AUTOINDEX_SHARED=NO   ;;
         --without-http_status_module)    HTTP_STATUS=NO
                                          HTTP_STATUS_SHARED=NO      ;;
+        --without-http_reqstat_module)   HTTP_REQ_STATUS=NO
+                                         HTTP_REQ_STATUS_SHARED=NO  ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
         --without-http_map_module)       HTTP_MAP=NO
                                          HTTP_MAP_SHARED=NO         ;;
@@ -666,8 +725,9 @@ cat << END
   --enable-mods-shared=all           enable all the modules to be shared
   --enable-mods-static=all           enable all the modules to be static
 
-  --dso-path=*)                      set dso default load path
-  --dso-tool-path=*)                 set dso_tool pathname
+  --dso-path=DIR                     set dso default load path
+  --dso-tool-path=DIR                set dso_tool pathname
+  --includedir=DIR                   set C header files[PREFIX/include]
 
   --with-rtsig_module                enable rtsig module
   --with-select_module               enable select module
@@ -684,6 +744,7 @@ cat << END
 
   --without-dso                      disable dso module load
 
+  --with-http_spdy_module            enable ngx_http_spdy_module
   --with-http_realip_module          enable ngx_http_realip_module
   --with-http_addition_module        enable ngx_http_addition_filter_module
   --with-http_xslt_module            enable ngx_http_xslt_filter_module
@@ -694,6 +755,7 @@ cat << END
   --with-http_flv_module             enable ngx_http_flv_module
   --with-http_slice_module           enable ngx_http_slice_module
   --with-http_mp4_module             enable ngx_http_mp4_module
+  --with-http_gunzip_module          enable ngx_http_gunzip_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
   --with-http_concat_module          enable ngx_http_concat_module
   --with-http_random_index_module    enable ngx_http_random_index_module
@@ -722,6 +784,8 @@ cat << END
                                      enable ngx_http_userid_filter_module (shared)
   --with-http_footer_filter_module=shared
                                      enable ngx_http_footer_filter_module (shared)
+  --with-http_trim_filter_module=shared
+                                     enable ngx_http_trim_filter_module (shared)
   --with-http_access_module=shared   enable ngx_http_access_module (shared)
   --with-http_autoindex_module=shared
                                      enable ngx_http_autoindex_module (shared)
@@ -750,6 +814,7 @@ cat << END
                                      enable ngx_http_upstream_least_conn_module (shared)
   --with-http_upstream_session_sticky_module=shared
                                      enable ngx_http_upstream_session_sticky_module (shared)
+  --with-http_reqstat_module=shared  enable ngx_http_reqstat_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -758,6 +823,7 @@ cat << END
   --without-http_userid_module       disable ngx_http_userid_filter_module
   --without-http_footer_filter_module
                                      disable ngx_http_footer_filter_module
+  --without-http_trim_filter_module  disable ngx_http_trim_filter_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
@@ -790,6 +856,7 @@ cat << END
                                      disable ngx_http_upstream_consistent_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
@@ -897,6 +964,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_CHARSET_SHARED=YES
     HTTP_USERID_SHARED=YES
     HTTP_FOOTER_SHARED=YES
+    HTTP_TRIM_SHARED=YES
     HTTP_ACCESS_SHARED=YES
     HTTP_AUTOINDEX_SHARED=YES
     HTTP_MAP_SHARED=YES
@@ -915,6 +983,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
+    HTTP_REQ_STATUS_SHARED=YES
 
     HTTP_XSLT=NO
     HTTP_IMAGE_FILTER=NO
@@ -932,6 +1001,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_CHARSET=NO
     HTTP_USERID=NO
     HTTP_FOOTER=NO
+    HTTP_TRIM=NO
     HTTP_ACCESS=NO
     HTTP_AUTOINDEX=NO
     HTTP_MAP=NO
@@ -950,6 +1020,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
+    HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CACHE=YES
@@ -997,11 +1068,13 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_GZIP_STATIC=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
+    HTTP_TRIM=YES
     HTTP_USER_AGENT=YES
     HTTP_UPSTREAM_CHECK=YES
     HTTP_UPSTREAM_LEAST_CONN=YES
     HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
+    HTTP_REQ_STATUS=YES
 
     HTTP_XSLT_SHARED=NO
     HTTP_IMAGE_FILTER_SHARED=NO
@@ -1019,6 +1092,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CHARSET_SHARED=NO
     HTTP_USERID_SHARED=NO
     HTTP_FOOTER_SHARED=NO
+    HTTP_TRIM_SHARED=NO
     HTTP_ACCESS_SHARED=NO
     HTTP_AUTOINDEX_SHARED=NO
     HTTP_STATUS_SHARED=NO
@@ -1038,6 +1112,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+    HTTP_REQ_STATUS_SHARED=NO
 fi
 
 
@@ -1057,6 +1132,17 @@ if [ $HTTP = NO ]; then
     HTTP_PROXY=NO
     HTTP_FASTCGI=NO
     HTTP_FASTCGI_SHARED=NO
+
+fi
+
+
+if [ $NGX_DEBUG = YES ]; then
+    NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_DEBUG_TAG))
+fi
+
+
+if [ $NGX_IPV6 = YES ]; then
+    NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_IPV6_TAG))
 fi
 
 

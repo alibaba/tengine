@@ -134,6 +134,8 @@ struct ngx_resolver_ctx_s {
 };
 
 
+ngx_int_t ngx_resolver_read_resolv_file(ngx_conf_t *cf, ngx_str_t *filename,
+    ngx_str_t **names, ngx_uint_t *n);
 ngx_resolver_t *ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names,
     ngx_uint_t n);
 ngx_resolver_ctx_t *ngx_resolve_start(ngx_resolver_t *r,

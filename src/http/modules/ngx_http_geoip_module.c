@@ -182,7 +182,7 @@ static ngx_http_variable_t  ngx_http_geoip_vars[] = {
 
     { ngx_string("geoip_country_code"), NULL,
       ngx_http_geoip_country_variable,
-      NGX_GEOIP_COUNTRY_CODE, 0, 0 },      
+      NGX_GEOIP_COUNTRY_CODE, 0, 0 },
 
     { ngx_string("geoip_country_code3"), NULL,
       ngx_http_geoip_country_variable,
@@ -260,19 +260,18 @@ static u_long
 ngx_http_geoip_addr(ngx_http_request_t *r, ngx_http_geoip_conf_t *gcf)
 {
     ngx_addr_t           addr;
-    ngx_table_elt_t     *xfwd;
+    ngx_array_t         *xfwd;
     struct sockaddr_in  *sin;
 
     addr.sockaddr = r->connection->sockaddr;
     addr.socklen = r->connection->socklen;
     /* addr.name = r->connection->addr_text; */
 
-    xfwd = r->headers_in.x_forwarded_for;
+    xfwd = &r->headers_in.x_forwarded_for;
 
-    if (xfwd != NULL && gcf->proxies != NULL) {
-        (void) ngx_http_get_forwarded_addr(r, &addr, xfwd->value.data,
-                                           xfwd->value.len, gcf->proxies,
-                                           gcf->proxy_recursive);
+    if (xfwd->nelts > 0 && gcf->proxies != NULL) {
+        (void) ngx_http_get_forwarded_addr(r, &addr, xfwd, NULL,
+                                           gcf->proxies, gcf->proxy_recursive);
     }
 
 #if (NGX_HAVE_INET6)
@@ -313,7 +312,7 @@ static geoipv6_t
 ngx_http_geoip_addr_v6(ngx_http_request_t *r, ngx_http_geoip_conf_t *gcf)
 {
     ngx_addr_t            addr;
-    ngx_table_elt_t      *xfwd;
+    ngx_array_t          *xfwd;
     in_addr_t             addr4;
     struct in6_addr       addr6;
     struct sockaddr_in   *sin;
@@ -323,12 +322,11 @@ ngx_http_geoip_addr_v6(ngx_http_request_t *r, ngx_http_geoip_conf_t *gcf)
     addr.socklen = r->connection->socklen;
     /* addr.name = r->connection->addr_text; */
 
-    xfwd = r->headers_in.x_forwarded_for;
+    xfwd = &r->headers_in.x_forwarded_for;
 
-    if (xfwd != NULL && gcf->proxies != NULL) {
-        (void) ngx_http_get_forwarded_addr(r, &addr, xfwd->value.data,
-                                           xfwd->value.len, gcf->proxies,
-                                           gcf->proxy_recursive);
+    if (xfwd->nelts > 0 && gcf->proxies != NULL) {
+        (void) ngx_http_get_forwarded_addr(r, &addr, xfwd, NULL,
+                                           gcf->proxies, gcf->proxy_recursive);
     }
 
     switch (addr.sockaddr->sa_family) {
@@ -467,17 +465,17 @@ ngx_http_geoip_region_variable(ngx_http_request_t *r,
     char         *val;
     size_t        len;
     GeoIPRegion  *gr;
-    
+
     ngx_http_geoip_conf_t  *gcf;
 
     gcf = ngx_http_get_module_main_conf(r, ngx_http_geoip_module);
-    
+
     if (gcf->region == NULL) {
         goto not_found;
     }
-    
+
     gr = GeoIP_region_by_ipnum(gcf->region, ngx_http_geoip_addr(r, gcf));
-    
+
     if (gr == NULL) {
         goto not_found;
     }
@@ -840,7 +838,7 @@ ngx_http_geoip_region(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
     }
-    
+
     switch (gcf->region->databaseType) {
         case GEOIP_REGION_EDITION_REV0:
         case GEOIP_REGION_EDITION_REV1:
@@ -1029,8 +1027,8 @@ ngx_http_geoip_cleanup(void *data)
     if (gcf->country) {
         GeoIP_delete(gcf->country);
     }
-    
-	if (gcf->region) {
+
+    if (gcf->region) {
         GeoIP_delete(gcf->region);
     }
 

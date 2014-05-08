@@ -318,6 +318,13 @@ static ngx_command_t ngx_http_uwsgi_commands[] = {
       offsetof(ngx_http_uwsgi_loc_conf_t, upstream.next_upstream),
       &ngx_http_uwsgi_next_upstream_masks },
 
+    { ngx_string("uwsgi_upstream_tries"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_uwsgi_loc_conf_t, upstream.upstream_tries),
+      NULL },
+
     { ngx_string("uwsgi_param"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_upstream_param_set_slot,
@@ -1018,7 +1025,7 @@ ngx_http_uwsgi_process_header(ngx_http_request_t *r)
             u = r->upstream;
 
             if (u->headers_in.status_n) {
-                return NGX_OK;
+                goto done;
             }
 
             if (u->headers_in.status) {
@@ -1047,6 +1054,14 @@ ngx_http_uwsgi_process_header(ngx_http_request_t *r)
 
             if (u->state) {
                 u->state->status = u->headers_in.status_n;
+            }
+
+        done:
+
+            if (u->headers_in.status_n == NGX_HTTP_SWITCHING_PROTOCOLS
+                && r->headers_in.upgrade)
+            {
+                u->upgrade = 1;
             }
 
             return NGX_OK;
@@ -1104,6 +1119,10 @@ ngx_http_uwsgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.buffering = NGX_CONF_UNSET;
     conf->upstream.ignore_client_abort = NGX_CONF_UNSET;
 
+    conf->upstream.local = NGX_CONF_UNSET_PTR;
+
+    conf->upstream.local = NGX_CONF_UNSET_PTR;
+
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.read_timeout = NGX_CONF_UNSET_MSEC;
@@ -1114,6 +1133,8 @@ ngx_http_uwsgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.busy_buffers_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.max_temp_file_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.temp_file_write_size_conf = NGX_CONF_UNSET_SIZE;
+
+    conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
 
     conf->upstream.pass_request_headers = NGX_CONF_UNSET;
     conf->upstream.pass_request_body = NGX_CONF_UNSET;
@@ -1171,6 +1192,12 @@ ngx_http_uwsgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->upstream.ignore_client_abort,
                               prev->upstream.ignore_client_abort, 0);
+
+    ngx_conf_merge_ptr_value(conf->upstream.local,
+                              prev->upstream.local, NULL);
+
+    ngx_conf_merge_ptr_value(conf->upstream.local,
+                              prev->upstream.local, NULL);
 
     ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
                               prev->upstream.connect_timeout, 60000);
@@ -1290,6 +1317,10 @@ ngx_http_uwsgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                  (NGX_CONF_BITMASK_SET
                                   |NGX_HTTP_UPSTREAM_FT_ERROR
                                   |NGX_HTTP_UPSTREAM_FT_TIMEOUT));
+
+    ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
+                              prev->upstream.upstream_tries,
+                              NGX_CONF_UNSET_UINT);
 
     if (conf->upstream.next_upstream & NGX_HTTP_UPSTREAM_FT_OFF) {
         conf->upstream.next_upstream = NGX_CONF_BITMASK_SET
