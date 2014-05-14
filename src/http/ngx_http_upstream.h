@@ -275,6 +275,24 @@ typedef void (*ngx_http_upstream_handler_pt)(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 
 
+typedef struct {
+    ngx_http_request_t              *request;
+    ngx_chain_t                     *out;
+    ngx_chain_t                     *busy;
+    ngx_chain_t                     *free;
+    ngx_buf_tag_t                    tag;
+    void                            *data;
+} ngx_http_upstream_output_filter_ctx_t;
+
+
+typedef ngx_int_t (*ngx_http_upstream_output_filter_init_pt)
+    (ngx_http_upstream_output_filter_ctx_t *ctx);
+typedef ngx_int_t (*ngx_http_upstream_output_filter_pt)
+    (ngx_http_upstream_output_filter_ctx_t *ctx, ngx_chain_t *in);
+typedef void (*ngx_http_upstream_output_filter_update_pt)
+    (ngx_http_upstream_output_filter_ctx_t *ctx);
+
+
 struct ngx_http_upstream_s {
     ngx_http_upstream_handler_pt     read_event_handler;
     ngx_http_upstream_handler_pt     write_event_handler;
@@ -304,10 +322,10 @@ struct ngx_http_upstream_s {
     ngx_chain_t                     *free_bufs;
 
     /* Nginx => Upstream */
-    ngx_int_t                      (*output_filter_init)(void *data);
-    ngx_int_t                      (*output_filter)(void *data,
-                                         ngx_chain_t *in);
-    void                            *output_filter_ctx;
+    ngx_http_upstream_output_filter_init_pt    output_filter_init;
+    ngx_http_upstream_output_filter_pt         output_filter;
+    ngx_http_upstream_output_filter_update_pt  output_filter_update;
+    ngx_http_upstream_output_filter_ctx_t     *output_filter_ctx;
 
     /* Upstream => Nginx */
     ngx_int_t                      (*input_filter_init)(void *data);
