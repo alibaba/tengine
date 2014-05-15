@@ -849,6 +849,13 @@ ngx_feature_test="struct stat sb;
 . auto/feature
 
 
+if [ -f "/etc/resolv.conf" ]; then
+    have=NGX_RESOLVER_FILE
+    value=\"/etc/resolv.conf\"
+    . auto/define
+fi
+
+
 ngx_feature="getaddrinfo()"
 ngx_feature_name="NGX_HAVE_GETADDRINFO"
 ngx_feature_run=no

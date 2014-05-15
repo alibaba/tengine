@@ -1,0 +1,5 @@
+# Automatically added by dh_installinit
+if [ "$1" = "purge" ] ; then
+	update-rc.d tengine remove >/dev/null
+fi
+# End automatically added section

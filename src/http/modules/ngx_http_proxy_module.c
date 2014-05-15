@@ -98,8 +98,10 @@ static ngx_int_t ngx_http_proxy_create_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_reinit_request(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_process_status_line(ngx_http_request_t *r);
 static ngx_int_t ngx_http_proxy_process_header(ngx_http_request_t *r);
-static ngx_int_t ngx_http_proxy_output_filter_init(void *data);
-static ngx_int_t ngx_http_proxy_output_filter(void *data, ngx_chain_t *in);
+static ngx_int_t ngx_http_proxy_output_filter_init(
+    ngx_http_upstream_output_filter_ctx_t *ctx);
+static ngx_int_t ngx_http_proxy_output_filter(
+    ngx_http_upstream_output_filter_ctx_t *ctx, ngx_chain_t *in);
 static ngx_int_t ngx_http_proxy_input_filter_init(void *data);
 static ngx_int_t ngx_http_proxy_copy_filter(ngx_event_pipe_t *p,
     ngx_buf_t *buf);
@@ -122,6 +124,9 @@ static ngx_int_t
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t
     ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t
+    ngx_http_proxy_internal_transfer_encoding_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_proxy_rewrite_redirect(ngx_http_request_t *r,
     ngx_table_elt_t *h, size_t prefix);
@@ -572,7 +577,8 @@ static ngx_keyval_t  ngx_http_proxy_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("") },
+    { ngx_string("Transfer-Encoding"),
+      ngx_string("$proxy_internal_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -599,7 +605,8 @@ static ngx_keyval_t  ngx_http_proxy_cache_headers[] = {
     { ngx_string("Host"), ngx_string("$proxy_host") },
     { ngx_string("Connection"), ngx_string("close") },
     { ngx_string("Content-Length"), ngx_string("$proxy_internal_body_length") },
-    { ngx_string("Transfer-Encoding"), ngx_string("") },
+    { ngx_string("Transfer-Encoding"),
+      ngx_string("$proxy_internal_transfer_encoding") },
     { ngx_string("Keep-Alive"), ngx_string("") },
     { ngx_string("Expect"), ngx_string("") },
     { ngx_string("Upgrade"), ngx_string("") },
@@ -632,6 +639,10 @@ static ngx_http_variable_t  ngx_http_proxy_vars[] = {
 
     { ngx_string("proxy_internal_body_length"), NULL,
       ngx_http_proxy_internal_body_length_variable, 0,
+      NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+
+    { ngx_string("proxy_internal_transfer_encoding"), NULL,
+      ngx_http_proxy_internal_transfer_encoding_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
@@ -702,14 +713,13 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
     }
 
     r->request_buffering = plcf->upstream.request_buffering;
-    if (r->headers_in.content_length_n <= 0) {
+    if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         r->request_buffering = 1;
     }
 
     if (!r->request_buffering) {
         u->output_filter_init = ngx_http_proxy_output_filter_init;
         u->output_filter = ngx_http_proxy_output_filter;
-        u->output_filter_ctx = r;
     }
 
     u->buffering = plcf->upstream.buffering;
@@ -1037,7 +1047,12 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
         len += body_len;
 
     } else {
-        ctx->internal_body_length = r->headers_in.content_length_n;
+
+        if (r->headers_in.chunked && !r->request_buffering) {
+            ctx->internal_body_length = -1;
+        } else {
+            ctx->internal_body_length = r->headers_in.content_length_n;
+        }
     }
 
     le.ip = plcf->headers_set_len->elts;
@@ -1129,7 +1144,9 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
 
     u->uri.len = b->last - u->uri.data;
 
-    if (plcf->http_version == NGX_HTTP_VERSION_11) {
+    if (plcf->http_version == NGX_HTTP_VERSION_11
+        || (r->headers_in.chunked && !r->request_buffering))
+    {
         b->last = ngx_cpymem(b->last, ngx_http_proxy_version_11,
                              sizeof(ngx_http_proxy_version_11) - 1);
 
@@ -1221,6 +1238,7 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
     if (plcf->body_set) {
         e.ip = plcf->body_set->elts;
         e.pos = b->last;
+        e.skip = 0;
 
         while (*(uintptr_t *) e.ip) {
             code = *(ngx_http_script_code_pt *) e.ip;
@@ -1296,9 +1314,9 @@ ngx_http_proxy_reinit_request(ngx_http_request_t *r)
 
 
 static ngx_int_t
-ngx_http_proxy_output_filter_init(void *data)
+ngx_http_proxy_output_filter_init(ngx_http_upstream_output_filter_ctx_t *ctx)
 {
-    ngx_http_request_t  *r = data;
+    ngx_http_request_t  *r = ctx->request;
 
     r->upstream->request_bufs = NULL;
 
@@ -1307,16 +1325,30 @@ ngx_http_proxy_output_filter_init(void *data)
 
 
 static ngx_int_t
-ngx_http_proxy_output_filter(void *data, ngx_chain_t *in)
+ngx_http_proxy_output_filter(ngx_http_upstream_output_filter_ctx_t *ctx,
+    ngx_chain_t *in)
 {
-    ngx_chain_t         *cl;
-    ngx_http_request_t  *r = data;
+    ngx_chain_t         *cl, *out;
+    ngx_http_request_t  *r = ctx->request;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http proxy output filter");
 
+    if (in == NULL || !r->headers_in.chunked) {
+        out = in;
+        goto filter_done;
+    }
+
+    if (ngx_http_chunked_output_filter(r, in, &ctx->out,
+                                       &ctx->free, ctx->tag) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    out = ctx->out;
+
+filter_done:
     if (r->upstream->request_bufs == NULL) {
-        r->upstream->request_bufs = in;
+        r->upstream->request_bufs = out;
     } else {
         cl = r->upstream->request_bufs;
 
@@ -1324,7 +1356,7 @@ ngx_http_proxy_output_filter(void *data, ngx_chain_t *in)
             cl = cl->next;
         }
 
-        cl->next = in;
+        cl->next = out;
     }
 
     return NGX_OK;
@@ -2147,6 +2179,33 @@ ngx_http_proxy_internal_body_length_variable(ngx_http_request_t *r,
     }
 
     v->len = ngx_sprintf(v->data, "%O", ctx->internal_body_length) - v->data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_proxy_internal_transfer_encoding_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_proxy_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_proxy_module);
+
+    if (ctx == NULL
+        || ctx->internal_body_length > 0
+        || !r->headers_in.chunked
+        || r->request_buffering)
+    {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = sizeof("chunked") - 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = (u_char *) "chunked";
 
     return NGX_OK;
 }

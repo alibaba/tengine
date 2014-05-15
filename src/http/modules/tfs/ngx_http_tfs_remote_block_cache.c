@@ -352,7 +352,6 @@ ngx_http_tfs_remote_block_cache_mget_handler(ngx_array_t *kvs, ngx_int_t rc,
 
                     hit_count++;
                     segment_data[j].cache_hit = NGX_HTTP_TFS_REMOTE_BLOCK_CACHE;
-                    segment_data[j].block_info_src = NGX_HTTP_TFS_FROM_CACHE;
 
                     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, t->log, 0,
                                    "remote block cache hit, "

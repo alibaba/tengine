@@ -70,7 +70,7 @@ ngx_http_restful_parse_raw(ngx_http_request_t *r,
     }
 
     if (r->method == NGX_HTTP_GET || r->method == NGX_HTTP_DELETE
-        || r->method == NGX_HTTP_PUT) {
+        || r->method == NGX_HTTP_PUT || r->method == NGX_HTTP_HEAD) {
         if (state == sw_appkey) {
             return NGX_ERROR;
         }
@@ -91,7 +91,6 @@ ngx_http_restful_parse_raw(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-    /* reserved for rc keepalive */
     } else {
         if (state == sw_appkey) {
             ctx->appkey.len = p - start;
@@ -576,8 +575,8 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
 
             ctx->size = NGX_HTTP_TFS_MAX_SIZE;
         }
+        break;
 
-        return NGX_OK;
     case NGX_HTTP_POST:
         ctx->action.code = NGX_HTTP_TFS_ACTION_WRITE_FILE;
         if (ngx_http_arg(r, (u_char *) "suffix", 6, &arg_value) == NGX_OK) {
@@ -643,7 +642,7 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
         }
 
         ngx_str_set(&ctx->action.msg, "write_file");
-        return NGX_OK;
+        break;
 
     case NGX_HTTP_DELETE:
         ctx->action.code = NGX_HTTP_TFS_ACTION_REMOVE_FILE;
@@ -702,10 +701,37 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
         {
             return NGX_HTTP_BAD_REQUEST;
         }
+        break;
 
-        return NGX_OK;
     case NGX_HTTP_HEAD:
-        return NGX_HTTP_BAD_REQUEST;
+        if (ngx_http_arg(r, (u_char *) "suffix", 6, &arg_value) == NGX_OK) {
+            ctx->file_suffix = arg_value;
+        }
+
+        rc = ngx_http_tfs_raw_fsname_parse(&ctx->file_path_s, &ctx->file_suffix,
+                                           &ctx->fsname);
+        if (rc != NGX_OK) {
+            return NGX_HTTP_BAD_REQUEST;
+        }
+
+        if (ngx_http_arg(r, (u_char *) "type", 4, &arg_value) == NGX_OK) {
+            if (arg_value.len != 1) {
+                return NGX_HTTP_BAD_REQUEST;
+            }
+            ctx->read_stat_type = ngx_atoi(arg_value.data, arg_value.len);
+            /* normal_read/stat(0) or force_read/stat(1) */
+            if (ctx->read_stat_type == NGX_ERROR
+                || (ctx->read_stat_type != NGX_HTTP_TFS_READ_STAT_NORMAL
+                    && ctx->read_stat_type != NGX_HTTP_TFS_READ_STAT_FORCE))
+            {
+                return NGX_HTTP_BAD_REQUEST;
+            }
+        }
+        ctx->action.code = NGX_HTTP_TFS_ACTION_STAT_FILE;
+        ngx_str_set(&ctx->action.msg, "stat_file");
+        ctx->chk_exist = NGX_HTTP_TFS_YES;
+        break;
+
     case NGX_HTTP_PUT:
         ctx->action.code = NGX_HTTP_TFS_ACTION_WRITE_FILE;
         if (ngx_http_arg(r, (u_char *) "suffix", 6, &arg_value) == NGX_OK) {
@@ -747,9 +773,10 @@ ngx_http_restful_parse_action_raw(ngx_http_request_t *r,
 
         ctx->is_raw_update = NGX_HTTP_TFS_YES;
         ngx_str_set(&ctx->action.msg, "write_file");
-        return NGX_OK;
+        break;
+
     default:
-        return NGX_ERROR;
+        return NGX_HTTP_BAD_REQUEST;
     }
 
     return NGX_OK;

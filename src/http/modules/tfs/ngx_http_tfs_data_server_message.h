@@ -25,6 +25,8 @@ ngx_int_t ngx_http_tfs_get_segment_for_read(ngx_http_tfs_t *t);
 ngx_int_t ngx_http_tfs_get_segment_for_delete(ngx_http_tfs_t *t);
 
 ngx_int_t ngx_http_tfs_fill_file_hole(ngx_http_tfs_t *t, size_t file_hole_size);
+ngx_int_t ngx_http_tfs_check_file_hole(ngx_http_tfs_file_t *file,
+    ngx_array_t *file_holes, ngx_log_t *log);
 
 
 #endif  /* _NGX_HTTP_TFS_DATA_SERVER_MESSAGE_H_INCLUDED_ */

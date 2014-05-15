@@ -1237,6 +1237,7 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #endif
 #if (NGX_HTTP_SPDY)
     ngx_uint_t             spdy;
+    ngx_uint_t             spdy_detect;
 #endif
 
     /*
@@ -1292,6 +1293,7 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #endif
 #if (NGX_HTTP_SPDY)
         spdy = lsopt->spdy || addr[i].opt.spdy;
+        spdy_detect = lsopt->spdy_detect || addr[i].opt.spdy_detect;
 #endif
 
         if (lsopt->set) {
@@ -1325,6 +1327,7 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #endif
 #if (NGX_HTTP_SPDY)
         addr[i].opt.spdy = spdy;
+        addr[i].opt.spdy_detect = spdy_detect;
 #endif
 
         return NGX_OK;
@@ -1849,6 +1852,7 @@ ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
 #endif
 #if (NGX_HTTP_SPDY)
         addrs[i].conf.spdy = addr[i].opt.spdy;
+        addrs[i].conf.spdy_detect = addr[i].opt.spdy_detect;
 #endif
 
         if (addr[i].hash.buckets == NULL
@@ -1913,6 +1917,7 @@ ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
 #endif
 #if (NGX_HTTP_SPDY)
         addrs6[i].conf.spdy = addr[i].opt.spdy;
+        addrs6[i].conf.spdy_detect = addr[i].opt.spdy_detect;
 #endif
 
         if (addr[i].hash.buckets == NULL
