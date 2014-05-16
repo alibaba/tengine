@@ -122,7 +122,7 @@ static ngx_http_output_header_filter_pt ngx_http_ss_next_header_filter;
 static ngx_command_t ngx_http_session_sticky_commands[] = {
 
     { ngx_string("session_sticky"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_ANY,
+      NGX_HTTP_UPS_CONF|NGX_CONF_ANY|NGX_CONF_1MORE,
       ngx_http_upstream_session_sticky,
       NGX_HTTP_SRV_CONF_OFFSET,
       0,
@@ -513,10 +513,8 @@ finish:
     {
         cookie->len -= (end - st);
         if (cookie->len == 0) {
-            rc = ngx_list_delete(&r->headers_in.headers, cookies[i]);
-            if (rc != NGX_OK) {
-                return NGX_ERROR;
-            }
+            cookies[i]->hash = 0;
+            return NGX_OK;
         }
 
         while (end < last) {
