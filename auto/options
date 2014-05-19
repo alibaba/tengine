@@ -257,6 +257,7 @@ HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 HTTP_UPSTREAM_CONSISTENT_HASH=YES
 HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
+HTTP_UPSTREAM_RBTREE=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
@@ -679,6 +680,8 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
+
+        --without-http-upstream-rbtree)  HTTP_UPSTREAM_RBTREE=NO    ;;
 
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
