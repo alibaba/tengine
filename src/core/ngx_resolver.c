@@ -191,7 +191,7 @@ ngx_resolver_read_resolv_file(ngx_conf_t *cf, ngx_str_t *filename, ngx_str_t **n
     ngx_memzero(&file, sizeof(ngx_file_t));
 
     file.name.data = filename->data;
-    file.name.len = sizeof(NGX_RESOLVER_FILE) - 1;
+    file.name.len = filename->len;
     file.log = cf->log;
 
     file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
