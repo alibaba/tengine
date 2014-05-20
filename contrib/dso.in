@@ -185,10 +185,12 @@ END
             echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_PREFIX
             cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_PREFIX
 	else
-            test ! -f $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext} \
-		|| unlink $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH${ngx_dirsep}${dso_binout}${ngx_soext}
-            echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
-            cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_PREFIX/$NGX_DSO_PATH
+            NGX_DSO_DEST=$NGX_PREFIX${ngx_dirsep}$NGX_DSO_PATH
+            [[ $NGX_DSO_PATH == /* ]] && NGX_DSO_DEST=$NGX_DSO_PATH
+            test ! -f $NGX_DSO_DEST${ngx_dirsep}${dso_binout}${ngx_soext} \
+		|| unlink $NGX_DSO_DEST${ngx_dirsep}${dso_binout}${ngx_soext}
+            echo copying $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} to $NGX_DSO_DEST
+            cp $NGX_OBJS${ngx_dirsep}${dso_binout}${ngx_soext} $NGX_DSO_DEST
 	fi
     fi
 }
