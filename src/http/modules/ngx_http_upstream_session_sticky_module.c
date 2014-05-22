@@ -513,8 +513,10 @@ finish:
     {
         cookie->len -= (end - st);
         if (cookie->len == 0) {
-            cookies[i]->hash = 0;
-            return NGX_OK;
+            rc = ngx_list_delete(&r->headers_in.headers, cookies[i]);
+            if (rc != NGX_OK) {
+                return NGX_ERROR;
+            }
         }
 
         while (end < last) {
