@@ -35,9 +35,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-	proxy_set_header Host $http_host;
-
-	upstream insert_indirect {
+    upstream insert_indirect {
         session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert option=indirect fallback=on;
 
         server          127.0.0.1:9000;
@@ -129,9 +127,9 @@ http {
     }
 
     upstream nothing {
-        session_sticky cookie=test maxidle=3600 option=indirect;
-        server         127.0.0.1:9000;
-        server         127.0.0.1:9001;
+        session_sticky cookie=test;
+        server         127.0.0.1:9002;
+        server         127.0.0.1:9003;
     }
 
     upstream insert_nocookie {
@@ -198,7 +196,7 @@ http {
     }
 
     server {
-        listen      8080;
+        listen      127.0.0.1:8080;
         server_name localhost;
 
         location /test_insert_indirect {
@@ -304,17 +302,9 @@ http {
         }
 
         location /test_nothing {
-            session_sticky_hide_cookie upstream=nothing;
             proxy_pass http://nothing/;
         }
     }
-
-	server {
-		listen 8080 default;
-
-		location /no_location {
-		}
-	}
 }
 
 EOF
@@ -477,10 +467,9 @@ sub my_http_get
     my ($url, $cookie) = @_;
     my $r = http(<<EOF);
 GET $url HTTP/1.1
+Host: localhost
 Connection: close
 Cookie: test=$cookie
-Host: localhost
-User-Agent:chrome
 
 EOF
 }
