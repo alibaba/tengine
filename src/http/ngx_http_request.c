@@ -567,6 +567,7 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     }
 
     b->last += n;
+    c->received += n;
 
     c->log->action = "reading client request line";
 
@@ -1487,6 +1488,7 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
+    c->received += n;
 
     return n;
 }
@@ -2970,6 +2972,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         c->data = r;
 
         c->sent = 0;
+
+        /* bytes in the buffer have already been counted */
+        c->received = 0;
+
         c->destroyed = 0;
 
         if (rev->timer_set) {
@@ -3223,6 +3229,7 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     }
 
     c->sent = 0;
+    c->received = n;
     c->destroyed = 0;
 
     ngx_del_timer(rev);
@@ -3313,6 +3320,8 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
             ngx_http_close_request(r, 0);
             return;
         }
+
+        c->received += n;
 
     } while (rev->ready);
 

@@ -90,6 +90,7 @@ NGX_ALL_MODULES="
     ngx_http_map_module
     ngx_http_split_clients_module
     ngx_http_user_agent_module
+    ngx_http_reqstat_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -257,9 +258,11 @@ HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 HTTP_UPSTREAM_CONSISTENT_HASH=YES
 HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
+HTTP_UPSTREAM_RBTREE=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
+HTTP_REQ_STATUS=YES
 
 # shared modules
 HTTP_XSLT_SHARED=NO
@@ -299,6 +302,7 @@ HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+HTTP_REQ_STATUS_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -542,6 +546,8 @@ do
         --with-http_upstream_session_sticky_module=shared)
                                                    HTTP_UPSTREAM_SESSION_STICKY=NO
                                                    HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
+        --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
+                                                   HTTP_REQ_STATUS_SHARED=YES        ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
                                          HTTP_CHARSET_SHARED=NO     ;;
@@ -561,6 +567,8 @@ do
                                          HTTP_AUTOINDEX_SHARED=NO   ;;
         --without-http_status_module)    HTTP_STATUS=NO
                                          HTTP_STATUS_SHARED=NO      ;;
+        --without-http_reqstat_module)   HTTP_REQ_STATUS=NO
+                                         HTTP_REQ_STATUS_SHARED=NO  ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
         --without-http_map_module)       HTTP_MAP=NO
                                          HTTP_MAP_SHARED=NO         ;;
@@ -679,6 +687,8 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
+
+        --without-http-upstream-rbtree)  HTTP_UPSTREAM_RBTREE=NO    ;;
 
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
@@ -809,6 +819,7 @@ cat << END
                                      enable ngx_http_upstream_least_conn_module (shared)
   --with-http_upstream_session_sticky_module=shared
                                      enable ngx_http_upstream_session_sticky_module (shared)
+  --with-http_reqstat_module=shared  enable ngx_http_reqstat_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -850,6 +861,7 @@ cat << END
                                      disable ngx_http_upstream_consistent_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
@@ -976,6 +988,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
+    HTTP_REQ_STATUS_SHARED=YES
 
     HTTP_XSLT=NO
     HTTP_IMAGE_FILTER=NO
@@ -1012,6 +1025,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
+    HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CACHE=YES
@@ -1065,6 +1079,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_LEAST_CONN=YES
     HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
+    HTTP_REQ_STATUS=YES
 
     HTTP_XSLT_SHARED=NO
     HTTP_IMAGE_FILTER_SHARED=NO
@@ -1102,6 +1117,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+    HTTP_REQ_STATUS_SHARED=NO
 fi
 
 
