@@ -1,3 +1,23 @@
+Changes with Tengine 2.0.3                                       21 May 2014
+
+    *) Feature: support running status statistics on specific key, domain, url, etc.
+       (cfsego)
+
+    *) Feature: support debian/ubuntu packaging. (betetrpm, szepeviktor)
+
+    *) Change: merge changes between nginx-1.4.6 and nginx-1.4.7. (chobits)
+
+    *) Change: speed up upstream parsing and lookup by RB Tree. (SarahWang)
+
+    *) Change: update copyright.
+
+    *) Bugfix: fix bugs of session-sticky. (dinic)
+
+    *) Bugfix: fix compilation and install problems of DSO modules. (cfsego)
+
+    *) Bugfix: fix bugs of SPDY. (chobits)
+
+
 Changes with Tengine 2.0.2                                       28 March 2014
 
     *) Bugfix: send output queue after processing of read event in SPDY. (chobits)
