@@ -161,7 +161,7 @@ NGX_DSO_ABI_ALL_TAG="
     with-ipv6
     with-syslog
     with-http-gzip
-    with-http-gzip-satic
+    with-http-gzip-static
     with-http-ssi
     with-http-dav
     with-http-realip
@@ -171,7 +171,8 @@ NGX_DSO_ABI_ALL_TAG="
     with-http-proxy
     with-http-degradation
     with-http-upstream-check
-    with-http-stat-stub"
+    with-http-stat-stub
+    with-http-upstream-rbtree"
 
 NGX_DSO_ABI_COMPATIBILITY=0x00000000
 NGX_DSO_DEBUG_TAG=0x00000001
@@ -191,6 +192,7 @@ NGX_DSO_PROXY_TAG=0x00002000
 NGX_DSO_DEGRADATION_TAG=0x00004000
 NGX_DSO_UPSTREAM_CHECK_TAG=0x00008000
 NGX_DSO_STAT_STUB_TAG=0x00010000
+NGX_DSO_UPSTREAM_RBTREE_TAG=0x00020000
 
 
 HTTP=YES
@@ -866,6 +868,8 @@ cat << END
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
   --with-perl=PATH                   set perl binary pathname
+
+  --without-http-upstream-rbtree     disable using rbtree for upstream lookup
 
   --with-http_lua_module             enable ngx_http_lua_module (will also enable --with-md5 and --with-sha1)
   --with-http_lua_module=shared      enable ngx_http_lua_module (shared) (will also enable --with-md5 and --with-sha1)
