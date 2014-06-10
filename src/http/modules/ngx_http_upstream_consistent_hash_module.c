@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2014 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -41,6 +41,11 @@ typedef struct {
 
 typedef struct {
     uint32_t                                hash;
+
+#if (NGX_HTTP_SSL)
+    ngx_ssl_session_t                  *ssl_session;
+#endif
+
     ngx_http_upstream_chash_server_t       *server;
     ngx_http_upstream_chash_srv_conf_t     *ucscf;
 } ngx_http_upstream_chash_peer_data_t;
@@ -63,6 +68,13 @@ static uint32_t ngx_http_upstream_chash_get_server_index(
 static void ngx_http_upstream_chash_delete_node(
     ngx_http_upstream_chash_srv_conf_t *ucscf,
     ngx_http_upstream_chash_server_t *server);
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_upstream_chash_set_peer_session(
+    ngx_peer_connection_t *pc, void *data);
+static void ngx_http_upstream_chash_save_peer_session(ngx_peer_connection_t *pc,
+    void *data);
+#endif
 
 
 static ngx_command_t ngx_http_upstream_chash_commands[] = {
@@ -306,6 +318,11 @@ ngx_http_upstream_init_chash_peer(ngx_http_request_t *r,
     r->upstream->peer.get = ngx_http_upstream_get_chash_peer;
     r->upstream->peer.free = ngx_http_upstream_free_chash_peer;
     r->upstream->peer.data = uchpd;
+
+#if (NGX_HTTP_SSL)
+    r->upstream->peer.set_session = ngx_http_upstream_chash_set_peer_session;
+    r->upstream->peer.save_session = ngx_http_upstream_chash_save_peer_session;
+#endif
 
     return NGX_OK;
 }
@@ -575,3 +592,55 @@ ngx_http_upstream_chash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+
+
+#if (NGX_HTTP_SSL)
+
+static ngx_int_t
+ngx_http_upstream_chash_set_peer_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_upstream_chash_peer_data_t *uchpd = data;
+
+    ngx_int_t            rc;
+    ngx_ssl_session_t   *ssl_session;
+
+    ssl_session = uchpd->ssl_session;
+    rc = ngx_ssl_set_session(pc->connection, ssl_session);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "set session: %p:%d",
+                   ssl_session, ssl_session ? ssl_session->references : 0);
+
+    return rc;
+}
+
+
+static void
+ngx_http_upstream_chash_save_peer_session(ngx_peer_connection_t *pc, void *data)
+{
+    ngx_http_upstream_chash_peer_data_t *uchpd = data;
+
+    ngx_ssl_session_t   *old_ssl_session, *ssl_session;
+
+    ssl_session = ngx_ssl_get_session(pc->connection);
+
+    if (ssl_session == NULL) {
+        return;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "save session: %p:%d", ssl_session, ssl_session->references);
+
+    old_ssl_session = uchpd->ssl_session;
+    uchpd->ssl_session = ssl_session;
+
+    if (old_ssl_session) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                       "old session: %p:%d",
+                       old_ssl_session, old_ssl_session->references);
+
+        ngx_ssl_free_session(old_ssl_session);
+    }
+}
+
+#endif
