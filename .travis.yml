@@ -1,0 +1,22 @@
+# travis-ci.org - continuous testing environment - http://docs.travis-ci.com/
+
+language: c
+compiler:
+  - gcc
+  - clang
+
+# The build machines are Ubuntu 12.04 x64
+before_install:
+  - sudo apt-get clean
+  - sudo apt-get update
+  - sudo apt-get install -y initscripts libc-bin libgd2-xpm-dev libgeoip-dev
+  - sudo apt-get install -y libxslt1-dev libpcre++0 libpcre++-dev
+  - sudo apt-get install -y liblua5.1-0-dev libssl-dev lua5.1 openssl passwd
+
+# TODO: fix tests so they don't depend on /usr/local/nginx/logs/
+#       so we can run `make`, `make test`, `make install`. 
+
+script: 
+  - ./configure --enable-mods-shared=all --with-file-aio --with-ipv6
+  - make
+  - sudo make install
