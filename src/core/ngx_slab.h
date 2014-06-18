@@ -18,6 +18,7 @@ typedef struct ngx_slab_page_s  ngx_slab_page_t;
 struct ngx_slab_page_s {
     uintptr_t         slab;
     ngx_slab_page_t  *next;
+    ngx_slab_page_t  *front;
     uintptr_t         prev;
 };
 
@@ -27,6 +28,7 @@ typedef struct {
 
     size_t            min_size;
     size_t            min_shift;
+    size_t            total_pages;
 
     ngx_slab_page_t  *pages;
     ngx_slab_page_t   free;
