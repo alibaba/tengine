@@ -382,6 +382,7 @@ struct ngx_http_upstream_s {
 
     unsigned                         request_sent:1;
     unsigned                         header_sent:1;
+    unsigned                         blocked:1;
 };
 
 
@@ -412,6 +413,8 @@ char *ngx_http_upstream_param_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
 ngx_int_t ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
     ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev,
     ngx_str_t *default_hide_headers, ngx_hash_init_t *hash);
+void ngx_http_upstream_connect(ngx_http_request_t *r,
+    ngx_http_upstream_t *u);
 
 
 #define ngx_http_conf_upstream_srv_conf(uscf, module)                         \
