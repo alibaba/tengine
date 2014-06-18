@@ -1,3 +1,13 @@
+Tengine 2.0.3 [2014-05-30]
+* Feature: 支持按指定维度(域名，url等)收集Tengine运行状态 [cfsego]
+* Feature: 支持debian、ubuntu打包 [betetrpm, szepeviktor]
+* Change: 合并nginx-1.4.7的修改 [chobits]
+* Change: 使用红黑树优化upstream配置解析和查找 [SarahWang]
+* Change: 更新版权信息
+* Bugfix: 修复session-sticky模块相关问题 [dinic]
+* Bugfix: 修复DSO编译和安装模块的问题 [cfsego]
+* Bugfix: 修复spdy相关问题 [chobits]
+
 Tengine 2.0.2 [2014-03-28]
 * Bugfix: 在读事件处理完后继续发送SPDY数据 [chobits]
 * Bugfix: CVE-2014-0133以及CVE-2014-0088 [chobits]

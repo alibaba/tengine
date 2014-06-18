@@ -18,6 +18,8 @@
 #define NGX_HTTP_IMAGE_RESIZE    3
 #define NGX_HTTP_IMAGE_CROP      4
 #define NGX_HTTP_IMAGE_ROTATE    5
+#define NGX_HTTP_IMAGE_CROP_KEEPX       6
+#define NGX_HTTP_IMAGE_CROP_KEEPY       7
 
 
 #define NGX_HTTP_IMAGE_START     0
@@ -846,7 +848,23 @@ transparent:
 
         resize = 0;
 
-        if ((double) dx / dy < (double) ctx->max_width / ctx->max_height) {
+        if (conf->filter == NGX_HTTP_IMAGE_CROP_KEEPX) {
+            if ((ngx_uint_t) dx > ctx->max_width) {
+                dy = dy * ctx->max_width / dx;
+                dy = dy ? dy : 1;
+                dx = ctx->max_width;
+                resize = 1;
+            }
+
+        } else if (conf->filter == NGX_HTTP_IMAGE_CROP_KEEPY) {
+            if ((ngx_uint_t) dy > ctx->max_height) {
+                dx = dx * ctx->max_height / dy;
+                dx = dx ? dx : 1;
+                dy = ctx->max_height;
+                resize = 1;
+            }
+
+        } else if ((double) dx / dy < (double) ctx->max_width / ctx->max_height) {
             if ((ngx_uint_t) dx > ctx->max_width) {
                 dy = dy * ctx->max_width / dx;
                 dy = dy ? dy : 1;
@@ -934,7 +952,9 @@ transparent:
         }
     }
 
-    if (conf->filter == NGX_HTTP_IMAGE_CROP) {
+    if (conf->filter == NGX_HTTP_IMAGE_CROP
+        || conf->filter == NGX_HTTP_IMAGE_CROP_KEEPX
+        || conf->filter == NGX_HTTP_IMAGE_CROP_KEEPY) {
 
         src = dst;
 
@@ -1421,6 +1441,12 @@ ngx_http_image_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     } else if (ngx_strcmp(value[i].data, "crop") == 0) {
         imcf->filter = NGX_HTTP_IMAGE_CROP;
+
+    } else if (ngx_strcmp(value[i].data, "crop_keepx") == 0) {
+        imcf->filter = NGX_HTTP_IMAGE_CROP_KEEPX;
+
+    } else if (ngx_strcmp(value[i].data, "crop_keepy") == 0) {
+        imcf->filter = NGX_HTTP_IMAGE_CROP_KEEPY;
 
     } else {
         goto failed;

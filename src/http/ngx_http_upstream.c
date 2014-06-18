@@ -5142,14 +5142,14 @@ ngx_http_upstream_add(ngx_conf_t *cf, ngx_url_t *u, ngx_uint_t flags)
             return NULL;
         }
 
-        if (u->port) {
+        if (!u->no_port) {
             ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                                "upstream \"%V\" may not have port %d",
                                &u->host, u->port);
             return NULL;
         }
 
-        if (uscf->port != u->port) {
+        if (uscf->port && u->port && uscf->port != u->port) {
             goto not_found;
         }
 
