@@ -28,6 +28,7 @@ Features
 * More user-friendly command lines, e.g., showing all compiled-in modules and supported directives.
 * Expiration times can be specified for certain MIME types.
 * Error pages can be reset to 'default'.
+* Linked to travis-ci.org, performing continuous testing
 * ...
 
 
