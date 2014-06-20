@@ -24,7 +24,7 @@ my $can_use_threads = eval 'use threads; 1';
 plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
-my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(8);
+my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(12);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -45,6 +45,8 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
     access_log    off;
+
+    sysguard_rt_cache 60s;
 
     server {
         listen       127.0.0.1:8080;
@@ -96,6 +98,30 @@ http {
             sysguard_mem free=%%free1%%k action=/limit;
         }
 
+        location /load_rt_limit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load1%% action=/limit;
+            sysguard_rt rt=0.001 period=1s;
+        }
+
+        location /load_rt_unlimit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load1%% action=/limit;
+            sysguard_rt rt=10.000 period=1s;
+        }
+
+        location /load_rt_unlimit2 {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load2%% action=/limit;
+            sysguard_rt rt=10.000 period=1s;
+        }
+
+        location /load_rt_unlimit3 {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load2%% action=/limit;
+            sysguard_rt rt=0.001 period=1s;
+        }
+
         location /limit {
             return 503;
         }
@@ -126,6 +152,7 @@ $content =~ s/%%free2%%/$free_up/gmse;
 
 $t->write_file_expand('nginx.conf', $content);
 
+$t->run_daemon(\&http_daemon);
 $t->run();
 
 ###############################################################################
@@ -140,6 +167,21 @@ like(http_get("/mem_load_limit"), qr/503/, 'mem_load_limit');
 like(http_get("/mem_load_limit1"), qr/503/, 'mem_load_limit1');
 like(http_get("/mem_load_limit2"), qr/503/, 'mem_load_limit2');
 like(http_get("/mem_load_limit3"), qr/404/, 'mem_load_limit3');
+
+# To expire cache (sysguard interval)
+sleep 1;
+
+http_get("/load_rt_limit");
+like(http_get("/load_rt_limit"), qr/503/, 'load_rt_limit');
+
+http_get("/load_rt_unlimit");
+like(http_get("/load_rt_unlimit"), qr/404/, 'load_rt_unlimit');
+
+like(http_get("/load_rt_unlimit2"), qr/404/, 'load_rt_unlimit2');
+
+http_get("/load_rt_limit");
+like(http_get("/load_rt_unlimit3"), qr/404/, 'load_rt_unlimit3');
+
 
 sub getload
 {
@@ -184,5 +226,53 @@ sub runload
     sleep(10);
     for ($i = 0; $i<=8; $i++) {
         $ths[$i]->kill('KILL')->detach();
+    }
+}
+
+sub http_daemon {
+    my $server = IO::Socket::INET->new(
+        Proto => 'tcp',
+        LocalHost => '127.0.0.1:8081',
+        Listen => 5,
+        Reuse => 1
+    )
+    or die "Can't create listening socket: $!\n";
+
+    local $SIG{PIPE} = 'IGNORE';
+
+    while (my $client = $server->accept()) {
+        $client->autoflush(1);
+
+        my $headers = '';
+        my $uri = '';
+
+        while (<$client>) {
+            $headers .= $_;
+            last if (/^\x0d?\x0a?$/);
+        }
+
+        $uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
+
+        if ($uri eq '/load_rt_limit') {
+            sleep 1;
+            print $client <<'EOF';
+HTTP/1.1 200 OK
+Connection: close
+
+EOF
+            print $client "TEST-OK-IF-YOU-SEE-THIS"
+            unless $headers =~ /^HEAD/i;
+
+        } else {
+
+            print $client <<"EOF";
+HTTP/1.1 404 Not Found
+Connection: close
+
+Oops, '$uri' not found
+EOF
+        }
+
+        close $client;
     }
 }
