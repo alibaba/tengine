@@ -9,21 +9,6 @@
 
 
 typedef struct {
-    ngx_flag_t  enable;
-    ngx_int_t   load;
-    ngx_str_t   load_action;
-    ngx_int_t   swap;
-    ngx_str_t   swap_action;
-    size_t      free;
-    ngx_str_t   free_action;
-    ngx_int_t   rt;
-    ngx_int_t   rt_period;
-    time_t      interval;
-
-    ngx_uint_t  log_level;
-} ngx_http_sysguard_conf_t;
-
-typedef struct {
     time_t           stamp;
     ngx_uint_t       requests;
     time_t           sec;
@@ -31,11 +16,33 @@ typedef struct {
 } ngx_http_sysguard_rt_node_t;
 
 typedef struct {
-    ngx_slab_pool_t              *shpool;
     ngx_http_sysguard_rt_node_t  *slots;
     ngx_int_t                     nr_slots;
     ngx_int_t                     current;
+
+    time_t                        cached_rt_exptime;
+    ngx_int_t                     cached_rt;
 } ngx_http_sysguard_rt_ring_t;
+
+typedef struct {
+    ngx_flag_t                    enable;
+    ngx_flag_t                    rt_load_combined;
+
+    ngx_int_t                     load;
+    ngx_str_t                     load_action;
+    ngx_int_t                     swap;
+    ngx_str_t                     swap_action;
+    size_t                        free;
+    ngx_str_t                     free_action;
+    ngx_int_t                     rt;
+    ngx_int_t                     rt_period;
+    ngx_str_t                     rt_action;
+    time_t                        interval;
+
+    ngx_uint_t                    log_level;
+
+    ngx_http_sysguard_rt_ring_t  *rt_ring;
+} ngx_http_sysguard_conf_t;
 
 
 static void *ngx_http_sysguard_create_conf(ngx_conf_t *cf);
@@ -45,11 +52,8 @@ static char *ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_sysguard_mem(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static char *ngx_http_sysguard_rt_cache(ngx_conf_t *cf,
-    ngx_command_t *cmd, void *conf);
 static char *ngx_http_sysguard_rt(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
-static ngx_int_t ngx_http_sysguard_pre_init(ngx_conf_t *cf);
 static ngx_int_t ngx_http_sysguard_init(ngx_conf_t *cf);
 
 
@@ -71,6 +75,13 @@ static ngx_command_t  ngx_http_sysguard_commands[] = {
       offsetof(ngx_http_sysguard_conf_t, enable),
       NULL },
 
+    { ngx_string("sysguard_rt_load_combined"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_sysguard_conf_t, rt_load_combined),
+      NULL },
+
     { ngx_string("sysguard_load"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_load,
@@ -85,15 +96,8 @@ static ngx_command_t  ngx_http_sysguard_commands[] = {
       0,
       NULL },
 
-    { ngx_string("sysguard_rt_cache"),
-      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
-      ngx_http_sysguard_rt_cache,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      0,
-      NULL },
-
     { ngx_string("sysguard_rt"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
       ngx_http_sysguard_rt,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -118,7 +122,7 @@ static ngx_command_t  ngx_http_sysguard_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_sysguard_module_ctx = {
-    ngx_http_sysguard_pre_init,             /* preconfiguration */
+    NULL,                                   /* preconfiguration */
     ngx_http_sysguard_init,                 /* postconfiguration */
 
     NULL,                                   /* create main configuration */
@@ -153,9 +157,6 @@ static time_t    ngx_http_sysguard_cached_mem_exptime;
 static ngx_int_t ngx_http_sysguard_cached_load;
 static ngx_int_t ngx_http_sysguard_cached_swapstat;
 static size_t    ngx_http_sysguard_cached_free;
-static ngx_int_t ngx_http_sysguard_cached_rt;
-static ngx_shm_zone_t *ngx_http_sysguard_rt_zone;
-static ngx_uint_t ngx_http_sysguard_rt_slot_num;
 
 
 static ngx_int_t
@@ -205,7 +206,7 @@ ngx_http_sysguard_update_mem(ngx_http_request_t *r, time_t exptime)
 
 
 static ngx_int_t
-ngx_http_sysguard_update_rt(ngx_http_request_t *r)
+ngx_http_sysguard_update_rt(ngx_http_request_t *r, time_t exptime)
 {
     ngx_uint_t                    rt = 0, rt_sec = 0,
                                   rt_requests = 0;
@@ -215,15 +216,12 @@ ngx_http_sysguard_update_rt(ngx_http_request_t *r)
     ngx_http_sysguard_rt_ring_t  *ring;
     ngx_http_sysguard_rt_node_t  *node, *cur_node;
 
-
     glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
 
-    ring = ngx_http_sysguard_rt_zone->data;
+    ring = glcf->rt_ring;
 
-    /* lock */
-    ngx_shmtx_lock(&ring->shpool->mutex);
+    ring->cached_rt_exptime = ngx_time() + exptime;
 
-    //i = (ring->current == 0) ? ring->nr_slots : (ring->current - 1);
     i = ring->current;
 
     head = (ring->current + 1) % ring->nr_slots;
@@ -266,9 +264,6 @@ cont:
         }
     }
 
-    /* unlock */
-    ngx_shmtx_unlock(&ring->shpool->mutex);
-
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "rt sec: %d, rt msec:%d, rc requests: %d",
                    rt_sec, rt_msec, rt_requests);
@@ -283,7 +278,7 @@ cont:
         rt = rt_msec / 1000 * 1000 + rt_msec % 1000;
     }
 
-    ngx_http_sysguard_cached_rt = rt;
+    ring->cached_rt = rt;
 
     return NGX_OK;
 }
@@ -298,7 +293,6 @@ ngx_http_sysguard_update_rt_node(ngx_http_request_t *r)
     ngx_uint_t                      cur_msec;
     ngx_http_sysguard_conf_t       *glcf;
 
-
     glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
 
     if (!glcf->enable) {
@@ -309,15 +303,10 @@ ngx_http_sysguard_update_rt_node(ngx_http_request_t *r)
         return;
     }
 
-
-
     cur_sec = ngx_cached_time->sec;
     cur_msec = ngx_cached_time->msec;
 
-    ring = ngx_http_sysguard_rt_zone->data;
-
-    /* lock current */
-    ngx_shmtx_lock(&ring->shpool->mutex);
+    ring = glcf->rt_ring;
 
     node = &ring->slots[ring->current];
 
@@ -342,12 +331,9 @@ ngx_http_sysguard_update_rt_node(ngx_http_request_t *r)
                    "sysguard update rt node: new current: %d",
                    ring->current);
 
-    /* unlock current */
-    ngx_shmtx_unlock(&ring->shpool->mutex);
-
-    ngx_atomic_fetch_add(&node->sec, cur_sec - r->start_sec);
-    ngx_atomic_fetch_add(&node->msec, cur_msec - r->start_msec);
-    ngx_atomic_fetch_add(&node->requests, 1);
+    node->sec += cur_sec - r->start_sec;
+    node->msec += cur_msec - r->start_msec;
+    node->requests++;
 }
 
 
@@ -391,14 +377,6 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
 
         if (ngx_http_sysguard_cached_load_exptime < ngx_time()) {
             ngx_http_sysguard_update_load(r, glcf->interval);
-
-            /*
-             * according to the requirement:
-             *
-             * response time should be considered along with load
-             * so they share the same interval.
-             */
-            ngx_http_sysguard_update_rt(r);
         }
 
         ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -408,23 +386,21 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
                        &r->uri,
                        &glcf->load_action);
 
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http sysguard handler rt: %1.3f %1.3f",
-                       ngx_http_sysguard_cached_rt * 1.0 / 1000,
-                       glcf->rt * 1.0 / 1000);
-
         if (ngx_http_sysguard_cached_load > glcf->load
-                && ngx_http_sysguard_cached_rt > glcf->rt) {
+            && (!glcf->rt_load_combined
+                || glcf->rt_ring->cached_rt > glcf->rt)) {
 
             ngx_log_error(glcf->log_level, r->connection->log, 0,
                           "sysguard load limited, current:%1.3f conf:%1.3f",
                           ngx_http_sysguard_cached_load * 1.0 / 1000,
                           glcf->load * 1.0 / 1000);
 
-            ngx_log_error(glcf->log_level, r->connection->log, 0,
-                          "sysguard rt limited, current:%1.3f conf:%1.3f",
-                          ngx_http_sysguard_cached_rt * 1.0 / 1000,
-                          glcf->rt * 1.0 / 1000);
+            if (glcf->rt_load_combined) {
+                ngx_log_error(glcf->log_level, r->connection->log, 0,
+                              "sysguard rt limited, current:%1.3f conf:%1.3f",
+                              glcf->rt_ring->cached_rt * 1.0 / 1000,
+                              glcf->rt * 1.0 / 1000);
+            }
 
             return ngx_http_sysguard_do_redirect(r, &glcf->load_action);
         }
@@ -486,6 +462,39 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
 
     }
 
+    /* response time */
+
+    if (glcf->rt != NGX_CONF_UNSET) {
+
+        if (glcf->rt_ring->cached_rt_exptime < ngx_time()) {
+            ngx_http_sysguard_update_rt(r, glcf->interval);
+        }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http sysguard handler rt: %1.3f %1.3f",
+                       glcf->rt_ring->cached_rt * 1.0 / 1000,
+                       glcf->rt * 1.0 / 1000);
+
+        if (glcf->rt_ring->cached_rt > glcf->rt
+            && (!glcf->rt_load_combined
+                || ngx_http_sysguard_cached_load > glcf->load)) {
+
+            ngx_log_error(glcf->log_level, r->connection->log, 0,
+                          "sysguard rt limited, current:%1.3f conf:%1.3f",
+                          glcf->rt_ring->cached_rt * 1.0 / 1000,
+                          glcf->rt * 1.0 / 1000);
+
+            if (glcf->rt_load_combined) {
+                ngx_log_error(glcf->log_level, r->connection->log, 0,
+                              "sysguard load limited, current:%1.3f conf:%1.3f",
+                              ngx_http_sysguard_cached_load * 1.0 / 1000,
+                              glcf->load * 1.0 / 1000);
+            }
+
+            return ngx_http_sysguard_do_redirect(r, &glcf->rt_action);
+        }
+    }
+
     return NGX_DECLINED;
 }
 
@@ -505,9 +514,12 @@ ngx_http_sysguard_create_conf(ngx_conf_t *cf)
      *
      *     conf->load_action = {0, NULL};
      *     conf->swap_action = {0, NULL};
+     *     conf->rt_action = {0, NULL};
+     *     conf->ring = NULL;
      */
 
     conf->enable = NGX_CONF_UNSET;
+    conf->rt_load_combined = NGX_CONF_UNSET;
     conf->load = NGX_CONF_UNSET;
     conf->swap = NGX_CONF_UNSET;
     conf->free = NGX_CONF_UNSET_SIZE;
@@ -527,9 +539,11 @@ ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_sysguard_conf_t  *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
+    ngx_conf_merge_value(conf->rt_load_combined, prev->rt_load_combined, 0);
     ngx_conf_merge_str_value(conf->load_action, prev->load_action, "");
     ngx_conf_merge_str_value(conf->swap_action, prev->swap_action, "");
     ngx_conf_merge_str_value(conf->free_action, prev->free_action, "");
+    ngx_conf_merge_str_value(conf->rt_action, prev->rt_action, "");
     ngx_conf_merge_value(conf->load, prev->load, NGX_CONF_UNSET);
     ngx_conf_merge_value(conf->swap, prev->swap, NGX_CONF_UNSET);
     ngx_conf_merge_size_value(conf->free, prev->free, NGX_CONF_UNSET_SIZE);
@@ -537,6 +551,30 @@ ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->rt_period, prev->rt_period, 1);
     ngx_conf_merge_value(conf->interval, prev->interval, 1);
     ngx_conf_merge_uint_value(conf->log_level, prev->log_level, NGX_LOG_ERR);
+
+    if (conf->rt_load_combined
+        && (conf->load == NGX_CONF_UNSET || conf->rt == NGX_CONF_UNSET)) {
+        return "requires \"sysguard_rt\" and \"sysguard_load\" directives";
+    }
+
+    if (conf->rt != NGX_CONF_UNSET) {
+        /* init glcf->ring */
+        conf->rt_ring = ngx_pcalloc(cf->pool,
+                                    sizeof(ngx_http_sysguard_rt_ring_t));
+        if (conf->rt_ring == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        conf->rt_ring->slots = ngx_pcalloc(cf->pool,
+                         sizeof(ngx_http_sysguard_rt_node_t) * conf->rt_period);
+        if (conf->rt_ring->slots == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        conf->rt_ring->nr_slots = conf->rt_period;
+        conf->rt_ring->current = 0;
+        conf->rt_ring->slots[0].stamp = ngx_time();
+    }
 
     return NGX_CONF_OK;
 }
@@ -709,83 +747,6 @@ invalid:
 }
 
 
-static ngx_int_t
-ngx_http_sysguard_init_rt_zone(ngx_shm_zone_t *shm_zone, void *data)
-{
-    ngx_slab_pool_t              *shpool;
-    ngx_http_sysguard_rt_ring_t  *ring;
-
-    if (data) {
-        shm_zone->data = data;
-        return NGX_OK;
-    }
-
-    shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
-
-    ring = ngx_slab_alloc(shpool, sizeof(ngx_http_sysguard_rt_ring_t));
-    if (ring == NULL) {
-        return NGX_ERROR;
-    }
-
-    ring->slots = ngx_slab_alloc(shpool,
-        sizeof(ngx_http_sysguard_rt_node_t) * ngx_http_sysguard_rt_slot_num);
-    if (ring->slots == NULL) {
-        return NGX_ERROR;
-    }
-
-    memset(ring->slots, 0,
-           sizeof(ngx_http_sysguard_rt_node_t) * ngx_http_sysguard_rt_slot_num);
-    ring->nr_slots = ngx_http_sysguard_rt_slot_num;
-    ring->current = 0;
-    ring->shpool = shpool;
-    ring->slots[0].stamp = ngx_time();
-
-    shm_zone->data = ring;
-
-    return NGX_OK;
-}
-
-
-static char *
-ngx_http_sysguard_rt_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_str_t  *value, shm_name;
-    size_t      size;
-    time_t      sec;
-
-    value = cf->args->elts;
-
-    sec = ngx_parse_time(&value[1], 1);
-    if (sec == NGX_ERROR) {
-        return NGX_CONF_ERROR;
-    }
-
-    ngx_http_sysguard_rt_slot_num = (ngx_uint_t) sec;
-
-    size = sizeof(ngx_http_sysguard_rt_ring_t)
-         + sizeof(ngx_http_sysguard_rt_node_t) * ngx_http_sysguard_rt_slot_num
-         + ngx_pagesize;
-
-
-    if (size < 8 * ngx_pagesize) {
-        size = 8 * ngx_pagesize;
-    }
-
-    ngx_str_set(&shm_name, "sysguard");
-
-    ngx_http_sysguard_rt_zone = ngx_shared_memory_add(cf, &shm_name, size,
-                                &ngx_http_sysguard_module);
-
-    if (ngx_http_sysguard_rt_zone == NULL) {
-        return "init shared memory failed";
-    }
-
-    ngx_http_sysguard_rt_zone->init = ngx_http_sysguard_init_rt_zone;
-
-    return NGX_CONF_OK;
-}
-
-
 static char *
 ngx_http_sysguard_rt(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -795,47 +756,53 @@ ngx_http_sysguard_rt(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t  i;
 
     value = cf->args->elts;
-    i = 1;
 
-    if (ngx_http_sysguard_rt_slot_num == 0) {
-        return "must specify \"sysguard_rt_cache\" first";
+    for (i = 1; i < cf->args->nelts; i++) {
+        if (ngx_strncmp(value[i].data, "rt=", 3) == 0) {
+
+            if (glcf->rt != NGX_CONF_UNSET) {
+                return "is duplicate";
+            }
+
+            glcf->rt = ngx_atofp(value[i].data + 3, value[i].len - 3, 3);
+            if (glcf->rt == NGX_ERROR) {
+                goto invalid;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "period=", 7) == 0) {
+
+            ss.data = value[i].data + 7;
+            ss.len = value[i].len - 7;
+
+            glcf->rt_period = ngx_parse_time(&ss, 1);
+            if (glcf->rt_period == NGX_ERROR) {
+                goto invalid;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "action=", 7) == 0) {
+
+            if (value[i].len == 7) {
+                goto invalid;
+            }
+
+            if (value[i].data[7] != '/' && value[i].data[7] != '@') {
+                goto invalid;
+            }
+
+            glcf->rt_action.data = value[i].data + 7;
+            glcf->rt_action.len = value[i].len - 7;
+
+            continue;
+        }
     }
 
-    if (ngx_strncmp(value[i].data, "rt=", 3) == 0) {
-
-        if (glcf->rt != NGX_CONF_UNSET) {
-            return "is duplicate";
-        }
-
-        glcf->rt = ngx_atofp(value[i].data + 3, value[i].len - 3, 3);
-        if (glcf->rt == NGX_ERROR) {
-            goto invalid;
-        }
-
-        if (cf->args->nelts == 2) {
-            return NGX_CONF_OK;
-        }
-
-        i++;
-
-        if (ngx_strncmp(value[i].data, "period=", 7) != 0) {
-            goto invalid;
-        }
-
-        if (value[i].len == 7) {
-            goto invalid;
-        }
-
-        ss.data = value[i].data + 7;
-        ss.len = value[i].len - 7;
-
-        glcf->rt_period = ngx_parse_time(&ss, 1);
-        if (glcf->rt_period == NGX_ERROR) {
-            goto invalid;
-        }
-
-        return NGX_CONF_OK;
-    }
+    return NGX_CONF_OK;
 
 invalid:
 
@@ -847,9 +814,9 @@ invalid:
 
 
 static ngx_int_t
-ngx_http_sysguard_pre_init(ngx_conf_t *cf)
+ngx_http_sysguard_log_handler(ngx_http_request_t *r)
 {
-    ngx_http_sysguard_rt_slot_num = 0;
+    ngx_http_sysguard_update_rt_node(r);
 
     return NGX_OK;
 }
@@ -869,6 +836,13 @@ ngx_http_sysguard_init(ngx_conf_t *cf)
     }
 
     *h = ngx_http_sysguard_handler;
+
+    h = ngx_array_push(&cmcf->phases[NGX_HTTP_LOG_PHASE].handlers);
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+
+    *h = ngx_http_sysguard_log_handler;
 
     return NGX_OK;
 }

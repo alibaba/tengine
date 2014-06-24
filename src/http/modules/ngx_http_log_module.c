@@ -300,10 +300,6 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
 };
 
 
-#if (NGX_HTTP_SYSGUARD)
-extern void ngx_http_sysguard_update_rt_node(ngx_http_request_t *);
-#endif
-
 static ngx_int_t
 ngx_http_log_handler(ngx_http_request_t *r)
 {
@@ -317,10 +313,6 @@ ngx_http_log_handler(ngx_http_request_t *r)
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http log handler");
-
-#if (NGX_HTTP_SYSGUARD)
-    ngx_http_sysguard_update_rt_node(r);
-#endif
 
     lcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
 

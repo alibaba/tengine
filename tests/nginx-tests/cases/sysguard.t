@@ -24,7 +24,7 @@ my $can_use_threads = eval 'use threads; 1';
 plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
-my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(12);
+my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(18);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -45,8 +45,6 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
     access_log    off;
-
-    sysguard_rt_cache 60s;
 
     server {
         listen       127.0.0.1:8080;
@@ -98,28 +96,66 @@ http {
             sysguard_mem free=%%free1%%k action=/limit;
         }
 
-        location /load_rt_limit {
+        location /rt_limit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_rt rt=0.001 period=2s action=/limit;
+        }
+
+        location /load_and_rt_limit {
             proxy_pass http://127.0.0.1:8081;
             sysguard_load load=%%load1%% action=/limit;
-            sysguard_rt rt=0.001 period=1s;
+            sysguard_rt rt=0.001 period=2s action=/limit;
+            sysguard_rt_load_combined on;
         }
 
-        location /load_rt_unlimit {
+        location /load_or_rt_limit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load2%% action=/limit;
+            sysguard_rt rt=0.001 period=2s actoin=/limit;
+        }
+
+        location /load_or_rt_limit1 {
             proxy_pass http://127.0.0.1:8081;
             sysguard_load load=%%load1%% action=/limit;
-            sysguard_rt rt=10.000 period=1s;
+            sysguard_rt rt=0.001 period=2s actoin=/limit;
         }
 
-        location /load_rt_unlimit2 {
+        location /load_or_rt_limit2 {
             proxy_pass http://127.0.0.1:8081;
-            sysguard_load load=%%load2%% action=/limit;
-            sysguard_rt rt=10.000 period=1s;
+            sysguard_load load=%%load1%% action=/limit;
+            sysguard_rt rt=10.000 period=2s actoin=/limit;
         }
 
-        location /load_rt_unlimit3 {
+        location /rt_unlimit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_rt rt=10.000 period=1s action=/limit;
+        }
+
+        location /load_and_rt_unlimit {
             proxy_pass http://127.0.0.1:8081;
             sysguard_load load=%%load2%% action=/limit;
-            sysguard_rt rt=0.001 period=1s;
+            sysguard_rt rt=10.000 period=1s action=/limit;
+            sysguard_rt_load_combined on;
+        }
+
+        location /load_and_rt_unlimit1 {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load1%% action=/limit;
+            sysguard_rt rt=10.000 period=1s action=/limit;
+            sysguard_rt_load_combined on;
+        }
+
+        location /load_and_rt_unlimit2 {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load2%% action=/limit;
+            sysguard_rt rt=0.001 period=1s action=/limit;
+            sysguard_rt_load_combined on;
+        }
+
+        location /load_or_rt_unlimit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_load load=%%load2%% action=/limit;
+            sysguard_rt rt=10.000 period=1s action=/limit;
         }
 
         location /limit {
@@ -168,19 +204,30 @@ like(http_get("/mem_load_limit1"), qr/503/, 'mem_load_limit1');
 like(http_get("/mem_load_limit2"), qr/503/, 'mem_load_limit2');
 like(http_get("/mem_load_limit3"), qr/404/, 'mem_load_limit3');
 
+
+http_get("/rt_limit");
 # To expire cache (sysguard interval)
 sleep 1;
 
-http_get("/load_rt_limit");
-like(http_get("/load_rt_limit"), qr/503/, 'load_rt_limit');
+like(http_get("/rt_limit"), qr/503/, 'rt_limit');
 
-http_get("/load_rt_unlimit");
-like(http_get("/load_rt_unlimit"), qr/404/, 'load_rt_unlimit');
+http_get("/load_and_rt_limit");
+sleep 1;
+like(http_get("/load_and_rt_limit"), qr/503/, 'load_and_rt_limit');
+http_get("/load_or_rt_limit");
+sleep 1;
+like(http_get("/load_or_rt_limit"), qr/503/, 'load_or_rt_limit');
+like(http_get("/load_or_rt_limit1"), qr/503/, 'load_or_rt_limit1');
+like(http_get("/load_or_rt_limit2"), qr/503/, 'load_or_rt_limit2');
 
-like(http_get("/load_rt_unlimit2"), qr/404/, 'load_rt_unlimit2');
+sleep 1;
+http_get("/rt_unlimit");
+like(http_get("/rt_unlimit"), qr/404/, 'rt_unlimit');
 
-http_get("/load_rt_limit");
-like(http_get("/load_rt_unlimit3"), qr/404/, 'load_rt_unlimit3');
+like(http_get("/load_and_rt_unlimit"), qr/404/, 'load_and_rt_unlimit');
+like(http_get("/load_and_rt_unlimit1"), qr/404/, 'load_and_rt_unlimit1');
+like(http_get("/load_and_rt_unlimit2"), qr/404/, 'load_and_rt_unlimit2');
+like(http_get("/load_or_rt_unlimit"), qr/404/, 'load_or_rt_unlimit');
 
 
 sub getload
@@ -253,7 +300,7 @@ sub http_daemon {
 
         $uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
 
-        if ($uri eq '/load_rt_limit') {
+        if ($uri =~ /^.*_limit$/) {
             sleep 1;
             print $client <<'EOF';
 HTTP/1.1 200 OK
