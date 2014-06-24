@@ -237,7 +237,7 @@ ngx_http_sysguard_update_rt(ngx_http_request_t *r, time_t exptime)
         node = &ring->slots[i];
 
         ngx_log_debug5(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "node in loop: i: %d, p:%d, sec: %d, msec: %d, r: %d",
+                       "node in loop: i: %d, p:%d, sec: %d, msec: %ud, r: %ud",
                        i, processed, node->sec, node->msec, node->requests
                        );
 
@@ -265,7 +265,7 @@ cont:
     }
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "rt sec: %d, rt msec:%d, rc requests: %d",
+                   "rt sec: %d, rt msec:%ud, rc requests: %ud",
                    rt_sec, rt_msec, rt_requests);
 
     rt_msec += (ngx_msec_int_t) (rt_sec * 1000);
