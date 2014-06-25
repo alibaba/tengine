@@ -674,14 +674,15 @@ static ngx_check_conf_t  ngx_check_types[] = {
 
     { NGX_HTTP_CHECK_HTTP,
       ngx_string("fastcgi"),
-      ngx_string(""),
+      ngx_null_string,
       0,
       ngx_http_upstream_check_send_handler,
       ngx_http_upstream_check_recv_handler,
       ngx_http_upstream_check_http_init,
       ngx_http_upstream_check_fastcgi_parse,
       ngx_http_upstream_check_http_reinit,
-      1 },
+      1,
+      0 },
 
     { NGX_HTTP_CHECK_SSL_HELLO,
       ngx_string("ssl_hello"),
