@@ -74,10 +74,11 @@ Context: `upstream`
  - `tcp`：简单的tcp连接，如果连接成功，就说明后端正常。
  - `ssl_hello`：发送一个初始的SSL hello包并接受服务器的SSL hello包。
  - `http`：发送HTTP请求，通过后端的回复包的状态来判断后端是否存活。
+ - `fastcgi`：发送fsatcgi请求，通过后端的回复包的状态来判断后端是否存活。
  - `mysql`: 向mysql服务器连接，通过接收服务器的greeting包来判断后端是否存活。
  - `ajp`：向后端发送AJP协议的Cping包，通过接收Cpong包来判断后端是否存活。
 * `port`: 指定后端服务器的检查端口。你可以指定不同于真实服务的后端服务器的端口，比如后端提供的是443端口的应用，你可以去检查80端口的状态来判断后端健康状况。默认是0，表示跟后端server提供真实服务的端口一样。该选项出现于Tengine-1.4.0。
-                                                                                                                         
+
 
 ## check\_keepalive\_requests ##
 
@@ -103,6 +104,18 @@ Context: `upstream`
 
 当采用长连接进行健康检查时，需在该指令中添加keep-alive请求头，如：`"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`。
 同时，在采用`"GET"`方法的情况下，请求uri的size不宜过大，确保可以在1个`interval`内传输完成，否则会被健康检查模块视为后端服务器或网络异常。
+
+## check\_fastcgi\_param ##
+
+Syntax: **check\_fastcgi\_params** `parameter`:`value`
+
+Default: `REQUEST_METHOD: GET`
+         `REQUEST_URI: /`
+         `SCRIPT_FILENAME: index.php'
+
+Context: `upstream`
+
+该指令可以配置fastcgi健康检查包发送的请求的header项。
 
 ## check\_http\_expect\_alive ##
 
@@ -197,4 +210,3 @@ Context: `location`
        {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
       ]
      }}
-
