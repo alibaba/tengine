@@ -24,7 +24,7 @@ my $can_use_threads = eval 'use threads; 1';
 plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
-my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(18);
+my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(19);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -103,25 +103,28 @@ http {
 
         location /load_and_rt_limit {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
             sysguard_load load=%%load1%% action=/limit;
             sysguard_rt rt=0.001 period=2s action=/limit;
-            sysguard_rt_load_combined on;
         }
 
         location /load_or_rt_limit {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode or;
             sysguard_load load=%%load2%% action=/limit;
             sysguard_rt rt=0.001 period=2s actoin=/limit;
         }
 
         location /load_or_rt_limit1 {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode or;
             sysguard_load load=%%load1%% action=/limit;
             sysguard_rt rt=0.001 period=2s actoin=/limit;
         }
 
         location /load_or_rt_limit2 {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode or;
             sysguard_load load=%%load1%% action=/limit;
             sysguard_rt rt=10.000 period=2s actoin=/limit;
         }
@@ -133,29 +136,38 @@ http {
 
         location /load_and_rt_unlimit {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
             sysguard_load load=%%load2%% action=/limit;
             sysguard_rt rt=10.000 period=1s action=/limit;
-            sysguard_rt_load_combined on;
         }
 
         location /load_and_rt_unlimit1 {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
             sysguard_load load=%%load1%% action=/limit;
             sysguard_rt rt=10.000 period=1s action=/limit;
-            sysguard_rt_load_combined on;
         }
 
         location /load_and_rt_unlimit2 {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
             sysguard_load load=%%load2%% action=/limit;
             sysguard_rt rt=0.001 period=1s action=/limit;
-            sysguard_rt_load_combined on;
         }
 
         location /load_or_rt_unlimit {
             proxy_pass http://127.0.0.1:8081;
+            sysguard_mode or;
             sysguard_load load=%%load2%% action=/limit;
             sysguard_rt rt=10.000 period=1s action=/limit;
+        }
+
+        location /load_and_mem_and_rt_limit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
+            sysguard_load load=%%load1%% action=/limit;
+            sysguard_rt rt=0.001 period=2s action=/limit;
+            sysguard_mem free=%%free2%%k action=/limit;
         }
 
         location /limit {
@@ -228,6 +240,12 @@ like(http_get("/load_and_rt_unlimit"), qr/404/, 'load_and_rt_unlimit');
 like(http_get("/load_and_rt_unlimit1"), qr/404/, 'load_and_rt_unlimit1');
 like(http_get("/load_and_rt_unlimit2"), qr/404/, 'load_and_rt_unlimit2');
 like(http_get("/load_or_rt_unlimit"), qr/404/, 'load_or_rt_unlimit');
+
+sleep 1;
+http_get("/load_and_mem_and_rt_limit");
+sleep 1;
+like(http_get("/load_and_mem_and_rt_limit"), qr/503/,
+     'load_and_mem_and_rt_limit');
 
 
 sub getload
