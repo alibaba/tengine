@@ -182,7 +182,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, reuse_port),
       NULL },
 
-#endif        
+#endif
 
       ngx_null_command
 };
@@ -616,7 +616,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 #if (NGX_HAVE_REUSEPORT)
         && !ecf->reuse_port
 #endif
-       ) {
+       )
+    {
         ngx_use_accept_mutex = 1;
         ngx_accept_mutex_held = 0;
         ngx_accept_mutex_delay = ecf->accept_mutex_delay;
