@@ -91,6 +91,7 @@ NGX_ALL_MODULES="
     ngx_http_split_clients_module
     ngx_http_user_agent_module
     ngx_http_reqstat_module
+    ngx_http_copy_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -245,6 +246,7 @@ HTTP_BROWSER=YES
 HTTP_SECURE_LINK=NO
 HTTP_DEGRADATION=NO
 HTTP_SYSGUARD=NO
+HTTP_COPY=NO
 HTTP_FLV=NO
 HTTP_SLICE=NO
 HTTP_MP4=NO
@@ -278,6 +280,7 @@ HTTP_LUA_SHARED=NO
 HTTP_TFS_SHARED=NO
 HTTP_SECURE_LINK_SHARED=NO
 HTTP_SYSGUARD_SHARED=NO
+HTTP_COPY_SHARED=NO
 HTTP_FLV_SHARED=NO
 HTTP_SLICE_SHARED=NO
 HTTP_MP4_SHARED=NO
@@ -470,6 +473,8 @@ do
         --with-http_degradation_module)            HTTP_DEGRADATION=YES              ;;
         --with-http_sysguard_module)               HTTP_SYSGUARD=YES
                                                    HTTP_SYSGUARD_SHARED=NO           ;;
+        --with-http_copy_module)                   HTTP_COPY=YES
+                                                   HTTP_COPY_SHARED=NO               ;;
         --with-http_upstream_check_module)         HTTP_UPSTREAM_CHECK=YES           ;;
         --with-http_upstream_consistent_hash_module)
                                                    HTTP_UPSTREAM_CONSISTENT_HASH=YES ;;
@@ -498,6 +503,8 @@ do
                                                    HTTP_SECURE_LINK=NO               ;;
         --with-http_sysguard_module=shared)        HTTP_SYSGUARD_SHARED=YES
                                                    HTTP_SYSGUARD=NO                  ;;
+        --with-http_copy_module=shared)            HTTP_COPY=NO
+                                                   HTTP_COPY_SHARED=YES              ;;
         --with-http_charset_filter_module=shared)  HTTP_CHARSET_SHARED=YES
                                                    HTTP_CHARSET=NO                   ;;
         --with-http_userid_filter_module=shared)   HTTP_USERID_SHARED=YES
@@ -769,6 +776,7 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_sysguard_module        enable ngx_http_sysguard_module
+  --with-http_copy_module            enable ngx_http_copy_module
 
   --with-http_addition_module=shared enable ngx_http_addition_filter_module (shared)
   --with-http_xslt_module=shared     enable ngx_http_xslt_filter_module (shared)
@@ -785,6 +793,7 @@ cat << END
   --with-http_secure_link_module=shared
                                      enable ngx_http_secure_link_module (shared)
   --with-http_sysguard_module=shared enable ngx_http_sysguard_module (shared)
+  --with-http_copy_module=shared     enable ngx_http_sysguard_module (shared)
   --with-http_charset_filter_module=shared
                                      enable ngx_http_charset_filter_module (shared)
   --with-http_userid_filter_module=shared
@@ -967,6 +976,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_LUA_SHARED=YES
     HTTP_SECURE_LINK_SHARED=YES
     HTTP_SYSGUARD_SHARED=YES
+    HTTP_COPY_SHARED=YES
     HTTP_FLV_SHARED=YES
     HTTP_SLICE_SHARED=YES
     HTTP_MP4_SHARED=YES
@@ -1004,6 +1014,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_LUA=NO
     HTTP_SECURE_LINK=NO
     HTTP_SYSGUARD=NO
+    HTTP_COPY=NO
     HTTP_FLV=NO
     HTTP_SLICE=NO
     HTTP_MP4=NO
@@ -1071,6 +1082,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_SECURE_LINK=YES
     HTTP_DEGRADATION=YES
     HTTP_SYSGUARD=YES
+    HTTP_COPY=YES
     HTTP_FLV=YES
     HTTP_SLICE=YES
     HTTP_MP4=YES
@@ -1095,6 +1107,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_LUA_SHARED=NO
     HTTP_SECURE_LINK_SHARED=NO
     HTTP_SYSGUARD_SHARED=NO
+    HTTP_COPY_SHARED=NO
     HTTP_FLV_SHARED=NO
     HTTP_SLICE_SHARED=NO
     HTTP_MP4_SHARED=NO
