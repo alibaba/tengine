@@ -1147,9 +1147,49 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 }
 
 
+static ngx_int_t
+ngx_read_channel_data(ngx_socket_t s, u_char *buf, size_t size, ngx_log_t *log)
+{
+    ssize_t     n;
+    ngx_err_t   err;
+
+retry:
+    n = recv(s, buf, size, MSG_DONTWAIT);
+
+    if (n == -1) {
+        err = ngx_errno;
+
+        if (err == NGX_EAGAIN) {
+            return NGX_AGAIN;
+        }
+
+        if (err == NGX_EINTR) {
+            goto retry;
+        }
+
+        ngx_log_error(NGX_LOG_ALERT, log, err, "recv() failed");
+        return NGX_ERROR;
+    }
+
+    if (n == 0) {
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "recv() returned zero");
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n < size) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0,
+                      "recv() returned not enough data: %uz", n);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
 static void
 ngx_channel_handler(ngx_event_t *ev)
 {
+    void              *data;
     ngx_int_t          n;
     ngx_channel_t      ch;
     ngx_connection_t  *c;
@@ -1233,6 +1273,54 @@ ngx_channel_handler(ngx_event_t *ev)
 
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
+            break;
+
+        case NGX_CMD_RPC:
+
+            data = NULL;
+
+            if (ch.len) {
+                data = ngx_alloc(ch.len, c->log);
+                if (data == NULL) {
+                    return;
+                }
+
+                n = ngx_read_channel_data(c->fd, data, ch.len, c->log);
+
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0, "recv: %i", n);
+
+                /* TODO: NGX_EAGAIN */
+                if (n != NGX_OK) {
+                    ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
+                                  "read channel data failed");
+
+                    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                        ngx_del_conn(c, 0);
+                    }
+
+                    ngx_close_connection(c);
+                    return;
+                }
+            }
+
+            if (ch.rpc) {
+                n = ch.rpc(&ch, data, ev->log);
+
+                /*TODO NGX_EAGAIN */
+                if (n != NGX_OK) {
+                    ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
+                                  "failed to execute channel RPC");
+
+                    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                        ngx_del_conn(c, 0);
+                    }
+
+                    ngx_close_connection(c);
+                    return;
+                }
+
+                ngx_free(data);
+            }
             break;
         }
     }
