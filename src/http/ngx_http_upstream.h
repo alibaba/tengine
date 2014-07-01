@@ -413,6 +413,8 @@ ngx_int_t ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
     ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev,
     ngx_str_t *default_hide_headers, ngx_hash_init_t *hash);
 
+void ngx_http_upstream_connect_done(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_int_t rc);
 
 #define ngx_http_conf_upstream_srv_conf(uscf, module)                         \
     uscf->srv_conf[module.ctx_index]

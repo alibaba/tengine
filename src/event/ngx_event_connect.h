@@ -62,6 +62,9 @@ struct ngx_peer_connection_s {
 
     ngx_log_t                       *log;
 
+    void                            *request;
+    void                            *upstream;
+
     unsigned                         cached:1;
 
                                      /* ngx_connection_log_error_e */
@@ -69,6 +72,8 @@ struct ngx_peer_connection_s {
 };
 
 
+ngx_int_t ngx_event_init_peer_socket(ngx_socket_t s, ngx_peer_connection_t *pc,
+    ngx_int_t rc);
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc);
 ngx_int_t ngx_event_get_peer(ngx_peer_connection_t *pc, void *data);
 
