@@ -12,31 +12,12 @@
 
 
 ngx_int_t
-ngx_event_connect_peer(ngx_peer_connection_t *pc)
+ngx_event_init_peer_socket(ngx_socket_t s, ngx_peer_connection_t *pc,
+    ngx_int_t rc)
 {
-    int                rc;
     ngx_int_t          event;
-    ngx_err_t          err;
-    ngx_uint_t         level;
-    ngx_socket_t       s;
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
-
-    rc = pc->get(pc, pc->data);
-    if (rc != NGX_OK) {
-        return rc;
-    }
-
-    s = ngx_socket(pc->sockaddr->sa_family, SOCK_STREAM, 0);
-
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, 0, "socket %d", s);
-
-    if (s == -1) {
-        ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                      ngx_socket_n " failed");
-        return NGX_ERROR;
-    }
-
 
     c = ngx_get_connection(s, pc->log);
 
@@ -47,32 +28,6 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         }
 
         return NGX_ERROR;
-    }
-
-    if (pc->rcvbuf) {
-        if (setsockopt(s, SOL_SOCKET, SO_RCVBUF,
-                       (const void *) &pc->rcvbuf, sizeof(int)) == -1)
-        {
-            ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                          "setsockopt(SO_RCVBUF) failed");
-            goto failed;
-        }
-    }
-
-    if (ngx_nonblocking(s) == -1) {
-        ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                      ngx_nonblocking_n " failed");
-
-        goto failed;
-    }
-
-    if (pc->local) {
-        if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
-            ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
-                          "bind(%V) failed", &pc->local->name);
-
-            goto failed;
-        }
     }
 
     c->recv = ngx_recv;
@@ -119,55 +74,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         if (ngx_add_conn(c) == NGX_ERROR) {
             goto failed;
         }
-    }
 
-    ngx_log_debug3(NGX_LOG_DEBUG_EVENT, pc->log, 0,
-                   "connect to %V, fd:%d #%d", pc->name, s, c->number);
-
-    rc = connect(s, pc->sockaddr, pc->socklen);
-
-    if (rc == -1) {
-        err = ngx_socket_errno;
-
-
-        if (err != NGX_EINPROGRESS
-#if (NGX_WIN32)
-            /* Winsock returns WSAEWOULDBLOCK (NGX_EAGAIN) */
-            && err != NGX_EAGAIN
-#endif
-            )
-        {
-            if (err == NGX_ECONNREFUSED
-#if (NGX_LINUX)
-                /*
-                 * Linux returns EAGAIN instead of ECONNREFUSED
-                 * for unix sockets if listen queue is full
-                 */
-                || err == NGX_EAGAIN
-#endif
-                || err == NGX_ECONNRESET
-                || err == NGX_ENETDOWN
-                || err == NGX_ENETUNREACH
-                || err == NGX_EHOSTDOWN
-                || err == NGX_EHOSTUNREACH)
-            {
-                level = NGX_LOG_ERR;
-
-            } else {
-                level = NGX_LOG_CRIT;
-            }
-
-            ngx_log_error(level, c->log, err, "connect() to %V failed",
-                          pc->name);
-
-            ngx_close_connection(c);
-            pc->connection = NULL;
-
-            return NGX_DECLINED;
-        }
-    }
-
-    if (ngx_add_conn) {
         if (rc == -1) {
 
             /* NGX_EINPROGRESS */
@@ -248,6 +155,108 @@ failed:
     pc->connection = NULL;
 
     return NGX_ERROR;
+}
+
+
+ngx_int_t
+ngx_event_connect_peer(ngx_peer_connection_t *pc)
+{
+    int                rc;
+    ngx_err_t          err;
+    ngx_uint_t         level;
+    ngx_socket_t       s;
+
+    rc = pc->get(pc, pc->data);
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    pc->connection = NULL;
+
+    s = ngx_socket(pc->sockaddr->sa_family, SOCK_STREAM, 0);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, 0, "socket %d", s);
+
+    if (s == -1) {
+        ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
+                      ngx_socket_n " failed");
+        return NGX_ERROR;
+    }
+
+    if (pc->rcvbuf) {
+        if (setsockopt(s, SOL_SOCKET, SO_RCVBUF,
+                       (const void *) &pc->rcvbuf, sizeof(int)) == -1)
+        {
+            ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
+                          "setsockopt(SO_RCVBUF) failed");
+            return NGX_ERROR;
+        }
+    }
+
+    if (ngx_nonblocking(s) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
+                      ngx_nonblocking_n " failed");
+
+        return NGX_ERROR;
+    }
+
+    if (pc->local) {
+        if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
+            ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
+                          "bind(%V) failed", &pc->local->name);
+
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, pc->log, 0,
+                   "connect to %V, fd:%d", pc->name, s);
+
+    rc = connect(s, pc->sockaddr, pc->socklen);
+
+    if (rc == -1) {
+        err = ngx_socket_errno;
+
+
+        if (err != NGX_EINPROGRESS
+#if (NGX_WIN32)
+            /* Winsock returns WSAEWOULDBLOCK (NGX_EAGAIN) */
+            && err != NGX_EAGAIN
+#endif
+            )
+        {
+            if (err == NGX_ECONNREFUSED
+#if (NGX_LINUX)
+                /*
+                 * Linux returns EAGAIN instead of ECONNREFUSED
+                 * for unix sockets if listen queue is full
+                 */
+                || err == NGX_EAGAIN
+#endif
+                || err == NGX_ECONNRESET
+                || err == NGX_ENETDOWN
+                || err == NGX_ENETUNREACH
+                || err == NGX_EHOSTDOWN
+                || err == NGX_EHOSTUNREACH)
+            {
+                level = NGX_LOG_ERR;
+
+            } else {
+                level = NGX_LOG_CRIT;
+            }
+
+            ngx_log_error(level, pc->log, err, "connect() to %V failed",
+                          pc->name);
+
+            pc->connection = NULL;
+
+            return NGX_DECLINED;
+        }
+    }
+
+    rc = ngx_event_init_peer_socket(s, pc, rc);
+
+    return rc;
 }
 
 

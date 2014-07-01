@@ -1299,6 +1299,7 @@ ngx_channel_handler(ngx_event_t *ev)
                     }
 
                     ngx_close_connection(c);
+                    ngx_free(data);
                     return;
                 }
             }
@@ -1316,6 +1317,7 @@ ngx_channel_handler(ngx_event_t *ev)
                     }
 
                     ngx_close_connection(c);
+                    ngx_free(data);
                     return;
                 }
 
