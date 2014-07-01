@@ -14,12 +14,19 @@
 #include <ngx_event.h>
 
 
-typedef struct {
-     ngx_uint_t  command;
-     ngx_pid_t   pid;
-     ngx_int_t   slot;
-     ngx_fd_t    fd;
-} ngx_channel_t;
+typedef struct ngx_channel_s  ngx_channel_t;
+
+typedef ngx_int_t (*ngx_channel_rpc_pt)(ngx_channel_t *ch, void *data,
+                                        ngx_log_t *log);
+
+struct ngx_channel_s {
+    ngx_uint_t           command;
+    ngx_pid_t            pid;
+    ngx_int_t            slot;
+    ngx_fd_t             fd;
+    ngx_channel_rpc_pt   rpc;
+    size_t               len;
+};
 
 
 ngx_int_t ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
