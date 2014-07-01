@@ -1207,50 +1207,15 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 }
 
 
-static void
-ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
+void
+ngx_http_upstream_connect_done(ngx_http_request_t *r, ngx_http_upstream_t *u,
+    ngx_int_t rc)
 {
-    ngx_int_t          rc;
-    ngx_time_t        *tp;
     ngx_connection_t  *c;
 
-    r->connection->log->action = "connecting to upstream";
-
-    if (u->request_sent && !r->request_buffering) {
-
-        /*
-         * no buffering request can't reuse the request body when part of
-         * the body has been sent.
-         */
-        ngx_http_upstream_finalize_request(r, u,
-                                           NGX_HTTP_BAD_GATEWAY);
-
+    if (rc == NGX_YIELD) {
         return;
     }
-
-    if (u->state && u->state->response_sec) {
-        tp = ngx_timeofday();
-        u->state->response_sec = tp->sec - u->state->response_sec;
-        u->state->response_msec = tp->msec - u->state->response_msec;
-    }
-
-    u->state = ngx_array_push(r->upstream_states);
-    if (u->state == NULL) {
-        ngx_http_upstream_finalize_request(r, u,
-                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
-        return;
-    }
-
-    ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
-
-    tp = ngx_timeofday();
-    u->state->response_sec = tp->sec;
-    u->state->response_msec = tp->msec;
-
-    rc = ngx_event_connect_peer(&u->peer);
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http upstream connect: %i", rc);
 
     if (rc == NGX_ERROR) {
         ngx_http_upstream_finalize_request(r, u,
@@ -1367,6 +1332,57 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     }
 
     ngx_http_upstream_send_request(r, u);
+}
+
+
+static void
+ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
+{
+    ngx_int_t          rc;
+    ngx_time_t        *tp;
+
+    r->connection->log->action = "connecting to upstream";
+
+    if (u->request_sent && !r->request_buffering) {
+
+        /*
+         * no buffering request can't reuse the request body when part of
+         * the body has been sent.
+         */
+        ngx_http_upstream_finalize_request(r, u,
+                                           NGX_HTTP_BAD_GATEWAY);
+
+        return;
+    }
+
+    if (u->state && u->state->response_sec) {
+        tp = ngx_timeofday();
+        u->state->response_sec = tp->sec - u->state->response_sec;
+        u->state->response_msec = tp->msec - u->state->response_msec;
+    }
+
+    u->state = ngx_array_push(r->upstream_states);
+    if (u->state == NULL) {
+        ngx_http_upstream_finalize_request(r, u,
+                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
+    ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
+
+    tp = ngx_timeofday();
+    u->state->response_sec = tp->sec;
+    u->state->response_msec = tp->msec;
+
+    u->peer.request = r;
+    u->peer.upstream = u;
+
+    rc = ngx_event_connect_peer(&u->peer);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http upstream connect: %i", rc);
+
+    ngx_http_upstream_connect_done(r, u, rc);
 }
 
 
