@@ -574,6 +574,10 @@ ngx_unlock_mutexes(ngx_pid_t pid)
             i = 0;
         }
 
+        if (shm_zone[i].shm.slab == 0) {
+            continue;
+        }
+
         sp = (ngx_slab_pool_t *) shm_zone[i].shm.addr;
 
         if (ngx_shmtx_force_unlock(&sp->mutex, pid)) {
