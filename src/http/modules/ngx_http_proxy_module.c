@@ -80,6 +80,11 @@ typedef struct {
 
 
 typedef struct {
+    ngx_flag_t                     set_header_graceful_merge_enable;
+} ngx_http_proxy_main_conf_t;
+
+
+typedef struct {
     ngx_http_status_t              status;
     ngx_http_chunked_t             chunked;
     ngx_http_proxy_vars_t          vars;
@@ -138,6 +143,11 @@ static ngx_int_t ngx_http_proxy_rewrite(ngx_http_request_t *r,
     ngx_table_elt_t *h, size_t prefix, size_t len, ngx_str_t *replacement);
 
 static ngx_int_t ngx_http_proxy_add_variables(ngx_conf_t *cf);
+
+static char * ngx_http_proxy_header_merge_method(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
+static void *ngx_http_proxy_create_main_conf(ngx_conf_t *cf);
+static char *ngx_http_proxy_init_main_conf(ngx_conf_t *cf, void *conf);
 static void *ngx_http_proxy_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
@@ -307,6 +317,13 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       ngx_conf_set_keyval_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_proxy_loc_conf_t, headers_source),
+      NULL },
+
+    { ngx_string("proxy_header_merge_method"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_http_proxy_header_merge_method,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      0,
       NULL },
 
     { ngx_string("proxy_headers_hash_max_size"),
@@ -542,8 +559,8 @@ static ngx_http_module_t  ngx_http_proxy_module_ctx = {
     ngx_http_proxy_add_variables,          /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
-    NULL,                                  /* create main configuration */
-    NULL,                                  /* init main configuration */
+    ngx_http_proxy_create_main_conf,       /* create main configuration */
+    ngx_http_proxy_init_main_conf,         /* init main configuration */
 
     NULL,                                  /* create server configuration */
     NULL,                                  /* merge server configuration */
@@ -2471,6 +2488,69 @@ ngx_http_proxy_add_variables(ngx_conf_t *cf)
 }
 
 
+static char *
+ngx_http_proxy_header_merge_method(ngx_conf_t *cf, ngx_command_t *cmd,
+                                  void *conf)
+{
+    ngx_str_t                   *value;
+    ngx_http_proxy_main_conf_t  *pmcf;
+
+    pmcf = conf;
+    value = cf->args->elts;
+
+    if(value[1].len == sizeof("default") - 1 &&
+       ngx_strncasecmp(value[1].data, (u_char *) "default",
+                       sizeof("default") - 1) == 0)
+    {
+        pmcf->set_header_graceful_merge_enable = 0;
+
+    } else if (value[1].len == sizeof("append_not_set") - 1 &&
+               ngx_strncasecmp(value[1].data, (u_char *) "append_not_set",
+                               sizeof("append_not_set") - 1) == 0)
+    {
+        pmcf->set_header_graceful_merge_enable = 1;
+
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid value \"%s\" in \"%s\" directive, "
+                           "it must be \"default\" or \"append_not_set\"",
+                           value[1].data, cmd->name.data);
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static void *
+ngx_http_proxy_create_main_conf(ngx_conf_t *cf)
+{
+    ngx_http_proxy_main_conf_t  *pmcf;
+
+    pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_http_proxy_main_conf_t));
+    if (pmcf == NULL) {
+        return NULL;
+    }
+
+    pmcf->set_header_graceful_merge_enable = NGX_CONF_UNSET;
+    return pmcf;
+}
+
+
+static char *
+ngx_http_proxy_init_main_conf(ngx_conf_t *cf, void *conf)
+{
+    ngx_http_proxy_main_conf_t  *pmcf;
+
+    pmcf = conf;
+    if (pmcf->set_header_graceful_merge_enable == NGX_CONF_UNSET) {
+        pmcf->set_header_graceful_merge_enable = 0;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
 static void *
 ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
 {
@@ -2977,12 +3057,13 @@ ngx_http_proxy_merge_headers(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
     u_char                       *p;
     size_t                        size;
     uintptr_t                    *code;
-    ngx_uint_t                    i;
+    ngx_uint_t                    i, j;
     ngx_array_t                   headers_names, headers_merged;
-    ngx_keyval_t                 *src, *s, *h;
+    ngx_keyval_t                 *src, *s, *h, *h_prev;
     ngx_hash_key_t               *hk;
     ngx_hash_init_t               hash;
     ngx_http_script_compile_t     sc;
+    ngx_http_proxy_main_conf_t   *pmcf;
     ngx_http_script_copy_code_t  *copy;
 
     if (conf->headers_source == NULL) {
@@ -3053,6 +3134,44 @@ ngx_http_proxy_merge_headers(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
         }
 
         *s = src[i];
+    }
+
+    /* merge headers from prev conf block */
+    pmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_proxy_module);
+
+    if (pmcf->set_header_graceful_merge_enable &&
+        prev->headers_source != NULL &&
+        prev->headers_source->nelts != 0)
+    {
+        h_prev = prev->headers_source->elts;
+
+        for (j = 0; j < prev->headers_source->nelts; j++) {
+
+            src = headers_merged.elts;
+
+            for (i = 0; i < headers_merged.nelts; i++) {
+                if (ngx_strcasecmp(h_prev[j].key.data, src[i].key.data) == 0) {
+                    goto ending;
+                }
+            }
+
+            s = ngx_array_push(&headers_merged);
+            if (s == NULL) {
+                return NGX_ERROR;
+            }
+
+            *s = h_prev[j];
+
+            /* push this header to conf structure, for future merge */
+            s = ngx_array_push(conf->headers_source);
+            if (s == NULL) {
+                return NGX_ERROR;
+            }
+
+            *s = h_prev[j];
+        ending:
+            continue;
+        }
     }
 
     while (h->key.len) {
