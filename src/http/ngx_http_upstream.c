@@ -1206,6 +1206,204 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     }
 }
 
+static void
+ngx_http_upstream_dyn_resolve_handler(ngx_resolver_ctx_t *ctx)
+{
+    ngx_http_request_t            *r;
+    ngx_http_upstream_t           *u;
+    ngx_peer_connection_t         *pc;
+    struct sockaddr_in            *sin;
+    in_port_t                      port;
+    ngx_str_t                     *addr;
+    u_char                        *p;
+    size_t                         len;
+
+    r = ctx->data;
+
+    u = r->upstream;
+    pc = &u->peer;
+
+    if (ctx->state) {
+
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "%V could not be resolved (%i: %s)",
+                      &ctx->name, ctx->state,
+                      ngx_resolver_strerror(ctx->state));
+
+        u->conf->dyn_fail_check = ngx_time();
+
+        pc->resolved = NGX_HTTP_UPSTREAM_DR_FAILED;
+
+    } else {
+        /* dns query ok */
+        u->conf->dyn_fail_check = 0;
+
+        sin = ngx_pcalloc(r->pool, sizeof(struct sockaddr_in));
+        if (sin == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        ngx_memcpy(sin, pc->sockaddr, pc->socklen);
+
+        /* only the first IP addr is used in version 1 */
+
+        if (sin->sin_addr.s_addr == ctx->addrs[0]) {
+
+            pc->resolved = NGX_HTTP_UPSTREAM_DR_OK;
+
+            goto out;
+        }
+
+        sin->sin_addr.s_addr = ctx->addrs[0];
+
+        len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+
+        p = ngx_pnalloc(r->pool, len);
+        if (p == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        port = ntohs(sin->sin_port);
+        len = ngx_inet_ntop(AF_INET, &sin->sin_addr.s_addr,
+                            p, NGX_INET_ADDRSTRLEN);
+        len = ngx_sprintf(&p[len], ":%d", port) - p;
+
+        addr = ngx_palloc(r->pool, sizeof(ngx_str_t));
+        if (addr == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        addr->data = p;
+        addr->len = len;
+
+        pc->sockaddr = (struct sockaddr *) sin;
+        pc->socklen = sizeof(struct sockaddr_in);
+        pc->name = addr;
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                "name was resolved to %V", pc->name);
+
+        pc->resolved = NGX_HTTP_UPSTREAM_DR_OK;
+    }
+
+out:
+    ngx_resolve_name_done(ctx);
+    u->dyn_resolve_ctx = NULL;
+
+    ngx_http_upstream_connect(r, u);
+}
+
+
+static ngx_int_t
+ngx_http_upstream_connect_and_resolve_peer(ngx_peer_connection_t *pc,
+    ngx_http_request_t *r)
+{
+    ngx_http_core_loc_conf_t       *clcf;
+    ngx_resolver_ctx_t             *ctx, temp;
+    ngx_http_upstream_t            *u;
+    int                             rc;
+
+    if (pc->resolved == NGX_HTTP_UPSTREAM_DR_OK) {
+        return _ngx_event_connect_peer(pc);
+    }
+
+    u = r->upstream;
+
+    if (pc->resolved == NGX_HTTP_UPSTREAM_DR_FAILED) {
+
+failed:
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "resolve failed! fallback: %ui", u->conf->dyn_fallback);
+
+        switch (u->conf->dyn_fallback) {
+
+        case NGX_HTTP_UPSTREAM_DYN_RESOLVE_STALE:
+            return _ngx_event_connect_peer(pc);
+
+        case NGX_HTTP_UPSTREAM_DYN_RESOLVE_SHUTDOWN:
+            ngx_http_upstream_finalize_request(r, u, NGX_HTTP_BAD_GATEWAY);
+            return NGX_DONE;
+
+        default:
+            /* default fallback action: check next upstream */
+            return NGX_DECLINED;
+        }
+
+        return NGX_DECLINED;
+    }
+
+    if (u->conf->dyn_fail_check
+        && (ngx_time() - u->conf->dyn_fail_check < u->conf->dyn_fail_timeout))
+    {
+        goto failed;
+    }
+
+    pc->host = NULL;
+    rc = pc->get(pc, pc->data);
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    if (pc->host == NULL) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "load balancer doesn't support dyn resolve!");
+        return _ngx_event_connect_peer(pc);
+    }
+
+    if (ngx_inet_addr(pc->host->data, pc->host->len) != INADDR_NONE) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "host is an IP address, connect directly!");
+        return _ngx_event_connect_peer(pc);
+    }
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (clcf->resolver == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "resolver has not been configured!");
+        return _ngx_event_connect_peer(pc);
+    }
+
+    temp.name = *pc->host;
+
+    ctx = ngx_resolve_start(clcf->resolver, &temp);
+    if (ctx == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "resolver start failed!");
+        return _ngx_event_connect_peer(pc);
+    }
+
+    if (ctx == NGX_NO_RESOLVER) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "resolver started but no resolver!");
+        return _ngx_event_connect_peer(pc);
+    }
+
+    ctx->name = *pc->host;
+    ctx->type = NGX_RESOLVE_A;
+    ctx->handler = ngx_http_upstream_dyn_resolve_handler;
+    ctx->data = r;
+    ctx->timeout = clcf->resolver_timeout;
+
+    u->dyn_resolve_ctx = ctx;
+
+    if (ngx_resolve_name(ctx) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "resolver name failed!\n");
+
+        u->dyn_resolve_ctx = NULL;
+
+        return NGX_DECLINED;
+    }
+
+    return NGX_STOP;
+}
+
 
 static void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
@@ -1247,11 +1445,17 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->response_sec = tp->sec;
     u->state->response_msec = tp->msec;
 
-    rc = ngx_event_connect_peer(&u->peer);
+    if (u->conf->dyn_resolve) {
+        rc = ngx_http_upstream_connect_and_resolve_peer(&u->peer, r);
+        if (rc == NGX_STOP) {
+            return;
+        }
+    } else {
+        rc = ngx_event_connect_peer(&u->peer);
+    }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http upstream connect: %i", rc);
-
     if (rc == NGX_ERROR) {
         ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -3697,6 +3901,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     }
 #endif
 
+    u->peer.resolved = 0;
     ngx_http_upstream_connect(r, u);
 }
 
@@ -3730,6 +3935,11 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     if (u->resolved && u->resolved->ctx) {
         ngx_resolve_name_done(u->resolved->ctx);
         u->resolved->ctx = NULL;
+    }
+
+    if (u->dyn_resolve_ctx) {
+        ngx_resolve_name_done(u->dyn_resolve_ctx);
+        u->dyn_resolve_ctx = NULL;
     }
 
     if (u->state && u->state->response_sec) {
@@ -5083,6 +5293,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     us->addrs = u.addrs;
     us->naddrs = u.naddrs;
+    us->host = u.host;
     us->weight = weight;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;

@@ -49,6 +49,10 @@
 #define NGX_HTTP_UPSTREAM_IGN_XA_BUFFERING   0x00000080
 #define NGX_HTTP_UPSTREAM_IGN_XA_CHARSET     0x00000100
 
+#define NGX_HTTP_UPSTREAM_DYN_RESOLVE_NEXT 0
+#define NGX_HTTP_UPSTREAM_DYN_RESOLVE_STALE 1
+#define NGX_HTTP_UPSTREAM_DYN_RESOLVE_SHUTDOWN 2
+
 
 typedef struct {
     ngx_msec_t                       bl_time;
@@ -100,6 +104,7 @@ typedef struct {
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
     ngx_str_t                        id;
+    ngx_str_t                        host;
 
     unsigned                         down:1;
     unsigned                         backup:1;
@@ -113,6 +118,10 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_DOWN          0x0010
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
 #define NGX_HTTP_UPSTREAM_ID            0x0040
+
+#define NGX_HTTP_UPSTREAM_DR_INIT         0
+#define NGX_HTTP_UPSTREAM_DR_OK           1
+#define NGX_HTTP_UPSTREAM_DR_FAILED       2
 
 
 struct ngx_http_upstream_srv_conf_s {
@@ -214,6 +223,11 @@ typedef struct {
     ngx_ssl_t                       *ssl;
     ngx_flag_t                       ssl_session_reuse;
 #endif
+
+    ngx_uint_t                       dyn_resolve;
+    ngx_int_t                        dyn_fallback;
+    time_t                           dyn_fail_timeout;
+    time_t                           dyn_fail_check;
 
     ngx_str_t                        module;
 } ngx_http_upstream_conf_t;
@@ -323,6 +337,7 @@ struct ngx_http_upstream_s {
     ngx_http_upstream_headers_in_t   headers_in;
 
     ngx_http_upstream_resolved_t    *resolved;
+    ngx_resolver_ctx_t              *dyn_resolve_ctx;
 
     ngx_buf_t                        from_client;
 

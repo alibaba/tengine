@@ -12,7 +12,7 @@
 
 
 ngx_int_t
-ngx_event_connect_peer(ngx_peer_connection_t *pc)
+_ngx_event_connect_peer(ngx_peer_connection_t *pc)
 {
     int                rc;
     ngx_int_t          event;
@@ -21,11 +21,6 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_socket_t       s;
     ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
-
-    rc = pc->get(pc, pc->data);
-    if (rc != NGX_OK) {
-        return rc;
-    }
 
     s = ngx_socket(pc->sockaddr->sa_family, SOCK_STREAM, 0);
 
@@ -250,6 +245,20 @@ failed:
     return NGX_ERROR;
 }
 
+
+ngx_int_t
+ngx_event_connect_peer(ngx_peer_connection_t *pc)
+{
+    int                rc;
+
+    rc = pc->get(pc, pc->data);
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    return _ngx_event_connect_peer(pc);
+}
+ 
 
 ngx_int_t
 ngx_event_get_peer(ngx_peer_connection_t *pc, void *data)

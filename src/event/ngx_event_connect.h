@@ -40,6 +40,7 @@ struct ngx_peer_connection_s {
     struct sockaddr                 *sockaddr;
     socklen_t                        socklen;
     ngx_str_t                       *name;
+    ngx_str_t                       *host;
 
     ngx_uint_t                       tries;
 
@@ -64,12 +65,15 @@ struct ngx_peer_connection_s {
 
     unsigned                         cached:1;
 
+    unsigned                         resolved:2;
+
                                      /* ngx_connection_log_error_e */
     unsigned                         log_error:2;
 };
 
 
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc);
+ngx_int_t _ngx_event_connect_peer(ngx_peer_connection_t *pc);
 ngx_int_t ngx_event_get_peer(ngx_peer_connection_t *pc, void *data);
 
 

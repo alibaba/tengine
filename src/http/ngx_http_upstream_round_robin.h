@@ -19,6 +19,7 @@ typedef struct {
     socklen_t                       socklen;
     ngx_str_t                       name;
     ngx_str_t                       id;
+    ngx_str_t                       host;
 
     ngx_int_t                       current_weight;
     ngx_int_t                       effective_weight;
