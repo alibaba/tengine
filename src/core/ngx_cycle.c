@@ -1408,6 +1408,7 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     shm_zone->shm.size = size;
     shm_zone->shm.name = *name;
     shm_zone->shm.exists = 0;
+    shm_zone->shm.slab = 1;
     shm_zone->init = NULL;
     shm_zone->tag = tag;
 

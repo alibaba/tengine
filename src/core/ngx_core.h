@@ -33,6 +33,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define  NGX_DONE       -4
 #define  NGX_DECLINED   -5
 #define  NGX_ABORT      -6
+#define  NGX_YIELD      -7
 
 
 #include <ngx_errno.h>
@@ -61,6 +62,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_crc.h>
 #include <ngx_crc32.h>
 #include <ngx_murmurhash.h>
+#include <ngx_lfstack.h>
 #if (NGX_PCRE)
 #include <ngx_regex.h>
 #endif

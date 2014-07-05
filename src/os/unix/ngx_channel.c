@@ -148,7 +148,7 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
 
 #if (NGX_HAVE_MSGHDR_MSG_CONTROL)
 
-    if (ch->command == NGX_CMD_OPEN_CHANNEL) {
+    if (ch->fd != -1) {
 
         if (cmsg.cm.cmsg_len < (socklen_t) CMSG_LEN(sizeof(int))) {
             ngx_log_error(NGX_LOG_ALERT, log, 0,
@@ -177,7 +177,7 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
 
 #else
 
-    if (ch->command == NGX_CMD_OPEN_CHANNEL) {
+    if (ch->fd != -1) {
         if (msg.msg_accrightslen != sizeof(int)) {
             ngx_log_error(NGX_LOG_ALERT, log, 0,
                           "recvmsg() returned no ancillary data");
