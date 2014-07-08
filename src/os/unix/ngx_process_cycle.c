@@ -387,6 +387,7 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
+    ngx_process_idx = 0;
     for (i = 0; i < n; i++) {
 
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
@@ -397,6 +398,8 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
         ch.fd = ngx_processes[ngx_process_slot].channel[0];
 
         ngx_pass_open_channel(cycle, &ch);
+
+        ngx_process_idx++;
     }
 }
 
