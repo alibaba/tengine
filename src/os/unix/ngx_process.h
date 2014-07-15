@@ -21,6 +21,7 @@ typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
 
 typedef struct {
     ngx_pid_t           pid;
+    ngx_int_t           idx;
     int                 status;
     ngx_socket_t        channel[2];
 
@@ -88,6 +89,7 @@ extern char         **ngx_os_argv;
 
 extern ngx_pid_t      ngx_pid;
 extern ngx_socket_t   ngx_channel;
+extern ngx_int_t      ngx_process_idx;
 extern ngx_int_t      ngx_process_slot;
 extern ngx_int_t      ngx_last_process;
 extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
