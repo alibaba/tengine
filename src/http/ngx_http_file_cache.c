@@ -287,7 +287,7 @@ ngx_http_file_cache_init(ngx_shm_zone_t *shm_zone, void *data)
     cache->max_size /= cache->bsize;
     
     cache->sh->num_of_levels=2;      // TODO  : script support   ,分层数目还没有实现脚本配置支持
-{
+
     cache->sh->reserve_size=cache->max_size/cache->sh->num_of_levels/8;
     cache->sh->tag=1;
     cache->sh->require_size=0;
