@@ -24,6 +24,7 @@
 
 #define NGX_HTTP_CACHE_KEY_LEN       16
 
+#define LOOP_POINT  0.1
 
 typedef struct {
     ngx_uint_t                       status;
@@ -32,6 +33,7 @@ typedef struct {
 
 
 typedef struct {
+    unsigned                         cur_of_level;
     ngx_rbtree_node_t                node;
     ngx_queue_t                      queue;
 
@@ -105,6 +107,14 @@ typedef struct {
     u_short                          body_start;
 } ngx_http_file_cache_header_t;
 
+typedef struct{
+    ngx_queue_t                       queue;
+    off_t                             max_size;
+    off_t                             require_size;
+    off_t                             hit_size;
+    off_t                             size;
+    unsigned                          weight;
+}level;
 
 typedef struct {
     ngx_rbtree_t                     rbtree;
@@ -117,6 +127,11 @@ typedef struct {
 
 
 struct ngx_http_file_cache_s {
+    level                           levels[10];
+    unsigned                        num_of_levels;         
+    off_t                           reserve_size;
+    unsigned                        tag;     
+    off_t                           require_size;
     ngx_http_file_cache_sh_t        *sh;
     ngx_slab_pool_t                 *shpool;
 
