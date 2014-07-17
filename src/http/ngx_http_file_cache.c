@@ -1410,7 +1410,7 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
 {
     u_char                      *name, *p;
     size_t                       len;
-    time_t                       now, wait;
+    time_t                       now, wait=10;
     ngx_path_t                  *path;
     ngx_queue_t                 *q;
     ngx_http_file_cache_node_t  *fcn;
@@ -1432,15 +1432,17 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
     now = ngx_time();
 
     ngx_shmtx_lock(&cache->shpool->mutex);
-
+    
+    unsigned i=1;
+    for(;i<cache->sh->num_of_levels;i++)
     for ( ;; ) {
 
-        if (ngx_queue_empty(&cache->sh->queue)) {
+        if (ngx_queue_empty(&cache->sh->levels[i].queue)) {
             wait = 10;
             break;
         }
 
-        q = ngx_queue_last(&cache->sh->queue);
+        q = ngx_queue_last(&cache->sh->levels[i].queue);
 
         fcn = ngx_queue_data(q, ngx_http_file_cache_node_t, queue);
 
@@ -1479,8 +1481,8 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
 
         ngx_queue_remove(q);
         fcn->expire = ngx_time() + cache->inactive;
-        ngx_queue_insert_head(&cache->sh->queue, &fcn->queue);
-
+        ngx_queue_insert_head(&cache->sh->levels[fcn->cur_of_level].queue, &fcn->queue);
+        
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
                       "ignore long locked inactive cache entry %*s, count:%d",
                       2 * NGX_HTTP_CACHE_KEY_LEN, key, fcn->count);
@@ -1507,7 +1509,7 @@ ngx_http_file_cache_delete(ngx_http_file_cache_t *cache, ngx_queue_t *q,
 
     if (fcn->exists) {
         cache->sh->size -= fcn->fs_size;
-
+        cache->sh->levels[fcn->cur_of_level].size-=fcn->fs_size;
         path = cache->path;
         p = name + path->name.len + 1 + path->len;
         p = ngx_hex_dump(p, (u_char *) &fcn->node.key,
@@ -1760,8 +1762,9 @@ ngx_http_file_cache_add(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
         fcn->valid_sec = 0;
         fcn->body_start = 0;
         fcn->fs_size = c->fs_size;
-
+        fcn->cur_of_level=ngx_http_file_cache_level(fcn->fs_size);
         cache->sh->size += c->fs_size;
+        cache->sh->levels[fcn->cur_of_level].size+=c->fs_size;
 
     } else {
         ngx_queue_remove(&fcn->queue);
@@ -1769,7 +1772,7 @@ ngx_http_file_cache_add(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
 
     fcn->expire = ngx_time() + cache->inactive;
 
-    ngx_queue_insert_head(&cache->sh->queue, &fcn->queue);
+    ngx_queue_insert_head(&cache->sh->levels[fcn->cur_of_level].queue, &fcn->queue);
 
     ngx_shmtx_unlock(&cache->shpool->mutex);
 
