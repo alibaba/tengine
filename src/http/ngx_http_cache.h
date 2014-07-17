@@ -117,6 +117,11 @@ typedef struct{
 }level;
 
 typedef struct {
+    level                           levels[10];
+    unsigned                        num_of_levels;         
+    off_t                           reserve_size;
+    unsigned                        tag;     
+    off_t                           require_size;
     ngx_rbtree_t                     rbtree;
     ngx_rbtree_node_t                sentinel;
     ngx_queue_t                      queue;
@@ -127,11 +132,7 @@ typedef struct {
 
 
 struct ngx_http_file_cache_s {
-    level                           levels[10];
-    unsigned                        num_of_levels;         
-    off_t                           reserve_size;
-    unsigned                        tag;     
-    off_t                           require_size;
+
     ngx_http_file_cache_sh_t        *sh;
     ngx_slab_pool_t                 *shpool;
 
