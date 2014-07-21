@@ -73,7 +73,6 @@ struct ngx_peer_connection_s {
 
 
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc);
-ngx_int_t _ngx_event_connect_peer(ngx_peer_connection_t *pc);
 ngx_int_t ngx_event_get_peer(ngx_peer_connection_t *pc, void *data);
 
 

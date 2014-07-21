@@ -205,7 +205,7 @@ ngx_module_t  ngx_http_proxy_module;
 static ngx_command_t  ngx_http_proxy_commands[] = {
 
     { ngx_string("proxy_pass"),
-      NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_HTTP_LMT_CONF|NGX_CONF_TAKE1234,
+      NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_HTTP_LMT_CONF|NGX_CONF_TAKE1,
       ngx_http_proxy_pass,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -2496,10 +2496,6 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
      *     conf->upstream.store_lengths = NULL;
      *     conf->upstream.store_values = NULL;
      *
-     *     conf->upstream.dyn_resolve = 0;
-     *     conf->upstream.dyn_fail_timeout = 0;
-     *     conf->upstream.dyn_fallback = 0;
-     *
      *     conf->method = { 0, NULL };
      *     conf->headers_source = NULL;
      *     conf->headers_set_len = NULL;
@@ -3241,21 +3237,13 @@ ngx_http_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_proxy_loc_conf_t *plcf = conf;
 
-    size_t                          add;
-    u_short                         port;
-    ngx_str_t                      *value, *url;
-    ngx_str_t                       host;
-    ngx_url_t                       u;
-    ngx_uint_t                      n;
-    ngx_http_core_loc_conf_t       *clcf;
-    ngx_http_script_compile_t       sc;
-    ngx_http_upstream_srv_conf_t   *uscf;
-    ngx_http_upstream_server_t     *server;
-    ngx_uint_t                      i;
-    ngx_str_t                       s;
-    time_t                          fail_timeout;
-    ngx_int_t                       fallback;
-
+    size_t                      add;
+    u_short                     port;
+    ngx_str_t                  *value, *url;
+    ngx_url_t                   u;
+    ngx_uint_t                  n;
+    ngx_http_core_loc_conf_t   *clcf;
+    ngx_http_script_compile_t   sc;
 
     if (plcf->upstream.upstream || plcf->proxy_lengths) {
         return "is duplicate";
@@ -3272,52 +3260,6 @@ ngx_http_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     url = &value[1];
-
-    for (i = 2; i < cf->args->nelts; i++) {
-
-        if (ngx_strncmp(value[i].data, "dynamic_resolve", 15) == 0) {
-
-            plcf->upstream.dyn_resolve = 1;
-
-            continue;
-        }
-
-        if (ngx_strncmp(value[i].data, "dynamic_fail_timeout=", 21) == 0) {
-
-            s.len = value[i].len - 21;
-            s.data = &value[i].data[21];
-
-            fail_timeout = ngx_parse_time(&s, 1);
-
-            if (fail_timeout == (time_t) NGX_ERROR) {
-                return "invalid fail_timeout";
-            }
-
-            plcf->upstream.dyn_fail_timeout = fail_timeout;
-
-            continue;
-        }
-
-        if (ngx_strncmp(value[i].data, "dynamic_fallback=", 17) == 0) {
-
-            s.len = value[i].len - 17;
-            s.data = &value[i].data[17];
-
-            if (ngx_strncmp(s.data, "next", 4) == 0) {
-                fallback = NGX_HTTP_UPSTREAM_DYN_RESOLVE_NEXT;
-            } else if (ngx_strncmp(s.data, "stale", 5) == 0) {
-                fallback = NGX_HTTP_UPSTREAM_DYN_RESOLVE_STALE;
-            } else if (ngx_strncmp(s.data, "shutdown", 8) == 0) {
-                fallback = NGX_HTTP_UPSTREAM_DYN_RESOLVE_SHUTDOWN;
-            } else {
-                return "invalid fallback action";
-            }
-
-            plcf->upstream.dyn_fallback = fallback;
-
-            continue;
-        }
-    }
 
     n = ngx_http_script_variables_count(url);
 
@@ -3342,10 +3284,6 @@ ngx_http_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 #endif
-
-        if (plcf->proxy_lengths) {  /* variable */
-            plcf->upstream.dyn_resolve = 0;
-        }
 
         return NGX_CONF_OK;
     }
@@ -3385,23 +3323,6 @@ ngx_http_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     plcf->upstream.upstream = ngx_http_upstream_add(cf, &u, 0);
     if (plcf->upstream.upstream == NULL) {
         return NGX_CONF_ERROR;
-    }
-
-    if (plcf->upstream.dyn_resolve == 1) {
-        uscf = plcf->upstream.upstream;
-        if (uscf->servers) {
-            server = uscf->servers->elts;
-            for (i = 0; i < uscf->servers->nelts; i++) {
-                host = server[i].host;
-                if (ngx_inet_addr(host.data, host.len) == INADDR_NONE) {
-                    break;
-                }
-            }
-
-            if (i == uscf->servers->nelts) {
-                plcf->upstream.dyn_resolve = 0;
-            }
-        }
     }
 
     plcf->vars.schema.len = add;

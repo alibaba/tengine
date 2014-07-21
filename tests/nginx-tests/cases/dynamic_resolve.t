@@ -54,6 +54,34 @@ http {
         server 127.0.0.4:8081 backup;
     }
 
+    upstream backend1 {
+        dynamic_resolve;
+
+        server senginx.test:8081 fail_timeout=0s;
+        server 127.0.0.4:8081 backup;
+    }
+
+    upstream backend2 {
+        dynamic_resolve fallback=stale;
+
+        server senginx.test:8081 fail_timeout=0s;
+        server 127.0.0.4:8081 backup;
+    }
+
+    upstream backend3 {
+        dynamic_resolve fallback=next;
+
+        server senginx.test:8081 fail_timeout=0s;
+        server 127.0.0.4:8081 backup;
+    }
+
+    upstream backend4 {
+        dynamic_resolve fallback=shutdown;
+
+        server senginx.test:8081 fail_timeout=0s;
+        server 127.0.0.4:8081 backup;
+    }
+
     upstream backend-ka {
         server senginx.test:8082;
 
@@ -69,19 +97,19 @@ http {
         }
 
         location / {
-            proxy_pass http://backend dynamic_resolve;
+            proxy_pass http://backend1;
         }
 
         location /stale {
-            proxy_pass http://backend dynamic_resolve dynamic_fallback=stale;
+            proxy_pass http://backend2;
         }
 
         location /next {
-            proxy_pass http://backend dynamic_resolve dynamic_fallback=next;
+            proxy_pass http://backend3;
         }
 
         location /shutdown {
-            proxy_pass http://backend dynamic_resolve dynamic_fallback=shutdown;
+            proxy_pass http://backend4;
         }
     }
 }
