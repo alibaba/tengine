@@ -167,8 +167,24 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                     return NGX_ERROR;
                 }
 
-                address->data = line;
-                address->len = line_end - line;
+#if (NGX_HAVE_INET6)
+
+                if (ngx_strlchr(line, line_end, ':')) {
+                    address->len = line_end - line + 2;
+                    address->data = ngx_palloc(cf->pool, address->len + 2);
+                    if (address->data == NULL) {
+                        return NGX_ERROR;
+                    }
+                    address->data[0] = '[';
+                    ngx_memcpy(address->data + 1, line, address->len - 2);
+                    address->data[address->len - 1] = ']';
+                } else {
+#endif
+                    address->data = line;
+                    address->len = line_end - line;
+#if (NGX_HAVE_INET6)
+                }
+#endif
             }
 
             line = p + 1;
