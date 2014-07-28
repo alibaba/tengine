@@ -21,6 +21,7 @@ int              ngx_argc;
 char           **ngx_argv;
 char           **ngx_os_argv;
 
+ngx_int_t        ngx_process_idx;
 ngx_int_t        ngx_process_slot;
 ngx_socket_t     ngx_channel;
 ngx_int_t        ngx_last_process;
@@ -84,6 +85,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
     if (respawn >= 0) {
         s = respawn;
+        ngx_process_idx = ngx_processes[s].idx;
 
     } else {
         for (s = 0; s < ngx_last_process; s++) {
@@ -206,6 +208,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     ngx_processes[s].data = data;
     ngx_processes[s].name = name;
     ngx_processes[s].exiting = 0;
+    ngx_processes[s].idx = ngx_process_idx;
 
     switch (respawn) {
 
@@ -569,6 +572,10 @@ ngx_unlock_mutexes(ngx_pid_t pid)
             part = part->next;
             shm_zone = part->elts;
             i = 0;
+        }
+
+        if (shm_zone[i].shm.slab == 0) {
+            continue;
         }
 
         sp = (ngx_slab_pool_t *) shm_zone[i].shm.addr;

@@ -18,7 +18,8 @@ typedef struct {
     size_t       size;
     ngx_str_t    name;
     ngx_log_t   *log;
-    ngx_uint_t   exists;   /* unsigned  exists:1;  */
+    ngx_uint_t   exists:1;   /* unsigned  exists:1;  */
+    ngx_uint_t   slab:1;     /* used for slab pool, set by default */
 } ngx_shm_t;
 
 

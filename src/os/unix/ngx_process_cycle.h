@@ -19,6 +19,7 @@
 #define NGX_CMD_TERMINATE      4
 #define NGX_CMD_REOPEN         5
 #define NGX_CMD_PIPE_BROKEN    6
+#define NGX_CMD_RPC            7
 
 
 #define NGX_PROCESS_SINGLE     0
