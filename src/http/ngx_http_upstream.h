@@ -100,6 +100,7 @@ typedef struct {
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
     ngx_str_t                        id;
+    ngx_str_t                        host;
 
     unsigned                         down:1;
     unsigned                         backup:1;
@@ -323,6 +324,7 @@ struct ngx_http_upstream_s {
     ngx_http_upstream_headers_in_t   headers_in;
 
     ngx_http_upstream_resolved_t    *resolved;
+    ngx_resolver_ctx_t              *dyn_resolve_ctx;
 
     ngx_buf_t                        from_client;
 
@@ -429,7 +431,6 @@ void ngx_http_upstream_check_get_peer(ngx_uint_t index);
 void ngx_http_upstream_check_free_peer(ngx_uint_t index);
 
 #endif
-
 
 extern ngx_module_t        ngx_http_upstream_module;
 extern ngx_conf_bitmask_t  ngx_http_upstream_cache_method_mask[];

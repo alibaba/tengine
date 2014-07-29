@@ -33,6 +33,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define  NGX_DONE       -4
 #define  NGX_DECLINED   -5
 #define  NGX_ABORT      -6
+#define  NGX_STOP       -7
 
 
 #include <ngx_errno.h>
