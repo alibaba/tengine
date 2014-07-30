@@ -209,6 +209,7 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
                        peer->check_index);
 
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
+            peer->uptime = 0;
             continue;
         }
 #endif
@@ -227,14 +228,14 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
          */
 
         if (best == NULL
-            || lcp->conns[i] * best->weight < lcp->conns[p] * peer->weight)
+            || lcp->conns[i] * best->effective_weight < lcp->conns[p] * peer->effective_weight)
         {
             best = peer;
             many = 0;
             p = i;
 
-        } else if (lcp->conns[i] * best->weight
-                   == lcp->conns[p] * peer->weight)
+        } else if (lcp->conns[i] * best->effective_weight
+                   == lcp->conns[p] * peer->effective_weight)
         {
             many = 1;
         }
@@ -272,11 +273,12 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
                            peer->check_index);
 
             if (ngx_http_upstream_check_peer_down(peer->check_index)) {
+                peer->uptime = 0;
                 continue;
             }
 #endif
 
-            if (lcp->conns[i] * best->weight != lcp->conns[p] * peer->weight) {
+            if (lcp->conns[i] * best->effective_weight != lcp->conns[p] * peer->effective_weight) {
                 continue;
             }
 
@@ -422,6 +424,7 @@ ngx_http_upstream_least_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                   |NGX_HTTP_UPSTREAM_WEIGHT
                   |NGX_HTTP_UPSTREAM_MAX_FAILS
                   |NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
+                  |NGX_HTTP_UPSTREAM_SLOW_START
                   |NGX_HTTP_UPSTREAM_DOWN
                   |NGX_HTTP_UPSTREAM_BACKUP;
 

@@ -4874,6 +4874,7 @@ ngx_http_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
                                          |NGX_HTTP_UPSTREAM_WEIGHT
                                          |NGX_HTTP_UPSTREAM_MAX_FAILS
                                          |NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
+                                         |NGX_HTTP_UPSTREAM_SLOW_START
                                          |NGX_HTTP_UPSTREAM_DOWN
                                          |NGX_HTTP_UPSTREAM_BACKUP);
     if (uscf == NULL) {
@@ -4964,7 +4965,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_upstream_srv_conf_t  *uscf = conf;
 
-    time_t                       fail_timeout;
+    time_t                       fail_timeout, slow_start;
     ngx_str_t                   *value, s, id;
     ngx_url_t                    u;
     ngx_int_t                    weight, max_fails;
@@ -5005,6 +5006,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     weight = 1;
     max_fails = 1;
     fail_timeout = 10;
+    slow_start = 0;
     ngx_str_null(&id);
 
     for (i = 2; i < cf->args->nelts; i++) {
@@ -5057,6 +5059,24 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+        if (ngx_strncmp(value[i].data, "slow_start=", 11) == 0) {
+
+            if (!(uscf->flags & NGX_HTTP_UPSTREAM_FAIL_TIMEOUT)) {
+                goto invalid;
+            }
+
+            s.len = value[i].len - 11;
+            s.data = &value[i].data[11];
+
+            slow_start = ngx_parse_time(&s, 1);
+
+            if (slow_start == (time_t) NGX_ERROR) {
+                goto invalid;
+            }
+
+            continue;
+        }
+
         if (ngx_strncmp(value[i].data, "backup", 6) == 0) {
 
             if (!(uscf->flags & NGX_HTTP_UPSTREAM_BACKUP)) {
@@ -5096,6 +5116,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->weight = weight;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;
+    us->slow_start = slow_start;
     us->id = id;
 
     return NGX_CONF_OK;

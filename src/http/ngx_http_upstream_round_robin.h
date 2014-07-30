@@ -32,6 +32,9 @@ typedef struct {
     ngx_uint_t                      max_fails;
     time_t                          fail_timeout;
 
+    time_t                          uptime;
+    time_t                          slow_start;
+
 #if (NGX_HTTP_UPSTREAM_CHECK)
     ngx_uint_t                      check_index;
 #endif
