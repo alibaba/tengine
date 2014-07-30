@@ -110,6 +110,27 @@ EVENT_SRCS="src/event/ngx_event.c \
             src/event/ngx_event_connect.c \
             src/event/ngx_event_pipe.c"
 
+TIMER_MODULES="ngx_timer_module"
+
+TIMER_INCS="src/event/timer"
+
+TIMER_DEPS="src/event/timer/ngx_heap.h \
+          src/event/timer/ngx_heap_template.h \
+          src/event/timer/ngx_timer_tree_template.h \
+          src/event/timer/ngx_timer_module.h "
+
+TIMER_SRCS="src/event/timer/ngx_heap.c \
+          src/event/timer/ngx_heap4.c \
+          src/event/timer/ngx_timer_rbtree.c \
+          src/event/timer/ngx_timer_heap.c \
+          src/event/timer/ngx_timer_heap4.c \
+          src/event/timer/ngx_timer_wheel.c \
+          src/event/timer/ngx_timer_module.c"
+
+EVENT_INCS="$EVENT_INCS $TIMER_INCS"
+EVENT_DEPS="$EVENT_DEPS $TIMER_DEPS"
+EVENT_MODULES="$EVENT_MODULES $TIMER_MODULES"
+EVENT_SRCS="$EVENT_SRCS $TIMER_SRCS"
 
 SELECT_MODULE=ngx_select_module
 SELECT_SRCS=src/event/modules/ngx_select_module.c

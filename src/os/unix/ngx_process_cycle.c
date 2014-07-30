@@ -840,7 +840,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 }
             }
 
-            if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
+            if (ngx_timer_empty())
             {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 

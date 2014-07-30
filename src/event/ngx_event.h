@@ -451,10 +451,6 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
 
-#define ngx_add_timer        ngx_event_add_timer
-#define ngx_del_timer        ngx_event_del_timer
-
-
 extern ngx_os_io_t  ngx_io;
 
 #define ngx_recv             ngx_io.recv
@@ -563,7 +559,7 @@ void ngx_close_accepted_connection(ngx_connection_t *c);
 #define ngx_event_ident(p)  ((ngx_connection_t *) (p))->fd
 
 
-#include <ngx_event_timer.h>
+#include <ngx_timer_module.h>
 #include <ngx_event_posted.h>
 #include <ngx_event_busy_lock.h>
 

@@ -215,7 +215,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         flags = 0;
 
     } else {
-        timer = ngx_event_find_timer();
+        timer = ngx_timer_find_min();
         flags = NGX_UPDATE_TIME;
 
 #if (NGX_THREADS)
@@ -267,7 +267,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     }
 
     if (delta) {
-        ngx_event_expire_timers();
+        ngx_timer_expire_timers();
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
