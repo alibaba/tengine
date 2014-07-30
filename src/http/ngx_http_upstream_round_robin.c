@@ -86,6 +86,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peers->peer[n].weight = server[i].weight;
                 peers->peer[n].effective_weight = server[i].weight;
                 peers->peer[n].current_weight = 0;
+                peers->peer[n].host = server[i].host;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
                 if (!server[i].down) {
@@ -152,6 +153,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 backup->peer[n].max_fails = server[i].max_fails;
                 backup->peer[n].fail_timeout = server[i].fail_timeout;
                 backup->peer[n].down = server[i].down;
+                backup->peer[n].host = server[i].host;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
                 if (!server[i].down) {
@@ -222,6 +224,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peers->peer[i].current_weight = 0;
         peers->peer[i].max_fails = 1;
         peers->peer[i].fail_timeout = 10;
+        peers->peer[i].host = u.host;
 #if (NGX_HTTP_UPSTREAM_CHECK)
         peers->peer[i].check_index = (ngx_uint_t) NGX_ERROR;
 #endif
@@ -454,6 +457,7 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+    pc->host = &peer->host;
 
     /* ngx_unlock_mutex(rrp->peers->mutex); */
 
