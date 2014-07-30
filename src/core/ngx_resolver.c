@@ -178,6 +178,7 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                     address->data[0] = '[';
                     ngx_memcpy(address->data + 1, line, address->len - 2);
                     address->data[address->len - 1] = ']';
+
                 } else {
 #endif
                     address->data = line;
