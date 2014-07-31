@@ -2,11 +2,7 @@
 
 # (C) Jason Liu
 
-# Tests for dynamic resolve in proxy module.
-#
-# Usage: need to write one entry in /etc/hosts file to let
-# nginx get started:
-#     127.0.0.1 senginx.test
+# Tests for dynamic resolve in upstream module.
 #
 ###############################################################################
 
@@ -49,7 +45,7 @@ http {
     resolver_timeout 1s;
 
     upstream backend {
-        server senginx.test:8081 fail_timeout=0s;
+        server www.taobao.com fail_timeout=0s;
 
         server 127.0.0.4:8081 backup;
     }
@@ -57,33 +53,33 @@ http {
     upstream backend1 {
         dynamic_resolve;
 
-        server senginx.test:8081 fail_timeout=0s;
+        server www.taobao.com:8081 fail_timeout=0s;
         server 127.0.0.4:8081 backup;
     }
 
     upstream backend2 {
         dynamic_resolve fallback=stale;
 
-        server senginx.test:8081 fail_timeout=0s;
+        server www.taobao.com:8081 fail_timeout=0s;
         server 127.0.0.4:8081 backup;
     }
 
     upstream backend3 {
         dynamic_resolve fallback=next;
 
-        server senginx.test:8081 fail_timeout=0s;
+        server www.taobao.com:8081 fail_timeout=0s;
         server 127.0.0.4:8081 backup;
     }
 
     upstream backend4 {
         dynamic_resolve fallback=shutdown;
 
-        server senginx.test:8081 fail_timeout=0s;
+        server www.taobao.com:8081 fail_timeout=0s;
         server 127.0.0.4:8081 backup;
     }
 
     upstream backend-ka {
-        server senginx.test:8082;
+        server www.taobao.com;
 
         keepalive 8;
     }
@@ -93,7 +89,7 @@ http {
         server_name  localhost;
 
         location /static {
-            proxy_pass http://backend;
+            proxy_pass http://backend/;
         }
 
         location / {
@@ -127,8 +123,8 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/static'), qr/127\.0\.0\.1/,
-    'static resolved should be 127.0.0.1');
+like(http_get('/static'), qr/302/,
+    'static resolved should be taobao\' IP addr');
 
 like(http_get('/'), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2');
@@ -140,9 +136,8 @@ wait;
 # wait for dns cache to expire
 sleep(2);
 
-# peers should be 127.0.0.2 and 127.0.0.3
-like(http_get('/stale'), qr/127\.0\.0\.1/,
-    'stale http server should be 127.0.0.1, using initial result');
+ok(!http_get('/stale'),
+    'stale http server should be www.taobao.com:8081, using initial result');
 
 like(http_get('/shutdown'), qr/502 Bad Gateway/,
     'shutdown connection if dns query is failed');
@@ -220,7 +215,7 @@ sub reply_handler {
         return ($rcode, \@ans, \@auth, \@add, { aa => 1 });
     }
 
-    if ($qname eq "senginx.test") {
+    if ($qname eq "www.taobao.com") {
         foreach my $ip (@domain_addrs) {
             ($ttl, $rdata) = (3600, $ip);
             $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $rdata");
