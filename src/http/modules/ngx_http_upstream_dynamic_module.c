@@ -340,7 +340,6 @@ ngx_http_upstream_get_dynamic_peer(ngx_peer_connection_t *pc, void *data)
 
     if (pc->resolved == NGX_HTTP_UPSTREAM_DR_FAILED) {
 
-failed:
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                        "resolve failed! fallback: %ui", dscf->fallback);
 
@@ -364,7 +363,26 @@ failed:
     if (dscf->fail_check
         && (ngx_time() - dscf->fail_check < dscf->fail_timeout))
     {
-        goto failed;
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                       "in fail timeout period, fallback: %ui", dscf->fallback);
+
+        switch (dscf->fallback) {
+
+        case NGX_HTTP_UPSTREAM_DYN_RESOLVE_STALE:
+            return bp->original_get_peer(pc, bp->data);
+
+        case NGX_HTTP_UPSTREAM_DYN_RESOLVE_SHUTDOWN:
+            ngx_http_upstream_finalize_request(r, u, NGX_HTTP_BAD_GATEWAY);
+            return NGX_YIELD;
+
+        default:
+            /* default fallback action: check next upstream, still need
+             * to get peer in fail timeout period
+             */
+            return bp->original_get_peer(pc, bp->data);
+        }
+
+        return NGX_DECLINED;
     }
 
     /* NGX_HTTP_UPSTREAM_DYN_RESOLVE_INIT,  ask balancer */
