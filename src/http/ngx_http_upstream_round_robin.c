@@ -653,11 +653,11 @@ ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
             peer->fails = 0;
         }
 
-        if (peer->uptime == 0) {
+        if (peer->slow_start && peer->uptime == 0) {
             peer->uptime = now;
             peer->effective_weight = 0;
         } else {
-            if (now - peer->uptime <= peer->slow_start) {
+            if (peer->slow_start && now - peer->uptime <= peer->slow_start) {
                 peer->effective_weight = peer->weight * (now - peer->uptime) / peer->slow_start;
             }
 
