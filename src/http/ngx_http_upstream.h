@@ -99,13 +99,13 @@ typedef struct {
     ngx_uint_t                       weight;
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
+    time_t                           slow_start;
     ngx_str_t                        id;
     ngx_str_t                        host;
 
     unsigned                         down:1;
     unsigned                         backup:1;
 
-    time_t                           slow_start;
 } ngx_http_upstream_server_t;
 
 
