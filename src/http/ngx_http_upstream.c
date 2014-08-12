@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_md5.h>
 
 
 #if (NGX_HTTP_CACHE)
@@ -161,6 +162,8 @@ static ngx_addr_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
 
 static void *ngx_http_upstream_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf);
+
+static ngx_int_t ngx_http_upstream_init_process(ngx_cycle_t *cycle);
 
 #if (NGX_HTTP_SSL)
 static void ngx_http_upstream_ssl_init_connection(ngx_http_request_t *,
@@ -345,7 +348,7 @@ ngx_module_t  ngx_http_upstream_module = {
     NGX_HTTP_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
-    NULL,                                  /* init process */
+    ngx_http_upstream_init_process,        /* init process */
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -5777,4 +5780,41 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
     }
 
     return NGX_CONF_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_init_process(ngx_cycle_t *cycle)
+{
+    u_char                            buf[16];
+    ngx_md5_t                         md5;
+    ngx_uint_t                        i, seed;
+    ngx_http_upstream_rr_peers_t     *peers, *backup;
+    ngx_http_upstream_srv_conf_t    **uscfp;
+    ngx_http_upstream_main_conf_t    *umcf;
+
+    ngx_md5_init(&md5);
+    ngx_md5_update(&md5, cycle->hostname.data, cycle->hostname.len);
+    ngx_md5_final(buf, &md5);
+
+    seed = (ngx_uint_t) buf[0] + ((ngx_uint_t) buf[1] << 8)
+           + ((ngx_uint_t) ngx_pid << 16);
+
+    srandom(seed);
+
+    umcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_upstream_module);
+
+    uscfp = umcf->upstreams.elts;
+
+    for (i = 0; i < umcf->upstreams.nelts; i++) {
+        peers = uscfp[i]->peer.data;
+        peers->init_number = ngx_random() % peers->number;
+
+        backup = peers->next;
+        if (backup) {
+            backup->init_number = ngx_random() % backup->number;
+        }
+    }
+
+    return NGX_OK;
 }

@@ -48,6 +48,7 @@ typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 
 struct ngx_http_upstream_rr_peers_s {
     ngx_uint_t                      number;
+    ngx_uint_t                      init_number;
 
  /* ngx_mutex_t                    *mutex; */
 
