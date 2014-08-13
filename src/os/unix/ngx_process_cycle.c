@@ -387,6 +387,20 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_uint_t           listen_nelt;
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+    if (ecf->reuse_port) {
+        listen_nelt = cycle->listening.nelts;
+        ngx_close_listening_sockets(cycle);
+        cycle->listening.nelts = listen_nelt;
+    }
+
+#endif
+
     for (i = 0; i < n; i++) {
 
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
@@ -942,6 +956,22 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
                           ccf->rlimit_sigpending);
         }
     }
+#endif
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+    if (ecf->reuse_port) {
+        if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+            /* fatal */
+            exit(2);
+        }
+
+        ngx_configure_listening_sockets(cycle);
+    }
+
 #endif
 
     if (geteuid() == 0) {
