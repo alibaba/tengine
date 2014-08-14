@@ -168,6 +168,13 @@ static ngx_command_t  ngx_event_core_commands[] = {
       offsetof(ngx_event_conf_t, accept_mutex_delay),
       NULL },
 
+    { ngx_string("timeout"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      0,
+      offsetof(ngx_event_conf_t, timeout),
+      NULL },
+
     { ngx_string("debug_connection"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_event_debug_connection,
@@ -741,6 +748,14 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 #endif
     }
 
+    if (ecf->timeout > 0) {
+        cycle->timeout_events =
+            ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n, cycle->log);
+        if (cycle->timeout_events == NULL) {
+            return NGX_ERROR;
+        }
+    }
+
     i = cycle->connection_n;
     next = NULL;
 
@@ -750,6 +765,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c[i].data = next;
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
+        c[i].timeout = cycle->timeout_events ? &cycle->timeout_events[i] : NULL;
         c[i].fd = (ngx_socket_t) -1;
 
         next = &c[i];
@@ -1203,6 +1219,7 @@ ngx_event_core_create_conf(ngx_cycle_t *cycle)
     ecf->multi_accept = NGX_CONF_UNSET;
     ecf->accept_mutex = NGX_CONF_UNSET;
     ecf->accept_mutex_delay = NGX_CONF_UNSET_MSEC;
+    ecf->timeout = NGX_CONF_UNSET_MSEC;
     ecf->name = (void *) NGX_CONF_UNSET;
 
 #if (NGX_DEBUG)
@@ -1318,6 +1335,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 1);
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 100);
+    ngx_conf_init_msec_value(ecf->timeout, 0);
 
 
 #if (NGX_HAVE_RTSIG)

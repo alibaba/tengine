@@ -114,6 +114,7 @@ struct ngx_connection_s {
     void               *data;
     ngx_event_t        *read;
     ngx_event_t        *write;
+    ngx_event_t        *timeout;
 
     ngx_socket_t        fd;
 
