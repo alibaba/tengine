@@ -73,6 +73,9 @@ static u_char *ngx_http_log_error_handler(ngx_http_request_t *r,
 static void ngx_http_connection_timeout_handler(ngx_event_t *ev);
 static void ngx_http_request_timeout_handler(ngx_event_t *ev);
 
+extern void ngx_http_upstream_finalize_request(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_int_t rc);
+
 #if (NGX_HTTP_SSL)
 static void ngx_http_ssl_handshake(ngx_event_t *rev);
 static void ngx_http_ssl_handshake_handler(ngx_connection_t *c);
@@ -2968,7 +2971,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
     ngx_http_free_request(r, 0);
 
-    if (c->timeout) {
+    if (c->timeout && c->timeout->timer_set) {
         ngx_del_timer(c->timeout);
     }
 
@@ -3271,7 +3274,6 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     if (c->timeout) {
         ngx_add_timer(c->timeout, ecf->timeout);
     }
-
 
     rev->handler = ngx_http_process_request_line;
     ngx_http_process_request_line(rev);
@@ -3754,17 +3756,18 @@ ngx_http_connection_timeout_handler(ngx_event_t *ev)
     ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
 
     c->timedout = 1;
+
     ngx_http_close_connection(c);
 
     return;
 }
-
 
 static void
 ngx_http_request_timeout_handler(ngx_event_t *ev)
 {
     ngx_connection_t    *c;
     ngx_http_request_t  *r;
+    ngx_http_cleanup_t  *cln;
 
     c = ev->data;
     r = c->data;
@@ -3774,7 +3777,22 @@ ngx_http_request_timeout_handler(ngx_event_t *ev)
     ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
 
     c->timedout = 1;
-    ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+    c->error = 1;
+
+    cln = r->cleanup;
+    r->cleanup = NULL;
+
+    while(cln) {
+        if (cln->handler) {
+            cln->handler(cln->data);
+        }
+
+        cln = cln->next;
+    }
+
+    r->count = 1;
+
+    ngx_http_close_request(r, NGX_HTTP_REQUEST_TIME_OUT);
 
     return;
 }
