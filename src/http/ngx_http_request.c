@@ -3758,41 +3758,31 @@ ngx_http_connection_timeout_handler(ngx_event_t *ev)
     c->timedout = 1;
 
     ngx_http_close_connection(c);
-
-    return;
 }
 
 static void
 ngx_http_request_timeout_handler(ngx_event_t *ev)
 {
-    ngx_connection_t    *c;
-    ngx_http_request_t  *r;
-    ngx_http_cleanup_t  *cln;
+    ngx_connection_t     *c;
+    ngx_http_request_t   *r;
+    ngx_http_upstream_t  *u;
 
     c = ev->data;
     r = c->data;
     r = r->main;
+    u = r->upstream ? r->upstream : NULL;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http request timeout handler");
     ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
 
     c->timedout = 1;
-    c->error = 1;
 
-    cln = r->cleanup;
-    r->cleanup = NULL;
+    if (u) {
+        ngx_http_upstream_finalize_request(r, u, NGX_HTTP_REQUEST_TIME_OUT);
 
-    while(cln) {
-        if (cln->handler) {
-            cln->handler(cln->data);
-        }
-
-        cln = cln->next;
+    } else {
+        ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
     }
 
-    r->count = 1;
-
-    ngx_http_close_request(r, NGX_HTTP_REQUEST_TIME_OUT);
-
-    return;
+    ngx_http_run_posted_requests(c);
 }
