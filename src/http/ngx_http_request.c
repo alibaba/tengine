@@ -1552,7 +1552,6 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
     hc = r->http_connection;
 
-
     if (hc->nfree) {
         b = hc->free[--hc->nfree];
 
@@ -3759,6 +3758,7 @@ ngx_http_connection_timeout_handler(ngx_event_t *ev)
 
     ngx_http_close_connection(c);
 }
+
 
 static void
 ngx_http_request_timeout_handler(ngx_event_t *ev)

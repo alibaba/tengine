@@ -824,6 +824,10 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     ngx_memzero(rev, sizeof(ngx_event_t));
     ngx_memzero(wev, sizeof(ngx_event_t));
 
+    if (tev) {
+        ngx_memzero(tev, sizeof(ngx_event_t));
+    }
+
     rev->instance = !instance;
     wev->instance = !instance;
 
