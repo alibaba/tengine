@@ -748,14 +748,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 #endif
     }
 
-    if (ecf->timeout > 0) {
-        cycle->timeout_events =
-            ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n, cycle->log);
-        if (cycle->timeout_events == NULL) {
-            return NGX_ERROR;
-        }
-    }
-
     i = cycle->connection_n;
     next = NULL;
 
@@ -765,7 +757,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c[i].data = next;
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
-        c[i].timeout = cycle->timeout_events ? &cycle->timeout_events[i] : NULL;
         c[i].fd = (ngx_socket_t) -1;
 
         next = &c[i];

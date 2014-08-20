@@ -766,7 +766,7 @@ ngx_connection_t *
 ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 {
     ngx_uint_t         instance;
-    ngx_event_t       *rev, *wev, *tev;
+    ngx_event_t       *rev, *wev;
     ngx_connection_t  *c;
 
     /* disable warning: Win32 SOCKET is u_int while UNIX socket is int */
@@ -809,13 +809,11 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     rev = c->read;
     wev = c->write;
-    tev = c->timeout;
 
     ngx_memzero(c, sizeof(ngx_connection_t));
 
     c->read = rev;
     c->write = wev;
-    c->timeout = tev;
     c->fd = s;
     c->log = log;
 
@@ -823,10 +821,6 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     ngx_memzero(rev, sizeof(ngx_event_t));
     ngx_memzero(wev, sizeof(ngx_event_t));
-
-    if (tev) {
-        ngx_memzero(tev, sizeof(ngx_event_t));
-    }
 
     rev->instance = !instance;
     wev->instance = !instance;

@@ -334,7 +334,6 @@ ngx_http_init_connection(ngx_connection_t *c)
     ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
 
     if (c->timeout) {
-        ngx_memzero(c->timeout, sizeof(ngx_event_t));
         c->timeout->data = c;
         c->timeout->log = c->log;
         c->timeout->handler = ngx_http_connection_timeout_handler;
