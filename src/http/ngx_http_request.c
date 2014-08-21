@@ -3775,6 +3775,7 @@ ngx_http_request_timeout_handler(ngx_event_t *ev)
     ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
 
     c->timedout = 1;
+    r->err_status = NGX_HTTP_REQUEST_TIME_OUT;
 
     if (u) {
         ngx_http_upstream_finalize_request(r, u, NGX_HTTP_REQUEST_TIME_OUT);
