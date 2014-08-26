@@ -6,7 +6,7 @@ Name
 Description
 ===========
 
-* This module provides the functionality to resolve domain names into IP address in an upstream at run-time.
+* This module provides the functionality to resolve domain names into IP addresses in an upstream at run-time.
 
 Examples
 ========
