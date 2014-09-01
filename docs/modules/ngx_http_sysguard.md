@@ -2,7 +2,7 @@
 
 ## Description
 
-This module monitors memory usage (including the swap partition), load of CPUs and average response time of requests of the system. If some or any target that is monitored exceeds the threshold set by user, the current request will be redirected to a specific url. To be clarified, this module can only be full functional when the system supports sysinfo function and loadavg function. The sysguard module also need to read memory information from /proc file system.
+This module monitors memory usage (including the swap partition), load of CPUs and average response time of requests of the system. If any guideline that is monitored exceeds the threshold set by user, the current request will be redirected to a specific url. To be clarified, this module can only be full functional when the system supports sysinfo function and loadavg function. The sysguard module also need to read memory information from /proc file system.
 
 ## Configuration
 
