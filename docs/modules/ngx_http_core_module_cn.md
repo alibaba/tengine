@@ -53,3 +53,13 @@ Context: `http, server, location`
 
 用法跟`proxy_request_buffering`指令一样。
 
+## gzip\_clear\_etag ##
+
+Syntax: **gzip\_clear\_etag** `on | off`
+
+Default: `on`
+
+Context: `http, server, location`
+
+压缩的时候是否删除"ETag"响应头。
+
