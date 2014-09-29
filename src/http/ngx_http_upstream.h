@@ -99,11 +99,13 @@ typedef struct {
     ngx_uint_t                       weight;
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
+    time_t                           slow_start;
     ngx_str_t                        id;
     ngx_str_t                        host;
 
     unsigned                         down:1;
     unsigned                         backup:1;
+
 } ngx_http_upstream_server_t;
 
 
@@ -114,6 +116,7 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_DOWN          0x0010
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
 #define NGX_HTTP_UPSTREAM_ID            0x0040
+#define NGX_HTTP_UPSTREAM_SLOW_START    0x0080
 
 
 struct ngx_http_upstream_srv_conf_s {
