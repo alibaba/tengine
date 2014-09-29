@@ -5793,6 +5793,11 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
     ngx_http_upstream_srv_conf_t    **uscfp;
     ngx_http_upstream_main_conf_t    *umcf;
 
+    umcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_upstream_module);
+    if (umcf == NULL) {
+        return NGX_OK;
+    }
+
     ngx_md5_init(&md5);
     ngx_md5_update(&md5, cycle->hostname.data, cycle->hostname.len);
     ngx_md5_final(buf, &md5);
@@ -5801,8 +5806,6 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
            + ((ngx_uint_t) ngx_pid << 16);
 
     srandom(seed);
-
-    umcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_upstream_module);
 
     uscfp = umcf->upstreams.elts;
 
