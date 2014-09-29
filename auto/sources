@@ -142,6 +142,16 @@ PROCS_DEPS="src/proc/ngx_proc.h"
 PROCS_INCS="src/proc"
 PROCS_SRCS="src/proc/ngx_proc.c"
 
+if [ $NGX_UNIT_TEST = YES ]; then
+    TEST_DEPS="src/test/ngx_test.h"
+    TEST_INCS="src/test"
+    TEST_SRCS="src/test/ngx_test.c"
+else
+    TEST_DEPS=
+    TEST_INCS=
+    TEST_SRCS=
+fi
+
 
 AIO_MODULE=ngx_aio_module
 AIO_SRCS="src/event/modules/ngx_aio_module.c \

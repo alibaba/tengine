@@ -10,7 +10,6 @@ export LC_ALL
 . auto/options
 . auto/init
 . auto/sources
-
 test -d $NGX_OBJS || mkdir $NGX_OBJS
 
 echo > $NGX_AUTO_HEADERS_H
@@ -21,6 +20,10 @@ echo "#define NGX_CONFIGURE \"$NGX_CONFIGURE\"" > $NGX_AUTO_CONFIG_H
 
 if [ $NGX_DEBUG = YES ]; then
     have=NGX_DEBUG . auto/have
+fi
+
+if [ $NGX_UNIT_TEST = YES ]; then
+    have=NGX_UNIT_TEST . auto/have
 fi
 
 if [ $NGX_SYSLOG = YES ]; then
