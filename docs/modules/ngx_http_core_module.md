@@ -53,3 +53,12 @@ Context: `http, server, location`
 
 The same as `proxy_request_buffering`.
 
+## gzip\_clear\_etag ##
+
+Syntax: **gzip\_clear\_etag** `on | off`
+
+Default: `on`
+
+Context: `http, server, location`
+
+Determines whether gzip module should clear the “ETag” response header field.
