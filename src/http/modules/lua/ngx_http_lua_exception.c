@@ -31,7 +31,7 @@ int
 ngx_http_lua_atpanic(lua_State *L)
 {
     u_char                  *s = NULL;
-    size_t                   len;
+    size_t                   len = 0;
 
     if (lua_type(L, -1) == LUA_TSTRING) {
         s = (u_char *) lua_tolstring(L, -1, &len);
@@ -43,12 +43,12 @@ ngx_http_lua_atpanic(lua_State *L)
     }
 
     ngx_log_stderr(0, "lua atpanic: Lua VM crashed, reason: %*s", len, s);
+    ngx_quit = 1;
 
     /*  restore nginx execution */
     NGX_LUA_EXCEPTION_THROW(1);
 
     /* impossible to reach here */
-    return 0;
 }
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

@@ -122,7 +122,7 @@ ngx_http_lua_complex_value(ngx_http_request_t *r, ngx_str_t *subj,
 
     ngx_memzero(&e, sizeof(ngx_http_lua_script_engine_t));
 
-    e.request = r;
+    e.log = r->connection->log;
     e.ncaptures = count * 2;
     e.captures = cap;
     e.captures_data = subj->data;
@@ -382,7 +382,7 @@ ngx_http_lua_script_copy_code(ngx_http_lua_script_engine_t *e)
     e->ip += sizeof(ngx_http_lua_script_copy_code_t)
           + ((code->len + sizeof(uintptr_t) - 1) & ~(sizeof(uintptr_t) - 1));
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->log, 0,
                    "lua script copy: \"%*s\"", e->pos - p, p);
 }
 
@@ -462,7 +462,7 @@ ngx_http_lua_script_copy_capture_code(ngx_http_lua_script_engine_t *e)
         e->pos = ngx_copy(pos, &p[cap[n]], cap[n + 1] - cap[n]);
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, e->log, 0,
                    "lua script capture: \"%*s\"", e->pos - pos, pos);
 }
 

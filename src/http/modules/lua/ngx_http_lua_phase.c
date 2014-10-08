@@ -24,10 +24,7 @@ ngx_http_lua_ngx_get_phase(lua_State *L)
     ngx_http_request_t          *r;
     ngx_http_lua_ctx_t          *ctx;
 
-    lua_pushlightuserdata(L, &ngx_http_lua_request_key);
-    lua_rawget(L, LUA_GLOBALSINDEX);
-    r = lua_touserdata(L, -1);
-    lua_pop(L, 1);
+    r = ngx_http_lua_get_req(L);
 
     /* If we have no request object, assume we are called from the "init"
      * phase. */
@@ -69,6 +66,10 @@ ngx_http_lua_ngx_get_phase(lua_State *L)
 
     case NGX_HTTP_LUA_CONTEXT_BODY_FILTER:
         lua_pushliteral(L, "body_filter");
+        break;
+
+    case NGX_HTTP_LUA_CONTEXT_TIMER:
+        lua_pushliteral(L, "timer");
         break;
 
     default:

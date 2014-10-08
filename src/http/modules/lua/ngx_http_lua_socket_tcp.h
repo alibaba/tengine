@@ -35,7 +35,10 @@ typedef void (*ngx_http_lua_socket_tcp_upstream_handler_pt)(
 
 
 typedef struct {
-    ngx_http_lua_main_conf_t          *conf;
+    lua_State                         *lua_vm;
+
+    /* active connections == out-of-pool reused connections
+     *                       + in-pool connections */
     ngx_uint_t                         active_connections;
 
     /* queues of ngx_http_lua_socket_pool_item_t: */
@@ -85,9 +88,11 @@ struct ngx_http_lua_socket_tcp_upstream_s {
 
     ngx_uint_t                       reused;
 
+    unsigned                         no_close:1;
     unsigned                         waiting:1;
     unsigned                         eof:1;
-    unsigned                         is_downstream:1;
+    unsigned                         body_downstream:1;
+    unsigned                         raw_downstream:1;
 };
 
 

@@ -96,6 +96,7 @@ ngx_http_lua_capture_header_filter(ngx_http_request_t *r)
 
         /* force subrequest response body buffer in memory */
         r->filter_need_in_memory = 1;
+        r->header_sent = 1;
 
         return NGX_OK;
     }
@@ -108,6 +109,7 @@ static ngx_int_t
 ngx_http_lua_capture_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
     int                              rc;
+    ngx_int_t                        eof;
     ngx_http_lua_ctx_t              *ctx;
     ngx_http_lua_ctx_t              *pr_ctx;
 
@@ -150,9 +152,15 @@ ngx_http_lua_capture_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
                    "lua capture body filter capturing response body, uri "
                    "\"%V\"", &r->uri);
 
-    rc = ngx_http_lua_add_copy_chain(r, pr_ctx, &ctx->last_body, in);
+    rc = ngx_http_lua_add_copy_chain(r, pr_ctx, &ctx->last_body, in, &eof);
     if (rc != NGX_OK) {
         return NGX_ERROR;
+    }
+
+    dd("add copy chain eof: %d, sr: %d", (int) eof, r != r->main);
+
+    if (eof) {
+        ctx->seen_last_for_subreq = 1;
     }
 
     ngx_http_lua_discard_bufs(r->pool, in);
