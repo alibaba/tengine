@@ -216,10 +216,11 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
     ngx_http_request_t     *r;
     ngx_http_upstream_t    *u;
     ngx_peer_connection_t  *pc;
-    struct sockaddr_in     *sin;
+    struct sockaddr_in     *sin, *csin;
     in_port_t               port;
     ngx_str_t              *addr;
     u_char                 *p;
+
     size_t                                 len;
     ngx_http_upstream_srv_conf_t          *us;
     ngx_http_upstream_dynamic_srv_conf_t  *dscf;
@@ -258,14 +259,15 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
 
         /* only the first IP addr is used in version 1 */
 
-        if (sin->sin_addr.s_addr == ctx->addrs[0]) {
+        csin = (struct sockaddr_in *) ctx->addrs[0].sockaddr;
+        if (sin->sin_addr.s_addr == csin->sin_addr.s_addr) {
 
             pc->resolved = NGX_HTTP_UPSTREAM_DR_OK;
 
             goto out;
         }
 
-        sin->sin_addr.s_addr = ctx->addrs[0];
+        sin->sin_addr.s_addr = csin->sin_addr.s_addr;
 
         len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
 
@@ -430,7 +432,9 @@ ngx_http_upstream_get_dynamic_peer(ngx_peer_connection_t *pc, void *data)
     }
 
     ctx->name = *pc->host;
-    ctx->type = NGX_RESOLVE_A;
+    /* TODO remove */
+    // ctx->type = NGX_RESOLVE_A;
+    /* END */
     ctx->handler = ngx_http_upstream_dynamic_handler;
     ctx->data = r;
     ctx->timeout = clcf->resolver_timeout;

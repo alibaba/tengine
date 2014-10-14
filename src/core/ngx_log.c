@@ -10,6 +10,8 @@
 
 
 static char *ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log);
+static void ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log);
 
 
 static ngx_command_t  ngx_errlog_commands[] = {
@@ -86,11 +88,13 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 #endif
 {
 #if (NGX_HAVE_VARIADIC_MACROS)
-    va_list  args;
+    va_list      args;
 #endif
-    u_char  *p, *last, *msg;
-    u_char   errstr[NGX_MAX_ERROR_STR];
+    u_char      *p, *last, *msg;
+    u_char       errstr[NGX_MAX_ERROR_STR];
+    ngx_uint_t   wrote_stderr, debug_connection;
 
+/* TODO: remove */
 #if (NGX_SYSLOG)
 
     if (log->syslog == NULL && log->file->fd == NGX_INVALID_FILE) {
@@ -104,6 +108,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     }
 
 #endif
+/* END */
 
     last = errstr + NGX_MAX_ERROR_STR;
 
@@ -150,27 +155,44 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
     ngx_linefeed(p);
 
+    wrote_stderr = 0;
+    debug_connection = (log->log_level & NGX_LOG_DEBUG_CONNECTION) != 0;
+
+    while (log) {
+
+        if (log->log_level < level && !debug_connection) {
+            break;
+        }
+
 #if (NGX_SYSLOG)
 
-    if (log->syslog != NULL) {
-        if (!(log->syslog->fd == NGX_INVALID_FILE
-            && ngx_cached_time->sec < log->syslog->next_try))
-        {
-            (void) ngx_write_syslog(log->syslog, errstr, p - errstr);
+        if (log->syslog != NULL) {
+            if (!(log->syslog->fd == NGX_INVALID_FILE
+                && ngx_cached_time->sec < log->syslog->next_try))
+            {
+                (void) ngx_write_syslog(log->syslog, errstr, p - errstr);
+            }
+
+        } else {
+            (void) ngx_write_fd(log->file->fd, errstr, p - errstr);
         }
-    } else {
-        (void) ngx_write_fd(log->file->fd, errstr, p - errstr);
-    }
 
 #else
 
-    (void) ngx_write_fd(log->file->fd, errstr, p - errstr);
+        (void) ngx_write_fd(log->file->fd, errstr, p - errstr);
 
 #endif
 
+        if (log->file->fd == ngx_stderr) {
+            wrote_stderr = 1;
+        }
+
+        log = log->next;
+    }
+
     if (!ngx_use_stderr
         || level > NGX_LOG_WARN
-        || log->file->fd == ngx_stderr)
+        || wrote_stderr)
     {
         return;
     }
@@ -371,51 +393,60 @@ ngx_log_init(u_char *prefix)
 }
 
 
-ngx_log_t *
-ngx_log_create(ngx_cycle_t *cycle, ngx_str_t *name)
+ngx_int_t
+ngx_log_open_default(ngx_cycle_t *cycle)
 {
-    ngx_log_t  *log;
-    ngx_int_t   rc;
-    ngx_str_t   full;
+    static ngx_str_t  error_log = ngx_string(NGX_ERROR_LOG_PATH);
 
-    log = ngx_pcalloc(cycle->pool, sizeof(ngx_log_t));
-    if (log == NULL) {
-        return NULL;
-    }
-
-    rc = ngx_log_target(cycle, name, log);
-
-    if (rc == NGX_ERROR) {
-        return NULL;
-    } else if (rc == NGX_OK) {
-        if (log->file != NULL) {
-            full = ngx_log_error_backup;
-            if (ngx_conf_full_name(cycle, &full, 0) != NGX_OK) {
-                return NULL;
-            }
-
-            log->file->name = full;
+    if (cycle->new_log.file == NULL) {
+        cycle->new_log.file = ngx_conf_open_file(cycle, &error_log);
+        if (cycle->new_log.file == NULL) {
+            return NGX_ERROR;
         }
 
-        return log;
+        cycle->new_log.log_level = NGX_LOG_ERR;
     }
 
-    log->file = ngx_conf_open_file(cycle, name);
-    if (log->file == NULL) {
-        return NULL;
-    }
-
-    return log;
+    return NGX_OK;
 }
 
 
-char *
+ngx_int_t
+ngx_log_redirect_stderr(ngx_cycle_t *cycle)
+{
+    ngx_fd_t  fd;
+
+    if (cycle->log_use_stderr) {
+        return NGX_OK;
+    }
+
+    fd = cycle->log->file->fd;
+
+    if (fd != ngx_stderr) {
+        if (ngx_set_stderr(fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          ngx_set_stderr_n " failed");
+
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+static char *
 ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 {
     ngx_uint_t   i, n, d, found;
     ngx_str_t   *value;
 
     value = cf->args->elts;
+
+    if (cf->args->nelts == 2) {
+        log->log_level = NGX_LOG_ERR;
+        return NGX_CONF_OK;
+    }
 
     for (i = 2; i < cf->args->nelts; i++) {
         found = 0;
@@ -470,16 +501,39 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 static char *
 ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+    ngx_log_t  *dummy;
+
+    dummy = &cf->cycle->new_log;
+
+    return ngx_log_set_log(cf, &dummy);
+}
+
+
+char *
+ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
+{
     ngx_int_t   rc;
+    ngx_log_t  *new_log;
     ngx_str_t  *value, name;
 
-    if (cf->cycle->new_log.file) {
-        return "is duplicate";
+    if (*head != NULL && (*head)->log_level == 0) {
+        new_log = *head;
+
+    } else {
+
+        new_log = ngx_pcalloc(cf->pool, sizeof(ngx_log_t));
+        if (new_log == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (*head == NULL) {
+            *head = new_log;
+        }
     }
 
     value = cf->args->elts;
 
-    rc = ngx_log_target(cf->cycle, &value[1], &cf->cycle->new_log);
+    rc = ngx_log_target(cf->cycle, &value[1], new_log);
 
     if (rc == NGX_ERROR) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -487,35 +541,39 @@ ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
 
     } else if (rc == NGX_OK) {
-        if (cf->cycle->new_log.file != NULL) {
+        if (new_log->file != NULL) {
             name = ngx_log_error_backup;
             if (ngx_conf_full_name(cf->cycle, &name, 0) != NGX_OK) {
                 return "fail to set backup";
             }
 
-            cf->cycle->new_log.file->name = name;
+            new_log->file->name = name;
         }
+
     } else {
         if (ngx_strcmp(value[1].data, "stderr") == 0) {
             ngx_str_null(&name);
+            cf->cycle->log_use_stderr = 1;
+
         } else {
             name = value[1];
         }
 
-        cf->cycle->new_log.file = ngx_conf_open_file(cf->cycle, &name);
-        if (cf->cycle->new_log.file == NULL) {
-            return NULL;
+        new_log->file = ngx_conf_open_file(cf->cycle, &name);
+        if (new_log->file == NULL) {
+            return NGX_CONF_ERROR;
         }
     }
 
-    if (cf->args->nelts == 2) {
-        cf->cycle->new_log.log_level = NGX_LOG_ERR;
-        return NGX_CONF_OK;
+    if (ngx_log_set_levels(cf, new_log) != NGX_CONF_OK) {
+        return NGX_CONF_ERROR;
     }
 
-    cf->cycle->new_log.log_level = 0;
+    if (*head != new_log) {
+        ngx_log_insert(*head, new_log);
+    }
 
-    return ngx_log_set_levels(cf, &cf->cycle->new_log);
+    return NGX_CONF_OK;
 }
 
 
@@ -547,6 +605,7 @@ ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_log_t *log)
 
         value->len -= 5;
         value->data += 5;
+
     } else if (ngx_strncmp(value->data, "pipe:", 5) == 0) {
 
 #if !(NGX_WIN32)
@@ -573,4 +632,38 @@ ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_log_t *log)
     }
 
     return NGX_DECLINED;
+}
+
+
+static void
+ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log)
+{
+    ngx_log_t  tmp;
+
+    if (new_log->log_level > log->log_level) {
+
+        /*
+         * list head address is permanent, insert new log after
+         * head and swap its contents with head
+         */
+
+        tmp = *log;
+        *log = *new_log;
+        *new_log = tmp;
+
+        log->next = new_log;
+        return;
+    }
+
+    while (log->next) {
+        if (new_log->log_level > log->next->log_level) {
+            new_log->next = log->next;
+            log->next = new_log;
+            return;
+        }
+
+        log = log->next;
+    }
+
+    log->next = new_log;
 }

@@ -792,7 +792,6 @@ ngx_ssl_ocsp_request(ngx_ssl_ocsp_ctx_t *ctx)
         }
 
         resolve->name = ctx->host;
-        resolve->type = NGX_RESOLVE_A;
         resolve->handler = ngx_ssl_ocsp_resolve_handler;
         resolve->data = ctx;
         resolve->timeout = ctx->resolver_timeout;
@@ -816,13 +815,14 @@ ngx_ssl_ocsp_resolve_handler(ngx_resolver_ctx_t *resolve)
 {
     ngx_ssl_ocsp_ctx_t *ctx = resolve->data;
 
-    u_char              *p;
-    size_t               len;
-    in_port_t            port;
-    ngx_uint_t           i;
-    struct sockaddr_in  *sin;
+    u_char           *p;
+    size_t            len;
+    in_port_t         port;
+    socklen_t         socklen;
+    ngx_uint_t        i;
+    struct sockaddr  *sockaddr;
 
-    ngx_log_debug0(NGX_LOG_ALERT, ctx->log, 0,
+    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
                    "ssl ocsp resolve handler");
 
     if (resolve->state) {
@@ -835,15 +835,19 @@ ngx_ssl_ocsp_resolve_handler(ngx_resolver_ctx_t *resolve)
 
 #if (NGX_DEBUG)
     {
-    in_addr_t   addr;
+    u_char     text[NGX_SOCKADDR_STRLEN];
+    ngx_str_t  addr;
+
+    addr.data = text;
 
     for (i = 0; i < resolve->naddrs; i++) {
-        addr = ntohl(resolve->addrs[i]);
+        addr.len = ngx_sock_ntop(resolve->addrs[i].sockaddr,
+                                 resolve->addrs[i].socklen,
+                                 text, NGX_SOCKADDR_STRLEN, 0);
 
-        ngx_log_debug4(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
-                       "name was resolved to %ud.%ud.%ud.%ud",
-                       (addr >> 24) & 0xff, (addr >> 16) & 0xff,
-                       (addr >> 8) & 0xff, addr & 0xff);
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+                       "name was resolved to %V", &addr);
+
     }
     }
 #endif
@@ -859,26 +863,34 @@ ngx_ssl_ocsp_resolve_handler(ngx_resolver_ctx_t *resolve)
 
     for (i = 0; i < resolve->naddrs; i++) {
 
-        sin = ngx_pcalloc(ctx->pool, sizeof(struct sockaddr_in));
-        if (sin == NULL) {
+        socklen = resolve->addrs[i].socklen;
+
+        sockaddr = ngx_palloc(ctx->pool, socklen);
+        if (sockaddr == NULL) {
             goto failed;
         }
 
-        sin->sin_family = AF_INET;
-        sin->sin_port = port;
-        sin->sin_addr.s_addr = resolve->addrs[i];
+        ngx_memcpy(sockaddr, resolve->addrs[i].sockaddr, socklen);
 
-        ctx->addrs[i].sockaddr = (struct sockaddr *) sin;
-        ctx->addrs[i].socklen = sizeof(struct sockaddr_in);
+        switch (sockaddr->sa_family) {
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            ((struct sockaddr_in6 *) sockaddr)->sin6_port = port;
+            break;
+#endif
+        default: /* AF_INET */
+            ((struct sockaddr_in *) sockaddr)->sin_port = port;
+        }
 
-        len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+        ctx->addrs[i].sockaddr = sockaddr;
+        ctx->addrs[i].socklen = socklen;
 
-        p = ngx_pnalloc(ctx->pool, len);
+        p = ngx_pnalloc(ctx->pool, NGX_SOCKADDR_STRLEN);
         if (p == NULL) {
             goto failed;
         }
 
-        len = ngx_sock_ntop((struct sockaddr *) sin, p, len, 1);
+        len = ngx_sock_ntop(sockaddr, socklen, p, NGX_SOCKADDR_STRLEN, 1);
 
         ctx->addrs[i].name.len = len;
         ctx->addrs[i].name.data = p;

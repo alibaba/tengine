@@ -959,7 +959,8 @@ ngx_http_cmp_locations(const ngx_queue_t *one, const ngx_queue_t *two)
 
 #endif
 
-    rc = ngx_strcmp(first->name.data, second->name.data);
+    rc = ngx_filename_cmp(first->name.data, second->name.data,
+                          ngx_min(first->name.len, second->name.len) + 1);
 
     if (rc == 0 && !first->exact_match && second->exact_match) {
         /* an exact match must be before the same inclusive one */
@@ -985,8 +986,10 @@ ngx_http_join_exact_locations(ngx_conf_t *cf, ngx_queue_t *locations)
         lq = (ngx_http_location_queue_t *) q;
         lx = (ngx_http_location_queue_t *) x;
 
-        if (ngx_strcmp(lq->name->data, lx->name->data) == 0) {
-
+        if (lq->name->len == lx->name->len
+            && ngx_filename_cmp(lq->name->data, lx->name->data, lx->name->len)
+               == 0)
+        {
             if ((lq->exact && lx->exact) || (lq->inclusive && lx->inclusive)) {
                 ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                               "duplicate location \"%V\" in %s:%ui",
@@ -1038,7 +1041,7 @@ ngx_http_create_locations_list(ngx_queue_t *locations, ngx_queue_t *q)
         lx = (ngx_http_location_queue_t *) x;
 
         if (len > lx->name->len
-            || (ngx_strncmp(name, lx->name->data, len) != 0))
+            || ngx_filename_cmp(name, lx->name->data, len) != 0)
         {
             break;
         }
@@ -1359,11 +1362,13 @@ ngx_http_add_address(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
         }
     }
 
-#if (NGX_HTTP_SPDY && NGX_HTTP_SSL && !defined TLSEXT_TYPE_next_proto_neg)
+#if (NGX_HTTP_SPDY && NGX_HTTP_SSL                                            \
+     && !defined TLSEXT_TYPE_application_layer_protocol_negotiation           \
+     && !defined TLSEXT_TYPE_next_proto_neg)
     if (lsopt->spdy && lsopt->ssl) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "nginx was built without OpenSSL NPN support, "
-                           "SPDY is not enabled for %s", lsopt->addr);
+                           "nginx was built without OpenSSL ALPN or NPN "
+                           "support, SPDY is not enabled for %s", lsopt->addr);
     }
 #endif
 
@@ -1821,6 +1826,10 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
     ls->setfib = addr->opt.setfib;
 #endif
 
+#if (NGX_HAVE_TCP_FASTOPEN)
+    ls->fastopen = addr->opt.fastopen;
+#endif
+
     return ls;
 }
 
@@ -1854,6 +1863,7 @@ ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
         addrs[i].conf.spdy = addr[i].opt.spdy;
         addrs[i].conf.spdy_detect = addr[i].opt.spdy_detect;
 #endif
+        addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
         if (addr[i].hash.buckets == NULL
             && (addr[i].wc_head == NULL

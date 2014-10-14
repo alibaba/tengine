@@ -62,13 +62,13 @@ $t->run()->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
 
-like(http_get('/'), qr/SEE-THIS/, 'fastcgi request');
-like(http_get('/'), qr/SEE-THIS/, 'fastcgi request cached');
+like(http_get('/'), qr/SEE-THIS.*^1$/ms, 'fastcgi request');
+like(http_get('/'), qr/SEE-THIS.*^1$/ms, 'fastcgi request cached');
 
 unlike(http_head('/'), qr/SEE-THIS/, 'no data in cached HEAD');
 
-like(http_get('/stderr'), qr/SEE-THIS/, 'large stderr handled');
-like(http_get('/stderr'), qr/SEE-THIS/, 'large stderr cached');
+like(http_get('/stderr'), qr/SEE-THIS.*^2$/ms, 'large stderr handled');
+like(http_get('/stderr'), qr/SEE-THIS.*^2$/ms, 'large stderr cached');
 
 ###############################################################################
 

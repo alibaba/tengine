@@ -58,6 +58,7 @@ typedef struct {
     ngx_hash_t                 types;
     ngx_array_t               *types_keys;
     ngx_array_t               *params;       /* ngx_http_xslt_param_t */
+    ngx_flag_t                 last_modified;
 } ngx_http_xslt_filter_loc_conf_t;
 
 
@@ -103,6 +104,7 @@ static void *ngx_http_xslt_filter_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_xslt_filter_create_conf(ngx_conf_t *cf);
 static char *ngx_http_xslt_filter_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
+static ngx_int_t ngx_http_xslt_filter_preconfiguration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_xslt_filter_init(ngx_conf_t *cf);
 static void ngx_http_xslt_filter_exit(ngx_cycle_t *cycle);
 
@@ -150,12 +152,19 @@ static ngx_command_t  ngx_http_xslt_filter_commands[] = {
       offsetof(ngx_http_xslt_filter_loc_conf_t, types_keys),
       &ngx_http_xslt_default_types[0] },
 
+    { ngx_string("xslt_last_modified"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_xslt_filter_loc_conf_t, last_modified),
+      NULL },
+
       ngx_null_command
 };
 
 
 static ngx_http_module_t  ngx_http_xslt_filter_module_ctx = {
-    NULL,                                  /* preconfiguration */
+    ngx_http_xslt_filter_preconfiguration, /* preconfiguration */
     ngx_http_xslt_filter_init,             /* postconfiguration */
 
     ngx_http_xslt_filter_create_main_conf, /* create main configuration */
@@ -300,9 +309,10 @@ static ngx_int_t
 ngx_http_xslt_send(ngx_http_request_t *r, ngx_http_xslt_filter_ctx_t *ctx,
     ngx_buf_t *b)
 {
-    ngx_int_t            rc;
-    ngx_chain_t          out;
-    ngx_pool_cleanup_t  *cln;
+    ngx_int_t                         rc;
+    ngx_chain_t                       out;
+    ngx_pool_cleanup_t               *cln;
+    ngx_http_xslt_filter_loc_conf_t  *conf;
 
     ctx->done = 1;
 
@@ -327,8 +337,13 @@ ngx_http_xslt_send(ngx_http_request_t *r, ngx_http_xslt_filter_ctx_t *ctx,
             r->headers_out.content_length = NULL;
         }
 
-        ngx_http_clear_last_modified(r);
         ngx_http_clear_etag(r);
+
+        conf = ngx_http_get_module_loc_conf(r, ngx_http_xslt_filter_module);
+
+        if (!conf->last_modified) {
+            ngx_http_clear_last_modified(r);
+        }
     }
 
     rc = ngx_http_next_header_filter(r);
@@ -1058,6 +1073,8 @@ ngx_http_xslt_filter_create_conf(ngx_conf_t *cf)
      *     conf->params = NULL;
      */
 
+    conf->last_modified = NGX_CONF_UNSET;
+
     return conf;
 }
 
@@ -1088,12 +1105,14 @@ ngx_http_xslt_filter_merge_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
+    ngx_conf_merge_value(conf->last_modified, prev->last_modified, 0);
+
     return NGX_CONF_OK;
 }
 
 
 static ngx_int_t
-ngx_http_xslt_filter_init(ngx_conf_t *cf)
+ngx_http_xslt_filter_preconfiguration(ngx_conf_t *cf)
 {
     xmlInitParser();
 
@@ -1101,6 +1120,13 @@ ngx_http_xslt_filter_init(ngx_conf_t *cf)
     exsltRegisterAll();
 #endif
 
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_xslt_filter_init(ngx_conf_t *cf)
+{
     ngx_http_next_header_filter = ngx_http_top_header_filter;
     ngx_http_top_header_filter = ngx_http_xslt_header_filter;
 

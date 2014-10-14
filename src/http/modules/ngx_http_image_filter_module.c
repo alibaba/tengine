@@ -500,7 +500,12 @@ ngx_http_image_read(ngx_http_request_t *r, ngx_chain_t *in)
                        "image buf: %uz", size);
 
         rest = ctx->image + ctx->length - p;
-        size = (rest < size) ? rest : size;
+
+        if (size > rest) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "image filter: too big response");
+            return NGX_ERROR;
+        }
 
         p = ngx_cpymem(p, b->pos, size);
         b->pos += size;
@@ -589,7 +594,8 @@ ngx_http_image_json(ngx_http_request_t *r, ngx_http_image_filter_ctx_t *ctx)
     ngx_http_clean_header(r);
 
     r->headers_out.status = NGX_HTTP_OK;
-    ngx_str_set(&r->headers_out.content_type, "text/plain");
+    r->headers_out.content_type_len = sizeof("application/json") - 1;
+    ngx_str_set(&r->headers_out.content_type, "application/json");
     r->headers_out.content_type_lowcase = NULL;
 
     if (ctx == NULL) {

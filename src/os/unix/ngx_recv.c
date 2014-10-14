@@ -80,6 +80,7 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
                      * even if kqueue reported about available data
                      */
 
+                    rev->ready = 0;
                     rev->eof = 1;
                     rev->available = 0;
                 }
@@ -87,7 +88,9 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
                 return n;
             }
 
-            if ((size_t) n < size) {
+            if ((size_t) n < size
+                && !(ngx_event_flags & NGX_USE_GREEDY_EVENT))
+            {
                 rev->ready = 0;
             }
 

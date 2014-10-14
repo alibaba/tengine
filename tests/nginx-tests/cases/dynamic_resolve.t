@@ -8,7 +8,7 @@
 
 use warnings;
 use strict;
-use v5.14;
+#use v5.14;
 
 use Test::More;
 
@@ -34,6 +34,7 @@ $t->write_file_expand('nginx.conf', <<"EOF");
 %%TEST_GLOBALS%%
 
 daemon         off;
+worker_processes 1;
 
 events {
 }
@@ -61,7 +62,6 @@ http {
         dynamic_resolve fallback=stale;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
     }
 
     upstream backend3 {
@@ -136,7 +136,7 @@ wait;
 # wait for dns cache to expire
 sleep(2);
 
-ok(!http_get('/stale'),
+unlike(http_get('/stale'), qr/127\.0\.0\.2/,
     'stale http server should be www.taobao.com:8081, using initial result');
 
 like(http_get('/shutdown'), qr/502 Bad Gateway/,
@@ -157,12 +157,17 @@ sub http_daemon {
 
     my $resp;
 
-    for ($addr) {
-        when ("127.0.0.1") {$resp = "from server 127.0.0.1";}
-        when ("127.0.0.2") {$resp = "from server 127.0.0.2";}
-        when ("127.0.0.3") {$resp = "from server 127.0.0.3";}
-        when ("127.0.0.4") {$resp = "from server 127.0.0.4";}
-    }
+#    for ($addr) {
+#        when ("127.0.0.1") {$resp = "from server 127.0.0.1";}
+#        when ("127.0.0.2") {$resp = "from server 127.0.0.2";}
+#        when ("127.0.0.3") {$resp = "from server 127.0.0.3";}
+#        when ("127.0.0.4") {$resp = "from server 127.0.0.4";}
+#    }
+
+    if ($addr eq "127.0.0.1") {$resp = "from server 127.0.0.1";}
+    elsif ($addr eq "127.0.0.2") {$resp = "from server 127.0.0.2";}
+    elsif ($addr eq "127.0.0.3") {$resp = "from server 127.0.0.3";}
+    elsif ($addr eq "127.0.0.4") {$resp = "from server 127.0.0.4";}
 
     while (my $client = $server->accept()) {
         $client->autoflush(1);

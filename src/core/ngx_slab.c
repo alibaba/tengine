@@ -131,6 +131,7 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 
     pool->last = pool->pages + pages;
 
+    pool->log_nomem = 1;
     pool->log_ctx = &pool->zero;
     pool->zero = '\0';
 }
@@ -442,7 +443,8 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
         n = ((uintptr_t) p & (ngx_pagesize - 1)) >> shift;
         m = (uintptr_t) 1 << (n & (sizeof(uintptr_t) * 8 - 1));
         n /= (sizeof(uintptr_t) * 8);
-        bitmap = (uintptr_t *) ((uintptr_t) p & ~(ngx_pagesize - 1));
+        bitmap = (uintptr_t *)
+                             ((uintptr_t) p & ~((uintptr_t) ngx_pagesize - 1));
 
         if (bitmap[n] & m) {
 
@@ -661,7 +663,10 @@ ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
         }
     }
 
-    ngx_slab_error(pool, NGX_LOG_CRIT, "ngx_slab_alloc() failed: no memory");
+    if (pool->log_nomem) {
+        ngx_slab_error(pool, NGX_LOG_CRIT,
+                       "ngx_slab_alloc() failed: no memory");
+    }
 
     return NULL;
 }

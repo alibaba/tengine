@@ -101,7 +101,9 @@ ngx_http_status_handler(ngx_http_request_t *r)
         return rc;
     }
 
+    r->headers_out.content_type_len = sizeof("text/plain") - 1;
     ngx_str_set(&r->headers_out.content_type, "text/plain");
+    r->headers_out.content_type_lowcase = NULL;
 
     if (r->method == NGX_HTTP_HEAD) {
         r->headers_out.status = NGX_HTTP_OK;
@@ -150,6 +152,7 @@ ngx_http_status_handler(ngx_http_request_t *r)
     r->headers_out.content_length_n = b->last - b->pos;
 
     b->last_buf = (r == r->main) ? 1 : 0;
+    b->last_in_chain = 1;
 
     rc = ngx_http_send_header(r);
 

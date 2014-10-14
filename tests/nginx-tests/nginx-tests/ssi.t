@@ -23,7 +23,7 @@ select STDOUT; $| = 1;
 
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)->plan(18);
+my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)->plan(27);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -64,6 +64,19 @@ http {
             ssi off;
             alias %%TESTDIR%%/;
         }
+        location /var {
+            ssi on;
+            add_header X-Var $date_gmt;
+        }
+        location /var_noformat {
+            ssi on;
+            add_header X-Var $date_gmt;
+            return 200;
+        }
+        location /var_nossi {
+            add_header X-Var $date_gmt;
+            return 200;
+        }
     }
 }
 
@@ -82,6 +95,24 @@ $t->write_file('test-empty2.html',
 $t->write_file('test-empty3.html',
 	'X<!--#include virtual="/cache/empty.html" -->X');
 $t->write_file('empty.html', '');
+
+$t->write_file('unescape.html?', 'SEE-THIS');
+$t->write_file('unescape1.html',
+	'X<!--#include virtual="/tes%741.html?test=test" -->X');
+$t->write_file('unescape2.html',
+	'X<!--#include virtual="/unescape.html%3f" -->X');
+$t->write_file('unescape3.html',
+	'X<!--#include virtual="/test1.html%3ftest=test" -->X');
+
+$t->write_file('var_format.html',
+	'x<!--#if expr="$arg_custom" -->'
+		. '<!--#config timefmt="%A, %H:%M:%S" -->'
+		. '<!--#set var="v" value="$date_gmt" -->'
+		. '<!--#echo var="v" -->'
+	. '<!--#else -->'
+		. '<!--#set var="v" value="$date_gmt" -->'
+		. '<!--#echo var="v" -->'
+	. '<!--#endif -->x');
 
 $t->run();
 
@@ -119,6 +150,42 @@ like(http_get('/test-empty1.html'), qr/HTTP/, 'empty with ssi');
 like(http_get('/test-empty2.html'), qr/HTTP/, 'empty without ssi');
 like(http_get('/test-empty3.html'), qr/HTTP/, 'empty with proxy');
 like(http_get('/test-empty3.html'), qr/HTTP/, 'empty with proxy cached');
+
+# handling of escaped URIs
+
+like(http_get('/unescape1.html'), qr/^XXtestXX$/m, 'escaped in path');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.5.9');
+
+like(http_get('/unescape2.html'), qr/^XSEE-THISX$/m,
+	'escaped question in path');
+like(http_get('/unescape3.html'), qr/404 Not Found/,
+	'escaped query separator');
+
+}
+
+# handling of embedded date variables
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.5.10');
+
+like(http_get('/var_nossi.html'),
+	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'no ssi');
+like(http_get('/var_noformat.html'),
+	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'no format');
+
+like(http_get('/var_format.html?custom=1'),
+	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'custom header');
+like(http_get('/var_format.html'),
+	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'default header');
+
+}
+
+like(http_get('/var_format.html?custom=1'),
+	qr/x\w+, \d\d:\d\d:\d\dx/, 'custom ssi');
+like(http_get('/var_format.html'),
+	qr/x\w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+x/, 'default ssi');
 
 like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 

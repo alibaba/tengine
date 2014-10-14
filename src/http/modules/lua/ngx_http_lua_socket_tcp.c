@@ -533,7 +533,9 @@ ngx_http_lua_socket_tcp_connect(lua_State *L)
     }
 
     rctx->name = host;
-    rctx->type = NGX_RESOLVE_A;
+    /* TODO remove */
+    // rctx->type = NGX_RESOLVE_A;
+    /* END */
     rctx->handler = ngx_http_lua_socket_resolve_handler;
     rctx->data = u;
     rctx->timeout = clcf->resolver_timeout;
@@ -654,13 +656,15 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
 
 #if (NGX_DEBUG)
     {
-    in_addr_t   addr;
-    ngx_uint_t  i;
+    in_addr_t           addr;
+    ngx_uint_t          i;
+    struct sockaddr_in *sin;
 
     for (i = 0; i < ctx->naddrs; i++) {
         dd("addr i: %d %p", (int) i,  &ctx->addrs[i]);
 
-        addr = ntohl(ctx->addrs[i]);
+        sin = (struct sockaddr_in *) ctx->addrs[i].sockaddr;
+        addr = ntohl(sin->sin_addr.s_addr);
 
         ngx_log_debug4(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "name was resolved to %ud.%ud.%ud.%ud",
@@ -718,7 +722,8 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
 
     sin->sin_family = AF_INET;
     sin->sin_port = htons(ur->port);
-    sin->sin_addr.s_addr = ur->addrs[i];
+    sin->sin_addr.s_addr = ((struct sockaddr_in *)
+                                       ur->addrs[i].sockaddr)->sin_addr.s_addr;
 
     ur->sockaddr = (struct sockaddr *) sin;
     ur->socklen = sizeof(struct sockaddr_in);
