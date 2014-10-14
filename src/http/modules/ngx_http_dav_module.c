@@ -10,8 +10,6 @@
 #include <ngx_http.h>
 
 
-#define NGX_HTTP_DAV_COPY_BLOCK      65536
-
 #define NGX_HTTP_DAV_OFF             2
 
 
@@ -606,7 +604,7 @@ destination_done:
 
     duri.len = last - p;
     duri.data = p;
-    flags = 0;
+    flags = NGX_HTTP_LOG_UNSAFE;
 
     if (ngx_http_parse_unsafe_uri(r, &duri, &args, &flags) != NGX_OK) {
         goto invalid_destination;

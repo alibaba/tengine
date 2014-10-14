@@ -44,10 +44,6 @@ mail {
     }
 }
 
-http {
-    # stub to avoid SIGSEGV when perl module compiled in, <= 0.7.30
-}
-
 EOF
 
 ###############################################################################

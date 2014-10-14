@@ -220,6 +220,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
+HTTP_AUTH_REQUEST=NO
 HTTP_USERID=YES
 HTTP_CONCAT=NO
 HTTP_AUTOINDEX=YES
@@ -463,6 +464,7 @@ do
                                                    HTTP_MP4_SHARED=NO                ;;
         --with-http_gunzip_module)                 HTTP_GUNZIP=YES                   ;;
         --with-http_gzip_static_module)            HTTP_GZIP_STATIC=YES              ;;
+        --with-http_auth_request_module)           HTTP_AUTH_REQUEST=YES             ;;
         --with-http_concat_module)                 HTTP_CONCAT=YES
                                                    HTTP_CONCAT_SHARED=NO             ;;
         --with-http_random_index_module)           HTTP_RANDOM_INDEX=YES
@@ -767,6 +769,7 @@ cat << END
   --with-http_mp4_module             enable ngx_http_mp4_module
   --with-http_gunzip_module          enable ngx_http_gunzip_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
+  --with-http_auth_request_module    enable ngx_http_auth_request_module
   --with-http_concat_module          enable ngx_http_concat_module
   --with-http_random_index_module    enable ngx_http_random_index_module
   --with-http_secure_link_module     enable ngx_http_secure_link_module
@@ -1080,6 +1083,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_SLICE=YES
     HTTP_MP4=YES
     HTTP_GZIP_STATIC=YES
+    HTTP_GUNZIP=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
     HTTP_TRIM=YES
@@ -1090,6 +1094,8 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_KEEPALIVE=YES
     HTTP_UPSTREAM_DYNAMIC=YES
     HTTP_REQ_STATUS=YES
+    HTTP_AUTH_REQUEST=YES
+    MAIL=YES
 
     HTTP_XSLT_SHARED=NO
     HTTP_IMAGE_FILTER_SHARED=NO

@@ -88,12 +88,16 @@ typedef struct {
     unsigned                   ipv6only:1;
 #endif
     unsigned                   so_keepalive:2;
+    unsigned                   proxy_protocol:1;
 
     int                        backlog;
     int                        rcvbuf;
     int                        sndbuf;
 #if (NGX_HAVE_SETFIB)
     int                        setfib;
+#endif
+#if (NGX_HAVE_TCP_FASTOPEN)
+    int                        fastopen;
 #endif
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                        tcp_keepidle;
@@ -248,6 +252,7 @@ struct ngx_http_addr_conf_s {
     unsigned                   spdy:1;
     unsigned                   spdy_detect:1;
 #endif
+    unsigned                   proxy_protocol:1;
 };
 
 

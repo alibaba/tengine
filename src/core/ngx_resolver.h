@@ -18,6 +18,9 @@
 #define NGX_RESOLVE_PTR       12
 #define NGX_RESOLVE_MX        15
 #define NGX_RESOLVE_TXT       16
+#if (NGX_HAVE_INET6)
+#define NGX_RESOLVE_AAAA      28
+#endif
 #define NGX_RESOLVE_DNAME     39
 
 #define NGX_RESOLVE_FORMERR   1
@@ -54,10 +57,18 @@ typedef struct {
     /* PTR: resolved name, A: name to resolve */
     u_char                   *name;
 
+#if (NGX_HAVE_INET6)
+    /* PTR: IPv6 address to resolve (IPv4 address is in rbtree node key) */
+    struct in6_addr           addr6;
+#endif
+
     u_short                   nlen;
     u_short                   qlen;
 
     u_char                   *query;
+#if (NGX_HAVE_INET6)
+    u_char                   *query6;
+#endif
 
     union {
         in_addr_t             addr;
@@ -65,11 +76,22 @@ typedef struct {
         u_char               *cname;
     } u;
 
+    u_char                    code;
     u_short                   naddrs;
     u_short                   cnlen;
 
+#if (NGX_HAVE_INET6)
+    union {
+        struct in6_addr       addr6;
+        struct in6_addr      *addrs6;
+    } u6;
+
+    u_short                   naddrs6;
+#endif
+
     time_t                    expire;
     time_t                    valid;
+    uint32_t                  ttl;
 
     ngx_resolver_ctx_t       *waiting;
 } ngx_resolver_node_t;
@@ -100,6 +122,14 @@ typedef struct {
     ngx_queue_t               name_expire_queue;
     ngx_queue_t               addr_expire_queue;
 
+#if (NGX_HAVE_INET6)
+    ngx_uint_t                ipv6;                 /* unsigned  ipv6:1; */
+    ngx_rbtree_t              addr6_rbtree;
+    ngx_rbtree_node_t         addr6_sentinel;
+    ngx_queue_t               addr6_resend_queue;
+    ngx_queue_t               addr6_expire_queue;
+#endif
+
     time_t                    resend_timeout;
     time_t                    expire;
     time_t                    valid;
@@ -117,12 +147,12 @@ struct ngx_resolver_ctx_s {
     ngx_int_t                 ident;
 
     ngx_int_t                 state;
-    ngx_int_t                 type;
     ngx_str_t                 name;
 
     ngx_uint_t                naddrs;
-    in_addr_t                *addrs;
-    in_addr_t                 addr;
+    ngx_addr_t               *addrs;
+    ngx_addr_t                addr;
+    struct sockaddr_in        sin;
 
     ngx_resolver_handler_pt   handler;
     void                     *data;

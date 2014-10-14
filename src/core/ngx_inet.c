@@ -174,7 +174,8 @@ ngx_inet6_addr(u_char *p, size_t len, u_char *addr)
 
 
 size_t
-ngx_sock_ntop(struct sockaddr *sa, u_char *text, size_t len, ngx_uint_t port)
+ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
+    ngx_uint_t port)
 {
     u_char               *p;
     struct sockaddr_in   *sin;
@@ -230,9 +231,18 @@ ngx_sock_ntop(struct sockaddr *sa, u_char *text, size_t len, ngx_uint_t port)
     case AF_UNIX:
         saun = (struct sockaddr_un *) sa;
 
+        /* on Linux sockaddr might not include sun_path at all */
+
+        if (socklen <= (socklen_t) offsetof(struct sockaddr_un, sun_path)) {
+            p = ngx_snprintf(text, len, "unix:%Z");
+
+        } else {
+            p = ngx_snprintf(text, len, "unix:%s%Z", saun->sun_path);
+        }
+
         /* we do not include trailing zero in address length */
 
-        return ngx_snprintf(text, len, "unix:%s%Z", saun->sun_path) - text - 1;
+        return (p - text - 1);
 
 #endif
 
@@ -953,6 +963,9 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
     ngx_memzero(&hints, sizeof(struct addrinfo));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_ADDRCONFIG
+    hints.ai_flags = AI_ADDRCONFIG;
+#endif
 
     if (getaddrinfo((char *) host, NULL, &hints, &res) != 0) {
         u->err = "host not found";
@@ -1020,7 +1033,7 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
             goto failed;
         }
 
-        len = ngx_sock_ntop((struct sockaddr *) sin, p, len, 1);
+        len = ngx_sock_ntop((struct sockaddr *) sin, rp->ai_addrlen, p, len, 1);
 
         u->addrs[i].name.len = len;
         u->addrs[i].name.data = p;
@@ -1053,7 +1066,8 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
             goto failed;
         }
 
-        len = ngx_sock_ntop((struct sockaddr *) sin6, p, len, 1);
+        len = ngx_sock_ntop((struct sockaddr *) sin6, rp->ai_addrlen, p,
+                            len, 1);
 
         u->addrs[i].name.len = len;
         u->addrs[i].name.data = p;
@@ -1138,7 +1152,8 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
                 return NGX_ERROR;
             }
 
-            len = ngx_sock_ntop((struct sockaddr *) sin, p, len, 1);
+            len = ngx_sock_ntop((struct sockaddr *) sin,
+                                sizeof(struct sockaddr_in), p, len, 1);
 
             u->addrs[i].name.len = len;
             u->addrs[i].name.data = p;
@@ -1181,3 +1196,76 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
 }
 
 #endif /* NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6 */
+
+
+ngx_int_t
+ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
+    struct sockaddr *sa2, socklen_t slen2, ngx_uint_t cmp_port)
+{
+    struct sockaddr_in   *sin1, *sin2;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6  *sin61, *sin62;
+#endif
+#if (NGX_HAVE_UNIX_DOMAIN)
+    struct sockaddr_un   *saun1, *saun2;
+#endif
+
+    if (sa1->sa_family != sa2->sa_family) {
+        return NGX_DECLINED;
+    }
+
+    switch (sa1->sa_family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+
+        sin61 = (struct sockaddr_in6 *) sa1;
+        sin62 = (struct sockaddr_in6 *) sa2;
+
+        if (cmp_port && sin61->sin6_port != sin62->sin6_port) {
+            return NGX_DECLINED;
+        }
+
+        if (ngx_memcmp(&sin61->sin6_addr, &sin62->sin6_addr, 16) != 0) {
+            return NGX_DECLINED;
+        }
+
+        break;
+#endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+    case AF_UNIX:
+
+       /* TODO length */
+
+       saun1 = (struct sockaddr_un *) sa1;
+       saun2 = (struct sockaddr_un *) sa2;
+
+       if (ngx_memcmp(&saun1->sun_path, &saun2->sun_path,
+                      sizeof(saun1->sun_path))
+           != 0)
+       {
+           return NGX_DECLINED;
+       }
+
+       break;
+#endif
+
+    default: /* AF_INET */
+
+        sin1 = (struct sockaddr_in *) sa1;
+        sin2 = (struct sockaddr_in *) sa2;
+
+        if (cmp_port && sin1->sin_port != sin2->sin_port) {
+            return NGX_DECLINED;
+        }
+
+        if (sin1->sin_addr.s_addr != sin2->sin_addr.s_addr) {
+            return NGX_DECLINED;
+        }
+
+        break;
+    }
+
+    return NGX_OK;
+}

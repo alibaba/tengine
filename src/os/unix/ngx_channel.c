@@ -34,6 +34,8 @@ ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
         msg.msg_control = (caddr_t) &cmsg;
         msg.msg_controllen = sizeof(cmsg);
 
+        ngx_memzero(&cmsg, sizeof(cmsg));
+
         cmsg.cm.cmsg_len = CMSG_LEN(sizeof(int));
         cmsg.cm.cmsg_level = SOL_SOCKET;
         cmsg.cm.cmsg_type = SCM_RIGHTS;
@@ -142,7 +144,7 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
 
     if ((size_t) n < sizeof(ngx_channel_t)) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
-                      "recvmsg() returned not enough data: %uz", n);
+                      "recvmsg() returned not enough data: %z", n);
         return NGX_ERROR;
     }
 

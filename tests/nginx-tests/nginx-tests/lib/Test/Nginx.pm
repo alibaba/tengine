@@ -12,7 +12,7 @@ use strict;
 use base qw/ Exporter /;
 
 our @EXPORT = qw/ log_in log_out http http_get http_head /;
-our @EXPORT_OK = qw/ http_gzip_request http_gzip_like /;
+our @EXPORT_OK = qw/ http_gzip_request http_gzip_like http_start http_end /;
 our %EXPORT_TAGS = (
 	gzip => [ qw/ http_gzip_request http_gzip_like / ]
 );
@@ -45,13 +45,16 @@ sub new {
 		or die "Can't create temp directory: $!\n";
 	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
 	$self->{_dso_module} = ();
-	mkdir("$self->{_testdir}/logs");
+	mkdir "$self->{_testdir}/logs"
+		or die "Can't create logs directory: $!\n";
 
 	return $self;
 }
 
 sub DESTROY {
 	my ($self) = @_;
+	local $?;
+
 	return if $self->{_pid} != $$;
 	$self->stop();
 	$self->stop_daemons();
@@ -116,6 +119,8 @@ sub has_module($) {
 		empty_gif
 			=> '(?s)^(?!.*--without-http_empty_gif_module)',
 		browser	=> '(?s)^(?!.*--without-http_browser_module)',
+		upstream_hash
+			=> '(?s)^(?!.*--without-http_upstream_hash_module)',
 		upstream_ip_hash
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
 		reqstat
@@ -140,7 +145,7 @@ sub has_module($) {
 	$self->{_configure_args} = `$NGINX -V 2>&1`
 		if !defined $self->{_configure_args};
 
-	return ($self->{_configure_args} =~ $re) ? 1 : 0;
+	return ($self->{_configure_args} =~ $re or $self->{_configure_args} =~ '--enable-mods-static=all') ? 1 : 0;
 }
 
 sub has_version($) {
@@ -149,7 +154,7 @@ sub has_version($) {
 	$self->{_configure_args} = `$NGINX -V 2>&1`
 		if !defined $self->{_configure_args};
 
-	$self->{_configure_args} =~ m!nginx version: nginx/([0-9.]+)!;
+	$self->{_configure_args} =~ m!nginx/([0-9.]+)!;
 
 	my @v = split(/\./, $1);
 	my ($n, $v);
@@ -183,6 +188,21 @@ sub has_daemon($) {
 	return $self;
 }
 
+sub try_run($$) {
+	my ($self, $message) = @_;
+
+        $self->run();
+
+	eval {
+		open OLDERR, ">&", \*STDERR; close STDERR;
+		$self->run();
+		open STDERR, ">&", \*OLDERR;
+	};
+
+	Test::More::plan(skip_all => $message) if $@;
+	return $self;
+}
+
 sub plan($) {
 	my ($self, $plan) = @_;
 
@@ -208,7 +228,7 @@ sub run(;$) {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		exec($NGINX, '-c', "$testdir/nginx.conf", @globals)
+		exec($NGINX, '-p', $testdir, '-c', 'nginx.conf', @globals),
 			or die "Unable to exec(): $!\n";
 	}
 
@@ -302,8 +322,8 @@ sub stop() {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'stop',
-			@globals) == 0
+		system($NGINX, '-p', $testdir, '-c', "nginx.conf",
+			'-s', 'stop', @globals) == 0
 			or die "system() failed: $?\n";
 
 	} else {
@@ -389,6 +409,8 @@ sub test_globals() {
 	$s .= "pid $self->{_testdir}/nginx.pid;\n";
 	$s .= "error_log $self->{_testdir}/error.log debug;\n";
 
+	$s .= $ENV{TEST_NGINX_GLOBALS}
+		if $ENV{TEST_NGINX_GLOBALS};
 	$self->{_test_globals} = $s;
 }
 
@@ -437,6 +459,9 @@ sub test_globals_http() {
 
 	$s .= "scgi_temp_path $self->{_testdir}/scgi_temp;\n"
 		if $self->has_module('scgi');
+
+	$s .= $ENV{TEST_NGINX_GLOBALS_HTTP}
+		if $ENV{TEST_NGINX_GLOBALS_HTTP};
 
 	$self->{_test_globals_http} = $s;
 }
@@ -491,14 +516,23 @@ EOF
 
 sub http($;%) {
 	my ($request, %extra) = @_;
-	my $reply;
+
+	my $s = http_start($request, %extra);
+
+	return $s if $extra{start} or !defined $s;
+	return http_end($s);
+}
+
+sub http_start($;%) {
+	my ($request, %extra) = @_;
+	my $s;
 
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
 		alarm(5);
 
-		my $s = $extra{socket} || IO::Socket::INET->new(
+		$s = $extra{socket} || IO::Socket::INET->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1:8080'
 		)
@@ -514,6 +548,26 @@ sub http($;%) {
 			log_out($extra{body});
 			$s->print($extra{body});
 		}
+
+		alarm(0);
+	};
+	alarm(0);
+	if ($@) {
+		log_in("died: $@");
+		return undef;
+	}
+
+	return $s;
+}
+
+sub http_end($;%) {
+	my ($s) = @_;
+	my $reply;
+
+	eval {
+		local $SIG{ALRM} = sub { die "timeout\n" };
+		local $SIG{PIPE} = sub { die "sigpipe\n" };
+		alarm(5);
 
 		local $/;
 		$reply = $s->getline();
