@@ -16,7 +16,8 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-use Net::DNS::Nameserver;
+eval { require Net::DNS::Nameserver; };
+plan(skip_all => 'Net::DNS::Nameserver not installed') if $@;
 
 ###############################################################################
 
