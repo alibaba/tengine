@@ -149,6 +149,7 @@ static void ngx_http_spdy_handle_connection_handler(ngx_event_t *rev);
 static void ngx_http_spdy_keepalive_handler(ngx_event_t *rev);
 static void ngx_http_spdy_finalize_connection(ngx_http_spdy_connection_t *sc,
     ngx_int_t rc);
+static ngx_int_t ngx_http_spdy_pending(ngx_http_spdy_connection_t *sc);
 
 static void ngx_http_spdy_pool_cleanup(void *data);
 
@@ -518,7 +519,7 @@ ngx_http_spdy_send_output_queue(ngx_http_spdy_connection_t *sc)
         return NGX_ERROR; /* FIXME */
     }
 
-    if (cl) {
+    if (cl || ngx_http_spdy_pending(sc)) {
         ngx_add_timer(wev, clcf->send_timeout);
 
     } else {
@@ -555,6 +556,37 @@ ngx_http_spdy_send_output_queue(ngx_http_spdy_connection_t *sc)
     sc->last_out = frame;
 
     return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_spdy_pending(ngx_http_spdy_connection_t *sc)
+{
+    ngx_uint_t                 i, size;
+    ngx_http_spdy_stream_t    *stream;
+    ngx_http_spdy_srv_conf_t  *sscf;
+
+    sscf = ngx_http_get_module_srv_conf(sc->http_connection->conf_ctx,
+                                        ngx_http_spdy_module);
+
+    size = ngx_http_spdy_streams_index_size(sscf);
+
+    for (i = 0; i < size; i++) {
+        stream = sc->streams_index[i];
+
+        while (stream) {
+
+            if (stream->pending) {
+                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, sc->connection->log, 0,
+                               "spdy pending");
+                return 1;
+            }
+
+            stream = stream->index;
+        }
+    }
+
+    return 0;
 }
 
 
