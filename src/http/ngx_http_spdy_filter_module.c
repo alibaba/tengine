@@ -1191,6 +1191,7 @@ ngx_http_spdy_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_chain_t                *cl, *ll, *out, **ln;
     ngx_http_spdy_stream_t     *stream;
     ngx_http_spdy_out_frame_t  *frame;
+    ngx_http_spdy_connection_t *sc;
 
     stream = r->spdy_stream;
 
@@ -1204,6 +1205,12 @@ ngx_http_spdy_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "spdy body filter \"%V?%V\"", &r->uri, &r->args);
+
+    sc = stream->connection;
+
+    if (sc->connection->error || r->connection->error) {
+        return NGX_ERROR;
+    }
 
     if (in == NULL || r->header_only) {
 
@@ -1289,7 +1296,9 @@ ngx_http_spdy_v3_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_chain_t                *cl, *tl, *ll, *out, **ln;
     ngx_http_spdy_stream_t     *stream;
     ngx_http_spdy_srv_conf_t   *sscf;
+    ngx_http_core_loc_conf_t   *clcf;
     ngx_http_spdy_out_frame_t  *frame;
+    ngx_http_spdy_connection_t *sc;
 
     total = 0;
     size = 0;
@@ -1302,6 +1311,12 @@ ngx_http_spdy_v3_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "spdy body filter \"%V?%V\"", &r->uri, &r->args);
+
+    sc = stream->connection;
+
+    if (sc->connection->error || r->connection->error) {
+        return NGX_ERROR;
+    }
 
     if (in == NULL || r->header_only) {
 
@@ -1388,6 +1403,12 @@ output:
 
         ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                       "zero send windows size");
+
+        if (!sc->connection->write->timer_set) {
+            clcf = ngx_http_get_module_loc_conf(sc->http_connection->conf_ctx,
+                                                ngx_http_core_module);
+            ngx_add_timer(sc->connection->write, clcf->send_timeout);
+        }
 
         r->connection->buffered |= NGX_SPDY_WRITE_BUFFERED;
         return NGX_AGAIN;
