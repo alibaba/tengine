@@ -729,19 +729,13 @@ ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
         n = ngx_read_glob(&gl, &glob_name);
 
         if (n != NGX_OK) {
-            if (ngx_errno != 0) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                                   "read \"%s\" failed", file.data);
-                rv = NGX_CONF_ERROR;
-            }
-
             break;
         }
 
         file.len = glob_name.len++;
         file.data = ngx_pstrdup(cf->pool, &glob_name);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso include %s", file.data);
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso include %V", &glob_name);
 
         cf->ctx = ctx;
         cf->module_type = NGX_CORE_MODULE;
