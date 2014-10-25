@@ -5421,8 +5421,12 @@ not_found:
 
 #if (NGX_HTTP_UPSTREAM_RBTREE)
 
+            uscf = uscfp[i];
+
             ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
             ngx_list_delete(&umcf->implicit_upstreams, &uscfp[i]);
+
+            return uscf;
 
 #endif
         }
