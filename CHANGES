@@ -1,4 +1,18 @@
 
+Changes with nginx 1.6.2                                         16 Sep 2014
+
+    *) Security: it was possible to reuse SSL sessions in unrelated contexts
+       if a shared SSL session cache or the same TLS session ticket key was
+       used for multiple "server" blocks (CVE-2014-3616).
+       Thanks to Antoine Delignat-Lavaud.
+
+    *) Bugfix: requests might hang if resolver was used and a DNS server
+       returned a malformed response; the bug had appeared in 1.5.8.
+
+    *) Bugfix: requests might hang if resolver was used and a timeout
+       occurred during a DNS request.
+
+
 Changes with nginx 1.6.1                                         05 Aug 2014
 
     *) Security: pipelined commands were not discarded after STARTTLS
