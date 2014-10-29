@@ -8,7 +8,7 @@ use Fcntl qw/:flock :seek/;
 
 use vars qw{$VERSION @ISA $ISCORE};
 BEGIN {
-	$VERSION = '1.01';
+	$VERSION = '1.06';
 	@ISA     = 'Module::Install::Base';
 	$ISCORE  = 1;
 }
@@ -215,18 +215,22 @@ sub write {
 	require ExtUtils::MakeMaker;
 
 	if ( $perl_version and $self->_cmp($perl_version, '5.006') >= 0 ) {
-		# MakeMaker can complain about module versions that include
-		# an underscore, even though its own version may contain one!
-		# Hence the funny regexp to get rid of it.  See RT #35800
-		# for details.
-		my $v = $ExtUtils::MakeMaker::VERSION =~ /^(\d+\.\d+)/;
-		$self->build_requires(     'ExtUtils::MakeMaker' => $v );
-		$self->configure_requires( 'ExtUtils::MakeMaker' => $v );
+		# This previous attempted to inherit the version of
+		# ExtUtils::MakeMaker in use by the module author, but this
+		# was found to be untenable as some authors build releases
+		# using future dev versions of EU:MM that nobody else has.
+		# Instead, #toolchain suggests we use 6.59 which is the most
+		# stable version on CPAN at time of writing and is, to quote
+		# ribasushi, "not terminally fucked, > and tested enough".
+		# TODO: We will now need to maintain this over time to push
+		# the version up as new versions are released.
+		$self->build_requires(     'ExtUtils::MakeMaker' => 6.59 );
+		$self->configure_requires( 'ExtUtils::MakeMaker' => 6.59 );
 	} else {
 		# Allow legacy-compatibility with 5.005 by depending on the
 		# most recent EU:MM that supported 5.005.
-		$self->build_requires(     'ExtUtils::MakeMaker' => 6.42 );
-		$self->configure_requires( 'ExtUtils::MakeMaker' => 6.42 );
+		$self->build_requires(     'ExtUtils::MakeMaker' => 6.36 );
+		$self->configure_requires( 'ExtUtils::MakeMaker' => 6.36 );
 	}
 
 	# Generate the MakeMaker params
@@ -241,7 +245,6 @@ in a module, and provide its file path via 'version_from' (or
 'all_from' if you prefer) in Makefile.PL.
 EOT
 
-	$DB::single = 1;
 	if ( $self->tests ) {
 		my @tests = split ' ', $self->tests;
 		my %seen;
@@ -412,4 +415,4 @@ sub postamble {
 
 __END__
 
-#line 541
+#line 544
