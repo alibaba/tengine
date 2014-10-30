@@ -23,7 +23,7 @@ Changes with Tengine 2.1.0                                         30 Oct 2014
     *) Feature: added variable "$normalized_request", to get normalized request
        url. (yunkai)
 
-    *) Feature: added wildcard support for include directive in dso block.
+    *) Feature: added wildcard support for directive "include" in dso block.
        (monadbobo)
 
     *) Feature: added "gzip_clear_etag" directive. (taoyuanyuan) 
