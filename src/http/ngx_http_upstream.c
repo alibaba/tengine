@@ -5991,6 +5991,11 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
         peers = uscfp[i]->peer.data;
+
+        if (peers == NULL) {
+            continue;
+        }
+
         peers->init_number = ngx_random() % peers->number;
 
         backup = peers->next;
