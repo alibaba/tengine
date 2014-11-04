@@ -14,8 +14,10 @@
 
 static ngx_int_t ngx_http_variable_request(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#if 0
 static void ngx_http_variable_request_set(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#endif
 static ngx_int_t ngx_http_variable_request_get_size(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static void ngx_http_variable_request_set_size(ngx_http_request_t *r,
@@ -80,6 +82,8 @@ static ngx_int_t ngx_http_variable_https(ngx_http_request_t *r,
 static ngx_int_t ngx_http_variable_full_request(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_normalized_request(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static void ngx_http_variable_set_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_is_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -277,7 +281,7 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_string("args"),
-      ngx_http_variable_request_set,
+      ngx_http_variable_set_args,
       ngx_http_variable_request,
       offsetof(ngx_http_request_t, args),
       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE, 0 },
@@ -787,6 +791,8 @@ ngx_http_variable_request(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 }
 
 
+#if 0
+
 static void
 ngx_http_variable_request_set(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -798,6 +804,8 @@ ngx_http_variable_request_set(ngx_http_request_t *r,
     s->len = v->len;
     s->data = v->data;
 }
+
+#endif
 
 
 static ngx_int_t
@@ -2043,6 +2051,16 @@ failed:
     v->valid = 0;
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_variable_set_args(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    r->args.len = v->len;
+    r->args.data = v->data;
+    r->valid_unparsed_uri = 0;
 }
 
 
