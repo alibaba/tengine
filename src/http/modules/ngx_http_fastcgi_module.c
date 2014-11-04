@@ -653,12 +653,12 @@ ngx_http_fastcgi_handler(ngx_http_request_t *r)
     u->finalize_request = ngx_http_fastcgi_finalize_request;
     r->state = 0;
 
-    r->request_buffering = flcf->upstream.request_buffering;
+    r->request_buffering_off = !flcf->upstream.request_buffering;
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
-        r->request_buffering = 1;
+        r->request_buffering_off = 0;
     }
 
-    if (!r->request_buffering) {
+    if (r->request_buffering_off) {
         u->output_filter_init = ngx_http_fastcgi_output_filter_init;
         u->output_filter = ngx_http_fastcgi_output_filter;
     }
@@ -1105,7 +1105,7 @@ ngx_http_fastcgi_create_request(ngx_http_request_t *r)
      * Don't send the last FASTCGI_STDIN record, It will be sent in the
      * output filter
      */
-    if (r->request_buffering) {
+    if (!r->request_buffering_off) {
         h = (ngx_http_fastcgi_header_t *) b->last;
         b->last += sizeof(ngx_http_fastcgi_header_t);
     }
@@ -1215,7 +1215,7 @@ ngx_http_fastcgi_create_request(ngx_http_request_t *r)
         r->upstream->request_bufs = cl;
     }
 
-    if (r->request_buffering) {
+    if (!r->request_buffering_off) {
         ngx_http_fastcgi_last_record(h);
     }
 

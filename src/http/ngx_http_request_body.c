@@ -98,7 +98,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (!r->request_buffering) {
+    if (r->request_buffering_off) {
         return ngx_http_read_non_buffered_client_request_body(r, post_handler);
     }
 
