@@ -1,0 +1,102 @@
+#!/usr/bin/perl
+# vim:set ft=perl ts=4 sw=4 et fdm=marker:
+#
+# revim - add customized vim modeline for given files
+# Copyright (c) 2010 chaoslawful
+
+use strict;
+use warnings;
+use Getopt::Std;
+
+my %opts;
+
+getopts('hm:', \%opts);
+
+if($opts{h} or !@ARGV) {
+    die <<EOT;
+Usage: revim [-m <vim modeline>] src/*
+
+In <vim modeline>, the following placeholder(s) can be used:
+
+    * %t - Expands to vim file type. E.g. 'c' for .c files, 'perl' for .pl files.
+EOT
+}
+
+my $vim_ml = $opts{m} || "vim:set ft=%t ts=4 sw=4 et fdm=marker:";
+my @files = map glob, @ARGV;
+for my $file (@files) {
+    next if -d $file;
+    my ($ft, $ml) = detect_filetype($file, $vim_ml);
+    next if !defined($ft);
+    revim($file, $ml);
+}
+
+sub detect_filetype
+{
+    my ($f, $tmpl) = @_;
+    my ($ft, $lcmt, $rcmt);
+    my %phs;
+
+    if($f =~ /.([cC]|[hH])$/) {
+        $ft = "c";
+        ($lcmt, $rcmt) = ("/* ", " */");
+    } elsif($f =~ /.(pl|pm)$/) {
+        $ft = "perl";
+        ($lcmt, $rcmt) = ("# ", "");
+    } elsif($f =~ /.t_?$/) {
+        # assuming tests are written in perl
+        $ft = "perl";
+        ($lcmt, $rcmt) = ("# ", "");
+    } else {
+        $ft = undef;
+    }
+
+    if(defined($ft)) {
+        %phs = (
+            "%t" => $ft,
+        );
+
+        $tmpl =~ s/(%[a-z])/$phs{$1}/ge;
+        $tmpl =~ s/^/$lcmt/;
+        $tmpl =~ s/$/$rcmt/;
+
+        return ($ft, $tmpl);
+    }
+
+    return (undef, undef);
+}
+
+sub revim
+{
+    my ($f, $ml) = @_;
+    my @lines;
+
+    open my $in, $f
+        or die "Can't open $f for reading: $!";
+    while(<$in>) {
+        push(@lines, $_);
+    }
+    close $in;
+
+    my @nlines = grep {!/\bvim?:/} @lines;
+    warn "revim: $f:\tremoved existing vim modeline.\n"
+        if(@nlines != @lines);
+
+    if($nlines[0] =~ /^#!/) {    # has shebang line
+        my $shebang = shift @nlines;
+        unshift(@nlines, $shebang, "$ml\n");
+    } else {
+        unshift(@nlines, "$ml\n");
+    }
+
+    my $text = join '', @nlines;
+
+    open my $out, "> $f"
+        or die "Can't open $f for writing: $!";
+    binmode $out;
+    print $out $text;
+    close $out;
+
+    warn "revim: $f:\tdone.\n";
+}
+
