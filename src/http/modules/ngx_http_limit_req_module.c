@@ -341,7 +341,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
             lr = (ngx_http_limit_req_node_t *) &node->color;
 
             node->key = hash;
-            lr->len = (u_char) total_len;
+            lr->len = (u_short) total_len;
 
             tp = ngx_timeofday();
             lr->last = (ngx_msec_t) (tp->sec * 1000 + tp->msec);
