@@ -102,11 +102,19 @@ struct ngx_log_s {
 
 void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
+void ngx_log_debug_location(const char *file_loc, ngx_uint_t line_loc,
+    ngx_uint_t level, ngx_log_t *log, ngx_err_t err, const char *fmt, ...);
 
+
+#if (NGX_DEBUG)
+#define ngx_log_debug(level, log, ...)                                        \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_location(basename(__FILE__), __LINE__, NGX_LOG_DEBUG, log, __VA_ARGS__)
+#else
 #define ngx_log_debug(level, log, ...)                                        \
     if ((log)->log_level & level)                                             \
         ngx_log_error_core(NGX_LOG_DEBUG, log, __VA_ARGS__)
-
+#endif
 /*********************************/
 
 #elif (NGX_HAVE_GCC_VARIADIC_MACROS)
