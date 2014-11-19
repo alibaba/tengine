@@ -73,6 +73,26 @@ static const char *debug_levels[] = {
 };
 
 
+#if (NGX_DEBUG)
+
+void
+ngx_log_debug_location(const char *file_loc, ngx_uint_t line_loc, ngx_uint_t level, ngx_log_t *log, ngx_err_t err, const char *fmt, ...)
+{
+    u_char   *p;
+    va_list   args;
+    u_char    debugstr[NGX_MAX_CONF_ERRSTR];
+
+    va_start(args, fmt);
+    p = ngx_vsnprintf(debugstr, sizeof(debugstr) - 1, fmt, args);
+    va_end(args);
+
+    ngx_log_error_core(level, log, err, "%*s %s:%d", p - debugstr, debugstr,
+        file_loc, line_loc);
+}
+
+#endif
+
+
 #if (NGX_HAVE_VARIADIC_MACROS)
 
 void
