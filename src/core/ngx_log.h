@@ -98,7 +98,8 @@ struct ngx_log_s {
 #define NGX_HAVE_VARIADIC_MACROS  1
 
 #define ngx_log_error(level, log, ...)                                        \
-    if ((log)->log_level >= level) ngx_log_error_core(level, log, __VA_ARGS__)
+    if ((log)->log_level >= level)                                             \
+        ngx_log_debug_location(basename(__FILE__), __LINE__, NGX_LOG_DEBUG, log, __VA_ARGS__)
 
 void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
