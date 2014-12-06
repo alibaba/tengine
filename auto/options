@@ -264,6 +264,7 @@ HTTP_UPSTREAM_DYNAMIC=YES
 HTTP_UPSTREAM_CONSISTENT_HASH=YES
 HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
 HTTP_UPSTREAM_RBTREE=YES
+HTTP_UPSTREAM_SOKEEPALIVE=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
@@ -623,6 +624,7 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
         --without-http_upstream_dynamic_module) HTTP_UPSTREAM_DYNAMIC=NO ;;
+        --without-http_upstream_sokeepalive_module) HTTP_UPSTREAM_SOKEEPALIVE=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
         --with-perl_modules_path=*)      NGX_PERL_MODULES="$value"  ;;
@@ -1093,6 +1095,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
     HTTP_UPSTREAM_DYNAMIC=YES
+	HTTP_UPSTREAM_SOKEEPALIVE=YES
     HTTP_REQ_STATUS=YES
     HTTP_AUTH_REQUEST=YES
     MAIL=YES
