@@ -1,4 +1,4 @@
-Tengine 2.1.0 [2014-10-30]
+Tengine 2.1.0 [2014-12-09]
 * Feature: 支持SO_REUSEPORT选项，以提升CPU负载均衡性和性能 [monadbobo]
 * Feature: 支持动态解析upstream中出现的域名 [InfoHunter]
 * Feature: rewrite指令支持重定向到命名location [yzprofile]
