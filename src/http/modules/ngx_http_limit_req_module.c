@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -416,7 +415,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         delay_time = (ngx_msec_t) delay_excess * 1000 / ctx->rate;
         ngx_log_error(lrcf->delay_log_level, r->connection->log, 0,
                       "delaying request,"
-                      "excess: %ui.%03ui, by zone \"%V\", delay \"%M\" s",
+                      "excess: %ui.%03ui, by zone \"%V\", delay \"%M\" ms",
                       delay_excess / 1000, delay_excess % 1000,
                       &limit_req[delay_postion].shm_zone->shm.name, delay_time);
 
