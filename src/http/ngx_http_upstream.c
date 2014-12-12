@@ -1276,7 +1276,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     r->connection->log->action = "connecting to upstream";
 
-    if (u->request_sent && !r->request_buffering) {
+    if (u->request_sent && r->request_buffering_off) {
 
         /*
          * no buffering request can't reuse the request body when part of
@@ -1424,7 +1424,7 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
 #endif
 
-    if (!r->request_buffering) {
+    if (r->request_buffering_off) {
         ngx_http_upstream_send_non_buffered_request(r, u);
         return;
     }
@@ -1497,7 +1497,7 @@ ngx_http_upstream_ssl_handshake(ngx_connection_t *c)
         c->write->handler = ngx_http_upstream_handler;
         c->read->handler = ngx_http_upstream_handler;
 
-        if (!r->request_buffering) {
+        if (r->request_buffering_off) {
             ngx_http_upstream_send_non_buffered_request(r, u);
             return;
         }
@@ -2003,7 +2003,7 @@ ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
         return;
     }
 
-    if (!r->request_buffering) {
+    if (r->request_buffering_off) {
         ngx_http_upstream_send_non_buffered_request(r, u);
         return;
     }
@@ -5421,8 +5421,12 @@ not_found:
 
 #if (NGX_HTTP_UPSTREAM_RBTREE)
 
+            uscf = uscfp[i];
+
             ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
             ngx_list_delete(&umcf->implicit_upstreams, &uscfp[i]);
+
+            return uscf;
 
 #endif
         }
@@ -5987,6 +5991,11 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
         peers = uscfp[i]->peer.data;
+
+        if (peers == NULL) {
+            continue;
+        }
+
         peers->init_number = ngx_random() % peers->number;
 
         backup = peers->next;

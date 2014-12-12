@@ -247,6 +247,7 @@ sleep 1;
 like(http_get("/load_and_mem_and_rt_limit"), qr/503/,
      'load_and_mem_and_rt_limit');
 
+closeload();
 
 sub getload
 {
@@ -280,19 +281,26 @@ sub while_thread
     }
 }
 
+our @ths;
+
 sub runload
 {
     my $i = 0;
-    my @ths;
     for ($i = 0; $i<=8; $i++) {
         $ths[$i] = threads->create( \&while_thread);
     }
 
     sleep(10);
+}
+
+sub closeload
+{
+    my $i = 0;
     for ($i = 0; $i<=8; $i++) {
         $ths[$i]->kill('KILL')->detach();
     }
 }
+
 
 sub http_daemon {
     my $server = IO::Socket::INET->new(

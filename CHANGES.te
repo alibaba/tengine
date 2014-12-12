@@ -1,3 +1,51 @@
+Changes with Tengine 2.1.0                                         30 Oct 2014
+
+    *) Feature: support the SO_REUSEPORT option, in order to achieve better
+       load balance between cpus. (monadbobo)
+
+    *) Feature: support for resolving upstream domain names during workers'
+       cycle. (InfoHunter)
+
+    *) Feature: support for rewriting to named locations. (yzprofile)
+
+    *) Feature: added two parameters "crop_keepx" and "crop_keepy" to the
+       directive "image_filter". (Lax)
+
+    *) Feature: support saving ssl sessions in consistent_hash module and
+       session_sticky module. (dinic)
+
+    *) Feature: support compiling nginx automatically in travis-ci.org. (Jamyn)
+
+    *) Feature: support fastcgi health check. (yzprofile)
+
+    *) Feature: enhanced sysguard module. (InfoHunter)
+
+    *) Feature: added variable "$normalized_request", to get normalized request
+       url. (yunkai)
+
+    *) Feature: added wildcard support for directive "include" in dso block.
+       (monadbobo)
+
+    *) Feature: added "gzip_clear_etag" directive. (taoyuanyuan) 
+
+    *) Bugfix: SPDY/3 drop the "delayed" flag when finalizing connection.
+       (chobits)
+
+    *) Bugfix: fixed SPDY/3 connection leak. (chobits)
+
+    *) Bugfix: failed to parse /etc/resolv.conf with IPv6 addresses. (lifeibo)
+
+    *) Bugfix: upstream rbtree bugfix. (taoyuanyuan)
+
+    *) Change: merged changes between nginx-1.6.2 and nginx-1.4.7.
+       (cfsego, taoyuanyuan, chobits)
+
+    *) Change: randomly select a server as the initialized server for each
+       worker. (taoyuanyuan)
+
+    *) Change: slab allocator free pages defragmentation. (chobits)
+
+
 Changes with Tengine 2.0.3                                         30 May 2014
 
     *) Feature: added support for collecting the running status of Tengine
