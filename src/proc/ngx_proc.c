@@ -1006,8 +1006,11 @@ ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 300);
     ngx_conf_merge_uint_value(conf->count, prev->count, 1);
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
+
+#if (NGX_PROCS_LUA)
     ngx_conf_merge_str_value(conf->lua_src, prev->lua_src, "");
     ngx_conf_merge_str_value(conf->lua_file, prev->lua_file, "");
+#endif
 
     return NGX_CONF_OK;
 }
