@@ -317,6 +317,7 @@ MAIL_SMTP=YES
 
 # procs module
 PROCS=YES
+PROCS_LUA=NO
 
 NGX_ADDONS=
 
@@ -423,6 +424,7 @@ do
 
         # PROCS
         --without-procs)                           PROCS=NO                   ;;
+        --with-procs-lua)                          PROCS_LUA=YES              ;;
 
         --with-file-aio)                           NGX_FILE_AIO=YES           ;;
         --with-ipv6)                               NGX_IPV6=YES               ;;
@@ -748,6 +750,7 @@ cat << END
   --without-poll_module              disable poll module
 
   --without-procs                    disable procs module
+  --with-procs-lua                   procs module support Lua script
 
   --with-file-aio                    enable file AIO support
   --with-ipv6                        enable IPv6 support

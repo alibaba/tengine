@@ -143,6 +143,7 @@ PROCS_MODULES="ngx_procs_module ngx_proc_core_module"
 PROCS_DEPS="src/proc/ngx_proc.h"
 PROCS_INCS="src/proc"
 PROCS_SRCS="src/proc/ngx_proc.c"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS src/proc/ngx_proc_lua.c"
 
 
 AIO_MODULE=ngx_aio_module

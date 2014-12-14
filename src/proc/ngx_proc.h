@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
@@ -33,6 +32,11 @@ typedef struct {
     ngx_msec_t                     delay_start;
     ngx_uint_t                     count;
     ngx_flag_t                     respawn;
+
+#if (NGX_PROCS_LUA)
+    ngx_str_t                      lua_src;
+    ngx_str_t                      lua_file;
+#endif
 
     ngx_proc_conf_ctx_t           *ctx;
 } ngx_proc_conf_t;

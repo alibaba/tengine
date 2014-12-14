@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -76,6 +75,10 @@ fi
 
 if [ $PROCS = YES ]; then
     have=NGX_PROCS . auto/have
+    if [ $PROCS_LUA = YES ]; then
+        have=NGX_PROCS_LUA . auto/have
+    fi
+
     CORE_SRCS="$CORE_SRCS $PROCS_SRCS"
     CORE_DEPS="$CORE_DEPS $PROCS_DEPS"
     CORE_INCS="$CORE_INCS $PROCS_INCS"

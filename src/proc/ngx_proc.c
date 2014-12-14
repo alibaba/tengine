@@ -25,6 +25,12 @@ static char *ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 static char *ngx_procs_set_priority(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+#if (NGX_PROCS_LUA)
+char *ngx_proc_set_lua_file_slot(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+ngx_int_t ngx_procs_process_lua_init(ngx_cycle_t *cycle, ngx_proc_conf_t *pcf);
+#endif
+
 
 static ngx_command_t ngx_procs_commands[] = {
 
@@ -98,6 +104,22 @@ static ngx_command_t ngx_proc_core_commands[] = {
       NGX_PROC_CONF_OFFSET,
       offsetof(ngx_proc_conf_t, respawn),
       NULL },
+
+#if (NGX_PROCS_LUA)
+    { ngx_string("init_process_by_lua"),
+      NGX_PROC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_str_slot,
+      NGX_PROC_CONF_OFFSET,
+      offsetof(ngx_proc_conf_t, lua_src),
+      NULL },
+
+    { ngx_string("init_process_by_lua_file"),
+      NGX_PROC_CONF|NGX_CONF_FLAG,
+      ngx_proc_set_lua_file_slot,
+      NGX_PROC_CONF_OFFSET,
+      offsetof(ngx_proc_conf_t, lua_file),
+      NULL },
+#endif
 
       ngx_null_command
 };
@@ -388,6 +410,15 @@ ngx_procs_cycle(ngx_cycle_t *cycle, void *data)
     ngx_msleep(cpcf->delay_start);
 
     ngx_procs_process_init(cycle, ctx, cpcf->priority);
+
+#if (NGX_PROCS_LUA)
+    rc = ngx_procs_process_lua_init(cycle, cpcf);
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_CRIT, cycle->log, 0,
+                      "process %V  lua init failed", &ctx->name);
+    }
+#endif
+
     ngx_close_listening_sockets(cycle);
     ngx_use_accept_mutex = 0;
 
@@ -828,6 +859,7 @@ ngx_proc_process(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ngx_modules[m]->type != NGX_PROC_MODULE) {
             continue;
         }
+
         module = ngx_modules[m]->ctx;
 
         if (ngx_strcmp(module->name.data, value[1].data) == 0) {
@@ -953,6 +985,8 @@ ngx_proc_create_conf(ngx_conf_t *cf)
      *     cpcf->priority = 0;
      *     cpcf->count = 0;
      *     cpcf->respawn = 0;
+     *     cpcf->lua_src = "";
+     *     cpcf->lua_file = "";
      */
 
     cpcf->delay_start = NGX_CONF_UNSET_MSEC;
@@ -972,6 +1006,8 @@ ngx_proc_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->delay_start, prev->delay_start, 300);
     ngx_conf_merge_uint_value(conf->count, prev->count, 1);
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
+    ngx_conf_merge_str_value(conf->lua_src, prev->lua_src, "");
+    ngx_conf_merge_str_value(conf->lua_file, prev->lua_file, "");
 
     return NGX_CONF_OK;
 }
