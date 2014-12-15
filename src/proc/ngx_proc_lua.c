@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
+ */
+
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 
