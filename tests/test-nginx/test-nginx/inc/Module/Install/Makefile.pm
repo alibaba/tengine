@@ -221,7 +221,7 @@ sub write {
 		# using future dev versions of EU:MM that nobody else has.
 		# Instead, #toolchain suggests we use 6.59 which is the most
 		# stable version on CPAN at time of writing and is, to quote
-		# ribasushi, "not terminally fucked, > and tested enough".
+		# ribasushi, "not terminally blamed, > and tested enough".
 		# TODO: We will now need to maintain this over time to push
 		# the version up as new versions are released.
 		$self->build_requires(     'ExtUtils::MakeMaker' => 6.59 );

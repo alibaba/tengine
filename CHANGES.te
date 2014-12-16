@@ -1,49 +1,55 @@
-Changes with Tengine 2.1.0                                         30 Oct 2014
+Changes with Tengine 2.1.0                                         16 Dec 2014
 
-    *) Feature: support the SO_REUSEPORT option, in order to achieve better
-       load balance between cpus. (monadbobo)
+    *) Feature: support the SO_REUSEPORT option, to improve performance on
+       multicore systems. (monadbobo)
 
-    *) Feature: support for resolving upstream domain names during workers'
-       cycle. (InfoHunter)
+    *) Feature: support for resolving upstream domain names on the fly.
+       (InfoHunter)
 
     *) Feature: support for rewriting to named locations. (yzprofile)
 
-    *) Feature: added two parameters "crop_keepx" and "crop_keepy" to the
-       directive "image_filter". (Lax)
+    *) Feature: added two parameters 'crop_keepx' and 'crop_keepy' to the
+       directive 'image_filter'. (Lax)
 
-    *) Feature: support saving ssl sessions in consistent_hash module and
+    *) Feature: support for saving SSL sessions in consistent_hash module and
        session_sticky module. (dinic)
 
-    *) Feature: support compiling nginx automatically in travis-ci.org. (Jamyn)
+    *) Feature: support for compiling Tengine automatically in travis-ci.org.
+       (Jamyn)
 
-    *) Feature: support fastcgi health check. (yzprofile)
+    *) Feature: support for FastCGI health check. (yzprofile)
 
     *) Feature: enhanced sysguard module. (InfoHunter)
 
-    *) Feature: added variable "$normalized_request", to get normalized request
-       url. (yunkai)
+    *) Feature: added a variable '$normalized_request', to get normalized
+       request URIs. (yunkai)
 
-    *) Feature: added wildcard support for directive "include" in dso block.
+    *) Feature: added wildcard support for 'include' directive in 'dso' block.
        (monadbobo)
 
-    *) Feature: added "gzip_clear_etag" directive. (taoyuanyuan) 
+    *) Feature: added the 'gzip_clear_etag' directive. (taoyuanyuan) 
 
-    *) Bugfix: SPDY/3 drop the "delayed" flag when finalizing connection.
+    *) Feature: added the 'unprintable' parameter to the 'log_escape' directive.
+       (skoo87)
+
+    *) Change: merged changes from nginx-1.6.2. (cfsego, taoyuanyuan, chobits)
+
+    *) Change: now the order of servers in an upstream are random when
+       initialized. (taoyuanyuan)
+
+    *) Change: slab allocator free pages defragmentation. (chobits)
+
+    *) Bugfix: SPDY/3 dropped the "delayed" flag when finalizing connection.
        (chobits)
 
     *) Bugfix: fixed SPDY/3 connection leak. (chobits)
 
+    *) Bugfix: now don't truncate value of key to 255 bytes in limit_req module.
+       (chobits)
+
     *) Bugfix: failed to parse /etc/resolv.conf with IPv6 addresses. (lifeibo)
 
     *) Bugfix: upstream rbtree bugfix. (taoyuanyuan)
-
-    *) Change: merged changes between nginx-1.6.2 and nginx-1.4.7.
-       (cfsego, taoyuanyuan, chobits)
-
-    *) Change: randomly select a server as the initialized server for each
-       worker. (taoyuanyuan)
-
-    *) Change: slab allocator free pages defragmentation. (chobits)
 
 
 Changes with Tengine 2.0.3                                         30 May 2014
