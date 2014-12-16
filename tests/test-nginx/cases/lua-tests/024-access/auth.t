@@ -27,12 +27,12 @@ __DATA__
 
         access_by_lua '
             -- check the client IP addr is in our black list
-            if ngx.var.remote_addr == "132.5.72.3" then
+            if ngx.var.remote_addr == "127.0.0.1" then
                 ngx.exit(ngx.HTTP_FORBIDDEN)
             end
 
             -- check if the request body contains bad words
-            if ngx.var.request_body and string.match(ngx.var.request_body, "fuck") then
+            if ngx.var.request_body and string.match(ngx.var.request_body, "error") then
                 return ngx.redirect("/terms_of_use.html")
             end
 
@@ -57,12 +57,12 @@ Logged in
 
         access_by_lua '
             -- check the client IP addr is in our black list
-            if ngx.var.remote_addr == "132.5.72.3" then
+            if ngx.var.remote_addr == "127.0.0.1" then
                 ngx.exit(ngx.HTTP_FORBIDDEN)
             end
 
             -- check if the request body contains bad words
-            if ngx.var.request_body and string.match(ngx.var.request_body, "fuck") then
+            if ngx.var.request_body and string.match(ngx.var.request_body, "error") then
                 return ngx.redirect("/terms_of_use.html")
             end
 
@@ -73,7 +73,7 @@ Logged in
     }
 --- request
 POST /lua
-He fucks himself!
+He kills himself!
 --- response_body_like: 302 Found
 --- response_headers_like
 Location: http://[^:]+:\d+/terms_of_use\.html
@@ -95,7 +95,7 @@ Location: http://[^:]+:\d+/terms_of_use\.html
             end
 
             -- check if the request body contains bad words
-            if ngx.var.request_body and string.match(ngx.var.request_body, "fuck") then
+            if ngx.var.request_body and string.match(ngx.var.request_body, "error") then
                 return ngx.redirect("/terms_of_use.html")
             end
 

@@ -539,7 +539,7 @@ after
             ngx.say("after")
             local sock = ngx.socket.tcp()
             sock:settimeout(12000)
-            local ok, err = sock:connect("106.187.41.147", 12345)
+            local ok, err = sock:connect("127.0.0.1", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
