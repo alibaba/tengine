@@ -183,7 +183,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 #endif
 
-        if (log->file->fd == ngx_stderr) {
+        if (log->file != NULL && log->file->fd == ngx_stderr) {
             wrote_stderr = 1;
         }
 

@@ -98,92 +98,92 @@ GET /p
 === TEST 11: syslog:user for error log ===
 --- config
 location /p {
-    error_log syslog:user;
-    empty_gif;
+    error_log syslog:user debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 12: syslog:user:info for error log ===
 --- config
 location /p {
     error_log syslog:user:info;
-    empty_gif;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 13: syslog:user:info:127.0.0.1 for error log ===
 --- config
 location /p {
-    error_log syslog:user:info:127.0.0.1;
-    empty_gif;
+    error_log syslog:user:info:127.0.0.1 debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 14: syslog:user:info:127.0.0.1:514 for error log ===
 --- config
 location /p {
-    error_log syslog:user:info:127.0.0.1:514;
-    empty_gif;
+    error_log syslog:user:info:127.0.0.1:514 debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 15: syslog:user:info:127.0.0.1:514:test.taobao.com for error log ===
 --- config
 location /p {
-    error_log syslog:user:info:127.0.0.1:514:test.taobao.com;
-    empty_gif;
+    error_log syslog:user:info:127.0.0.1:514:test.taobao.com debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 16: syslog:user::127.0.0.1:514:test.taobao.com for error log ===
 --- config
 location /p {
-    error_log syslog:user::127.0.0.1:514:test.taobao.com;
-    empty_gif;
+    error_log syslog:user::127.0.0.1:514:test.taobao.com debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 17: syslog:user:info:127.0.0.1::test.taobao.com for error log ===
 --- config
 location /p {
-    error_log syslog:user:info:127.0.0.1::test.taobao.com;
-    empty_gif;
+    error_log syslog:user:info:127.0.0.1::test.taobao.com debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 18: syslog:user:info:/dev/log:test.taobao.com for error log ===
 --- config
 location /p {
-    error_log syslog:user::/dev/log:test.taobao.com;
-    empty_gif;
+    error_log syslog:user::/dev/log:test.taobao.com debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === TEST 19: syslog:user:info:/dev/log for error log ===
 --- config
 location /p {
-    error_log syslog:user::/dev/log;
-    empty_gif;
+    error_log syslog:user::/dev/log debug;
+    root /not/exist;
 }
 --- request
 GET /p
---- error_code: 200
+--- error_code: 404
 
 === Test 20: hostname and domain support, besides ip ===
 --- config
