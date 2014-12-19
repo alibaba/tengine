@@ -60,14 +60,14 @@ struct ngx_peer_connection_s {
     ngx_addr_t                      *local;
 
     int                              rcvbuf;
-	
+
     int                              so_keepalive;
 
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                              keepidle;
     int                              keepintvl;
     int                              keepcnt;
-#endif   
+#endif
 
     ngx_log_t                       *log;
 
