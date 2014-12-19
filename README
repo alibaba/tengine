@@ -8,7 +8,7 @@ Tengine has been an open source project since December 2011. It is being activel
 
 Features
 --------
-* All features of nginx-1.4.4 are inherited, i.e., it is 100% compatible with nginx.
+* All features of nginx-1.6.2 are inherited, i.e., it is 100% compatible with nginx.
 * Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
 * SPDY v3 support, and SPDY/HTTP servers can listen on the same port.
 * Sends unbuffered upload directly to HTTP and FastCGI backend servers, which saves disk I/Os.
