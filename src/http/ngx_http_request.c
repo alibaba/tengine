@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_event.h>
 
 #if (NGX_HTTP_SPDY && defined TLSEXT_TYPE_next_proto_neg)
 #include <ngx_http_spdy_module.h>
@@ -68,6 +69,12 @@ static void ngx_http_log_request(ngx_http_request_t *r);
 static u_char *ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len);
 static u_char *ngx_http_log_error_handler(ngx_http_request_t *r,
     ngx_http_request_t *sr, u_char *buf, size_t len);
+
+static void ngx_http_connection_timeout_handler(ngx_event_t *ev);
+static void ngx_http_request_timeout_handler(ngx_event_t *ev);
+
+extern void ngx_http_upstream_finalize_request(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_int_t rc);
 
 #if (NGX_HTTP_SSL)
 static void ngx_http_ssl_handshake(ngx_event_t *rev);
@@ -209,6 +216,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     ngx_event_t            *rev;
     struct sockaddr_in     *sin;
     ngx_http_port_t        *port;
+    ngx_event_conf_t       *ecf;
     ngx_http_in_addr_t     *addr;
     ngx_http_log_ctx_t     *ctx;
     ngx_http_connection_t  *hc;
@@ -322,6 +330,16 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev = c->read;
     rev->handler = ngx_http_wait_request_handler;
     c->write->handler = ngx_http_empty_handler;
+
+    ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
+
+    if (c->timeout) {
+        c->timeout->data = c;
+        c->timeout->log = c->log;
+        c->timeout->handler = ngx_http_connection_timeout_handler;
+
+        ngx_add_timer(c->timeout, ecf->timeout);
+    }
 
 #if (NGX_HTTP_SPDY)
     if (hc->addr_conf->spdy) {
@@ -604,6 +622,10 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     if (c->data == NULL) {
         ngx_http_close_connection(c);
         return;
+    }
+
+    if (c->timeout) {
+        c->timeout->handler = ngx_http_request_timeout_handler;
     }
 
     rev->handler = ngx_http_process_request_line;
@@ -2981,6 +3003,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     ngx_int_t                  i;
     ngx_buf_t                 *b, *f;
     ngx_event_t               *rev, *wev;
+    ngx_event_conf_t          *ecf;
     ngx_connection_t          *c;
     ngx_http_connection_t     *hc;
     ngx_http_core_srv_conf_t  *cscf;
@@ -2989,6 +3012,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     c = r->connection;
     rev = c->read;
 
+    ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "set http keepalive handler");
@@ -3048,6 +3072,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
     ngx_http_free_request(r, 0);
 
+    if (c->timeout && c->timeout->timer_set) {
+        ngx_del_timer(c->timeout);
+    }
+
     c->data = hc;
 
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
@@ -3083,6 +3111,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
         if (rev->timer_set) {
             ngx_del_timer(rev);
+        }
+
+        if (c->timeout) {
+            ngx_add_timer(c->timeout, ecf->timeout);
         }
 
         rev->handler = ngx_http_process_request_line;
@@ -3217,6 +3249,7 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     ssize_t            n;
     ngx_buf_t         *b;
     ngx_connection_t  *c;
+    ngx_event_conf_t  *ecf;
 
     c = rev->data;
 
@@ -3336,6 +3369,12 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     c->destroyed = 0;
 
     ngx_del_timer(rev);
+
+    ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
+
+    if (c->timeout) {
+        ngx_add_timer(c->timeout, ecf->timeout);
+    }
 
     rev->handler = ngx_http_process_request_line;
     ngx_http_process_request_line(rev);
@@ -3809,4 +3848,49 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
     }
 
     return buf;
+}
+
+
+static void
+ngx_http_connection_timeout_handler(ngx_event_t *ev)
+{
+    ngx_connection_t  *c;
+
+    c = ev->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http connection timeout handler");
+    ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
+
+    c->timedout = 1;
+
+    ngx_http_close_connection(c);
+}
+
+
+static void
+ngx_http_request_timeout_handler(ngx_event_t *ev)
+{
+    ngx_connection_t     *c;
+    ngx_http_request_t   *r;
+    ngx_http_upstream_t  *u;
+
+    c = ev->data;
+    r = c->data;
+    r = r->main;
+    u = r->upstream ? r->upstream : NULL;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http request timeout handler");
+    ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "total timed out");
+
+    c->timedout = 1;
+    r->err_status = NGX_HTTP_REQUEST_TIME_OUT;
+
+    if (u) {
+        ngx_http_upstream_finalize_request(r, u, NGX_HTTP_REQUEST_TIME_OUT);
+
+    } else {
+        ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+    }
+
+    ngx_http_run_posted_requests(c);
 }

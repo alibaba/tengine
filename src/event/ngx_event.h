@@ -482,6 +482,8 @@ typedef struct {
 
     ngx_msec_t    accept_mutex_delay;
 
+    ngx_msec_t    timeout;
+
     u_char       *name;
 
 #if (NGX_DEBUG)

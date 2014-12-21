@@ -992,6 +992,10 @@ ngx_close_connection(ngx_connection_t *c)
         ngx_del_timer(c->write);
     }
 
+    if (c->timeout && c->timeout->timer_set) {
+        ngx_del_timer(c->timeout);
+    }
+
     if (ngx_del_conn) {
         ngx_del_conn(c, NGX_CLOSE_EVENT);
 

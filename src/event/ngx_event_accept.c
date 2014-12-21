@@ -247,6 +247,14 @@ ngx_event_accept(ngx_event_t *ev)
         rev->log = log;
         wev->log = log;
 
+        if (ecf->timeout > 0) {
+            c->timeout = ngx_pcalloc(c->pool, sizeof(ngx_event_t));
+            if (c->timeout == NULL) {
+                ngx_close_accepted_connection(c);
+                return;
+            }
+        }
+
         /*
          * TODO: MT: - ngx_atomic_fetch_add()
          *             or protection by critical section or light mutex
