@@ -527,6 +527,10 @@ HTTP_SYSGUARD_MODULE=ngx_http_sysguard_module
 HTTP_SYSGUARD_SRCS=src/http/modules/ngx_http_sysguard_module.c
 
 
+HTTP_COPY_MODULE=ngx_http_copy_module
+HTTP_COPY_SRCS=src/http/modules/ngx_http_copy_module.c
+
+
 HTTP_FLV_MODULE=ngx_http_flv_module
 HTTP_FLV_SRCS=src/http/modules/ngx_http_flv_module.c
 
