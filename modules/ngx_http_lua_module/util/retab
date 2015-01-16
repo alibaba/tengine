@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for f in $*; do
+	if [ -f "$f" ]; then
+		vim -c retab -c x $f
+	fi
+done
+

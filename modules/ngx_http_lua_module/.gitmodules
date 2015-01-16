@@ -1,0 +1,3 @@
+[submodule "deps/ngx_devel_kit"]
+	path = deps/ngx_devel_kit
+	url = git://github.com/simpl/ngx_devel_kit.git
