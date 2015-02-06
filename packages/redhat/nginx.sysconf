@@ -1,0 +1,4 @@
+# Configuration file for the nginx service.
+
+NGINX=/usr/sbin/nginx
+CONFFILE=/etc/nginx/nginx.conf
