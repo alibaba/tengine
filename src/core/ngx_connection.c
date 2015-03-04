@@ -389,7 +389,8 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 if (ngx_process == NGX_PROCESS_SIGNALLER
                     || (cycle->old_cycle != NULL && !ngx_is_init_cycle(cycle->old_cycle))
                     || ls[i].reuse_port
-                    || onfly != NULL)
+                    || onfly != NULL
+                    || ngx_test_config)
                 {
 
                     if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
