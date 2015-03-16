@@ -1773,6 +1773,11 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
                 }
 
+                if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+                    ngx_http_upstream_finalize_request(r, u,
+                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
+                }
+
                 return;
             }
         }
@@ -1886,6 +1891,12 @@ send_done:
         if (rc == NGX_AGAIN) {
             ngx_add_timer(c->write, u->conf->send_timeout);
 
+            if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
+                ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+
             if (ngx_handle_write_event(c->write, u->conf->send_lowat)
                 != NGX_OK) {
                 ngx_http_upstream_finalize_request(r, u,
@@ -1939,6 +1950,12 @@ send_done:
         return;
     }
 #endif
+
+    if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
+        ngx_http_upstream_finalize_request(r, u,
+                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
 
     u->write_event_handler = ngx_http_upstream_dummy_handler;
 
