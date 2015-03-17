@@ -657,6 +657,11 @@ ngx_http_fastcgi_handler(ngx_http_request_t *r)
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         r->request_buffering_off = 0;
     }
+#if (NGX_HTTP_SPDY)
+    if (r->spdy_stream) {
+        r->request_buffering_off = 0;
+    }
+#endif
 
     if (r->request_buffering_off) {
         u->output_filter_init = ngx_http_fastcgi_output_filter_init;
