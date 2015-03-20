@@ -1,5 +1,10 @@
 # Name #
 
+**注意**
+1. Tengine-2.1.0以上版本的SPDY模块已经与官方nginx同步，只支持SPDY/3.1。
+   文档参考: http://nginx.org/en/docs/http/ngx_http_SPDY_module.html
+2. 以下文档只适用于Tengine-2.1.0及以下版本，只支持SPDY/2和SPDY/3。listen参数`spdy_detect`在SPDY/3.1下任然可以使用。
+
 **ngx\_http\_spdy\_module**
 
 Tengine对SPDY模块增加SPDY/3协议的支持。以下是新增的指令。
