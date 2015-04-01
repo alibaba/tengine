@@ -1,5 +1,10 @@
 # Name #
 
+**NOTE**
+1. This module has been updated to official nginx SPDY/3.1 module, the document is available here:
+   http://nginx.org/en/docs/http/ngx_http_spdy_module.html
+2. This document only applies to Tengine-2.1.0 and its old version.  But the listen option `spdy_detect` can still be used with SPDY/3.1.
+
 **ngx\_http\_spdy\_module**
 
 Tengine added SPDY/3 support to this module. The new directives are listed below.
