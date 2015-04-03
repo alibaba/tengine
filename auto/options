@@ -90,6 +90,7 @@ NGX_ALL_MODULES="
     ngx_http_map_module
     ngx_http_split_clients_module
     ngx_http_user_agent_module
+    ngx_http_reqstat_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module
@@ -111,8 +112,8 @@ NGX_ALL_MODULES="
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
+    ngx_http_upstream_dynamic_module
     ngx_http_upstream_check_module
-    ngx_http_upstream_session_sticky_module
     ngx_http_upstream_consistent_hash_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
@@ -130,6 +131,7 @@ NGX_ALL_MODULES="
     ngx_http_userid_filter_module
     ngx_http_footer_filter_module
     ngx_http_trim_filter_module
+    ngx_http_upstream_session_sticky_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -160,7 +162,7 @@ NGX_DSO_ABI_ALL_TAG="
     with-ipv6
     with-syslog
     with-http-gzip
-    with-http-gzip-satic
+    with-http-gzip-static
     with-http-ssi
     with-http-dav
     with-http-realip
@@ -170,7 +172,8 @@ NGX_DSO_ABI_ALL_TAG="
     with-http-proxy
     with-http-degradation
     with-http-upstream-check
-    with-http-stat-stub"
+    with-http-stat-stub
+    with-http-upstream-rbtree"
 
 NGX_DSO_ABI_COMPATIBILITY=0x00000000
 NGX_DSO_DEBUG_TAG=0x00000001
@@ -190,6 +193,7 @@ NGX_DSO_PROXY_TAG=0x00002000
 NGX_DSO_DEGRADATION_TAG=0x00004000
 NGX_DSO_UPSTREAM_CHECK_TAG=0x00008000
 NGX_DSO_STAT_STUB_TAG=0x00010000
+NGX_DSO_UPSTREAM_RBTREE_TAG=0x00020000
 
 
 HTTP=YES
@@ -216,6 +220,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
+HTTP_AUTH_REQUEST=NO
 HTTP_USERID=YES
 HTTP_CONCAT=NO
 HTTP_AUTOINDEX=YES
@@ -255,11 +260,14 @@ HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
+HTTP_UPSTREAM_DYNAMIC=YES
 HTTP_UPSTREAM_CONSISTENT_HASH=YES
 HTTP_UPSTREAM_CONSISTENT_HASH_SHARED=NO
+HTTP_UPSTREAM_RBTREE=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
+HTTP_REQ_STATUS=YES
 
 # shared modules
 HTTP_XSLT_SHARED=NO
@@ -299,6 +307,7 @@ HTTP_USER_AGENT_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+HTTP_REQ_STATUS_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -455,6 +464,7 @@ do
                                                    HTTP_MP4_SHARED=NO                ;;
         --with-http_gunzip_module)                 HTTP_GUNZIP=YES                   ;;
         --with-http_gzip_static_module)            HTTP_GZIP_STATIC=YES              ;;
+        --with-http_auth_request_module)           HTTP_AUTH_REQUEST=YES             ;;
         --with-http_concat_module)                 HTTP_CONCAT=YES
                                                    HTTP_CONCAT_SHARED=NO             ;;
         --with-http_random_index_module)           HTTP_RANDOM_INDEX=YES
@@ -542,6 +552,8 @@ do
         --with-http_upstream_session_sticky_module=shared)
                                                    HTTP_UPSTREAM_SESSION_STICKY=NO
                                                    HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
+        --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
+                                                   HTTP_REQ_STATUS_SHARED=YES        ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
                                          HTTP_CHARSET_SHARED=NO     ;;
@@ -561,6 +573,8 @@ do
                                          HTTP_AUTOINDEX_SHARED=NO   ;;
         --without-http_status_module)    HTTP_STATUS=NO
                                          HTTP_STATUS_SHARED=NO      ;;
+        --without-http_reqstat_module)   HTTP_REQ_STATUS=NO
+                                         HTTP_REQ_STATUS_SHARED=NO  ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
         --without-http_map_module)       HTTP_MAP=NO
                                          HTTP_MAP_SHARED=NO         ;;
@@ -608,6 +622,7 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_UPSTREAM_SESSION_STICKY=NO
                                          HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
+        --without-http_upstream_dynamic_module) HTTP_UPSTREAM_DYNAMIC=NO ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
         --with-perl_modules_path=*)      NGX_PERL_MODULES="$value"  ;;
@@ -679,6 +694,8 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
+
+        --without-http-upstream-rbtree)  HTTP_UPSTREAM_RBTREE=NO    ;;
 
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
@@ -752,6 +769,7 @@ cat << END
   --with-http_mp4_module             enable ngx_http_mp4_module
   --with-http_gunzip_module          enable ngx_http_gunzip_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
+  --with-http_auth_request_module    enable ngx_http_auth_request_module
   --with-http_concat_module          enable ngx_http_concat_module
   --with-http_random_index_module    enable ngx_http_random_index_module
   --with-http_secure_link_module     enable ngx_http_secure_link_module
@@ -809,6 +827,7 @@ cat << END
                                      enable ngx_http_upstream_least_conn_module (shared)
   --with-http_upstream_session_sticky_module=shared
                                      enable ngx_http_upstream_session_sticky_module (shared)
+  --with-http_reqstat_module=shared  enable ngx_http_reqstat_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -844,16 +863,21 @@ cat << END
                                      disable ngx_http_upstream_session_sticky_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
+  --without-http_upstream_dynamic_module
+                                     disable ngx_http_upstream_dynamic_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_upstream_consistent_hash_module
                                      disable ngx_http_upstream_consistent_hash_module
   --without-http_user_agent_module   disable ngx_http_user_agent_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
+  --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
   --with-perl=PATH                   set perl binary pathname
+
+  --without-http-upstream-rbtree     disable using rbtree for upstream lookup
 
   --with-http_lua_module             enable ngx_http_lua_module (will also enable --with-md5 and --with-sha1)
   --with-http_lua_module=shared      enable ngx_http_lua_module (shared) (will also enable --with-md5 and --with-sha1)
@@ -976,6 +1000,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
+    HTTP_REQ_STATUS_SHARED=YES
 
     HTTP_XSLT=NO
     HTTP_IMAGE_FILTER=NO
@@ -1012,6 +1037,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
+    HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_CACHE=YES
@@ -1057,6 +1083,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_SLICE=YES
     HTTP_MP4=YES
     HTTP_GZIP_STATIC=YES
+    HTTP_GUNZIP=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
     HTTP_TRIM=YES
@@ -1065,6 +1092,10 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_LEAST_CONN=YES
     HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
+    HTTP_UPSTREAM_DYNAMIC=YES
+    HTTP_REQ_STATUS=YES
+    HTTP_AUTH_REQUEST=YES
+    MAIL=YES
 
     HTTP_XSLT_SHARED=NO
     HTTP_IMAGE_FILTER_SHARED=NO
@@ -1102,6 +1133,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
+    HTTP_REQ_STATUS_SHARED=NO
 fi
 
 

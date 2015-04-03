@@ -1,0 +1,27 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+for my $infile (@ARGV) {
+    warn "Processing $infile...\n";
+    open my $in, $infile or
+        die "Cannot open $infile for reading: $!\n";
+    my $s;
+    my $changed = 0;
+    while (<$in>) {
+        $changed += s{//(.*)}{/* $1 */};
+        $s .= $_;
+    }
+    close $in;
+
+    if ($changed) {
+        my $outfile = $infile;
+        open my $out, ">$outfile" or
+            die "Cannot open $outfile for writing: $!\n";
+        print $out $s;
+        close $out;
+        warn "Wrote $outfile\n";
+    }
+}
+

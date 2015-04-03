@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http dav/)->plan(13);
+my $t = Test::Nginx->new()->has(qw/http dav/)->plan(15);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -130,6 +130,23 @@ Connection: close
 
 EOF
 
-like($r, qr/201.*(Content-Length|\x0d\0a0\x0d\x0a)/ms, 'move dir');
+like($r, qr/201 Created.*(Content-Length|\x0d\0a0\x0d\x0a)/ms, 'move dir');
+
+$r = http(<<EOF);
+COPY /file HTTP/1.1
+Host: localhost
+Destination: /file-moved%20escape
+Connection: close
+
+EOF
+
+like($r, qr/204 No Content/, 'copy file escaped');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.5.9');
+
+is(-s $t->testdir() . '/file-moved escape', 10, 'file copied unescaped');
+
+}
 
 ###############################################################################

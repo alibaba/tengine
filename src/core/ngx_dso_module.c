@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -672,30 +672,84 @@ static char *
 ngx_dso_include(ngx_conf_t *cf, ngx_dso_conf_ctx_t *ctx,
     ngx_str_t *name)
 {
-    char       *rv;
-    ngx_str_t   file;
-    ngx_conf_t  pcf;
+    char        *rv;
+    ngx_int_t    n;
+    ngx_str_t    file, glob_name;
+    ngx_glob_t   gl;
+    ngx_conf_t   pcf;
 
     file.len = name->len;
     file.data = ngx_pnalloc(cf->temp_pool, name->len + 1);
-
     if (file.data == NULL) {
         return NGX_CONF_ERROR;
     }
 
     ngx_sprintf(file.data, "%V%Z", name);
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso include %s", file.data);
 
     if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
 
+    if (strpbrk((char *) file.data, "*?[") == NULL) {
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso include %s", file.data);
+
+        pcf = *cf;
+
+        cf->ctx = ctx;
+        cf->module_type = NGX_CORE_MODULE;
+
+        rv = ngx_conf_parse(cf, &file);
+
+        *cf = pcf;
+
+        return rv;
+    }
+
+    ngx_memzero(&gl, sizeof(ngx_glob_t));
+
+    gl.pattern = file.data;
+    gl.log = cf->log;
+    gl.test = 1;
+
+    if (ngx_open_glob(&gl) != NGX_OK) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
+                           ngx_open_glob_n " \"%s\" failed", file.data);
+        return NGX_CONF_ERROR;
+    }
+
+    rv = NGX_CONF_OK;
+
     pcf = *cf;
     cf->ctx = ctx;
     cf->module_type = NGX_CORE_MODULE;
 
-    rv = ngx_conf_parse(cf, &file);
+    for ( ;; ) {
+        n = ngx_read_glob(&gl, &glob_name);
+
+        if (n != NGX_OK) {
+            break;
+        }
+
+        file.len = glob_name.len++;
+        file.data = ngx_pstrdup(cf->pool, &glob_name);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "dso include %V", &glob_name);
+
+        cf->ctx = ctx;
+        cf->module_type = NGX_CORE_MODULE;
+
+        rv = ngx_conf_parse(cf, &file);
+
+        if (rv != NGX_CONF_OK) {
+            break;
+        }
+    }
 
     *cf = pcf;
+
+    ngx_close_glob(&gl);
 
     return rv;
 }

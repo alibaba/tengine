@@ -17,11 +17,17 @@ requires        ('LWP::UserAgent');
 requires        ('HTTP::Response');
 requires        ('Fcntl');
 requires        ('POSIX');
+requires        ('URI::Escape');
 requires        ('IO::Select');
+requires        ('File::Path');
+requires        ('File::Temp');
+requires        ('File::Path' => '2.06_05');
 requires        ('List::MoreUtils');
+requires        ('List::Util');
+requires        ('Encode');
 requires        ('ExtUtils::MakeMaker');
-
-requires        ('Parallel::ForkManager');
+requires        ('File::Find');
+requires        ('IO::Socket::INET');
 
 use_test_base();
 auto_install();

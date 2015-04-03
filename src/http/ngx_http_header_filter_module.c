@@ -92,10 +92,7 @@ static ngx_str_t ngx_http_status_lines[] = {
     ngx_string("411 Length Required"),
     ngx_string("412 Precondition Failed"),
     ngx_string("413 Request Entity Too Large"),
-    ngx_null_string,  /* "414 Request-URI Too Large", but we never send it
-                       * because we treat such requests as the HTTP/0.9
-                       * requests and send only a body without a header
-                       */
+    ngx_string("414 Request-URI Too Large"),
     ngx_string("415 Unsupported Media Type"),
     ngx_string("416 Requested Range Not Satisfiable"),
 
@@ -267,7 +264,13 @@ ngx_http_header_filter(ngx_http_request_t *r)
             len += ngx_http_status_lines[status].len;
 
         } else {
-            len += NGX_INT_T_LEN;
+            len += NGX_INT_T_LEN + 1 /* SP */;
+            status_line = NULL;
+        }
+
+        if (status_line && status_line->len == 0) {
+            status = r->headers_out.status;
+            len += NGX_INT_T_LEN + 1 /* SP */;
             status_line = NULL;
         }
     }
@@ -455,7 +458,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
         b->last = ngx_copy(b->last, status_line->data, status_line->len);
 
     } else {
-        b->last = ngx_sprintf(b->last, "%03ui", status);
+        b->last = ngx_sprintf(b->last, "%03ui ", status);
     }
     *b->last++ = CR; *b->last++ = LF;
 

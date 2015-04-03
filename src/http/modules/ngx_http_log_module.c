@@ -14,9 +14,10 @@
 #endif
 
 
-#define NGX_HTTP_LOG_ESCAPE_ON      1
-#define NGX_HTTP_LOG_ESCAPE_OFF     2
-#define NGX_HTTP_LOG_ESCAPE_ASCII   3
+#define NGX_HTTP_LOG_ESCAPE_ON          1
+#define NGX_HTTP_LOG_ESCAPE_OFF         2
+#define NGX_HTTP_LOG_ESCAPE_ASCII       3
+#define NGX_HTTP_LOG_ESCAPE_UNPRINTABLE 4
 
 
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
@@ -190,6 +191,7 @@ static ngx_conf_enum_t ngx_http_log_var_escape_types[] = {
     { ngx_string("on"), NGX_HTTP_LOG_ESCAPE_ON },
     { ngx_string("off"), NGX_HTTP_LOG_ESCAPE_OFF },
     { ngx_string("ascii"), NGX_HTTP_LOG_ESCAPE_ASCII },
+    { ngx_string("unprintable"), NGX_HTTP_LOG_ESCAPE_UNPRINTABLE },
     { ngx_null_string, 0 }
 };
 
@@ -1139,7 +1141,36 @@ ngx_http_log_escape(u_char *dst, u_char *src, size_t size, ngx_uint_t flag)
         0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
     };
 
-    escape = (flag == NGX_HTTP_LOG_ESCAPE_ON) ? table : ascii_table;
+    static uint32_t   unprintable_table[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+    switch (flag) {
+    case NGX_HTTP_LOG_ESCAPE_ASCII:
+        escape = ascii_table;
+        break;
+
+    case NGX_HTTP_LOG_ESCAPE_UNPRINTABLE:
+        escape = unprintable_table;
+        break;
+
+    default:
+        escape = table;
+    }
 
     if (dst == NULL) {
 

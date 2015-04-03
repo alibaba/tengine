@@ -1,3 +1,79 @@
+Changes with Tengine 2.1.0                                         19 Dec 2014
+
+    *) Feature: support the SO_REUSEPORT option, to improve performance on
+       multicore systems. (monadbobo)
+
+    *) Feature: support for resolving upstream domain names on the fly.
+       (InfoHunter)
+
+    *) Feature: support for rewriting to named locations. (yzprofile)
+
+    *) Feature: added two parameters 'crop_keepx' and 'crop_keepy' to the
+       directive 'image_filter'. (Lax)
+
+    *) Feature: support for saving SSL sessions in consistent_hash module and
+       session_sticky module. (dinic)
+
+    *) Feature: support for compiling Tengine automatically in travis-ci.org.
+       (Jamyn)
+
+    *) Feature: support for FastCGI health check. (yzprofile)
+
+    *) Feature: enhanced sysguard module. (InfoHunter)
+
+    *) Feature: added a variable '$normalized_request', to get normalized
+       request URIs. (yunkai)
+
+    *) Feature: added wildcard support for 'include' directive in 'dso' block.
+       (monadbobo)
+
+    *) Feature: added the 'gzip_clear_etag' directive. (taoyuanyuan) 
+
+    *) Feature: added the 'unprintable' parameter to the 'log_escape' directive.
+       (skoo87)
+
+    *) Change: merged changes from nginx-1.6.2. (cfsego, taoyuanyuan, chobits)
+
+    *) Change: now the order of servers in an upstream are random when
+       initialized. (taoyuanyuan)
+
+    *) Change: slab allocator free pages defragmentation. (chobits)
+
+    *) Bugfix: SPDY/3 dropped the "delayed" flag when finalizing connection.
+       (chobits)
+
+    *) Bugfix: fixed SPDY/3 connection leak. (chobits)
+
+    *) Bugfix: now don't truncate value of key to 255 bytes in limit_req module.
+       (chobits)
+
+    *) Bugfix: failed to parse /etc/resolv.conf with IPv6 addresses. (lifeibo)
+
+    *) Bugfix: upstream rbtree bugfix. (taoyuanyuan)
+
+
+Changes with Tengine 2.0.3                                         30 May 2014
+
+    *) Feature: added support for collecting the running status of Tengine
+       according to specific key (domain, url, etc). (cfsego)
+
+    *) Feature: added support for generating package of debian/ubuntu
+       format(*.deb). (betetrpm, szepeviktmr)
+
+    *) Change: merged changes between nginx-1.4.6 and nginx-1.4.7. (chobits)
+
+    *) Change: optimized the parsing and searching strategy of upstream by
+       using rbtree. (SarahWang)
+
+    *) Change: updated the copyright.
+
+    *) Bugfix: fixed bugs of session-sticky module. (dinic)
+
+    *) Bugfix: fixed compiling and installing issues of DSO modules. (cfsego)
+
+    *) Bugfix: fixed bugs of SPDY protocol. (chobits)
+
+
 Changes with Tengine 2.0.2                                       28 March 2014
 
     *) Bugfix: send output queue after processing of read event in SPDY. (chobits)
@@ -53,7 +129,7 @@ Changes with Tengine 2.0.0                                       08 Jan 2014
        for numeric comparison. (flygoast)
 
     *) Feature: now upstream health check module uses keep-alive connections.
-       (lilbedwin)
+       added a new directive "check_keepalive_requests". (lilbedwin)
 
     *) Feature: now trim module can handle SSI and ESI comments properly.
        (taoyuanyuan)

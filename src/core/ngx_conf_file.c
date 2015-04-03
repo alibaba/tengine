@@ -12,7 +12,6 @@
 
 static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last);
 static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf);
-static ngx_int_t ngx_conf_test_full_name(ngx_str_t *name);
 static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 
 
@@ -228,6 +227,11 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
              * the custom handler, i.e., that is used in the http's
              * "types { ... }" directive
              */
+
+            if (rc == NGX_CONF_BLOCK_START) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"{\"");
+                goto failed;
+            }
 
             rv = (*cf->handler)(cf, NULL, cf->handler_conf);
             if (rv == NGX_CONF_OK) {
@@ -804,95 +808,11 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 ngx_int_t
 ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 {
-    size_t      len;
-    u_char     *p, *n, *prefix;
-    ngx_int_t   rc;
+    ngx_str_t  *prefix;
 
-    rc = ngx_conf_test_full_name(name);
+    prefix = conf_prefix ? &cycle->conf_prefix : &cycle->prefix;
 
-    if (rc == NGX_OK) {
-        return rc;
-    }
-
-    if (conf_prefix) {
-        len = cycle->conf_prefix.len;
-        prefix = cycle->conf_prefix.data;
-
-    } else {
-        len = cycle->prefix.len;
-        prefix = cycle->prefix.data;
-    }
-
-#if (NGX_WIN32)
-
-    if (rc == 2) {
-        len = rc;
-    }
-
-#endif
-
-    n = ngx_pnalloc(cycle->pool, len + name->len + 1);
-    if (n == NULL) {
-        return NGX_ERROR;
-    }
-
-    p = ngx_cpymem(n, prefix, len);
-    ngx_cpystrn(p, name->data, name->len + 1);
-
-    name->len += len;
-    name->data = n;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_conf_test_full_name(ngx_str_t *name)
-{
-#if (NGX_WIN32)
-    u_char  c0, c1;
-
-    c0 = name->data[0];
-
-    if (name->len < 2) {
-        if (c0 == '/') {
-            return 2;
-        }
-
-        return NGX_DECLINED;
-    }
-
-    c1 = name->data[1];
-
-    if (c1 == ':') {
-        c0 |= 0x20;
-
-        if ((c0 >= 'a' && c0 <= 'z')) {
-            return NGX_OK;
-        }
-
-        return NGX_DECLINED;
-    }
-
-    if (c1 == '/') {
-        return NGX_OK;
-    }
-
-    if (c0 == '/') {
-        return 2;
-    }
-
-    return NGX_DECLINED;
-
-#else
-
-    if (name->data[0] == '/') {
-        return NGX_OK;
-    }
-
-    return NGX_DECLINED;
-
-#endif
+    return ngx_get_full_name(cycle->pool, prefix, name);
 }
 
 

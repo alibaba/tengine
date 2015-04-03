@@ -88,6 +88,8 @@ Context: `upstream`
 
 The directive specifies the number of requests sent on a connection, the default vaule 1 indicates that tengine will certainly close the connection after a request.
 
+This directive was first introduced in Tengine-2.0.0.
+
 ## check\_http\_send ##
 
 Syntax: **check\_http\_send** `http_packet`
@@ -168,7 +170,7 @@ Below it's the sample html page:
             <tr>
                 <td>0</td>
                 <td>backend</td>
-                <td>106.187.48.116:80</td>
+                <td>192.168.0.1:80</td>
                 <td>up</td>
                 <td>39</td>
                 <td>0</td>
@@ -181,7 +183,7 @@ Below it's the sample html page:
 
 Below it's the sample of csv page:
 
-    0,backend,106.187.48.116:80,up,46,0,http,80
+    0,backend,192.168.0.1:80,up,46,0,http,80
 
 Below it's the sample of json page:
 
@@ -189,7 +191,7 @@ Below it's the sample of json page:
       "total": 1,
       "generation": 3,
       "server": [
-       {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
+       {"index": 0, "upstream": "backend", "name": "192.168.0.1:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
       ]
      }}
 

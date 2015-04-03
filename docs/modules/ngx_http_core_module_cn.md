@@ -41,6 +41,8 @@ Context: `http, server, location`
 
 需要注意的是，如果你配置成off且已经发出部分数据，tengine的重试机制就会失效。如果后端返回异常响应，tengine就会直接返回500。此时$request_body，$request_body_file也会不可用，他们保存的可能是不完整的内容。
 
+额外注意的是，当tengine开启了spdy时，`proxy_request_buffering off`不会起效。
+
 ## fastcgi\_request\_buffering ##
 
 Syntax: **fastcgi\_request\_buffering** `on | off`
@@ -50,4 +52,14 @@ Default: `on`
 Context: `http, server, location`
 
 用法跟`proxy_request_buffering`指令一样。
+
+## gzip\_clear\_etag ##
+
+Syntax: **gzip\_clear\_etag** `on | off`
+
+Default: `on`
+
+Context: `http, server, location`
+
+压缩的时候是否删除"ETag"响应头。
 

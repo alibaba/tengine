@@ -21,6 +21,7 @@ typedef struct {
     ngx_flag_t    enable;
     ngx_flag_t    silent_errors;
     ngx_flag_t    ignore_recycled_buffers;
+    ngx_flag_t    last_modified;
 
     ngx_hash_t    types;
 
@@ -162,6 +163,13 @@ static ngx_command_t  ngx_http_ssi_filter_commands[] = {
       offsetof(ngx_http_ssi_loc_conf_t, types_keys),
       &ngx_http_html_default_types[0] },
 
+    { ngx_string("ssi_last_modified"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_ssi_loc_conf_t, last_modified),
+      NULL },
+
       ngx_null_command
 };
 
@@ -205,6 +213,7 @@ static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
 static u_char ngx_http_ssi_string[] = "<!--";
 
 static ngx_str_t ngx_http_ssi_none = ngx_string("(none)");
+static ngx_str_t ngx_http_ssi_timefmt = ngx_string("%A, %d-%b-%Y %H:%M:%S %Z");
 static ngx_str_t ngx_http_ssi_null_string = ngx_null_string;
 
 
@@ -351,7 +360,7 @@ ngx_http_ssi_header_filter(ngx_http_request_t *r)
     ctx->params.nalloc = NGX_HTTP_SSI_PARAMS_N;
     ctx->params.pool = r->pool;
 
-    ngx_str_set(&ctx->timefmt, "%A, %d-%b-%Y %H:%M:%S %Z");
+    ctx->timefmt = ngx_http_ssi_timefmt;
     ngx_str_set(&ctx->errmsg,
                 "[an error occurred while processing the directive]");
 
@@ -359,9 +368,12 @@ ngx_http_ssi_header_filter(ngx_http_request_t *r)
 
     if (r == r->main) {
         ngx_http_clear_content_length(r);
-        ngx_http_clear_last_modified(r);
         ngx_http_clear_accept_ranges(r);
         ngx_http_clear_etag(r);
+
+        if (!slcf->last_modified) {
+            ngx_http_clear_last_modified(r);
+        }
     }
 
     return ngx_http_next_header_filter(r);
@@ -1971,8 +1983,6 @@ static ngx_int_t
 ngx_http_ssi_include(ngx_http_request_t *r, ngx_http_ssi_ctx_t *ctx,
     ngx_str_t **params)
 {
-    u_char                      *dst, *src;
-    size_t                       len;
     ngx_int_t                    rc, key;
     ngx_str_t                   *uri, *file, *wait, *set, *stub, args;
     ngx_buf_t                   *b;
@@ -2042,18 +2052,6 @@ ngx_http_ssi_include(ngx_http_request_t *r, ngx_http_ssi_ctx_t *ctx,
     if (rc != NGX_OK) {
         return rc;
     }
-
-    dst = uri->data;
-    src = uri->data;
-
-    ngx_unescape_uri(&dst, &src, uri->len, NGX_UNESCAPE_URI);
-
-    len = (uri->data + uri->len) - src;
-    if (len) {
-        dst = ngx_movemem(dst, src, len);
-    }
-
-    uri->len = dst - uri->data;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "ssi include: \"%V\"", uri);
@@ -2723,6 +2721,7 @@ ngx_http_ssi_date_gmt_local_variable(ngx_http_request_t *r,
 {
     ngx_http_ssi_ctx_t  *ctx;
     ngx_time_t          *tp;
+    ngx_str_t           *timefmt;
     struct tm            tm;
     char                 buf[NGX_HTTP_SSI_DATE_LEN];
 
@@ -2734,9 +2733,10 @@ ngx_http_ssi_date_gmt_local_variable(ngx_http_request_t *r,
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_ssi_filter_module);
 
-    if (ctx == NULL
-        || (ctx->timefmt.len == sizeof("%s") - 1
-            && ctx->timefmt.data[0] == '%' && ctx->timefmt.data[1] == 's'))
+    timefmt = ctx ? &ctx->timefmt : &ngx_http_ssi_timefmt;
+
+    if (timefmt->len == sizeof("%s") - 1
+        && timefmt->data[0] == '%' && timefmt->data[1] == 's')
     {
         v->data = ngx_pnalloc(r->pool, NGX_TIME_T_LEN);
         if (v->data == NULL) {
@@ -2755,7 +2755,7 @@ ngx_http_ssi_date_gmt_local_variable(ngx_http_request_t *r,
     }
 
     v->len = strftime(buf, NGX_HTTP_SSI_DATE_LEN,
-                      (char *) ctx->timefmt.data, &tm);
+                      (char *) timefmt->data, &tm);
     if (v->len == 0) {
         return NGX_ERROR;
     }
@@ -2878,6 +2878,7 @@ ngx_http_ssi_create_loc_conf(ngx_conf_t *cf)
     slcf->enable = NGX_CONF_UNSET;
     slcf->silent_errors = NGX_CONF_UNSET;
     slcf->ignore_recycled_buffers = NGX_CONF_UNSET;
+    slcf->last_modified = NGX_CONF_UNSET;
 
     slcf->min_file_chunk = NGX_CONF_UNSET_SIZE;
     slcf->value_len = NGX_CONF_UNSET_SIZE;
@@ -2896,6 +2897,7 @@ ngx_http_ssi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->silent_errors, prev->silent_errors, 0);
     ngx_conf_merge_value(conf->ignore_recycled_buffers,
                          prev->ignore_recycled_buffers, 0);
+    ngx_conf_merge_value(conf->last_modified, prev->last_modified, 0);
 
     ngx_conf_merge_size_value(conf->min_file_chunk, prev->min_file_chunk, 1024);
     ngx_conf_merge_size_value(conf->value_len, prev->value_len, 255);

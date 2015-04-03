@@ -542,17 +542,40 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
                           CRLF) - 1
                    + s->connection->addr_text.len + s->login.len + s->host.len;
 
+#if (NGX_HAVE_INET6)
+        if (s->connection->sockaddr->sa_family == AF_INET6) {
+            line.len += sizeof("IPV6:") - 1;
+        }
+#endif
+
         line.data = ngx_pnalloc(c->pool, line.len);
         if (line.data == NULL) {
             ngx_mail_proxy_internal_server_error(s);
             return;
         }
 
-        line.len = ngx_sprintf(line.data,
-                       "XCLIENT ADDR=%V%s%V NAME=%V" CRLF,
-                       &s->connection->addr_text,
-                       (s->login.len ? " LOGIN=" : ""), &s->login, &s->host)
-                   - line.data;
+        p = ngx_cpymem(line.data, "XCLIENT ADDR=", sizeof("XCLIENT ADDR=") - 1);
+
+#if (NGX_HAVE_INET6)
+        if (s->connection->sockaddr->sa_family == AF_INET6) {
+            p = ngx_cpymem(p, "IPV6:", sizeof("IPV6:") - 1);
+        }
+#endif
+
+        p = ngx_copy(p, s->connection->addr_text.data,
+                     s->connection->addr_text.len);
+
+        if (s->login.len) {
+            p = ngx_cpymem(p, " LOGIN=", sizeof(" LOGIN=") - 1);
+            p = ngx_copy(p, s->login.data, s->login.len);
+        }
+
+        p = ngx_cpymem(p, " NAME=", sizeof(" NAME=") - 1);
+        p = ngx_copy(p, s->host.data, s->host.len);
+
+        *p++ = CR; *p++ = LF;
+
+        line.len = p - line.data;
 
         if (s->smtp_helo.len) {
             s->mail_state = ngx_smtp_xclient_helo;
@@ -657,7 +680,12 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
         c->log->action = NULL;
         ngx_log_error(NGX_LOG_INFO, c->log, 0, "client logged in");
 
-        ngx_mail_proxy_handler(s->connection->write);
+        if (s->buffer->pos == s->buffer->last) {
+            ngx_mail_proxy_handler(s->connection->write);
+
+        } else {
+            ngx_mail_proxy_handler(c->write);
+        }
 
         return;
 
@@ -702,7 +730,7 @@ ngx_mail_proxy_dummy_handler(ngx_event_t *wev)
 static ngx_int_t
 ngx_mail_proxy_read_response(ngx_mail_session_t *s, ngx_uint_t state)
 {
-    u_char                 *p;
+    u_char                 *p, *m;
     ssize_t                 n;
     ngx_buf_t              *b;
     ngx_mail_proxy_conf_t  *pcf;
@@ -779,6 +807,25 @@ ngx_mail_proxy_read_response(ngx_mail_session_t *s, ngx_uint_t state)
         break;
 
     default: /* NGX_MAIL_SMTP_PROTOCOL */
+
+        if (p[3] == '-') {
+            /* multiline reply, check if we got last line */
+
+            m = b->last - (sizeof(CRLF "200" CRLF) - 1);
+
+            while (m > p) {
+                if (m[0] == CR && m[1] == LF) {
+                    break;
+                }
+
+                m--;
+            }
+
+            if (m <= p || m[5] == '-') {
+                return NGX_AGAIN;
+            }
+        }
+
         switch (state) {
 
         case ngx_smtp_start:

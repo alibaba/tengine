@@ -20,7 +20,7 @@ mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
          $NGX_OBJS/src/os/unix $NGX_OBJS/src/os/win32 \
          $NGX_OBJS/src/http $NGX_OBJS/src/http/modules \
          $NGX_OBJS/src/http/modules/perl \
-         $NGX_OBJS/src/http/modules/lua \
+         $NGX_OBJS/modules/ngx_http_lua_module/src \
          $NGX_OBJS/src/http/modules/tfs \
          $NGX_OBJS/src/mail \
          $NGX_OBJS/src/misc \
@@ -628,7 +628,7 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
-# Copyright (C) 2010-2013 Alibaba Group Holding Limited
+# Copyright (C) 2010-2014 Alibaba Group Holding Limited
 
 
 ngx_soext='$NGX_SOEXT'

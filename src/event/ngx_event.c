@@ -59,7 +59,6 @@ ngx_uint_t            ngx_accept_events;
 ngx_uint_t            ngx_accept_mutex_held;
 ngx_msec_t            ngx_accept_mutex_delay;
 ngx_int_t             ngx_accept_disabled;
-ngx_file_t            ngx_accept_mutex_lock_file;
 
 
 #if (NGX_STAT_STUB)
@@ -174,6 +173,17 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       0,
       NULL },
+
+#if (NGX_HAVE_REUSEPORT)
+
+    { ngx_string("reuse_port"),
+      NGX_EVENT_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      0,
+      offsetof(ngx_event_conf_t, reuse_port),
+      NULL },
+
+#endif        
 
       ngx_null_command
 };
@@ -605,7 +615,11 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
 
-    if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
+    if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex
+#if (NGX_HAVE_REUSEPORT)
+        && !ecf->reuse_port
+#endif
+       ) {
         ngx_use_accept_mutex = 1;
         ngx_accept_mutex_held = 0;
         ngx_accept_mutex_delay = ecf->accept_mutex_delay;
@@ -1205,6 +1219,10 @@ ngx_event_core_create_conf(ngx_cycle_t *cycle)
     ecf->accept_mutex_delay = NGX_CONF_UNSET_MSEC;
     ecf->name = (void *) NGX_CONF_UNSET;
 
+#if (NGX_HAVE_REUSEPORT)
+    ecf->reuse_port = NGX_CONF_UNSET;
+#endif
+
 #if (NGX_DEBUG)
 
     if (ngx_array_init(&ecf->debug_connection, cycle->pool, 4,
@@ -1318,6 +1336,12 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 1);
     ngx_conf_init_msec_value(ecf->accept_mutex_delay, 100);
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ngx_conf_init_value(ecf->reuse_port, 0);
+
+#endif
 
 
 #if (NGX_HAVE_RTSIG)

@@ -1,0 +1,5 @@
+function ngx_http_lua_ctx_context(r)
+{
+
+}
+

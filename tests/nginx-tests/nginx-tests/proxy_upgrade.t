@@ -4,7 +4,7 @@
 
 # Tests for http proxy upgrade support.  In contrast to proxy_websocket.t
 # this test doesn't try to use binary WebSocket protocol, but uses simple
-# plain text protol instead.
+# plain text protocol instead.
 
 ###############################################################################
 
@@ -136,7 +136,7 @@ sub upgrade_connect {
 	my $buf = "GET / HTTP/1.1" . CRLF
 		. "Host: localhost" . CRLF
 		. ($opts{noheader} ? '' : "Upgrade: foo" . CRLF)
-		. "Connection: Upgade" . CRLF . CRLF;
+		. "Connection: Upgrade" . CRLF . CRLF;
 
 	$buf .= $opts{message} . CRLF if defined $opts{message};
 

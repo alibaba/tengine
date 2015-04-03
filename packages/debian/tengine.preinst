@@ -1,0 +1,56 @@
+#! /bin/sh
+# preinst script for nginx
+
+set -e
+
+addnginxuser() {
+    # creating nginx group if he isn't already there
+    if ! getent group nginx >/dev/null; then
+        addgroup --system nginx >/dev/null
+    fi
+
+    # creating nginx user if he isn't already there
+    if ! getent passwd nginx >/dev/null; then
+        adduser \
+          --system \
+          --disabled-login \
+          --ingroup nginx \
+          --no-create-home \
+          --home /nonexistent \
+          --gecos "nginx user" \
+          --shell /bin/false \
+          nginx  >/dev/null
+    fi
+}
+
+case "$1" in
+    install)
+        addnginxuser
+        cat <<BANNER
+----------------------------------------------------------------------
+
+Thanks for using Tengine!
+
+Please find the official documentation for Tengine here:
+* http://tengine.taobao.org/
+
+
+----------------------------------------------------------------------
+BANNER
+        ;;
+    upgrade)
+        addnginxuser
+        ;;
+
+    abort-upgrade)
+        ;;
+
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 0
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

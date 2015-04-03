@@ -26,6 +26,8 @@ typedef struct {
     ngx_uint_t                      verify;
     ngx_uint_t                      verify_depth;
 
+    size_t                          buffer_size;
+
     ssize_t                         builtin_session_cache;
 
     time_t                          session_timeout;
@@ -42,6 +44,9 @@ typedef struct {
     ngx_str_t                       ciphers;
 
     ngx_shm_zone_t                 *shm_zone;
+
+    ngx_flag_t                      session_tickets;
+    ngx_array_t                    *session_ticket_keys;
 
     ngx_flag_t                      stapling;
     ngx_flag_t                      stapling_verify;

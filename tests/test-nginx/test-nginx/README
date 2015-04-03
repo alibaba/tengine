@@ -1,13 +1,14 @@
 NAME
-    Test::Nginx - Testing modules for Nginx C module development
+    Test::Nginx - Data-driven test scaffold for Nginx C module and OpenResty
+    Lua library development
 
 DESCRIPTION
     This distribution provides two testing modules for Nginx C module
     development:
 
-    *   Test::Nginx::LWP
+    *   Test::Nginx::Socket (This is recommended.)
 
-    *   Test::Nginx::Socket
+    *   Test::Nginx::LWP (This is obsolete.)
 
     All of them are based on Test::Base.
 
@@ -90,6 +91,7 @@ DESCRIPTION
       --- request
           GET /foo
       --- response_body_like: STORED
+      --- error_code: 201
 
     The Test::Nginx library will automatically expand the special macro
     $TEST_NGINX_MEMCACHED_PORT to the environment with the same name. You
@@ -130,7 +132,7 @@ DESCRIPTION
   valgrind integration
     Test::Nginx has integrated support for valgrind (<http://valgrind.org>)
     even though by default it does not bother running it with the tests
-    because valgrind will significantly slow down the test sutie.
+    because valgrind will significantly slow down the test suite.
 
     First ensure that your valgrind executable visible in your PATH env. And
     then run your test suite with the "TEST_NGINX_USE_VALGRIND" env set to
@@ -191,6 +193,9 @@ Nginx C modules that use Test::Nginx to drive their test suites
     ngx_rds_json
         <http://github.com/agentzh/rds-json-nginx-module>
 
+    ngx_rds_csv
+        <http://github.com/agentzh/rds-csv-nginx-module>
+
     ngx_xss
         <http://github.com/agentzh/xss-nginx-module>
 
@@ -221,6 +226,9 @@ Nginx C modules that use Test::Nginx to drive their test suites
     ngx_coolkit
         <http://github.com/FRiCKLE/ngx_coolkit>
 
+    Naxsi
+        <http://code.google.com/p/naxsi/>
+
 SOURCE REPOSITORY
     This module has a Git repository on Github, which has access for all.
 
@@ -228,18 +236,29 @@ SOURCE REPOSITORY
 
     If you want a commit bit, feel free to drop me a line.
 
+DEBIAN PACKAGES
+    António P. P. Almeida is maintaining a Debian package for this module in
+    his Debian repository: <http://debian.perusio.net>
+
+Community
+  English Mailing List
+    The "openresty-en" mailing list is for English speakers:
+    <https://groups.google.com/group/openresty-en>
+
+  Chinese Mailing List
+    The "openresty" mailing list is for Chinese speakers:
+    <https://groups.google.com/group/openresty>
+
 AUTHORS
     agentzh (章亦春) "<agentzh@gmail.com>"
 
     Antoine BONAVITA "<antoine.bonavita@gmail.com>"
 
 COPYRIGHT & LICENSE
-    Copyright (c) 2009-2011, Taobao Inc., Alibaba Group
-    (<http://www.taobao.com>).
+    Copyright (c) 2009-2014, agentzh "<agentzh@gmail.com>".
 
-    Copyright (c) 2009-2011, agentzh "<agentzh@gmail.com>".
-
-    Copyright (c) 2011, Antoine Bonavita "<antoine.bonavita@gmail.com>".
+    Copyright (c) 2011-2012, Antoine Bonavita
+    "<antoine.bonavita@gmail.com>".
 
     This module is licensed under the terms of the BSD license.
 
@@ -254,9 +273,9 @@ COPYRIGHT & LICENSE
         notice, this list of conditions and the following disclaimer in the
         documentation and/or other materials provided with the distribution.
 
-    *   Neither the name of the Taobao Inc. nor the names of its
-        contributors may be used to endorse or promote products derived from
-        this software without specific prior written permission.
+    *   Neither the name of the authors nor the names of its contributors
+        may be used to endorse or promote products derived from this
+        software without specific prior written permission.
 
     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
     IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED

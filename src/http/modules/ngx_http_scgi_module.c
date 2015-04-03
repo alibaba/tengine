@@ -65,6 +65,7 @@ static ngx_conf_bitmask_t ngx_http_scgi_next_upstream_masks[] = {
     { ngx_string("invalid_header"), NGX_HTTP_UPSTREAM_FT_INVALID_HEADER },
     { ngx_string("http_500"), NGX_HTTP_UPSTREAM_FT_HTTP_500 },
     { ngx_string("http_503"), NGX_HTTP_UPSTREAM_FT_HTTP_503 },
+    { ngx_string("http_403"), NGX_HTTP_UPSTREAM_FT_HTTP_403 },
     { ngx_string("http_404"), NGX_HTTP_UPSTREAM_FT_HTTP_404 },
     { ngx_string("updating"), NGX_HTTP_UPSTREAM_FT_UPDATING },
     { ngx_string("off"), NGX_HTTP_UPSTREAM_FT_OFF },
@@ -261,6 +262,13 @@ static ngx_command_t ngx_http_scgi_commands[] = {
       offsetof(ngx_http_scgi_loc_conf_t, upstream.cache_lock_timeout),
       NULL },
 
+    { ngx_string("scgi_cache_revalidate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.cache_revalidate),
+      NULL },
+
 #endif
 
     { ngx_string("scgi_temp_path"),
@@ -375,7 +383,8 @@ static ngx_str_t ngx_http_scgi_hide_headers[] = {
 #if (NGX_HTTP_CACHE)
 
 static ngx_keyval_t  ngx_http_scgi_cache_headers[] = {
-    { ngx_string("HTTP_IF_MODIFIED_SINCE"), ngx_string("") },
+    { ngx_string("HTTP_IF_MODIFIED_SINCE"),
+      ngx_string("$upstream_cache_last_modified") },
     { ngx_string("HTTP_IF_UNMODIFIED_SINCE"), ngx_string("") },
     { ngx_string("HTTP_IF_NONE_MATCH"), ngx_string("") },
     { ngx_string("HTTP_IF_MATCH"), ngx_string("") },
@@ -399,13 +408,6 @@ ngx_http_scgi_handler(ngx_http_request_t *r)
     ngx_http_status_t         *status;
     ngx_http_upstream_t       *u;
     ngx_http_scgi_loc_conf_t  *scf;
-
-    if (r->subrequest_in_memory) {
-        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
-                      "ngx_http_scgi_module does not support "
-                      "subrequests in memory");
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
 
     if (ngx_http_upstream_create(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -890,7 +892,7 @@ ngx_http_scgi_process_status_line(ngx_http_request_t *r)
         return ngx_http_scgi_process_header(r);
     }
 
-    if (u->state) {
+    if (u->state && u->state->status == 0) {
         u->state->status = status->code;
     }
 
@@ -1018,7 +1020,7 @@ ngx_http_scgi_process_header(ngx_http_request_t *r)
                 ngx_str_set(&u->headers_in.status_line, "200 OK");
             }
 
-            if (u->state) {
+            if (u->state && u->state->status == 0) {
                 u->state->status = u->headers_in.status_n;
             }
 
@@ -1110,6 +1112,7 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.cache_valid = NGX_CONF_UNSET_PTR;
     conf->upstream.cache_lock = NGX_CONF_UNSET;
     conf->upstream.cache_lock_timeout = NGX_CONF_UNSET_MSEC;
+    conf->upstream.cache_revalidate = NGX_CONF_UNSET;
 #endif
 
     conf->upstream.hide_headers = NGX_CONF_UNSET_PTR;
@@ -1357,6 +1360,9 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->upstream.cache_lock_timeout,
                               prev->upstream.cache_lock_timeout, 5000);
 
+    ngx_conf_merge_value(conf->upstream.cache_revalidate,
+                              prev->upstream.cache_revalidate, 0);
+
 #endif
 
     ngx_conf_merge_value(conf->upstream.pass_request_headers,
@@ -1518,7 +1524,7 @@ ngx_http_scgi_merge_params(ngx_conf_t *cf, ngx_http_scgi_loc_conf_t *conf,
 
             s->key = h->key;
             s->value = h->value;
-            s->skip_empty = 0;
+            s->skip_empty = 1;
 
         next:
 
@@ -1746,7 +1752,7 @@ ngx_http_scgi_store(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     sc.source = &value[1];
     sc.lengths = &scf->upstream.store_lengths;
     sc.values = &scf->upstream.store_values;
-    sc.variables = ngx_http_script_variables_count(&value[1]);;
+    sc.variables = ngx_http_script_variables_count(&value[1]);
     sc.complete_lengths = 1;
     sc.complete_values = 1;
 

@@ -5,8 +5,8 @@
  */
 
 
-#ifndef _NGX_HTTP_CONF_FILE_H_INCLUDED_
-#define _NGX_HTTP_CONF_FILE_H_INCLUDED_
+#ifndef _NGX_CONF_FILE_H_INCLUDED_
+#define _NGX_CONF_FILE_H_INCLUDED_
 
 
 #include <ngx_config.h>
@@ -343,4 +343,4 @@ extern u_char        *ngx_module_names[];
 extern const char    *ngx_all_module_names[];
 
 
-#endif /* _NGX_HTTP_CONF_FILE_H_INCLUDED_ */
+#endif /* _NGX_CONF_FILE_H_INCLUDED_ */

@@ -327,8 +327,9 @@ typedef struct {
     ngx_int_t                         nfree;
 
 #if (NGX_HTTP_SSL)
-    ngx_uint_t                        ssl;    /* unsigned  ssl:1; */
+    unsigned                          ssl:1;
 #endif
+    unsigned                          proxy_protocol:1;
 } ngx_http_connection_t;
 
 
@@ -440,6 +441,7 @@ struct ngx_http_request_s {
 #endif
 
     size_t                            limit_rate;
+    size_t                            limit_rate_after;
 
     /* used to learn the Apache compatible response length without a header */
     size_t                            header_size;
@@ -487,7 +489,7 @@ struct ngx_http_request_s {
     unsigned                          uri_changed:1;
     unsigned                          uri_changes:4;
 
-    unsigned                          request_buffering:1;
+    unsigned                          request_buffering_off:1;
     unsigned                          request_body_in_single_buf:1;
     unsigned                          request_body_in_file_only:1;
     unsigned                          request_body_in_persistent_file:1;
@@ -550,6 +552,7 @@ struct ngx_http_request_s {
     unsigned                          filter_need_in_memory:1;
     unsigned                          filter_need_temporary:1;
     unsigned                          allow_ranges:1;
+    unsigned                          single_range:1;
 
 #if (NGX_STAT_STUB)
     unsigned                          stat_reading:1;
@@ -610,6 +613,7 @@ extern ngx_http_header_out_t   ngx_http_headers_out[];
 #define ngx_http_set_connection_log(c, l)                                     \
                                                                               \
     c->log->file = l->file;                                                   \
+    c->log->next = l->next;                                                   \
     c->log->syslog = l->syslog;                                               \
     if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {                    \
         c->log->log_level = l->log_level;                                     \
@@ -620,6 +624,7 @@ extern ngx_http_header_out_t   ngx_http_headers_out[];
 #define ngx_http_set_connection_log(c, l)                                     \
                                                                               \
     c->log->file = l->file;                                                   \
+    c->log->next = l->next;                                                   \
     if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {                    \
         c->log->log_level = l->log_level;                                     \
     }
