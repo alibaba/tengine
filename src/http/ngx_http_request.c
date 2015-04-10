@@ -902,20 +902,9 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
      && (defined TLSEXT_TYPE_application_layer_protocol_negotiation           \
          || defined TLSEXT_TYPE_next_proto_neg))
         {
-        ngx_http_connection_t       *hc;
-        ngx_http_spdy_srv_conf_t    *sscf;
         unsigned int                 len;
         const unsigned char         *data;
-        ngx_str_t                    spdy;
-
-        hc = c->data;
-        sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_spdy_module);
-
-        if (sscf->version == NGX_SPDY_VERSION_V3) {
-            ngx_str_set(&spdy, NGX_SPDY_V3_NPN_NEGOTIATED);
-        } else {
-            ngx_str_set(&spdy, NGX_SPDY_NPN_NEGOTIATED);
-        }
+        static const ngx_str_t       spdy = ngx_string(NGX_SPDY_NPN_NEGOTIATED);
 
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
         SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
