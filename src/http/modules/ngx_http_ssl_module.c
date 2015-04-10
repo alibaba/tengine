@@ -385,20 +385,13 @@ ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
 
 #if (NGX_HTTP_SPDY)
     {
-    ngx_http_connection_t      *hc;
-    ngx_http_spdy_srv_conf_t   *sscf;
+    ngx_http_connection_t  *hc;
 
     hc = c->data;
-    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_spdy_module);
 
     if (hc->addr_conf->spdy) {
-        if (sscf->version == NGX_SPDY_VERSION_V3) {
-            *out = (unsigned char *) NGX_SPDY_V3_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-            *outlen = sizeof(NGX_SPDY_V3_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-        } else {
-            *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-            *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-        }
+        *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
+        *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
 
         return SSL_TLSEXT_ERR_OK;
     }
