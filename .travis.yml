@@ -14,9 +14,9 @@ before_install:
   - sudo apt-get install -y liblua5.1-0-dev libssl-dev lua5.1 openssl passwd
 
 # TODO: fix tests so they don't depend on /usr/local/nginx/logs/
-#       so we can run `make`, `make test`, `make install`. 
+#       so we can run `make`, `make test`, `make install`.
 
-script: 
-  - ./configure --enable-mods-shared=all --with-file-aio --with-ipv6
+script:
+  - ./configure --enable-mods-shared=all --with-file-aio --with-ipv6 --with-http_spdy_module
   - make
   - sudo make install
