@@ -63,6 +63,8 @@ Context: `upstream`
 
 Add health check for the upstream servers.
 
+Passive health checking should not be enabled, as they may interfere. So do not use fail_timeout for the servers in the upstream context for which proactive health checking is enabled.
+
 The parameters' meanings are:
 
 * `interval`: the check request's interval time.
