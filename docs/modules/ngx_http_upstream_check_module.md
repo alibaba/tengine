@@ -107,7 +107,7 @@ In addition, in the case of "GET" method, size of the request uri should not be 
 
 Syntax: **check\_http\_expect\_alive** `[ http_2xx | http_3xx | http_4xx | http_5xx ]`
 
-Default: `http_2xx | http_3xx`
+Default: `http_2xx http_3xx`
 
 Context: `upstream`
 
