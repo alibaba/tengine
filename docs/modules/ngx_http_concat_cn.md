@@ -39,7 +39,7 @@
 
 **concat_types** `MIME types`
 
-**默认:** `concat_types: text/css application/x-javascript`
+**默认:** `concat_types: application/x-javascript text/css`
 
 **上下文:** `http, server, location`
 
