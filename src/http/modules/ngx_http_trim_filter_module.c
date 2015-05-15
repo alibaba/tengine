@@ -1,6 +1,6 @@
 
 /*
- *  Copyright (C) 2010-2014 Alibaba Group Holding Limited
+ *  Copyright (C) 2010-2013 Alibaba Group Holding Limited
  */
 
 
@@ -41,6 +41,9 @@ typedef struct {
 
     size_t          looked;
     size_t          saved_comment;
+
+    off_t           tin;
+    off_t           tout;
 
     ngx_int_t       tag;
     ngx_int_t       saved;
@@ -159,8 +162,14 @@ static uint32_t   trim_css_prefix[] = {
 };
 
 
-static ngx_int_t ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
+static ngx_int_t ngx_http_trim_parse(ngx_http_request_t *r, ngx_chain_t *in,
     ngx_http_trim_ctx_t *ctx);
+
+static ngx_int_t ngx_http_trim_add_variables(ngx_conf_t *cf);
+static ngx_int_t ngx_http_trim_bytes_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_trim_original_bytes_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 
 static void *ngx_http_trim_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_trim_merge_loc_conf(ngx_conf_t *cf,
@@ -203,7 +212,7 @@ static ngx_command_t  ngx_http_trim_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_trim_filter_module_ctx = {
-    NULL,                                    /* preconfiguration */
+    ngx_http_trim_add_variables,             /* preconfiguration */
     ngx_http_trim_filter_init,               /* postconfiguration */
 
     NULL,                                    /* create main configuration */
@@ -250,6 +259,17 @@ static ngx_str_t ngx_http_trim_comment_ie_end = ngx_string("<![endif]-->");
 static ngx_str_t ngx_http_trim_saved_html = ngx_string("<!--[if");
 static ngx_str_t ngx_http_trim_saved_jscss = ngx_string("/**");
 static ngx_str_t ngx_http_trim_saved_css_hack = ngx_string("/*\\*");
+
+static ngx_http_variable_t ngx_http_trim_vars[] = {
+
+    { ngx_string("trim_bytes"), NULL,
+      ngx_http_trim_bytes_variable, 0, 0, 0 },
+
+    { ngx_string("trim_original_bytes"), NULL,
+      ngx_http_trim_original_bytes_variable, 0, 0, 0 },
+
+    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+};
 
 
 static ngx_int_t
@@ -364,7 +384,12 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ll = &out;
 
     for (ln = ctx->in; ln; ln = ln->next) {
-        ngx_http_trim_parse(r, ln->buf, ctx);
+        ctx->tin += ln->buf->last - ln->buf->pos;
+
+        rc = ngx_http_trim_parse(r, ln, ctx);
+        if (rc == NGX_ERROR) {
+            return rc;
+        }
 
         if (ctx->saved) {
             cl = ngx_chain_get_free_buf(r->pool, &ctx->free);
@@ -402,6 +427,8 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
             *ll = cl;
             ll = &cl->next;
+
+            ctx->tout += cl->buf->last - cl->buf->pos;
 
             ctx->saved = 0;
         }
@@ -454,12 +481,34 @@ ngx_http_trim_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
 
 static ngx_int_t
-ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
+ngx_http_trim_parse(ngx_http_request_t *r, ngx_chain_t *in,
     ngx_http_trim_ctx_t *ctx)
 {
     u_char                    *read, *write, ch, look;
+    size_t                     size;
+    ngx_buf_t                 *b, *buf;
 
-    for (write = buf->pos, read = buf->pos; read < buf->last; read++) {
+    b = in->buf;
+    buf = in->buf;
+    size = ngx_buf_size(buf);
+
+    if (size == 0) {
+        return NGX_OK;
+    }
+
+    if (!buf->temporary) {
+        b = ngx_create_temp_buf(r->pool, size);
+        if (b == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->sync = buf->sync;
+        b->flush = buf->flush;
+        b->last_buf = buf->last_buf;
+        b->last_in_chain = buf->last_in_chain;
+    }
+
+    for (write = b->pos, read = buf->pos; read < buf->last; read++) {
 
         ch = ngx_tolower(*read);
 
@@ -1939,7 +1988,86 @@ ngx_http_trim_parse(ngx_http_request_t *r, ngx_buf_t *buf,
          ctx->prev = *read;
     }
 
-    buf->last = write;
+    if (!buf->temporary) {
+        in->buf = b;
+        buf->pos = buf->last;
+    }
+
+    b->last = write;
+    ctx->tout += b->last - b->pos;
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_trim_add_variables(ngx_conf_t *cf)
+{
+    ngx_http_variable_t   *var, *v;
+
+    for (v = ngx_http_trim_vars; v->name.len; v++) {
+        var = ngx_http_add_variable(cf, &v->name, v->flags);
+        if (var == NULL) {
+            return NGX_ERROR;
+        }
+
+        var->get_handler = v->get_handler;
+        var->data = v->data;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_trim_bytes_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_trim_ctx_t   *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_trim_filter_module);
+
+    if (ctx == NULL) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->data = ngx_pnalloc(r->pool, NGX_OFF_T_LEN);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(v->data, "%O", ctx->tin - ctx->tout) - v->data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_trim_original_bytes_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_trim_ctx_t   *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_trim_filter_module);
+
+    if (ctx == NULL) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->data = ngx_pnalloc(r->pool, NGX_OFF_T_LEN);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(v->data, "%O", ctx->tin) - v->data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
     return NGX_OK;
 }
 
