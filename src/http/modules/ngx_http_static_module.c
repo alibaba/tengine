@@ -59,7 +59,7 @@ ngx_http_static_handler(ngx_http_request_t *r)
     ngx_open_file_info_t       of;
     ngx_http_core_loc_conf_t  *clcf;
 
-    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD|NGX_HTTP_POST))) {
+    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
@@ -203,10 +203,6 @@ ngx_http_static_handler(ngx_http_request_t *r)
     }
 
 #endif
-
-    if (r->method & NGX_HTTP_POST) {
-        return NGX_HTTP_NOT_ALLOWED;
-    }
 
     rc = ngx_http_discard_request_body(r);
 
