@@ -63,6 +63,8 @@ Context: `upstream`
 
 Add health check for the upstream servers.
 
+Passive health checking should not be enabled, as they may interfere. So do not use fail_timeout for the servers in the upstream context for which proactive health checking is enabled.
+
 The parameters' meanings are:
 
 * `interval`: the check request's interval time.
@@ -107,7 +109,7 @@ In addition, in the case of "GET" method, size of the request uri should not be 
 
 Syntax: **check\_http\_expect\_alive** `[ http_2xx | http_3xx | http_4xx | http_5xx ]`
 
-Default: `http_2xx | http_3xx`
+Default: `http_2xx http_3xx`
 
 Context: `upstream`
 
