@@ -1037,6 +1037,64 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
         return NGX_OK;
     }
 
+#if (NGX_HTTP_SSL)
+    ngx_connection_t  *c;
+    c = r->connection;
+
+    if (r->main == r && r->http_connection->ssl) {
+        long                      rc;
+        X509                     *cert;
+        ngx_http_ssl_srv_conf_t  *sscf;
+        ngx_http_ssl_loc_conf_t  *slcf;
+
+        if (c->ssl == NULL) {
+            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                          "client sent plain HTTP request to HTTPS port");
+            ngx_http_finalize_request(r, NGX_HTTP_TO_HTTPS);
+            return NGX_OK;
+        }
+
+        sscf = ngx_http_get_module_srv_conf(r, ngx_http_ssl_module);
+        slcf = ngx_http_get_module_loc_conf(r, ngx_http_ssl_module);
+
+        if (sscf->verify && slcf->verify_exception < 1) {
+            rc = SSL_get_verify_result(c->ssl->connection);
+
+            if (rc != X509_V_OK
+                && (sscf->verify != 3 || !ngx_ssl_verify_error_optional(rc)))
+            {
+                ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                              "client SSL certificate verify error: (%l:%s)",
+                              rc, X509_verify_cert_error_string(rc));
+
+                ngx_ssl_remove_cached_session(sscf->ssl.ctx,
+                                       (SSL_get0_session(c->ssl->connection)));
+
+                ngx_http_finalize_request(r, NGX_HTTPS_CERT_ERROR);
+                return NGX_OK;
+            }
+
+            if (sscf->verify == 1) {
+                cert = SSL_get_peer_certificate(c->ssl->connection);
+
+                if (cert == NULL) {
+                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent no required SSL certificate");
+
+                    ngx_ssl_remove_cached_session(sscf->ssl.ctx,
+                                       (SSL_get0_session(c->ssl->connection)));
+
+                    ngx_http_finalize_request(r, NGX_HTTPS_NO_CERT);
+                    return NGX_OK;
+                }
+
+                X509_free(cert);
+            }
+        }
+    }
+
+#endif
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (!r->internal && clcf->internal) {
