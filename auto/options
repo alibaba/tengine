@@ -663,6 +663,7 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-cc=*)                     CC="$value"                ;;
         --with-cpp=*)                    CPP="$value"               ;;
+        --with-link=*)                   LINK="$value"              ;;
         --with-cc-opt=*)                 NGX_CC_OPT="$value"        ;;
         --with-ld-opt=*)                 NGX_LD_OPT="$value"        ;;
         --with-cpu-opt=*)                CPU="$value"               ;;
@@ -920,6 +921,7 @@ cat << END
 
   --with-cc=PATH                     set C compiler pathname
   --with-cpp=PATH                    set C preprocessor pathname
+  --with-link=LINK                   set C linker
   --with-cc-opt=OPTIONS              set additional C compiler options
   --with-ld-opt=OPTIONS              set additional linker options
   --with-cpu-opt=CPU                 build for the specified CPU, valid values:

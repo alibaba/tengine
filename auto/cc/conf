@@ -3,7 +3,7 @@
 # Copyright (C) Nginx, Inc.
 
 
-LINK="\$(CC)"
+LINK=${LINK:-"\$(CC)"}
 
 ngx_include_opt="-I "
 ngx_compile_opt="-c"
