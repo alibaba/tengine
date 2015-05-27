@@ -78,6 +78,14 @@ struct ngx_event_s {
     unsigned         posted_ready:1;
 #endif
 
+    unsigned         closed:1;
+
+    /* to test on worker exit */
+    unsigned         channel:1;
+    unsigned         resolver:1;
+	
+    unsigned         cancelable:1;
+
 #if (NGX_WIN32)
     /* setsockopt(SO_UPDATE_ACCEPT_CONTEXT) was successful */
     unsigned         accept_context_updated:1;
@@ -128,12 +136,6 @@ struct ngx_event_s {
     ngx_log_t       *log;
 
     ngx_rbtree_node_t   timer;
-
-    unsigned         closed:1;
-
-    /* to test on worker exit */
-    unsigned         channel:1;
-    unsigned         resolver:1;
 
 #if (NGX_THREADS)
 
@@ -475,10 +477,6 @@ typedef struct {
 
     ngx_flag_t    multi_accept;
     ngx_flag_t    accept_mutex;
-
-#if (NGX_HAVE_REUSEPORT)
-    ngx_flag_t    reuse_port;
-#endif
 
     ngx_msec_t    accept_mutex_delay;
 
