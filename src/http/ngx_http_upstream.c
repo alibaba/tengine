@@ -450,6 +450,13 @@ ngx_http_upstream_create(ngx_http_request_t *r)
     u->peer.lock = &r->connection->lock;
 #endif
 
+    u->peer.so_keepalive = 0;
+#if (NGX_HAVE_KEEPALIVE_TUNABLE)
+    u->peer.keepidle = 0;
+    u->peer.keepintvl = 0;
+    u->peer.keepcnt = 0;
+#endif
+
 #if (NGX_HTTP_CACHE)
     r->cache = NULL;
 #endif
