@@ -688,7 +688,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
                     return NGX_ERROR;
                 }
 
-                word->data = ngx_pnalloc(cf->pool, b->pos - start + 1);
+                word->data = ngx_pnalloc(cf->pool, b->pos - start);
                 if (word->data == NULL) {
                     return NGX_ERROR;
                 }
