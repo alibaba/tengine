@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -571,6 +570,13 @@ HTTP_UPSTREAM_DYNAMIC_MODULE=ngx_http_upstream_dynamic_module
 HTTP_UPSTREAM_DYNAMIC_SRCS=" \
     src/http/modules/ngx_http_upstream_dynamic_module.c"
 
+HTTP_DYUPS_MODULE=ngx_http_dyups_module
+HTTP_DYUPS_SRCS="src/http/modules/ngx_http_dyups_module.c"
+HTTP_DYUPS_DEPS="src/http/modules/ngx_http_dyups.h"
+HTTP_DYUPS_LUA_SRCS="src/http/modules/ngx_http_dyups_lua.c"
+HTTP_DYUPS_LUA_DEPS="src/http/modules/ngx_http_dyups_lua.h"
+
+
 HTTP_REQ_STATUS_MODULE=ngx_http_reqstat_module
 HTTP_REQ_STATUS_SRCS=src/http/modules/ngx_http_reqstat_module.c
 HTTP_REQ_STATUS_DEPS=src/http/modules/ngx_http_reqstat.h
@@ -772,5 +778,3 @@ NGX_HTTP_TFS_MODULE_SRCS="src/http/modules/tfs/ngx_tfs_common.c \
                           src/http/modules/tfs/ngx_http_tfs_meta_server_message.c \
                           src/http/modules/tfs/ngx_http_tfs_peer_connection.c \
                           src/http/modules/tfs/ngx_http_tfs_server_handler.c "
-
-
