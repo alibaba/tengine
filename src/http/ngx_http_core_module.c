@@ -4050,10 +4050,11 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                prev->error_pages != NGX_CONF_UNSET_PTR)
     {
         ep = prev->error_pages->elts;
-        ec = conf->error_pages->elts;
 
         for (i = 0; i < prev->error_pages->nelts; i++) {
             found = 0;
+
+            ec = conf->error_pages->elts;
 
             for (j = 0; j < conf->error_pages->nelts; j++) {
                 if (ep[i].status == ec[j].status) {
