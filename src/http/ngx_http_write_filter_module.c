@@ -12,6 +12,8 @@
 
 static ngx_int_t ngx_http_write_filter_init(ngx_conf_t *cf);
 
+ngx_int_t (*ngx_http_log_flow)(ngx_http_request_t *r) = NULL;
+
 
 static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
     NULL,                                  /* preconfiguration */
@@ -243,6 +245,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
                    "http write filter limit %O", limit);
 
     chain = c->send_chain(c, r->out, limit);
+
+    if (ngx_http_log_flow && ngx_http_log_flow(r) == NGX_ERROR) {
+        return NGX_ERROR;
+    }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http write filter %p", chain);

@@ -25,9 +25,15 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has('reqstat');
 
+$t->set_dso("ngx_http_reqstat_module", "ngx_http_reqstat_module.so");
+$t->set_dso("ngx_http_lua_module", "ngx_http_lua_module.so");
+$t->set_dso("ngx_http_rewrite_module", "ngx_http_rewrite_module.so");
+
 my $cf_1 = <<'EOF';
 
 %%TEST_GLOBALS%%
+
+%%TEST_GLOBALS_DSO%%
 
 http {
 
@@ -118,6 +124,8 @@ EOF
 my $cf_2 = <<'EOF';
 
 %%TEST_GLOBALS%%
+
+%%TEST_GLOBALS_DSO%%
 
 http {
 
@@ -284,6 +292,8 @@ my $cf_3 = <<'EOF';
 
 %%TEST_GLOBALS%%
 
+%%TEST_GLOBALS_DSO%%
+
 http {
 
     root %%TESTDIR%%;
@@ -339,6 +349,8 @@ $t->stop();
 my $cf_4 = <<'EOF';
 
 %%TEST_GLOBALS%%
+
+%%TEST_GLOBALS_DSO%%
 
 http {
 
