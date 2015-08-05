@@ -596,6 +596,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 if (ls[i].ignore) {
                     continue;
                 }
+				
+                if (ls[i].remain) {
+                    continue;
+                }
 
                 if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
                                      ls[i].sockaddr, ls[i].socklen, 1)
@@ -644,6 +648,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                         nls[n].add_deferred = 1;
                     }
 #endif
+
+#if (NGX_HAVE_REUSEPORT)
+                    if (nls[n].reuseport && !ls[i].reuseport) {
+                        nls[n].add_reuseport = 1;
+                    }
+#endif
+
+
                     break;
                 }
             }
