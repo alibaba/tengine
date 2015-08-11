@@ -10,6 +10,8 @@
 #include <ngx_http.h>
 #include <ngx_md5.h>
 
+static void  ngx_http_file_cache_size_adjusted(ngx_http_file_cache_t * cache);
+static unsigned ngx_http_file_cache_level(off_t size);
 
 static ngx_int_t ngx_http_file_cache_lock(ngx_http_request_t *r,
     ngx_http_cache_t *c);
@@ -60,6 +62,156 @@ ngx_str_t  ngx_http_cache_status[] = {
 
 static u_char  ngx_http_file_cache_key[] = { LF, 'K', 'E', 'Y', ':', ' ' };
 
+static unsigned ngx_http_file_cache_level(off_t size)       // TODO :  script support  , 分层还没有实现脚本配置支持
+{
+    if(size==0)
+        return 0;
+    if(size>0 && size <=400)
+        return 1;
+    if(size>400)
+        return 2;
+    
+    else
+        return 100;
+}
+
+static void  ngx_http_file_cache_size_adjusted(ngx_http_file_cache_t * cache)
+{
+
+    unsigned num = cache->sh->num_of_levels;
+    double weights[num],total = 0 ,restart_total=0;
+    unsigned random;  
+    off_t random_seed =0;
+    unsigned rm[num];
+    unsigned rm_count = 0;
+
+    
+    off_t gap_size = 0 , total_size = 0;
+   
+    double gap_weight[num],gap_total = 0;
+    unsigned i = 1;
+    
+    for(i = 1; i <= num; i++){
+     
+        rm[i] = 0;
+    }
+    
+    for(i = 1; i <= num; i++){
+        weights[i] = (double)cache->sh->levels[i].hit_size/cache->sh->require_size*cache->sh->levels[i].weight
+                          + (double)cache->sh->levels[i].require_size/LOOP_POINT/cache->sh->levels[i].max_size/num*cache->sh->levels[i].weight
+                          + (double)1/LOOP_POINT/3;
+        
+        total += weights[i];
+    }
+    
+    restart_total = total;
+    
+    for( i=1; i <=num; i++){
+        double weight;
+        weight = weights[i]/total*num;
+        if(weight <= 1)
+        {
+            off_t temp = cache->sh->levels[i].max_size;
+            cache->sh->levels[i].max_size = cache->sh->levels[i].max_size*weight>cache->sh->reserve_size ?
+             cache->sh->levels[i].max_size*weight:cache->sh->reserve_size;
+        
+            gap_size += temp - cache->sh->levels[i].max_size;
+            
+            total_size += cache->sh->levels[i].max_size;
+            rm[i] =1;
+            rm_count++;
+            restart_total -= weights[i];
+        }
+        
+       if(weight > 1){
+           if(cache->sh->levels[i].max_size > 1.1*cache->sh->levels[i].size ){
+        
+               off_t temp = cache->sh->levels[i].max_size;
+               cache->sh->levels[i].max_size = 1.05*cache->sh->levels[i].size;
+              
+               
+               gap_size += temp - cache->sh->levels[i].max_size;
+               total_size += cache->sh->levels[i].max_size;
+                rm[i] =1;
+                rm_count++;
+               restart_total -= weights[i];
+               
+           }
+           gap_weight[i] = cache->sh->levels[i].max_size*(weights[i]-1);
+           gap_total += gap_weight[i];
+       }
+    }
+    
+    if(gap_size < cache->max_size*0.1 && (num - rm_count) >1 ){
+        total = restart_total;
+        for(i = 1; i <= num; i++){
+            if(!rm[i]){
+               
+                double weight;
+                weight = weights[i]/total*num;
+                if(weight <= 1)
+                  {
+                    off_t temp = cache->sh->levels[i].max_size;
+                    cache->sh->levels[i].max_size = cache->sh->levels[i].max_size*weight>cache->sh->reserve_size ?
+                    cache->sh->levels[i].max_size*weight:cache->sh->reserve_size;
+        
+                    gap_size += temp - cache->sh->levels[i].max_size;
+            
+                    total_size += cache->sh->levels[i].max_size;
+                    rm[i] =1;
+                    rm_count++;
+                    
+                  }
+                
+            }
+        }
+    }
+    
+    for(i = 1; i <= num ; i++){
+        if(!rm[i]){
+           double weight;
+           weight = weights[i]/total*num;
+           gap_weight[i] = cache->sh->levels[i].max_size*(weight-1);
+           gap_total += gap_weight[i];
+        }
+    }
+    
+    
+    
+    for(i = 1;i <= num; i++){
+        if(!rm[i]){
+            cache->sh->levels[i].max_size += (off_t)gap_size*(gap_weight[i]/gap_total);
+         
+            total_size += cache->sh->levels[i].max_size;
+            
+            random_seed = cache->sh->levels[i].require_size;
+        }
+    }
+    
+    random = random_seed % num ;
+    
+    for(i =1; i <=num; i++){
+        random = random % num + 1;
+        off_t temp =cache->sh->levels[random].max_size ;
+        temp -= total_size - cache->max_size;
+        if(temp > cache->sh->reserve_size){
+            cache->sh->levels[random].max_size = temp;
+            break;
+        }
+        else{
+            continue;
+        }
+            
+    }
+   
+    
+    
+    for( i=1; i <=num; i++){
+        cache->sh->levels[i].require_size = 0;
+        cache->sh->levels[i].hit_size = 0;
+    }
+    cache->sh->require_size=0;
+}
 
 static ngx_int_t
 ngx_http_file_cache_init(ngx_shm_zone_t *shm_zone, void *data)
@@ -125,7 +277,7 @@ ngx_http_file_cache_init(ngx_shm_zone_t *shm_zone, void *data)
     ngx_rbtree_init(&cache->sh->rbtree, &cache->sh->sentinel,
                     ngx_http_file_cache_rbtree_insert_value);
 
-    ngx_queue_init(&cache->sh->queue);
+    
 
     cache->sh->cold = 1;
     cache->sh->loading = 0;
@@ -134,6 +286,24 @@ ngx_http_file_cache_init(ngx_shm_zone_t *shm_zone, void *data)
     cache->bsize = ngx_fs_bsize(cache->path->name.data);
 
     cache->max_size /= cache->bsize;
+    
+    cache->sh->num_of_levels=2;      // TODO  : script support   ,分层数目还没有实现脚本配置支持
+
+    cache->sh->reserve_size=cache->max_size/cache->sh->num_of_levels/8;
+    cache->sh->tag=1;
+    cache->sh->require_size=0;
+    
+    unsigned i=0;
+    for( ;i<=cache->sh->num_of_levels;i++ ){
+        ngx_queue_init(&cache->sh->levels[i].queue);
+        cache->sh->levels[i].require_size=0;
+        cache->sh->levels[i].hit_size=0;
+        cache->sh->levels[i].size=0;
+        cache->sh->levels[i].max_size=cache->max_size;
+        cache->sh->levels[i].weight=1;         // TODO  : script support   ,weight 还没有实现脚本配置支持
+    }
+    cache->sh->levels[1].weight=5;              // TODO  : script support   ,weight 还没有实现脚本配置支持
+    
 
     len = sizeof(" in cache keys zone \"\"") + shm_zone->shm.name.len;
 
@@ -258,6 +428,40 @@ ngx_http_file_cache_open(ngx_http_request_t *r)
     }
 
     cache = c->file_cache;
+    
+
+     if(cache->sh->tag && cache->sh->size > cache->max_size){
+             
+            cache->sh->tag = 0;
+            off_t max_i = 1,total =0 ;
+            unsigned i;
+            
+            for(i=1;i<=cache->sh->num_of_levels;i++){
+                cache->sh->levels[i].max_size=(double)cache->sh->levels[i].size *cache->max_size/cache->sh->size> cache->sh->reserve_size ?
+                    (double)cache->sh->levels[i].size *cache->max_size/cache->sh->size: cache->sh->reserve_size ;
+                
+                if(cache->sh->levels[max_i].max_size < cache->sh->levels[i].max_size){
+                    max_i = i;
+                }
+                
+                total += cache->sh->levels[i].max_size;
+            }
+         
+            cache->sh->levels[max_i].max_size -= total - cache->max_size;
+            
+            ngx_http_file_cache_size_adjusted(cache);
+         
+            
+        }
+        else{
+            if(cache->sh->tag==0 && cache->sh->require_size > LOOP_POINT*cache->max_size){
+      
+                ngx_http_file_cache_size_adjusted(cache);
+   
+            }
+            
+        }
+        
 
     if (c->node == NULL) {
         cln = ngx_pool_cleanup_add(r->pool, 0);
@@ -534,8 +738,16 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
             c->node->exists = 1;
             c->node->uniq = c->uniq;
             c->node->fs_size = c->fs_size;
+            c->node->cur_of_level=ngx_http_file_cache_level(c->node->fs_size);
 
             cache->sh->size += c->fs_size;
+            cache->sh->levels[c->node->cur_of_level].size+=c->fs_size;
+            cache->sh->require_size+=c->fs_size;
+            cache->sh->levels[c->node->cur_of_level].require_size+=c->fs_size;
+            
+            ngx_queue_remove(&c->node->queue);
+        
+            ngx_queue_insert_head(&cache->sh->levels[c->node->cur_of_level].queue, &c->node->queue);
         }
 
         ngx_shmtx_unlock(&cache->shpool->mutex);
@@ -643,6 +855,10 @@ ngx_http_file_cache_exists(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
     }
 
     if (fcn) {
+        cache->sh->require_size+=fcn->fs_size;
+        cache->sh->levels[fcn->cur_of_level].hit_size+=fcn->fs_size;
+        cache->sh->levels[fcn->cur_of_level].require_size+=fcn->fs_size;
+        
         ngx_queue_remove(&fcn->queue);
 
         if (c->node == NULL) {
@@ -718,12 +934,14 @@ renew:
     fcn->uniq = 0;
     fcn->body_start = 0;
     fcn->fs_size = 0;
+    fcn->cur_of_level=ngx_http_file_cache_level(0);
 
 done:
 
     fcn->expire = ngx_time() + cache->inactive;
 
-    ngx_queue_insert_head(&cache->sh->queue, &fcn->queue);
+    
+    ngx_queue_insert_head(&cache->sh->levels[fcn->cur_of_level].queue, &fcn->queue);
 
     c->uniq = fcn->uniq;
     c->error = fcn->error;
@@ -960,7 +1178,18 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
     c->node->body_start = c->body_start;
 
     cache->sh->size += fs_size - c->node->fs_size;
+    cache->sh->levels[c->node->cur_of_level].size-= c->node->fs_size;
     c->node->fs_size = fs_size;
+    
+    c->node->cur_of_level=ngx_http_file_cache_level(c->node->fs_size);
+    cache->sh->levels[c->node->cur_of_level].size+= fs_size ;
+    
+    cache->sh->require_size+=fs_size;
+    cache->sh->levels[c->node->cur_of_level].require_size+=fs_size;
+    
+    ngx_queue_remove(&c->node->queue);
+        
+    ngx_queue_insert_head(&cache->sh->levels[c->node->cur_of_level].queue, &c->node->queue);
 
     if (rc == NGX_OK) {
         c->node->exists = 1;
@@ -1248,32 +1477,37 @@ ngx_http_file_cache_forced_expire(ngx_http_file_cache_t *cache)
     tries = 20;
 
     ngx_shmtx_lock(&cache->shpool->mutex);
+    unsigned i=1;
+    for(;i<=cache->sh->num_of_levels;i++){
+        if(cache->sh->levels[i].size > cache->sh->levels[i].max_size){
+            for (q = ngx_queue_last(&cache->sh->levels[i].queue);
+                  q != ngx_queue_sentinel(&cache->sh->levels[i].queue);
+                  q = ngx_queue_prev(q))
+           {
+                fcn = ngx_queue_data(q, ngx_http_file_cache_node_t, queue);
 
-    for (q = ngx_queue_last(&cache->sh->queue);
-         q != ngx_queue_sentinel(&cache->sh->queue);
-         q = ngx_queue_prev(q))
-    {
-        fcn = ngx_queue_data(q, ngx_http_file_cache_node_t, queue);
-
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                  ngx_log_debug6(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                   "http file cache forced expire: #%d %d %02xd%02xd%02xd%02xd",
                   fcn->count, fcn->exists,
                   fcn->key[0], fcn->key[1], fcn->key[2], fcn->key[3]);
 
-        if (fcn->count == 0) {
-            ngx_http_file_cache_delete(cache, q, name);
-            wait = 0;
+                 if (fcn->count == 0) {
+                 ngx_http_file_cache_delete(cache, q, name);
+                 wait = 0;
 
-        } else {
-            if (--tries) {
-                continue;
-            }
+                   } else {
+                      if (--tries) {
+                         continue;
+                       }
 
-            wait = 1;
+                       wait = 1;
+                     }
+
+                 break;
+         }
         }
-
-        break;
-    }
+            
+    } 
 
     ngx_shmtx_unlock(&cache->shpool->mutex);
 
@@ -1288,7 +1522,7 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
 {
     u_char                      *name, *p;
     size_t                       len;
-    time_t                       now, wait;
+    time_t                       now, wait=10;
     ngx_path_t                  *path;
     ngx_queue_t                 *q;
     ngx_http_file_cache_node_t  *fcn;
@@ -1310,15 +1544,17 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
     now = ngx_time();
 
     ngx_shmtx_lock(&cache->shpool->mutex);
-
+    
+    unsigned i=1;
+    for(;i<cache->sh->num_of_levels;i++)
     for ( ;; ) {
 
-        if (ngx_queue_empty(&cache->sh->queue)) {
+        if (ngx_queue_empty(&cache->sh->levels[i].queue)) {
             wait = 10;
             break;
         }
 
-        q = ngx_queue_last(&cache->sh->queue);
+        q = ngx_queue_last(&cache->sh->levels[i].queue);
 
         fcn = ngx_queue_data(q, ngx_http_file_cache_node_t, queue);
 
@@ -1357,8 +1593,8 @@ ngx_http_file_cache_expire(ngx_http_file_cache_t *cache)
 
         ngx_queue_remove(q);
         fcn->expire = ngx_time() + cache->inactive;
-        ngx_queue_insert_head(&cache->sh->queue, &fcn->queue);
-
+        ngx_queue_insert_head(&cache->sh->levels[fcn->cur_of_level].queue, &fcn->queue);
+        
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
                       "ignore long locked inactive cache entry %*s, count:%d",
                       2 * NGX_HTTP_CACHE_KEY_LEN, key, fcn->count);
@@ -1385,7 +1621,7 @@ ngx_http_file_cache_delete(ngx_http_file_cache_t *cache, ngx_queue_t *q,
 
     if (fcn->exists) {
         cache->sh->size -= fcn->fs_size;
-
+        cache->sh->levels[fcn->cur_of_level].size-=fcn->fs_size;
         path = cache->path;
         p = name + path->name.len + 1 + path->len;
         p = ngx_hex_dump(p, (u_char *) &fcn->node.key,
@@ -1638,8 +1874,9 @@ ngx_http_file_cache_add(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
         fcn->valid_sec = 0;
         fcn->body_start = 0;
         fcn->fs_size = c->fs_size;
-
+        fcn->cur_of_level=ngx_http_file_cache_level(fcn->fs_size);
         cache->sh->size += c->fs_size;
+        cache->sh->levels[fcn->cur_of_level].size+=c->fs_size;
 
     } else {
         ngx_queue_remove(&fcn->queue);
@@ -1647,7 +1884,7 @@ ngx_http_file_cache_add(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
 
     fcn->expire = ngx_time() + cache->inactive;
 
-    ngx_queue_insert_head(&cache->sh->queue, &fcn->queue);
+    ngx_queue_insert_head(&cache->sh->levels[fcn->cur_of_level].queue, &fcn->queue);
 
     ngx_shmtx_unlock(&cache->shpool->mutex);
 
