@@ -511,3 +511,30 @@ GET /
 --- error_code: 502
 --- response_body_like: ^.*$
 
+=== TEST 18: the http_check with check_keepalive_requests configured
+--- http_config
+    upstream test{
+        server 127.0.0.1:1970;
+        check_keepalive_requests 10;
+        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+
+--- request
+GET /
+--- response_body_like: ^<(.*)>$

@@ -27,7 +27,7 @@ my $t = Test::Nginx->new()->has(qw/mail smtp http/)->plan(2)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -44,10 +44,6 @@ mail {
     }
 }
 
-http {
-    # stub to avoid SIGSEGV when perl module compiled in, <= 0.7.30
-}
-
 EOF
 
 ###############################################################################
@@ -60,7 +56,7 @@ $s->send('HELO example.com');
 $s->check(qr/^5.. /, "command before greeting - session must be rejected");
 
 TODO: {
-local $TODO = 'not in official nginx yet';
+local $TODO = 'not yet' unless $t->has_version('1.5.6');
 
 ok($s->eof(), "session have to be closed");
 

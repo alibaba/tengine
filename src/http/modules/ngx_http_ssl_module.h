@@ -26,6 +26,8 @@ typedef struct {
     ngx_uint_t                      verify;
     ngx_uint_t                      verify_depth;
 
+    size_t                          buffer_size;
+
     ssize_t                         builtin_session_cache;
 
     time_t                          session_timeout;
@@ -36,15 +38,28 @@ typedef struct {
     ngx_str_t                       dhparam;
     ngx_str_t                       ecdh_curve;
     ngx_str_t                       client_certificate;
+    ngx_str_t                       trusted_certificate;
     ngx_str_t                       crl;
 
     ngx_str_t                       ciphers;
 
     ngx_shm_zone_t                 *shm_zone;
 
+    ngx_flag_t                      session_tickets;
+    ngx_array_t                    *session_ticket_keys;
+
+    ngx_flag_t                      stapling;
+    ngx_flag_t                      stapling_verify;
+    ngx_str_t                       stapling_file;
+    ngx_str_t                       stapling_responder;
+
     u_char                         *file;
     ngx_uint_t                      line;
 } ngx_http_ssl_srv_conf_t;
+
+typedef struct {
+    ngx_flag_t                      verify_exception;
+} ngx_http_ssl_loc_conf_t;
 
 
 extern ngx_module_t  ngx_http_ssl_module;

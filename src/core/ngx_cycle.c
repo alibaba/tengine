@@ -18,7 +18,6 @@ extern void ngx_show_dso_directives(ngx_conf_t *cf);
 
 
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
-static ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, struct sockaddr *sa2);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
     ngx_shm_zone_t *shm_zone);
 static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
@@ -44,8 +43,6 @@ ngx_tls_key_t          ngx_core_tls_key;
 /* STUB NAME */
 static ngx_connection_t  dumb;
 /* STUB */
-
-static ngx_str_t  error_log = ngx_string(NGX_ERROR_LOG_PATH);
 
 
 ngx_cycle_t *
@@ -98,7 +95,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     cycle->pool = pool;
     cycle->log = log;
-    cycle->new_log.log_level = NGX_LOG_ERR;
     cycle->old_cycle = old_cycle;
 
     cycle->conf_prefix.len = old_cycle->conf_prefix.len;
@@ -403,11 +399,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
 
 
-    if (cycle->new_log.file == NULL) {
-        cycle->new_log.file = ngx_conf_open_file(cycle, &error_log);
-        if (cycle->new_log.file == NULL) {
-            goto failed;
-        }
+    if (ngx_log_open_default(cycle) != NGX_OK) {
+        goto failed;
     }
 
 
@@ -604,13 +597,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                     continue;
                 }
 
-                if (ngx_cmp_sockaddr(nls[n].sockaddr, ls[i].sockaddr) == NGX_OK)
+                if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
+                                     ls[i].sockaddr, ls[i].socklen, 1)
+                    == NGX_OK)
                 {
                     nls[n].fd = ls[i].fd;
                     nls[n].previous = &ls[i];
                     ls[i].remain = 1;
 
-                    if (ls[n].backlog != nls[i].backlog) {
+                    if (ls[i].backlog != nls[n].backlog) {
                         nls[n].listen = 1;
                     }
 
@@ -641,7 +636,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
 
-                    if (ls[n].deferred_accept && !nls[n].deferred_accept) {
+                    if (ls[i].deferred_accept && !nls[n].deferred_accept) {
                         nls[n].delete_deferred = 1;
 
                     } else if (ls[i].deferred_accept != nls[n].deferred_accept)
@@ -653,8 +648,18 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 }
             }
 
-            if (nls[n].fd == -1) {
+            if (nls[n].fd == (ngx_socket_t) -1) {
                 nls[n].open = 1;
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+                if (nls[n].accept_filter) {
+                    nls[n].add_deferred = 1;
+                }
+#endif
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+                if (nls[n].deferred_accept) {
+                    nls[n].add_deferred = 1;
+                }
+#endif
             }
         }
 
@@ -686,12 +691,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* commit the new cycle configuration */
 
-    if (!ngx_use_stderr && cycle->log->file->fd != ngx_stderr) {
-
-        if (ngx_set_stderr(cycle->log->file->fd) == NGX_FILE_ERROR) {
-            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                          ngx_set_stderr_n " failed");
-        }
+    if (!ngx_use_stderr) {
+        (void) ngx_log_redirect_stderr(cycle);
     }
 
     pool->log = cycle->log;
@@ -763,7 +764,7 @@ old_shm_zone_done:
     ls = old_cycle->listening.elts;
     for (i = 0; i < old_cycle->listening.nelts; i++) {
 
-        if (ls[i].remain || ls[i].fd == -1) {
+        if (ls[i].remain || ls[i].fd == (ngx_socket_t) -1) {
             continue;
         }
 
@@ -929,7 +930,7 @@ failed:
 
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
-        if (ls[i].fd == -1 || !ls[i].open) {
+        if (ls[i].fd == (ngx_socket_t) -1 || !ls[i].open) {
             continue;
         }
 
@@ -951,74 +952,6 @@ ngx_destroy_cycle_pools(ngx_conf_t *conf)
 {
     ngx_destroy_pool(conf->temp_pool);
     ngx_destroy_pool(conf->pool);
-}
-
-
-static ngx_int_t
-ngx_cmp_sockaddr(struct sockaddr *sa1, struct sockaddr *sa2)
-{
-    struct sockaddr_in   *sin1, *sin2;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6  *sin61, *sin62;
-#endif
-#if (NGX_HAVE_UNIX_DOMAIN)
-    struct sockaddr_un   *saun1, *saun2;
-#endif
-
-    if (sa1->sa_family != sa2->sa_family) {
-        return NGX_DECLINED;
-    }
-
-    switch (sa1->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin61 = (struct sockaddr_in6 *) sa1;
-        sin62 = (struct sockaddr_in6 *) sa2;
-
-        if (sin61->sin6_port != sin62->sin6_port) {
-            return NGX_DECLINED;
-        }
-
-        if (ngx_memcmp(&sin61->sin6_addr, &sin62->sin6_addr, 16) != 0) {
-            return NGX_DECLINED;
-        }
-
-        break;
-#endif
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-       saun1 = (struct sockaddr_un *) sa1;
-       saun2 = (struct sockaddr_un *) sa2;
-
-       if (ngx_memcmp(&saun1->sun_path, &saun2->sun_path,
-                      sizeof(saun1->sun_path))
-           != 0)
-       {
-           return NGX_DECLINED;
-       }
-
-       break;
-#endif
-
-    default: /* AF_INET */
-
-        sin1 = (struct sockaddr_in *) sa1;
-        sin2 = (struct sockaddr_in *) sa2;
-
-        if (sin1->sin_port != sin2->sin_port) {
-            return NGX_DECLINED;
-        }
-
-        if (sin1->sin_addr.s_addr != sin2->sin_addr.s_addr) {
-            return NGX_DECLINED;
-        }
-
-        break;
-    }
-
-    return NGX_OK;
 }
 
 
@@ -1334,16 +1267,7 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
         file[i].fd = fd;
     }
 
-#if !(NGX_WIN32)
-
-    if (cycle->log->file->fd != STDERR_FILENO) {
-        if (dup2(cycle->log->file->fd, STDERR_FILENO) == -1) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                          "dup2(STDERR) failed");
-        }
-    }
-
-#endif
+    (void) ngx_log_redirect_stderr(cycle);
 }
 
 

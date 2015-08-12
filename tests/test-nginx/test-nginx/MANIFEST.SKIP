@@ -29,3 +29,5 @@ update
 genmobi\.sh$
 \.mobi$
 .*\.tar$
+^MYMETA\.\w+$
+^tags$

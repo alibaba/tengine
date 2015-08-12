@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -42,13 +42,6 @@ typedef struct {
 } ngx_http_tfs_block_info_t;
 
 
-typedef enum {
-    NGX_HTTP_TFS_FROM_NONE = 0,
-    NGX_HTTP_TFS_FROM_CACHE,
-    NGX_HTTP_TFS_FROM_NS,
-} ngx_http_tfs_block_info_src_e;
-
-
 typedef struct {
     uint32_t                       block_id;
     uint64_t                       file_id;
@@ -68,14 +61,11 @@ typedef struct {
 
 struct ngx_http_tfs_segment_data_s {
     uint8_t                        cache_hit;
-    ngx_http_tfs_block_info_src_e  block_info_src;
     ngx_http_tfs_segment_info_t    segment_info;
     /* read/write offset inside this segment */
     uint32_t                       oper_offset;
     /* read/write size inside this segment */
     uint32_t                       oper_size;
-    /* current writing data's crc */
-    uint32_t                       curr_crc;
     union {
         uint64_t                   write_file_number;
     };
@@ -83,6 +73,7 @@ struct ngx_http_tfs_segment_data_s {
     ngx_uint_t                     ds_retry;
     ngx_uint_t                     ds_index;
     ngx_chain_t                   *data;
+    ngx_chain_t                   *orig_data; /* for write retry */
 } NGX_PACKED;
 
 
@@ -109,6 +100,9 @@ struct  ngx_http_tfs_upstream_s {
     ngx_str_t                      rcs_zone_name;
     ngx_shm_zone_t                *rcs_shm_zone;
     ngx_http_tfs_rc_ctx_t         *rc_ctx;
+    uint8_t                        rcserver_index;
+    uint32_t                       rc_servers_count;
+    uint64_t                       rc_servers[NGX_HTTP_TFS_MAX_RCSERVER_COUNT];
 
     /* upstream name and port */
     in_port_t                      port;
@@ -153,7 +147,7 @@ struct  ngx_http_tfs_main_conf_s {
     ngx_msec_t                     tfs_read_timeout;
 
     ngx_msec_t                     tair_timeout;
-    ngx_http_tfs_tair_instance_t  dup_instances[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
+    ngx_http_tfs_tair_instance_t   dup_instances[NGX_HTTP_TFS_MAX_CLUSTER_COUNT];
 
     size_t                         send_lowat;
     size_t                         buffer_size;
@@ -318,9 +312,10 @@ struct ngx_http_tfs_s {
     ngx_chain_t                   *meta_segment_data;
     ngx_http_tfs_file_t            file;
     ngx_http_tfs_segment_head_t   *seg_head;
-    ngx_http_tfs_raw_file_info_t   file_info;
+    ngx_http_tfs_raw_file_stat_t   file_stat;
     ngx_buf_t                     *readv2_rsp_tail_buf;
     uint8_t                        read_ver;
+    uint8_t                        retry_count;
 
     /* block cache */
     ngx_http_tfs_block_cache_ctx_t block_cache_ctx;
@@ -350,6 +345,7 @@ struct ngx_http_tfs_s {
     unsigned                       request_timeout:1;
     unsigned                       client_abort:1;
     unsigned                       is_rolling_back:1;
+    unsigned                       header_sent:1;
 };
 
 

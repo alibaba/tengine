@@ -176,12 +176,7 @@ ngx_rbtree_delete(ngx_thread_volatile ngx_rbtree_t *tree,
 
     } else {
         subst = ngx_rbtree_min(node->right, sentinel);
-
-        if (subst->left != sentinel) {
-            temp = subst->left;
-        } else {
-            temp = subst->right;
-        }
+        temp = subst->right;
     }
 
     if (subst == *root) {

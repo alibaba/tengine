@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -42,6 +41,7 @@ fi
 
 if [ $NGX_TEST_BUILD_EPOLL = YES ]; then
     have=NGX_HAVE_EPOLL . auto/have
+    have=NGX_HAVE_EPOLLRDHUP . auto/have
     have=NGX_HAVE_EVENTFD . auto/have
     have=NGX_TEST_BUILD_EPOLL . auto/have
     EVENT_MODULES="$EVENT_MODULES $EPOLL_MODULE"
@@ -124,6 +124,7 @@ fi
 #     ngx_http_write_filter
 #     ngx_http_header_filter
 #     ngx_http_chunked_filter
+#     ngx_http_spdy_filter
 #     ngx_http_range_header_filter
 #     ngx_http_gzip_filter
 #     ngx_http_postpone_filter
@@ -133,6 +134,7 @@ fi
 #         ngx_http_image_filter
 #         ngx_http_sub_filter
 #         ngx_http_addition_filter
+#         ngx_http_gunzip_filter
 #         ngx_http_userid_filter
 #         ngx_http_footer_filter
 #         ngx_http_trim_filter
@@ -143,8 +145,13 @@ fi
 
 HTTP_FILTER_MODULES="$HTTP_WRITE_FILTER_MODULE \
                      $HTTP_HEADER_FILTER_MODULE \
-                     $HTTP_CHUNKED_FILTER_MODULE \
-                     $HTTP_RANGE_HEADER_FILTER_MODULE"
+                     $HTTP_CHUNKED_FILTER_MODULE"
+
+if [ $HTTP_SPDY = YES ]; then
+    HTTP_FILTER_MODULES="$HTTP_FILTER_MODULES $HTTP_SPDY_FILTER_MODULE"
+fi
+
+HTTP_FILTER_MODULES="$HTTP_FILTER_MODULES $HTTP_RANGE_HEADER_FILTER_MODULE"
 
 if [ $HTTP_GZIP = YES ]; then
     have=NGX_HTTP_GZIP . auto/have
@@ -221,10 +228,28 @@ if [ $HTTP_ADDITION_SHARED = YES ]; then
     NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_ADDITION_SRCS"
 fi
 
+
+if [ $HTTP_GUNZIP = YES ]; then
+    have=NGX_HTTP_GZIP . auto/have
+    USE_ZLIB=YES
+    HTTP_FILTER_MODULES="$HTTP_FILTER_MODULES $HTTP_GUNZIP_FILTER_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_GUNZIP_SRCS"
+fi
+
 if [ $HTTP_USERID = YES ]; then
     HTTP_FILTER_MODULES="$HTTP_FILTER_MODULES $HTTP_USERID_FILTER_MODULE"
     HTTP_SRCS="$HTTP_SRCS $HTTP_USERID_SRCS"
 fi
+
+
+if [ $HTTP_SPDY = YES ]; then
+    have=NGX_HTTP_SPDY . auto/have
+    USE_ZLIB=YES
+    HTTP_MODULES="$HTTP_MODULES $HTTP_SPDY_MODULE"
+    HTTP_DEPS="$HTTP_DEPS $HTTP_SPDY_DEPS"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_SPDY_SRCS"
+fi
+
 
 if [ $HTTP_USERID_SHARED = YES ]; then
     NGX_SHARED_MODULES="$NGX_SHARED_MODULES $HTTP_USERID_FILTER_MODULE"
@@ -299,6 +324,11 @@ if [ $HTTP_CONCAT_SHARED = YES ]; then
     NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_CONCAT_SRCS"
 fi
 
+if [ $HTTP_AUTH_REQUEST = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES $HTTP_AUTH_REQUEST_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_AUTH_REQUEST_SRCS"
+fi
+
 if [ $HTTP_AUTH_BASIC = YES ]; then
     USE_MD5=YES
     USE_SHA1=YES
@@ -357,7 +387,6 @@ if [ $HTTP_STATUS_SHARED = YES ]; then
 fi
 
 if [ $HTTP_GEO = YES ]; then
-    have=NGX_HTTP_GEO . auto/have
     have=NGX_HTTP_X_FORWARDED_FOR . auto/have
     NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_GEO_TAG))
     HTTP_MODULES="$HTTP_MODULES $HTTP_GEO_MODULE"
@@ -428,7 +457,6 @@ if [ $HTTP_SSL = YES ]; then
 fi
 
 if [ $HTTP_PROXY = YES ]; then
-    have=NGX_HTTP_PROXY . auto/have
     have=NGX_HTTP_X_FORWARDED_FOR . auto/have
     NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_PROXY_TAG))
     #USE_MD5=YES
@@ -476,18 +504,13 @@ if [ $HTTP_PERL = YES ]; then
 fi
 
 if [ $HTTP_LUA = YES ]; then
-    USE_MD5=YES
-    USE_SHA1=YES
-    CORE_INCS="$CORE_INCS src/http/modules/lua/api"
-    HTTP_AUX_FILTER_MODULES="$HTTP_AUX_FILTER_MODULES $NGX_HTTP_LUA_MODULE"
-    HTTP_DEPS="$HTTP_DEPS $NGX_HTTP_LUA_MODULE_DEPS"
-    HTTP_SRCS="$HTTP_SRCS $NGX_HTTP_LUA_MODULE_SRCS"
+     NGX_ADDONS="$NGX_ADDONS modules/ngx_http_lua_module"
 fi
 
 if [ $HTTP_LUA_SHARED = YES ]; then
     USE_MD5=YES
     USE_SHA1=YES
-    CORE_INCS="$CORE_INCS src/http/modules/lua/api"
+    CORE_INCS="$CORE_INCS modules/ngx_http_lua_module/src/api"
     NGX_SHARED_MODULES="$NGX_SHARED_MODULES $NGX_HTTP_LUA_MODULE"
     HTTP_DEPS="$HTTP_DEPS $NGX_HTTP_LUA_MODULE_DEPS"
     NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$NGX_HTTP_LUA_MODULE_SRCS"
@@ -655,9 +678,36 @@ if [ $HTTP_UPSTREAM_SESSION_STICKY_SHARED = YES ]; then
     NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_UPSTREAM_SESSION_STICKY_SRCS"
 fi
 
+if [ $HTTP_REQ_STATUS = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES $HTTP_REQ_STATUS_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_REQ_STATUS_SRCS"
+    HTTP_DEPS="$HTTP_DEPS $HTTP_REQ_STATUS_DEPS"
+fi
+
+if [ $HTTP_REQ_STATUS_SHARED = YES ]; then
+    NGX_SHARED_MODULES="$NGX_SHARED_MODULES $HTTP_REQ_STATUS_MODULE"
+    NGX_SHARED_SRCS="$NGX_SHARED_SRCS|$HTTP_REQ_STATUS_SRCS"
+    HTTP_DEPS="$HTTP_DEPS $HTTP_REQ_STATUS_DEPS"
+fi
+
 if [ $HTTP_UPSTREAM_KEEPALIVE = YES ]; then
     HTTP_MODULES="$HTTP_MODULES $HTTP_UPSTREAM_KEEPALIVE_MODULE"
     HTTP_SRCS="$HTTP_SRCS $HTTP_UPSTREAM_KEEPALIVE_SRCS"
+fi
+
+if [ $HTTP_UPSTREAM_DYNAMIC = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES $HTTP_UPSTREAM_DYNAMIC_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_UPSTREAM_DYNAMIC_SRCS"
+fi
+
+if [ $HTTP_DYNAMIC_UPSTREAM = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES $HTTP_DYUPS_MODULE"
+    HTTP_SRCS="$HTTP_SRCS $HTTP_DYUPS_SRCS"
+    if [ $HTTP_DYNAMIC_UPSTREAM_LUA = YES ]; then
+        HTTP_SRCS="$HTTP_SRCS $HTTP_DYUPS_LUA_SRCS"
+        HTTP_DEPS="$HTTP_DEPS $HTTP_DYUPS_LUA_DEPS"
+        have=NGX_DYUPS_LUA . auto/have
+    fi
 fi
 
 if [ $HTTP_STUB_STATUS = YES ]; then
@@ -665,6 +715,11 @@ if [ $HTTP_STUB_STATUS = YES ]; then
     NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_STAT_STUB_TAG))
     HTTP_MODULES="$HTTP_MODULES ngx_http_stub_status_module"
     HTTP_SRCS="$HTTP_SRCS src/http/modules/ngx_http_stub_status_module.c"
+fi
+
+if [ $HTTP_UPSTREAM_RBTREE = YES ]; then
+    have=NGX_HTTP_UPSTREAM_RBTREE . auto/have
+    NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_UPSTREAM_RBTREE_TAG))
 fi
 
 #if [ -r $NGX_OBJS/auto ]; then
@@ -773,6 +828,8 @@ if [ $MAIL = YES ]; then
 
     modules="$modules $MAIL_PROXY_MODULE"
     MAIL_SRCS="$MAIL_SRCS $MAIL_PROXY_SRCS"
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS \$(MAIL_DEPS)"
 fi
 
 
@@ -884,6 +941,7 @@ END
 
 END
 
+    echo ''                                      > $NGX_MODULE_STUBS
     for mod in $NGX_ALL_MODULES
     do
         echo "module_stub $mod;"                  >> $NGX_MODULE_STUBS

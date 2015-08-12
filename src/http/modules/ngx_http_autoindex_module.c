@@ -233,6 +233,7 @@ ngx_http_autoindex_handler(ngx_http_request_t *r)
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_type_len = sizeof("text/html") - 1;
     ngx_str_set(&r->headers_out.content_type, "text/html");
+    r->headers_out.content_type_lowcase = NULL;
 
     rc = ngx_http_send_header(r);
 
@@ -304,7 +305,7 @@ ngx_http_autoindex_handler(ngx_http_request_t *r)
             if (ngx_de_info(filename, &dir) == NGX_FILE_ERROR) {
                 err = ngx_errno;
 
-                if (err != NGX_ENOENT) {
+                if (err != NGX_ENOENT && err != NGX_ELOOP) {
                     ngx_log_error(NGX_LOG_CRIT, r->connection->log, err,
                                   ngx_de_info_n " \"%s\" failed", filename);
 
@@ -357,7 +358,7 @@ ngx_http_autoindex_handler(ngx_http_request_t *r)
 
     if (ngx_close_dir(&dir) == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, ngx_errno,
-                      ngx_close_dir_n " \"%s\" failed", &path);
+                      ngx_close_dir_n " \"%V\" failed", &path);
     }
 
     escape_html = ngx_escape_html(NULL, r->uri.data, r->uri.len);
@@ -388,7 +389,7 @@ ngx_http_autoindex_handler(ngx_http_request_t *r)
 
     b = ngx_create_temp_buf(r->pool, len);
     if (b == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        return NGX_ERROR;
     }
 
     if (entries.nelts > 1) {
@@ -649,7 +650,7 @@ ngx_http_autoindex_error(ngx_http_request_t *r, ngx_dir_t *dir, ngx_str_t *name)
                       ngx_close_dir_n " \"%V\" failed", name);
     }
 
-    return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    return r->header_sent ? NGX_ERROR : NGX_HTTP_INTERNAL_SERVER_ERROR;
 }
 
 

@@ -11,6 +11,8 @@
 
 static u_char *ngx_sprintf_num(u_char *buf, u_char *last, uint64_t ui64,
     u_char zero, ngx_uint_t hexadecimal, ngx_uint_t width);
+static void ngx_encode_base64_internal(ngx_str_t *dst, ngx_str_t *src,
+    const u_char *basis, ngx_uint_t padding);
 static ngx_int_t ngx_decode_base64_internal(ngx_str_t *dst, ngx_str_t *src,
     const u_char *basis);
 
@@ -486,7 +488,7 @@ ngx_sprintf_num(u_char *buf, u_char *last, uint64_t ui64, u_char zero,
 
     if (hexadecimal == 0) {
 
-        if (ui64 <= NGX_MAX_UINT32_VALUE) {
+        if (ui64 <= (uint64_t) NGX_MAX_UINT32_VALUE) {
 
             /*
              * To divide 64-bit numbers and to find remainders
@@ -853,6 +855,46 @@ ngx_dns_strcmp(u_char *s1, u_char *s2)
 
 
 ngx_int_t
+ngx_filename_cmp(u_char *s1, u_char *s2, size_t n)
+{
+    ngx_uint_t  c1, c2;
+
+    while (n) {
+        c1 = (ngx_uint_t) *s1++;
+        c2 = (ngx_uint_t) *s2++;
+
+#if (NGX_HAVE_CASELESS_FILESYSTEM)
+        c1 = tolower(c1);
+        c2 = tolower(c2);
+#endif
+
+        if (c1 == c2) {
+
+            if (c1) {
+                n--;
+                continue;
+            }
+
+            return 0;
+        }
+
+        /* we need '/' to be the lowest character */
+
+        if (c1 == 0 || c2 == 0) {
+            return c1 - c2;
+        }
+
+        c1 = (c1 == '/') ? 0 : c1;
+        c2 = (c2 == '/') ? 0 : c2;
+
+        return c1 - c2;
+    }
+
+    return 0;
+}
+
+
+ngx_int_t
 ngx_atoi(u_char *line, size_t n)
 {
     ngx_int_t  value;
@@ -1086,38 +1128,59 @@ ngx_hex_dump(u_char *dst, u_char *src, size_t len)
 void
 ngx_encode_base64(ngx_str_t *dst, ngx_str_t *src)
 {
-    u_char         *d, *s;
-    size_t          len;
     static u_char   basis64[] =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    ngx_encode_base64_internal(dst, src, basis64, 1);
+}
+
+
+void
+ngx_encode_base64url(ngx_str_t *dst, ngx_str_t *src)
+{
+    static u_char   basis64[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+    ngx_encode_base64_internal(dst, src, basis64, 0);
+}
+
+
+static void
+ngx_encode_base64_internal(ngx_str_t *dst, ngx_str_t *src, const u_char *basis,
+    ngx_uint_t padding)
+{
+    u_char         *d, *s;
+    size_t          len;
 
     len = src->len;
     s = src->data;
     d = dst->data;
 
     while (len > 2) {
-        *d++ = basis64[(s[0] >> 2) & 0x3f];
-        *d++ = basis64[((s[0] & 3) << 4) | (s[1] >> 4)];
-        *d++ = basis64[((s[1] & 0x0f) << 2) | (s[2] >> 6)];
-        *d++ = basis64[s[2] & 0x3f];
+        *d++ = basis[(s[0] >> 2) & 0x3f];
+        *d++ = basis[((s[0] & 3) << 4) | (s[1] >> 4)];
+        *d++ = basis[((s[1] & 0x0f) << 2) | (s[2] >> 6)];
+        *d++ = basis[s[2] & 0x3f];
 
         s += 3;
         len -= 3;
     }
 
     if (len) {
-        *d++ = basis64[(s[0] >> 2) & 0x3f];
+        *d++ = basis[(s[0] >> 2) & 0x3f];
 
         if (len == 1) {
-            *d++ = basis64[(s[0] & 3) << 4];
+            *d++ = basis[(s[0] & 3) << 4];
             *d++ = '=';
 
         } else {
-            *d++ = basis64[((s[0] & 3) << 4) | (s[1] >> 4)];
-            *d++ = basis64[(s[1] & 0x0f) << 2];
+            *d++ = basis[((s[0] & 3) << 4) | (s[1] >> 4)];
+            *d++ = basis[(s[1] & 0x0f) << 2];
         }
 
-        *d++ = '=';
+        if (padding) {
+            *d++ = '=';
+        }
     }
 
     dst->len = d - dst->data;

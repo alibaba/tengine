@@ -167,6 +167,7 @@ ngx_int_t ngx_rstrncmp(u_char *s1, u_char *s2, size_t n);
 ngx_int_t ngx_rstrncasecmp(u_char *s1, u_char *s2, size_t n);
 ngx_int_t ngx_memn2cmp(u_char *s1, u_char *s2, size_t n1, size_t n2);
 ngx_int_t ngx_dns_strcmp(u_char *s1, u_char *s2);
+ngx_int_t ngx_filename_cmp(u_char *s1, u_char *s2, size_t n);
 
 ngx_int_t ngx_atoi(u_char *line, size_t n);
 long long ngx_atoll(u_char *line, size_t n);
@@ -183,6 +184,7 @@ u_char *ngx_hex_dump(u_char *dst, u_char *src, size_t len);
 #define ngx_base64_decoded_length(len)  (((len + 3) / 4) * 3)
 
 void ngx_encode_base64(ngx_str_t *dst, ngx_str_t *src);
+void ngx_encode_base64url(ngx_str_t *dst, ngx_str_t *src);
 ngx_int_t ngx_decode_base64(ngx_str_t *dst, ngx_str_t *src);
 ngx_int_t ngx_decode_base64url(ngx_str_t *dst, ngx_str_t *src);
 

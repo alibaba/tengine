@@ -24,13 +24,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http secure_link/)->plan(8);
+my $t = Test::Nginx->new()->has(qw/http secure_link rewrite/)->plan(9);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -94,6 +94,21 @@ http {
 
             rewrite ^ /$secure_link break;
         }
+
+        location /inheritance/ {
+            secure_link_secret secret;
+
+            location = /inheritance/test {
+                secure_link      Xr4ilOzQ4PCOq3aQ0qbuaQ==;
+                secure_link_md5  secret;
+
+                if ($secure_link = "1") {
+                    rewrite ^ /test.html break;
+                }
+
+                return 403;
+            }
+        }
     }
 }
 
@@ -134,6 +149,7 @@ like(http_get('/p/' . md5_hex('test.html' . 'secret') . '/test.html'),
 like(http_get('/p/' . md5_hex('fake') . '/test.html'), qr/^HTTP.*403/,
 	'request old style fake hash');
 like(http_get('/p/test.html'), qr/^HTTP.*403/, 'request old style no hash');
+like(http_get('/inheritance/test'), qr/PASSED/, 'inheritance');
 
 ###############################################################################
 
