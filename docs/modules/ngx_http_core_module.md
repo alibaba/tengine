@@ -41,6 +41,8 @@ By default in the buffered mode, the whole request body larger than the `client_
 
 Note that, if you turn it off, the nginx retry mechanism with unsuccessful response will be broken after you sent part of the request to backend. It just returns 500 directly when it encounters an unsuccessful response. This directive also breaks these variables: $request_body, $request_body_file. You should not use them any more while their values are incomplete.
 
+Also note that, enabling spdy will prevent `proxy_request_buffering off` from taking effect.
+
 ## fastcgi\_request\_buffering ##
 
 Syntax: **fastcgi\_request\_buffering** `on | off`
@@ -51,3 +53,12 @@ Context: `http, server, location`
 
 The same as `proxy_request_buffering`.
 
+## gzip\_clear\_etag ##
+
+Syntax: **gzip\_clear\_etag** `on | off`
+
+Default: `on`
+
+Context: `http, server, location`
+
+Determines whether gzip module should clear the “ETag” response header field.

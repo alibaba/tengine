@@ -370,7 +370,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_DEFER_ACCEPT, NULL, 0)"
 . auto/feature
 
 
-ngx_feature="TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT"
+ngx_feature="TCP_KEEPIDLE"
 ngx_feature_name="NGX_HAVE_KEEPALIVE_TUNABLE"
 ngx_feature_run=no
 ngx_feature_incs="#include <sys/socket.h>
@@ -381,6 +381,18 @@ ngx_feature_libs=
 ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_KEEPIDLE, NULL, 0);
                   setsockopt(0, IPPROTO_TCP, TCP_KEEPINTVL, NULL, 0);
                   setsockopt(0, IPPROTO_TCP, TCP_KEEPCNT, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="TCP_FASTOPEN"
+ngx_feature_name="NGX_HAVE_TCP_FASTOPEN"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_FASTOPEN, NULL, 0)"
 . auto/feature
 
 
@@ -846,4 +858,25 @@ ngx_feature_libs=
 ngx_feature_test="struct stat sb;
                   openat(AT_FDCWD, \".\", O_RDONLY|O_NOFOLLOW);
                   fstatat(AT_FDCWD, \".\", &sb, AT_SYMLINK_NOFOLLOW);"
+. auto/feature
+
+
+if [ -f "/etc/resolv.conf" ]; then
+    have=NGX_RESOLVER_FILE
+    value=\"/etc/resolv.conf\"
+    . auto/define
+fi
+
+
+ngx_feature="getaddrinfo()"
+ngx_feature_name="NGX_HAVE_GETADDRINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+                  #include <sys/socket.h>
+                  #include <netdb.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='struct addrinfo *res;
+                  if (getaddrinfo("localhost", NULL, NULL, &res) != 0) return 1;
+                  freeaddrinfo(res)'
 . auto/feature

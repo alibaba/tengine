@@ -27,13 +27,13 @@ plan(skip_all => 'Cache::Memcached not installed') if $@;
 eval { require IO::Compress::Gzip; };
 plan(skip_all => "IO::Compress::Gzip not found") if $@;
 
-my $t = Test::Nginx->new()->has(qw/http gunzip memcached/)
+my $t = Test::Nginx->new()->has(qw/http gunzip memcached rewrite/)
 	->has_daemon('memcached')
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

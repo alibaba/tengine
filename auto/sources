@@ -1,4 +1,3 @@
-
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
@@ -38,7 +37,8 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_conf_file.h \
            src/core/ngx_resolver.h \
            src/core/ngx_open_file_cache.h \
-           src/core/ngx_crypt.h"
+           src/core/ngx_crypt.h \
+           src/core/ngx_proxy_protocol.h"
 
 
 CORE_SRCS="src/core/nginx.c \
@@ -71,7 +71,8 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_conf_file.c \
            src/core/ngx_resolver.c \
            src/core/ngx_open_file_cache.c \
-           src/core/ngx_crypt.c"
+           src/core/ngx_crypt.c \
+           src/core/ngx_proxy_protocol.c"
 
 
 REGEX_MODULE=ngx_regex_module
@@ -87,7 +88,8 @@ DSO_INCS=
 
 OPENSSL_MODULE=ngx_openssl_module
 OPENSSL_DEPS=src/event/ngx_event_openssl.h
-OPENSSL_SRCS=src/event/ngx_event_openssl.c
+OPENSSL_SRCS="src/event/ngx_event_openssl.c \
+              src/event/ngx_event_openssl_stapling.c"
 
 
 EVENT_MODULES="ngx_events_module ngx_event_core_module"
@@ -349,12 +351,25 @@ HTTP_POSTPONE_FILTER_SRCS=src/http/ngx_http_postpone_filter_module.c
 HTTP_FILE_CACHE_SRCS=src/http/ngx_http_file_cache.c
 
 
+HTTP_SPDY_MODULE=ngx_http_spdy_module
+HTTP_SPDY_FILTER_MODULE=ngx_http_spdy_filter_module
+HTTP_SPDY_DEPS="src/http/ngx_http_spdy.h \
+                src/http/ngx_http_spdy_module.h"
+HTTP_SPDY_SRCS="src/http/ngx_http_spdy.c \
+                src/http/ngx_http_spdy_module.c \
+                src/http/ngx_http_spdy_filter_module.c"
+
+
 HTTP_CHARSET_FILTER_MODULE=ngx_http_charset_filter_module
 HTTP_CHARSET_SRCS=src/http/modules/ngx_http_charset_filter_module.c
 
 
 HTTP_GZIP_FILTER_MODULE=ngx_http_gzip_filter_module
 HTTP_GZIP_SRCS=src/http/modules/ngx_http_gzip_filter_module.c
+
+
+HTTP_GUNZIP_FILTER_MODULE=ngx_http_gunzip_filter_module
+HTTP_GUNZIP_SRCS=src/http/modules/ngx_http_gunzip_filter_module.c
 
 
 HTTP_SSI_FILTER_MODULE=ngx_http_ssi_filter_module
@@ -405,6 +420,10 @@ HTTP_AUTH_BASIC_SRCS=src/http/modules/ngx_http_auth_basic_module.c
 
 HTTP_CONCAT_MODULE=ngx_http_concat_module
 HTTP_CONCAT_SRCS=src/http/modules/ngx_http_concat_module.c
+
+
+HTTP_AUTH_REQUEST_MODULE=ngx_http_auth_request_module
+HTTP_AUTH_REQUEST_SRCS=src/http/modules/ngx_http_auth_request_module.c
 
 
 HTTP_AUTOINDEX_MODULE=ngx_http_autoindex_module
@@ -547,6 +566,21 @@ HTTP_UPSTREAM_KEEPALIVE_MODULE=ngx_http_upstream_keepalive_module
 HTTP_UPSTREAM_KEEPALIVE_SRCS=" \
     src/http/modules/ngx_http_upstream_keepalive_module.c"
 
+HTTP_UPSTREAM_DYNAMIC_MODULE=ngx_http_upstream_dynamic_module
+HTTP_UPSTREAM_DYNAMIC_SRCS=" \
+    src/http/modules/ngx_http_upstream_dynamic_module.c"
+
+HTTP_DYUPS_MODULE=ngx_http_dyups_module
+HTTP_DYUPS_SRCS="src/http/modules/ngx_http_dyups_module.c"
+HTTP_DYUPS_DEPS="src/http/modules/ngx_http_dyups.h"
+HTTP_DYUPS_LUA_SRCS="src/http/modules/ngx_http_dyups_lua.c"
+HTTP_DYUPS_LUA_DEPS="src/http/modules/ngx_http_dyups_lua.h"
+
+
+HTTP_REQ_STATUS_MODULE=ngx_http_reqstat_module
+HTTP_REQ_STATUS_SRCS=src/http/modules/ngx_http_reqstat_module.c
+HTTP_REQ_STATUS_DEPS=src/http/modules/ngx_http_reqstat.h
+
 
 MAIL_INCS="src/mail"
 
@@ -593,98 +627,106 @@ NGX_BACKTRACE_MODULE=ngx_backtrace_module
 NGX_BACKTRACE_SRCS=src/misc/ngx_backtrace_module.c
 
 NGX_HTTP_LUA_MODULE=ngx_http_lua_module
-NGX_HTTP_LUA_MODULE_SRCS="src/http/modules/lua/ngx_http_lua_script.c \
-                          src/http/modules/lua/ngx_http_lua_log.c \
-                          src/http/modules/lua/ngx_http_lua_subrequest.c \
-                          src/http/modules/lua/ngx_http_lua_ndk.c \
-                          src/http/modules/lua/ngx_http_lua_control.c \
-                          src/http/modules/lua/ngx_http_lua_time.c \
-                          src/http/modules/lua/ngx_http_lua_misc.c \
-                          src/http/modules/lua/ngx_http_lua_variable.c \
-                          src/http/modules/lua/ngx_http_lua_string.c \
-                          src/http/modules/lua/ngx_http_lua_output.c \
-                          src/http/modules/lua/ngx_http_lua_headers.c \
-                          src/http/modules/lua/ngx_http_lua_req_body.c \
-                          src/http/modules/lua/ngx_http_lua_uri.c \
-                          src/http/modules/lua/ngx_http_lua_args.c \
-                          src/http/modules/lua/ngx_http_lua_ctx.c \
-                          src/http/modules/lua/ngx_http_lua_regex.c \
-                          src/http/modules/lua/ngx_http_lua_module.c \
-                          src/http/modules/lua/ngx_http_lua_headers_out.c \
-                          src/http/modules/lua/ngx_http_lua_headers_in.c \
-                          src/http/modules/lua/ngx_http_lua_directive.c \
-                          src/http/modules/lua/ngx_http_lua_consts.c \
-                          src/http/modules/lua/ngx_http_lua_exception.c \
-                          src/http/modules/lua/ngx_http_lua_util.c \
-                          src/http/modules/lua/ngx_http_lua_cache.c \
-                          src/http/modules/lua/ngx_http_lua_contentby.c \
-                          src/http/modules/lua/ngx_http_lua_rewriteby.c \
-                          src/http/modules/lua/ngx_http_lua_accessby.c \
-                          src/http/modules/lua/ngx_http_lua_setby.c \
-                          src/http/modules/lua/ngx_http_lua_capturefilter.c \
-                          src/http/modules/lua/ngx_http_lua_clfactory.c \
-                          src/http/modules/lua/ngx_http_lua_pcrefix.c \
-                          src/http/modules/lua/ngx_http_lua_headerfilterby.c \
-                          src/http/modules/lua/ngx_http_lua_shdict.c \
-                          src/http/modules/lua/ngx_http_lua_socket_tcp.c \
-                          src/http/modules/lua/ngx_http_lua_api.c \
-                          src/http/modules/lua/ngx_http_lua_logby.c \
-                          src/http/modules/lua/ngx_http_lua_sleep.c \
-                          src/http/modules/lua/ngx_http_lua_coroutine.c \
-                          src/http/modules/lua/ngx_http_lua_bodyfilterby.c \
-                          src/http/modules/lua/ngx_http_lua_initby.c \
-                          src/http/modules/lua/ngx_http_lua_socket_udp.c \
-                          src/http/modules/lua/ngx_http_lua_req_method.c \
-                          src/http/modules/lua/ngx_http_lua_phase.c \
-                          src/http/modules/lua/ngx_http_lua_uthread.c"
+NGX_HTTP_LUA_MODULE_SRCS="modules/ngx_http_lua_module/src/ngx_http_lua_script.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_log.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_subrequest.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_ndk.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_control.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_time.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_misc.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_variable.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_string.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_output.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_req_body.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_uri.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_args.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_ctx.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_regex.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_module.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers_out.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers_in.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_directive.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_consts.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_exception.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_util.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_cache.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_contentby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_rewriteby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_accessby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_setby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_capturefilter.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_clfactory.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_pcrefix.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headerfilterby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_shdict.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_socket_tcp.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_api.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_logby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_sleep.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_coroutine.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_bodyfilterby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_initby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_initworkerby.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_socket_udp.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_req_method.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_phase.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_uthread.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_timer.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_config.c \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_worker.c"
 
 
-NGX_HTTP_LUA_MODULE_DEPS="src/http/modules/lua/ddebug.h \
-                          src/http/modules/lua/ngx_http_lua_script.h \
-                          src/http/modules/lua/ngx_http_lua_log.h \
-                          src/http/modules/lua/ngx_http_lua_subrequest.h \
-                          src/http/modules/lua/ngx_http_lua_ndk.h \
-                          src/http/modules/lua/ngx_http_lua_control.h \
-                          src/http/modules/lua/ngx_http_lua_time.h \
-                          src/http/modules/lua/ngx_http_lua_string.h \
-                          src/http/modules/lua/ngx_http_lua_misc.h \
-                          src/http/modules/lua/ngx_http_lua_variable.h \
-                          src/http/modules/lua/ngx_http_lua_output.h \
-                          src/http/modules/lua/ngx_http_lua_headers.h \
-                          src/http/modules/lua/ngx_http_lua_uri.h \
-                          src/http/modules/lua/ngx_http_lua_req_body.h \
-                          src/http/modules/lua/ngx_http_lua_args.h \
-                          src/http/modules/lua/ngx_http_lua_ctx.h \
-                          src/http/modules/lua/ngx_http_lua_regex.h \
-                          src/http/modules/lua/ngx_http_lua_common.h \
-                          src/http/modules/lua/ngx_http_lua_directive.h \
-                          src/http/modules/lua/ngx_http_lua_headers_out.h \
-                          src/http/modules/lua/ngx_http_lua_headers_in.h \
-                          src/http/modules/lua/ngx_http_lua_consts.h \
-                          src/http/modules/lua/ngx_http_lua_exception.h \
-                          src/http/modules/lua/ngx_http_lua_util.h \
-                          src/http/modules/lua/ngx_http_lua_cache.h \
-                          src/http/modules/lua/ngx_http_lua_contentby.h \
-                          src/http/modules/lua/ngx_http_lua_rewriteby.h \
-                          src/http/modules/lua/ngx_http_lua_accessby.h \
-                          src/http/modules/lua/ngx_http_lua_setby.h \
-                          src/http/modules/lua/ngx_http_lua_capturefilter.h \
-                          src/http/modules/lua/ngx_http_lua_clfactory.h \
-                          src/http/modules/lua/ngx_http_lua_pcrefix.h \
-                          src/http/modules/lua/ngx_http_lua_headerfilterby.h \
-                          src/http/modules/lua/ngx_http_lua_shdict.h \
-                          src/http/modules/lua/ngx_http_lua_socket_tcp.h \
-                          src/http/modules/lua/api/ngx_http_lua_api.h \
-                          src/http/modules/lua/ngx_http_lua_logby.h \
-                          src/http/modules/lua/ngx_http_lua_sleep.h \
-                          src/http/modules/lua/ngx_http_lua_coroutine.h \
-                          src/http/modules/lua/ngx_http_lua_bodyfilterby.h \
-                          src/http/modules/lua/ngx_http_lua_initby.h \
-                          src/http/modules/lua/ngx_http_lua_socket_udp.h \
-                          src/http/modules/lua/ngx_http_lua_req_method.h \
-                          src/http/modules/lua/ngx_http_lua_phase.h \
-                          src/http/modules/lua/ngx_http_lua_probe.h \
-                          src/http/modules/lua/ngx_http_lua_uthread.h"
+NGX_HTTP_LUA_MODULE_DEPS="modules/ngx_http_lua_module/src/ddebug.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_script.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_log.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_subrequest.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_ndk.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_control.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_time.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_string.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_misc.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_variable.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_output.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_uri.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_req_body.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_args.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_ctx.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_regex.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_common.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_directive.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers_out.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headers_in.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_consts.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_exception.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_util.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_cache.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_contentby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_rewriteby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_accessby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_setby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_capturefilter.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_clfactory.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_pcrefix.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_headerfilterby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_shdict.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_socket_tcp.h \
+                          modules/ngx_http_lua_module/src/api/ngx_http_lua_api.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_logby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_sleep.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_coroutine.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_bodyfilterby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_initby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_initworkerby.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_socket_udp.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_req_method.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_phase.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_probe.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_uthread.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_timer.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_config.h \
+                          modules/ngx_http_lua_module/src/ngx_http_lua_worker.h"
 
 
 NGX_HTTP_TFS_MODULE="ngx_http_tfs_module"
@@ -694,6 +736,7 @@ NGX_HTTP_TFS_MODULE_DEPS="src/http/modules/tfs/ngx_http_tfs.h \
                           src/http/modules/tfs/ngx_http_tfs_restful.h \
                           src/http/modules/tfs/ngx_http_tfs_restful.h \
                           src/http/modules/tfs/ngx_http_tfs_protocol.h \
+                          src/http/modules/tfs/ngx_http_tfs_serialization.h \
                           src/http/modules/tfs/ngx_http_connection_pool.h \
                           src/http/modules/tfs/ngx_http_tfs_json.h \
                           src/http/modules/tfs/ngx_http_tfs_rc_server_info.h \
@@ -717,6 +760,7 @@ NGX_HTTP_TFS_MODULE_SRCS="src/http/modules/tfs/ngx_tfs_common.c \
                           src/http/modules/tfs/ngx_http_tfs.c \
                           src/http/modules/tfs/ngx_http_tfs_module.c \
                           src/http/modules/tfs/ngx_http_tfs_restful.c \
+                          src/http/modules/tfs/ngx_http_tfs_serialization.c \
                           src/http/modules/tfs/ngx_http_connection_pool.c \
                           src/http/modules/tfs/ngx_http_tfs_json.c \
                           src/http/modules/tfs/ngx_http_tfs_rc_server_info.c \
@@ -734,5 +778,3 @@ NGX_HTTP_TFS_MODULE_SRCS="src/http/modules/tfs/ngx_tfs_common.c \
                           src/http/modules/tfs/ngx_http_tfs_meta_server_message.c \
                           src/http/modules/tfs/ngx_http_tfs_peer_connection.c \
                           src/http/modules/tfs/ngx_http_tfs_server_handler.c "
-
-

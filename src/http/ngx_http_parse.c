@@ -212,14 +212,17 @@ ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b)
                 case 5:
                     if (ngx_str5cmp(m, 'M', 'K', 'C', 'O', 'L')) {
                         r->method = NGX_HTTP_MKCOL;
+                        break;
                     }
 
                     if (ngx_str5cmp(m, 'P', 'A', 'T', 'C', 'H')) {
                         r->method = NGX_HTTP_PATCH;
+                        break;
                     }
 
                     if (ngx_str5cmp(m, 'T', 'R', 'A', 'C', 'E')) {
                         r->method = NGX_HTTP_TRACE;
+                        break;
                     }
 
                     break;
@@ -883,6 +886,19 @@ ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
                     break;
                 }
 
+                if (ch == '_') {
+                    if (allow_underscores) {
+                        hash = ngx_hash(0, ch);
+                        r->lowcase_header[0] = ch;
+                        i = 1;
+
+                    } else {
+                        r->invalid_header = 1;
+                    }
+
+                    break;
+                }
+
                 if (ch == '\0') {
                     return NGX_HTTP_PARSE_INVALID_HEADER;
                 }
@@ -1077,6 +1093,154 @@ header_done:
 
 
 ngx_int_t
+ngx_http_parse_uri(ngx_http_request_t *r)
+{
+    u_char  *p, ch;
+    enum {
+        sw_start = 0,
+        sw_after_slash_in_uri,
+        sw_check_uri,
+        sw_uri
+    } state;
+
+    state = sw_start;
+
+    for (p = r->uri_start; p != r->uri_end; p++) {
+
+        ch = *p;
+
+        switch (state) {
+
+        case sw_start:
+
+            if (ch != '/') {
+                return NGX_ERROR;
+            }
+
+            state = sw_after_slash_in_uri;
+            break;
+
+        /* check "/.", "//", "%", and "\" (Win32) in URI */
+        case sw_after_slash_in_uri:
+
+            if (usual[ch >> 5] & (1 << (ch & 0x1f))) {
+                state = sw_check_uri;
+                break;
+            }
+
+            switch (ch) {
+            case ' ':
+                r->space_in_uri = 1;
+                state = sw_check_uri;
+                break;
+            case '.':
+                r->complex_uri = 1;
+                state = sw_uri;
+                break;
+            case '%':
+                r->quoted_uri = 1;
+                state = sw_uri;
+                break;
+            case '/':
+                r->complex_uri = 1;
+                state = sw_uri;
+                break;
+#if (NGX_WIN32)
+            case '\\':
+                r->complex_uri = 1;
+                state = sw_uri;
+                break;
+#endif
+            case '?':
+                r->args_start = p + 1;
+                state = sw_uri;
+                break;
+            case '#':
+                r->complex_uri = 1;
+                state = sw_uri;
+                break;
+            case '+':
+                r->plus_in_uri = 1;
+                break;
+            default:
+                state = sw_check_uri;
+                break;
+            }
+            break;
+
+        /* check "/", "%" and "\" (Win32) in URI */
+        case sw_check_uri:
+
+            if (usual[ch >> 5] & (1 << (ch & 0x1f))) {
+                break;
+            }
+
+            switch (ch) {
+            case '/':
+#if (NGX_WIN32)
+                if (r->uri_ext == p) {
+                    r->complex_uri = 1;
+                    state = sw_uri;
+                    break;
+                }
+#endif
+                r->uri_ext = NULL;
+                state = sw_after_slash_in_uri;
+                break;
+            case '.':
+                r->uri_ext = p + 1;
+                break;
+            case ' ':
+                r->space_in_uri = 1;
+                break;
+#if (NGX_WIN32)
+            case '\\':
+                r->complex_uri = 1;
+                state = sw_after_slash_in_uri;
+                break;
+#endif
+            case '%':
+                r->quoted_uri = 1;
+                state = sw_uri;
+                break;
+            case '?':
+                r->args_start = p + 1;
+                state = sw_uri;
+                break;
+            case '#':
+                r->complex_uri = 1;
+                state = sw_uri;
+                break;
+            case '+':
+                r->plus_in_uri = 1;
+                break;
+            }
+            break;
+
+        /* URI */
+        case sw_uri:
+
+            if (usual[ch >> 5] & (1 << (ch & 0x1f))) {
+                break;
+            }
+
+            switch (ch) {
+            case ' ':
+                r->space_in_uri = 1;
+                break;
+            case '#':
+                r->complex_uri = 1;
+                break;
+            }
+            break;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
 ngx_http_parse_complex_uri(ngx_http_request_t *r, ngx_uint_t merge_slashes)
 {
     u_char  c, ch, decoded, *p, *u;
@@ -1110,8 +1274,8 @@ ngx_http_parse_complex_uri(ngx_http_request_t *r, ngx_uint_t merge_slashes)
          * the line feed
          */
 
-        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "s:%d in:'%Xd:%c', out:'%c'", state, ch, ch, *u);
+        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "s:%d in:'%Xd:%c'", state, ch, ch);
 
         switch (state) {
 
@@ -1629,23 +1793,32 @@ ngx_int_t
 ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args, ngx_uint_t *flags)
 {
-    u_char  ch, *p;
-    size_t  len;
+    u_char      ch, *p, *src, *dst;
+    size_t      len;
+    ngx_uint_t  quoted;
 
     len = uri->len;
     p = uri->data;
+    quoted = 0;
 
     if (len == 0 || p[0] == '?') {
         goto unsafe;
     }
 
-    if (p[0] == '.' && len == 3 && p[1] == '.' && (ngx_path_separator(p[2]))) {
+    if (p[0] == '.' && len > 1 && p[1] == '.'
+        && (len == 2 || ngx_path_separator(p[2])))
+    {
         goto unsafe;
     }
 
     for ( /* void */ ; len; len--) {
 
         ch = *p++;
+
+        if (ch == '%') {
+            quoted = 1;
+            continue;
+        }
 
         if (usual[ch >> 5] & (1 << (ch & 0x1f))) {
             continue;
@@ -1656,7 +1829,7 @@ ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
             args->data = p;
             uri->len -= len;
 
-            return NGX_OK;
+            break;
         }
 
         if (ch == '\0') {
@@ -1665,10 +1838,62 @@ ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
 
         if (ngx_path_separator(ch) && len > 2) {
 
-            /* detect "/../" */
+            /* detect "/../" and "/.." */
 
-            if (p[0] == '.' && p[1] == '.' && ngx_path_separator(p[2])) {
+            if (p[0] == '.' && p[1] == '.'
+                && (len == 3 || ngx_path_separator(p[2])))
+            {
                 goto unsafe;
+            }
+        }
+    }
+
+    if (quoted) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "escaped URI: \"%V\"", uri);
+
+        src = uri->data;
+
+        dst = ngx_pnalloc(r->pool, uri->len);
+        if (dst == NULL) {
+            return NGX_ERROR;
+        }
+
+        uri->data = dst;
+
+        ngx_unescape_uri(&dst, &src, uri->len, 0);
+
+        uri->len = dst - uri->data;
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "unescaped URI: \"%V\"", uri);
+
+        len = uri->len;
+        p = uri->data;
+
+        if (p[0] == '.' && len > 1 && p[1] == '.'
+            && (len == 2 || ngx_path_separator(p[2])))
+        {
+            goto unsafe;
+        }
+
+        for ( /* void */ ; len; len--) {
+
+            ch = *p++;
+
+            if (ch == '\0') {
+                goto unsafe;
+            }
+
+            if (ngx_path_separator(ch) && len > 2) {
+
+                /* detect "/../" and "/.." */
+
+                if (p[0] == '.' && p[1] == '.'
+                    && (len == 3 || ngx_path_separator(p[2])))
+                {
+                    goto unsafe;
+                }
             }
         }
     }
@@ -1874,4 +2099,392 @@ ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value)
 {
     return ngx_http_header(&r->headers_out.headers.part, name, len, value);
+}
+
+
+ngx_int_t
+ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
+    ngx_http_chunked_t *ctx)
+{
+    u_char     *pos, ch, c;
+    ngx_int_t   rc;
+    enum {
+        sw_chunk_start = 0,
+        sw_chunk_size,
+        sw_chunk_extension,
+        sw_chunk_extension_almost_done,
+        sw_chunk_data,
+        sw_after_data,
+        sw_after_data_almost_done,
+        sw_last_chunk_extension,
+        sw_last_chunk_extension_almost_done,
+        sw_trailer,
+        sw_trailer_almost_done,
+        sw_trailer_header,
+        sw_trailer_header_almost_done
+    } state;
+
+    state = ctx->state;
+
+    if (state == sw_chunk_data && ctx->size == 0) {
+        state = sw_after_data;
+    }
+
+    rc = NGX_AGAIN;
+
+    for (pos = b->pos; pos < b->last; pos++) {
+
+        ch = *pos;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http chunked byte: %02Xd s:%d", ch, state);
+
+        switch (state) {
+
+        case sw_chunk_start:
+            if (ch >= '0' && ch <= '9') {
+                state = sw_chunk_size;
+                ctx->size = ch - '0';
+                break;
+            }
+
+            c = (u_char) (ch | 0x20);
+
+            if (c >= 'a' && c <= 'f') {
+                state = sw_chunk_size;
+                ctx->size = c - 'a' + 10;
+                break;
+            }
+
+            goto invalid;
+
+        case sw_chunk_size:
+            if (ch >= '0' && ch <= '9') {
+                ctx->size = ctx->size * 16 + (ch - '0');
+                break;
+            }
+
+            c = (u_char) (ch | 0x20);
+
+            if (c >= 'a' && c <= 'f') {
+                ctx->size = ctx->size * 16 + (c - 'a' + 10);
+                break;
+            }
+
+            if (ctx->size == 0) {
+
+                switch (ch) {
+                case CR:
+                    state = sw_last_chunk_extension_almost_done;
+                    break;
+                case LF:
+                    state = sw_trailer;
+                    break;
+                case ';':
+                case ' ':
+                case '\t':
+                    state = sw_last_chunk_extension;
+                    break;
+                default:
+                    goto invalid;
+                }
+
+                break;
+            }
+
+            switch (ch) {
+            case CR:
+                state = sw_chunk_extension_almost_done;
+                break;
+            case LF:
+                state = sw_chunk_data;
+                break;
+            case ';':
+            case ' ':
+            case '\t':
+                state = sw_chunk_extension;
+                break;
+            default:
+                goto invalid;
+            }
+
+            break;
+
+        case sw_chunk_extension:
+            switch (ch) {
+            case CR:
+                state = sw_chunk_extension_almost_done;
+                break;
+            case LF:
+                state = sw_chunk_data;
+            }
+            break;
+
+        case sw_chunk_extension_almost_done:
+            if (ch == LF) {
+                state = sw_chunk_data;
+                break;
+            }
+            goto invalid;
+
+        case sw_chunk_data:
+            rc = NGX_OK;
+            goto data;
+
+        case sw_after_data:
+            switch (ch) {
+            case CR:
+                state = sw_after_data_almost_done;
+                break;
+            case LF:
+                state = sw_chunk_start;
+            }
+            break;
+
+        case sw_after_data_almost_done:
+            if (ch == LF) {
+                state = sw_chunk_start;
+                break;
+            }
+            goto invalid;
+
+        case sw_last_chunk_extension:
+            switch (ch) {
+            case CR:
+                state = sw_last_chunk_extension_almost_done;
+                break;
+            case LF:
+                state = sw_trailer;
+            }
+            break;
+
+        case sw_last_chunk_extension_almost_done:
+            if (ch == LF) {
+                state = sw_trailer;
+                break;
+            }
+            goto invalid;
+
+        case sw_trailer:
+            switch (ch) {
+            case CR:
+                state = sw_trailer_almost_done;
+                break;
+            case LF:
+                goto done;
+            default:
+                state = sw_trailer_header;
+            }
+            break;
+
+        case sw_trailer_almost_done:
+            if (ch == LF) {
+                goto done;
+            }
+            goto invalid;
+
+        case sw_trailer_header:
+            switch (ch) {
+            case CR:
+                state = sw_trailer_header_almost_done;
+                break;
+            case LF:
+                state = sw_trailer;
+            }
+            break;
+
+        case sw_trailer_header_almost_done:
+            if (ch == LF) {
+                state = sw_trailer;
+                break;
+            }
+            goto invalid;
+
+        }
+    }
+
+data:
+
+    ctx->state = state;
+    b->pos = pos;
+
+    switch (state) {
+
+    case sw_chunk_start:
+        ctx->length = 3 /* "0" LF LF */;
+        break;
+    case sw_chunk_size:
+        ctx->length = 1 /* LF */
+                      + (ctx->size ? ctx->size + 4 /* LF "0" LF LF */
+                                   : 1 /* LF */);
+        break;
+    case sw_chunk_extension:
+    case sw_chunk_extension_almost_done:
+        ctx->length = 1 /* LF */ + ctx->size + 4 /* LF "0" LF LF */;
+        break;
+    case sw_chunk_data:
+        ctx->length = ctx->size + 4 /* LF "0" LF LF */;
+        break;
+    case sw_after_data:
+    case sw_after_data_almost_done:
+        ctx->length = 4 /* LF "0" LF LF */;
+        break;
+    case sw_last_chunk_extension:
+    case sw_last_chunk_extension_almost_done:
+        ctx->length = 2 /* LF LF */;
+        break;
+    case sw_trailer:
+    case sw_trailer_almost_done:
+        ctx->length = 1 /* LF */;
+        break;
+    case sw_trailer_header:
+    case sw_trailer_header_almost_done:
+        ctx->length = 2 /* LF LF */;
+        break;
+
+    }
+
+    if (ctx->size < 0 || ctx->length < 0) {
+        goto invalid;
+    }
+
+    return rc;
+
+done:
+
+    ctx->state = 0;
+    b->pos = pos + 1;
+
+    return NGX_DONE;
+
+invalid:
+
+    return NGX_ERROR;
+}
+
+
+ngx_int_t
+ngx_http_chunked_output_filter(ngx_http_request_t *r, ngx_chain_t *in,
+    ngx_chain_t **output, ngx_chain_t **free, ngx_buf_tag_t tag)
+{
+    u_char      *chunk;
+    off_t        size;
+    ngx_buf_t   *b;
+    ngx_chain_t *out, *cl, *tl, **ll;
+
+    if (in == NULL || !r->headers_in.chunked) {
+        *output = in;
+        return NGX_OK;
+    }
+
+    out = NULL;
+    ll = &out;
+
+    size = 0;
+    cl = in;
+
+    for ( ;; ) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http output chunk: %d", ngx_buf_size(cl->buf));
+
+        size += ngx_buf_size(cl->buf);
+
+        if (cl->buf->flush
+            || cl->buf->sync
+            || ngx_buf_size(cl->buf) > 0)
+        {
+            tl = ngx_alloc_chain_link(r->pool);
+            if (tl == NULL) {
+                return NGX_ERROR;
+            }
+
+            tl->buf = cl->buf;
+            *ll = tl;
+            ll = &tl->next;
+        }
+
+        if (cl->next == NULL) {
+            break;
+        }
+
+        cl = cl->next;
+    }
+
+    if (size) {
+        tl = ngx_chain_get_free_buf(r->pool, free);
+        if (tl == NULL) {
+            return NGX_ERROR;
+        }
+
+        b = tl->buf;
+        chunk = b->start;
+
+        if (chunk == NULL) {
+            /* the "0000000000000000" is 64-bit hexadecimal string */
+
+            chunk = ngx_palloc(r->pool, sizeof("0000000000000000" CRLF) - 1);
+            if (chunk == NULL) {
+                return NGX_ERROR;
+            }
+
+            b->start = chunk;
+            b->end = chunk + sizeof("0000000000000000" CRLF) - 1;
+        }
+
+        b->tag = tag;
+        b->memory = 0;
+        b->temporary = 1;
+        b->pos = chunk;
+        b->last = ngx_sprintf(chunk, "%xO" CRLF, size);
+
+        tl->next = out;
+        out = tl;
+    }
+
+    if (cl->buf->last_buf) {
+        tl = ngx_chain_get_free_buf(r->pool, free);
+        if (tl == NULL) {
+            return NGX_ERROR;
+        }
+
+        b = tl->buf;
+
+        b->tag = tag;
+        b->memory = 0;
+        b->temporary = 1;
+        b->last_buf = 1;
+        b->pos = (u_char *) CRLF "0" CRLF CRLF;
+        b->last = b->pos + 7;
+
+        cl->buf->last_buf = 0;
+
+        *ll = tl;
+
+        if (size == 0) {
+            b->pos += 2;
+        }
+
+    } else if (size > 0) {
+        tl = ngx_chain_get_free_buf(r->pool, free);
+        if (tl == NULL) {
+            return NGX_ERROR;
+        }
+
+        b = tl->buf;
+
+        b->tag = tag;
+        b->temporary = 0;
+        b->memory = 1;
+        b->pos = (u_char *) CRLF;
+        b->last = b->pos + 2;
+
+        *ll = tl;
+
+    } else {
+        *ll = NULL;
+    }
+
+    *output = out;
+
+    return NGX_OK;
 }

@@ -24,7 +24,7 @@
  * so we limit it to 2G-1 bytes.
  */
 
-#define NGX_SENDFILE_LIMIT  2147483647L
+#define NGX_SENDFILE_MAXSIZE  2147483647L
 
 
 #if (IOV_MAX > 64)
@@ -63,8 +63,8 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
     /* the maximum limit size is 2G-1 - the page size */
 
-    if (limit == 0 || limit > (off_t) (NGX_SENDFILE_LIMIT - ngx_pagesize)) {
-        limit = NGX_SENDFILE_LIMIT - ngx_pagesize;
+    if (limit == 0 || limit > (off_t) (NGX_SENDFILE_MAXSIZE - ngx_pagesize)) {
+        limit = NGX_SENDFILE_MAXSIZE - ngx_pagesize;
     }
 
 
@@ -163,7 +163,7 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
                                (const void *) &tcp_nodelay, sizeof(int)) == -1)
                 {
-                    err = ngx_errno;
+                    err = ngx_socket_errno;
 
                     /*
                      * there is a tiny chance to be interrupted, however,
@@ -181,7 +181,7 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 } else {
                     c->tcp_nodelay = NGX_TCP_NODELAY_UNSET;
 
-                    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
                                    "no tcp_nodelay");
                 }
             }
@@ -189,7 +189,7 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
             if (c->tcp_nodelay == NGX_TCP_NODELAY_UNSET) {
 
                 if (ngx_tcp_nopush(c->fd) == NGX_ERROR) {
-                    err = ngx_errno;
+                    err = ngx_socket_errno;
 
                     /*
                      * there is a tiny chance to be interrupted, however,
@@ -325,9 +325,9 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
         c->sent += sent;
 
-        for (cl = in; cl; cl = cl->next) {
+        for ( /* void */ ; in; in = in->next) {
 
-            if (ngx_buf_special(cl->buf)) {
+            if (ngx_buf_special(in->buf)) {
                 continue;
             }
 
@@ -335,28 +335,28 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 break;
             }
 
-            size = ngx_buf_size(cl->buf);
+            size = ngx_buf_size(in->buf);
 
             if (sent >= size) {
                 sent -= size;
 
-                if (ngx_buf_in_memory(cl->buf)) {
-                    cl->buf->pos = cl->buf->last;
+                if (ngx_buf_in_memory(in->buf)) {
+                    in->buf->pos = in->buf->last;
                 }
 
-                if (cl->buf->in_file) {
-                    cl->buf->file_pos = cl->buf->file_last;
+                if (in->buf->in_file) {
+                    in->buf->file_pos = in->buf->file_last;
                 }
 
                 continue;
             }
 
-            if (ngx_buf_in_memory(cl->buf)) {
-                cl->buf->pos += (size_t) sent;
+            if (ngx_buf_in_memory(in->buf)) {
+                in->buf->pos += (size_t) sent;
             }
 
-            if (cl->buf->in_file) {
-                cl->buf->file_pos += sent;
+            if (in->buf->in_file) {
+                in->buf->file_pos += sent;
             }
 
             break;
@@ -368,13 +368,11 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
         if (!complete) {
             wev->ready = 0;
-            return cl;
+            return in;
         }
 
-        if (send >= limit || cl == NULL) {
-            return cl;
+        if (send >= limit || in == NULL) {
+            return in;
         }
-
-        in = cl;
     }
 }

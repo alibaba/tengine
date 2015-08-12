@@ -70,7 +70,7 @@ if [ $USE_PERL = YES ]; then
     . auto/lib/perl/conf
 fi
 
-if [ $HTTP_LUA = YES ] || [ $HTTP_LUA_SHARED = YES ]; then
+if [ $HTTP_LUA_SHARED = YES ]; then
     . auto/lib/lua/conf
 fi
 

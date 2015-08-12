@@ -1,29 +1,549 @@
 
-Changes with nginx 1.2.9                                         13 May 2013
+Changes with nginx 1.6.2                                         16 Sep 2014
 
-    *) Security: contents of worker process memory might be sent to a client
-       if HTTP backend returned specially crafted response (CVE-2013-2070);
-       the bug had appeared in 1.1.4.
+    *) Security: it was possible to reuse SSL sessions in unrelated contexts
+       if a shared SSL session cache or the same TLS session ticket key was
+       used for multiple "server" blocks (CVE-2014-3616).
+       Thanks to Antoine Delignat-Lavaud.
+
+    *) Bugfix: requests might hang if resolver was used and a DNS server
+       returned a malformed response; the bug had appeared in 1.5.8.
+
+    *) Bugfix: requests might hang if resolver was used and a timeout
+       occurred during a DNS request.
 
 
-Changes with nginx 1.2.8                                         02 Apr 2013
+Changes with nginx 1.6.1                                         05 Aug 2014
+
+    *) Security: pipelined commands were not discarded after STARTTLS
+       command in SMTP proxy (CVE-2014-3556); the bug had appeared in 1.5.6.
+       Thanks to Chris Boulton.
+
+    *) Bugfix: the $uri variable might contain garbage when returning errors
+       with code 400.
+       Thanks to Sergey Bobrov.
+
+    *) Bugfix: in the "none" parameter in the "smtp_auth" directive; the bug
+       had appeared in 1.5.6.
+       Thanks to Svyatoslav Nikolsky.
+
+
+Changes with nginx 1.6.0                                         24 Apr 2014
+
+    *) 1.6.x stable branch.
+
+
+Changes with nginx 1.5.13                                        08 Apr 2014
+
+    *) Change: improved hash table handling; the default values of the
+       "variables_hash_max_size" and "types_hash_bucket_size" were changed
+       to 1024 and 64 respectively.
+
+    *) Feature: the ngx_http_mp4_module now supports the "end" argument.
+
+    *) Feature: byte ranges support in the ngx_http_mp4_module and while
+       saving responses to cache.
+
+    *) Bugfix: alerts "ngx_slab_alloc() failed: no memory" no longer logged
+       when using shared memory in the "ssl_session_cache" directive and in
+       the ngx_http_limit_req_module.
+
+    *) Bugfix: the "underscores_in_headers" directive did not allow
+       underscore as a first character of a header.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: cache manager might hog CPU on exit in nginx/Windows.
+
+    *) Bugfix: nginx/Windows terminated abnormally if the
+       "ssl_session_cache" directive was used with the "shared" parameter.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+
+
+Changes with nginx 1.5.12                                        18 Mar 2014
+
+    *) Security: a heap memory buffer overflow might occur in a worker
+       process while handling a specially crafted request by
+       ngx_http_spdy_module, potentially resulting in arbitrary code
+       execution (CVE-2014-0133).
+       Thanks to Lucas Molas, researcher at Programa STIC, Fundación Dr.
+       Manuel Sadosky, Buenos Aires, Argentina.
+
+    *) Feature: the "proxy_protocol" parameters of the "listen" and
+       "real_ip_header" directives, the $proxy_protocol_addr variable.
+
+    *) Bugfix: in the "fastcgi_next_upstream" directive.
+       Thanks to Lucas Molas.
+
+
+Changes with nginx 1.5.11                                        04 Mar 2014
+
+    *) Security: memory corruption might occur in a worker process on 32-bit
+       platforms while handling a specially crafted request by
+       ngx_http_spdy_module, potentially resulting in arbitrary code
+       execution (CVE-2014-0088); the bug had appeared in 1.5.10.
+       Thanks to Lucas Molas, researcher at Programa STIC, Fundación Dr.
+       Manuel Sadosky, Buenos Aires, Argentina.
+
+    *) Feature: the $ssl_session_reused variable.
+
+    *) Bugfix: the "client_max_body_size" directive might not work when
+       reading a request body using chunked transfer encoding; the bug had
+       appeared in 1.3.9.
+       Thanks to Lucas Molas.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       proxying WebSocket connections.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       ngx_http_spdy_module was used on 32-bit platforms; the bug had
+       appeared in 1.5.10.
+
+    *) Bugfix: the $upstream_status variable might contain wrong data if the
+       "proxy_cache_use_stale" or "proxy_cache_revalidate" directives were
+       used.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       errors with code 400 were redirected to a named location using the
+       "error_page" directive.
+
+    *) Bugfix: nginx/Windows could not be built with Visual Studio 2013.
+
+
+Changes with nginx 1.5.10                                        04 Feb 2014
+
+    *) Feature: the ngx_http_spdy_module now uses SPDY 3.1 protocol.
+       Thanks to Automattic and MaxCDN for sponsoring this work.
+
+    *) Feature: the ngx_http_mp4_module now skips tracks too short for a
+       seek requested.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       $ssl_session_id variable was used in logs; the bug had appeared in
+       1.5.9.
+
+    *) Bugfix: the $date_local and $date_gmt variables used wrong format
+       outside of the ngx_http_ssi_filter_module.
+
+    *) Bugfix: client connections might be immediately closed if deferred
+       accept was used; the bug had appeared in 1.3.15.
+
+    *) Bugfix: alerts "getsockopt(TCP_FASTOPEN) ... failed" appeared in logs
+       during binary upgrade on Linux; the bug had appeared in 1.5.8.
+       Thanks to Piotr Sikora.
+
+
+Changes with nginx 1.5.9                                         22 Jan 2014
+
+    *) Change: now nginx expects escaped URIs in "X-Accel-Redirect" headers.
+
+    *) Feature: the "ssl_buffer_size" directive.
+
+    *) Feature: the "limit_rate" directive can now be used to rate limit
+       responses sent in SPDY connections.
+
+    *) Feature: the "spdy_chunk_size" directive.
+
+    *) Feature: the "ssl_session_tickets" directive.
+       Thanks to Dirkjan Bussink.
+
+    *) Bugfix: the $ssl_session_id variable contained full session
+       serialized instead of just a session id.
+       Thanks to Ivan Ristić.
+
+    *) Bugfix: nginx incorrectly handled escaped "?" character in the
+       "include" SSI command.
+
+    *) Bugfix: the ngx_http_dav_module did not unescape destination URI of
+       the COPY and MOVE methods.
+
+    *) Bugfix: resolver did not understand domain names with a trailing dot.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: alerts "zero size buf in output" might appear in logs while
+       proxying; the bug had appeared in 1.3.9.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       ngx_http_spdy_module was used.
+
+    *) Bugfix: proxied WebSocket connections might hang right after
+       handshake if the select, poll, or /dev/poll methods were used.
+
+    *) Bugfix: the "xclient" directive of the mail proxy module incorrectly
+       handled IPv6 client addresses.
+
+
+Changes with nginx 1.5.8                                         17 Dec 2013
+
+    *) Feature: IPv6 support in resolver.
+
+    *) Feature: the "listen" directive supports the "fastopen" parameter.
+       Thanks to Mathew Rodley.
+
+    *) Feature: SSL support in the ngx_http_uwsgi_module.
+       Thanks to Roberto De Ioris.
+
+    *) Feature: vim syntax highlighting scripts were added to contrib.
+       Thanks to Evan Miller.
+
+    *) Bugfix: a timeout might occur while reading client request body in an
+       SSL connection using chunked transfer encoding.
+
+    *) Bugfix: the "master_process" directive did not work correctly in
+       nginx/Windows.
+
+    *) Bugfix: the "setfib" parameter of the "listen" directive might not
+       work.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+
+
+Changes with nginx 1.5.7                                         19 Nov 2013
+
+    *) Security: a character following an unescaped space in a request line
+       was handled incorrectly (CVE-2013-4547); the bug had appeared in
+       0.8.41.
+       Thanks to Ivan Fratric of the Google Security Team.
+
+    *) Change: a logging level of auth_basic errors about no user/password
+       provided has been lowered from "error" to "info".
+
+    *) Feature: the "proxy_cache_revalidate", "fastcgi_cache_revalidate",
+       "scgi_cache_revalidate", and "uwsgi_cache_revalidate" directives.
+
+    *) Feature: the "ssl_session_ticket_key" directive.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: the directive "add_header Cache-Control ''" added a
+       "Cache-Control" response header line with an empty value.
+
+    *) Bugfix: the "satisfy any" directive might return 403 error instead of
+       401 if auth_request and auth_basic directives were used.
+       Thanks to Jan Marc Hoffmann.
+
+    *) Bugfix: the "accept_filter" and "deferred" parameters of the "listen"
+       directive were ignored for listen sockets created during binary
+       upgrade.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: some data received from a backend with unbufferred proxy
+       might not be sent to a client immediately if "gzip" or "gunzip"
+       directives were used.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: in error handling in ngx_http_gunzip_filter_module.
+
+    *) Bugfix: responses might hang if the ngx_http_spdy_module was used
+       with the "auth_request" directive.
+
+    *) Bugfix: memory leak in nginx/Windows.
+
+
+Changes with nginx 1.5.6                                         01 Oct 2013
+
+    *) Feature: the "fastcgi_buffering" directive.
+
+    *) Feature: the "proxy_ssl_protocols" and "proxy_ssl_ciphers"
+       directives.
+       Thanks to Piotr Sikora.
+
+    *) Feature: optimization of SSL handshakes when using long certificate
+       chains.
+
+    *) Feature: the mail proxy supports SMTP pipelining.
+
+    *) Bugfix: in the ngx_http_auth_basic_module when using "$apr1$"
+       password encryption method.
+       Thanks to Markus Linnala.
+
+    *) Bugfix: in MacOSX, Cygwin, and nginx/Windows incorrect location might
+       be used to process a request if locations were given using characters
+       in different cases.
+
+    *) Bugfix: automatic redirect with appended trailing slash for proxied
+       locations might not work.
+
+    *) Bugfix: in the mail proxy server.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+
+
+Changes with nginx 1.5.5                                         17 Sep 2013
+
+    *) Change: now nginx assumes HTTP/1.0 by default if it is not able to
+       detect protocol reliably.
+
+    *) Feature: the "disable_symlinks" directive now uses O_PATH on Linux.
+
+    *) Feature: now nginx uses EPOLLRDHUP events to detect premature
+       connection close by clients if the "epoll" method is used.
+
+    *) Bugfix: in the "valid_referers" directive if the "server_names"
+       parameter was used.
+
+    *) Bugfix: the $request_time variable did not work in nginx/Windows.
+
+    *) Bugfix: in the "image_filter" directive.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: OpenSSL 1.0.1f compatibility.
+       Thanks to Piotr Sikora.
+
+
+Changes with nginx 1.5.4                                         27 Aug 2013
+
+    *) Change: the "js" extension MIME type has been changed to
+       "application/javascript"; default value of the "charset_types"
+       directive was changed accordingly.
+
+    *) Change: now the "image_filter" directive with the "size" parameter
+       returns responses with the "application/json" MIME type.
+
+    *) Feature: the ngx_http_auth_request_module.
+
+    *) Bugfix: a segmentation fault might occur on start or during
+       reconfiguration if the "try_files" directive was used with an empty
+       parameter.
+
+    *) Bugfix: memory leak if relative paths were specified using variables
+       in the "root" or "auth_basic_user_file" directives.
+
+    *) Bugfix: the "valid_referers" directive incorrectly executed regular
+       expressions if a "Referer" header started with "https://".
+       Thanks to Liangbin Li.
+
+    *) Bugfix: responses might hang if subrequests were used and an SSL
+       handshake error happened during subrequest processing.
+       Thanks to Aviram Cohen.
+
+    *) Bugfix: in the ngx_http_autoindex_module.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+
+
+Changes with nginx 1.5.3                                         30 Jul 2013
+
+    *) Change in internal API: now u->length defaults to -1 if working with
+       backends in unbuffered mode.
+
+    *) Change: now after receiving an incomplete response from a backend
+       server nginx tries to send an available part of the response to a
+       client, and then closes client connection.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       ngx_http_spdy_module was used with the "client_body_in_file_only"
+       directive.
+
+    *) Bugfix: the "so_keepalive" parameter of the "listen" directive might
+       be handled incorrectly on DragonFlyBSD.
+       Thanks to Sepherosa Ziehau.
+
+    *) Bugfix: in the ngx_http_xslt_filter_module.
+
+    *) Bugfix: in the ngx_http_sub_filter_module.
+
+
+Changes with nginx 1.5.2                                         02 Jul 2013
+
+    *) Feature: now several "error_log" directives can be used.
+
+    *) Bugfix: the $r->header_in() embedded perl method did not return value
+       of the "Cookie" and "X-Forwarded-For" request header lines; the bug
+       had appeared in 1.3.14.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+       Thanks to Jim Radford.
+
+    *) Bugfix: nginx could not be built on Linux with x32 ABI.
+       Thanks to Serguei Ivantsov.
+
+
+Changes with nginx 1.5.1                                         04 Jun 2013
+
+    *) Feature: the "ssi_last_modified", "sub_filter_last_modified", and
+       "xslt_last_modified" directives.
+       Thanks to Alexey Kolpakov.
+
+    *) Feature: the "http_403" parameter of the "proxy_next_upstream",
+       "fastcgi_next_upstream", "scgi_next_upstream", and
+       "uwsgi_next_upstream" directives.
+
+    *) Feature: the "allow" and "deny" directives now support unix domain
+       sockets.
+
+    *) Bugfix: nginx could not be built with the ngx_mail_ssl_module, but
+       without ngx_http_ssl_module; the bug had appeared in 1.3.14.
+
+    *) Bugfix: in the "proxy_set_body" directive.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: in the "lingering_time" directive.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: the "fail_timeout" parameter of the "server" directive in the
+       "upstream" context might not work if "max_fails" parameter was used;
+       the bug had appeared in 1.3.0.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "ssl_stapling" directive was used.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: in the mail proxy server.
+       Thanks to Filipe Da Silva.
+
+    *) Bugfix: nginx/Windows might stop accepting connections if several
+       worker processes were used.
+
+
+Changes with nginx 1.5.0                                         07 May 2013
+
+    *) Security: a stack-based buffer overflow might occur in a worker
+       process while handling a specially crafted request, potentially
+       resulting in arbitrary code execution (CVE-2013-2028); the bug had
+       appeared in 1.3.9.
+       Thanks to Greg MacManus, iSIGHT Partners Labs.
+
+
+Changes with nginx 1.4.0                                         24 Apr 2013
+
+    *) Bugfix: nginx could not be built with the ngx_http_perl_module if the
+       --with-openssl option was used; the bug had appeared in 1.3.16.
+
+    *) Bugfix: in a request body handling in the ngx_http_perl_module; the
+       bug had appeared in 1.3.9.
+
+
+Changes with nginx 1.3.16                                        16 Apr 2013
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       subrequests were used; the bug had appeared in 1.3.9.
+
+    *) Bugfix: the "tcp_nodelay" directive caused an error if a WebSocket
+       connection was proxied into a unix domain socket.
+
+    *) Bugfix: the $upstream_response_length variable has an incorrect value
+       "0" if buffering was not used.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: in the eventport and /dev/poll methods.
+
+
+Changes with nginx 1.3.15                                        26 Mar 2013
+
+    *) Change: opening and closing a connection without sending any data in
+       it is no longer logged to access_log with error code 400.
+
+    *) Feature: the ngx_http_spdy_module.
+       Thanks to Automattic for sponsoring this work.
+
+    *) Feature: the "limit_req_status" and "limit_conn_status" directives.
+       Thanks to Nick Marden.
+
+    *) Feature: the "image_filter_interlace" directive.
+       Thanks to Ian Babrou.
+
+    *) Feature: $connections_waiting variable in the
+       ngx_http_stub_status_module.
+
+    *) Feature: the mail proxy module now supports IPv6 backends.
+
+    *) Bugfix: request body might be transmitted incorrectly when retrying a
+       request to the next upstream server; the bug had appeared in 1.3.9.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: in the "client_body_in_file_only" directive; the bug had
+       appeared in 1.3.9.
+
+    *) Bugfix: responses might hang if subrequests were used and a DNS error
+       happened during subrequest processing.
+       Thanks to Lanshun Zhou.
+
+    *) Bugfix: in backend usage accounting.
+
+
+Changes with nginx 1.3.14                                        05 Mar 2013
+
+    *) Feature: $connections_active, $connections_reading, and
+       $connections_writing variables in the ngx_http_stub_status_module.
+
+    *) Feature: support of WebSocket connections in the
+       ngx_http_uwsgi_module and ngx_http_scgi_module.
+
+    *) Bugfix: in virtual servers handling with SNI.
 
     *) Bugfix: new sessions were not always stored if the "ssl_session_cache
        shared" directive was used and there was no free space in shared
        memory.
        Thanks to Piotr Sikora.
 
-    *) Bugfix: responses might hang if subrequests were used and a DNS error
-       happened during subrequest processing.
-       Thanks to Lanshun Zhou.
+    *) Bugfix: multiple X-Forwarded-For headers were handled incorrectly.
+       Thanks to Neal Poole for sponsoring this work.
 
     *) Bugfix: in the ngx_http_mp4_module.
        Thanks to Gernot Vormayr.
 
-    *) Bugfix: in backend usage accounting.
+
+Changes with nginx 1.3.13                                        19 Feb 2013
+
+    *) Change: a compiler with name "cc" is now used by default.
+
+    *) Feature: support for proxying of WebSocket connections.
+       Thanks to Apcera and CloudBees for sponsoring this work.
+
+    *) Feature: the "auth_basic_user_file" directive supports "{SHA}"
+       password encryption method.
+       Thanks to Louis Opter.
 
 
-Changes with nginx 1.2.7                                         12 Feb 2013
+Changes with nginx 1.3.12                                        05 Feb 2013
+
+    *) Feature: variables support in the "proxy_bind", "fastcgi_bind",
+       "memcached_bind", "scgi_bind", and "uwsgi_bind" directives.
+
+    *) Feature: the $pipe, $request_length, $time_iso8601, and $time_local
+       variables can now be used not only in the "log_format" directive.
+       Thanks to Kiril Kalchev.
+
+    *) Feature: IPv6 support in the ngx_http_geoip_module.
+       Thanks to Gregor Kališnik.
+
+    *) Bugfix: in the "proxy_method" directive.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       resolver was used with the poll method.
+
+    *) Bugfix: nginx might hog CPU during SSL handshake with a backend if
+       the select, poll, or /dev/poll methods were used.
+
+    *) Bugfix: the "[crit] SSL_write() failed (SSL:)" error.
+
+    *) Bugfix: in the "client_body_in_file_only" directive; the bug had
+       appeared in 1.3.9.
+
+    *) Bugfix: in the "fastcgi_keep_conn" directive.
+
+
+Changes with nginx 1.3.11                                        10 Jan 2013
+
+    *) Bugfix: a segmentation fault might occur if logging was used; the bug
+       had appeared in 1.3.10.
+
+    *) Bugfix: the "proxy_pass" directive did not work with IP addresses
+       without port specified; the bug had appeared in 1.3.10.
+
+    *) Bugfix: a segmentation fault occurred on start or during
+       reconfiguration if the "keepalive" directive was specified more than
+       once in a single upstream block.
+
+    *) Bugfix: parameter "default" of the "geo" directive did not set
+       default value for IPv6 addresses.
+
+
+Changes with nginx 1.3.10                                        25 Dec 2012
+
+    *) Change: domain names specified in configuration file are now resolved
+       to IPv6 addresses as well as IPv4 ones.
 
     *) Change: now if the "include" directive with mask is used on Unix
        systems, included files are sorted in alphabetical order.
@@ -37,13 +557,6 @@ Changes with nginx 1.2.7                                         12 Feb 2013
        directive.
 
     *) Feature: variables support in the "auth_basic" directive.
-
-    *) Feature: the $pipe, $request_length, $time_iso8601, and $time_local
-       variables can now be used not only in the "log_format" directive.
-       Thanks to Kiril Kalchev.
-
-    *) Feature: IPv6 support in the ngx_http_geoip_module.
-       Thanks to Gregor Kališnik.
 
     *) Bugfix: nginx could not be built with the ngx_http_perl_module in
        some cases.
@@ -78,24 +591,11 @@ Changes with nginx 1.2.7                                         12 Feb 2013
     *) Bugfix: proxied HEAD requests might return incorrect response if the
        "gzip" directive was used.
 
-    *) Bugfix: a segmentation fault occurred on start or during
-       reconfiguration if the "keepalive" directive was specified more than
-       once in a single upstream block.
 
-    *) Bugfix: in the "proxy_method" directive.
+Changes with nginx 1.3.9                                         27 Nov 2012
 
-    *) Bugfix: a segmentation fault might occur in a worker process if
-       resolver was used with the poll method.
-
-    *) Bugfix: nginx might hog CPU during SSL handshake with a backend if
-       the select, poll, or /dev/poll methods were used.
-
-    *) Bugfix: the "[crit] SSL_write() failed (SSL:)" error.
-
-    *) Bugfix: in the "fastcgi_keep_conn" directive.
-
-
-Changes with nginx 1.2.6                                         11 Dec 2012
+    *) Feature: support for chunked transfer encoding while reading client
+       request body.
 
     *) Feature: the $request_time and $msec variables can now be used not
        only in the "log_format" directive.
@@ -106,7 +606,7 @@ Changes with nginx 1.2.6                                         11 Dec 2012
     *) Bugfix: in the ngx_http_dav_module.
 
 
-Changes with nginx 1.2.5                                         13 Nov 2012
+Changes with nginx 1.3.8                                         30 Oct 2012
 
     *) Feature: the "optional_no_ca" parameter of the "ssl_verify_client"
        directive.
@@ -116,23 +616,47 @@ Changes with nginx 1.2.5                                         13 Nov 2012
        variables can now be used not only in the "log_format" directive.
        Thanks to Benjamin Grössing.
 
-    *) Feature: resolver now randomly rotates addresses returned from cache.
-       Thanks to Anton Jouline.
-
     *) Feature: the "auto" parameter of the "worker_processes" directive.
 
     *) Bugfix: "cache file ... has md5 collision" alert.
 
+    *) Bugfix: in the ngx_http_gunzip_filter_module.
+
+    *) Bugfix: in the "ssl_stapling" directive.
+
+
+Changes with nginx 1.3.7                                         02 Oct 2012
+
+    *) Feature: OCSP stapling support.
+       Thanks to Comodo, DigiCert and GlobalSign for sponsoring this work.
+
+    *) Feature: the "ssl_trusted_certificate" directive.
+
+    *) Feature: resolver now randomly rotates addresses returned from cache.
+       Thanks to Anton Jouline.
+
     *) Bugfix: OpenSSL 0.9.7 compatibility.
 
 
-Changes with nginx 1.2.4                                         25 Sep 2012
+Changes with nginx 1.3.6                                         12 Sep 2012
+
+    *) Feature: the ngx_http_gunzip_filter_module.
+
+    *) Feature: the "memcached_gzip_flag" directive.
+
+    *) Feature: the "always" parameter of the "gzip_static" directive.
 
     *) Bugfix: in the "limit_req" directive; the bug had appeared in 1.1.14.
        Thanks to Charles Chen.
 
     *) Bugfix: nginx could not be built by gcc 4.7 with -O2 optimization if
        the --with-ipv6 option was used.
+
+
+Changes with nginx 1.3.5                                         21 Aug 2012
+
+    *) Change: the ngx_http_mp4_module module no longer skips tracks in
+       formats other than H.264 and AAC.
 
     *) Bugfix: a segmentation fault might occur in a worker process if the
        "map" directive was used with variables as values.
@@ -154,7 +678,10 @@ Changes with nginx 1.2.4                                         25 Sep 2012
        Thanks to HAYASHI Kentaro.
 
 
-Changes with nginx 1.2.3                                         07 Aug 2012
+Changes with nginx 1.3.4                                         31 Jul 2012
+
+    *) Change: the "ipv6only" parameter is now turned on by default for
+       listening IPv6 sockets.
 
     *) Feature: the Clang compiler support.
 
@@ -170,6 +697,11 @@ Changes with nginx 1.2.3                                         07 Aug 2012
        "fastcgi_hide_header", "scgi_hide_header", and "uwsgi_hide_header"
        directives might be inherited incorrectly.
 
+
+Changes with nginx 1.3.3                                         10 Jul 2012
+
+    *) Feature: entity tags support and the "etag" directive.
+
     *) Bugfix: trailing dot in a source value was not ignored if the "map"
        directive was used with the "hostnames" parameter.
 
@@ -178,7 +710,7 @@ Changes with nginx 1.2.3                                         07 Aug 2012
        to a named location.
 
 
-Changes with nginx 1.2.2                                         03 Jul 2012
+Changes with nginx 1.3.2                                         26 Jun 2012
 
     *) Change: the "single" parameter of the "keepalive" directive is now
        ignored.
@@ -186,39 +718,11 @@ Changes with nginx 1.2.2                                         03 Jul 2012
     *) Change: SSL compression is now disabled when using all versions of
        OpenSSL, including ones prior to 1.0.0.
 
-    *) Feature: the "proxy_pass", "fastcgi_pass", "scgi_pass", "uwsgi_pass"
-       directives, and the "server" directive inside the "upstream" block,
-       now support IPv6 addresses.
-
-    *) Feature: the "resolver" directive now supports IPv6 addresses and an
-       optional port specification.
-
-    *) Feature: the "least_conn" directive inside the "upstream" block.
-
-    *) Feature: it is now possible to specify a weight for servers while
-       using the "ip_hash" directive.
-
     *) Feature: it is now possible to use the "ip_hash" directive to balance
        IPv6 clients.
 
     *) Feature: the $status variable can now be used not only in the
        "log_format" directive.
-
-    *) Bugfix: nginx could not be built with ngx_cpp_test_module; the bug
-       had appeared in 1.1.12.
-
-    *) Bugfix: access to variables from SSI and embedded perl module might
-       not work after reconfiguration.
-       Thanks to Yichun Zhang.
-
-    *) Bugfix: in the ngx_http_xslt_filter_module.
-       Thanks to Kuramoto Eiji.
-
-    *) Bugfix: memory leak if $geoip_org variable was used.
-       Thanks to Denis F. Latypoff.
-
-    *) Bugfix: in the "proxy_cookie_domain" and "proxy_cookie_path"
-       directives.
 
     *) Bugfix: a segmentation fault might occur in a worker process on
        shutdown if the "resolver" directive was used.
@@ -238,11 +742,45 @@ Changes with nginx 1.2.2                                         03 Jul 2012
        while reconfiguration.
 
 
-Changes with nginx 1.2.1                                         05 Jun 2012
+Changes with nginx 1.3.1                                         05 Jun 2012
 
     *) Security: now nginx/Windows ignores trailing dot in URI path
        component, and does not allow URIs with ":$" in it.
        Thanks to Vladimir Kochetkov, Positive Research Center.
+
+    *) Feature: the "proxy_pass", "fastcgi_pass", "scgi_pass", "uwsgi_pass"
+       directives, and the "server" directive inside the "upstream" block,
+       now support IPv6 addresses.
+
+    *) Feature: the "resolver" directive now supports IPv6 addresses and an
+       optional port specification.
+
+    *) Feature: the "least_conn" directive inside the "upstream" block.
+
+    *) Feature: it is now possible to specify a weight for servers while
+       using the "ip_hash" directive.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "image_filter" directive was used; the bug had appeared in 1.3.0.
+
+    *) Bugfix: nginx could not be built with ngx_cpp_test_module; the bug
+       had appeared in 1.1.12.
+
+    *) Bugfix: access to variables from SSI and embedded perl module might
+       not work after reconfiguration.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: in the ngx_http_xslt_filter_module.
+       Thanks to Kuramoto Eiji.
+
+    *) Bugfix: memory leak if $geoip_org variable was used.
+       Thanks to Denis F. Latypoff.
+
+    *) Bugfix: in the "proxy_cookie_domain" and "proxy_cookie_path"
+       directives.
+
+
+Changes with nginx 1.3.0                                         15 May 2012
 
     *) Feature: the "debug_connection" directive now supports IPv6 addresses
        and the "unix:" parameter.
@@ -5855,7 +6393,7 @@ Changes with nginx 0.1.16                                        25 Jan 2005
     *) Bugfix: the compressed response encrypted by SSL may not transferred
        complete.
 
-    *) Bugfix: the TCP-specific TCP_NODELAY, TCP_NOPSUH, and TCP_CORK
+    *) Bugfix: the TCP-specific TCP_NODELAY, TCP_NOPUSH, and TCP_CORK
        options, are not used for the unix domain sockets.
 
     *) Feature: the rewrite directive supports the arguments rewriting.

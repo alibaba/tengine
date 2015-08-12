@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -84,55 +84,68 @@ ngx_http_tfs_select_name_server(ngx_http_tfs_t *t,
         break;
 
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
-        for (;
-             t->logical_cluster_index < rc_info->logical_cluster_count;
-             t->logical_cluster_index++)
-        {
-            logical_cluster =
-                           &rc_info->logical_clusters[t->logical_cluster_index];
+        if (t->r_ctx.is_raw_update == NGX_HTTP_TFS_NO) {
             for (;
-                 t->rw_cluster_index < logical_cluster->rw_cluster_count;
-                 t->rw_cluster_index++)
+                 t->logical_cluster_index < rc_info->logical_cluster_count;
+                 t->logical_cluster_index++)
             {
-                physical_cluster =
-                             &logical_cluster->rw_clusters[t->rw_cluster_index];
-                if (physical_cluster->access_type
-                    == NGX_HTTP_TFS_ACCESS_READ_AND_WRITE)
+                logical_cluster =
+                               &rc_info->logical_clusters[t->logical_cluster_index];
+                for (;
+                     t->rw_cluster_index < logical_cluster->rw_cluster_count;
+                     t->rw_cluster_index++)
                 {
-                    /* custom file should ensure writing
-                     * all frags in the same cluster */
-                    if (curr_cluster_id > 0) {
-                        cluster_id_text = &physical_cluster->cluster_id_text;
-                        cluster_id =
-                            ngx_http_tfs_get_cluster_id(cluster_id_text->data);
-                        if (cluster_id != curr_cluster_id) {
-                            continue;
+                    physical_cluster =
+                                 &logical_cluster->rw_clusters[t->rw_cluster_index];
+                    if (physical_cluster->access_type
+                        == NGX_HTTP_TFS_ACCESS_READ_AND_WRITE)
+                    {
+                        /* custom file should ensure writing
+                         * all frags in the same cluster */
+                        if (curr_cluster_id > 0) {
+                            cluster_id_text = &physical_cluster->cluster_id_text;
+                            cluster_id =
+                                ngx_http_tfs_get_cluster_id(cluster_id_text->data);
+                            if (cluster_id != curr_cluster_id) {
+                                continue;
+                            }
                         }
+                        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, t->log, 0,
+                                       "write, select logical cluster "
+                                       "index: %ui, rw_cluster_index: %ui, "
+                                       "nameserver: %V",
+                                       t->logical_cluster_index,
+                                       t->rw_cluster_index,
+                                       &physical_cluster->ns_vip_text);
+                        (*addr) = physical_cluster->ns_vip;
+                        (*addr_text) = physical_cluster->ns_vip_text;
+
+                        /* check if need get cluster id from ns */
+                        if (t->state == NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO) {
+                            if (physical_cluster->cluster_id > 0) {
+                                t->file.cluster_id = physical_cluster->cluster_id;
+
+                            } else {
+                                t->state = NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS;
+                            }
+                        }
+
+                        return NGX_OK;
                     }
-                    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                                   "write, select logical cluster "
-                                   "index: %ui, rw_cluster_index: %ui, "
-                                   "nameserver: %V",
-                                   t->logical_cluster_index,
-                                   t->rw_cluster_index,
-                                   &physical_cluster->ns_vip_text);
-                    (*addr) = physical_cluster->ns_vip;
-                    (*addr_text) = physical_cluster->ns_vip_text;
-                    return NGX_OK;
                 }
+                t->rw_cluster_index = 0;
             }
-            t->rw_cluster_index = 0;
+
+            break;
         }
 
-        break;
-
+        /* update raw file */
     case NGX_HTTP_TFS_ACTION_REMOVE_FILE:
-        cluster_group_info = rc_info->unlink_clusters;
-
-        for (i = 0; i < rc_info->unlink_cluster_count; i++) {
-            group_info = cluster_group_info[i].group_info;
-            cluster_id = cluster_group_info[i].cluster_id;
-            info_count = cluster_group_info[i].info_count;
+        for (i = 0; i < rc_info->unlink_cluster_group_count; i++) {
+            cluster_group_info = &rc_info->unlink_cluster_groups[i];
+            group_info = cluster_group_info->group_info;
+            cluster_id = cluster_group_info->cluster_id;
+            info_count = cluster_group_info->info_count;
 
             if ((curr_cluster_id > 0 && cluster_id != curr_cluster_id)
                 || info_count < 1)
@@ -140,47 +153,52 @@ ngx_http_tfs_select_name_server(ngx_http_tfs_t *t,
                 continue;
             }
 
-            if (cluster_group_info[i].group_count <= 0) {
+            /* only one cluster, select it */
+            if (info_count == 1) {
                 (*addr) = group_info[0].ns_vip;
                 (*addr_text) = group_info[0].ns_vip_text;
-                t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_COUNT;
+                if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_REMOVE_FILE) {
+                    t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
+
+                } else if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
+                    t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+                }
+                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
+                               "unlink, select nameserver: %V",
+                               &group_info[0].ns_vip_text);
+                goto find_logical_cluster_index;
+            }
+
+            /* two clusters or more */
+            if (cluster_group_info->group_count <= 0) {
+                (*addr) = group_info[0].ns_vip;
+                (*addr_text) = group_info[0].ns_vip_text;
+                if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_REMOVE_FILE) {
+                    t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_COUNT;
+
+                } else if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
+                    t->state = NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT;
+                }
                 return NGX_OK;
             }
 
-            /* if there is only one group count, select master cluster */
-            if (cluster_group_info[i].group_count == 1) {
-                for (j = 0; j < info_count; j++) {
-                    if (group_info[j].is_master) {
-                        (*addr) = group_info[j].ns_vip;
-                        (*addr_text) = group_info[j].ns_vip_text;
-                        t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
-                        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
-                                       "unlink, select nameserver: %V",
-                                       &group_info[j].ns_vip_text);
-                        goto find_logical_cluster_index;
-                    }
-                }
-                /* no master */
-                if (j == cluster_group_info[i].info_count) {
-                    /* sth wrong in TFS cluster configure,
-                     * select the first cluster
-                     */
-                    (*addr) = group_info[0].ns_vip;
-                    (*addr_text) = group_info[0].ns_vip_text;
-                    t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
-                    ngx_log_error(NGX_LOG_WARN, t->log, 0,
-                                  "unlink, no master found, "
-                                  "select nameserver: %V",
-                                  &group_info[0].ns_vip_text);
-                    goto find_logical_cluster_index;
-                }
+            /* if there are two clusters or more but group count is 1, sth wrong in TFS cluster configure */
+            if (cluster_group_info->group_count == 1) {
+                ngx_log_error(NGX_LOG_ERR, t->log, 0,
+                               "unlink, can not select nameserver.");
+                return NGX_ERROR;
             }
 
             for (j = 0; j < info_count; j++) {
                 if (group_info[j].group_seq < 0) {
                     (*addr) = group_info[j].ns_vip;
                     (*addr_text) = group_info[j].ns_vip_text;
-                    t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_SEQ;
+                    if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_REMOVE_FILE) {
+                        t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_GROUP_SEQ;
+
+                    } else if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
+                        t->state = NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ;
+                    }
                     return NGX_OK;
                 }
 
@@ -191,11 +209,18 @@ ngx_http_tfs_select_name_server(ngx_http_tfs_t *t,
                         t->file.segment_data[0].segment_info.block_id;
                 }
                 if (ngx_http_tfs_group_seq_match(curr_block_id,
-                                              cluster_group_info[i].group_count,
+                                              cluster_group_info->group_count,
                                               group_info[j].group_seq))
                 {
                     (*addr) = group_info[j].ns_vip;
                     (*addr_text) = group_info[j].ns_vip_text;
+                    if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_REMOVE_FILE) {
+                        t->state = NGX_HTTP_TFS_STATE_REMOVE_GET_BLK_INFO;
+
+                    } else if (t->r_ctx.action.code == NGX_HTTP_TFS_ACTION_WRITE_FILE) {
+                        t->state = NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO;
+                    }
+
                     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, t->log, 0,
                                    "unlink, select nameserver: %V",
                                    &group_info[j].ns_vip_text);
@@ -282,11 +307,22 @@ ngx_http_tfs_name_server_create_message(ngx_http_tfs_t *t)
         t->file.open_mode = NGX_HTTP_TFS_OPEN_MODE_WRITE
                              | NGX_HTTP_TFS_OPEN_MODE_CREATE;
         switch(t->state) {
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT:
+            ngx_log_error(NGX_LOG_INFO, t->log, 0, "get group count from ns");
+            cl = ngx_http_tfs_create_ctl_message(t,
+                NGX_HTTP_TFS_CMD_GET_GROUP_COUNT);
+            break;
+
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ:
+            ngx_log_error(NGX_LOG_INFO, t->log, 0, "get group seq from ns");
+            cl = ngx_http_tfs_create_ctl_message(t,
+                NGX_HTTP_TFS_CMD_GET_GROUP_SEQ);
+            break;
 
         case NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS:
             ngx_log_error(NGX_LOG_INFO, t->log, 0, "get cluster id from ns");
             cl = ngx_http_tfs_create_ctl_message(t,
-                                            NGX_HTTP_TFS_CMD_GET_CLUSTER_ID_NS);
+                NGX_HTTP_TFS_CMD_GET_CLUSTER_ID_NS);
             break;
         case NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO:
             ngx_log_error(NGX_LOG_INFO, t->log, 0, "get block info from ns");
@@ -367,9 +403,18 @@ ngx_http_tfs_name_server_parse_message(ngx_http_tfs_t *t)
 
     case NGX_HTTP_TFS_ACTION_WRITE_FILE:
         switch(t->state) {
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_COUNT:
+            return ngx_http_tfs_parse_ctl_message(t,
+                NGX_HTTP_TFS_CMD_GET_GROUP_COUNT);
+
+        case NGX_HTTP_TFS_STATE_WRITE_GET_GROUP_SEQ:
+            return ngx_http_tfs_parse_ctl_message(t,
+                NGX_HTTP_TFS_CMD_GET_GROUP_SEQ);
+
         case NGX_HTTP_TFS_STATE_WRITE_CLUSTER_ID_NS:
             return ngx_http_tfs_parse_ctl_message(t,
-                                            NGX_HTTP_TFS_CMD_GET_CLUSTER_ID_NS);
+                NGX_HTTP_TFS_CMD_GET_CLUSTER_ID_NS);
+
         case NGX_HTTP_TFS_STATE_WRITE_GET_BLK_INFO:
             if (!t->parent
                 && !t->is_rolling_back
@@ -638,7 +683,6 @@ ngx_http_tfs_parse_block_info_message(ngx_http_tfs_t *t,
         value.ds_addrs = (uint64_t *)block_info->ds_addrs;
         ngx_http_tfs_block_cache_insert(&t->block_cache_ctx,
                                         t->pool, t->log, &key, &value);
-        segment_data->block_info_src = NGX_HTTP_TFS_FROM_NS;
     }
 
     if (t->file.open_mode & NGX_HTTP_TFS_OPEN_MODE_WRITE) {
@@ -783,7 +827,6 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
             value.ds_addrs = (uint64_t *)block_info->ds_addrs;
             ngx_http_tfs_block_cache_insert(&t->block_cache_ctx,
                                             t->pool, t->log, &key, &value);
-            segment_data[j].block_info_src = NGX_HTTP_TFS_FROM_NS;
         }
 
         /* reset segment status */
@@ -809,7 +852,6 @@ ngx_http_tfs_parse_batch_block_info_message(ngx_http_tfs_t *t,
 
                 /* TODO: check this */
                 segment_data[i].block_info = segment_data[j].block_info;
-                segment_data[i].block_info_src = NGX_HTTP_TFS_FROM_NS;
                 segment_data[i].ds_retry = 0;
                 complete_count++;
                 break;

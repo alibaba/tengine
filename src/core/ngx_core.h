@@ -15,7 +15,6 @@ typedef struct ngx_cycle_s       ngx_cycle_t;
 typedef struct ngx_pool_s        ngx_pool_t;
 typedef struct ngx_chain_s       ngx_chain_t;
 typedef struct ngx_log_s         ngx_log_t;
-typedef struct ngx_array_s       ngx_array_t;
 typedef struct ngx_open_file_s   ngx_open_file_t;
 typedef struct ngx_command_s     ngx_command_t;
 typedef struct ngx_file_s        ngx_file_t;
@@ -34,6 +33,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define  NGX_DONE       -4
 #define  NGX_DECLINED   -5
 #define  NGX_ABORT      -6
+#define  NGX_YIELD      -7
 
 
 #include <ngx_errno.h>
@@ -72,15 +72,16 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_shmtx.h>
 #include <ngx_slab.h>
 #include <ngx_cycle.h>
+#include <ngx_resolver.h>
 #if (NGX_OPENSSL)
 #include <ngx_event_openssl.h>
 #endif
 #include <ngx_process_cycle.h>
 #include <ngx_conf_file.h>
-#include <ngx_resolver.h>
 #include <ngx_open_file_cache.h>
 #include <ngx_os.h>
 #include <ngx_connection.h>
+#include <ngx_proxy_protocol.h>
 #if (NGX_SYSLOG)
 #include <ngx_syslog.h>
 #endif

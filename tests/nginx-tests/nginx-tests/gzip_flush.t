@@ -26,7 +26,7 @@ my $t = Test::Nginx->new()->has(qw/http gzip perl/)->plan(2)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

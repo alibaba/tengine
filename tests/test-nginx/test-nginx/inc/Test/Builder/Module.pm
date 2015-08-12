@@ -8,19 +8,11 @@ use Test::Builder;
 require Exporter;
 our @ISA = qw(Exporter);
 
-our $VERSION = '0.92';
+our $VERSION = '0.98';
 $VERSION = eval $VERSION;      ## no critic (BuiltinFunctions::ProhibitStringyEval)
 
-# 5.004's Exporter doesn't have export_to_level.
-my $_export_to_level = sub {
-    my $pkg   = shift;
-    my $level = shift;
-    (undef) = shift;    # redundant arg
-    my $callpkg = caller($level);
-    $pkg->export( $callpkg, @_ );
-};
 
-#line 82
+#line 74
 
 sub import {
     my($class) = shift;
@@ -39,7 +31,7 @@ sub import {
 
     $test->plan(@_);
 
-    $class->$_export_to_level( 1, $class, @imports );
+    $class->export_to_level( 1, $class, @imports );
 }
 
 sub _strip_imports {
@@ -68,11 +60,11 @@ sub _strip_imports {
     return @imports;
 }
 
-#line 145
+#line 137
 
 sub import_extra { }
 
-#line 175
+#line 167
 
 sub builder {
     return Test::Builder->new;

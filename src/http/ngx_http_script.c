@@ -1327,16 +1327,17 @@ ngx_http_script_full_name_code(ngx_http_script_engine_t *e)
 {
     ngx_http_script_full_name_code_t  *code;
 
-    ngx_str_t  value;
+    ngx_str_t  value, *prefix;
 
     code = (ngx_http_script_full_name_code_t *) e->ip;
 
     value.data = e->buf.data;
     value.len = e->pos - e->buf.data;
 
-    if (ngx_conf_full_name((ngx_cycle_t *) ngx_cycle, &value, code->conf_prefix)
-        != NGX_OK)
-    {
+    prefix = code->conf_prefix ? (ngx_str_t *) &ngx_cycle->conf_prefix:
+                                 (ngx_str_t *) &ngx_cycle->prefix;
+
+    if (ngx_get_full_name(e->request->pool, prefix, &value) != NGX_OK) {
         e->ip = ngx_http_script_exit;
         e->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         return;
@@ -1393,7 +1394,7 @@ ngx_http_script_if_code(ngx_http_script_engine_t *e)
 
     e->sp--;
 
-    if (e->sp->len && (e->sp->len !=1 || e->sp->data[0] != '0')) {
+    if (e->sp->len && (e->sp->len != 1 || e->sp->data[0] != '0')) {
         if (code->loc_conf) {
             e->request->loc_conf = code->loc_conf;
             ngx_http_update_location_config(e->request);
@@ -1433,6 +1434,162 @@ ngx_http_script_equal_code(ngx_http_script_engine_t *e)
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
                    "http script equal: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+void
+ngx_http_script_greater_code(ngx_http_script_engine_t *e)
+{
+    int64_t                     val_n, res_n;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script greater");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    val_n = ngx_atoll(val->data, val->len);
+    if (val_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    res_n = ngx_atoll(res->data, res->len);
+    if (res_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    if (res_n > val_n) {
+        *res = ngx_http_variable_true_value;
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script greater: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+void
+ngx_http_script_less_code(ngx_http_script_engine_t *e)
+{
+    int64_t                     val_n, res_n;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    val_n = ngx_atoll(val->data, val->len);
+    if (val_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    res_n = ngx_atoll(res->data, res->len);
+    if (res_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    if (res_n < val_n) {
+        *res = ngx_http_variable_true_value;
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+void
+ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e)
+{
+    int64_t                     val_n, res_n;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script greater or equal");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    val_n = ngx_atoll(val->data, val->len);
+    if (val_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    res_n = ngx_atoll(res->data, res->len);
+    if (res_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    if (res_n >= val_n) {
+        *res = ngx_http_variable_true_value;
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script greater or equal: no");
+
+    *res = ngx_http_variable_null_value;
+}
+
+
+void
+ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e)
+{
+    int64_t                     val_n, res_n;
+    ngx_http_variable_value_t  *val, *res;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less or equal");
+
+    e->sp--;
+    val = e->sp;
+    res = e->sp - 1;
+
+    e->ip += sizeof(uintptr_t);
+
+    val_n = ngx_atoll(val->data, val->len);
+    if (val_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    res_n = ngx_atoll(res->data, res->len);
+    if (res_n == NGX_ERROR) {
+        *res = ngx_http_variable_null_value;
+        return;
+    }
+
+    if (res_n <= val_n) {
+        *res = ngx_http_variable_true_value;
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                   "http script less or equal: no");
 
     *res = ngx_http_variable_null_value;
 }

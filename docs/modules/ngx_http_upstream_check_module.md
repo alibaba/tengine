@@ -9,21 +9,36 @@ This module is not built by default, it should be enabled with the `--with-http_
 # Examples #
 
 	http {
-		upstream cluster {
+		upstream cluster1 {
 			# simple round-robin
 			server 192.168.0.1:80;
 			server 192.168.0.2:80;
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
-			check_http_send "GET / HTTP/1.0\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.0\r\n\r\n";
+			check_http_expect_alive http_2xx http_3xx;
+		}
+
+		upstream cluster2 {
+			# simple round-robin
+			server 192.168.0.3:80;
+			server 192.168.0.4:80;
+
+			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
+			check_keepalive_requests 100;
+			check_http_send "HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
 		server {
 			listen 80;
 
-			location / {
-				proxy_pass http://cluster;
+			location /1 {
+				proxy_pass http://cluster1;
+			}
+
+			location /2 {
+				proxy_pass http://cluster2;
 			}
 
 			location /status {
@@ -32,7 +47,7 @@ This module is not built by default, it should be enabled with the `--with-http_
 				access_log   off;
 				allow SOME.IP.ADD.RESS;
 				deny all;
-		   }
+			}
 		}
 	}
 
@@ -48,6 +63,8 @@ Context: `upstream`
 
 Add health check for the upstream servers.
 
+Passive health checking should not be enabled, as they may interfere. So do not use fail_timeout for the servers in the upstream context for which proactive health checking is enabled.
+
 The parameters' meanings are:
 
 * `interval`: the check request's interval time.
@@ -62,7 +79,18 @@ The parameters' meanings are:
  - `mysql`: connect to the mysql server, receive the greeting response to diagnose if the upstream server is alive.
  - `ajp`: send an AJP Cping packet, receive and parse the AJP Cpong response to diagnose if the upstream server is alive.
 * `port`: specify the check port in the backend servers. It can be different with the original servers port. Default the port is 0 and it means the same as the original backend server. This option is added after tengine-1.4.0.
-                                                                                                                         
+
+## check\_keepalive\_requests ##
+
+Syntax: **check\_keepalive\_requests** `request_num`
+
+Default: `1`
+
+Context: `upstream`
+
+The directive specifies the number of requests sent on a connection, the default vaule 1 indicates that tengine will certainly close the connection after a request.
+
+This directive was first introduced in Tengine-2.0.0.
 
 ## check\_http\_send ##
 
@@ -72,13 +100,16 @@ Default: `"GET / HTTP/1.0\r\n\r\n"`
 
 Context: `upstream`
 
-If the check type is http, the check function will send this http packet to the upstream server.
+If the check type is http, the check function will send this http packet to the upstream server. Method "HEAD" is recommended for reducing traffic.
+
+When persistant connection is used, a keep-alive request header should be added to the value of the directive, e.g. `"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`.
+In addition, in the case of "GET" method, size of the request uri should not be too large, make sure the transmission can be finished within an `interval`, otherwise the health check will deduce a conclusion that there is something wrong with the servers or the net. 
 
 ## check\_http\_expect\_alive ##
 
 Syntax: **check\_http\_expect\_alive** `[ http_2xx | http_3xx | http_4xx | http_5xx ]`
 
-Default: `http_2xx | http_3xx`
+Default: `http_2xx http_3xx`
 
 Context: `upstream`
 
@@ -141,7 +172,7 @@ Below it's the sample html page:
             <tr>
                 <td>0</td>
                 <td>backend</td>
-                <td>106.187.48.116:80</td>
+                <td>192.168.0.1:80</td>
                 <td>up</td>
                 <td>39</td>
                 <td>0</td>
@@ -154,7 +185,7 @@ Below it's the sample html page:
 
 Below it's the sample of csv page:
 
-    0,backend,106.187.48.116:80,up,46,0,http,80
+    0,backend,192.168.0.1:80,up,46,0,http,80
 
 Below it's the sample of json page:
 
@@ -162,7 +193,7 @@ Below it's the sample of json page:
       "total": 1,
       "generation": 3,
       "server": [
-       {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
+       {"index": 0, "upstream": "backend", "name": "192.168.0.1:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
       ]
      }}
 

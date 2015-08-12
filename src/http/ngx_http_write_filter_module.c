@@ -12,6 +12,8 @@
 
 static ngx_int_t ngx_http_write_filter_init(ngx_conf_t *cf);
 
+ngx_int_t (*ngx_http_log_flow)(ngx_http_request_t *r) = NULL;
+
 
 static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
     NULL,                                  /* preconfiguration */
@@ -184,7 +186,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_AGAIN;
     }
 
-    if (size == 0 && !(c->buffered & NGX_LOWLEVEL_BUFFERED)) {
+    if (size == 0
+        && !(c->buffered & NGX_LOWLEVEL_BUFFERED)
+        && !(last && c->need_last_buf))
+    {
         if (last || flush) {
             for (cl = r->out; cl; /* void */) {
                 ln = cl;
@@ -207,8 +212,12 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     if (r->limit_rate) {
+        if (r->limit_rate_after == 0) {
+            r->limit_rate_after = clcf->limit_rate_after;
+        }
+
         limit = (off_t) r->limit_rate * (ngx_time() - r->start_sec + 1)
-                - (c->sent - clcf->limit_rate_after);
+                - (c->sent - r->limit_rate_after);
 
         if (limit <= 0) {
             c->write->delayed = 1;
@@ -237,6 +246,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     chain = c->send_chain(c, r->out, limit);
 
+    if (ngx_http_log_flow && ngx_http_log_flow(r) == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http write filter %p", chain);
 
@@ -249,14 +262,14 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
         nsent = c->sent;
 
-        if (clcf->limit_rate_after) {
+        if (r->limit_rate_after) {
 
-            sent -= clcf->limit_rate_after;
+            sent -= r->limit_rate_after;
             if (sent < 0) {
                 sent = 0;
             }
 
-            nsent -= clcf->limit_rate_after;
+            nsent -= r->limit_rate_after;
             if (nsent < 0) {
                 nsent = 0;
             }

@@ -39,11 +39,11 @@
 
 **concat_types** `MIME types`
 
-**默认:** `concat_types: text/css application/x-javascript`
+**默认:** `concat_types: application/x-javascript text/css`
 
 **上下文:** `http, server, location`
 
-定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)是可以被接受
+定义配置的[MIME types](http://en.wikipedia.org/wiki/MIME_type)以及 "application/x-javascript" 是可以被接受
 
 <br/>
 <br/>

@@ -63,8 +63,12 @@ struct ngx_listening_s {
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
 
+#if (NGX_HAVE_REUSEPORT)
+    unsigned            reuse_port:1;
+#endif
+
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
-    unsigned            ipv6only:2;
+    unsigned            ipv6only:1;
 #endif
     unsigned            keepalive:2;
 
@@ -78,6 +82,10 @@ struct ngx_listening_s {
 #endif
 #if (NGX_HAVE_SETFIB)
     int                 setfib;
+#endif
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+    int                 fastopen;
 #endif
 
 };
@@ -108,6 +116,7 @@ typedef enum {
 
 #define NGX_LOWLEVEL_BUFFERED  0x0f
 #define NGX_SSL_BUFFERED       0x01
+#define NGX_SPDY_BUFFERED      0x02
 
 
 struct ngx_connection_s {
@@ -125,6 +134,7 @@ struct ngx_connection_s {
     ngx_listening_t    *listening;
 
     off_t               sent;
+    off_t               received;
 
     ngx_log_t          *log;
 
@@ -134,11 +144,14 @@ struct ngx_connection_s {
     socklen_t           socklen;
     ngx_str_t           addr_text;
 
+    ngx_str_t           proxy_protocol_addr;
+
 #if (NGX_SSL)
     ngx_ssl_connection_t  *ssl;
 #endif
 
     struct sockaddr    *local_sockaddr;
+    socklen_t           local_socklen;
 
     ngx_buf_t          *buffer;
 
@@ -152,7 +165,6 @@ struct ngx_connection_s {
 
     unsigned            log_error:3;     /* ngx_connection_log_error_e */
 
-    unsigned            single_connection:1;
     unsigned            unexpected_eof:1;
     unsigned            timedout:1;
     unsigned            error:1;
@@ -167,12 +179,15 @@ struct ngx_connection_s {
     unsigned            tcp_nodelay:2;   /* ngx_connection_tcp_nodelay_e */
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
 
+    unsigned            need_last_buf:1;
+
 #if (NGX_HAVE_IOCP)
     unsigned            accept_context_updated:1;
 #endif
 
 #if (NGX_HAVE_AIO_SENDFILE)
     unsigned            aio_sendfile:1;
+    unsigned            busy_count:2;
     ngx_buf_t          *busy_sendfile;
 #endif
 

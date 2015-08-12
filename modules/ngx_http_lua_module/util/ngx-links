@@ -1,0 +1,62 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Cwd qw( cwd );
+use Getopt::Std;
+
+my %opts;
+getopts('f', \%opts) or
+    die "Usage: $0 [-f]
+Options:
+    -f          Override exising symbolic links with force
+";
+
+my $root = shift || 'src';
+
+my $force = $opts{f};
+
+opendir my $dir, $root
+    or die "Can't open directory src/ for reading: $!\n";
+
+my @links;
+
+while (my $entry = readdir $dir) {
+    my ($base, $ext);
+
+    my $source = "$root/$entry";
+
+    if (-l $source || -d $source) {
+        warn "skipping $source\n";
+        next;
+    }
+
+    if ($entry =~ m{ ^ ngx_ (?: \w+ _ )+ (\w+) \. ([ch]|rl) $}x) {
+        ($base, $ext) = ($1, $2);
+    } else {
+        next;
+    }
+
+    my $target = "$root/$base.$ext";
+    if (-e $target && ! -l $target) {
+        die "target $target already exists, and not a symlink, not overriding...Abort.\n";
+    } elsif (-l $target) {
+        #warn "it's a link";
+        if ( ! $force ) {
+            die "target $target already exists, not overriding...Abort.\n";
+        }
+        warn "overriding existing symlink $target\n";
+    }
+    #warn "creating $target --> $root/$entry\n";
+    system("ln -svf `pwd`/$source $target") == 0 or
+        die "Failed to create the symlink\n";;
+
+    push @links, $target;
+}
+
+print join("\n", @links), "\n";
+
+close $dir;
+
+

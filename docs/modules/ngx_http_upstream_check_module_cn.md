@@ -1,4 +1,4 @@
-﻿# Name #
+# Name #
 
 **ngx\_http\_upstream\_check\_module**
 
@@ -8,22 +8,37 @@
 
 # Examples #
 
-	http {
-		upstream cluster {
+    http {
+		upstream cluster1 {
 			# simple round-robin
 			server 192.168.0.1:80;
 			server 192.168.0.2:80;
 
 			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
-			check_http_send "GET / HTTP/1.0\r\n\r\n";
+			check_http_send "HEAD / HTTP/1.0\r\n\r\n";
+			check_http_expect_alive http_2xx http_3xx;
+		}
+
+		upstream cluster2 {
+			# simple round-robin
+			server 192.168.0.3:80;
+			server 192.168.0.4:80;
+
+			check interval=3000 rise=2 fall=5 timeout=1000 type=http;
+			check_keepalive_requests 100;
+			check_http_send "HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
 			check_http_expect_alive http_2xx http_3xx;
 		}
 
 		server {
 			listen 80;
 
-			location / {
-				proxy_pass http://cluster;
+			location /1 {
+				proxy_pass http://cluster1;
+			}
+
+			location /2 {
+				proxy_pass http://cluster2;
 			}
 
 			location /status {
@@ -32,7 +47,7 @@
 				access_log   off;
 				allow SOME.IP.ADD.RESS;
 				deny all;
-		   }
+			}
 		}
 	}
 
@@ -59,10 +74,23 @@ Context: `upstream`
  - `tcp`：简单的tcp连接，如果连接成功，就说明后端正常。
  - `ssl_hello`：发送一个初始的SSL hello包并接受服务器的SSL hello包。
  - `http`：发送HTTP请求，通过后端的回复包的状态来判断后端是否存活。
+ - `fastcgi`：发送fsatcgi请求，通过后端的回复包的状态来判断后端是否存活。
  - `mysql`: 向mysql服务器连接，通过接收服务器的greeting包来判断后端是否存活。
  - `ajp`：向后端发送AJP协议的Cping包，通过接收Cpong包来判断后端是否存活。
 * `port`: 指定后端服务器的检查端口。你可以指定不同于真实服务的后端服务器的端口，比如后端提供的是443端口的应用，你可以去检查80端口的状态来判断后端健康状况。默认是0，表示跟后端server提供真实服务的端口一样。该选项出现于Tengine-1.4.0。
-                                                                                                                         
+
+
+## check\_keepalive\_requests ##
+
+Syntax: **check\_keepalive\_requests** `request_num`
+
+Default: `1`
+
+Context: `upstream`
+
+该指令可以配置一个连接发送的请求数，其默认值为1，表示Tengine完成1次请求后即关闭连接。
+
+该指令在Tengine-2.0.0首次被引入。
 
 ## check\_http\_send ##
 
@@ -72,7 +100,22 @@ Default: `"GET / HTTP/1.0\r\n\r\n"`
 
 Context: `upstream`
 
-该指令可以配置http健康检查包发送的请求内容。
+该指令可以配置http健康检查包发送的请求内容。为了减少传输数据量，推荐采用`"HEAD"`方法。
+
+当采用长连接进行健康检查时，需在该指令中添加keep-alive请求头，如：`"HEAD / HTTP/1.1\r\nConnection: keep-alive\r\n\r\n"`。
+同时，在采用`"GET"`方法的情况下，请求uri的size不宜过大，确保可以在1个`interval`内传输完成，否则会被健康检查模块视为后端服务器或网络异常。
+
+## check\_fastcgi\_param ##
+
+Syntax: **check\_fastcgi\_params** `parameter`:`value`
+
+Default: `REQUEST_METHOD: GET`
+         `REQUEST_URI: /`
+         `SCRIPT_FILENAME: index.php'
+
+Context: `upstream`
+
+该指令可以配置fastcgi健康检查包发送的请求的header项。
 
 ## check\_http\_expect\_alive ##
 
@@ -143,7 +186,7 @@ Context: `location`
             <tr>
                 <td>0</td>
                 <td>backend</td>
-                <td>106.187.48.116:80</td>
+                <td>192.168.0.1:80</td>
                 <td>up</td>
                 <td>39</td>
                 <td>0</td>
@@ -156,7 +199,7 @@ Context: `location`
 
 下面是csv格式页面的例子：
 
-    0,backend,106.187.48.116:80,up,46,0,http,80
+    0,backend,192.168.0.1:80,up,46,0,http,80
 
 下面是json格式页面的例子：
 
@@ -167,4 +210,3 @@ Context: `location`
        {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
       ]
      }}
-

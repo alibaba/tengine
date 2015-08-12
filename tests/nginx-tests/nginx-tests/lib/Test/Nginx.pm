@@ -12,15 +12,17 @@ use strict;
 use base qw/ Exporter /;
 
 our @EXPORT = qw/ log_in log_out http http_get http_head /;
-our @EXPORT_OK = qw/ http_gzip_request http_gzip_like /;
+our @EXPORT_OK = qw/ http_gzip_request http_gzip_like http_start http_end /;
 our %EXPORT_TAGS = (
 	gzip => [ qw/ http_gzip_request http_gzip_like / ]
 );
 
 ###############################################################################
 
+use File::Path qw/ rmtree /;
 use File::Temp qw/ tempdir /;
 use IO::Socket;
+use POSIX qw/ waitpid WNOHANG /;
 use Socket qw/ CRLF /;
 use Test::More qw//;
 
@@ -33,26 +35,34 @@ sub new {
 	my $self = {};
 	bless $self;
 
+	$self->{_pid} = $$;
+
 	$self->{_testdir} = tempdir(
 		'nginx-test-XXXXXXXXXX',
 		TMPDIR => 1,
 		CLEANUP => not $ENV{TEST_NGINX_LEAVE}
 	)
 		or die "Can't create temp directory: $!\n";
-
 	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
 	$self->{_dso_module} = ();
-	mkdir("$self->{_testdir}/logs");
+	mkdir "$self->{_testdir}/logs"
+		or die "Can't create logs directory: $!\n";
 
 	return $self;
 }
 
 sub DESTROY {
 	my ($self) = @_;
+	local $?;
+
+	return if $self->{_pid} != $$;
 	$self->stop();
 	$self->stop_daemons();
 	if ($ENV{TEST_NGINX_CATLOG}) {
 		system("cat $self->{_testdir}/error.log");
+	}
+	if (not $ENV{TEST_NGINX_LEAVE}) {
+		eval { rmtree($self->{_testdir}); };
 	}
 }
 
@@ -68,18 +78,21 @@ sub has($;) {
 }
 
 sub set_dso($;) {
-        my ($self, $module_name, $module_path) = @_;
+	my ($self, $module_name, $module_path) = @_;
 
-        $self->{_dso_module}{$module_name} = $module_path;
+	$self->{_dso_module}{$module_name} = $module_path;
 }
 
 sub has_module($) {
 	my ($self, $feature) = @_;
 
 	my %regex = (
+		sni	=> 'TLS SNI support enabled',
 		mail	=> '--with-mail(?!\S)',
 		flv	=> '--with-http_flv_module',
 		perl	=> '--with-http_perl_module',
+		auth_request
+			=> '--with-http_auth_request_module',
 		charset	=> '(?s)^(?!.*--without-http_charset_module)',
 		gzip	=> '(?s)^(?!.*--without-http_gzip_module)',
 		ssi	=> '(?s)^(?!.*--without-http_ssi_module)',
@@ -99,21 +112,31 @@ sub has_module($) {
 		scgi	=> '(?s)^(?!.*--without-http_scgi_module)',
 		memcached
 			=> '(?s)^(?!.*--without-http_memcached_module)',
-		limit_zone
-			=> '(?s)^(?!.*--without-http_limit_zone_module)',
+		limit_conn
+			=> '(?s)^(?!.*--without-http_limit_conn_module)',
 		limit_req
 			=> '(?s)^(?!.*--without-http_limit_req_module)',
 		empty_gif
 			=> '(?s)^(?!.*--without-http_empty_gif_module)',
 		browser	=> '(?s)^(?!.*--without-http_browser_module)',
+		upstream_hash
+			=> '(?s)^(?!.*--without-http_upstream_hash_module)',
 		upstream_ip_hash
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
+		reqstat
+			=> '(?s)^(?!.*--without-http_reqstat_module)',
+		upstream_least_conn
+			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
+		upstream_keepalive
+			=> '(?s)^(?!.*--without-http_upstream_keepalive_modu)',
 		http	=> '(?s)^(?!.*--without-http(?!\S))',
 		cache	=> '(?s)^(?!.*--without-http-cache)',
 		pop3	=> '(?s)^(?!.*--without-mail_pop3_module)',
 		imap	=> '(?s)^(?!.*--without-mail_imap_module)',
 		smtp	=> '(?s)^(?!.*--without-mail_smtp_module)',
 		pcre	=> '(?s)^(?!.*--without-pcre)',
+		split_clients
+			=> '(?s)^(?!.*--without-http_split_clients_module)',
 	);
 
 	my $re = $regex{$feature};
@@ -122,7 +145,27 @@ sub has_module($) {
 	$self->{_configure_args} = `$NGINX -V 2>&1`
 		if !defined $self->{_configure_args};
 
-	return ($self->{_configure_args} =~ $re) ? 1 : 0;
+	return ($self->{_configure_args} =~ $re or $self->{_configure_args} =~ '--enable-mods-static=all') ? 1 : 0;
+}
+
+sub has_version($) {
+	my ($self, $need) = @_;
+
+	$self->{_configure_args} = `$NGINX -V 2>&1`
+		if !defined $self->{_configure_args};
+
+	$self->{_configure_args} =~ m!nginx/([0-9.]+)!;
+
+	my @v = split(/\./, $1);
+	my ($n, $v);
+
+	for $n (split(/\./, $need)) {
+		$v = shift @v || 0;
+		return 0 if $n > $v;
+		return 1 if $v > $n;
+	}
+
+	return 1;
 }
 
 sub has_daemon($) {
@@ -142,6 +185,21 @@ sub has_daemon($) {
 	Test::More::plan(skip_all => "$daemon not found")
 		unless `which $daemon`;
 
+	return $self;
+}
+
+sub try_run($$) {
+	my ($self, $message) = @_;
+
+        $self->run();
+
+	eval {
+		open OLDERR, ">&", \*STDERR; close STDERR;
+		$self->run();
+		open STDERR, ">&", \*OLDERR;
+	};
+
+	Test::More::plan(skip_all => $message) if $@;
 	return $self;
 }
 
@@ -170,26 +228,30 @@ sub run(;$) {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		exec($NGINX, '-c', "$testdir/nginx.conf", '-p', "$testdir",
-		     @globals) or die "Unable to exec(): $!\n";
+		exec($NGINX, '-p', $testdir, '-c', 'nginx.conf', @globals),
+			or die "Unable to exec(): $!\n";
 	}
 
 	# wait for nginx to start
 
-	$self->waitforfile("$testdir/nginx.pid")
+	$self->waitforfile("$testdir/nginx.pid", $pid)
 		or die "Can't start nginx";
 
 	$self->{_started} = 1;
 	return $self;
 }
 
-sub waitforfile($) {
-	my ($self, $file) = @_;
+sub waitforfile($;$) {
+	my ($self, $file, $pid) = @_;
+	my $exited;
 
 	# wait for file to appear
+	# or specified process to exit
 
 	for (1 .. 30) {
 		return 1 if -e $file;
+		return 0 if $exited;
+		$exited = waitpid($pid, WNOHANG) != 0 if $pid;
 		select undef, undef, undef, 0.1;
 	}
 
@@ -215,52 +277,64 @@ sub waitforsocket($) {
 	return undef;
 }
 
-sub stop() {
-	my ($self) = @_;
+sub reload() {
+	my ($self) = @_; 
 
 	return $self unless $self->{_started};
+
+	local $/;
+	open F, '<' . $self->{_testdir} . '/nginx.pid'
+		or die "Can't open nginx.pid: $!";
+	my $pid = <F>;
+	close F;
 
 	if ($^O eq 'MSWin32') {
 		my $testdir = $self->{_testdir};
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'stop',
+		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'reload',
 			@globals) == 0
 			or die "system() failed: $?\n";
 
 	} else {
-		kill 'QUIT', `cat $self->{_testdir}/nginx.pid`;
+		kill 'HUP', $pid;
 	}
 
-	wait;
-
-	$self->{_started} = 0;
+	sleep(1);
 
 	return $self;
 }
 
-sub reload() {
-    my ($self) = @_; 
+sub stop() {
+	my ($self) = @_;
 
-    return $self unless $self->{_started};
+	return $self unless $self->{_started};
 
-    if ($^O eq 'MSWin32') {
-        my $testdir = $self->{_testdir};
-        my @globals = $self->{_test_globals} ?
-            () : ('-g', "pid $testdir/nginx.pid; "
-		  . "error_log $testdir/error.log debug;");
-        system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'reload',
-            @globals) == 0
-		or die "system() failed: $?\n";
+	local $/;
+	open F, '<' . $self->{_testdir} . '/nginx.pid'
+		or die "Can't open nginx.pid: $!";
+	my $pid = <F>;
+	close F;
 
-    } else {
-        kill 'HUP', `cat $self->{_testdir}/nginx.pid`;
-    }   
+	if ($^O eq 'MSWin32') {
+		my $testdir = $self->{_testdir};
+		my @globals = $self->{_test_globals} ?
+			() : ('-g', "pid $testdir/nginx.pid; "
+			. "error_log $testdir/error.log debug;");
+		system($NGINX, '-p', $testdir, '-c', "nginx.conf",
+			'-s', 'stop', @globals) == 0
+			or die "system() failed: $?\n";
 
-    sleep(1);
+	} else {
+		kill 'QUIT', $pid;
+	}
 
-    return $self;
+	waitpid($pid, 0);
+
+	$self->{_started} = 0;
+
+	return $self;
 }
 
 sub stop_daemons() {
@@ -269,7 +343,7 @@ sub stop_daemons() {
 	while ($self->{_daemons} && scalar @{$self->{_daemons}}) {
 		my $p = shift @{$self->{_daemons}};
 		kill $^O eq 'MSWin32' ? 9 : 'TERM', $p;
-		wait;
+		waitpid($p, 0);
 	}
 
 	return $self;
@@ -290,7 +364,7 @@ sub write_file_expand($$) {
 	my ($self, $name, $content) = @_;
 
 	$content =~ s/%%TEST_GLOBALS%%/$self->test_globals()/gmse;
-        $content =~ s/%%TEST_GLOBALS_DSO%%/$self->test_globals_dso()/gmse;
+	$content =~ s/%%TEST_GLOBALS_DSO%%/$self->test_globals_dso()/gmse;
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
 
@@ -335,29 +409,31 @@ sub test_globals() {
 	$s .= "pid $self->{_testdir}/nginx.pid;\n";
 	$s .= "error_log $self->{_testdir}/error.log debug;\n";
 
+	$s .= $ENV{TEST_NGINX_GLOBALS}
+		if $ENV{TEST_NGINX_GLOBALS};
 	$self->{_test_globals} = $s;
 }
 
 sub test_globals_dso() {
-        my ($self) = @_;
+	my ($self) = @_;
 
-        return "" unless defined $ENV{TEST_NGINX_DSO};
+	return "" unless defined $ENV{TEST_NGINX_DSO};
 
-	return $self->{_test_globals_dso}
-		if defined $self->{_test_globals_dso};
+	return $self->{_test_globals_dso} if defined $self->{_test_globals_dso};
 
-        my $s = '';
-        
-        $s .= "dso {\n";
-        if (defined $ENV{NGINX_DSO_PATH}) {
-            $s .= "path $ENV{NGINX_DSO_PATH};\n";
-        }
-        while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
-          $s .= "load $key $value;\n";
-        }
-        $s .= "}\n";
+	my $s = '';
 
-        $self->{_test_globals_dso} = $s;
+	$s .= "dso {\n";
+	if (defined $ENV{NGINX_DSO_PATH}) {
+		$s .= "path $ENV{NGINX_DSO_PATH};\n";
+	}
+
+	while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
+		$s .= "load $key $value;\n";
+	}
+	$s .= "}\n";
+
+	$self->{_test_globals_dso} = $s;
 }
 
 sub test_globals_http() {
@@ -372,7 +448,7 @@ sub test_globals_http() {
 	$s .= "access_log $self->{_testdir}/access.log;\n";
 	$s .= "client_body_temp_path $self->{_testdir}/client_body_temp;\n";
 
-	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n" 
+	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n"
 		if $self->has_module('fastcgi');
 
 	$s .= "proxy_temp_path $self->{_testdir}/proxy_temp;\n"
@@ -383,6 +459,9 @@ sub test_globals_http() {
 
 	$s .= "scgi_temp_path $self->{_testdir}/scgi_temp;\n"
 		if $self->has_module('scgi');
+
+	$s .= $ENV{TEST_NGINX_GLOBALS_HTTP}
+		if $ENV{TEST_NGINX_GLOBALS_HTTP};
 
 	$self->{_test_globals_http} = $s;
 }
@@ -395,9 +474,9 @@ sub log_core {
 	($prefix, $msg) = ('', $prefix) unless defined $msg;
 	$prefix .= ' ' if length($prefix) > 0;
 
-	if (length($msg) > 4096) {
-		$msg = substr($msg, 0, 4096)
-			. "(...logged only 4096 of " . length($msg)
+	if (length($msg) > 2048) {
+		$msg = substr($msg, 0, 2048)
+			. "(...logged only 2048 of " . length($msg)
 			. " bytes)";
 	}
 
@@ -437,21 +516,39 @@ EOF
 
 sub http($;%) {
 	my ($request, %extra) = @_;
-	my $reply;
+
+	my $s = http_start($request, %extra);
+
+	return $s if $extra{start} or !defined $s;
+	return http_end($s);
+}
+
+sub http_start($;%) {
+	my ($request, %extra) = @_;
+	my $s;
+
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
-		my $s = IO::Socket::INET->new(
+		alarm(5);
+
+		$s = $extra{socket} || IO::Socket::INET->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1:8080'
-		);
+		)
+			or die "Can't connect to nginx: $!\n";
+
 		log_out($request);
 		$s->print($request);
-		local $/;
+
 		select undef, undef, undef, $extra{sleep} if $extra{sleep};
 		return '' if $extra{aborted};
-		$reply = $s->getline();
+
+		if ($extra{body}) {
+			log_out($extra{body});
+			$s->print($extra{body});
+		}
+
 		alarm(0);
 	};
 	alarm(0);
@@ -459,6 +556,30 @@ sub http($;%) {
 		log_in("died: $@");
 		return undef;
 	}
+
+	return $s;
+}
+
+sub http_end($;%) {
+	my ($s) = @_;
+	my $reply;
+
+	eval {
+		local $SIG{ALRM} = sub { die "timeout\n" };
+		local $SIG{PIPE} = sub { die "sigpipe\n" };
+		alarm(5);
+
+		local $/;
+		$reply = $s->getline();
+
+		alarm(0);
+	};
+	alarm(0);
+	if ($@) {
+		log_in("died: $@");
+		return undef;
+	}
+
 	log_in($reply);
 	return $reply;
 }

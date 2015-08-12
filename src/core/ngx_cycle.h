@@ -14,7 +14,7 @@
 
 
 #ifndef NGX_CYCLE_POOL_SIZE
-#define NGX_CYCLE_POOL_SIZE     16384
+#define NGX_CYCLE_POOL_SIZE     NGX_DEFAULT_POOL_SIZE
 #endif
 
 
@@ -40,6 +40,8 @@ struct ngx_cycle_s {
 
     ngx_log_t                *log;
     ngx_log_t                 new_log;
+
+    ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */
 
     ngx_connection_t        **files;
     ngx_connection_t         *free_connections;

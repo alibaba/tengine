@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -771,10 +770,10 @@ ngx_procs_process_exit(ngx_cycle_t *cycle, ngx_proc_module_t *module)
     ngx_procs_exit_cycle.log = &ngx_procs_exit_log;
     ngx_cycle = &ngx_procs_exit_cycle;
 
-    ngx_destroy_pool(cycle->pool);
-
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "process %V exit",
                   &module->name);
+
+    ngx_destroy_pool(cycle->pool);
 
     exit(0);
 }

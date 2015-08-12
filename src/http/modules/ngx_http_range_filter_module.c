@@ -22,7 +22,7 @@
  * ... data ...
  *
  *
- * the mutlipart format:
+ * the multipart format:
  *
  * "HTTP/1.0 206 Partial Content" CRLF
  * ... header ...
@@ -146,7 +146,9 @@ static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
 static ngx_int_t
 ngx_http_range_header_filter(ngx_http_request_t *r)
 {
-    time_t                        if_range;
+    time_t                        if_range_time;
+    ngx_str_t                    *if_range, *etag;
+    ngx_uint_t                    ranges;
     ngx_http_core_loc_conf_t     *clcf;
     ngx_http_range_filter_ctx_t  *ctx;
 
@@ -174,19 +176,46 @@ ngx_http_range_header_filter(ngx_http_request_t *r)
         goto next_filter;
     }
 
-    if (r->headers_in.if_range && r->headers_out.last_modified_time != -1) {
+    if (r->headers_in.if_range) {
 
-        if_range = ngx_http_parse_time(r->headers_in.if_range->value.data,
-                                       r->headers_in.if_range->value.len);
+        if_range = &r->headers_in.if_range->value;
+
+        if (if_range->len >= 2 && if_range->data[if_range->len - 1] == '"') {
+
+            if (r->headers_out.etag == NULL) {
+                goto next_filter;
+            }
+
+            etag = &r->headers_out.etag->value;
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "http ir:%V etag:%V", if_range, etag);
+
+            if (if_range->len != etag->len
+                || ngx_strncmp(if_range->data, etag->data, etag->len) != 0)
+            {
+                goto next_filter;
+            }
+
+            goto parse;
+        }
+
+        if (r->headers_out.last_modified_time == (time_t) -1) {
+            goto next_filter;
+        }
+
+        if_range_time = ngx_http_parse_time(if_range->data, if_range->len);
 
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http ir:%d lm:%d",
-                       if_range, r->headers_out.last_modified_time);
+                       if_range_time, r->headers_out.last_modified_time);
 
-        if (if_range != r->headers_out.last_modified_time) {
+        if (if_range_time != r->headers_out.last_modified_time) {
             goto next_filter;
         }
     }
+
+parse:
 
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_range_filter_ctx_t));
     if (ctx == NULL) {
@@ -199,7 +228,9 @@ ngx_http_range_header_filter(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    switch (ngx_http_range_parse(r, ctx, clcf->max_ranges)) {
+    ranges = r->single_range ? 1 : clcf->max_ranges;
+
+    switch (ngx_http_range_parse(r, ctx, ranges)) {
 
     case NGX_OK:
         ngx_http_set_ctx(r, ctx, ngx_http_range_body_filter_module);
@@ -404,7 +435,9 @@ ngx_http_range_multipart_header(ngx_http_request_t *r,
           + r->headers_out.content_type.len
           + sizeof(CRLF "Content-Range: bytes ") - 1;
 
-    if (r->headers_out.charset.len) {
+    if (r->headers_out.content_type_len == r->headers_out.content_type.len
+        && r->headers_out.charset.len)
+    {
         len += sizeof("; charset=") - 1 + r->headers_out.charset.len;
     }
 
@@ -423,7 +456,9 @@ ngx_http_range_multipart_header(ngx_http_request_t *r,
      * "Content-Range: bytes "
      */
 
-    if (r->headers_out.charset.len) {
+    if (r->headers_out.content_type_len == r->headers_out.content_type.len
+        && r->headers_out.charset.len)
+    {
         ctx->boundary_header.len = ngx_sprintf(ctx->boundary_header.data,
                                            CRLF "--%0muA" CRLF
                                            "Content-Type: %V; charset=%V" CRLF
@@ -432,8 +467,6 @@ ngx_http_range_multipart_header(ngx_http_request_t *r,
                                            &r->headers_out.content_type,
                                            &r->headers_out.charset)
                                    - ctx->boundary_header.data;
-
-        r->headers_out.charset.len = 0;
 
     } else if (r->headers_out.content_type.len) {
         ctx->boundary_header.len = ngx_sprintf(ctx->boundary_header.data,
@@ -472,6 +505,8 @@ ngx_http_range_multipart_header(ngx_http_request_t *r,
                            - r->headers_out.content_type.data;
 
     r->headers_out.content_type_len = r->headers_out.content_type.len;
+
+    r->headers_out.charset.len = 0;
 
     /* the size of the last boundary CRLF "--0123456789--" CRLF */
 

@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -141,6 +141,9 @@ typedef enum
     NGX_HTTP_TFS_ACTION_STAT_FILE = 11,
     NGX_HTTP_TFS_ACTION_KEEPALIVE = 12,
     NGX_HTTP_TFS_ACTION_GET_APPID = 13,
+    NGX_HTTP_TFS_ACTION_UNDELETE_FILE = 14,
+    NGX_HTTP_TFS_ACTION_CONCEAL_FILE = 15,
+    NGX_HTTP_TFS_ACTION_REVEAL_FILE = 16,
 } ngx_http_tfs_action_e;
 
 
@@ -417,28 +420,6 @@ typedef struct {
     uint32_t                                 crc;
     uint64_t                                 file_number;
 } NGX_PACKED ngx_http_tfs_ds_close_request_t;
-
-
-typedef struct {
-    int64_t                    pid;
-    int64_t                    id;
-    uint32_t                   create_time;
-    uint32_t                   modify_time;
-    uint64_t                   size;
-    uint16_t                   ver_no;
-} NGX_PACKED ngx_http_tfs_custom_file_info_t;
-
-
-typedef struct {
-    uint64_t                   id;
-    int32_t                    offset;
-    int32_t                    size;
-    int32_t                    u_size;
-    int32_t                    modify_time;
-    int32_t                    create_time;
-    int32_t                    flag;
-    uint32_t                   crc;
-} NGX_PACKED ngx_http_tfs_raw_file_info_t;
 
 
 typedef struct {

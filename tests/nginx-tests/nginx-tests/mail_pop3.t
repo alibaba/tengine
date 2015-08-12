@@ -35,7 +35,7 @@ my $t = Test::Nginx->new()
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }

@@ -5,7 +5,7 @@ types {
     text/xml                              xml;
     image/gif                             gif;
     image/jpeg                            jpeg jpg;
-    application/x-javascript              js;
+    application/javascript                js;
     application/atom+xml                  atom;
     application/rss+xml                   rss;
 
@@ -24,13 +24,17 @@ types {
     image/svg+xml                         svg svgz;
     image/webp                            webp;
 
+    application/font-woff                 woff;
     application/java-archive              jar war ear;
+    application/json                      json;
     application/mac-binhex40              hqx;
     application/msword                    doc;
     application/pdf                       pdf;
     application/postscript                ps eps ai;
     application/rtf                       rtf;
+    application/vnd.apple.mpegurl         m3u8;
     application/vnd.ms-excel              xls;
+    application/vnd.ms-fontobject         eot;
     application/vnd.ms-powerpoint         ppt;
     application/vnd.wap.wmlc              wmlc;
     application/vnd.google-earth.kml+xml  kml;
@@ -51,6 +55,7 @@ types {
     application/x-x509-ca-cert            der pem crt;
     application/x-xpinstall               xpi;
     application/xhtml+xml                 xhtml;
+    application/xspf+xml                  xspf;
     application/zip                       zip;
     application/x-nokia-widget            wgz;
     application/vnd.android.package-archive apk;
@@ -58,9 +63,12 @@ types {
     application/octet-stream              bin exe dll;
     application/octet-stream              deb;
     application/octet-stream              dmg;
-    application/octet-stream              eot;
     application/octet-stream              iso img;
     application/octet-stream              msi msp msm;
+
+    application/vnd.openxmlformats-officedocument.wordprocessingml.document    docx;
+    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet          xlsx;
+    application/vnd.openxmlformats-officedocument.presentationml.presentation  pptx;
 
     audio/midi                            mid midi kar;
     audio/mpeg                            mp3;
@@ -69,6 +77,7 @@ types {
     audio/x-realaudio                     ra;
 
     video/3gpp                            3gpp 3gp;
+    video/mp2t                            ts;
     video/mp4                             mp4;
     video/mpeg                            mpeg mpg;
     video/quicktime                       mov;

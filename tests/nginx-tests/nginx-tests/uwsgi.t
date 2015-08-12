@@ -26,7 +26,7 @@ my $t = Test::Nginx->new()->has(qw/http uwsgi/)->has_daemon('uwsgi')->plan(3)
 
 %%TEST_GLOBALS%%
 
-daemon         off;
+daemon off;
 
 events {
 }
@@ -56,7 +56,15 @@ def application(env, start_response):
 
 END
 
-$t->run_daemon('uwsgi', '--socket', '127.0.0.1:8081',
+my $uwsgihelp = `uwsgi -h`;
+my @uwsgiopts = ();
+
+if ($uwsgihelp !~ /--wsgi-file/) {
+	# uwsgi has no python support, maybe plugin load is necessary
+	push @uwsgiopts, '--plugin', 'python';
+}
+
+$t->run_daemon('uwsgi', '--socket', '127.0.0.1:8081', @uwsgiopts,
 	'--wsgi-file', $t->testdir() . '/uwsgi_test_app.py',
 	'--logto', $t->testdir() . '/uwsgi_log');
 
@@ -70,14 +78,8 @@ $t->waitforsocket('127.0.0.1:8081')
 like(http_get('/'), qr/SEE-THIS/, 'uwsgi request');
 unlike(http_head('/head'), qr/SEE-THIS/, 'no data in HEAD');
 
-SKIP: {
-skip 'unsafe', 1 unless $ENV{TEST_NGINX_UNSAFE};
-local $TODO = 'not yet';
-
 like(http_get_headers('/headers'), qr/SEE-THIS/,
 	'uwsgi request with many ignored headers');
-
-}
 
 ###############################################################################
 

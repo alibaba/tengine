@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -162,28 +162,12 @@ static char *
 ngx_backtrace_files(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)
 {
-    ngx_str_t             file, *value;
-    ngx_log_t            *log;
     ngx_backtrace_conf_t *bcf;
 
     bcf = (ngx_backtrace_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                                 ngx_backtrace_module);
 
-    value = cf->args->elts;
-    file = value[1];
-
-    if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
-        return NGX_CONF_ERROR;
-    }
-
-    log = ngx_log_create(cf->cycle, &file);
-    if (log == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    bcf->log = log;
-
-    return NGX_CONF_OK;
+    return ngx_log_set_log(cf, &bcf->log);
 }
 
 

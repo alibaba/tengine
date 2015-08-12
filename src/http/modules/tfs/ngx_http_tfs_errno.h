@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2013 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2014 Alibaba Group Holding Limited
  */
 
 
@@ -91,7 +91,7 @@
 /* create block by block id failed */
 #define NGX_HTTP_TFS_EXIT_CREATE_BLOCK_BY_ID_ERROR            -5016
 /* server object not found in XXX */
-#define NGX_HTTP_TFS_EIXT_SERVER_OBJECT_NOT_FOUND             -5017
+#define NGX_HTTP_TFS_EXIT_SERVER_OBJECT_NOT_FOUND             -5017
 /* update relation error */
 #define NGX_HTTP_TFS_EXIT_UPDATE_RELATION_ERROR               -5018
 /* nameserver in safe_mode_time, discard newblk packet */
