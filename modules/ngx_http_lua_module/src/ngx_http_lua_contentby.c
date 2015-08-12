@@ -180,7 +180,7 @@ ngx_http_lua_content_handler(ngx_http_request_t *r)
         r->request_body_in_clean_file = 1;
 
         rc = ngx_http_read_client_request_body(r,
-                                       ngx_http_lua_content_phase_post_read);
+                                        ngx_http_lua_content_phase_post_read);
 
         if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
 #if (nginx_version < 1002006) ||                                             \
@@ -242,7 +242,7 @@ ngx_http_lua_content_handler_file(ngx_http_request_t *r)
     }
 
     script_path = ngx_http_lua_rebase_path(r->pool, eval_src.data,
-            eval_src.len);
+                                           eval_src.len);
 
     if (script_path == NULL) {
         return NGX_ERROR;
@@ -283,7 +283,8 @@ ngx_http_lua_content_handler_inline(ngx_http_request_t *r)
     rc = ngx_http_lua_cache_loadbuffer(r, L, llcf->content_src.value.data,
                                        llcf->content_src.value.len,
                                        llcf->content_src_key,
-                                       "=content_by_lua");
+                                       (const char *)
+                                       llcf->content_chunkname);
     if (rc != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }

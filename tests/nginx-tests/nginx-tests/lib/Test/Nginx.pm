@@ -349,6 +349,17 @@ sub stop_daemons() {
 	return $self;
 }
 
+sub read_file($) {
+    my ($self, $name) = @_;
+    local $/;
+
+    open F, '<', $self->{_testdir} . '/' . $name or die "Can't open $name: $!";
+    my $content = <F>;
+    close F;
+    
+    return $content;
+}
+
 sub write_file($$) {
 	my ($self, $name, $content) = @_;
 

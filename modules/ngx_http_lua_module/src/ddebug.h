@@ -8,6 +8,7 @@
 #define _DDEBUG_H_INCLUDED_
 
 
+#include <ngx_config.h>
 #include <nginx.h>
 #include <ngx_core.h>
 

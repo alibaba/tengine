@@ -130,7 +130,7 @@ ngx_event_module_t  ngx_rtsig_module_ctx = {
         NULL,                            /* disable an event */
         ngx_rtsig_add_connection,        /* add an connection */
         ngx_rtsig_del_connection,        /* delete an connection */
-        NULL,                            /* process the changes */
+        NULL,                            /* trigger a notify */
         ngx_rtsig_process_events,        /* process the events */
         ngx_rtsig_init,                  /* init the events */
         ngx_rtsig_done,                  /* done the events */
@@ -307,7 +307,8 @@ ngx_rtsig_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_int_t           instance;
     ngx_err_t           err;
     siginfo_t           si;
-    ngx_event_t        *rev, *wev, **queue;
+    ngx_event_t        *rev, *wev;
+    ngx_queue_t        *queue;
     struct timespec     ts, *tp;
     struct sigaction    sa;
     ngx_connection_t   *c;
@@ -404,10 +405,10 @@ ngx_rtsig_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             rev->ready = 1;
 
             if (flags & NGX_POST_EVENTS) {
-                queue = (ngx_event_t **) (rev->accept ?
-                               &ngx_posted_accept_events : &ngx_posted_events);
+                queue = rev->accept ? &ngx_posted_accept_events
+                                    : &ngx_posted_events;
 
-                ngx_locked_post_event(rev, queue);
+                ngx_post_event(rev, queue);
 
             } else {
                 rev->handler(rev);
@@ -421,7 +422,7 @@ ngx_rtsig_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             wev->ready = 1;
 
             if (flags & NGX_POST_EVENTS) {
-                ngx_locked_post_event(wev, &ngx_posted_events);
+                ngx_post_event(wev, &ngx_posted_events);
 
             } else {
                 wev->handler(wev);
@@ -480,7 +481,8 @@ ngx_rtsig_process_overflow(ngx_cycle_t *cycle, ngx_msec_t timer,
     size_t             len;
     ngx_err_t          err;
     ngx_uint_t         tested, n, i;
-    ngx_event_t       *rev, *wev, **queue;
+    ngx_event_t       *rev, *wev;
+    ngx_queue_t       *queue;
     ngx_connection_t  *c;
     ngx_rtsig_conf_t  *rtscf;
 
@@ -554,8 +556,6 @@ ngx_rtsig_process_overflow(ngx_cycle_t *cycle, ngx_msec_t timer,
             continue;
         }
 
-        ngx_mutex_lock(ngx_posted_events_mutex);
-
         for (i = 0; i < n; i++) {
             c = cycle->files[overflow_list[i].fd];
 
@@ -573,18 +573,13 @@ ngx_rtsig_process_overflow(ngx_cycle_t *cycle, ngx_msec_t timer,
             {
                 tested++;
 
-                if ((flags & NGX_POST_THREAD_EVENTS) && !rev->accept) {
-                    rev->posted_ready = 1;
-
-                } else {
-                    rev->ready = 1;
-                }
+                rev->ready = 1;
 
                 if (flags & NGX_POST_EVENTS) {
-                    queue = (ngx_event_t **) (rev->accept ?
-                               &ngx_posted_accept_events : &ngx_posted_events);
+                    queue = rev->accept ? &ngx_posted_accept_events
+                                        : &ngx_posted_events;
 
-                    ngx_locked_post_event(rev, queue);
+                    ngx_post_event(rev, queue);
 
                 } else {
                     rev->handler(rev);
@@ -601,23 +596,16 @@ ngx_rtsig_process_overflow(ngx_cycle_t *cycle, ngx_msec_t timer,
             {
                 tested++;
 
-                if (flags & NGX_POST_THREAD_EVENTS) {
-                    wev->posted_ready = 1;
-
-                } else {
-                    wev->ready = 1;
-                }
+                wev->ready = 1;
 
                 if (flags & NGX_POST_EVENTS) {
-                    ngx_locked_post_event(wev, &ngx_posted_events);
+                    ngx_post_event(wev, &ngx_posted_events);
 
                 } else {
                     wev->handler(wev);
                 }
             }
         }
-
-        ngx_mutex_unlock(ngx_posted_events_mutex);
 
         if (tested >= rtscf->overflow_test) {
 

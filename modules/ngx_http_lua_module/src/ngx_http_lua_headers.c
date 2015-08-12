@@ -128,24 +128,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
            + line_break_len <= b->pos)
     {
         first = b;
-
-        if (mr->header_in == b) {
-            size += mr->header_in->pos - mr->request_line.data;
-
-        } else {
-            /* the subsequent part of the header is in the large header
-             * buffers */
-#if 1
-            p = b->pos;
-            size += p - mr->request_line.data;
-
-            /* skip truncated header entries (if any) */
-            while (b->pos > b->start && b->pos[-1] != LF) {
-                b->pos--;
-                size--;
-            }
-#endif
-        }
+        size += b->pos - mr->request_line.data;
     }
 
     dd("size: %d", (int) size);
@@ -171,11 +154,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
                 first = b;
             }
 
-            if (b == mr->header_in) {
-                size += mr->header_in->pos - b->start;
-                break;
-            }
-
+            dd("adding size %d", (int) (b->pos - b->start));
             size += b->pos - b->start;
         }
     }
@@ -189,13 +168,11 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     last = data;
 
     b = c->buffer;
-    if (first == b) {
-        if (mr->header_in == b) {
-            pos = mr->header_in->pos;
+    found = 0;
 
-        } else {
-            pos = b->pos;
-        }
+    if (first == b) {
+        found = 1;
+        pos = b->pos;
 
         if (no_req_line) {
             last = ngx_copy(data,
@@ -207,6 +184,13 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
         } else {
             last = ngx_copy(data, mr->request_line.data,
                             pos - mr->request_line.data);
+        }
+
+        if (b != mr->header_in) {
+            /* skip truncated header entries (if any) */
+            while (last > data && last[-1] != LF) {
+                last--;
+            }
         }
 
         i = 0;
@@ -227,7 +211,6 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     }
 
     if (hc->nbusy) {
-        found = (b == c->buffer);
         for (i = 0; i < hc->nbusy; i++) {
             b = hc->busy[i];
 
@@ -242,12 +225,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
 
             p = last;
 
-            if (b == mr->header_in) {
-                pos = mr->header_in->pos;
-
-            } else {
-                pos = b->pos;
-            }
+            pos = b->pos;
 
             if (b == first) {
                 dd("request line: %.*s", (int) mr->request_line.len,
@@ -510,7 +488,7 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
 
 #if 1
     if (r->headers_out.content_type.len) {
-        lua_pushliteral(L, "Content-Type");
+        lua_pushliteral(L, "content-type");
         lua_pushlstring(L, (char *) r->headers_out.content_type.data,
                         r->headers_out.content_type.len);
         lua_rawset(L, -3);
@@ -519,12 +497,12 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     if (r->headers_out.content_length == NULL
         && r->headers_out.content_length_n >= 0)
     {
-        lua_pushliteral(L, "Content-Length");
+        lua_pushliteral(L, "content-length");
         lua_pushfstring(L, "%d", (int) r->headers_out.content_length_n);
         lua_rawset(L, -3);
     }
 
-    lua_pushliteral(L, "Connection");
+    lua_pushliteral(L, "connection");
     if (r->headers_out.status == NGX_HTTP_SWITCHING_PROTOCOLS) {
         lua_pushliteral(L, "upgrade");
 
@@ -537,7 +515,7 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     lua_rawset(L, -3);
 
     if (r->chunked) {
-        lua_pushliteral(L, "Transfer-Encoding");
+        lua_pushliteral(L, "transfer-encoding");
         lua_pushliteral(L, "chunked");
         lua_rawset(L, -3);
     }
@@ -680,7 +658,7 @@ ngx_http_lua_ngx_header_set(lua_State *L)
 
     ngx_http_lua_check_fake_request(L, r);
 
-    if (r->header_sent) {
+    if (r->header_sent || ctx->header_sent) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "attempt to "
                       "set ngx.header.HEADER after sending out "
                       "response headers");
@@ -1108,7 +1086,7 @@ ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
 
-    if (r->header_sent) {
+    if (r->header_sent || ctx->header_sent) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "attempt to "
                       "set ngx.header.HEADER after sending out "
                       "response headers");

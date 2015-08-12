@@ -262,8 +262,8 @@ M(http-lua-info) {
 --- request
 GET /main
 --- response_body_like: \b500\b
---- error_log
-content_by_lua:8: bad request
+--- error_log eval
+qr/content_by_lua\(nginx\.conf:\d+\):8: bad request/
 
 
 
@@ -327,8 +327,8 @@ end
 --- request
 GET /main
 --- response_body_like: \b500\b
---- error_log
-content_by_lua:6: bad request
+--- error_log eval
+qr/content_by_lua\(nginx\.conf:\d+\):6: bad request/
 
 
 
@@ -558,7 +558,7 @@ lua udp socket read timed out
 
             udp:settimeout(2000) -- 2 sec
 
-            local ok, err = udp:setpeername("8.8.8.8", 53)
+            local ok, err = udp:setpeername("$TEST_NGINX_RESOLVER", 53)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -603,9 +603,20 @@ lua udp socket receive buffer size: 8192
 === TEST 11: access the google DNS server (using domain names)
 --- config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     location /t {
         content_by_lua '
+            -- avoid flushing google in "check leak" testing mode:
+            local counter = package.loaded.counter
+            if not counter then
+                counter = 1
+            elseif counter >= 2 then
+                return ngx.exit(503)
+            else
+                counter = counter + 1
+            end
+            package.loaded.counter = counter
+
             local socket = ngx.socket
             -- local socket = require "socket"
 
@@ -657,7 +668,7 @@ lua udp socket receive buffer size: 8192
 
 === TEST 12: github issue #215: Handle the posted requests in lua cosocket api (failed to resolve)
 --- config
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
 
     location = /sub {
         content_by_lua '
@@ -699,7 +710,7 @@ resolve name done
 
 === TEST 13: github issue #215: Handle the posted requests in lua cosocket api (successfully resolved)
 --- config
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
     resolver_timeout 3s;
 
     location = /sub {
@@ -857,8 +868,9 @@ GET /main
 qr/^peer set
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -913,8 +925,9 @@ GET /main
 qr/^peer set
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -969,8 +982,9 @@ GET /main
 qr/^peer set
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -1025,8 +1039,9 @@ GET /main
 qr/^peer set
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -1081,8 +1096,9 @@ GET /main
 qr/^peer set
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 

@@ -121,7 +121,7 @@ GET /read
     }
 --- request
 GET /read
---- raw_response_headers_like: Location: http://localhost(?::\d+)?/echo\r\n
+--- raw_response_headers_like: Location: /echo\r\n
 --- response_body_like: 302 Found
 --- error_code: 302
 

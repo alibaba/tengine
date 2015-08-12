@@ -897,12 +897,13 @@ chunk: true
     }
 --- request
 GET /t
---- response_body
-child: resume: falsecontent_by_lua:4: bad
+--- response_body eval
+qr/^child: resume: falsecontent_by_lua\(nginx\.conf:\d+\):4: bad
 child: status: dead
 parent: status: running
---- error_log
-lua coroutine: runtime error: content_by_lua:4: bad
+$/s
+--- error_log eval
+qr/lua coroutine: runtime error: content_by_lua\(nginx\.conf:\d+\):4: bad/
 
 
 

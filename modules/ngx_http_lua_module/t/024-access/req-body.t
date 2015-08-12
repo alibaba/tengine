@@ -8,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 1);
+plan tests => repeat_each() * (blocks() * 2 + 19);
 
 #no_diff();
 #no_long_string();
@@ -122,4 +122,100 @@ Expect: 100-Continue
 [alert]
 [error]
 http finalize request: 500, "/test?" a:1, c:0
+
+
+
+=== TEST 6: not discard body (exit 200)
+--- config
+    location = /foo {
+        access_by_lua '
+            -- ngx.req.discard_body()
+            ngx.say("body: ", ngx.var.request_body)
+            ngx.exit(200)
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+["body: nil\n",
+"body: hiya, world\n",
+]
+--- error_code eval
+[200, 200]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 7: not discard body (exit 201)
+--- config
+    location = /foo {
+        access_by_lua '
+            -- ngx.req.discard_body()
+            ngx.say("body: ", ngx.var.request_body)
+            ngx.exit(201)
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+["body: nil\n",
+"body: hiya, world\n",
+]
+--- error_code eval
+[200, 200]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 8: not discard body (exit 302)
+--- config
+    location = /foo {
+        access_by_lua '
+            -- ngx.req.discard_body()
+            -- ngx.say("body: ", ngx.var.request_body)
+            ngx.redirect("/blah")
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+[qr/302 Found/,
+"body: hiya, world\n",
+]
+--- error_code eval
+[302, 200]
+--- no_error_log
+[error]
+[alert]
 

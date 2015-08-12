@@ -46,11 +46,12 @@ __DATA__
         }
 --- request
 GET /test
---- response_body
-res len: 2
-res: falsecontent_by_lua:4: zero error
+--- response_body eval
+qr/^res len: 2
+res: falsecontent_by_lua\(nginx\.conf:\d+\):4: zero error
 res len: 4
 res: true23hellotrue
+$/s
 --- no_error_log
 [error]
 
@@ -94,12 +95,14 @@ res: true23hellotrue
         }
 --- request
 GET /test
---- response_body
-error handler called: content_by_lua:4: zero error
+--- response_body eval
+qr/^error handler called: content_by_lua\(nginx\.conf:\d+\):4: zero error
 res len: 2
 res: falsethis is the new err
 res len: 4
 res: true23hellotrue
+$/
+
 --- no_error_log
 [error]
 

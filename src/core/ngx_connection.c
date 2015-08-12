@@ -83,10 +83,6 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
     ls->setfib = -1;
 #endif
 
-#if (NGX_HAVE_REUSEPORT)
-    ls->reuse_port = 0;
-#endif
-
 #if (NGX_HAVE_TCP_FASTOPEN)
     ls->fastopen = -1;
 #endif
@@ -309,14 +305,14 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
-    int               reuse;
+    int               reuseaddr;
     ngx_uint_t        i, tries, failed;
     ngx_err_t         err;
     ngx_log_t        *log;
     ngx_socket_t      s;
     ngx_listening_t  *ls;
 
-    reuse = 1;
+    reuseaddr = 1;
 #if (NGX_SUPPRESS_WARN)
     failed = 0;
 #endif
@@ -359,7 +355,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 
             if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-                           (const void *) &reuse, sizeof(int))
+                           (const void *) &reuseaddr, sizeof(int))
                 == -1)
             {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -374,47 +370,6 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
-
-#if (NGX_HAVE_REUSEPORT)
-
-            u_char              *onfly;
-            ngx_event_conf_t    *ecf;
-
-            ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
-
-            if (ecf->reuse_port) {
-
-                onfly = (u_char *) getenv(NGINX_VAR);
-
-                if (ngx_process == NGX_PROCESS_SIGNALLER
-                    || (cycle->old_cycle != NULL && !ngx_is_init_cycle(cycle->old_cycle))
-                    || ls[i].reuse_port
-                    || onfly != NULL
-                    || ngx_test_config)
-                {
-
-                    if(setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
-                                  (const void *) &reuse, sizeof(int))
-                       == -1)
-                    {
-                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                            "setsockopt(SO_REUSEPORT) %V failed",
-                                     &ls[i].addr_text);
-
-                        if (ngx_close_socket(s) == -1) {
-                            ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                ngx_close_socket_n " %V failed",
-                                         &ls[i].addr_text);
-                        }
-
-                        return NGX_ERROR;
-                    }
-
-                    ls[i].reuse_port = 1;
-                }
-
-            }
-#endif
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
 
@@ -517,21 +472,6 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
                 return NGX_ERROR;
             }
-
-#if (NGX_HAVE_REUSEPORT)
-
-            if (ecf->reuse_port && !ls[i].reuse_port) {
-                if (ngx_close_socket(s) == -1) {
-                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  ngx_close_socket_n " %V failed",
-                                  &ls[i].addr_text);
-                }
-
-                failed = 1;
-                ls[i].reuse_port = 1;
-                continue;
-            }
-#endif
 
             ls[i].listen = 1;
 
@@ -898,8 +838,6 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         return NULL;
     }
 
-    /* ngx_mutex_lock */
-
     c = ngx_cycle->free_connections;
 
     if (c == NULL) {
@@ -912,15 +850,11 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
                       "%ui worker_connections are not enough",
                       ngx_cycle->connection_n);
 
-        /* ngx_mutex_unlock */
-
         return NULL;
     }
 
     ngx_cycle->free_connections = c->data;
     ngx_cycle->free_connection_n--;
-
-    /* ngx_mutex_unlock */
 
     if (ngx_cycle->files) {
         ngx_cycle->files[s] = c;
@@ -959,13 +893,9 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 void
 ngx_free_connection(ngx_connection_t *c)
 {
-    /* ngx_mutex_lock */
-
     c->data = ngx_cycle->free_connections;
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
-
-    /* ngx_mutex_unlock */
 
     if (ngx_cycle->files) {
         ngx_cycle->files[c->fd] = NULL;
@@ -1006,47 +936,16 @@ ngx_close_connection(ngx_connection_t *c)
         }
     }
 
-#if (NGX_THREADS)
-
-    /*
-     * we have to clean the connection information before the closing
-     * because another thread may reopen the same file descriptor
-     * before we clean the connection
-     */
-
-    ngx_mutex_lock(ngx_posted_events_mutex);
-
-    if (c->read->prev) {
+    if (c->read->posted) {
         ngx_delete_posted_event(c->read);
     }
 
-    if (c->write->prev) {
+    if (c->write->posted) {
         ngx_delete_posted_event(c->write);
     }
 
     c->read->closed = 1;
     c->write->closed = 1;
-
-    ngx_unlock(&c->lock);
-    c->read->locked = 0;
-    c->write->locked = 0;
-
-    ngx_mutex_unlock(ngx_posted_events_mutex);
-
-#else
-
-    if (c->read->prev) {
-        ngx_delete_posted_event(c->read);
-    }
-
-    if (c->write->prev) {
-        ngx_delete_posted_event(c->write);
-    }
-
-    c->read->closed = 1;
-    c->write->closed = 1;
-
-#endif
 
     ngx_reusable_connection(c, 0);
 
@@ -1155,33 +1054,33 @@ ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     struct sockaddr_in6  *sin6;
 #endif
 
-    if (c->local_socklen == 0) {
-        return NGX_ERROR;
-    }
+    addr = 0;
 
-    switch (c->local_sockaddr->sa_family) {
+    if (c->local_socklen) {
+        switch (c->local_sockaddr->sa_family) {
 
 #if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = (struct sockaddr_in6 *) c->local_sockaddr;
+        case AF_INET6:
+            sin6 = (struct sockaddr_in6 *) c->local_sockaddr;
 
-        for (addr = 0, i = 0; addr == 0 && i < 16; i++) {
-            addr |= sin6->sin6_addr.s6_addr[i];
-        }
+            for (addr = 0, i = 0; addr == 0 && i < 16; i++) {
+                addr |= sin6->sin6_addr.s6_addr[i];
+            }
 
-        break;
+            break;
 #endif
 
 #if (NGX_HAVE_UNIX_DOMAIN)
-    case AF_UNIX:
-        addr = 1;
-        break;
+        case AF_UNIX:
+            addr = 1;
+            break;
 #endif
 
-    default: /* AF_INET */
-        sin = (struct sockaddr_in *) c->local_sockaddr;
-        addr = sin->sin_addr.s_addr;
-        break;
+        default: /* AF_INET */
+            sin = (struct sockaddr_in *) c->local_sockaddr;
+            addr = sin->sin_addr.s_addr;
+            break;
+        }
     }
 
     if (addr == 0) {

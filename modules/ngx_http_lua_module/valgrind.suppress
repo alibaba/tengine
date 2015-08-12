@@ -104,6 +104,13 @@ fun:main
    fun:ngx_event_process_init
 }
 {
+    <insert_a_suppression_name_here>
+    Memcheck:Param
+    sendmsg(mmsg[0].msg_hdr)
+    fun:sendmmsg
+    fun:__libc_res_nsend
+}
+{
    <insert_a_suppression_name_here>
    Memcheck:Param
    sendmsg(msg.msg_iov[0])
@@ -131,4 +138,14 @@ fun:main
    fun:dl_main
    fun:_dl_sysdep_start
    fun:_dl_start
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Param
+   sendmsg(mmsg[0].msg_hdr)
+   fun:sendmmsg
+   fun:__libc_res_nsend
+   fun:__libc_res_nquery
+   fun:__libc_res_nquerydomain
+   fun:__libc_res_nsearch
 }

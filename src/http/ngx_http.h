@@ -36,7 +36,6 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_script.h>
 #include <ngx_http_upstream.h>
 #include <ngx_http_upstream_round_robin.h>
-#include <ngx_http_busy_lock.h>
 #include <ngx_http_core_module.h>
 
 #if (NGX_HTTP_SPDY)
@@ -105,6 +104,8 @@ ngx_int_t ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_uint_t allow_underscores);
 ngx_int_t ngx_http_parse_multi_header_lines(ngx_array_t *headers,
     ngx_str_t *name, ngx_str_t *value);
+ngx_int_t ngx_http_parse_set_cookie_lines(ngx_array_t *headers,
+    ngx_str_t *name, ngx_str_t *value);
 ngx_int_t ngx_http_arg(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
@@ -146,6 +147,7 @@ ngx_int_t ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags);
 
 ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
+ngx_int_t ngx_http_read_unbuffered_request_body(ngx_http_request_t *r);
 
 ngx_int_t ngx_http_send_header(ngx_http_request_t *r);
 ngx_int_t ngx_http_special_response_handler(ngx_http_request_t *r,
@@ -185,6 +187,7 @@ extern ngx_str_t  ngx_http_html_default_types[];
 
 extern ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
 extern ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
+extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 
 extern ngx_http_input_body_filter_pt     ngx_http_top_input_body_filter;
 

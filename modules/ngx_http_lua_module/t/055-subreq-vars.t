@@ -65,8 +65,8 @@ M(http-subrequest-start) {
 --- request
 GET /lua
 --- response_body_like: 500 Internal Server Error
---- error_log chop
-variable "dog" cannot be assigned a value (maybe you forgot to define it first?)
+--- error_log eval
+qr/variable "(dog|cat)" cannot be assigned a value \(maybe you forgot to define it first\?\)/
 --- error_code: 500
 
 

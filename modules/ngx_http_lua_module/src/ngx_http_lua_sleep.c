@@ -102,8 +102,10 @@ ngx_http_lua_sleep_handler(ngx_event_t *ev)
         return;
     }
 
-    log_ctx = c->log->data;
-    log_ctx->current_request = r;
+    if (c->fd != -1) {  /* not a fake connection */
+        log_ctx = c->log->data;
+        log_ctx->current_request = r;
+    }
 
     coctx->cleanup = NULL;
 

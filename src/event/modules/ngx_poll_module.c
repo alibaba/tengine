@@ -22,7 +22,7 @@ static char *ngx_poll_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
 static struct pollfd  *event_list;
-static ngx_int_t       nevents;
+static ngx_uint_t      nevents;
 
 
 static ngx_str_t    poll_name = ngx_string("poll");
@@ -39,7 +39,7 @@ ngx_event_module_t  ngx_poll_module_ctx = {
         ngx_poll_del_event,                /* disable an event */
         NULL,                              /* add an connection */
         NULL,                              /* delete an connection */
-        NULL,                              /* process the changes */
+        NULL,                              /* trigger a notify */
         ngx_poll_process_events,           /* process the events */
         ngx_poll_init,                     /* init the events */
         ngx_poll_done                      /* done the events */
@@ -198,7 +198,7 @@ ngx_poll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     if (e == NULL || e->index == NGX_INVALID_INDEX) {
         nevents--;
 
-        if (ev->index < (ngx_uint_t) nevents) {
+        if (ev->index < nevents) {
 
             ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                            "index: copy event %ui to %i", nevents, ev->index);
@@ -212,11 +212,11 @@ ngx_poll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
                               "unexpected last event");
 
             } else {
-                if (c->read->index == (ngx_uint_t) nevents) {
+                if (c->read->index == nevents) {
                     c->read->index = ev->index;
                 }
 
-                if (c->write->index == (ngx_uint_t) nevents) {
+                if (c->write->index == nevents) {
                     c->write->index = ev->index;
                 }
             }
@@ -240,9 +240,9 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 {
     int                 ready, revents;
     ngx_err_t           err;
-    ngx_int_t           i, nready;
-    ngx_uint_t          found, level;
-    ngx_event_t        *ev, **queue;
+    ngx_uint_t          i, found, level;
+    ngx_event_t        *ev;
+    ngx_queue_t        *queue;
     ngx_connection_t   *c;
 
     /* NGX_TIMER_INFINITE == INFTIM */
@@ -251,7 +251,7 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     if (cycle->log->log_level & NGX_LOG_DEBUG_ALL) {
         for (i = 0; i < nevents; i++) {
             ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                           "poll: %d: fd:%d ev:%04Xd",
+                           "poll: %ui: fd:%d ev:%04Xd",
                            i, event_list[i].fd, event_list[i].events);
         }
     }
@@ -268,7 +268,7 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "poll ready %d of %d", ready, nevents);
+                   "poll ready %d of %ui", ready, nevents);
 
     if (err) {
         if (err == NGX_EINTR) {
@@ -298,22 +298,18 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
         return NGX_ERROR;
     }
 
-    ngx_mutex_lock(ngx_posted_events_mutex);
-
-    nready = 0;
-
     for (i = 0; i < nevents && ready; i++) {
 
         revents = event_list[i].revents;
 
 #if 1
         ngx_log_debug4(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                       "poll: %d: fd:%d ev:%04Xd rev:%04Xd",
+                       "poll: %ui: fd:%d ev:%04Xd rev:%04Xd",
                        i, event_list[i].fd, event_list[i].events, revents);
 #else
         if (revents) {
             ngx_log_debug4(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                           "poll: %d: fd:%d ev:%04Xd rev:%04Xd",
+                           "poll: %ui: fd:%d ev:%04Xd rev:%04Xd",
                            i, event_list[i].fd, event_list[i].events, revents);
         }
 #endif
@@ -375,31 +371,21 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             found = 1;
 
             ev = c->read;
+            ev->ready = 1;
 
-            if ((flags & NGX_POST_THREAD_EVENTS) && !ev->accept) {
-                ev->posted_ready = 1;
+            queue = ev->accept ? &ngx_posted_accept_events
+                               : &ngx_posted_events;
 
-            } else {
-                ev->ready = 1;
-            }
-
-            queue = (ngx_event_t **) (ev->accept ? &ngx_posted_accept_events:
-                                                   &ngx_posted_events);
-            ngx_locked_post_event(ev, queue);
+            ngx_post_event(ev, queue);
         }
 
         if ((revents & POLLOUT) && c->write->active) {
             found = 1;
+
             ev = c->write;
+            ev->ready = 1;
 
-            if (flags & NGX_POST_THREAD_EVENTS) {
-                ev->posted_ready = 1;
-
-            } else {
-                ev->ready = 1;
-            }
-
-            ngx_locked_post_event(ev, &ngx_posted_events);
+            ngx_post_event(ev, &ngx_posted_events);
         }
 
         if (found) {
@@ -408,13 +394,11 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
         }
     }
 
-    ngx_mutex_unlock(ngx_posted_events_mutex);
-
     if (ready != 0) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "poll ready != events");
     }
 
-    return nready;
+    return NGX_OK;
 }
 
 
@@ -429,7 +413,7 @@ ngx_poll_init_conf(ngx_cycle_t *cycle, void *conf)
         return NGX_CONF_OK;
     }
 
-#if (NGX_THREADS)
+#if (NGX_OLD_THREADS)
 
     ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                   "poll() is not supported in the threaded mode");

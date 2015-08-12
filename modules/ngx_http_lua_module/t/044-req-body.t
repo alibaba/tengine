@@ -8,7 +8,7 @@ log_level('warn');
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 4 + 35);
+plan tests => repeat_each() * (blocks() * 4 + 51);
 
 #no_diff();
 no_long_string();
@@ -140,7 +140,7 @@ hiya, world"]
 
 
 
-=== TEST 6: not discard body
+=== TEST 6: not discard body (content_by_lua falls through)
 --- config
     location = /foo {
         content_by_lua '
@@ -161,9 +161,10 @@ hello, world",
 hiya, world"]
 --- response_body eval
 ["body: nil\n",
-qr/400 Bad Request/]
+"body: hiya, world\n",
+]
 --- error_code eval
-[200, 400]
+[200, 200]
 --- no_error_log
 [error]
 [alert]
@@ -315,8 +316,8 @@ POST /test
 yeah
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
---- error_log
-lua entry thread aborted: runtime error: content_by_lua:2: request body not read yet
+--- error_log eval
+qr/lua entry thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):2: request body not read yet/
 --- no_error_log
 [alert]
 
@@ -573,8 +574,9 @@ hello, world
 Will you change this world?
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
---- error_log
-lua entry thread aborted: runtime error: rewrite_by_lua:3: request body not read yet
+--- error_log eval
+qr/lua entry thread aborted: runtime error: rewrite_by_lua\(nginx\.conf:\d+\):3: request body not read yet/
+
 --- no_error_log
 [alert]
 
@@ -976,8 +978,9 @@ a client request body is buffered to a temporary file
     GET /t
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
---- error_log
-lua entry thread aborted: runtime error: content_by_lua:2: request body not read yet
+--- error_log eval
+qr/lua entry thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):2: request body not read yet/
+
 --- no_error_log
 [alert]
 
@@ -1480,3 +1483,127 @@ Will you change this world?
 [error]
 [alert]
 
+
+
+=== TEST 45: not discard body (content_by_lua exit 200)
+--- config
+    location = /foo {
+        content_by_lua '
+            -- ngx.req.discard_body()
+            ngx.say("body: ", ngx.var.request_body)
+            ngx.exit(200)
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+["body: nil\n",
+"body: hiya, world\n",
+]
+--- error_code eval
+[200, 200]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 46: not discard body (content_by_lua exit 201)
+--- config
+    location = /foo {
+        content_by_lua '
+            -- ngx.req.discard_body()
+            ngx.say("body: ", ngx.var.request_body)
+            ngx.exit(201)
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+["body: nil\n",
+"body: hiya, world\n",
+]
+--- error_code eval
+[200, 200]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 47: not discard body (content_by_lua exit 302)
+--- config
+    location = /foo {
+        content_by_lua '
+            -- ngx.req.discard_body()
+            -- ngx.say("body: ", ngx.var.request_body)
+            ngx.redirect("/blah")
+        ';
+    }
+    location = /bar {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.say("body: ", ngx.var.request_body)
+        ';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /bar
+hiya, world"]
+--- response_body eval
+[qr/302 Found/,
+"body: hiya, world\n",
+]
+--- error_code eval
+[302, 200]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 48: not discard body (custom error page)
+--- config
+    error_page 404 = /err;
+
+    location = /foo {
+        content_by_lua '
+            ngx.exit(404)
+        ';
+    }
+    location = /err {
+        content_by_lua 'ngx.say("error")';
+    }
+--- pipelined_requests eval
+["POST /foo
+hello, world",
+"POST /foo
+hiya, world"]
+--- response_body eval
+["error\n",
+"error\n",
+]
+--- error_code eval
+[404, 404]
+--- no_error_log
+[error]
+[alert]

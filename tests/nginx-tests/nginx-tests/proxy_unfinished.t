@@ -31,10 +31,11 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
+my $t = Test::Nginx->new()->has(qw/http proxy cache sub shmem/)->plan(15);
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache sub/)->plan(15)
-	->write_file_expand('nginx.conf', <<'EOF');
+$t->todo_alerts() if $^O eq 'solaris';
+
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -50,7 +51,7 @@ http {
                        keys_zone=one:1m;
 
     server {
-        listen       127.0.0.1:8080;
+        listen       127.0.0.1:8080 sndbuf=32k;
         server_name  localhost;
 
         location / {
@@ -98,19 +99,11 @@ $t->run()->waitforsocket('127.0.0.1:8081');
 http_get('/cache/length');
 like(http_get('/cache/length'), qr/MISS/, 'unfinished not cached');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 # chunked encoding has enough information to don't cache a response,
 # much like with Content-Length available
 
 http_get('/cache/chunked');
 like(http_get('/cache/chunked'), qr/MISS/, 'unfinished chunked');
-
-}
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
 
 # make sure there is no final chunk in unfinished responses
 
@@ -119,8 +112,6 @@ like(http_get_11('/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
 like(http_get_11('/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
 	'chunked no final chunk');
 
-}
-
 # but there is final chunk in complete responses
 
 like(http_get_11('/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
@@ -128,22 +119,17 @@ like(http_get_11('/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
 like(http_get_11('/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
 	'chunked final chunk');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 # the same with proxy_buffering set to off
 
 like(http_get_11('/un/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
-        'unbuffered length no final chunk');
+	'unbuffered length no final chunk');
 like(http_get_11('/un/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
-        'unbuffered chunked no final chunk');
-
-}
+	'unbuffered chunked no final chunk');
 
 like(http_get_11('/un/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
-        'unbuffered length final chunk');
+	'unbuffered length final chunk');
 like(http_get_11('/un/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
-        'unbuffered chunked final chunk');
+	'unbuffered chunked final chunk');
 
 # big responses
 
@@ -152,17 +138,12 @@ like(http_get('/big/ok', sleep => 0.1), qr/finished/s, 'big finished');
 like(http_get('/un/big', sleep => 0.1), qr/unfinished/s, 'big unfinished un');
 like(http_get('/un/big/ok', sleep => 0.1), qr/finished/s, 'big finished un');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 # if disk buffering fails for some reason, there should be
 # no final chunk
 
 chmod(0000, $t->testdir() . '/proxy_temp');
 like(http_get_11('/proxy/big.html', sleep => 0.5),
-	qr/X(?!.*\x0d\x0a?0\x0d\x0a?)/s, 'no proxy temp');
-
-}
+	qr/X(?!.*\x0d\x0a?0\x0d\x0a?)|finished/s, 'no proxy temp');
 
 ###############################################################################
 
@@ -212,7 +193,7 @@ sub http_daemon {
 				CRLF .
 				"unfinished" . CRLF;
 
-                } elsif ($uri eq '/length/ok') {
+		} elsif ($uri eq '/length/ok') {
 			print $client
 				"HTTP/1.1 200 OK" . CRLF .
 				"Content-Length: 10" . CRLF .
@@ -221,7 +202,7 @@ sub http_daemon {
 				CRLF .
 				"finished" . CRLF;
 
-                } elsif ($uri eq '/big') {
+		} elsif ($uri eq '/big') {
 			print $client
 				"HTTP/1.1 200 OK" . CRLF .
 				"Content-Length: 1000100" . CRLF .
@@ -233,7 +214,7 @@ sub http_daemon {
 			}
 			print $client "unfinished" . CRLF;
 
-                } elsif ($uri eq '/big/ok') {
+		} elsif ($uri eq '/big/ok') {
 			print $client
 				"HTTP/1.1 200 OK" . CRLF .
 				"Content-Length: 1000010" . CRLF .
@@ -264,7 +245,7 @@ sub http_daemon {
 				CRLF .
 				"a" . CRLF .
 				"finished" . CRLF .
-                                CRLF . "0" . CRLF . CRLF;
+				CRLF . "0" . CRLF . CRLF;
 		}
 	}
 }

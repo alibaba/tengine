@@ -76,7 +76,7 @@ POST /lua
 He fucks himself!
 --- response_body_like: 302 Found
 --- response_headers_like
-Location: http://[^:]+:\d+/terms_of_use\.html
+Location: /terms_of_use\.html
 --- error_code: 302
 
 

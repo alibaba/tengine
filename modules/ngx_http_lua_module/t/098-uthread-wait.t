@@ -419,8 +419,8 @@ delete thread 1
 hello in thread
 thread created: zombie
 failed to wait thread: bad bad!
---- error_log
-lua user thread aborted: runtime error: content_by_lua:4: bad bad!
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):4: bad bad!/
 
 
 
@@ -469,8 +469,8 @@ delete thread 1
 thread created: running
 hello in thread
 failed to wait thread: bad bad!
---- error_log
-lua user thread aborted: runtime error: content_by_lua:5: bad bad!
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):5: bad bad!/
 
 
 
@@ -885,8 +885,8 @@ failed to wait thread: f done
 f status: dead
 g status: zombie
 
---- error_log
-lua user thread aborted: runtime error: content_by_lua:7: f done
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):7: f done/
 
 
 
@@ -961,8 +961,8 @@ f status: dead
 g status: running
 g: hello
 
---- error_log
-lua user thread aborted: runtime error: content_by_lua:8: f done
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):8: f done/
 
 
 
@@ -1184,8 +1184,8 @@ delete thread 1
 
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
---- error_log
-lua entry thread aborted: runtime error: content_by_lua:11: attempt to wait on a coroutine that is not a user thread
+--- error_log eval
+qr/lua entry thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):11: attempt to wait on a coroutine that is not a user thread/
 
 
 
@@ -1220,8 +1220,8 @@ delete thread 2
 --- response_body
 ok
 
---- error_log
-lua user thread aborted: runtime error: content_by_lua:5: f done
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):5: f done/
 
 
 

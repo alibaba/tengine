@@ -201,8 +201,8 @@ lua release ngx.ctx
 GET /lua
 --- response_body
 ok
---- error_log
-failed to run log_by_lua*: log_by_lua:1: Bad
+--- error_log eval
+qr/failed to run log_by_lua\*: log_by_lua\(nginx\.conf:\d+\):1: Bad/
 
 
 
@@ -577,8 +577,9 @@ GET /lua
 
 --- response_body
 ok
---- error_log
-log_by_lua:1: content-type: text/plain
+--- error_log eval
+qr{log_by_lua\(nginx\.conf:\d+\):1: content-type: text/plain}
+
 --- no_error_log
 [error]
 

@@ -8,27 +8,35 @@ ngx_feature_test="#if LUA_VERSION_NUM != 501
 #   error unsupported Lua language version
 #endif
 (void) luaL_newstate();"
+ngx_lua_opt_I=
+ngx_lua_opt_L=
 
 if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
-    # explicitly set Lua lib path
-    ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env)"
+    # explicitly set LuaJIT paths
+
+    # attempt to link with -ldl, static linking on Linux requires it.
+    ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env, with -ldl)"
     ngx_feature_path="$LUAJIT_INC"
+    ngx_lua_opt_I="-I$LUAJIT_INC"
+    ngx_lua_opt_L="-L$LUAJIT_LIB"
     if [ $NGX_RPATH = YES ]; then
-        ngx_feature_libs="-R$LUAJIT_LIB -L$LUAJIT_LIB -lluajit-5.1 -lm"
+        ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 -lm -ldl"
     else
-        ngx_feature_libs="-L$LUAJIT_LIB -lluajit-5.1 -lm"
+        ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 -lm -ldl"
     fi
 
     . auto/feature
 
     if [ $ngx_found = no ]; then
-        # retry with -ldl, static linking on Linux requires it.
-        ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env, with -ldl)"
+        # retry without -ldl
+        ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env)"
         ngx_feature_path="$LUAJIT_INC"
+        ngx_lua_opt_I="-I$LUAJIT_INC"
+        ngx_lua_opt_L="-L$LUAJIT_LIB"
         if [ $NGX_RPATH = YES ]; then
-            ngx_feature_libs="-R$LUAJIT_LIB -L$LUAJIT_LIB -lluajit-5.1 -lm -ldl"
+            ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 -lm"
         else
-            ngx_feature_libs="-L$LUAJIT_LIB -lluajit-5.1 -lm -ldl"
+            ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 -lm"
         fi
 
         . auto/feature
@@ -59,16 +67,33 @@ END
     esac
 else
     if [ -n "$LUA_INC" -o -n "$LUA_LIB" ]; then
-        # explicitly set Lua lib path
+        # explicitly set Lua paths
         ngx_feature="Lua library in $LUA_LIB and $LUA_INC (specified by the LUA_LIB and LUA_INC env)"
         ngx_feature_path="$LUA_INC"
+        ngx_lua_opt_I="-I$LUA_INC"
+        ngx_lua_opt_L="-L$LUA_LIB"
         if [ $NGX_RPATH = YES ]; then
-            ngx_feature_libs="-R$LUA_LIB -L$LUA_LIB -llua -lm"
+            ngx_feature_libs="-R$LUA_LIB $ngx_lua_opt_L -llua -lm -ldl"
         else
-            ngx_feature_libs="-L$LUA_LIB -llua -lm"
+            ngx_feature_libs="$ngx_lua_opt_L -llua -lm -ldl"
         fi
 
         . auto/feature
+
+        if [ $ngx_found = no ]; then
+            # retry without -ldl
+
+            ngx_feature_path="$LUA_INC"
+            ngx_lua_opt_I="-I$LUA_INC"
+            ngx_lua_opt_L="-L$LUA_LIB"
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R$LUA_LIB $ngx_lua_opt_L -llua -lm"
+            else
+                ngx_feature_libs="$ngx_lua_opt_L -llua -lm"
+            fi
+
+            . auto/feature
+        fi
 
         if [ $ngx_found = no ]; then
             cat << END
@@ -167,19 +192,7 @@ END
         fi
 
         if [ $ngx_found = no ]; then
-            # Gentoo with LuaJIT-2.0
-            ngx_feature="LuaJIT library in /usr/"
-            ngx_feature_path="/usr/include/luajit-2.0"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1"
-            else
-                ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # Gentoo with LuaJIT-2.0, retry with -ldl
+            # Gentoo with LuaJIT-2.0, try with -ldl
             ngx_feature="LuaJIT library in /usr/"
             ngx_feature_path="/usr/include/luajit-2.0"
             if [ $NGX_RPATH = YES ]; then
@@ -189,10 +202,27 @@ END
             fi
             . auto/feature
         fi
+
+        if [ $ngx_found = no ]; then
+            # Gentoo with LuaJIT 2.0
+            ngx_feature="LuaJIT library in /usr/"
+            ngx_feature_path="/usr/include/luajit-2.0"
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1"
+            else
+                ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1"
+            fi
+            . auto/feature
+        fi
     fi
 fi
 
 if [ $ngx_found = yes ]; then
+    # this is a hack to persuade nginx's build system to favor
+    # the paths set by our user environments:
+    CFLAGS="$ngx_lua_opt_I $CFLAGS"
+    NGX_LD_OPT="$ngx_lua_opt_L $NGX_LD_OPT"
+
     CORE_INCS="$CORE_INCS $ngx_feature_path"
     CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
 else

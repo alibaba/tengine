@@ -17,14 +17,21 @@
 
 
 typedef struct {
-    unsigned      premature;  /* :1 */
-
-    int           co_ref;
-    lua_State    *co;
-
     void        **main_conf;
     void        **srv_conf;
     void        **loc_conf;
+
+    /* event ident must be after 3 words (i.e. 3 pointers' size) as in
+     * ngx_connection_t. and we use the Lua coroutine reference number as
+     * the event ident */
+    int           co_ref;
+    unsigned      premature;  /* :1 */
+    lua_State    *co;
+
+    ngx_pool_t   *pool;
+
+    ngx_listening_t                   *listening;
+    ngx_str_t                          client_addr_text;
 
     ngx_http_lua_main_conf_t          *lmcf;
     ngx_http_lua_vm_state_t           *vm_state;
@@ -34,7 +41,7 @@ typedef struct {
 
 static int ngx_http_lua_ngx_timer_at(lua_State *L);
 static void ngx_http_lua_timer_handler(ngx_event_t *ev);
-static u_char * ngx_http_lua_log_timer_error(ngx_log_t *log, u_char *buf,
+static u_char *ngx_http_lua_log_timer_error(ngx_log_t *log, u_char *buf,
     size_t len);
 static void ngx_http_lua_abort_pending_timers(ngx_event_t *ev);
 
@@ -59,7 +66,7 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     lua_State               *vm;  /* the main thread */
     lua_State               *co;
     ngx_msec_t               delay;
-    ngx_event_t             *ev;
+    ngx_event_t             *ev = NULL;
     ngx_http_request_t      *r;
     ngx_connection_t        *saved_c = NULL;
     ngx_http_lua_ctx_t      *ctx;
@@ -67,7 +74,7 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     ngx_http_connection_t   *hc;
 #endif
 
-    ngx_http_lua_timer_ctx_t      *tctx;
+    ngx_http_lua_timer_ctx_t      *tctx = NULL;
     ngx_http_lua_main_conf_t      *lmcf;
 #if 0
     ngx_http_core_main_conf_t     *cmcf;
@@ -201,10 +208,7 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     p = ngx_alloc(sizeof(ngx_event_t) + sizeof(ngx_http_lua_timer_ctx_t),
                   r->connection->log);
     if (p == NULL) {
-        lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
-        lua_rawget(L, LUA_REGISTRYINDEX);
-        luaL_unref(L, -1, co_ref);
-        return luaL_error(L, "no memory");
+        goto nomem;
     }
 
     ev = (ngx_event_t *) p;
@@ -222,6 +226,34 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     tctx->srv_conf = r->srv_conf;
     tctx->loc_conf = r->loc_conf;
     tctx->lmcf = lmcf;
+
+    tctx->pool = ngx_create_pool(128, ngx_cycle->log);
+    if (tctx->pool == NULL) {
+        goto nomem;
+    }
+
+    if (r->connection) {
+        tctx->listening = r->connection->listening;
+
+    } else {
+        tctx->listening = NULL;
+    }
+
+    if (r->connection->addr_text.len) {
+        tctx->client_addr_text.data = ngx_palloc(tctx->pool,
+                                                 r->connection->addr_text.len);
+        if (tctx->client_addr_text.data == NULL) {
+            goto nomem;
+        }
+
+        ngx_memcpy(tctx->client_addr_text.data, r->connection->addr_text.data,
+                   r->connection->addr_text.len);
+        tctx->client_addr_text.len = r->connection->addr_text.len;
+
+    } else {
+        tctx->client_addr_text.len = 0;
+        tctx->client_addr_text.data = NULL;
+    }
 
     if (ctx && ctx->vm_state) {
         tctx->vm_state = ctx->vm_state;
@@ -241,6 +273,22 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
 
     lua_pushinteger(L, 1);
     return 1;
+
+nomem:
+
+    if (tctx && tctx->pool) {
+        ngx_destroy_pool(tctx->pool);
+    }
+
+    if (ev) {
+        ngx_free(ev);
+    }
+
+    lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    luaL_unref(L, -1, co_ref);
+
+    return luaL_error(L, "no memory");
 }
 
 
@@ -278,12 +326,16 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
         goto failed;
     }
 
-    c = ngx_http_lua_create_fake_connection();
+    c = ngx_http_lua_create_fake_connection(tctx.pool);
     if (c == NULL) {
         goto failed;
     }
 
     c->log->handler = ngx_http_lua_log_timer_error;
+    c->log->data = c;
+
+    c->listening = tctx.listening;
+    c->addr_text = tctx.client_addr_text;
 
     r = ngx_http_lua_create_fake_request(c);
     if (r == NULL) {
@@ -295,10 +347,28 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
     r->loc_conf = tctx.loc_conf;
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+#if defined(nginx_version) && nginx_version >= 1003014
+
+#   if nginx_version >= 1009000
+
+    ngx_set_connection_log(r->connection, clcf->error_log);
+
+#   else
+
+    ngx_http_set_connection_log(r->connection, clcf->error_log);
+
+#   endif
+
+#else
+
     c->log->file = clcf->error_log->file;
+
     if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
         c->log->log_level = clcf->error_log->log_level;
     }
+
+#endif
 
     dd("lmcf: %p", lmcf);
 
@@ -392,12 +462,11 @@ failed:
         ngx_http_lua_cleanup_vm(tctx.vm_state);
     }
 
-    if (r && r->pool) {
-        ngx_destroy_pool(r->pool);
-    }
-
     if (c) {
         ngx_http_lua_close_fake_connection(c);
+
+    } else if (tctx.pool) {
+        ngx_destroy_pool(tctx.pool);
     }
 }
 
@@ -406,6 +475,7 @@ static u_char *
 ngx_http_lua_log_timer_error(ngx_log_t *log, u_char *buf, size_t len)
 {
     u_char              *p;
+    ngx_connection_t    *c;
 
     if (log->action) {
         p = ngx_snprintf(buf, len, " while %s", log->action);
@@ -413,7 +483,27 @@ ngx_http_lua_log_timer_error(ngx_log_t *log, u_char *buf, size_t len)
         buf = p;
     }
 
-    return ngx_snprintf(buf, len, ", context: ngx.timer");
+    c = log->data;
+
+    dd("ctx = %p", c);
+
+    p = ngx_snprintf(buf, len, ", context: ngx.timer");
+    len -= p - buf;
+    buf = p;
+
+    if (c->addr_text.len) {
+        p = ngx_snprintf(buf, len, ", client: %V", &c->addr_text);
+        len -= p - buf;
+        buf = p;
+    }
+
+    if (c && c->listening && c->listening->addr_text.len) {
+        p = ngx_snprintf(buf, len, ", server: %V", &c->listening->addr_text);
+        /* len -= p - buf; */
+        buf = p;
+    }
+
+    return buf;
 }
 
 

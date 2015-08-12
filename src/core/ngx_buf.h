@@ -90,10 +90,21 @@ struct ngx_output_chain_ctx_s {
 #endif
     unsigned                     need_in_memory:1;
     unsigned                     need_in_temp:1;
-#if (NGX_HAVE_FILE_AIO)
+#if (NGX_HAVE_FILE_AIO || NGX_THREADS)
     unsigned                     aio:1;
+#endif
 
+#if (NGX_HAVE_FILE_AIO)
     ngx_output_chain_aio_pt      aio_handler;
+#if (NGX_HAVE_AIO_SENDFILE)
+    ssize_t                    (*aio_preload)(ngx_buf_t *file);
+#endif
+#endif
+
+#if (NGX_THREADS)
+    ngx_int_t                  (*thread_handler)(ngx_thread_task_t *task,
+                                                 ngx_file_t *file);
+    ngx_thread_task_t           *thread_task;
 #endif
 
     off_t                        alignment;
@@ -158,5 +169,8 @@ ngx_chain_t *ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free);
 void ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free,
     ngx_chain_t **busy, ngx_chain_t **out, ngx_buf_tag_t tag);
 
+off_t ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit);
+
+ngx_chain_t *ngx_chain_update_sent(ngx_chain_t *in, off_t sent);
 
 #endif /* _NGX_BUF_H_INCLUDED_ */

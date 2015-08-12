@@ -97,7 +97,7 @@ events {
 }
 
 http {
-
+    error_log %%TESTDIR%%/error_dyups.log debug;
     upstream host1 {
         server 127.0.0.1:8088;
     }

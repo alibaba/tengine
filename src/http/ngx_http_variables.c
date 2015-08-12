@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -701,6 +702,17 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
     if (ngx_strncmp(name->data, "cookie_", 7) == 0) {
 
         if (ngx_http_variable_cookie(r, vv, (uintptr_t) name) == NGX_OK) {
+            return vv;
+        }
+
+        return NULL;
+    }
+
+    if (ngx_strncmp(name->data, "upstream_cookie_", 16) == 0) {
+
+        if (ngx_http_upstream_cookie_variable(r, vv, (uintptr_t) name)
+            == NGX_OK)
+        {
             return vv;
         }
 
@@ -1501,6 +1513,10 @@ ngx_http_variable_content_length(ngx_http_request_t *r,
         v->valid = 1;
         v->no_cacheable = 0;
         v->not_found = 0;
+
+    } else if (r->reading_body) {
+        v->not_found = 1;
+        v->no_cacheable = 1;
 
     } else if (r->headers_in.content_length_n >= 0) {
         p = ngx_pnalloc(r->pool, NGX_OFF_T_LEN);
@@ -3381,8 +3397,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
             av = key[n].value;
 
-            if (av->get_handler
-                && v[i].name.len == key[n].key.len
+            if (v[i].name.len == key[n].key.len
                 && ngx_strncmp(v[i].name.data, key[n].key.data, v[i].name.len)
                    == 0)
             {
@@ -3393,6 +3408,10 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
                 v[i].flags = av->flags;
 
                 av->index = i;
+
+                if (av->get_handler == NULL) {
+                    break;
+                }
 
                 goto next;
             }
@@ -3414,6 +3433,14 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
         if (ngx_strncmp(v[i].name.data, "upstream_http_", 14) == 0) {
             v[i].get_handler = ngx_http_upstream_header_variable;
+            v[i].data = (uintptr_t) &v[i].name;
+            v[i].flags = NGX_HTTP_VAR_NOCACHEABLE;
+
+            continue;
+        }
+
+        if (ngx_strncmp(v[i].name.data, "upstream_cookie_", 16) == 0) {
+            v[i].get_handler = ngx_http_upstream_cookie_variable;
             v[i].data = (uintptr_t) &v[i].name;
             v[i].flags = NGX_HTTP_VAR_NOCACHEABLE;
 

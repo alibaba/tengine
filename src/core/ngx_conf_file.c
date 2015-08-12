@@ -270,7 +270,7 @@ done:
             ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
                           ngx_close_file_n " %s failed",
                           filename->data);
-            return NGX_CONF_ERROR;
+            rc = NGX_ERROR;
         }
 
         cf->conf_file = prev;
@@ -789,6 +789,9 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         file.len = name.len++;
         file.data = ngx_pstrdup(cf->pool, &name);
+        if (file.data == NULL) {
+            return NGX_CONF_ERROR;
+        }
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
 

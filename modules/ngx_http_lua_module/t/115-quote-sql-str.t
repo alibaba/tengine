@@ -62,7 +62,7 @@ GET /set
 
 
 
-=== TEST 4: \z
+=== TEST 4: \Z
 --- config
     location = /set {
         content_by_lua '
@@ -72,7 +72,7 @@ GET /set
 --- request
 GET /set
 --- response_body
-'a\zb\z'
+'a\Zb\Z'
 --- no_error_log
 [error]
 

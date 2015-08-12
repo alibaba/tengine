@@ -29,30 +29,26 @@
  */
 
 
-#if (IOV_MAX > 64)
-#define NGX_HEADERS   64
-#define NGX_TRAILERS  64
-#else
-#define NGX_HEADERS   IOV_MAX
-#define NGX_TRAILERS  IOV_MAX
-#endif
-
-
 ngx_chain_t *
 ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {
-    int              rc, flags;
-    u_char          *prev;
-    off_t            size, send, prev_send, aligned, sent, fprev;
-    size_t           header_size, file_size;
-    ngx_uint_t       eintr, eagain, complete;
-    ngx_err_t        err;
-    ngx_buf_t       *file;
-    ngx_array_t      header, trailer;
-    ngx_event_t     *wev;
-    ngx_chain_t     *cl;
-    struct sf_hdtr   hdtr;
-    struct iovec    *iov, headers[NGX_HEADERS], trailers[NGX_TRAILERS];
+    int               rc, flags;
+    off_t             send, prev_send, sent;
+    size_t            file_size;
+    ssize_t           n;
+    ngx_uint_t        eintr, eagain;
+    ngx_err_t         err;
+    ngx_buf_t        *file;
+    ngx_event_t      *wev;
+    ngx_chain_t      *cl;
+    ngx_iovec_t       header, trailer;
+    struct sf_hdtr    hdtr;
+    struct iovec      headers[NGX_IOVS_PREALLOCATE];
+    struct iovec      trailers[NGX_IOVS_PREALLOCATE];
+#if (NGX_HAVE_AIO_SENDFILE)
+    ngx_uint_t        ebusy;
+    ngx_event_aio_t  *aio;
+#endif
 
     wev = c->write;
 
@@ -81,151 +77,52 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
     eagain = 0;
     flags = 0;
 
-    header.elts = headers;
-    header.size = sizeof(struct iovec);
-    header.nalloc = NGX_HEADERS;
-    header.pool = c->pool;
+#if (NGX_HAVE_AIO_SENDFILE && NGX_SUPPRESS_WARN)
+    aio = NULL;
+    file = NULL;
+#endif
 
-    trailer.elts = trailers;
-    trailer.size = sizeof(struct iovec);
-    trailer.nalloc = NGX_TRAILERS;
-    trailer.pool = c->pool;
+    header.iovs = headers;
+    header.nalloc = NGX_IOVS_PREALLOCATE;
+
+    trailer.iovs = trailers;
+    trailer.nalloc = NGX_IOVS_PREALLOCATE;
 
     for ( ;; ) {
-        file = NULL;
-        file_size = 0;
-        header_size = 0;
         eintr = 0;
-        complete = 0;
+#if (NGX_HAVE_AIO_SENDFILE)
+        ebusy = 0;
+#endif
         prev_send = send;
-
-        header.nelts = 0;
-        trailer.nelts = 0;
 
         /* create the header iovec and coalesce the neighbouring bufs */
 
-        prev = NULL;
-        iov = NULL;
+        cl = ngx_output_chain_to_iovec(&header, in, limit - send, c->log);
 
-        for (cl = in; cl && send < limit; cl = cl->next) {
-
-            if (ngx_buf_special(cl->buf)) {
-                continue;
-            }
-
-            if (!ngx_buf_in_memory_only(cl->buf)) {
-                break;
-            }
-
-            size = cl->buf->last - cl->buf->pos;
-
-            if (send + size > limit) {
-                size = limit - send;
-            }
-
-            if (prev == cl->buf->pos) {
-                iov->iov_len += (size_t) size;
-
-            } else {
-                if (header.nelts >= IOV_MAX){
-                    break;
-                }
-
-                iov = ngx_array_push(&header);
-                if (iov == NULL) {
-                    return NGX_CHAIN_ERROR;
-                }
-
-                iov->iov_base = (void *) cl->buf->pos;
-                iov->iov_len = (size_t) size;
-            }
-
-            prev = cl->buf->pos + (size_t) size;
-            header_size += (size_t) size;
-            send += size;
+        if (cl == NGX_CHAIN_ERROR) {
+            return NGX_CHAIN_ERROR;
         }
 
+        send += header.size;
 
         if (cl && cl->buf->in_file && send < limit) {
             file = cl->buf;
 
             /* coalesce the neighbouring file bufs */
 
-            do {
-                size = cl->buf->file_last - cl->buf->file_pos;
+            file_size = (size_t) ngx_chain_coalesce_file(&cl, limit - send);
 
-                if (send + size > limit) {
-                    size = limit - send;
-
-                    aligned = (cl->buf->file_pos + size + ngx_pagesize - 1)
-                               & ~((off_t) ngx_pagesize - 1);
-
-                    if (aligned <= cl->buf->file_last) {
-                        size = aligned - cl->buf->file_pos;
-                    }
-                }
-
-                file_size += (size_t) size;
-                send += size;
-                fprev = cl->buf->file_pos + size;
-                cl = cl->next;
-
-            } while (cl
-                     && cl->buf->in_file
-                     && send < limit
-                     && file->file->fd == cl->buf->file->fd
-                     && fprev == cl->buf->file_pos);
-        }
-
-
-        if (file) {
+            send += file_size;
 
             /* create the trailer iovec and coalesce the neighbouring bufs */
 
-            prev = NULL;
-            iov = NULL;
+            cl = ngx_output_chain_to_iovec(&trailer, cl, limit - send, c->log);
 
-            while (cl && send < limit) {
-
-                if (ngx_buf_special(cl->buf)) {
-                    cl = cl->next;
-                    continue;
-                }
-
-                if (!ngx_buf_in_memory_only(cl->buf)) {
-                    break;
-                }
-
-                size = cl->buf->last - cl->buf->pos;
-
-                if (send + size > limit) {
-                    size = limit - send;
-                }
-
-                if (prev == cl->buf->pos) {
-                    iov->iov_len += (size_t) size;
-
-                } else {
-                    if (trailer.nelts >= IOV_MAX){
-                        break;
-                    }
-
-                    iov = ngx_array_push(&trailer);
-                    if (iov == NULL) {
-                        return NGX_CHAIN_ERROR;
-                    }
-
-                    iov->iov_base = (void *) cl->buf->pos;
-                    iov->iov_len = (size_t) size;
-                }
-
-                prev = cl->buf->pos + (size_t) size;
-                send += size;
-                cl = cl->next;
+            if (cl == NGX_CHAIN_ERROR) {
+                return NGX_CHAIN_ERROR;
             }
-        }
 
-        if (file) {
+            send += trailer.size;
 
             if (ngx_freebsd_use_tcp_nopush
                 && c->tcp_nopush == NGX_TCP_NOPUSH_UNSET)
@@ -258,28 +155,29 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
              * but corresponding pointer is not NULL
              */
 
-            hdtr.headers = header.nelts ? (struct iovec *) header.elts: NULL;
-            hdtr.hdr_cnt = header.nelts;
-            hdtr.trailers = trailer.nelts ? (struct iovec *) trailer.elts: NULL;
-            hdtr.trl_cnt = trailer.nelts;
+            hdtr.headers = header.count ? header.iovs : NULL;
+            hdtr.hdr_cnt = header.count;
+            hdtr.trailers = trailer.count ? trailer.iovs : NULL;
+            hdtr.trl_cnt = trailer.count;
 
             /*
              * the "nbytes bug" of the old sendfile() syscall:
-             * http://www.freebsd.org/cgi/query-pr.cgi?pr=33771
+             * http://bugs.freebsd.org/33771
              */
 
             if (!ngx_freebsd_sendfile_nbytes_bug) {
-                header_size = 0;
+                header.size = 0;
             }
 
             sent = 0;
 
 #if (NGX_HAVE_AIO_SENDFILE)
-            flags = c->aio_sendfile ? SF_NODISKIO : 0;
+            aio = file->file->aio;
+            flags = (aio && aio->preload_handler) ? SF_NODISKIO : 0;
 #endif
 
             rc = sendfile(file->file->fd, c->fd, file->file_pos,
-                          file_size + header_size, &hdtr, &sent, flags);
+                          file_size + header.size, &hdtr, &sent, flags);
 
             if (rc == -1) {
                 err = ngx_errno;
@@ -295,7 +193,7 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
 #if (NGX_HAVE_AIO_SENDFILE)
                 case NGX_EBUSY:
-                    c->busy_sendfile = file;
+                    ebusy = 1;
                     break;
 #endif
 
@@ -330,85 +228,58 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
             ngx_log_debug4(NGX_LOG_DEBUG_EVENT, c->log, 0,
                            "sendfile: %d, @%O %O:%uz",
-                           rc, file->file_pos, sent, file_size + header_size);
+                           rc, file->file_pos, sent, file_size + header.size);
 
         } else {
-            rc = writev(c->fd, header.elts, header.nelts);
+            n = ngx_writev(c, &header);
 
-            ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                           "writev: %d of %uz", rc, header_size);
-
-            if (rc == -1) {
-                err = ngx_errno;
-
-                switch (err) {
-                case NGX_EAGAIN:
-                    break;
-
-                case NGX_EINTR:
-                    eintr = 1;
-                    break;
-
-                default:
-                    wev->error = 1;
-                    ngx_connection_error(c, err, "writev() failed");
-                    return NGX_CHAIN_ERROR;
-                }
-
-                ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
-                               "writev() not ready");
+            if (n == NGX_ERROR) {
+                return NGX_CHAIN_ERROR;
             }
 
-            sent = rc > 0 ? rc : 0;
-        }
-
-        if (send - prev_send == sent) {
-            complete = 1;
+            sent = (n == NGX_AGAIN) ? 0 : n;
         }
 
         c->sent += sent;
 
-        for ( /* void */ ; in; in = in->next) {
-
-            if (ngx_buf_special(in->buf)) {
-                continue;
-            }
-
-            if (sent == 0) {
-                break;
-            }
-
-            size = ngx_buf_size(in->buf);
-
-            if (sent >= size) {
-                sent -= size;
-
-                if (ngx_buf_in_memory(in->buf)) {
-                    in->buf->pos = in->buf->last;
-                }
-
-                if (in->buf->in_file) {
-                    in->buf->file_pos = in->buf->file_last;
-                }
-
-                continue;
-            }
-
-            if (ngx_buf_in_memory(in->buf)) {
-                in->buf->pos += (size_t) sent;
-            }
-
-            if (in->buf->in_file) {
-                in->buf->file_pos += sent;
-            }
-
-            break;
-        }
+        in = ngx_chain_update_sent(in, sent);
 
 #if (NGX_HAVE_AIO_SENDFILE)
-        if (c->busy_sendfile) {
+
+        if (ebusy) {
+            if (sent == 0) {
+                c->busy_count++;
+
+                if (c->busy_count > 2) {
+                    ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                                  "sendfile(%V) returned busy again",
+                                  &file->file->name);
+
+                    c->busy_count = 0;
+                    aio->preload_handler = NULL;
+
+                    send = prev_send;
+                    continue;
+                }
+
+            } else {
+                c->busy_count = 0;
+            }
+
+            n = aio->preload_handler(file);
+
+            if (n > 0) {
+                send = prev_send + sent;
+                continue;
+            }
+
             return in;
         }
+
+        if (flags == SF_NODISKIO) {
+            c->busy_count = 0;
+        }
+
 #endif
 
         if (eagain) {
@@ -425,10 +296,11 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         }
 
         if (eintr) {
+            send = prev_send + sent;
             continue;
         }
 
-        if (!complete) {
+        if (send - prev_send != sent) {
             wev->ready = 0;
             return in;
         }

@@ -41,7 +41,7 @@ static ngx_command_t  ngx_mail_core_commands[] = {
       NULL },
 
     { ngx_string("listen"),
-      NGX_MAIL_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_MAIL_SRV_CONF|NGX_CONF_1MORE,
       ngx_mail_core_listen,
       NGX_MAIL_SRV_CONF_OFFSET,
       0,
@@ -336,7 +336,7 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             off = offsetof(struct sockaddr_in6, sin6_addr);
             len = 16;
             sin6 = (struct sockaddr_in6 *) sa;
-            port = sin6->sin6_port;
+            port = ntohs(sin6->sin6_port);
             break;
 #endif
 
@@ -352,7 +352,7 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             off = offsetof(struct sockaddr_in, sin_addr);
             len = 4;
             sin = (struct sockaddr_in *) sa;
-            port = sin->sin_port;
+            port = ntohs(sin->sin_port);
             break;
         }
 

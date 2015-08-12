@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 2);
+plan tests => repeat_each() * (blocks() * 3 + 3);
 
 #no_diff();
 #no_long_string();
@@ -278,3 +278,30 @@ baz = 78
 [error]
 Failed to resume our co: 
 
+
+
+=== TEST 11: access a field in the ngx. table
+--- http_config
+    init_by_lua '
+        print("INIT 1: foo = ", ngx.foo)
+        ngx.foo = 3
+        print("INIT 2: foo = ", ngx.foo)
+    ';
+--- config
+    location /t {
+        echo ok;
+    }
+--- request
+GET /t
+--- response_body
+ok
+--- no_error_log
+[error]
+--- grep_error_log eval: qr/INIT \d+: foo = \S+/
+--- grep_error_log_out eval
+[
+"INIT 1: foo = nil
+INIT 2: foo = 3
+",
+"",
+]

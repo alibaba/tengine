@@ -17,6 +17,9 @@ typedef struct {
 
 
 static ngx_int_t ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer);
+#ifdef EVFILT_USER
+static ngx_int_t ngx_kqueue_notify_init(ngx_log_t *log);
+#endif
 static void ngx_kqueue_done(ngx_cycle_t *cycle);
 static ngx_int_t ngx_kqueue_add_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
@@ -24,7 +27,9 @@ static ngx_int_t ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
 static ngx_int_t ngx_kqueue_set_event(ngx_event_t *ev, ngx_int_t filter,
     ngx_uint_t flags);
-static ngx_int_t ngx_kqueue_process_changes(ngx_cycle_t *cycle, ngx_uint_t try);
+#ifdef EVFILT_USER
+static ngx_int_t ngx_kqueue_notify(ngx_event_handler_pt handler);
+#endif
 static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
 static ngx_inline void ngx_kqueue_dump_event(ngx_log_t *log,
@@ -36,23 +41,14 @@ static char *ngx_kqueue_init_conf(ngx_cycle_t *cycle, void *conf);
 
 int                    ngx_kqueue = -1;
 
-/*
- * The "change_list" should be declared as ngx_thread_volatile.
- * However, the use of the change_list is localized in kqueue functions and
- * is protected by the mutex so even the "icc -ipo" should not build the code
- * with the race condition.  Thus we avoid the declaration to make a more
- * readable code.
- */
-
-static struct kevent  *change_list, *change_list0, *change_list1;
+static struct kevent  *change_list;
 static struct kevent  *event_list;
 static ngx_uint_t      max_changes, nchanges, nevents;
 
-#if (NGX_THREADS)
-static ngx_mutex_t    *list_mutex;
-static ngx_mutex_t    *kevent_mutex;
+#ifdef EVFILT_USER
+static ngx_event_t     notify_event;
+static struct kevent   notify_kev;
 #endif
-
 
 
 static ngx_str_t      kqueue_name = ngx_string("kqueue");
@@ -89,7 +85,11 @@ ngx_event_module_t  ngx_kqueue_module_ctx = {
         ngx_kqueue_del_event,              /* disable an event */
         NULL,                              /* add an connection */
         NULL,                              /* delete an connection */
-        ngx_kqueue_process_changes,        /* process the changes */
+#ifdef EVFILT_USER
+        ngx_kqueue_notify,                 /* trigger a notify */
+#else
+        NULL,                              /* trigger a notify */
+#endif
         ngx_kqueue_process_events,         /* process the events */
         ngx_kqueue_init,                   /* init the events */
         ngx_kqueue_done                    /* done the events */
@@ -133,18 +133,10 @@ ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer)
             return NGX_ERROR;
         }
 
-#if (NGX_THREADS)
-
-        list_mutex = ngx_mutex_init(cycle->log, 0);
-        if (list_mutex == NULL) {
+#ifdef EVFILT_USER
+        if (ngx_kqueue_notify_init(cycle->log) != NGX_OK) {
             return NGX_ERROR;
         }
-
-        kevent_mutex = ngx_mutex_init(cycle->log, 0);
-        if (kevent_mutex == NULL) {
-            return NGX_ERROR;
-        }
-
 #endif
     }
 
@@ -163,27 +155,15 @@ ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer)
             nchanges = 0;
         }
 
-        if (change_list0) {
-            ngx_free(change_list0);
+        if (change_list) {
+            ngx_free(change_list);
         }
 
-        change_list0 = ngx_alloc(kcf->changes * sizeof(struct kevent),
-                                 cycle->log);
-        if (change_list0 == NULL) {
+        change_list = ngx_alloc(kcf->changes * sizeof(struct kevent),
+                                cycle->log);
+        if (change_list == NULL) {
             return NGX_ERROR;
         }
-
-        if (change_list1) {
-            ngx_free(change_list1);
-        }
-
-        change_list1 = ngx_alloc(kcf->changes * sizeof(struct kevent),
-                                 cycle->log);
-        if (change_list1 == NULL) {
-            return NGX_ERROR;
-        }
-
-        change_list = change_list0;
     }
 
     max_changes = kcf->changes;
@@ -247,6 +227,37 @@ ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 }
 
 
+#ifdef EVFILT_USER
+
+static ngx_int_t
+ngx_kqueue_notify_init(ngx_log_t *log)
+{
+    notify_kev.ident = 0;
+    notify_kev.filter = EVFILT_USER;
+    notify_kev.data = 0;
+    notify_kev.flags = EV_ADD|EV_CLEAR;
+    notify_kev.fflags = 0;
+    notify_kev.udata = 0;
+
+    if (kevent(ngx_kqueue, &notify_kev, 1, NULL, 0, NULL) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      "kevent(EVFILT_USER, EV_ADD) failed");
+        return NGX_ERROR;
+    }
+
+    notify_event.active = 1;
+    notify_event.log = log;
+
+    notify_kev.flags = 0;
+    notify_kev.fflags = NOTE_TRIGGER;
+    notify_kev.udata = NGX_KQUEUE_UDATA_T ((uintptr_t) &notify_event);
+
+    return NGX_OK;
+}
+
+#endif
+
+
 static void
 ngx_kqueue_done(ngx_cycle_t *cycle)
 {
@@ -257,17 +268,9 @@ ngx_kqueue_done(ngx_cycle_t *cycle)
 
     ngx_kqueue = -1;
 
-#if (NGX_THREADS)
-    ngx_mutex_destroy(kevent_mutex);
-    ngx_mutex_destroy(list_mutex);
-#endif
-
-    ngx_free(change_list1);
-    ngx_free(change_list0);
+    ngx_free(change_list);
     ngx_free(event_list);
 
-    change_list1 = NULL;
-    change_list0 = NULL;
     change_list = NULL;
     event_list = NULL;
     max_changes = 0;
@@ -288,8 +291,6 @@ ngx_kqueue_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     ev->active = 1;
     ev->disabled = 0;
     ev->oneshot = (flags & NGX_ONESHOT_EVENT) ? 1 : 0;
-
-    ngx_mutex_lock(list_mutex);
 
 #if 0
 
@@ -315,8 +316,6 @@ ngx_kqueue_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
                 e->index = ev->index;
             }
 
-            ngx_mutex_unlock(list_mutex);
-
             return NGX_OK;
         }
 
@@ -325,16 +324,12 @@ ngx_kqueue_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
         ngx_log_error(NGX_LOG_ALERT, ev->log, 0,
                       "previous event on #%d were not passed in kernel", c->fd);
 
-        ngx_mutex_unlock(list_mutex);
-
         return NGX_ERROR;
     }
 
 #endif
 
     rc = ngx_kqueue_set_event(ev, event, EV_ADD|EV_ENABLE|flags);
-
-    ngx_mutex_unlock(list_mutex);
 
     return rc;
 }
@@ -348,8 +343,6 @@ ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 
     ev->active = 0;
     ev->disabled = 0;
-
-    ngx_mutex_lock(list_mutex);
 
     if (ev->index < nchanges
         && ((uintptr_t) change_list[ev->index].udata & (uintptr_t) ~1)
@@ -370,8 +363,6 @@ ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
             e->index = ev->index;
         }
 
-        ngx_mutex_unlock(list_mutex);
-
         return NGX_OK;
     }
 
@@ -382,7 +373,6 @@ ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
      */
 
     if (flags & NGX_CLOSE_EVENT) {
-        ngx_mutex_unlock(list_mutex);
         return NGX_OK;
     }
 
@@ -394,8 +384,6 @@ ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     }
 
     rc = ngx_kqueue_set_event(ev, event, flags);
-
-    ngx_mutex_unlock(list_mutex);
 
     return rc;
 }
@@ -487,6 +475,25 @@ ngx_kqueue_set_event(ngx_event_t *ev, ngx_int_t filter, ngx_uint_t flags)
 }
 
 
+#ifdef EVFILT_USER
+
+static ngx_int_t
+ngx_kqueue_notify(ngx_event_handler_pt handler)
+{
+    notify_event.handler = handler;
+
+    if (kevent(ngx_kqueue, &notify_kev, 1, NULL, 0, NULL) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, notify_event.log, ngx_errno,
+                      "kevent(EVFILT_USER, NOTE_TRIGGER) failed");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+#endif
+
+
 static ngx_int_t
 ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
@@ -495,20 +502,12 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_int_t         i, instance;
     ngx_uint_t        level;
     ngx_err_t         err;
-    ngx_event_t      *ev, **queue;
+    ngx_event_t      *ev;
+    ngx_queue_t      *queue;
     struct timespec   ts, *tp;
 
-    if (ngx_threaded) {
-        if (ngx_kqueue_process_changes(cycle, 0) == NGX_ERROR) {
-            return NGX_ERROR;
-        }
-
-        n = 0;
-
-    } else {
-        n = (int) nchanges;
-        nchanges = 0;
-    }
+    n = (int) nchanges;
+    nchanges = 0;
 
     if (timer == NGX_TIMER_INFINITE) {
         tp = NULL;
@@ -573,8 +572,6 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         return NGX_ERROR;
     }
 
-    ngx_mutex_lock(ngx_posted_events_mutex);
-
     for (i = 0; i < events; i++) {
 
         ngx_kqueue_dump_event(cycle->log, &event_list[i]);
@@ -626,24 +623,6 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
                 ev->active = 0;
             }
 
-#if (NGX_THREADS)
-
-            if ((flags & NGX_POST_THREAD_EVENTS) && !ev->accept) {
-                ev->posted_ready = 1;
-                ev->posted_available = event_list[i].data;
-
-                if (event_list[i].flags & EV_EOF) {
-                    ev->posted_eof = 1;
-                    ev->posted_errno = event_list[i].fflags;
-                }
-
-                ngx_locked_post_event(ev, &ngx_posted_events);
-
-                continue;
-            }
-
-#endif
-
             ev->available = event_list[i].data;
 
             if (event_list[i].flags & EV_EOF) {
@@ -666,6 +645,11 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
             break;
 
+#ifdef EVFILT_USER
+        case EVFILT_USER:
+            break;
+#endif
+
         default:
             ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
                           "unexpected kevent() filter %d",
@@ -674,9 +658,10 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         }
 
         if (flags & NGX_POST_EVENTS) {
-            queue = (ngx_event_t **) (ev->accept ? &ngx_posted_accept_events:
-                                                   &ngx_posted_events);
-            ngx_locked_post_event(ev, queue);
+            queue = ev->accept ? &ngx_posted_accept_events
+                               : &ngx_posted_events;
+
+            ngx_post_event(ev, queue);
 
             continue;
         }
@@ -684,62 +669,7 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         ev->handler(ev);
     }
 
-    ngx_mutex_unlock(ngx_posted_events_mutex);
-
     return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_kqueue_process_changes(ngx_cycle_t *cycle, ngx_uint_t try)
-{
-    int               n;
-    ngx_int_t         rc;
-    ngx_err_t         err;
-    struct timespec   ts;
-    struct kevent    *changes;
-
-    ngx_mutex_lock(kevent_mutex);
-
-    ngx_mutex_lock(list_mutex);
-
-    if (nchanges == 0) {
-        ngx_mutex_unlock(list_mutex);
-        ngx_mutex_unlock(kevent_mutex);
-        return NGX_OK;
-    }
-
-    changes = change_list;
-    if (change_list == change_list0) {
-        change_list = change_list1;
-    } else {
-        change_list = change_list0;
-    }
-
-    n = (int) nchanges;
-    nchanges = 0;
-
-    ngx_mutex_unlock(list_mutex);
-
-    ts.tv_sec = 0;
-    ts.tv_nsec = 0;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "kevent changes: %d", n);
-
-    if (kevent(ngx_kqueue, changes, n, NULL, 0, &ts) == -1) {
-        err = ngx_errno;
-        ngx_log_error((err == NGX_EINTR) ? NGX_LOG_INFO : NGX_LOG_ALERT,
-                      cycle->log, err, "kevent() failed");
-        rc = NGX_ERROR;
-
-    } else {
-        rc = NGX_OK;
-    }
-
-    ngx_mutex_unlock(kevent_mutex);
-
-    return rc;
 }
 
 

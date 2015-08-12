@@ -35,12 +35,7 @@ ngx_chain_t *ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in,
 #endif
 
 
-#if (IOV_MAX > 64)
-#define NGX_SENDFILEVECS  64
-#else
-#define NGX_SENDFILEVECS  IOV_MAX
-#endif
-
+#define NGX_SENDFILEVECS  NGX_IOVS_PREALLOCATE
 
 
 ngx_chain_t *
@@ -51,10 +46,10 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
     off_t           size, send, prev_send, aligned, fprev;
     size_t          sent;
     ssize_t         n;
-    ngx_int_t       eintr, complete;
+    ngx_int_t       eintr;
     ngx_err_t       err;
+    ngx_uint_t      nsfv;
     sendfilevec_t  *sfv, sfvs[NGX_SENDFILEVECS];
-    ngx_array_t     vec;
     ngx_event_t    *wev;
     ngx_chain_t    *cl;
 
@@ -78,22 +73,16 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
     send = 0;
 
-    vec.elts = sfvs;
-    vec.size = sizeof(sendfilevec_t);
-    vec.nalloc = NGX_SENDFILEVECS;
-    vec.pool = c->pool;
-
     for ( ;; ) {
         fd = SFV_FD_SELF;
         prev = NULL;
         fprev = 0;
         sfv = NULL;
         eintr = 0;
-        complete = 0;
         sent = 0;
         prev_send = send;
 
-        vec.nelts = 0;
+        nsfv = 0;
 
         /* create the sendfilevec and coalesce the neighbouring bufs */
 
@@ -116,14 +105,11 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                     sfv->sfv_len += (size_t) size;
 
                 } else {
-                    if (vec.nelts >= IOV_MAX) {
+                    if (nsfv == NGX_SENDFILEVECS) {
                         break;
                     }
 
-                    sfv = ngx_array_push(&vec);
-                    if (sfv == NULL) {
-                        return NGX_CHAIN_ERROR;
-                    }
+                    sfv = &sfvs[nsfv++];
 
                     sfv->sfv_fd = SFV_FD_SELF;
                     sfv->sfv_flag = 0;
@@ -154,14 +140,11 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                     sfv->sfv_len += (size_t) size;
 
                 } else {
-                    if (vec.nelts >= IOV_MAX) {
+                    if (nsfv == NGX_SENDFILEVECS) {
                         break;
                     }
 
-                    sfv = ngx_array_push(&vec);
-                    if (sfv == NULL) {
-                        return NGX_CHAIN_ERROR;
-                    }
+                    sfv = &sfvs[nsfv++];
 
                     fd = cl->buf->file->fd;
                     sfv->sfv_fd = fd;
@@ -175,7 +158,7 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
             }
         }
 
-        n = sendfilev(c->fd, vec.elts, vec.nelts, &sent);
+        n = sendfilev(c->fd, sfvs, nsfv, &sent);
 
         if (n == -1) {
             err = ngx_errno;
@@ -201,54 +184,16 @@ ngx_solaris_sendfilev_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                        "sendfilev: %z %z", n, sent);
 
-        if (send - prev_send == (off_t) sent) {
-            complete = 1;
-        }
-
         c->sent += sent;
 
-        for ( /* void */ ; in; in = in->next) {
-
-            if (ngx_buf_special(in->buf)) {
-                continue;
-            }
-
-            if (sent == 0) {
-                break;
-            }
-
-            size = ngx_buf_size(in->buf);
-
-            if ((off_t) sent >= size) {
-                sent = (size_t) ((off_t) sent - size);
-
-                if (ngx_buf_in_memory(in->buf)) {
-                    in->buf->pos = in->buf->last;
-                }
-
-                if (in->buf->in_file) {
-                    in->buf->file_pos = in->buf->file_last;
-                }
-
-                continue;
-            }
-
-            if (ngx_buf_in_memory(in->buf)) {
-                in->buf->pos += sent;
-            }
-
-            if (in->buf->in_file) {
-                in->buf->file_pos += sent;
-            }
-
-            break;
-        }
+        in = ngx_chain_update_sent(in, sent);
 
         if (eintr) {
+            send = prev_send + sent;
             continue;
         }
 
-        if (!complete) {
+        if (send - prev_send != (off_t) sent) {
             wev->ready = 0;
             return in;
         }

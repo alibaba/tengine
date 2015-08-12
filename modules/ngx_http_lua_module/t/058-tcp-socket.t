@@ -5,7 +5,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 169;
+plan tests => repeat_each() * 175;
 
 our $HtmlDir = html_dir;
 
@@ -404,7 +404,7 @@ attempt to send data on a closed socket
 === TEST 9: resolver error (timeout)
 --- config
     server_tokens off;
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
     resolver_timeout 1ms;
     location /t {
         content_by_lua '
@@ -1996,7 +1996,7 @@ close: 1 nil
 
 === TEST 33: github issue #215: Handle the posted requests in lua cosocket api (failed to resolve)
 --- config
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
 
     location = /sub {
         content_by_lua '
@@ -2039,7 +2039,7 @@ resolve name done
 
 === TEST 34: github issue #215: Handle the posted requests in lua cosocket api (successfully resolved)
 --- config
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
 
     location = /sub {
         content_by_lua '
@@ -2716,8 +2716,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:7: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):7: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2772,8 +2773,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2828,8 +2830,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2884,8 +2887,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2940,8 +2944,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2999,8 +3004,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: content_by_lua:16: bad request
+--- error_log eval
+qr/runtime error: content_by_lua\(nginx\.conf:\d+\):16: bad request/
+
 --- no_error_log
 [alert]
 
@@ -3009,7 +3015,7 @@ runtime error: content_by_lua:16: bad request
 === TEST 50: cosocket resolving aborted by coroutine yielding failures (require)
 --- http_config
     lua_package_path "$prefix/html/?.lua;;";
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
 
 --- config
     location = /t {
@@ -3043,7 +3049,7 @@ runtime error: attempt to yield across C-call boundary
 === TEST 51: cosocket resolving aborted by coroutine yielding failures (xpcall err)
 --- http_config
     lua_package_path "$prefix/html/?.lua;;";
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER;
 
 --- config
     location = /t {
@@ -3219,4 +3225,122 @@ close: 1 nil
 --- no_error_log
 lua socket tcp_nodelay
 [error]
+
+
+
+=== TEST 54: IPv6
+--- http_config
+    server_tokens off;
+
+    server {
+        listen [::1]:$TEST_NGINX_SERVER_PORT;
+
+        location /foo {
+            content_by_lua 'ngx.say("foo")';
+            more_clear_headers Date;
+        }
+    }
+--- config
+    location /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_SERVER_PORT;
+
+        content_by_lua '
+            local sock = ngx.socket.tcp()
+            local port = ngx.var.port
+            local ok, err = sock:connect("[::1]", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.0\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n"
+            -- req = "OK"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            while true do
+                local line, err, part = sock:receive()
+                if line then
+                    ngx.say("received: ", line)
+
+                else
+                    ngx.say("failed to receive a line: ", err, " [", part, "]")
+                    break
+                end
+            end
+
+            ok, err = sock:close()
+            ngx.say("close: ", ok, " ", err)
+        ';
+    }
+
+--- request
+GET /t
+--- response_body
+connected: 1
+request sent: 57
+received: HTTP/1.1 200 OK
+received: Server: nginx
+received: Content-Type: text/plain
+received: Content-Length: 4
+received: Connection: close
+received: 
+received: foo
+failed to receive a line: closed []
+close: 1 nil
+--- no_error_log
+[error]
+
+
+
+=== TEST 55: kill a thread with a connecting socket
+--- config
+    server_tokens off;
+    lua_socket_connect_timeout 1s;
+    resolver $TEST_NGINX_RESOLVER;
+    resolver_timeout 3s;
+    location /t {
+        content_by_lua '
+            local sock
+
+            local thr = ngx.thread.spawn(function ()
+                sock = ngx.socket.tcp()
+                local ok, err = sock:connect("agentzh.org", 12345)
+                if not ok then
+                    ngx.say("failed to connect: ", err)
+                    return
+                end
+
+                ngx.say("connected: ", ok)
+            end)
+
+            ngx.sleep(0.002)
+            ngx.thread.kill(thr)
+            ngx.sleep(0.001)
+
+            local ok, err = sock:setkeepalive()
+            if not ok then
+                ngx.say("failed to setkeepalive: ", err)
+            else
+                ngx.say("setkeepalive: ", ok)
+            end
+        ';
+    }
+
+--- request
+GET /t
+--- response_body
+failed to setkeepalive: closed
+--- error_log
+lua tcp socket connect timeout: 100
+--- timeout: 10
 
