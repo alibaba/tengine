@@ -8,9 +8,13 @@
 
 * 这个模块计算定义的变量，根据变量值分别统计Tengine的运行状况。
 
-* 可以监视的运行状况有：连接数、请求数、各种响应码范围的请求数、输入输出流量、rt、upstream访问。
+* 可以监视的运行状况有：连接数、请求数、各种响应码范围的请求数、输入输出流量、rt、upstream访问等。
 
 * 可以指定获取所有监控结果或者一部分监控结果。
+
+* 利用变量添加自定义监控状态。总的监控状态最大个数为50个。
+
+* 回收过期的监控数据。
 
 编译
 ===========
@@ -39,9 +43,9 @@
 
     * 每行的格式
 
-            kv,bytes_in_total,bytes_out_total,conn_total,req_total,2xx,3xx,4xx,5xx,other,rt_total
+            kv,bytes_in_total,bytes_out_total,conn_total,req_total,2xx,3xx,4xx,5xx,other,rt_total,upstream_req,upstream_rt,upstream_tries,200,206,302,304,403,404,416,499,500,502,503,504,508,detail_other,ups_4xx,ups_5xx
 
-        * kv                计算得到的req_status_zone指令定义变量的值
+        * kv                计算得到的req_status_zone指令定义变量的值，最大长度可配置，默认104B，超长的部分截断
         * bytes_in_total    从客户端接收流量总和
         * bytes_out_total   发送到客户端流量总和
         * conn_total        处理过的连接总数
@@ -55,6 +59,24 @@
         * upstream_req      需要访问upstream的请求总数
         * upstream_rt       访问upstream的总rt
         * upstream_tries    upstram总访问次数
+        * 200               200请求的总数
+        * 206               206请求的总数
+        * 302               302请求的总数
+        * 304               304请求的总数
+        * 403               403请求的总数
+        * 404               404请求的总数
+        * 416               416请求的总数
+        * 499               499请求的总数
+        * 500               500请求的总数
+        * 502               502请求的总数
+        * 503               503请求的总数
+        * 504               504请求的总数
+        * 508               508请求的总数
+        * detail_other      非以上13种status code的请求总数
+        * ups_4xx           upstream返回4xx响应的请求总数
+        * ups_5xx           upstream返回5xx响应的请求总数
+
+    * 注，后续会清理这些状态，因为已经支持了自定义状态。
 
 * tsar可解析输出结果，具体见https://github.com/alibaba/tsar
 
@@ -103,3 +125,41 @@ req_status_show
 **Context**: *loc*
 
 按格式返回统计结果。可指定返回部分目标的统计结果。
+
+
+req_status_zone_add_indicator
+--------------------------------
+
+**Syntax**: *req_status_zone_add_indecator zone_name $var1 [$var2 [...]]*
+
+**Default**: *none*
+
+**Context**: *main*
+
+通过变量增加自定义字段，新增加的字段目前会展现在每行的末尾。
+
+
+req_status_zone_key_length
+-------------------------------
+
+**Syntax**: *req_status_zone_key_length zone_name length*
+
+**Default**: *none*
+
+**Context**: *main*
+
+定义某个共享内存块中key的最大长度，默认值104。key中超出的部分会被截断。
+
+
+req_status_zone_recycle
+-------------------------------
+
+**Syntax**: *req_status_zone_recycle zone_name times seconds*
+
+**Default**: *none*
+
+**Context**: *main*
+
+定义某个共享内存块过期数据的回收。回收在共享内存耗尽时自动开启。只会回收访问频率低于设置值的监控数据。
+频率定义为 times / seconds，默认值为10r/min，即
+     req_status_zone_recycle demo_zone 10 60;

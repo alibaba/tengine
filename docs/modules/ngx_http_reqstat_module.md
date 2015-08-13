@@ -13,9 +13,13 @@ This module will help monitor running status of Tengine.
 * The information is divided into different zones, and each zone is independent.
 
 * The status information is about connections, requests, response status codes, input and output flows,
-  rt, and upstreams.
+  rt, upstreams, and so on.
 
 * It shows all the results by default, and can be set to show part of them by specifying zones.
+
+* It support for user-defined status by using nginx variables. The maximum of all the status is 50.
+
+* It recycles out-of-date running status information.
 
 Compilation
 ===========
@@ -47,9 +51,9 @@ Example
 
     * Line format:
 
-            kv,bytes_in_total,bytes_out_total,conn_total,req_total,2xx,3xx,4xx,5xx,other,rt_total,upstream_req,upstream_rt,upstream_tries
+            kv,bytes_in_total,bytes_out_total,conn_total,req_total,2xx,3xx,4xx,5xx,other,rt_total,upstream_req,upstream_rt,upstream_tries,200,206,302,304,403,404,416,499,500,502,503,504,508,detail_other,ups_4xx,ups_5xx
 
-        * **kv**                value of the variable defined by the directive 'req_status_zone'
+        * **kv**                value of the variable defined by the directive 'req_status_zone'. The maximun key length is configurable, 104B by default, and overlength will be cut off
         * **bytes_in_total**    total number of bytes received from client
         * **bytes_out_total**   total number of bytes sent to client
         * **conn_total**        total number of accepted connections
@@ -63,6 +67,24 @@ Example
         * **upstream_req**      total number of requests calling for upstream
         * **upstream_rt**       accumulation or upstream rt
         * **upstream_tries**    total number of times calling for upstream
+        * **200**               total number of 200 requests
+        * **206**               total number of 206 requests
+        * **302**               total number of 302 requests
+        * **304**               total number of 304 requests
+        * **403**               total number of 403 requests
+        * **404**               total number of 404 requests
+        * **416**               total number of 416 requests
+        * **499**               total number of 499 requests
+        * **500**               total number of 500 requests
+        * **502**               total number of 502 requests
+        * **503**               total number of 503 requests
+        * **504**               total number of 504 requests
+        * **508**               total number of 508 requests
+        * **detail_other**      total number of requests of other status codes 
+        * **ups_4xx**           total number of requests of upstream 4xx
+        * **ups_5xx**           total number of requests of upstream 5xx
+
+    * some fields will be removed in future, because user-defined status has been supported.
 
 * tsar can parse the result and monitor, see also https://github.com/alibaba/tsar
 
@@ -112,3 +134,41 @@ req_status_show
 **Context**: *loc*
 
 Display the status information. You can specify zones to display.
+
+
+req_status_zone_add_indicator
+--------------------------------
+
+**Syntax**: *req_status_zone_add_indecator zone_name $var1 [$var2 [...]]*
+
+**Default**: *none*
+
+**Context**: *main*
+
+Add user-defined status by using nginx variables. The status will be appended at the end of each line on display.
+
+
+req_status_zone_key_length
+-------------------------------
+
+**Syntax**: *req_status_zone_key_length zone_name length*
+
+**Default**: *none*
+
+**Context**: *main*
+
+Define the maximun length of key for a zone. The default is 104.
+
+
+req_status_zone_recycle
+-------------------------------
+
+**Syntax**: *req_status_zone_recycle zone_name times seconds*
+
+**Default**: *none*
+
+**Context**: *main*
+
+Define the recycle threshold for a zone. Recycle will be switched on when the shared memory is exhausted, and will only take effect on imformation whose visit frequency is lower than the setting.
+The setting frequency is defined by 'times' and 'seconds', and it is 10r/min by default.
+     req_status_zone_recycle demo_zone 10 60;
