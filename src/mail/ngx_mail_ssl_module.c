@@ -21,6 +21,8 @@ static char *ngx_mail_ssl_enable(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_mail_ssl_starttls(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_mail_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static char *ngx_mail_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -44,7 +46,13 @@ static ngx_conf_bitmask_t  ngx_mail_ssl_protocols[] = {
 };
 
 
-static ngx_str_t ngx_mail_ssl_unknown_server_name = ngx_string("unknown");
+static ngx_conf_enum_t  ngx_mail_ssl_verify[] = {
+    { ngx_string("off"), 0 },
+    { ngx_string("on"), 1 },
+    { ngx_string("optional"), 2 },
+    { ngx_string("optional_no_ca"), 3 },
+    { ngx_null_string, 0 }
+};
 
 
 static ngx_command_t  ngx_mail_ssl_commands[] = {
@@ -54,13 +62,6 @@ static ngx_command_t  ngx_mail_ssl_commands[] = {
       ngx_mail_ssl_enable,
       NGX_MAIL_SRV_CONF_OFFSET,
       offsetof(ngx_mail_ssl_conf_t, enable),
-      NULL },
-
-    { ngx_string("ssl_pass_phrase_dialog"),
-      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_MAIL_SRV_CONF_OFFSET,
-      offsetof(ngx_mail_ssl_conf_t, pass_phrase_dialog),
       NULL },
 
     { ngx_string("starttls"),
@@ -82,6 +83,13 @@ static ngx_command_t  ngx_mail_ssl_commands[] = {
       ngx_conf_set_str_slot,
       NGX_MAIL_SRV_CONF_OFFSET,
       offsetof(ngx_mail_ssl_conf_t, certificate_key),
+      NULL },
+
+    { ngx_string("ssl_password_file"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_mail_ssl_password_file,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      0,
       NULL },
 
     { ngx_string("ssl_dhparam"),
@@ -147,6 +155,41 @@ static ngx_command_t  ngx_mail_ssl_commands[] = {
       offsetof(ngx_mail_ssl_conf_t, session_timeout),
       NULL },
 
+    { ngx_string("ssl_verify_client"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, verify),
+      &ngx_mail_ssl_verify },
+
+    { ngx_string("ssl_verify_depth"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, verify_depth),
+      NULL },
+
+    { ngx_string("ssl_client_certificate"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, client_certificate),
+      NULL },
+
+    { ngx_string("ssl_trusted_certificate"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, trusted_certificate),
+      NULL },
+
+    { ngx_string("ssl_crl"),
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_MAIL_SRV_CONF_OFFSET,
+      offsetof(ngx_mail_ssl_conf_t, crl),
+      NULL },
+
       ngx_null_command
 };
 
@@ -199,13 +242,19 @@ ngx_mail_ssl_create_conf(ngx_conf_t *cf)
      *     scf->certificate_key = { 0, NULL };
      *     scf->dhparam = { 0, NULL };
      *     scf->ecdh_curve = { 0, NULL };
+     *     scf->client_certificate = { 0, NULL };
+     *     scf->trusted_certificate = { 0, NULL };
+     *     scf->crl = { 0, NULL };
      *     scf->ciphers = { 0, NULL };
      *     scf->shm_zone = NULL;
      */
 
     scf->enable = NGX_CONF_UNSET;
     scf->starttls = NGX_CONF_UNSET_UINT;
+    scf->passwords = NGX_CONF_UNSET_PTR;
     scf->prefer_server_ciphers = NGX_CONF_UNSET;
+    scf->verify = NGX_CONF_UNSET_UINT;
+    scf->verify_depth = NGX_CONF_UNSET_UINT;
     scf->builtin_session_cache = NGX_CONF_UNSET;
     scf->session_timeout = NGX_CONF_UNSET;
     scf->session_tickets = NGX_CONF_UNSET;
@@ -224,9 +273,6 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     char                *mode;
     ngx_pool_cleanup_t  *cln;
 
-    ngx_mail_core_srv_conf_t           *cscf;
-    ngx_http_ssl_pphrase_dialog_conf_t  dialog;
-
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_uint_value(conf->starttls, prev->starttls,
                          NGX_MAIL_STARTTLS_OFF);
@@ -241,18 +287,27 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
                          (NGX_CONF_BITMASK_SET|NGX_SSL_SSLv3|NGX_SSL_TLSv1
                           |NGX_SSL_TLSv1_1|NGX_SSL_TLSv1_2));
 
+    ngx_conf_merge_uint_value(conf->verify, prev->verify, 0);
+    ngx_conf_merge_uint_value(conf->verify_depth, prev->verify_depth, 1);
+
     ngx_conf_merge_str_value(conf->certificate, prev->certificate, "");
     ngx_conf_merge_str_value(conf->certificate_key, prev->certificate_key, "");
+
+    ngx_conf_merge_ptr_value(conf->passwords, prev->passwords, NULL);
 
     ngx_conf_merge_str_value(conf->dhparam, prev->dhparam, "");
 
     ngx_conf_merge_str_value(conf->ecdh_curve, prev->ecdh_curve,
                          NGX_DEFAULT_ECDH_CURVE);
 
+    ngx_conf_merge_str_value(conf->client_certificate,
+                         prev->client_certificate, "");
+    ngx_conf_merge_str_value(conf->trusted_certificate,
+                         prev->trusted_certificate, "");
+    ngx_conf_merge_str_value(conf->crl, prev->crl, "");
+
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
-    ngx_conf_merge_str_value(conf->pass_phrase_dialog, prev->pass_phrase_dialog,
-                             "builtin");
 
     conf->ssl.log = cf->log;
 
@@ -316,20 +371,40 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
 
-    cscf = ngx_mail_conf_get_module_srv_conf(cf, ngx_mail_core_module);
-    dialog.ssl = &conf->ssl;
-    dialog.type = &conf->pass_phrase_dialog;
-    if (cscf->server_name.len != 0) {
-        dialog.server_name = &cscf->server_name;
-    } else {
-        dialog.server_name = &ngx_mail_ssl_unknown_server_name;
-    }
-
     if (ngx_ssl_certificate(cf, &conf->ssl, &conf->certificate,
-                            &conf->certificate_key, &dialog)
+                            &conf->certificate_key, conf->passwords)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
+    }
+
+    if (conf->verify) {
+
+        if (conf->client_certificate.len == 0 && conf->verify != 3) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "no ssl_client_certificate for ssl_client_verify");
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_ssl_client_certificate(cf, &conf->ssl,
+                                       &conf->client_certificate,
+                                       conf->verify_depth)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_ssl_trusted_certificate(cf, &conf->ssl,
+                                        &conf->trusted_certificate,
+                                        conf->verify_depth)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_ssl_crl(cf, &conf->ssl, &conf->crl) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
     }
 
     if (SSL_CTX_set_cipher_list(conf->ssl.ctx,
@@ -346,7 +421,9 @@ ngx_mail_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
         SSL_CTX_set_options(conf->ssl.ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
     }
 
+#ifndef LIBRESSL_VERSION_NUMBER
     SSL_CTX_set_tmp_rsa_callback(conf->ssl.ctx, ngx_ssl_rsa512_key_callback);
+#endif
 
     if (ngx_ssl_dhparam(cf, &conf->ssl, &conf->dhparam) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -440,6 +517,29 @@ ngx_mail_ssl_starttls(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     scf->file = cf->conf_file->file.name.data;
     scf->line = cf->conf_file->line;
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_mail_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_mail_ssl_conf_t  *scf = conf;
+
+    ngx_str_t  *value;
+
+    if (scf->passwords != NGX_CONF_UNSET_PTR) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    scf->passwords = ngx_ssl_read_password_file(cf, &value[1]);
+
+    if (scf->passwords == NULL) {
+        return NGX_CONF_ERROR;
+    }
 
     return NGX_CONF_OK;
 }

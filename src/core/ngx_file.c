@@ -114,7 +114,7 @@ ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
         rc = ngx_create_temp_file(&tf->file, tf->path, tf->pool,
                                   tf->persistent, tf->clean, tf->access);
 
-        if (rc == NGX_ERROR || rc == NGX_AGAIN) {
+        if (rc != NGX_OK) {
             return rc;
         }
 
@@ -356,7 +356,7 @@ ngx_conf_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (ngx_conf_full_name(cf->cycle, &path->name, 0) != NGX_OK) {
-        return NULL;
+        return NGX_CONF_ERROR;
     }
 
     path->conf_file = cf->conf_file->file.name.data;
@@ -372,8 +372,8 @@ ngx_conf_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         path->len += level + 1;
     }
 
-    while (i < 3) {
-        path->level[i++] = 0;
+    if (path->len > 10 + i) {
+        return "invalid value";
     }
 
     *slot = path;
@@ -1035,8 +1035,16 @@ ngx_walk_tree(ngx_tree_ctx_t *ctx, ngx_str_t *tree)
             ctx->access = ngx_de_access(&dir);
             ctx->mtime = ngx_de_mtime(&dir);
 
-            if (ctx->pre_tree_handler(ctx, &file) == NGX_ABORT) {
+            rc = ctx->pre_tree_handler(ctx, &file);
+
+            if (rc == NGX_ABORT) {
                 goto failed;
+            }
+
+            if (rc == NGX_DECLINED) {
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, ctx->log, 0,
+                               "tree skip dir \"%s\"", file.data);
+                continue;
             }
 
             if (ngx_walk_tree(ctx, &file) == NGX_ABORT) {

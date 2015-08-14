@@ -13,7 +13,7 @@
 #include "ngx_http_lua_script.h"
 
 
-static void * ngx_http_lua_script_add_code(ngx_array_t *codes, size_t size);
+static void *ngx_http_lua_script_add_code(ngx_array_t *codes, size_t size);
 static size_t ngx_http_lua_script_copy_len_code(
     ngx_http_lua_script_engine_t *e);
 static void ngx_http_lua_script_copy_code(ngx_http_lua_script_engine_t *e);

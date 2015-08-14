@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 24);
+plan tests => repeat_each() * (blocks() * 3 + 34);
 
 #no_diff();
 no_long_string();
@@ -839,8 +839,11 @@ Hello
           results.content_type = "anything"
           results.somehing_else = "hi"
 
-          for k, v in pairs(results) do
-            ngx.say(k .. ": " .. v)
+          local arr = {}
+          for k in pairs(results) do table.insert(arr, k) end
+          table.sort(arr)
+          for i, k in ipairs(arr) do
+            ngx.say(k .. ": " .. results[k])
           end
         ';
     }
@@ -850,9 +853,9 @@ GET /read
 Content-Type: text/my-plain
 
 --- response_body
+content_type: anything
 somehing_else: hi
 something: hello
-content_type: anything
 --- no_error_log
 [error]
 
@@ -1234,6 +1237,8 @@ bar: baz
         header_filter_by_lua '
             local hs = ngx.resp.get_headers()
             print("my Content-Type: ", hs["Content-Type"])
+            print("my content-type: ", hs["content-type"])
+            print("my content_type: ", hs["content_type"])
         ';
     }
 --- request
@@ -1245,6 +1250,8 @@ hi
 [alert]
 --- error_log
 my Content-Type: text/plain
+my content-type: text/plain
+my content_type: text/plain
 
 
 
@@ -1259,6 +1266,8 @@ my Content-Type: text/plain
         header_filter_by_lua '
             local hs = ngx.resp.get_headers()
             print("my Content-Length: ", hs["Content-Length"])
+            print("my content-length: ", hs["content-length"])
+            print("my content_length: ", hs.content_length)
         ';
     }
 --- request
@@ -1270,6 +1279,8 @@ hi
 [alert]
 --- error_log
 my Content-Length: 3
+my content-length: 3
+my content_length: 3
 
 
 
@@ -1284,6 +1295,7 @@ my Content-Length: 3
         header_filter_by_lua '
             local hs = ngx.resp.get_headers()
             print("my Connection: ", hs["Connection"])
+            print("my connection: ", hs["connection"])
         ';
     }
 --- request
@@ -1295,6 +1307,7 @@ hi
 [alert]
 --- error_log
 my Connection: close
+my connection: close
 
 
 
@@ -1309,6 +1322,8 @@ my Connection: close
         body_filter_by_lua '
             local hs = ngx.resp.get_headers()
             print("my Transfer-Encoding: ", hs["Transfer-Encoding"])
+            print("my transfer-encoding: ", hs["transfer-encoding"])
+            print("my transfer_encoding: ", hs.transfer_encoding)
         ';
     }
 --- request
@@ -1320,6 +1335,7 @@ hi
 [alert]
 --- error_log
 my Transfer-Encoding: chunked
+my transfer-encoding: chunked
 
 
 
@@ -1334,6 +1350,8 @@ my Transfer-Encoding: chunked
         body_filter_by_lua '
             local hs = ngx.resp.get_headers()
             print("my Transfer-Encoding: ", hs["Transfer-Encoding"])
+            print("my transfer-encoding: ", hs["transfer-encoding"])
+            print("my transfer_encoding: ", hs.transfer_encoding)
         ';
     }
 --- request
@@ -1345,4 +1363,44 @@ hi
 [alert]
 --- error_log
 my Transfer-Encoding: nil
+my transfer-encoding: nil
+my transfer_encoding: nil
+
+
+
+=== TEST 65: set Location (no host)
+--- config
+    location = /t {
+        content_by_lua '
+            ngx.header.location = "/foo/bar"
+            return ngx.exit(301)
+        ';
+    }
+--- request
+GET /t
+--- response_headers
+Location: /foo/bar
+--- response_body_like: 301 Moved Permanently
+--- error_code: 301
+--- no_error_log
+[error]
+
+
+
+=== TEST 66: set Location (with host)
+--- config
+    location = /t {
+        content_by_lua '
+            ngx.header.location = "http://test.com/foo/bar"
+            return ngx.exit(301)
+        ';
+    }
+--- request
+GET /t
+--- response_headers
+Location: http://test.com/foo/bar
+--- response_body_like: 301 Moved Permanently
+--- error_code: 301
+--- no_error_log
+[error]
 

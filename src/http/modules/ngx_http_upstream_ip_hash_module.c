@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+#include "ngx_http_upstream_check_module.h"
+#endif
 
 typedef struct {
     /* the round robin data must be first */
@@ -241,7 +244,7 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
 
     next:
 
-        if (++iphp->tries >= 20) {
+        if (++iphp->tries > 20) {
             return iphp->get_rr_peer(pc, &iphp->rrp);
         }
     }

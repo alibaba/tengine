@@ -35,7 +35,7 @@ our $StapScript = $t::StapThread::StapScript;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 1 + 2);
+plan tests => repeat_each() * 17;
 
 #no_diff();
 no_long_string();
@@ -57,7 +57,9 @@ __DATA__
 GET /test
 --- ignore_response
 --- error_log eval
-[qr/client timed out \(\d+: .*?timed out\)/]
+qr/client timed out \(\d+: .*?timed out\)/
+--- no_error_log
+[error]
 
 
 
@@ -215,4 +217,106 @@ free request
 --- ignore_response
 --- no_error_log
 [error]
+
+
+
+=== TEST 4: flush wait - return "timeout" error
+--- config
+    send_timeout 100ms;
+    location /test {
+        content_by_lua '
+            ngx.say("hello, world")
+            local ok, err = ngx.flush(true)
+            if not ok then
+                ngx.log(ngx.ERR, "failed to flush: ", err)
+                return
+            end
+            ngx.say("hiya")
+        ';
+    }
+--- request
+GET /test
+--- ignore_response
+--- error_log eval
+[
+qr/client timed out \(\d+: .*?timed out\)/,
+'failed to flush: timeout',
+]
+--- no_error_log
+[alert]
+
+
+
+=== TEST 5: flush wait in multiple user threads - return "timeout" error
+--- config
+    send_timeout 100ms;
+    location /test {
+        content_by_lua '
+            ngx.say("hello, world")
+
+            local function run(tag)
+                local ok, err = ngx.flush(true)
+                if not ok then
+                    ngx.log(ngx.ERR, "thread ", tag, ": failed to flush: ", err)
+                    return
+                end
+                ngx.say("hiya")
+            end
+
+            local function new_thread(tag)
+                local ok, err = ngx.thread.spawn(run, tag)
+                if not ok then
+                    return error("failed to spawn thread: ", err)
+                end
+            end
+
+            new_thread("A")
+            new_thread("B")
+            run("main")
+        ';
+    }
+--- request
+GET /test
+--- ignore_response
+--- error_log eval
+[
+qr/client timed out \(\d+: .*?timed out\)/,
+'thread main: failed to flush: timeout',
+'thread A: failed to flush: timeout',
+'thread B: failed to flush: timeout',
+]
+--- no_error_log
+[alert]
+
+
+
+=== TEST 6: flush wait - client abort connection prematurely
+--- config
+    #send_timeout 100ms;
+    location /test {
+        limit_rate 2;
+        content_by_lua '
+            ngx.say("hello, lua")
+            local ok, err = ngx.flush(true)
+            if not ok then
+                ngx.log(ngx.ERR, "failed to flush: ", err)
+                return
+            end
+            ngx.say("hiya")
+        ';
+    }
+--- request
+GET /test
+--- ignore_response
+--- error_log eval
+[
+qr/writev\(\) failed .*? Broken pipe/i,
+qr/failed to flush: client aborted/,
+]
+--- no_error_log
+[alert]
+
+--- timeout: 0.2
+--- abort
+--- wait: 1
 

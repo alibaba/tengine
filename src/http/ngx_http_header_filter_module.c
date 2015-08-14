@@ -68,7 +68,7 @@ static ngx_str_t ngx_http_status_lines[] = {
     /* ngx_null_string, */  /* "300 Multiple Choices" */
 
     ngx_string("301 Moved Permanently"),
-    ngx_string("302 Found"),
+    ngx_string("302 Moved Temporarily"),
     ngx_string("303 See Other"),
     ngx_string("304 Not Modified"),
     ngx_null_string,  /* "305 Use Proxy" */
@@ -83,7 +83,7 @@ static ngx_str_t ngx_http_status_lines[] = {
     ngx_string("402 Payment Required"),
     ngx_string("403 Forbidden"),
     ngx_string("404 Not Found"),
-    ngx_string("405 Method Not Allowed"),
+    ngx_string("405 Not Allowed"),
     ngx_string("406 Not Acceptable"),
     ngx_null_string,  /* "407 Proxy Authentication Required" */
     ngx_string("408 Request Time-out"),
@@ -280,9 +280,8 @@ ngx_http_header_filter(ngx_http_request_t *r)
     if (r->headers_out.server == NULL) {
 
         if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
-            len += clcf->server_tokens
-                ? sizeof(ngx_http_server_full_string) - 1
-                : sizeof(ngx_http_server_string) - 1;
+            len += clcf->server_tokens ? sizeof(ngx_http_server_full_string) - 1: 
+                                         sizeof(ngx_http_server_string) - 1;
 
         } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
             len += clcf->server_tag_header.len;

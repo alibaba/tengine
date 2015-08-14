@@ -47,7 +47,7 @@ ngx_event_module_t  ngx_select_module_ctx = {
         ngx_select_del_event,              /* disable an event */
         NULL,                              /* add an connection */
         NULL,                              /* delete an connection */
-        NULL,                              /* process the changes */
+        NULL,                              /* trigger a notify */
         ngx_select_process_events,         /* process the events */
         ngx_select_init,                   /* init the events */
         ngx_select_done                    /* done the events */
@@ -214,7 +214,8 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     int                ready, nready;
     ngx_err_t          err;
     ngx_uint_t         i, found;
-    ngx_event_t       *ev, **queue;
+    ngx_event_t       *ev;
+    ngx_queue_t       *queue;
     struct timeval     tv, *tp;
     ngx_connection_t  *c;
 
@@ -227,7 +228,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                       "change max_fd: %d", max_fd);
+                       "change max_fd: %i", max_fd);
     }
 
 #if (NGX_DEBUG)
@@ -240,7 +241,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                       "max_fd: %d", max_fd);
+                       "max_fd: %i", max_fd);
     }
 #endif
 
@@ -305,8 +306,6 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         return NGX_ERROR;
     }
 
-    ngx_mutex_lock(ngx_posted_events_mutex);
-
     nready = 0;
 
     for (i = 0; i < nevents; i++) {
@@ -332,15 +331,14 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         if (found) {
             ev->ready = 1;
 
-            queue = (ngx_event_t **) (ev->accept ? &ngx_posted_accept_events:
-                                                   &ngx_posted_events);
-            ngx_locked_post_event(ev, queue);
+            queue = ev->accept ? &ngx_posted_accept_events
+                               : &ngx_posted_events;
+
+            ngx_post_event(ev, queue);
 
             nready++;
         }
     }
-
-    ngx_mutex_unlock(ngx_posted_events_mutex);
 
     if (ready != nready) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
@@ -421,7 +419,7 @@ ngx_select_init_conf(ngx_cycle_t *cycle, void *conf)
         return NGX_CONF_ERROR;
     }
 
-#if (NGX_THREADS)
+#if (NGX_OLD_THREADS)
 
     ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                   "select() is not supported in the threaded mode");

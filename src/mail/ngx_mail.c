@@ -98,7 +98,7 @@ ngx_mail_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     *(ngx_mail_conf_ctx_t **) conf = ctx;
 
-    /* count the number of the http modules and set up their indices */
+    /* count the number of the mail modules and set up their indices */
 
     ngx_mail_max_module = 0;
     for (m = 0; ngx_modules[m]; m++) {
@@ -131,8 +131,7 @@ ngx_mail_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     /*
-     * create the main_conf's, the null srv_conf's, and the null loc_conf's
-     * of the all mail modules
+     * create the main_conf's and the null srv_conf's of the all mail modules
      */
 
     for (m = 0; ngx_modules[m]; m++) {

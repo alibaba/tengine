@@ -44,14 +44,6 @@ typedef struct {
 } ngx_exec_ctx_t;
 
 
-typedef struct {
-    int     signo;
-    char   *signame;
-    char   *name;
-    void  (*handler)(int signo);
-} ngx_signal_t;
-
-
 #define NGX_MAX_PROCESSES         1024
 
 #define NGX_PROCESS_NORESPAWN     -1

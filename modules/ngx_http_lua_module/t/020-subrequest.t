@@ -10,7 +10,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 21);
+plan tests => repeat_each() * (blocks() * 3 + 22);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 
@@ -2463,7 +2463,6 @@ capture body filter
           end
         ";
 
-        resolver 8.8.8.8;
         proxy_http_version 1.1;
         proxy_pass $_url;
     }
@@ -2534,7 +2533,6 @@ qr/Assertion .*? failed/
           end
         ";
 
-        resolver 8.8.8.8;
         proxy_http_version 1.1;
         proxy_pass $_url;
     }
@@ -2757,6 +2755,45 @@ GET /lua
 ^content-length: \d+
 body: \[\]
 $
+--- no_error_log
+[error]
+
+
+
+=== TEST 74: image_filter + ngx.location.capture
+ngx_http_image_filter_module's header filter intercepts
+the header filter chain so the r->header_sent flag won't
+get set right after the header filter chain is first invoked.
+
+--- config
+
+location = /back {
+    empty_gif;
+}
+
+location = /t {
+    image_filter rotate 90;
+
+    content_by_lua '
+        local res = ngx.location.capture("/back")
+        for k, v in pairs(res.header) do
+            ngx.header[k] = v
+        end
+        ngx.status = res.status
+        ngx.print(res.body)
+    ';
+}
+
+--- request
+GET /t
+--- response_body_like: .
+--- stap
+F(ngx_http_image_header_filter) {
+    println("image header filter")
+}
+--- stap_out
+image header filter
+
 --- no_error_log
 [error]
 

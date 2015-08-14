@@ -33,10 +33,9 @@ eval {
 	Compress::Raw::Zlib->WANT_GZIP_OR_ZLIB;
 };
 plan(skip_all => 'Compress::Raw::Zlib not installed') if $@;
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()
-	->has(qw/http proxy cache limit_conn rewrite spdy realip/);
+	->has(qw/http proxy cache limit_conn rewrite spdy realip shmem/);
 
 $t->plan(82)->write_file_expand('nginx.conf', <<'EOF');
 
@@ -154,10 +153,10 @@ my $sid1 = spdy_stream($sess, { path => '/s' });
 $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-ok($frame, 'SYN_REPLAY frame');
-is($frame->{sid}, $sid1, 'SYN_REPLAY stream');
-is($frame->{headers}->{':status'}, 200, 'SYN_REPLAY status');
-is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLAY header');
+ok($frame, 'SYN_REPLY frame');
+is($frame->{sid}, $sid1, 'SYN_REPLY stream');
+is($frame->{headers}->{':status'}, 200, 'SYN_REPLY status');
+is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLY header');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 ok($frame, 'DATA frame');
@@ -170,13 +169,13 @@ my $sid2 = spdy_stream($sess, { path => '/s' });
 $frames = spdy_read($sess, all => [{ sid => $sid2, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-is($frame->{sid}, $sid2, 'SYN_REPLAY stream 2');
-is($frame->{headers}->{':status'}, 200, 'SYN_REPLAY status 2');
-is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLAY header 2');
+is($frame->{sid}, $sid2, 'SYN_REPLY stream 2');
+is($frame->{headers}->{':status'}, 200, 'SYN_REPLY status 2');
+is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLY header 2');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 ok($frame, 'DATA frame 2');
-is($frame->{sid}, $sid2, 'SYN_REPLAY stream 2');
+is($frame->{sid}, $sid2, 'SYN_REPLY stream 2');
 is($frame->{length}, length 'body', 'DATA length 2');
 is($frame->{data}, 'body', 'DATA payload 2');
 
@@ -187,9 +186,9 @@ $sid1 = spdy_stream($sess, { path => '/s', method => 'HEAD' });
 $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-is($frame->{sid}, $sid1, 'SYN_REPLAY stream HEAD');
-is($frame->{headers}->{':status'}, 200, 'SYN_REPLAY status HEAD');
-is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLAY header HEAD');
+is($frame->{sid}, $sid1, 'SYN_REPLY stream HEAD');
+is($frame->{headers}->{':status'}, 200, 'SYN_REPLY status HEAD');
+is($frame->{headers}->{'x-header'}, 'X-Foo', 'SYN_REPLY header HEAD');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 is($frame, undef, 'HEAD no body');
@@ -202,7 +201,7 @@ $sid1 = spdy_stream($sess, { path => '/pp' });
 $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-ok($frame, 'PROXY SYN_REPLAY frame');
+ok($frame, 'PROXY SYN_REPLY frame');
 is($frame->{headers}->{'x-pp'}, '192.0.2.1', 'PROXY remote addr');
 
 # request header
@@ -214,14 +213,11 @@ $sid1 = spdy_stream($sess, { path => '/t1.html',
 $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-is($frame->{headers}->{':status'}, 206, 'SYN_REPLAY status range');
+is($frame->{headers}->{':status'}, 206, 'SYN_REPLY status range');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 is($frame->{length}, 10, 'DATA length range');
 is($frame->{data}, '002XXXX000', 'DATA payload range');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.7.4');
 
 # request header with multiple values
 
@@ -245,8 +241,6 @@ $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 is($frame->{headers}->{'x-cookie'}, 'val1; val2',
 	'multiple request header values - proxied');
 
-}
-
 # response header with multiple values
 
 $sess = new_session();
@@ -258,9 +252,6 @@ is($frame->{headers}->{'set-cookie'}, "val1\0val2",
 	'response header with multiple values');
 
 # response header with multiple values - no empty values inside
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.7.8');
 
 $sess = new_session();
 $sid1 = spdy_stream($sess, { path => '/header/inside' });
@@ -280,8 +271,6 @@ $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
 is($frame->{headers}->{'x-foo'}, "val1\0val2", 'no empty header value last');
-
-}
 
 # $spdy
 
@@ -312,7 +301,7 @@ $sid1 = spdy_stream($sess, { path => '/redirect' });
 $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
-is($frame->{headers}->{':status'}, 405, 'SYN_REPLAY status with redirect');
+is($frame->{headers}->{':status'}, 405, 'SYN_REPLY status with redirect');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 ok($frame, 'DATA frame with redirect');
@@ -330,15 +319,9 @@ ok(!grep ({ $_->{type} eq "DATA" } @$frames), 'proxy cache HEAD - no body');
 # ensure that HEAD-like requests, i.e., without response body, do not lead to
 # client connection close due to cache filling up with upstream response body
 
-TODO: {
-local $TODO = 'premature client connection close'
-	unless $t->has_version('1.7.3');
-
 $sid2 = spdy_stream($sess, { path => '/' });
 $frames = spdy_read($sess, all => [{ sid => $sid2, fin => 1 }]);
 ok(grep ({ $_->{type} eq "SYN_REPLY" } @$frames), 'proxy cache headers only');
-
-}
 
 # HEAD on empty cache with proxy_buffering off
 
@@ -497,7 +480,7 @@ $frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 is($frame->{data}, 7, 'priority 7');
 
-# stream muliplexing + priority
+# stream multiplexing + priority
 
 $sess = new_session();
 $sid1 = spdy_stream($sess, { path => '/t1.html', prio => 7 });
@@ -588,7 +571,7 @@ local $TODO = 'not yet';
 
 $sess = new_session();
 spdy_stream($sess, { path => '/s' }, 2);
-$frames = spdy_read($sess);
+$frames = spdy_read($sess, all => [{ type => 'GOAWAY' }]);
 
 ($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
 ok($frame, 'even stream - GOAWAY frame');
@@ -604,10 +587,10 @@ local $TODO = 'not yet';
 
 $sess = new_session();
 $sid1 = spdy_stream($sess, { path => '/s' }, 3);
-spdy_read($sess);
+spdy_read($sess, all => [{ type => 'GOAWAY' }]);
 
 $sid2 = spdy_stream($sess, { path => '/s' }, 1);
-$frames = spdy_read($sess);
+$frames = spdy_read($sess, all => [{ type => 'GOAWAY' }]);
 
 ($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
 ok($frame, 'backward stream - GOAWAY frame');
@@ -625,7 +608,7 @@ $sess = new_session();
 $sid1 = spdy_stream($sess, { path => '/s' }, 3);
 spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
 $sid2 = spdy_stream($sess, { path => '/s' }, 3);
-$frames = spdy_read($sess);
+$frames = spdy_read($sess, all => [{ type => 'RST_STREAM' }]);
 
 ($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
 ok($frame, 'dup stream - RST_STREAM frame');
@@ -659,7 +642,7 @@ $t->stop();
 TODO: {
 local $TODO = 'not yet';
 
-$frames = spdy_read($sess);
+$frames = spdy_read($sess, all => [{ type => 'RST_STREAM' }]);
 
 ($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
 ok($frame, 'GOAWAY on connection close');
@@ -704,17 +687,14 @@ sub spdy_read {
 	my $s = $sess->{socket};
 	my $buf = '';
 
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-again:
-		alarm(1);
-
+	while (1) {
 		$buf = raw_read($s, $buf, 8);
+		last unless length $buf;
 
 		my $type = unpack("B", $buf);
 		$length = 8 + hex unpack("x5 H6", $buf);
 		$buf = raw_read($s, $buf, $length);
+		last unless length $buf;
 
 		if ($type == 0) {
 			push @got, dframe($buf);
@@ -725,10 +705,8 @@ again:
 		}
 		$buf = substr($buf, $length);
 
-		goto again if test_fin($got[-1], $extra{all});
-		alarm(0);
+		last unless test_fin($got[-1], $extra{all});
 	};
-	alarm(0);
 	return \@got;
 }
 
@@ -974,8 +952,8 @@ sub raw_read {
 	my ($s, $buf, $len) = @_;
 	my $got = '';
 
-	while (length($buf) < $len)  {
-		$s->sysread($got, $len - length($buf)) or die;
+	while (length($buf) < $len && IO::Select->new($s)->can_read(1)) {
+		$s->sysread($got, $len - length($buf)) or last;
 		log_in($got);
 		$buf .= $got;
 	}

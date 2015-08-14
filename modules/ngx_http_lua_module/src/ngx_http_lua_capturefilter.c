@@ -97,6 +97,7 @@ ngx_http_lua_capture_header_filter(ngx_http_request_t *r)
         /* force subrequest response body buffer in memory */
         r->filter_need_in_memory = 1;
         r->header_sent = 1;
+        ctx->header_sent = 1;
 
         if (r->method == NGX_HTTP_HEAD) {
             r->header_only = 1;

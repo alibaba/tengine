@@ -10,7 +10,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 2 + 18);
+plan tests => repeat_each() * (blocks() * 2 + 19);
 
 #no_diff();
 #no_long_string();
@@ -76,6 +76,8 @@ Yay! 123
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log eval
+qr/content_by_lua\(nginx\.conf:\d+\):1: attempt to call field 'echo' \(a nil value\)/
 
 
 

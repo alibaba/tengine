@@ -43,6 +43,7 @@ struct ngx_peer_connection_s {
     ngx_str_t                       *host;
 
     ngx_uint_t                       tries;
+    ngx_msec_t                       start_time;
 
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
@@ -51,10 +52,6 @@ struct ngx_peer_connection_s {
 #if (NGX_SSL)
     ngx_event_set_peer_session_pt    set_session;
     ngx_event_save_peer_session_pt   save_session;
-#endif
-
-#if (NGX_THREADS)
-    ngx_atomic_t                    *lock;
 #endif
 
     ngx_addr_t                      *local;

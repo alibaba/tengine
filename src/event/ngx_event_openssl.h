@@ -14,10 +14,21 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/bn.h>
 #include <openssl/conf.h>
+#include <openssl/crypto.h>
+#include <openssl/dh.h>
+#ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
+#endif
 #include <openssl/evp.h>
+#ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
+#endif
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 #define NGX_SSL_NAME     "OpenSSL"
 
@@ -53,14 +64,12 @@ typedef struct {
     unsigned                    handshake_buffer_set:1;
 } ngx_ssl_connection_t;
 
-
 typedef struct {
     ngx_ssl_t                  *ssl;
     ngx_str_t                  *server_name;
     ngx_str_t                  *type;
     ngx_str_t                  *encrypt;
 } ngx_http_ssl_pphrase_dialog_conf_t;
-
 
 #define NGX_SSL_NO_SCACHE            -2
 #define NGX_SSL_NONE_SCACHE          -3
@@ -119,8 +128,8 @@ typedef struct {
 
 ngx_int_t ngx_ssl_init(ngx_log_t *log);
 ngx_int_t ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data);
-ngx_int_t ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
-    ngx_str_t *key, ngx_http_ssl_pphrase_dialog_conf_t *dialog);
+ngx_int_t ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
+    ngx_str_t *cert, ngx_str_t *key, ngx_array_t *passwords);
 ngx_int_t ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_str_t *cert, ngx_int_t depth);
 ngx_int_t ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
@@ -132,6 +141,7 @@ ngx_int_t ngx_ssl_stapling_resolver(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_resolver_t *resolver, ngx_msec_t resolver_timeout);
 RSA *ngx_ssl_rsa512_key_callback(ngx_ssl_conn_t *ssl_conn, int is_export,
     int key_length);
+ngx_array_t *ngx_ssl_read_password_file(ngx_conf_t *cf, ngx_str_t *file);
 ngx_int_t ngx_ssl_dhparam(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *file);
 ngx_int_t ngx_ssl_ecdh_curve(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *name);
 ngx_int_t ngx_ssl_session_cache(ngx_ssl_t *ssl, ngx_str_t *sess_ctx,
@@ -158,6 +168,8 @@ ngx_int_t ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session);
      || n == X509_V_ERR_CERT_UNTRUSTED                                        \
      || n == X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE)
 
+ngx_int_t ngx_ssl_check_host(ngx_connection_t *c, ngx_str_t *name);
+
 
 ngx_int_t ngx_ssl_get_protocol(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
@@ -166,6 +178,8 @@ ngx_int_t ngx_ssl_get_cipher_name(ngx_connection_t *c, ngx_pool_t *pool,
 ngx_int_t ngx_ssl_get_session_id(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_session_reused(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_server_name(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
@@ -177,6 +191,8 @@ ngx_int_t ngx_ssl_get_issuer_dn(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_serial_number(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+ngx_int_t ngx_ssl_get_fingerprint(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
 ngx_int_t ngx_ssl_get_client_verify(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 
@@ -184,7 +200,7 @@ ngx_int_t ngx_ssl_get_client_verify(ngx_connection_t *c, ngx_pool_t *pool,
 ngx_int_t ngx_ssl_handshake(ngx_connection_t *c);
 ssize_t ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size);
 ssize_t ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size);
-ssize_t ngx_ssl_recv_chain(ngx_connection_t *c, ngx_chain_t *cl);
+ssize_t ngx_ssl_recv_chain(ngx_connection_t *c, ngx_chain_t *cl, off_t limit);
 ngx_chain_t *ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in,
     off_t limit);
 void ngx_ssl_free_buffer(ngx_connection_t *c);
@@ -201,7 +217,6 @@ extern int  ngx_ssl_session_ticket_keys_index;
 extern int  ngx_ssl_certificate_index;
 extern int  ngx_ssl_stapling_index;
 
-
 #if (OPENSSL_VERSION_NUMBER < 0x00904000)
 #define ngx_ssl_pem_read_bio_x509(b, x, cb, arg)    \
     PEM_read_bio_X509(b, x, cb)
@@ -209,6 +224,5 @@ extern int  ngx_ssl_stapling_index;
 #define ngx_ssl_pem_read_bio_x509(b, x, cb, arg)    \
     PEM_read_bio_X509(b, x, cb, arg)
 #endif
-
 
 #endif /* _NGX_EVENT_OPENSSL_H_INCLUDED_ */

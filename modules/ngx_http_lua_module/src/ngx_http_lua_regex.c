@@ -1850,11 +1850,12 @@ exec:
 
     } else {
         if (offset < (int) subj.len) {
-            dd("adding trailer: %s (len %d)", &subj.data[offset],
-               (int) (subj.len - offset));
+            dd("adding trailer: %s (len %d)", &subj.data[cp_offset],
+               (int) (subj.len - cp_offset));
 
-            luaL_addlstring(&luabuf, (char *) &subj.data[offset],
-                            subj.len - offset);
+
+            luaL_addlstring(&luabuf, (char *) &subj.data[cp_offset],
+                            subj.len - cp_offset);
         }
 
         luaL_pushresult(&luabuf);
@@ -2302,9 +2303,9 @@ ngx_http_lua_ffi_exec_regex(ngx_http_lua_regex_t *re, int flags,
                                          (int) pos, cap, ovecsize, ws,
                                          sizeof(ws)/sizeof(ws[0]), exec_opts);
 
-#else /* LUA_HAVE_PCRE_DFA */
+#else
 
-        return PCRE_ERROR_INTERNAL;
+        return PCRE_ERROR_BADOPTION;
 
 #endif /* LUA_HAVE_PCRE_DFA */
 

@@ -223,8 +223,8 @@ delete thread 1
 
 --- response_body
 after
---- error_log
-lua user thread aborted: runtime error: content_by_lua:3: attempt to call field 'blah' (a nil value)
+--- error_log eval
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):3: attempt to call field 'blah' \(a nil value\)/
 
 
 

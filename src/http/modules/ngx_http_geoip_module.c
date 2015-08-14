@@ -628,6 +628,9 @@ ngx_http_geoip_city_float_variable(ngx_http_request_t *r,
     val = *(float *) ((char *) gr + data);
 
     v->len = ngx_sprintf(v->data, "%.4f", val) - v->data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     GeoIPRecord_delete(gr);
 
@@ -657,6 +660,9 @@ ngx_http_geoip_city_int_variable(ngx_http_request_t *r,
     val = *(int *) ((char *) gr + data);
 
     v->len = ngx_sprintf(v->data, "%d", val) - v->data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     GeoIPRecord_delete(gr);
 
@@ -766,7 +772,7 @@ ngx_http_geoip_country(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (cf->args->nelts == 3) {
         if (ngx_strcmp(value[2].data, "utf8") == 0) {
-            GeoIP_set_charset (gcf->country, GEOIP_CHARSET_UTF8);
+            GeoIP_set_charset(gcf->country, GEOIP_CHARSET_UTF8);
 
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -875,7 +881,7 @@ ngx_http_geoip_org(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (cf->args->nelts == 3) {
         if (ngx_strcmp(value[2].data, "utf8") == 0) {
-            GeoIP_set_charset (gcf->org, GEOIP_CHARSET_UTF8);
+            GeoIP_set_charset(gcf->org, GEOIP_CHARSET_UTF8);
 
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -892,6 +898,16 @@ ngx_http_geoip_org(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     case GEOIP_ASNUM_EDITION:
 
         return NGX_CONF_OK;
+
+#if (NGX_HAVE_GEOIP_V6)
+    case GEOIP_ISP_EDITION_V6:
+    case GEOIP_ORG_EDITION_V6:
+    case GEOIP_DOMAIN_EDITION_V6:
+    case GEOIP_ASNUM_EDITION_V6:
+
+        gcf->org_v6 = 1;
+        return NGX_CONF_OK;
+#endif
 
     default:
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -926,7 +942,7 @@ ngx_http_geoip_city(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (cf->args->nelts == 3) {
         if (ngx_strcmp(value[2].data, "utf8") == 0) {
-            GeoIP_set_charset (gcf->city, GEOIP_CHARSET_UTF8);
+            GeoIP_set_charset(gcf->city, GEOIP_CHARSET_UTF8);
 
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,

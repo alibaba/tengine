@@ -663,6 +663,9 @@ ngx_http_dyups_exit_process(ngx_cycle_t *cycle)
 
     dumcf = ngx_http_cycle_get_module_main_conf(ngx_cycle,
                                                 ngx_http_dyups_module);
+    if (dumcf == NULL) {
+    	return;
+    }
 
     duscfs = dumcf->dy_upstreams.elts;
     for (i = 0; i < dumcf->dy_upstreams.nelts; i++) {

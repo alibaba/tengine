@@ -296,11 +296,13 @@ lua req cleanup
 --- abort
 --- wait: 0.7
 --- ignore_response
---- error_log
-client prematurely closed connection
-on abort called
-lua user thread aborted: runtime error: content_by_lua:4: attempt to abort with pending subrequests
-main handler done
+--- error_log eval
+[
+'client prematurely closed connection',
+'on abort called',
+qr/lua user thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):4: attempt to abort with pending subrequests/,
+'main handler done',
+]
 
 
 

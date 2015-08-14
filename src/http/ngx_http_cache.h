@@ -24,6 +24,10 @@
 #define NGX_HTTP_CACHE_SCARCE        8
 
 #define NGX_HTTP_CACHE_KEY_LEN       16
+#define NGX_HTTP_CACHE_ETAG_LEN      42
+#define NGX_HTTP_CACHE_VARY_LEN      42
+
+#define NGX_HTTP_CACHE_VERSION       3
 
 
 typedef struct {
@@ -53,6 +57,7 @@ typedef struct {
     time_t                           valid_sec;
     size_t                           body_start;
     off_t                            fs_size;
+    ngx_msec_t                       lock_time;
 } ngx_http_file_cache_node_t;
 
 
@@ -61,11 +66,16 @@ struct ngx_http_cache_s {
     ngx_array_t                      keys;
     uint32_t                         crc32;
     u_char                           key[NGX_HTTP_CACHE_KEY_LEN];
+    u_char                           main[NGX_HTTP_CACHE_KEY_LEN];
 
     ngx_file_uniq_t                  uniq;
     time_t                           valid_sec;
     time_t                           last_modified;
     time_t                           date;
+
+    ngx_str_t                        etag;
+    ngx_str_t                        vary;
+    u_char                           variant[NGX_HTTP_CACHE_KEY_LEN];
 
     size_t                           header_start;
     size_t                           body_start;
@@ -81,7 +91,13 @@ struct ngx_http_cache_s {
     ngx_http_file_cache_t           *file_cache;
     ngx_http_file_cache_node_t      *node;
 
+#if (NGX_THREADS)
+    ngx_thread_task_t               *thread_task;
+#endif
+
     ngx_msec_t                       lock_timeout;
+    ngx_msec_t                       lock_age;
+    ngx_msec_t                       lock_time;
     ngx_msec_t                       wait_time;
 
     ngx_event_t                      wait_event;
@@ -93,10 +109,13 @@ struct ngx_http_cache_s {
     unsigned                         updating:1;
     unsigned                         exists:1;
     unsigned                         temp_file:1;
+    unsigned                         reading:1;
+    unsigned                         secondary:1;
 };
 
 
 typedef struct {
+    ngx_uint_t                       version;
     time_t                           valid_sec;
     time_t                           last_modified;
     time_t                           date;
@@ -104,6 +123,11 @@ typedef struct {
     u_short                          valid_msec;
     u_short                          header_start;
     u_short                          body_start;
+    u_char                           etag_len;
+    u_char                           etag[NGX_HTTP_CACHE_ETAG_LEN];
+    u_char                           vary_len;
+    u_char                           vary[NGX_HTTP_CACHE_VARY_LEN];
+    u_char                           variant[NGX_HTTP_CACHE_KEY_LEN];
 } ngx_http_file_cache_header_t;
 
 
@@ -122,6 +146,7 @@ struct ngx_http_file_cache_s {
     ngx_slab_pool_t                 *shpool;
 
     ngx_path_t                      *path;
+    ngx_path_t                      *temp_path;
 
     off_t                            max_size;
     size_t                           bsize;
@@ -142,7 +167,7 @@ ngx_int_t ngx_http_file_cache_new(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_create(ngx_http_request_t *r);
 void ngx_http_file_cache_create_key(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_open(ngx_http_request_t *r);
-void ngx_http_file_cache_set_header(ngx_http_request_t *r, u_char *buf);
+ngx_int_t ngx_http_file_cache_set_header(ngx_http_request_t *r, u_char *buf);
 void ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf);
 void ngx_http_file_cache_update_header(ngx_http_request_t *r);
 ngx_int_t ngx_http_cache_send(ngx_http_request_t *);

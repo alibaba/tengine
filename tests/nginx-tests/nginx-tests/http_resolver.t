@@ -15,7 +15,7 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_end /;
 
 ###############################################################################
 
@@ -29,7 +29,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -64,6 +63,17 @@ http {
             proxy_pass  http://$http_x_name:8080/backend;
         }
         location /invalid {
+            resolver    127.0.0.1:8081;
+            proxy_pass  http://$host:8080/backend;
+        }
+        location /resend {
+            resolver    127.0.0.1:8081;
+            resolver_timeout 8s;
+            proxy_pass  http://$host:8080/backend;
+        }
+        location /bad {
+            resolver    127.0.0.1:8089;
+            resolver_timeout 1s;
             proxy_pass  http://$host:8080/backend;
         }
 
@@ -80,27 +90,28 @@ EOF
 
 $t->run_daemon(\&dns_daemon, 8081, $t);
 $t->run_daemon(\&dns_daemon, 8082, $t);
+$t->run_daemon(\&dns_daemon, 8089, $t);
 
-$t->run()->plan(30);
+$t->run()->plan(32);
 
 $t->waitforfile($t->testdir . '/8081');
 $t->waitforfile($t->testdir . '/8082');
+$t->waitforfile($t->testdir . '/8089');
 
 ###############################################################################
+
+# schedule resend test, which takes about 5 seconds to complete
+
+my $s = http_host_header('id.example.net', '/resend', start => 1);
 
 like(http_host_header('a.example.net', '/'), qr/200 OK/, 'A');
 
 # ensure that resolver serves queries from cache in a case-insensitive manner
 # we check this by marking 2nd and subsequent queries on backend with SERVFAIL
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.8');
-
 http_x_name_header('case.example.net', '/case');
 like(http_x_name_header('CASE.example.net', '/case'), qr/200 OK/,
 	'A case-insensitive');
-
-}
 
 like(http_host_header('awide.example.net', '/'), qr/200 OK/, 'A uncompressed');
 like(http_host_header('short.example.net', '/'), qr/502 Bad/,
@@ -205,9 +216,6 @@ sleep 2;
 like(http_host_header('ttl.example.net', '/valid'), qr/502 Bad/,
 	'valid expired');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.9');
-
 # Ensure that resolver respects expired CNAME in CNAME + A combined response.
 # When ttl in CNAME is expired, the answer should not be served from cache.
 # Catch this by returning SERVFAIL on the 2nd and subsequent queries.
@@ -219,15 +227,20 @@ sleep 2;
 like(http_host_header('cname_a_ttl2.example.net', '/'), qr/502 Bad/,
 	'CNAME + A with expired CNAME ttl');
 
-}
+like(http_host_header('example.net', '/invalid'), qr/502 Bad/, 'no resolver');
 
-like(http_host_header('invalid.example.net', '/invalid'), qr/502 Bad/, 'no resolver');
+like(http_end($s), qr/200 OK/, 'resend after malformed response');
 
+$s = http_get('/bad', start => 1);
+my $s2 = http_get('/bad', start => 1);
+
+http_end($s);
+ok(http_end($s2), 'timeout handler on 2nd request');
 ###############################################################################
 
 sub http_host_header {
-	my ($host, $uri) = @_;
-	return http(<<EOF);
+	my ($host, $uri, %extra) = @_;
+	return http(<<EOF, %extra);
 GET $uri HTTP/1.0
 Host: $host
 
@@ -287,6 +300,13 @@ sub reply_handler {
 	} elsif ($name eq 'case.example.net' && $type == A) {
 		if (++$state->{casecnt} > 1) {
 			$rcode = SERVFAIL;
+		}
+
+		push @rdata, rd_addr($ttl, '127.0.0.1');
+
+	} elsif ($name eq 'id.example.net' && $type == A) {
+		if (++$state->{idcnt} == 1) {
+			$id++;
 		}
 
 		push @rdata, rd_addr($ttl, '127.0.0.1');
@@ -445,6 +465,7 @@ sub dns_daemon {
 		cttl2cnt     => 0,
 		manycnt      => 0,
 		casecnt      => 0,
+		idcnt        => 0,
 	);
 
 	# signal we are ready
@@ -454,6 +475,7 @@ sub dns_daemon {
 
 	while (1) {
 		$socket->recv($recv_data, 65536);
+		next if $port == 8089;
 		$data = reply_handler($recv_data, $port, \%state);
 		$socket->send($data);
 	}
