@@ -171,6 +171,17 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
+#if (NGX_HAVE_REUSEPORT)
+
+    { ngx_string("reuse_port"),
+      NGX_EVENT_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      0,
+      offsetof(ngx_event_conf_t, reuse_port),
+      NULL },
+
+#endif
+
       ngx_null_command
 };
 
@@ -738,6 +749,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+#if (NGX_HAVE_REUSEPORT)
+        if (ls[i].reuseport && ls[i].worker != ngx_worker) {
+            continue;
+        }
+#endif
+
         c = ngx_get_connection(ls[i].fd, cycle->log);
 
         if (c == NULL) {
@@ -805,7 +822,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         } else {
             rev->handler = ngx_event_accept;
 
-            if (ngx_use_accept_mutex) {
+            if (ngx_use_accept_mutex
+#if (NGX_HAVE_REUSEPORT)
+                && !ls[i].reuseport
+#endif
+               ) 
+            {
                 continue;
             }
 
@@ -1174,6 +1196,10 @@ ngx_event_core_create_conf(ngx_cycle_t *cycle)
     ecf->accept_mutex_delay = NGX_CONF_UNSET_MSEC;
     ecf->name = (void *) NGX_CONF_UNSET;
 
+#if (NGX_HAVE_REUSEPORT)
+    ecf->reuse_port = NGX_CONF_UNSET;
+#endif
+
 #if (NGX_DEBUG)
 
     if (ngx_array_init(&ecf->debug_connection, cycle->pool, 4,
@@ -1286,8 +1312,12 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 1);
-    ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
+    ngx_conf_init_msec_value(ecf->accept_mutex_delay, 100);
 
+#if (NGX_HAVE_REUSEPORT)
+    ngx_conf_init_value(ecf->reuse_port, 0);
+
+#endif
 
 #if (NGX_HAVE_RTSIG)
 

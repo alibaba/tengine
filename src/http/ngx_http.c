@@ -1753,6 +1753,10 @@ ngx_http_init_listening(ngx_conf_t *cf, ngx_http_conf_port_t *port)
             break;
         }
 
+        if (ngx_clone_listening(cf, ls) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
         addr++;
         last--;
     }
@@ -1829,6 +1833,10 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
 
 #if (NGX_HAVE_TCP_FASTOPEN)
     ls->fastopen = addr->opt.fastopen;
+#endif
+
+#if (NGX_HAVE_REUSEPORT)
+    ls->reuseport = addr->opt.reuseport;
 #endif
 
     return ls;

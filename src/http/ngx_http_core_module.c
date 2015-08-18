@@ -4342,6 +4342,18 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     lsopt.ipv6only = 1;
 #endif
 
+#if (NGX_HAVE_REUSEPORT)
+    ngx_event_conf_t    *ecf;
+
+    ecf = ngx_event_get_conf(cf->cycle->conf_ctx, ngx_event_core_module);
+
+    if (ecf && ecf->reuse_port == 1) {
+        lsopt.reuseport = 1;
+        lsopt.set = 1;
+        lsopt.bind = 1;
+    }
+#endif
+
     (void) ngx_sock_ntop(&lsopt.u.sockaddr, lsopt.socklen, lsopt.addr,
                          NGX_SOCKADDR_STRLEN, 1);
 
@@ -4504,6 +4516,19 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                "on this platform");
             return NGX_CONF_ERROR;
 #endif
+        }
+
+        if (ngx_strcmp(value[n].data, "reuseport") == 0) {
+#if (NGX_HAVE_REUSEPORT)
+            lsopt.reuseport = 1;
+            lsopt.set = 1;
+            lsopt.bind = 1;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "reuseport is not supported "
+                               "on this platform, ignored");
+#endif
+            continue;
         }
 
         if (ngx_strcmp(value[n].data, "ssl") == 0) {
