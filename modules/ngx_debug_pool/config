@@ -1,0 +1,14 @@
+ngx_addon_name=ngx_http_debug_pool_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_debug_pool_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_debug_pool_module.c"
+
+# use ngx_debug_pool/ngx_palloc.* instead of src/core/ngx_palloc.*
+
+CORE_DEPS=`echo "$CORE_DEPS" | sed "s/[^ \n\t]*ngx_palloc.h//g"`
+CORE_DEPS="$CORE_DEPS $ngx_addon_dir/ngx_palloc.h"
+CORE_INCS="-I $ngx_addon_dir $CORE_INCS"
+
+CORE_SRCS=`echo "$CORE_SRCS" | sed "s/[^ \n\t]*ngx_palloc.c//g"`
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_palloc.c"
+
+have=NGX_DEBUG_POOL . auto/have
