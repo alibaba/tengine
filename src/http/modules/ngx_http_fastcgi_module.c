@@ -2629,10 +2629,41 @@ ngx_http_fastcgi_process_record(ngx_http_request_t *r,
     return NGX_AGAIN;
 }
 
+/* Construct and send real abort request */
+static ngx_int_t
+ngx_http_fastcgi_abort_request_real(ngx_http_request_t *r)
+{
+    ngx_buf_t *b;
+    ngx_http_fastcgi_header_t *h;
+    
+    b = ngx_create_temp_buf(r->pool, sizeof(ngx_http_fastcgi_header_t));
+    if (b == NULL) {
+        return NGX_ERROR;
+    }    
+
+    b->last = b->end;
+    h = (ngx_http_fastcgi_header_t *)b->pos;
+    h->version = 1; 
+    h->type = NGX_HTTP_FASTCGI_ABORT_REQUEST;;
+    h->request_id_hi = 0; 
+    h->request_id_lo = 1; 
+    h->content_length_hi = 0; 
+    h->content_length_lo = 0; 
+    h->padding_length = 0; 
+    h->reserved = 0; 
+    r->header_in = b; 
+
+    ngx_http_upstream_upgraded_write_upstream(r, r->upstream);
+
+    return NGX_OK;
+}
 
 static void
 ngx_http_fastcgi_abort_request(ngx_http_request_t *r)
 {
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "abort http fastcgi request start...");
+    ngx_http_fastcgi_abort_request_real(r);
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "abort http fastcgi request");
 
