@@ -567,7 +567,7 @@ do
         --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
                                                    HTTP_REQ_STATUS_SHARED=YES        ;;
 
-        --with-http_dyups_module)        HTTP_NODYNAMIC_UPSTREAM=YES  ;;
+        --with-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=YES  ;;
         --with-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=YES  ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
