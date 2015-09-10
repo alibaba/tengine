@@ -1171,6 +1171,7 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
 
     ngx_shmtx_lock(&shpool->mutex);
 
+#if 0
     for (i = 0; i < peers_shm->number; i++) {
 
         /* TODO: lock the peer mutex */
@@ -1188,6 +1189,7 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
             return i;
         }
     }
+#endif
 
     for (i = 0; i < peers_shm->number; i++) {
 
