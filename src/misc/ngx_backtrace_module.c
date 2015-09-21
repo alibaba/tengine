@@ -13,6 +13,14 @@
 #define NGX_BACKTRACE_DEFAULT_STACK_MAX_SIZE 30
 
 
+typedef struct {
+    int     signo;
+    char   *signame;
+    char   *name;
+    void  (*handler)(int signo);
+} ngx_signal_t;
+
+
 static char *ngx_backtrace_files(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static void ngx_error_signal_handler(int signo);
