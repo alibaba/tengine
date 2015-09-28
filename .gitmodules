@@ -1,0 +1,3 @@
+[submodule "modules/ngx_http_lua_module"]
+	path = modules/ngx_http_lua_module
+	url = https://github.com/openresty/lua-nginx-module.git
