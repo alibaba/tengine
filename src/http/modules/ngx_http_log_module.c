@@ -116,6 +116,10 @@ static u_char *ngx_http_log_msec(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static u_char *ngx_http_log_request_time(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
+static u_char *ngx_http_log_request_time_msec(ngx_http_request_t *r,
+    u_char *buf, ngx_http_log_op_t *op);
+static u_char *ngx_http_log_request_time_usec(ngx_http_request_t *r,
+    u_char *buf, ngx_http_log_op_t *op);
 static u_char *ngx_http_log_status(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static u_char *ngx_http_log_bytes_sent(ngx_http_request_t *r, u_char *buf,
@@ -226,6 +230,10 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
     { ngx_string("msec"), NGX_TIME_T_LEN + 4, ngx_http_log_msec },
     { ngx_string("request_time"), NGX_TIME_T_LEN + 4,
                           ngx_http_log_request_time },
+    { ngx_string("request_time_msec"), NGX_TIME_T_LEN,
+                          ngx_http_log_request_time_msec },
+    { ngx_string("request_time_usec"), NGX_TIME_T_LEN,
+                          ngx_http_log_request_time_usec },
     { ngx_string("status"), NGX_INT_T_LEN, ngx_http_log_status },
     { ngx_string("bytes_sent"), NGX_OFF_T_LEN, ngx_http_log_bytes_sent },
     { ngx_string("body_bytes_sent"), NGX_OFF_T_LEN,
@@ -843,6 +851,40 @@ ngx_http_log_request_time(ngx_http_request_t *r, u_char *buf,
     ms = ngx_max(ms, 0);
 
     return ngx_sprintf(buf, "%T.%03M", (time_t) ms / 1000, ms % 1000);
+}
+
+
+static u_char *
+ngx_http_log_request_time_msec(ngx_http_request_t *r, u_char *buf,
+    ngx_http_log_op_t *op)
+{
+    ngx_time_t      *tp;
+    ngx_msec_int_t   ms;
+
+    tp = ngx_timeofday();
+
+    ms = (ngx_msec_int_t)
+             ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+    ms = ngx_max(ms, 0);
+
+    return ngx_sprintf(buf, "%T", (time_t) ms);
+}
+
+
+static u_char *
+ngx_http_log_request_time_usec(ngx_http_request_t *r, u_char *buf,
+    ngx_http_log_op_t *op)
+{
+    struct timeval   tv;
+    ngx_usec_int_t   us;
+
+    ngx_gettimeofday(&tv);
+    us = (ngx_usec_int_t) (1000000 * (tv.tv_sec - r->start_sec)
+                + (tv.tv_usec - r->start_msec * 1000 - r->start_usec));
+
+    us = ngx_max(us, 0);
+
+    return ngx_sprintf(buf, "%T", (time_t) us);
 }
 
 
