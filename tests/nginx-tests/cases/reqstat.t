@@ -156,12 +156,12 @@ EOF
 
 #################################################################################
 
-$t->plan(46);
+$t->plan(52);
 $t->write_file_expand('nginx.conf', $cf_1);
 $t->write_file('B4', '1234567890');
 $t->write_file('BYPASS', '1234567890');
 $t->run();
-my $w=my_http_get('/B4', 'www.test_app_a.com', 3129);
+my $w = my_http_get('/B4', 'www.test_app_a.com', 3129);
 warn length $w;
 my $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 
@@ -189,7 +189,7 @@ $t->reload();
 sleep 2;
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 like($r, qr/242/, 'reload length check');
-my_http_get('/B4', 'www.test_app_a.com', 3129);
+$r = my_http_get('/B4', 'www.test_app_a.com', 3129);
 
 #3
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
@@ -221,7 +221,7 @@ my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
 
 #5
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/1,400\d,2,/, 'upstream');
+like($r, qr/1,400\d,2/, 'upstream');
 my $r1 = content(my_http_get('/usr1', 'www.test_cp.com', 3128));
 my $r2 = content(my_http_get('/usr2', 'www.test_cp.com', 3128));
 $r = substr($r1, length($r2), length($r1)-length($r2));
@@ -292,14 +292,17 @@ http {
 
     req_status_zone         test3   "$uri"   1M;
     req_status_zone_recycle test3   1  1;
-    req_status              test3;
 
     server {
         listen              3128;
         server_name         www.test_cp.com;
 
+        location / {
+            req_status      test3;
+        }
+
         location /usr {
-                req_status_show test3;
+            req_status_show test3;
         }
     }
 }
@@ -316,22 +319,27 @@ $t->stop;
 sleep(2);
 $t->run();
 
-for $i (0..1011) {
+for $i (0..1009) {
   my_http_get('/test' . $i, 'www.test_cp.com', 3128);
 }
 
+$r = my_http_get('/usr', 'www.test_cp.com', 3128);
+unlike($r, qr/test1008/, 'test1008 is dropped because any is not spare');
+unlike($r, qr/test1009/, 'test1009 is dropped because any is not spare');
+
 sleep 1;
 
-my_http_get('/test1012', 'www.test_cp.com', 3128);
-my_http_get('/test1011', 'www.test_cp.com', 3128);
+my_http_get('/test1007', 'www.test_cp.com', 3128);
+my_http_get('/test1008', 'www.test_cp.com', 3128);
 
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 
-like($r, qr/test1012/, 'test0 is recycled for test1012');
+unlike($r, qr/test0/, 'test0 is recycled');
+like($r, qr/test1008/, 'test0 is recycled for test1008');
 
-(my $l) = $r =~ /(.*test1011.*)/;
+(my $l) = $r =~ /(.*test1007.*)/;
 is (field_line($l, 4), 2, 'request count is 2 after recycle');
-($l) = $r =~ /(.*test1012.*)/;
+($l) = $r =~ /(.*test1008.*)/;
 is (field_line($l, 4), 1, 'request count is 1');
 
 $t->stop();
@@ -386,6 +394,123 @@ warn $r;
 my @lines = split(m/\s/s, $r);
 my @content = @lines[-5,-4];
 is ($content[0], $content[1], 'key cut');
+
+my $cf_5 = <<'EOF';
+
+%%TEST_GLOBALS%%
+
+worker_rlimit_core   10000M;
+
+http {
+
+    root %%TESTDIR%%;
+
+    req_status_zone server "$host,$server_addr:$server_port" 40M;
+    req_status_zone server1 "$server_port" 10M;
+
+    req_status_zone_add_indicator  server1 $root;
+
+    server {
+        listen              3128;
+        server_name         www.test_cp.com;
+
+        location /usr {
+                req_status_show server;
+        }
+
+        location /usr_1 {
+                req_status_show          server1;
+                req_status_show_field    req_total $root;
+        }
+    }
+
+    server {
+        listen              3130;
+        listen              3131;
+        location / {
+            rewrite_by_lua 'ngx.sleep(2);ngx.exit(500)';
+        }
+    }
+
+    upstream test {
+        server 127.0.0.1:3131 max_fails=0;
+        server 127.0.0.1:3130 max_fails=0;
+    }
+
+    server {
+        listen              127.0.0.1:3129;
+        server_name         www.test_app_a.com;
+        proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_next_upstream error timeout http_500;
+        proxy_intercept_errors on;
+
+        error_page 500 /B4;
+
+        set $root 0;
+        req_status      server1;
+
+        if ($uri = '/') {
+            set $root 1;
+        }
+
+        location /proxy/ {
+            req_status          server server1;
+            proxy_pass http://test/;
+        }
+
+        location /302/ {
+            return 302;
+        }
+    }
+
+    server {
+        listen              127.0.0.1:3129;
+        server_name         www.test_app_a1.com;
+    }
+
+    server {
+        listen              127.0.0.1:3127;
+        server_name         www.test_app_a2.com;
+        req_status          server;
+        rewrite  .   http://www.taobao.com;
+    }
+}
+
+events {
+    use     epoll;
+}
+
+EOF
+
+
+#---test error page----
+$t->write_file_expand('nginx.conf', $cf_5);
+#this time for error_page redirect
+$t->stop();
+sleep(2);
+$t->run();
+
+my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
+my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
+
+$r = my_http_get('/usr', 'www.test_cp.com', 3128);
+is (field($r, 9), 2, '5xx count is 2');
+
+$t->stop();
+sleep(2);
+$t->run();
+
+my_http_get('/proxy/B4', 'www.test_app_a2.com', 3127);
+my_http_get('/proxy/B4', 'www.test_app_a2.com', 3127);
+my_http_get('/', 'www.test_app_a.com', 3129);
+my_http_get('/', 'www.test_app_a.com', 3129);
+my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
+my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
+
+$r = my_http_get('/usr', 'www.test_cp.com', 3128);
+is (field($r, 7), 2, '3xx count is 2 when rewrite in server');
+$r = my_http_get('/usr_1', 'www.test_cp.com', 3128);
+like($r, qr/3129,4,2/, 'req_status_show_field and req_status_zone_add_indicator');
 
 $t->stop();
 

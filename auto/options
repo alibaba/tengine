@@ -90,7 +90,6 @@ NGX_ALL_MODULES="
     ngx_http_map_module
     ngx_http_split_clients_module
     ngx_http_user_agent_module
-    ngx_http_reqstat_module
     ngx_http_referer_module
     ngx_http_rewrite_module
     ngx_http_ssl_module

@@ -17,9 +17,15 @@ This module will help monitor running status of Tengine.
 
 * It shows all the results by default, and can be set to show part of them by specifying zones.
 
-* It support for user-defined status by using nginx variables. The maximum of all the status is 50.
+* It supports for user-defined status by using nginx variables. The maximum of all the status is 50.
 
 * It recycles out-of-date running status information.
+
+* It supports for defining output format.
+
+* It follows the request processing flow, so internal redirect will not affect monitoring.
+
+* Do not use variables of response as a condition, eg., $status.
 
 Compilation
 ===========
@@ -27,16 +33,27 @@ Compilation
 The module is compiled into Tengine by default. It can be disabled with '--without-http_reqstat_module'
 configuration parameter, or it can be compiled as a '.so' with '--with-http_reqstat_module=shared'.
 
+If you use this module as a '.so', please make sure it is after 'ngx_http_lua_module'. Please refer to
+'nginx -m'.
+
 
 Example
 ===========
 
-    http {
-        req_status_zone server "$host,$server_addr:$server_port" 10M;
+    req_status_zone server "$host,$server_addr:$server_port" 10M;
+    req_status_zone_add_indicator server $limit;
 
+    http {
         server {
             location /us {
                 req_status_show;
+                req_status_show_field req_total $limit;
+            }
+
+            set $limit 0;
+
+            if ($arg_limit = '1') {
+                set $limit 1;
             }
 
             req_status server;
@@ -45,46 +62,48 @@ Example
 
 * when you call '/us', you will get the results like this:
 
-            www.taobao.com,127.0.0.1:80,162,6242,1,1,1,0,0,0,0,10,1,10,1
+            www.example.com,127.0.0.1:80,162,6242,1,1,1,0,0,0,0,10,1,10,1....
 
     * Each line shows the status infomation of a "$host,$server_addr:$server_port".
 
-    * Line format:
+    * Default line format:
 
-            kv,bytes_in_total,bytes_out_total,conn_total,req_total,2xx,3xx,4xx,5xx,other,rt_total,upstream_req,upstream_rt,upstream_tries,200,206,302,304,403,404,416,499,500,502,503,504,508,detail_other,ups_4xx,ups_5xx
+            kv,bytes_in,bytes_out,conn_total,req_total,http_2xx,http_3xx,http_4xx,http_5xx,http_other_status,rt,ups_req,ups_rt,ups_tries,http_200,http_206,http_302,http_304,http_403,http_404,http_416,http_499,http_500,http_502,http_503,http_504,http_508,http_other_detail_status,http_ups_4xx,http_ups_5xx
 
-        * **kv**                value of the variable defined by the directive 'req_status_zone'. The maximun key length is configurable, 104B by default, and overlength will be cut off
-        * **bytes_in_total**    total number of bytes received from client
-        * **bytes_out_total**   total number of bytes sent to client
+        * **kv**                value of the variable defined by the directive 'req_status_zone'. The maximun key length is configurable, 152B by default, and overlength will be cut off
+        * **bytes_in**          total number of bytes received from client
+        * **bytes_out**         total number of bytes sent to client
         * **conn_total**        total number of accepted connections
         * **req_total**         total number of processed requests
-        * **2xx**               total number of 2xx requests
-        * **3xx**               total number of 3xx requests
-        * **4xx**               total number of 4xx requests
-        * **5xx**               total number of 5xx requests
-        * **other**             total number of other requests
-        * **rt_total**          accumulation or rt
-        * **upstream_req**      total number of requests calling for upstream
-        * **upstream_rt**       accumulation or upstream rt
-        * **upstream_tries**    total number of times calling for upstream
-        * **200**               total number of 200 requests
-        * **206**               total number of 206 requests
-        * **302**               total number of 302 requests
-        * **304**               total number of 304 requests
-        * **403**               total number of 403 requests
-        * **404**               total number of 404 requests
-        * **416**               total number of 416 requests
-        * **499**               total number of 499 requests
-        * **500**               total number of 500 requests
-        * **502**               total number of 502 requests
-        * **503**               total number of 503 requests
-        * **504**               total number of 504 requests
-        * **508**               total number of 508 requests
-        * **detail_other**      total number of requests of other status codes 
-        * **ups_4xx**           total number of requests of upstream 4xx
-        * **ups_5xx**           total number of requests of upstream 5xx
+        * **http_2xx**          total number of 2xx requests
+        * **http_3xx**          total number of 3xx requests
+        * **http_4xx**          total number of 4xx requests
+        * **http_5xx**          total number of 5xx requests
+        * **http_other_status** total number of other requests
+        * **rt**                accumulation or rt
+        * **ups_req**           total number of requests calling for upstream
+        * **ups_rt**            accumulation or upstream rt
+        * **ups_tries**         total number of times calling for upstream
+        * **http_200**          total number of 200 requests
+        * **http_206**          total number of 206 requests
+        * **http_302**          total number of 302 requests
+        * **http_304**          total number of 304 requests
+        * **http_403**          total number of 403 requests
+        * **http_404**          total number of 404 requests
+        * **http_416**          total number of 416 requests
+        * **http_499**          total number of 499 requests
+        * **http_500**          total number of 500 requests
+        * **http_502**          total number of 502 requests
+        * **http_503**          total number of 503 requests
+        * **http_504**          total number of 504 requests
+        * **http_508**          total number of 508 requests
+        * **http_other_detail_status**      total number of requests of other status codes 
+        * **http_ups_4xx**      total number of requests of upstream 4xx
+        * **http_ups_5xx**      total number of requests of upstream 5xx
 
-    * some fields will be removed in future, because user-defined status has been supported.
+    * You can use names in the left column to define output format, with directive 'req_status_show_field'
+
+    * Some fields will be removed in future, because user-defined status has been supported.
 
 * tsar can parse the result and monitor, see also https://github.com/alibaba/tsar
 
@@ -116,7 +135,7 @@ Example:
 req_status
 -------------------------
 
-**Syntax**: *req_status zone_name1 [zone_name2 [zone_name3]]*
+**Syntax**: *req_status zone_name1 [zone_name2 [zone_name3 [...]]]*
 
 **Default**: *none*
 
@@ -134,6 +153,19 @@ req_status_show
 **Context**: *loc*
 
 Display the status information. You can specify zones to display.
+
+
+req_status_show_field
+-------------------------------
+**Syntax**: *req_status_show_field field_name1 [field_name2 [field_name3 [...]]]*
+
+**Default**: *all the fields, including user defined fields*
+
+**Context**: *loc*
+
+Define output format, used with the directive 'req_status_show'. You can use names
+to define internal supported fields, see it above. And also you can use variables
+to define user defined fields. 'kv' is always the first field in a line.
 
 
 req_status_zone_add_indicator
@@ -169,6 +201,7 @@ req_status_zone_recycle
 
 **Context**: *main*
 
-Define the recycle threshold for a zone. Recycle will be switched on when the shared memory is exhausted, and will only take effect on imformation whose visit frequency is lower than the setting.
+Define the recycle threshold for a zone. Recycle will be switched on when the shared memory is exhausted,
+and will only take effect on imformation whose visit frequency is lower than the setting.
 The setting frequency is defined by 'times' and 'seconds', and it is 10r/min by default.
      req_status_zone_recycle demo_zone 10 60;
