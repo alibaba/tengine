@@ -31,10 +31,11 @@
 例子
 ===========
 
-    req_status_zone server "$host,$server_addr:$server_port" 10M;
-    req_status_zone_add_indicator server $limit;
-
     http {
+
+        req_status_zone server "$host,$server_addr:$server_port" 10M;
+        req_status_zone_add_indicator server $limit;
+
         server {
             location /us {
                 req_status_show;
@@ -126,7 +127,7 @@ req_status
 
 **Default**: *none*
 
-**Context**: *main、srv、loc*
+**Context**: *http、srv、loc*
 
 开启统计，可以指定同时统计多个目标，每一个zone_name对应一个目标。
 
@@ -162,7 +163,7 @@ req_status_zone_add_indicator
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 通过变量增加自定义字段，新增加的字段目前会展现在每行的末尾。
 
@@ -174,7 +175,7 @@ req_status_zone_key_length
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 定义某个共享内存块中key的最大长度，默认值104。key中超出的部分会被截断。
 
@@ -186,7 +187,7 @@ req_status_zone_recycle
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 定义某个共享内存块过期数据的回收。回收在共享内存耗尽时自动开启。只会回收访问频率低于设置值的监控数据。
 频率定义为 times / seconds，默认值为10r/min，即
