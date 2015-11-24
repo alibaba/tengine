@@ -1,3 +1,32 @@
+Changes with Tengine 2.1.1                                         12 Aug 2015
+
+    *) Feature: support for dynamic upstream update. (yzprofile)
+
+    *) Feature: enchanced ngx_http_reqstat_module. (cfsego)
+
+    *) Feature: added ssl_verify_client_exception directive. (InfoHunter)
+
+    *) Change:  Reduced memory usage while parsing configuration. (ilexshen)
+
+    *) Change:  added $trim_bytes and $trim_original_bytes. (taoyuanyuan)
+
+    *) Change:  upgrade debian package to 2.1.0 (PeterDaveHello)
+
+    *) Change:  support for auto compile for ngx_http_spdy_module. (chobits)
+
+    *) Change:  updated SPDY/3.1. (chobits)
+
+    *) Change:  disabled 'proxy_request_buffering' for SPDY. (chobits)
+
+    *) Change:  added configue options to support set linker. (tanguofu)
+
+    *) Bugfix:  fixed Backport bug of SPDY (nginx official, ym)
+
+    *) Bugfix:  fixed compile error with SSL. (ym)
+
+    *) Bugfix:  fixed bug of reuseport. (monadbobo)
+
+
 Changes with Tengine 2.1.0                                         19 Dec 2014
 
     *) Feature: support the SO_REUSEPORT option, to improve performance on

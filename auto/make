@@ -628,7 +628,7 @@ END
     cat << END                                            > $NGX_DSO_COMPILE
 #!/bin/sh
 
-# Copyright (C) 2010-2014 Alibaba Group Holding Limited
+# Copyright (C) 2010-2015 Alibaba Group Holding Limited
 
 
 ngx_soext='$NGX_SOEXT'

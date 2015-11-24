@@ -4,18 +4,27 @@
 #include <ngx_http.h>
 
 
-#define NGX_HTTP_REQSTAT_USI     29
-#define NGX_HTTP_REQSTAT_UMAX    50
-#define NGX_HTTP_REQSTAT_SLOT    NGX_HTTP_REQSTAT_UMAX - NGX_HTTP_REQSTAT_USI
+#define NGX_HTTP_REQSTAT_RSRV    29
+#define NGX_HTTP_REQSTAT_MAX     50
+#define NGX_HTTP_REQSTAT_USER    NGX_HTTP_REQSTAT_MAX - NGX_HTTP_REQSTAT_RSRV
 
+
+#define variable_index(str, index)  { ngx_string(str), index }
 
 typedef struct ngx_http_reqstat_rbnode_s ngx_http_reqstat_rbnode_t;
 
+typedef struct variable_index_s variable_index_t;
+
+struct variable_index_s {
+    ngx_str_t                    name;
+    ngx_int_t                    index;
+};
 
 struct ngx_http_reqstat_rbnode_s {
     u_char                       color;
     u_char                       padding[3];
     uint32_t                     len;
+
     ngx_queue_t                  queue;
     ngx_queue_t                  visit;
 
@@ -48,7 +57,7 @@ struct ngx_http_reqstat_rbnode_s {
     ngx_atomic_t                 ureq;
     ngx_atomic_t                 urt;
     ngx_atomic_t                 utries;
-    ngx_atomic_t                 extra[NGX_HTTP_REQSTAT_SLOT];
+    ngx_atomic_t                 extra[NGX_HTTP_REQSTAT_USER];
 
     ngx_atomic_int_t             excess;
 
@@ -62,6 +71,9 @@ typedef struct {
     ngx_array_t                 *monitor;
     ngx_array_t                 *display;
     ngx_array_t                 *bypass;
+    ngx_int_t                    index;
+    ngx_array_t                 *user_select;
+    ngx_array_t                 *user_defined_str;
 } ngx_http_reqstat_conf_t;
 
 
@@ -81,6 +93,7 @@ typedef struct {
     ngx_array_t                 *user_defined;
     ngx_int_t                    key_len;
     ngx_uint_t                   recycle_rate;
+    ngx_int_t                    alloc_already_fail;
 } ngx_http_reqstat_ctx_t;
 
 
@@ -89,6 +102,7 @@ typedef struct {
     ngx_uint_t                   sent;
     ngx_array_t                  monitor_index;
     ngx_flag_t                   bypass;
+    ngx_http_reqstat_conf_t     *conf;
 } ngx_http_reqstat_store_t;
 
 
@@ -186,5 +200,6 @@ typedef struct {
 #define NGX_HTTP_REQSTAT_REQ_FIELD(node, offset)                        \
     ((ngx_atomic_t *) ((char *) node + offset))
 
-ngx_http_reqstat_rbnode_t *ngx_http_reqstat_rbtree_lookup(
-    ngx_shm_zone_t *shm_zone, ngx_str_t *val);
+
+ngx_http_reqstat_rbnode_t *
+    ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val);
