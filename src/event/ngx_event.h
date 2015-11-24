@@ -27,14 +27,6 @@ typedef struct {
 #endif
 
 
-typedef struct {
-    ngx_uint_t       lock;
-
-    ngx_event_t     *events;
-    ngx_event_t     *last;
-} ngx_event_mutex_t;
-
-
 struct ngx_event_s {
     void            *data;
 
@@ -74,9 +66,7 @@ struct ngx_event_s {
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
     unsigned         pending_eof:1;
 
-#if !(NGX_THREADS)
-    unsigned         posted_ready:1;
-#endif
+    unsigned         posted:1;
 
 #if (NGX_WIN32)
     /* setsockopt(SO_UPDATE_ACCEPT_CONTEXT) was successful */
@@ -129,39 +119,16 @@ struct ngx_event_s {
 
     ngx_rbtree_node_t   timer;
 
+    /* the posted queue */
+    ngx_queue_t      queue;
+
     unsigned         closed:1;
 
     /* to test on worker exit */
     unsigned         channel:1;
     unsigned         resolver:1;
 
-#if (NGX_THREADS)
-
-    unsigned         locked:1;
-
-    unsigned         posted_ready:1;
-    unsigned         posted_timedout:1;
-    unsigned         posted_eof:1;
-
-#if (NGX_HAVE_KQUEUE)
-    /* the pending errno reported by kqueue */
-    int              posted_errno;
-#endif
-
-#if (NGX_HAVE_KQUEUE) || (NGX_HAVE_IOCP)
-    int              posted_available;
-#else
-    unsigned         posted_available:1;
-#endif
-
-    ngx_atomic_t    *lock;
-    ngx_atomic_t    *own_lock;
-
-#endif
-
-    /* the links of the posted queue */
-    ngx_event_t     *next;
-    ngx_event_t    **prev;
+    unsigned         cancelable:1;
 
 
 #if 0
@@ -193,21 +160,19 @@ struct ngx_event_aio_s {
     ngx_event_handler_pt       handler;
     ngx_file_t                *file;
 
+#if (NGX_HAVE_AIO_SENDFILE)
+    ssize_t                  (*preload_handler)(ngx_buf_t *file);
+#endif
+
     ngx_fd_t                   fd;
 
 #if (NGX_HAVE_EVENTFD)
     int64_t                    res;
-#if (NGX_TEST_BUILD_EPOLL)
-    ngx_err_t                  err;
-    size_t                     nbytes;
-#endif
-#else
-    ngx_err_t                  err;
-    size_t                     nbytes;
 #endif
 
-#if (NGX_HAVE_AIO_SENDFILE)
-    off_t                      last_offset;
+#if !(NGX_HAVE_EVENTFD) || (NGX_TEST_BUILD_EPOLL)
+    ngx_err_t                  err;
+    size_t                     nbytes;
 #endif
 
     ngx_aiocb_t                aiocb;
@@ -227,7 +192,8 @@ typedef struct {
     ngx_int_t  (*add_conn)(ngx_connection_t *c);
     ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
 
-    ngx_int_t  (*process_changes)(ngx_cycle_t *cycle, ngx_uint_t nowait);
+    ngx_int_t  (*notify)(ngx_event_handler_pt handler);
+
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
                    ngx_uint_t flags);
 
@@ -236,11 +202,8 @@ typedef struct {
 } ngx_event_actions_t;
 
 
-typedef ngx_int_t (*ngx_event_accept_filter_pt) (ngx_connection_t *c);
-
-
 extern ngx_event_actions_t   ngx_event_actions;
-extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
+
 
 /*
  * The event filter requires to read/write the whole data:
@@ -443,7 +406,6 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #endif
 
 
-#define ngx_process_changes  ngx_event_actions.process_changes
 #define ngx_process_events   ngx_event_actions.process_events
 #define ngx_done_events      ngx_event_actions.done
 
@@ -451,6 +413,8 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define ngx_del_event        ngx_event_actions.del
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
+
+#define ngx_notify           ngx_event_actions.notify
 
 #define ngx_add_timer        ngx_event_add_timer
 #define ngx_del_timer        ngx_event_del_timer
@@ -527,7 +491,6 @@ extern ngx_atomic_t  *ngx_stat_request_time;
 
 #define NGX_UPDATE_TIME         1
 #define NGX_POST_EVENTS         2
-#define NGX_POST_THREAD_EVENTS  4
 
 
 extern sig_atomic_t           ngx_event_timer_alarm;
@@ -561,16 +524,12 @@ u_char *ngx_acceptex_log_error(ngx_log_t *log, u_char *buf, size_t len);
 ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 
 
-void ngx_close_accepted_connection(ngx_connection_t *c);
-
-
 /* used in ngx_log_debugX() */
 #define ngx_event_ident(p)  ((ngx_connection_t *) (p))->fd
 
 
 #include <ngx_event_timer.h>
 #include <ngx_event_posted.h>
-#include <ngx_event_busy_lock.h>
 
 #if (NGX_WIN32)
 #include <ngx_iocp_module.h>

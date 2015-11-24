@@ -86,7 +86,7 @@ http {
 
     gzip on;
     gzip_http_version 1.0;
-   #gzip_clear_etag on;
+    gzip_clear_etag on;
 
     server {
         listen       127.0.0.1:8080;

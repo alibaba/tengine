@@ -51,6 +51,8 @@ struct ngx_listening_s {
     ngx_listening_t    *previous;
     ngx_connection_t   *connection;
 
+    ngx_uint_t          worker;
+
     unsigned            open:1;
     unsigned            remain:1;
     unsigned            ignore:1;
@@ -63,12 +65,12 @@ struct ngx_listening_s {
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
 
-#if (NGX_HAVE_REUSEPORT)
-    unsigned            reuse_port:1;
-#endif
-
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned            ipv6only:1;
+#endif
+#if (NGX_HAVE_REUSEPORT)
+    unsigned            reuseport:1;
+    unsigned            add_reuseport:1;
 #endif
     unsigned            keepalive:2;
 
@@ -186,19 +188,18 @@ struct ngx_connection_s {
 #endif
 
 #if (NGX_HAVE_AIO_SENDFILE)
-    unsigned            aio_sendfile:1;
     unsigned            busy_count:2;
-    ngx_buf_t          *busy_sendfile;
 #endif
 
 #if (NGX_THREADS)
-    ngx_atomic_t        lock;
+    ngx_thread_task_t  *sendfile_task;
 #endif
 };
 
 
 ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
     socklen_t socklen);
+ngx_int_t ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls);
 ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
 ngx_int_t ngx_open_listening_sockets(ngx_cycle_t *cycle);
 void ngx_configure_listening_sockets(ngx_cycle_t *cycle);

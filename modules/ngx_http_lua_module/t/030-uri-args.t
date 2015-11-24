@@ -655,7 +655,12 @@ args:
 --- request
 GET /lua
 --- response_body_like
-^args:(?:a=9&a=2&b=3|b=3&a=9&a=2)$
+(?x) ^args:
+    (?= .*? \b a=9 \b )  # 3 chars
+    (?= .*? \b a=2 \b )  # 3 chars
+    (?= .*? \b b=3 \b )  # 3 chars
+    (?= (?: [^&]+ & ){2} [^&]+ $ )  # requires exactly 2 &'s
+    (?= .{11} $ )  # requires for total 11 chars (exactly) in the string
 
 
 
@@ -700,8 +705,13 @@ args: foo=3
     }
 --- request
 GET /lua
---- response_body
-foo=3&bar=32&bar
+--- response_body_like
+(?x) ^
+    (?= .*? \b bar=32 \b )     # 6 chars
+    (?= .*? \b bar (?!=) \b )  # 3 chars
+    (?= .*? \b foo=3 \b )      # 5 chars
+    (?= (?: [^&]+ & ){2} [^&]+ $ )  # requires exactly 2 &'s
+    (?= .{16} $ )  # requires for total 16 chars (exactly) in the string
 --- no_error_log
 [error]
 
@@ -1129,7 +1139,12 @@ b = foo
         content_by_lua '
             local s = "f+f=bar&B=foo"
             args = ngx.decode_args(s)
+            local arr = {}
             for k, v in pairs(args) do
+                table.insert(arr, k)
+            end
+            table.sort(arr)
+            for i, k in ipairs(arr) do
                 ngx.say("key: ", k)
             end
             ngx.say("s = ", s)
@@ -1138,8 +1153,8 @@ b = foo
 --- request
 GET /lua
 --- response_body
-key: f f
 key: B
+key: f f
 s = f+f=bar&B=foo
 --- no_error_log
 [error]
@@ -1170,8 +1185,13 @@ s = f+f=bar&B=foo
             for _, command in pairs(commands) do
                 --command = ngx.unescape_uri(command)
                 local request_args = ngx.decode_args(command, 0)
-                for key, value in pairs(request_args) do
-                    ngx.say(key, ": ", value)
+                local arr = {}
+                for k, v in pairs(request_args) do
+                    table.insert(arr, k)
+                end
+                table.sort(arr)
+                for i, k in ipairs(arr) do
+                    ngx.say(k, ": ", request_args[k])
                 end
                 ngx.say(" ===============")
             end
@@ -1181,20 +1201,20 @@ s = f+f=bar&B=foo
 POST /t
 method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852||method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852||method=zadd&key=User%3A1227713%3Alikes%3Atwitters&arg1=1356514698&arg2=780984852
 --- response_body
-arg2: 780984852
-method: zadd
-key: User:1227713:likes:twitters
 arg1: 1356514698
+arg2: 780984852
+key: User:1227713:likes:twitters
+method: zadd
  ===============
-arg2: 780984852
-method: zadd
-key: User:1227713:likes:twitters
 arg1: 1356514698
+arg2: 780984852
+key: User:1227713:likes:twitters
+method: zadd
  ===============
-arg2: 780984852
-method: zadd
-key: User:1227713:likes:twitters
 arg1: 1356514698
+arg2: 780984852
+key: User:1227713:likes:twitters
+method: zadd
  ===============
 --- no_error_log
 [error]
@@ -1244,8 +1264,14 @@ rewrite or internal redirection cycle while processing "/jump"
     }
 --- request
 GET /lua
---- response_body
-foo=3&a=32&a&bar=5
+--- response_body_like
+(?x) ^
+    (?= .*? \b a=32 \b )       # 4 chars
+    (?= .*? \b a (?=&|$) \b )  # 1 chars
+    (?= .*? \b foo=3 \b )      # 5 chars
+    (?= .*? \b bar=5 \b )      # 5 chars
+    (?= (?: [^&]+ & ){3} [^&]+ $ )  # requires exactly 3 &'s
+    (?= .{18} $ )  # requires for total 18 chars (exactly) in the string
 --- no_error_log
 [error]
 
@@ -1262,8 +1288,13 @@ foo=3&a=32&a&bar=5
     }
 --- request
 GET /lua
---- response_body
-foo=3&a=32&bar=5
+--- response_body_like
+(?x) ^
+    (?= .*? \b a=32 \b )   # 4 chars
+    (?= .*? \b foo=3 \b )  # 5 chars
+    (?= .*? \b bar=5 \b )  # 5 chars
+    (?= (?: [^&]+ & ){2} [^&]+ $ )  # requires exactly 2 &'s
+    (?= .{16} $ )  # requires for total 16 chars (exactly) in the string
 --- no_error_log
 [error]
 
@@ -1280,8 +1311,13 @@ foo=3&a=32&bar=5
     }
 --- request
 GET /lua
---- response_body
-foo=3&a%20b=32&bar=5
+--- response_body_like
+(?x) ^
+    (?= .*? \b a%20b=32 \b )  # 8 chars
+    (?= .*? \b foo=3 \b )     # 5 chars
+    (?= .*? \b bar=5 \b )     # 5 chars
+    (?= (?: [^&]+ & ){2} [^&]+ $ )  # requires exactly 2 &'s
+    (?= .{20} $ )  # requires for total 20 chars (exactly) in the string
 --- no_error_log
 [error]
 
@@ -1298,8 +1334,14 @@ foo=3&a%20b=32&bar=5
     }
 --- request
 GET /lua
---- response_body
-foo=3&a%20b=32&a%20b&bar=5
+--- response_body_like
+(?x) ^
+    (?= .*? \b a%20b=32 \b )     # 8 chars
+    (?= .*? \b a%20b (?!=) \b )  # 5 chars
+    (?= .*? \b foo=3 \b )        # 5 chars
+    (?= .*? \b bar=5 \b )        # 5 chars
+    (?= (?: [^&]+ & ){3} [^&]+ $ )  # requires exactly 3 &'s
+    (?= .{26} $ )  # requires for total 26 chars (exactly) in the string
 --- no_error_log
 [error]
 
@@ -1320,8 +1362,14 @@ foo=3&a%20b=32&a%20b&bar=5
     }
 --- request
     GET /foo?world
---- response_body
-HTTP/1.0 a=3&b=5&b&b=6
+--- response_body_like
+(?x) ^HTTP/1.0 \s
+    (?= .*? \b a=3 \b )      # 3 chars
+    (?= .*? \b b=5 \b )      # 3 chars
+    (?= .*? \b b (?!=) \b )  # 1 chars
+    (?= .*? \b b=6 \b )      # 3 chars
+    (?= (?: [^&]+ & ){3} [^&]+ $ )  # requires exactly 3 &'s
+    (?= .{13} $ )  # requires for total 13 chars (exactly) in the string
 
 
 
@@ -1340,6 +1388,6 @@ HTTP/1.0 a=3&b=5&b&b=6
     }
 --- request
     GET /foo?world
---- response_body
-HTTP/1.0 a=3&b
+--- response_body_like
+^HTTP/1.0 (a=3&b|b&a=3)$
 

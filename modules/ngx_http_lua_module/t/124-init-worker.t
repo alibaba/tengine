@@ -578,7 +578,7 @@ second line received: Server: openresty
 timer created
 failed to connect: connection refused
 --- error_log eval
-qr/connect\(\) failed \(\d+: Connection refused\)/
+qr/connect\(\) failed \(\d+: Connection refused\), context: ngx\.timer$/
 
 
 
@@ -705,4 +705,38 @@ ok
 [error]
 [alert]
 [emerg]
+
+
+
+=== TEST 18: syslog error log
+--- http_config
+    #error_log syslog:server=127.0.0.1:12345 error;
+    init_worker_by_lua '
+        done = false
+        os.execute("sleep 0.1")
+        ngx.log(ngx.ERR, "Bad bad bad")
+        done = true
+    ';
+--- config
+    location /t {
+        content_by_lua '
+            while not done do
+                ngx.sleep(0.001)
+            end
+            ngx.say("ok")
+        ';
+    }
+--- log_level: error
+--- error_log_file: syslog:server=127.0.0.1:12345
+--- udp_listen: 12345
+--- udp_query eval: qr/Bad bad bad/
+--- udp_reply: hello
+--- wait: 0.1
+--- request
+    GET /t
+--- response_body
+ok
+--- error_log
+Bad bad bad
+--- skip_nginx: 4: < 1.7.1
 

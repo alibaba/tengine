@@ -28,10 +28,6 @@
 static ngx_http_output_header_filter_pt ngx_http_next_header_filter;
 
 
-/* light user data key for the "ngx" table in the Lua VM regsitry */
-static char ngx_http_lua_headerfilterby_ngx_key;
-
-
 /**
  * Set environment table for the given code closure.
  *
@@ -63,12 +59,6 @@ ngx_http_lua_header_filter_by_lua_env(lua_State *L, ngx_http_request_t *r)
      * of the script run.
      * */
     ngx_http_lua_create_new_globals_table(L, 0 /* narr */, 1 /* nrec */);
-
-    /*  {{{ initialize ngx.* namespace */
-    lua_pushlightuserdata(L, &ngx_http_lua_headerfilterby_ngx_key);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_setfield(L, -2, "ngx");
-    /*  }}} */
 
     /*  {{{ make new env inheriting main thread's globals table */
     lua_createtable(L, 0, 1 /* nrec */);   /* the metatable for the new env */
@@ -141,6 +131,11 @@ ngx_http_lua_header_filter_by_chunk(lua_State *L, ngx_http_request_t *r)
     dd("exited: %d, exit code: %d, old exit code: %d",
        (int) ctx->exited, (int) ctx->exit_code, (int) old_exit_code);
 
+#if 1
+    /*  clear Lua stack */
+    lua_settop(L, 0);
+#endif
+
     if (ctx->exited && ctx->exit_code != old_exit_code) {
         if (ctx->exit_code == NGX_ERROR) {
             return NGX_ERROR;
@@ -156,9 +151,6 @@ ngx_http_lua_header_filter_by_chunk(lua_State *L, ngx_http_request_t *r)
 
         return NGX_DECLINED;
     }
-
-    /*  clear Lua stack */
-    lua_settop(L, 0);
 
     return NGX_OK;
 }

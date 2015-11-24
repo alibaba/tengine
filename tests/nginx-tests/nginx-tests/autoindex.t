@@ -91,7 +91,7 @@ unlike($r, qr!href="test-colon:blah"!ms, 'colon not scheme');
 like($r, qr!test-long-0{37}\.\.&gt;!ms, 'long name');
 
 like($r, qr!href="test-escape-url-%25"!ms, 'escaped url');
-like($r, qr!href="test-escape-url2-%3f"!ms, 'escaped ? in url');
+like($r, qr!href="test-escape-url2-%3F"!ms, 'escaped ? in url');
 like($r, qr!test-escape-html-&lt;&gt;&amp;!ms, 'escaped html');
 like($r, qr!test-long-(&gt;){37}\.\.&gt;!ms, 'long escaped html');
 

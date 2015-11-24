@@ -136,9 +136,6 @@ static ngx_uint_t       ngx_procs_max_module;
 static ngx_cycle_t      ngx_procs_exit_cycle;
 static ngx_log_t        ngx_procs_exit_log;
 static ngx_open_file_t  ngx_procs_exit_log_file;
-#if (NGX_SYSLOG)
-static ngx_syslog_t     ngx_procs_exit_log_syslog;
-#endif
 
 
 static char *
@@ -759,13 +756,6 @@ ngx_procs_process_exit(ngx_cycle_t *cycle, ngx_proc_module_t *module)
 
     ngx_procs_exit_log = *ngx_cycle->log;
     ngx_procs_exit_log.file = &ngx_procs_exit_log_file;
-
-#if (NGX_SYSLOG)
-    if (ngx_procs_exit_log.syslog != NULL) {
-        ngx_procs_exit_log_syslog = *ngx_procs_exit_log.syslog;
-        ngx_procs_exit_log.syslog = &ngx_procs_exit_log_syslog;
-    }
-#endif
 
     ngx_procs_exit_cycle.log = &ngx_procs_exit_log;
     ngx_cycle = &ngx_procs_exit_cycle;

@@ -84,7 +84,7 @@ eval {
 };
 plan(skip_all => 'no proxy_cache_lock') if $@;
 
-$t->plan(19);
+$t->plan(15);
 $t->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
@@ -115,11 +115,10 @@ for my $i (1 .. 3) {
 	$sockets[$i] = http_start('/timeout');
 }
 
-for my $i (1 .. 3) {
-	like(http_end($sockets[$i]), qr/request $i/, 'lock timeout ' . $i);
-}
+like(http_end($sockets[1]), qr/request 1/, 'lock timeout - first');
 
-like(http_get('/timeout'), qr/request 3/, 'lock timeout - last cached');
+my $rest = http_end($sockets[2]);
+$rest .= http_end($sockets[3]);
 
 # no lock
 
@@ -127,10 +126,12 @@ for my $i (1 .. 3) {
 	$sockets[$i] = http_start('/nolock');
 }
 
-for my $i (1 .. 3) {
-	like(http_end($sockets[$i]), qr/request $i/, 'nolock  ' . $i);
-}
+like(http_end($sockets[1]), qr/request 1/, 'nolock - first');
 
+$rest = http_end($sockets[2]);
+$rest .= http_end($sockets[3]);
+
+like($rest, qr/request (2.*request 3|3.*request 2)/s, 'nolock - rest');
 like(http_get('/nolock'), qr/request 3/, 'nolock - last cached');
 
 ###############################################################################

@@ -13,7 +13,7 @@ our $StapScript = $t::StapThread::StapScript;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 8 + 76);
+plan tests => repeat_each() * (blocks() * 8 + 72);
 
 #no_diff();
 no_long_string();
@@ -69,7 +69,7 @@ timer prematurely expired: true
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])\d*, context: ngx\.timer/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])\d*, context: ngx\.timer, client: \d+\.\d+\.\d+\.\d+, server: 0\.0\.0\.0:\d+/,
 "lua ngx.timer expired",
 "http lua close fake http connection",
 "timer prematurely expired: false",
@@ -115,7 +115,7 @@ foo = nil
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -161,7 +161,7 @@ foo = 3
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -209,7 +209,7 @@ registered timer
 --- error_log eval
 [
 qr/\[lua\] .*? my lua timer handler/,
-qr/\[lua\] content_by_lua:\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -455,7 +455,7 @@ registered timer
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: 0(?:[^.]|\.00)/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0(?:[^.]|\.00)/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -588,7 +588,7 @@ hello world
 [
 "registered timer",
 qr/\[lua\] .*? my lua timer handler/,
-qr/\[lua\] log_by_lua:\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
+qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -1482,10 +1482,12 @@ registered timer
 [alert]
 [crit]
 
---- error_log
-lua ngx.timer expired
-http lua close fake http connection
-trace: [m][f][g]
+--- error_log eval
+[
+'lua ngx.timer expired',
+'http lua close fake http connection',
+qr/trace: \[m\]\[f\]\[g\], context: ngx\.timer, client: \d+\.\d+\.\d+\.\d+, server: 0\.0\.0\.0:\d+/,
+]
 
 
 
@@ -1929,10 +1931,12 @@ registered timer
 [crit]
 [error]
 
---- error_log
-1 lua_max_running_timers are not enough
-lua ngx.timer expired
-http lua close fake http connection
+--- error_log eval
+[
+qr/\[alert\] .*? 1 lua_max_running_timers are not enough/,
+"lua ngx.timer expired",
+"http lua close fake http connection",
+]
 
 
 
@@ -2112,7 +2116,7 @@ timer prematurely expired: true
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])\d*, context: ngx\.timer/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])\d*, context: ngx\.timer/,
 "lua ngx.timer expired",
 "http lua close fake http connection",
 "timer prematurely expired: false",
@@ -2155,10 +2159,40 @@ timer prematurely expired: true
 
 --- error_log eval
 [
-qr/\[lua\] content_by_lua:\d+: elapsed: .*?, context: ngx\.timer/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: .*?, context: ngx\.timer/,
 "lua ngx.timer expired",
 "http lua close fake http connection",
 "timer prematurely expired: false",
 "lua release ngx.ctx at ref ",
 ]
+
+
+
+=== TEST 32: syslog error log
+--- http_config
+    #error_log syslog:server=127.0.0.1:12345 error;
+--- config
+    location /t {
+        content_by_lua '
+            local function f()
+                ngx.log(ngx.ERR, "Bad bad bad")
+            end
+            ngx.timer.at(0, f)
+            ngx.sleep(0.001)
+            ngx.say("ok")
+        ';
+    }
+--- log_level: error
+--- error_log_file: syslog:server=127.0.0.1:12345
+--- udp_listen: 12345
+--- udp_query eval: qr/Bad bad bad/
+--- udp_reply: hello
+--- wait: 0.1
+--- request
+    GET /t
+--- response_body
+ok
+--- error_log
+Bad bad bad
+--- skip_nginx: 4: < 1.7.1
 

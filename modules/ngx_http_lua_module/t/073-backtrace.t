@@ -58,13 +58,15 @@ attempt to call global 'lua_concat'
 --- request
 GET /lua
 --- ignore_response
---- error_log
-lua entry thread aborted: runtime error: unknown reason
-stack traceback:
- in function 'error'
-: in function 'bar'
-:5: in function 'foo'
-:7: in function <content_by_lua:1>
+--- error_log eval
+[
+'lua entry thread aborted: runtime error: unknown reason',
+'stack traceback:',
+" in function 'error'",
+": in function 'bar'",
+":5: in function 'foo'",
+qr/:7: in function <content_by_lua\(nginx\.conf:\d+\):1>/,
+]
 
 
 

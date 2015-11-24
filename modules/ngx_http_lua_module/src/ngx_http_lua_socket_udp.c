@@ -1299,8 +1299,10 @@ ngx_http_lua_socket_udp_handler(ngx_event_t *ev)
     r = u->request;
     c = r->connection;
 
-    ctx = c->log->data;
-    ctx->current_request = r;
+    if (c->fd != -1) {  /* not a fake connection */
+        ctx = c->log->data;
+        ctx->current_request = r;
+    }
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "lua udp socket handler for \"%V?%V\", wev %d", &r->uri,
@@ -1397,17 +1399,6 @@ ngx_http_lua_udp_connect(ngx_udp_connection_t *uc)
     uc->connection = c;
 
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
-
-#if (NGX_THREADS)
-
-    /* TODO: lock event when call completion handler */
-
-    rev->lock = &c->lock;
-    wev->lock = &c->lock;
-    rev->own_lock = &c->lock;
-    wev->own_lock = &c->lock;
-
-#endif
 
 #if (NGX_HTTP_LUA_HAVE_SO_PASSCRED)
     if (uc->sockaddr->sa_family == AF_UNIX) {

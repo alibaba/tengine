@@ -29,6 +29,10 @@
 
 static ngx_inline ngx_int_t
     ngx_output_chain_as_is(ngx_output_chain_ctx_t *ctx, ngx_buf_t *buf);
+#if (NGX_HAVE_AIO_SENDFILE)
+static ngx_int_t ngx_output_chain_aio_setup(ngx_output_chain_ctx_t *ctx,
+    ngx_file_t *file);
+#endif
 static ngx_int_t ngx_output_chain_add_copy(ngx_pool_t *pool,
     ngx_chain_t **chain, ngx_chain_t *in);
 static ngx_int_t ngx_output_chain_align_file_buf(ngx_output_chain_ctx_t *ctx,
@@ -45,8 +49,12 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
     ngx_int_t     rc, last;
     ngx_chain_t  *cl, *out, **last_out;
 
-    if (ctx->in == NULL && ctx->busy == NULL) {
-
+    if (ctx->in == NULL && ctx->busy == NULL
+#if (NGX_HAVE_FILE_AIO || NGX_THREADS)
+        && !ctx->aio
+#endif
+       )
+    {
         /*
          * the short path for the case when the ctx->in and ctx->busy chains
          * are empty, the incoming chain is empty too or has the single buf
@@ -81,7 +89,7 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 
     for ( ;; ) {
 
-#if (NGX_HAVE_FILE_AIO)
+#if (NGX_HAVE_FILE_AIO || NGX_THREADS)
         if (ctx->aio) {
             return NGX_AGAIN;
         }
@@ -225,6 +233,13 @@ ngx_output_chain_as_is(ngx_output_chain_ctx_t *ctx, ngx_buf_t *buf)
         return 1;
     }
 
+#if (NGX_THREADS)
+    if (buf->in_file) {
+        buf->file->thread_handler = ctx->thread_handler;
+        buf->file->thread_ctx = ctx->filter_ctx;
+    }
+#endif
+
     if (buf->in_file && buf->file->directio) {
         return 0;
     }
@@ -248,6 +263,12 @@ ngx_output_chain_as_is(ngx_output_chain_ctx_t *ctx, ngx_buf_t *buf)
         buf->in_file = 0;
     }
 
+#if (NGX_HAVE_AIO_SENDFILE)
+    if (ctx->aio_preload && buf->in_file) {
+        (void) ngx_output_chain_aio_setup(ctx, buf->file);
+    }
+#endif
+
     if (ctx->need_in_memory && !ngx_buf_in_memory(buf)) {
         return 0;
     }
@@ -258,6 +279,28 @@ ngx_output_chain_as_is(ngx_output_chain_ctx_t *ctx, ngx_buf_t *buf)
 
     return 1;
 }
+
+
+#if (NGX_HAVE_AIO_SENDFILE)
+
+static ngx_int_t
+ngx_output_chain_aio_setup(ngx_output_chain_ctx_t *ctx, ngx_file_t *file)
+{
+    ngx_event_aio_t  *aio;
+
+    if (file->aio == NULL && ngx_file_aio_init(file, ctx->pool) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    aio = file->aio;
+
+    aio->data = ctx->filter_ctx;
+    aio->preload_handler = ctx->aio_preload;
+
+    return NGX_OK;
+}
+
+#endif
 
 
 static ngx_int_t
@@ -523,7 +566,6 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
 #endif
 
 #if (NGX_HAVE_FILE_AIO)
-
         if (ctx->aio_handler) {
             n = ngx_file_aio_read(src->file, dst->pos, (size_t) size,
                                   src->file_pos, ctx->pool);
@@ -532,15 +574,23 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
                 return NGX_AGAIN;
             }
 
-        } else {
+        } else
+#endif
+#if (NGX_THREADS)
+        if (src->file->thread_handler) {
+            n = ngx_thread_read(&ctx->thread_task, src->file, dst->pos,
+                                (size_t) size, src->file_pos, ctx->pool);
+            if (n == NGX_AGAIN) {
+                ctx->aio = 1;
+                return NGX_AGAIN;
+            }
+
+        } else
+#endif
+        {
             n = ngx_read_file(src->file, dst->pos, (size_t) size,
                               src->file_pos);
         }
-#else
-
-        n = ngx_read_file(src->file, dst->pos, (size_t) size, src->file_pos);
-
-#endif
 
 #if (NGX_HAVE_ALIGNED_DIRECTIO)
 
@@ -604,7 +654,7 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
     ngx_chain_writer_ctx_t *ctx = data;
 
     off_t              size;
-    ngx_chain_t       *cl, *ct;
+    ngx_chain_t       *cl, *ln, *chain;
     ngx_connection_t  *c;
 
     c = ctx->connection;
@@ -613,7 +663,23 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
 
 #if 1
         if (ngx_buf_size(in->buf) == 0 && !ngx_buf_special(in->buf)) {
+
+            ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, 0,
+                          "zero size buf in chain writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          in->buf->temporary,
+                          in->buf->recycled,
+                          in->buf->in_file,
+                          in->buf->start,
+                          in->buf->pos,
+                          in->buf->last,
+                          in->buf->file,
+                          in->buf->file_pos,
+                          in->buf->file_last);
+
             ngx_debug_point();
+
+            continue;
         }
 #endif
 
@@ -641,9 +707,24 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
 
 #if 1
         if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
-            ngx_debug_point();
-        }
 
+            ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, 0,
+                          "zero size buf in chain writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          cl->buf->temporary,
+                          cl->buf->recycled,
+                          cl->buf->in_file,
+                          cl->buf->start,
+                          cl->buf->pos,
+                          cl->buf->last,
+                          cl->buf->file,
+                          cl->buf->file_pos,
+                          cl->buf->file_last);
+
+            ngx_debug_point();
+
+            continue;
+        }
 #endif
 
         size += ngx_buf_size(cl->buf);
@@ -653,22 +734,22 @@ ngx_chain_writer(void *data, ngx_chain_t *in)
         return NGX_OK;
     }
 
-    cl = ctx->out;
-
-    ctx->out = c->send_chain(c, ctx->out, ctx->limit);
+    chain = c->send_chain(c, ctx->out, ctx->limit);
 
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
-                   "chain writer out: %p", ctx->out);
+                   "chain writer out: %p", chain);
 
-    if (ctx->out == NGX_CHAIN_ERROR) {
+    if (chain == NGX_CHAIN_ERROR) {
         return NGX_ERROR;
     }
 
-    while (cl != ctx->out) {
-        ct = cl->next;
-        ngx_free_chain(ctx->pool, cl);
-        cl = ct;
+    for (cl = ctx->out; cl && cl != chain; /* void */) {
+        ln = cl;
+        cl = cl->next;
+        ngx_free_chain(ctx->pool, ln);
     }
+
+    ctx->out = chain;
 
     if (ctx->out == NULL) {
         ctx->last = &ctx->out;

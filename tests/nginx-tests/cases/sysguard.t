@@ -69,6 +69,7 @@ http {
 
         location /free_limit {
             root %%TESTDIR%%;
+            #error_log %%TESTDIR%%/free_limit.log debug;
             sysguard_mem free=%%free2%%k action=/limit;
         }
 
@@ -92,6 +93,7 @@ http {
 
         location /mem_load_limit3  {
             root %%TESTDIR%%;
+            #error_log %%TESTDIR%%/error_mem_load_limit3.log debug;
             sysguard_load load=%%load2%% action=/limit;
             sysguard_mem free=%%free1%%k action=/limit;
         }
@@ -179,19 +181,29 @@ http {
 EOF
 
 
+my $pload = getload($t);
+warn "pload:".($pload);
 runload();
 my $load = getload($t);
+warn "load:".($load);
 
 my $load_less = $load - 4.0;
 if ($load_less lt 2) {
     $load_less = 0;
 }
+warn "load_less:".($load_less);
 
 my $load_up= $load + 4.0;
+warn "load_up:".($load_up);
 
 my $free = getfree($t);
+warn "free:".($free);
+
 my $free_less = $free - 100000;
+warn "free_less:".($free_less);
+
 my $free_up = $free + 100000;
+warn "free_up:".($free_up);
 
 $content =~ s/%%load1%%/$load_less/gmse;
 $content =~ s/%%load2%%/$load_up/gmse;
@@ -252,23 +264,40 @@ closeload();
 sub getload
 {
     my($t) = @_;
-    system("/usr/bin/uptime | awk  '{print \$11}' | awk -F ',' '{print \$1}' > $t->{_testdir}/uptime");
+    system("cat /proc/loadavg | awk  '{print \$1}' > $t->{_testdir}/uptime");
     open(FD, "$t->{_testdir}/uptime")||die("Can not open the file!$!n");
-    my @uptime=<FD>;
+    my $uptime=<FD>;
     close(FD);
 
-    return $uptime[0];
+    return $uptime;
 }
 
 sub getfree
 {
     my($t) = @_;
-    system("/usr/bin/free | grep Mem | awk '{print \$4 + \$6 + \$7}' > $t->{_testdir}/free");
-    open(FD, "$t->{_testdir}/free")||die("Can not open the file!$!n");
-    my @free=<FD>;
-    close(FD);
+    #system("/usr/bin/free | grep Mem | awk '{print \$4 + \$6 + \$7}' > $t->{_testdir}/free");
+    #
+open(my $meminfo, "/proc/meminfo") or die("Can't open proc meminfo");
+my $cache;
+my $buffer;
+my $memfree;
+while(my $line = <$meminfo>) {
+    if ($line =~ /^Cached:\s+(\d+)\skB$/) {
+        $cache = $1; 
+    } 
 
-    return $free[0];
+    if ($line =~ /^Buffers:\s+(\d+)\skB$/) {
+        $buffer = $1;
+    }
+
+    if ($line =~ /^MemFree:\s+(\d+)\skB$/) {
+        $memfree = $1;
+    }
+}
+#
+    my $freeall = $cache + $buffer + $memfree;
+
+    return $freeall;
 }
 
 sub while_thread
@@ -286,17 +315,17 @@ our @ths;
 sub runload
 {
     my $i = 0;
-    for ($i = 0; $i<=8; $i++) {
+    for ($i = 0; $i<=64; $i++) {
         $ths[$i] = threads->create( \&while_thread);
     }
 
-    sleep(10);
+    sleep(60);
 }
 
 sub closeload
 {
     my $i = 0;
-    for ($i = 0; $i<=8; $i++) {
+    for ($i = 0; $i<=64; $i++) {
         $ths[$i]->kill('KILL')->detach();
     }
 }

@@ -238,7 +238,7 @@ ngx_http_lua_ngx_escape_sql_str(u_char *dst, u_char *src, size_t size)
                     case '\n':
                     case '\r':
                     case '\t':
-                    case 26:  /* \z */
+                    case 26:  /* \Z */
                     case '\\':
                     case '\'':
                     case '"':
@@ -285,7 +285,7 @@ ngx_http_lua_ngx_escape_sql_str(u_char *dst, u_char *src, size_t size)
 
                 case 26:
                     *dst++ = '\\';
-                    *dst++ = 'z';
+                    *dst++ = 'Z';
                     break;
 
                 case '\\':
@@ -450,13 +450,68 @@ ngx_http_lua_ngx_decode_base64(lua_State *L)
 }
 
 
+static void
+ngx_http_lua_encode_base64(ngx_str_t *dst, ngx_str_t *src, int no_padding)
+{
+    u_char         *d, *s;
+    size_t          len;
+    static u_char   basis[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    len = src->len;
+    s = src->data;
+    d = dst->data;
+
+    while (len > 2) {
+        *d++ = basis[(s[0] >> 2) & 0x3f];
+        *d++ = basis[((s[0] & 3) << 4) | (s[1] >> 4)];
+        *d++ = basis[((s[1] & 0x0f) << 2) | (s[2] >> 6)];
+        *d++ = basis[s[2] & 0x3f];
+
+        s += 3;
+        len -= 3;
+    }
+
+    if (len) {
+        *d++ = basis[(s[0] >> 2) & 0x3f];
+
+        if (len == 1) {
+            *d++ = basis[(s[0] & 3) << 4];
+            if (!no_padding) {
+                *d++ = '=';
+            }
+
+        } else {
+            *d++ = basis[((s[0] & 3) << 4) | (s[1] >> 4)];
+            *d++ = basis[(s[1] & 0x0f) << 2];
+        }
+
+        if (!no_padding) {
+            *d++ = '=';
+        }
+    }
+
+    dst->len = d - dst->data;
+}
+
+
+static size_t
+ngx_http_lua_base64_encoded_length(size_t n, int no_padding)
+{
+    return no_padding ? (n * 8 + 5) / 6 : ngx_base64_encoded_length(n);
+}
+
+
 static int
 ngx_http_lua_ngx_encode_base64(lua_State *L)
 {
+    int                      n;
+    int                      no_padding = 0;
     ngx_str_t                p, src;
 
-    if (lua_gettop(L) != 1) {
-        return luaL_error(L, "expecting one argument");
+    n = lua_gettop(L);
+    if (n != 1 && n != 2) {
+        return luaL_error(L, "expecting one or two arguments");
     }
 
     if (lua_isnil(L, 1)) {
@@ -467,11 +522,17 @@ ngx_http_lua_ngx_encode_base64(lua_State *L)
         src.data = (u_char *) luaL_checklstring(L, 1, &src.len);
     }
 
-    p.len = ngx_base64_encoded_length(src.len);
+    if (n == 2) {
+        /* get the 2nd optional argument */
+        luaL_checktype(L, 2, LUA_TBOOLEAN);
+        no_padding = lua_toboolean(L, 2);
+    }
+
+    p.len = ngx_http_lua_base64_encoded_length(src.len, no_padding);
 
     p.data = lua_newuserdata(L, p.len);
 
-    ngx_encode_base64(&p, &src);
+    ngx_http_lua_encode_base64(&p, &src, no_padding);
 
     lua_pushlstring(L, (char *) p.data, p.len);
 
@@ -639,7 +700,8 @@ ngx_http_lua_ffi_sha1_bin(const u_char *src, size_t len, u_char *dst)
 
 
 size_t
-ngx_http_lua_ffi_encode_base64(const u_char *src, size_t slen, u_char *dst)
+ngx_http_lua_ffi_encode_base64(const u_char *src, size_t slen, u_char *dst,
+    int no_padding)
 {
     ngx_str_t      in, out;
 
@@ -648,7 +710,7 @@ ngx_http_lua_ffi_encode_base64(const u_char *src, size_t slen, u_char *dst)
 
     out.data = dst;
 
-    ngx_encode_base64(&out, &in);
+    ngx_http_lua_encode_base64(&out, &in, no_padding);
 
     return out.len;
 }

@@ -429,8 +429,12 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
             case 'N':
 #if (NGX_WIN32)
                 *buf++ = CR;
-#endif
+                if (buf < last) {
+                    *buf++ = LF;
+                }
+#else
                 *buf++ = LF;
+#endif
                 fmt++;
 
                 continue;
@@ -897,26 +901,28 @@ ngx_filename_cmp(u_char *s1, u_char *s2, size_t n)
 ngx_int_t
 ngx_atoi(u_char *line, size_t n)
 {
-    ngx_int_t  value;
+    ngx_int_t  value, cutoff, cutlim;
 
     if (n == 0) {
         return NGX_ERROR;
     }
+
+    cutoff = NGX_MAX_INT_T_VALUE / 10;
+    cutlim = NGX_MAX_INT_T_VALUE % 10;
 
     for (value = 0; n--; line++) {
         if (*line < '0' || *line > '9') {
             return NGX_ERROR;
         }
 
+        if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+            return NGX_ERROR;
+        }
+
         value = value * 10 + (*line - '0');
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
@@ -951,12 +957,15 @@ ngx_atoll(u_char *line, size_t n)
 ngx_int_t
 ngx_atofp(u_char *line, size_t n, size_t point)
 {
-    ngx_int_t   value;
+    ngx_int_t   value, cutoff, cutlim;
     ngx_uint_t  dot;
 
     if (n == 0) {
         return NGX_ERROR;
     }
+
+    cutoff = NGX_MAX_INT_T_VALUE / 10;
+    cutlim = NGX_MAX_INT_T_VALUE % 10;
 
     dot = 0;
 
@@ -979,98 +988,107 @@ ngx_atofp(u_char *line, size_t n, size_t point)
             return NGX_ERROR;
         }
 
+        if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+            return NGX_ERROR;
+        }
+
         value = value * 10 + (*line - '0');
         point -= dot;
     }
 
     while (point--) {
+        if (value > cutoff) {
+            return NGX_ERROR;
+        }
+
         value = value * 10;
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
 ssize_t
 ngx_atosz(u_char *line, size_t n)
 {
-    ssize_t  value;
+    ssize_t  value, cutoff, cutlim;
 
     if (n == 0) {
         return NGX_ERROR;
     }
+
+    cutoff = NGX_MAX_SIZE_T_VALUE / 10;
+    cutlim = NGX_MAX_SIZE_T_VALUE % 10;
 
     for (value = 0; n--; line++) {
         if (*line < '0' || *line > '9') {
             return NGX_ERROR;
         }
 
+        if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+            return NGX_ERROR;
+        }
+
         value = value * 10 + (*line - '0');
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
 off_t
 ngx_atoof(u_char *line, size_t n)
 {
-    off_t  value;
+    off_t  value, cutoff, cutlim;
 
     if (n == 0) {
         return NGX_ERROR;
     }
+
+    cutoff = NGX_MAX_OFF_T_VALUE / 10;
+    cutlim = NGX_MAX_OFF_T_VALUE % 10;
 
     for (value = 0; n--; line++) {
         if (*line < '0' || *line > '9') {
             return NGX_ERROR;
         }
 
+        if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+            return NGX_ERROR;
+        }
+
         value = value * 10 + (*line - '0');
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
 time_t
 ngx_atotm(u_char *line, size_t n)
 {
-    time_t  value;
+    time_t  value, cutoff, cutlim;
 
     if (n == 0) {
         return NGX_ERROR;
     }
+
+    cutoff = NGX_MAX_TIME_T_VALUE / 10;
+    cutlim = NGX_MAX_TIME_T_VALUE % 10;
 
     for (value = 0; n--; line++) {
         if (*line < '0' || *line > '9') {
             return NGX_ERROR;
         }
 
+        if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+            return NGX_ERROR;
+        }
+
         value = value * 10 + (*line - '0');
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
@@ -1078,13 +1096,19 @@ ngx_int_t
 ngx_hextoi(u_char *line, size_t n)
 {
     u_char     c, ch;
-    ngx_int_t  value;
+    ngx_int_t  value, cutoff;
 
     if (n == 0) {
         return NGX_ERROR;
     }
 
+    cutoff = NGX_MAX_INT_T_VALUE / 16;
+
     for (value = 0; n--; line++) {
+        if (value > cutoff) {
+            return NGX_ERROR;
+        }
+
         ch = *line;
 
         if (ch >= '0' && ch <= '9') {
@@ -1102,12 +1126,7 @@ ngx_hextoi(u_char *line, size_t n)
         return NGX_ERROR;
     }
 
-    if (value < 0) {
-        return NGX_ERROR;
-
-    } else {
-        return value;
-    }
+    return value;
 }
 
 
@@ -1171,7 +1190,9 @@ ngx_encode_base64_internal(ngx_str_t *dst, ngx_str_t *src, const u_char *basis,
 
         if (len == 1) {
             *d++ = basis[(s[0] & 3) << 4];
-            *d++ = '=';
+            if (padding) {
+                *d++ = '=';
+            }
 
         } else {
             *d++ = basis[((s[0] & 3) << 4) | (s[1] >> 4)];
@@ -1431,7 +1452,7 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
 {
     ngx_uint_t      n;
     uint32_t       *escape;
-    static u_char   hex[] = "0123456789abcdef";
+    static u_char   hex[] = "0123456789ABCDEF";
 
                     /* " ", "#", "%", "?", %00-%1F, %7F-%FF */
 
@@ -1553,30 +1574,10 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
         0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
     };
 
-                    /* NOT: " ", "-", ".", "_", "0"-"9", "A"-"Z", "a"-"z" */
-
-    static uint32_t   form[] = {
-        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
-
-                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
-        0xfc009ffe, /* 1111 1100 0000 0000  1001 1111 1111 1110 */
-
-                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
-        0x78000001, /* 0111 1000 0000 0000  0000 0000 0000 0001 */
-
-                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
-        0xf8000001, /* 1111 1000 0000 0000  0000 0000 0000 0001 */
-
-        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
-        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
-        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
-        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
-    };
-
                     /* mail_auth is the same as memcached */
 
     static uint32_t  *map[] =
-        { uri, args, uri_component, html, refresh, memcached, memcached, form };
+        { uri, args, uri_component, html, refresh, memcached, memcached };
 
 
     escape = map[type];
@@ -1606,14 +1607,7 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
             src++;
 
         } else {
-            if (type == NGX_ESCAPE_WWW_FORM
-                && *src == ' ')
-            {
-                src++;
-                *dst++ = '+';
-            } else {
-                *dst++ = *src++;
-            }
+            *dst++ = *src++;
         }
         size--;
     }
@@ -1644,13 +1638,6 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
 
         switch (state) {
         case sw_usual:
-            if (ch == '+'
-                && (type & NGX_UNESCAPE_WWW_FORM))
-            {
-                *d++ = ' ';
-                break;
-            }
-
             if (ch == '?'
                 && (type & (NGX_UNESCAPE_URI|NGX_UNESCAPE_REDIRECT)))
             {
@@ -1748,7 +1735,6 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
 
             /* the invalid quoted character */
 
-            *d++ = '%'; *d++ = *(s - 2); *d++ = *(s - 1);
             break;
         }
     }
@@ -1825,6 +1811,58 @@ ngx_escape_html(u_char *dst, u_char *src, size_t size)
             *dst++ = ch;
             break;
         }
+        size--;
+    }
+
+    return (uintptr_t) dst;
+}
+
+
+uintptr_t
+ngx_escape_json(u_char *dst, u_char *src, size_t size)
+{
+    u_char      ch;
+    ngx_uint_t  len;
+
+    if (dst == NULL) {
+        len = 0;
+
+        while (size) {
+            ch = *src++;
+
+            if (ch == '\\' || ch == '"') {
+                len++;
+
+            } else if (ch <= 0x1f) {
+                len += sizeof("\\u001F") - 2;
+            }
+
+            size--;
+        }
+
+        return (uintptr_t) len;
+    }
+
+    while (size) {
+        ch = *src++;
+
+        if (ch > 0x1f) {
+
+            if (ch == '\\' || ch == '"') {
+                *dst++ = '\\';
+            }
+
+            *dst++ = ch;
+
+        } else {
+            *dst++ = '\\'; *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
+            *dst++ = '0' + (ch >> 4);
+
+            ch &= 0xf;
+
+            *dst++ = (ch < 10) ? ('0' + ch) : ('A' + ch - 10);
+        }
+
         size--;
     }
 

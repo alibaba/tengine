@@ -1,9 +1,16 @@
 #!/usr/bin/perl
 
-# (C) Sergey Kandaurov
-# (C) Nginx, Inc.
+# (C) Maxim Dounin
 
-# Tests for haproxy protocol.
+# Tests for http proxy and prematurely closed connections.  Incomplete
+# responses shouldn't loose information about their incompleteness.
+
+# In particular, incomplete responses:
+#
+# - shouldn't be cached
+#
+# - if a response is sent using chunked transfer encoding,
+#   final chunk shouldn't be sent
 
 ###############################################################################
 
@@ -24,11 +31,11 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http access ipv6 realip/);
+my $t = Test::Nginx->new()->has(qw/http proxy cache sub shmem/)->plan(15);
 
-plan(skip_all => 'no PROXY support') unless $t->has_version('1.5.12');
+$t->todo_alerts() if $^O eq 'solaris';
 
-$t->write_file_expand('nginx.conf', <<'EOF')->plan(18);
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -40,104 +47,207 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    log_format pp '$remote_addr $request';
+    proxy_cache_path   %%TESTDIR%%/cache  levels=1:2
+                       keys_zone=one:1m;
 
     server {
-        listen       127.0.0.1:8080 proxy_protocol;
+        listen       127.0.0.1:8080 sndbuf=32k;
         server_name  localhost;
 
-        set_real_ip_from  127.0.0.1/32;
-        add_header X-IP $remote_addr;
-        add_header X-PP $proxy_protocol_addr;
+        location / {
+            sub_filter foo bar;
+            sub_filter_types *;
+            proxy_pass http://127.0.0.1:8081;
+        }
 
-        location /pp {
-            real_ip_header proxy_protocol;
-            error_page 404 =200 /t1;
-            access_log %%TESTDIR%%/pp.log pp;
+        location /un/ {
+            sub_filter foo bar;
+            sub_filter_types *;
+            proxy_pass http://127.0.0.1:8081/;
+            proxy_buffering off;
+        }
 
-            location /pp_4 {
-                deny 192.0.2.1/32;
-            }
-            location /pp_6 {
-                deny 2001:DB8::1/128;
-            }
+        location /cache/ {
+            proxy_pass http://127.0.0.1:8081/;
+            proxy_cache one;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /proxy/ {
+            sub_filter foo bar;
+            sub_filter_types *;
+            proxy_pass http://127.0.0.1:8080/local/;
+            proxy_buffer_size 1k;
+            proxy_buffers 4 1k;
+        }
+
+        location /local/ {
+            alias %%TESTDIR%%/;
         }
     }
 }
 
 EOF
 
-$t->write_file('t1', 'SEE-THIS');
-$t->run();
+$t->write_file('big.html', 'X' x (1024 * 1024) . 'finished');
+
+$t->run_daemon(\&http_daemon);
+$t->run()->waitforsocket('127.0.0.1:8081');
 
 ###############################################################################
 
-my $tcp4 = 'PROXY TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
-my $tcp6 = 'PROXY TCP6 2001:Db8::1 2001:Db8::2 1234 5678' . CRLF;
-my $unk1 = 'PROXY UNKNOWN' . CRLF;
-my $unk2 = 'PROXY UNKNOWN 1 2 3 4 5 6' . CRLF;
-my $r;
+http_get('/cache/length');
+like(http_get('/cache/length'), qr/MISS/, 'unfinished not cached');
 
-# no realip, just PROXY header parsing
+# chunked encoding has enough information to don't cache a response,
+# much like with Content-Length available
 
-$r = pp_get('/t1', $tcp4);
-like($r, qr/SEE-THIS/, 'tcp4 request');
-like($r, qr/X-PP: 192.0.2.1/, 'tcp4 proxy');
-unlike($r, qr/X-IP: 192.0.2.1/, 'tcp4 client');
+http_get('/cache/chunked');
+like(http_get('/cache/chunked'), qr/MISS/, 'unfinished chunked');
 
-$r = pp_get('/t1', $tcp6);
-like($r, qr/SEE-THIS/, 'tcp6 request');
-like($r, qr/X-PP: 2001:DB8::1/i, 'tcp6 proxy');
-unlike($r, qr/X-IP: 2001:DB8::1/i, 'tcp6 client');
+# make sure there is no final chunk in unfinished responses
 
-like(pp_get('/t1', $unk1), qr/SEE-THIS/, 'unknown request 1');
-like(pp_get('/t1', $unk2), qr/SEE-THIS/, 'unknown request 2');
+like(http_get_11('/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+	'length no final chunk');
+like(http_get_11('/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+	'chunked no final chunk');
 
-# realip
+# but there is final chunk in complete responses
 
-$r = pp_get('/pp', $tcp4);
-like($r, qr/SEE-THIS/, 'tcp4 request realip');
-like($r, qr/X-PP: 192.0.2.1/, 'tcp4 proxy realip');
-like($r, qr/X-IP: 192.0.2.1/, 'tcp4 client realip');
+like(http_get_11('/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+	'length final chunk');
+like(http_get_11('/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+	'chunked final chunk');
 
-$r = pp_get('/pp', $tcp6);
-like($r, qr/SEE-THIS/, 'tcp6 request realip');
-like($r, qr/X-PP: 2001:DB8::1/i, 'tcp6 proxy realip');
-like($r, qr/X-IP: 2001:DB8::1/i, 'tcp6 client realip');
+# the same with proxy_buffering set to off
 
-# access
+like(http_get_11('/un/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+	'unbuffered length no final chunk');
+like(http_get_11('/un/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+	'unbuffered chunked no final chunk');
 
-$r = pp_get('/pp_4', $tcp4);
-like($r, qr/403 Forbidden/, 'tcp4 access');
+like(http_get_11('/un/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+	'unbuffered length final chunk');
+like(http_get_11('/un/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+	'unbuffered chunked final chunk');
 
-$r = pp_get('/pp_6', $tcp6);
-like($r, qr/403 Forbidden/, 'tcp6 access');
+# big responses
 
-# client address in access.log
+like(http_get('/big', sleep => 0.1), qr/unfinished/s, 'big unfinished');
+like(http_get('/big/ok', sleep => 0.1), qr/finished/s, 'big finished');
+like(http_get('/un/big', sleep => 0.1), qr/unfinished/s, 'big unfinished un');
+like(http_get('/un/big/ok', sleep => 0.1), qr/finished/s, 'big finished un');
 
-$t->stop();
+# if disk buffering fails for some reason, there should be
+# no final chunk
 
-my $log;
-
-{
-	open LOG, $t->testdir() . '/pp.log'
-		or die("Can't open nginx access log file.\n");
-	local $/;
-	$log = <LOG>;
-	close LOG;
-}
-
-like($log, qr!^192\.0\.2\.1 GET /pp_4!m, 'tcp4 access log');
-like($log, qr!^2001:DB8::1 GET /pp_6!mi, 'tcp6 access log');
+chmod(0000, $t->testdir() . '/proxy_temp');
+like(http_get_11('/proxy/big.html', sleep => 0.5),
+	qr/X(?!.*\x0d\x0a?0\x0d\x0a?)|finished/s, 'no proxy temp');
 
 ###############################################################################
 
-sub pp_get {
-	my ($url, $proxy) = @_;
-	return http($proxy . <<EOF);
-GET $url HTTP/1.0
-Host: localhost
+sub http_get_11 {
+	my ($uri, %extra) = @_;
 
-EOF
+	return http(
+		"GET $uri HTTP/1.1" . CRLF .
+		"Connection: close" . CRLF .
+		"Host: localhost" . CRLF . CRLF,
+		%extra
+	);
 }
+
+###############################################################################
+
+sub http_daemon {
+	my $server = IO::Socket::INET->new(
+		Proto => 'tcp',
+		LocalAddr => '127.0.0.1:8081',
+		Listen => 5,
+		Reuse => 1
+	)
+		or die "Can't create listening socket: $!\n";
+
+	local $SIG{PIPE} = 'IGNORE';
+
+	while (my $client = $server->accept()) {
+		$client->autoflush(1);
+
+		my $headers = '';
+		my $uri = '';
+
+		while (<$client>) {
+			$headers .= $_;
+			last if (/^\x0d?\x0a?$/);
+		}
+
+		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
+
+		if ($uri eq '/length') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Content-Length: 100" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF .
+				"unfinished" . CRLF;
+
+		} elsif ($uri eq '/length/ok') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Content-Length: 10" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF .
+				"finished" . CRLF;
+
+		} elsif ($uri eq '/big') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Content-Length: 1000100" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF;
+			for (1 .. 10000) {
+				print $client ("X" x 98) . CRLF;
+			}
+			print $client "unfinished" . CRLF;
+
+		} elsif ($uri eq '/big/ok') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Content-Length: 1000010" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF;
+			for (1 .. 10000) {
+				print $client ("X" x 98) . CRLF;
+			}
+			print $client "finished" . CRLF;
+
+		} elsif ($uri eq '/chunked') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Transfer-Encoding: chunked" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF .
+				"ff" . CRLF .
+				"unfinished" . CRLF;
+
+		} elsif ($uri eq '/chunked/ok') {
+			print $client
+				"HTTP/1.1 200 OK" . CRLF .
+				"Transfer-Encoding: chunked" . CRLF .
+				"Cache-Control: max-age=300" . CRLF .
+				"Connection: close" . CRLF .
+				CRLF .
+				"a" . CRLF .
+				"finished" . CRLF .
+				CRLF . "0" . CRLF . CRLF;
+		}
+	}
+}
+
 ###############################################################################

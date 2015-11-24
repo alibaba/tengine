@@ -14,7 +14,7 @@
 #include "ngx_http_lua_util.h"
 
 
-static u_char * ngx_http_lua_log_init_worker_error(ngx_log_t *log,
+static u_char *ngx_http_lua_log_init_worker_error(ngx_log_t *log,
     u_char *buf, size_t len);
 
 
@@ -207,7 +207,7 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     ngx_destroy_pool(conf.temp_pool);
     conf.temp_pool = NULL;
 
-    c = ngx_http_lua_create_fake_connection();
+    c = ngx_http_lua_create_fake_connection(NULL);
     if (c == NULL) {
         goto failed;
     }
@@ -224,10 +224,28 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     r->loc_conf = http_ctx.loc_conf;
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+#if defined(nginx_version) && nginx_version >= 1003014
+
+#   if nginx_version >= 1009000
+
+    ngx_set_connection_log(r->connection, clcf->error_log);
+
+#   else
+
+    ngx_http_set_connection_log(r->connection, clcf->error_log);
+
+#   endif
+
+#else
+
     c->log->file = clcf->error_log->file;
+
     if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
         c->log->log_level = clcf->error_log->log_level;
     }
+
+#endif
 
     if (top_clcf->resolver) {
         clcf->resolver = top_clcf->resolver;
@@ -251,7 +269,6 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
 
     (void) lmcf->init_worker_handler(cycle->log, lmcf, lmcf->lua);
 
-    ngx_destroy_pool(r->pool);
     ngx_destroy_pool(c->pool);
     return NGX_OK;
 
@@ -259,10 +276,6 @@ failed:
 
     if (conf.temp_pool) {
         ngx_destroy_pool(conf.temp_pool);
-    }
-
-    if (r && r->pool) {
-        ngx_destroy_pool(r->pool);
     }
 
     if (c) {

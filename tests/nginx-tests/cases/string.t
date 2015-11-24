@@ -77,7 +77,7 @@ $t->run();
 
 like(http_get('/good'), qr/s%20elect/, 'good');
 like(http_get('/good1'), qr/s&elect/,  'good1');
-like(http_get('/invalid'), qr/s%elect/, 'invalid');
+like(http_get('/invalid'), qr/sect/, 'invalid');
 like(http_get('/invalid1'), qr/se%lect/, 'invalid1');
 
 ###############################################################################

@@ -14,6 +14,7 @@ NGX_PID_PATH=
 NGX_LOCK_PATH=
 NGX_USER=
 NGX_GROUP=
+NGX_BUILD=
 
 NGX_DSO_PATH=
 NGX_DSO_TOOL_PATH=
@@ -80,6 +81,7 @@ NGX_ALL_MODULES="
     ngx_http_index_module
     ngx_http_random_index_module
     ngx_http_auth_basic_module
+    ngx_http_auth_request_module
     ngx_http_access_module
     ngx_http_limit_conn_module
     ngx_http_limit_req_module
@@ -108,6 +110,7 @@ NGX_ALL_MODULES="
     ngx_http_slice_module
     ngx_http_concat_module
     ngx_http_tfs_module
+    ngx_http_upstream_hash_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
@@ -219,7 +222,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
-HTTP_AUTH_REQUEST=NO
+HTTP_AUTH_REQUEST=YES
 HTTP_USERID=YES
 HTTP_CONCAT=NO
 HTTP_AUTOINDEX=YES
@@ -251,6 +254,7 @@ HTTP_SLICE=NO
 HTTP_MP4=NO
 HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
+HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_TRIM=YES
@@ -305,6 +309,7 @@ HTTP_LIMIT_REQ_SHARED=NO
 HTTP_EMPTY_GIF_SHARED=NO
 HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
+HTTP_UPSTREAM_HASH_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
@@ -407,6 +412,7 @@ do
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
+        --build=*)                       NGX_BUILD="$value"         ;;
         --builddir=*)                              NGX_OBJS="$value"          ;;
 
         --enable-mods-shared=all)                  NGX_SHARED_ALL_MODULES=YES ;;
@@ -419,6 +425,7 @@ do
         --without-poll_module)                     EVENT_POLL=NONE            ;;
         --with-aio_module)                         EVENT_AIO=YES              ;;
 
+        #--with-threads)                            USE_THREADS=YES            ;;
         #--with-threads=*)                          USE_THREADS="$value"       ;;
         #--with-threads)                            USE_THREADS="pthreads"     ;;
 
@@ -541,6 +548,9 @@ do
                                                    HTTP_BROWSER=NO                   ;;
         --with-http_user_agent_module=shared)      HTTP_USER_AGENT_SHARED=YES
                                                    HTTP_USER_AGENT=NO                ;;
+        --with-http_upstream_hash_module=shared)
+                                                   HTTP_UPSTREAM_HASH_SHARED=YES
+                                                   HTTP_UPSTREAM_HASH=NO          ;;
         --with-http_upstream_ip_hash_module=shared)
                                                    HTTP_UPSTREAM_IP_HASH_SHARED=YES
                                                    HTTP_UPSTREAM_IP_HASH=NO          ;;
@@ -555,6 +565,9 @@ do
                                                    HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES ;;
         --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
                                                    HTTP_REQ_STATUS_SHARED=YES        ;;
+
+        --with-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=YES  ;;
+        --with-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=YES  ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO
                                          HTTP_CHARSET_SHARED=NO     ;;
@@ -610,6 +623,8 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_BROWSER_SHARED=NO     ;;
         --without-http_user_agent_module) HTTP_USER_AGENT=NO
                                           HTTP_USER_AGENT_SHARED=NO ;;
+        --without-http_upstream_hash_module) HTTP_UPSTREAM_HASH=NO
+                                                HTTP_UPSTREAM_HASH_SHARED=NO ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO
                                                 HTTP_UPSTREAM_IP_HASH_SHARED=NO ;;
         --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO ;;
@@ -625,8 +640,8 @@ use the \"--without-http_limit_conn_module\" option instead"
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
         --without-http_upstream_dynamic_module) HTTP_UPSTREAM_DYNAMIC=NO ;;
 
-        --with-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=YES  ;;
-        --with-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=YES  ;;
+        --without-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=NO  ;;
+        --without-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=NO  ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
         --with-perl_modules_path=*)      NGX_PERL_MODULES="$value"  ;;
@@ -736,6 +751,7 @@ cat << END
   --group=GROUP                      set non-privileged group for
                                      worker processes
 
+  --build=NAME                       set build name
   --builddir=DIR                     set build directory
 
   --enable-mods-shared=all           enable all the modules to be shared
@@ -826,6 +842,8 @@ cat << END
   --with-http_browser_module=shared  enable ngx_http_browser_module (shared)
   --with-http_user_agent_module=shared
                                      enable ngx_http_user_agent_module (shared)
+  --with-http_upstream_hash_module=shared
+                                     enable ngx_http_upstream_hash_module (shared)
   --with-http_upstream_ip_hash_module=shared
                                      enable ngx_http_upstream_ip_hash_module (shared)
   --with-http_upstream_least_conn_module=shared
@@ -870,6 +888,8 @@ cat << END
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_dynamic_module
                                      disable ngx_http_upstream_dynamic_module
+  --without-http_upstream_hash_module
+                                     disable ngx_http_upstream_hash_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_upstream_consistent_hash_module
@@ -879,6 +899,7 @@ cat << END
   --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_dyups_module           enable ngx_http_dyups_module
+  --with-http_dyups_lua_api          enable ngx_http_dyups_lua_api
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
@@ -1005,6 +1026,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF_SHARED=YES
     HTTP_BROWSER_SHARED=YES
     HTTP_USER_AGENT_SHARED=YES
+    HTTP_UPSTREAM_HASH_SHARED=YES
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
@@ -1042,12 +1064,14 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF=NO
     HTTP_BROWSER=NO
     HTTP_USER_AGENT=NO
+    HTTP_UPSTREAM_HASH=NO
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
     HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
+    HTTP_SPDY=YES
     HTTP_CACHE=YES
     HTTP_CHARSET=YES
     HTTP_GZIP=YES
@@ -1078,7 +1102,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UWSGI=YES
     HTTP_SCGI=YES
     HTTP_PERL=YES
-    HTTP_LUA=YES
     HTTP_MEMCACHED=YES
     HTTP_LIMIT_CONN=YES
     HTTP_LIMIT_REQ=YES
@@ -1092,6 +1115,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_MP4=YES
     HTTP_GZIP_STATIC=YES
     HTTP_GUNZIP=YES
+    HTTP_UPSTREAM_HASH=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
     HTTP_TRIM=YES
@@ -1102,6 +1126,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_KEEPALIVE=YES
     HTTP_UPSTREAM_DYNAMIC=YES
     HTTP_DYNAMIC_UPSTREAM=YES
+#    HTTP_DYNAMIC_UPSTREAM_LUA=NO
     HTTP_REQ_STATUS=YES
     HTTP_AUTH_REQUEST=YES
     MAIL=YES
@@ -1139,6 +1164,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF_SHARED=NO
     HTTP_BROWSER_SHARED=NO
     HTTP_USER_AGENT_SHARED=NO
+    HTTP_UPSTREAM_HASH_SHARED=NO
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO

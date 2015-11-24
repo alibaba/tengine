@@ -3426,7 +3426,7 @@ ngx_http_spdy_close_stream(ngx_http_spdy_stream_t *stream, ngx_int_t rc)
         ngx_del_timer(ev);
     }
 
-    if (ev->prev) {
+    if (ev->posted) {
         ngx_delete_posted_event(ev);
     }
 
@@ -3441,7 +3441,7 @@ ngx_http_spdy_close_stream(ngx_http_spdy_stream_t *stream, ngx_int_t rc)
         ngx_del_timer(ev);
     }
 
-    if (ev->prev) {
+    if (ev->posted) {
         ngx_delete_posted_event(ev);
     }
 

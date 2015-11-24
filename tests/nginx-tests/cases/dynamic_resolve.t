@@ -28,7 +28,7 @@ my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(5);
 my @server_addrs = ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4");
 my @domain_addrs = ("127.0.0.2");
 
-my $ipv6 = $t->has_module("ipv6") ? "ipv6=off" : "";
+#my $ipv6 = $t->has_module("ipv6") ? "ipv6=off" : "";
 
 $t->write_file_expand('nginx.conf', <<"EOF");
 
@@ -43,7 +43,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    resolver 127.0.0.1:53530 valid=1s $ipv6;
+    resolver 127.0.0.1:53530 valid=1s;
     resolver_timeout 1s;
 
     upstream backend {
@@ -90,7 +90,7 @@ http {
         server_name  localhost;
 
         location /static {
-            proxy_pass http://backend/;
+            proxy_pass http://backend;
         }
 
         location / {
@@ -124,9 +124,8 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/static'), qr/302/,
+like(http_get('/static'), qr/501/,
     'static resolved should be taobao\' IP addr');
-
 like(http_get('/'), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2');
 
@@ -238,6 +237,7 @@ sub reply_handler {
 
 sub dns_server_daemon {
     my $ns = new Net::DNS::Nameserver(
+        LocalAddr    => '127.0.0.1',
         LocalPort    => 53530,
         ReplyHandler => \&reply_handler,
         Verbose      => 0

@@ -38,6 +38,8 @@ static ngx_int_t ngx_http_clear_last_modified_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
 static ngx_int_t ngx_http_clear_content_length_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
+static ngx_int_t ngx_http_set_location_header(ngx_http_request_t *r,
+    ngx_http_lua_header_val_t *hv, ngx_str_t *value);
 
 
 static ngx_http_lua_set_header_t  ngx_http_lua_set_handlers[] = {
@@ -58,7 +60,7 @@ static ngx_http_lua_set_header_t  ngx_http_lua_set_handlers[] = {
 
     { ngx_string("Location"),
                  offsetof(ngx_http_headers_out_t, location),
-                 ngx_http_set_builtin_header },
+                 ngx_http_set_location_header },
 
     { ngx_string("Refresh"),
                  offsetof(ngx_http_headers_out_t, refresh),
@@ -231,6 +233,32 @@ new_header:
 
     if (output_header) {
         *output_header = h;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_set_location_header(ngx_http_request_t *r,
+    ngx_http_lua_header_val_t *hv, ngx_str_t *value)
+{
+    ngx_int_t         rc;
+    ngx_table_elt_t  *h;
+
+    rc = ngx_http_set_builtin_header(r, hv, value);
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    /*
+     * we do not set r->headers_out.location here to avoid the handling
+     * the local redirects without a host name by ngx_http_header_filter()
+     */
+
+    h = r->headers_out.location;
+    if (h && h->value.len && h->value.data[0] == '/') {
+        r->headers_out.location = NULL;
     }
 
     return NGX_OK;

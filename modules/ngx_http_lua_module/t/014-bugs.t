@@ -773,7 +773,7 @@ See more details here: http://mailman.nginx.org/pipermail/nginx-devel/2013-Janua
     location /t {
         set $myserver nginx.org;
         proxy_pass http://$myserver/;
-        resolver 127.0.0.1;
+        resolver 127.0.0.1:6789;
     }
 --- request
     GET /t
@@ -784,7 +784,7 @@ See more details here: http://mailman.nginx.org/pipermail/nginx-devel/2013-Janua
 --- no_error_log
 [alert]
 --- error_log eval
-qr/recv\(\) failed \(\d+: Connection refused\) while resolving/
+qr/(?:send|recv)\(\) failed \(\d+: Connection refused\) while resolving/
 
 
 
@@ -859,6 +859,7 @@ GET /t
 --- response_body_like: An example for a vimrc file
 --- no_error_log
 [error]
+--- timeout: 10
 
 
 

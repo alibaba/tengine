@@ -2088,8 +2088,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:7: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):7: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2146,8 +2147,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2204,8 +2206,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2262,8 +2265,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2320,8 +2324,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:14: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
+
 --- no_error_log
 [alert]
 
@@ -2381,8 +2386,9 @@ GET /main
 qr/^connected
 <html.*?500 Internal Server Error/ms
 
---- error_log
-runtime error: rewrite_by_lua:16: bad request
+--- error_log eval
+qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):16: bad request/
+
 --- no_error_log
 [alert]
 

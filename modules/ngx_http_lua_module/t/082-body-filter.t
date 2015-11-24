@@ -700,8 +700,10 @@ F(ngx_http_write_filter) {
     }
 }
 
---- stap_out eval
-("seen flush buf.\n" x 10) . "seen last buf.\n"
+--- stap_out_like eval
+qr/^(?:seen flush buf\.
+){10,}seen last buf\.
+$/
 
 --- stap2
 global active = 1

@@ -14,6 +14,10 @@
 #define NGX_CHASH_LESS                      -1
 #define NGX_CHASH_VIRTUAL_NODE_NUMBER       160
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+#include "ngx_http_upstream_check_module.h"
+#endif
+
 typedef struct {
     time_t                                  timeout;
     ngx_int_t                               id;

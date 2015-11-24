@@ -22,12 +22,10 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http limit_req/);
-
-plan(skip_all => 'not yet') unless $t->has_version('1.5.2');
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-$t->plan(25)->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->has(qw/http limit_req/)
+	->plan(25)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -39,7 +37,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    limit_req_zone $binary_remote_addr zone=one:10m rate=1r/m;
+    limit_req_zone $binary_remote_addr zone=one:1m rate=1r/m;
     limit_req zone=one;
 
     server {

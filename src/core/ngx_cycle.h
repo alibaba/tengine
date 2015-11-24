@@ -105,17 +105,20 @@ typedef struct {
      ngx_array_t              env;
      char                   **environment;
 
-#if (NGX_THREADS)
+#if (NGX_OLD_THREADS)
      ngx_int_t                worker_threads;
      size_t                   thread_stack_size;
 #endif
 
 } ngx_core_conf_t;
 
+#if (NGX_OLD_THREADS)
 
 typedef struct {
      ngx_pool_t              *pool;   /* pcre's malloc() pool */
 } ngx_core_tls_t;
+
+#endif
 
 
 #define ngx_is_init_cycle(cycle)  (cycle->conf_ctx == NULL)

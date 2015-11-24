@@ -11,13 +11,13 @@
 
 
 static ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle);
-static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle);
+static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all);
+static void ngx_close_accepted_connection(ngx_connection_t *c);
 
 
 void
 ngx_event_accept(ngx_event_t *ev)
 {
-    ngx_int_t          rc;
     socklen_t          socklen;
     ngx_err_t          err;
     ngx_log_t         *log;
@@ -112,7 +112,7 @@ ngx_event_accept(ngx_event_t *ev)
             }
 
             if (err == NGX_EMFILE || err == NGX_ENFILE) {
-                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle)
+                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1)
                     != NGX_OK)
                 {
                     return;
@@ -262,13 +262,6 @@ ngx_event_accept(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_handled, 1);
 #endif
 
-#if (NGX_THREADS)
-        rev->lock = &c->lock;
-        wev->lock = &c->lock;
-        rev->own_lock = &c->lock;
-        wev->own_lock = &c->lock;
-#endif
-
         if (ls->addr_ntop) {
             c->addr_text.data = ngx_pnalloc(c->pool, ls->addr_text_max_len);
             if (c->addr_text.data == NULL) {
@@ -288,9 +281,11 @@ ngx_event_accept(ngx_event_t *ev)
 #if (NGX_DEBUG)
         {
 
+        ngx_str_t             addr;
         struct sockaddr_in   *sin;
         ngx_cidr_t           *cidr;
         ngx_uint_t            i;
+        u_char                text[NGX_SOCKADDR_STRLEN];
 #if (NGX_HAVE_INET6)
         struct sockaddr_in6  *sin6;
         ngx_uint_t            n;
@@ -340,11 +335,17 @@ ngx_event_accept(ngx_event_t *ev)
             continue;
         }
 
+        if (log->log_level & NGX_LOG_DEBUG_EVENT) {
+            addr.data = text;
+            addr.len = ngx_sock_ntop(c->sockaddr, c->socklen, text,
+                                     NGX_SOCKADDR_STRLEN, 1);
+
+            ngx_log_debug3(NGX_LOG_DEBUG_EVENT, log, 0,
+                           "*%uA accept: %V fd:%d", c->number, &addr, s);
+        }
+
         }
 #endif
-
-        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, log, 0,
-                       "*%uA accept: %V fd:%d", c->number, &c->addr_text, s);
 
         if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
             if (ngx_add_conn(c) == NGX_ERROR) {
@@ -355,23 +356,6 @@ ngx_event_accept(ngx_event_t *ev)
 
         log->data = NULL;
         log->handler = NULL;
-
-        /* accept filter */
-
-        rc = ngx_event_top_accept_filter(c);
-
-        if (rc == NGX_ERROR) {
-            ngx_close_accepted_connection(c);
-            return;
-        }
-
-        if (rc == NGX_DECLINED) {
-            if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
-                ev->available--;
-            }
-
-            continue;
-        }
 
         ls->handler(c);
 
@@ -413,7 +397,7 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
                    "accept mutex lock failed: %ui", ngx_accept_mutex_held);
 
     if (ngx_accept_mutex_held) {
-        if (ngx_disable_accept_events(cycle) == NGX_ERROR) {
+        if (ngx_disable_accept_events(cycle, 0) == NGX_ERROR) {
             return NGX_ERROR;
         }
 
@@ -436,7 +420,7 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
 
         c = ls[i].connection;
 
-        if (c->read->active) {
+        if (c == NULL || c->read->active) {
             continue;
         }
 
@@ -458,7 +442,7 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
 
 
 static ngx_int_t
-ngx_disable_accept_events(ngx_cycle_t *cycle)
+ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
 {
     ngx_uint_t         i;
     ngx_listening_t   *ls;
@@ -469,9 +453,23 @@ ngx_disable_accept_events(ngx_cycle_t *cycle)
 
         c = ls[i].connection;
 
-        if (!c->read->active) {
+        if (c == NULL || !c->read->active) {
             continue;
         }
+
+#if (NGX_HAVE_REUSEPORT)
+
+        /*
+         * do not disable accept on worker's own sockets
+         * when disabling accept events due to accept mutex
+         */
+
+        if (ls[i].reuseport && !all) {
+            continue;
+        }
+
+#endif
+
 
         if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
             if (ngx_del_conn(c, NGX_DISABLE_EVENT) == NGX_ERROR) {
@@ -491,7 +489,7 @@ ngx_disable_accept_events(ngx_cycle_t *cycle)
 }
 
 
-void
+static void
 ngx_close_accepted_connection(ngx_connection_t *c)
 {
     ngx_socket_t  fd;
