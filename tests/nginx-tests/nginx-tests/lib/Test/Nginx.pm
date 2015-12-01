@@ -211,6 +211,14 @@ sub plan($) {
 	return $self;
 }
 
+sub todo_alerts() {
+	my ($self) = @_;
+
+	$self->{_alerts} = 0;
+
+	return $self;
+}
+
 sub run(;$) {
 	my ($self, $conf) = @_;
 
