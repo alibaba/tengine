@@ -99,7 +99,7 @@ static ngx_int_t ngx_http_upstream_keepalive_get_peer_in_slice(
     ngx_peer_connection_t *pc, ngx_http_upstream_keepalive_peer_data_t *kp);
 static ngx_int_t
     ngx_http_upstream_do_get_keepalive_peer(ngx_peer_connection_t *pc,
-    ngx_queue_t *free, ngx_queue_t *cache, off_t offset);
+    ngx_queue_t *cache, ngx_queue_t *free, off_t offset);
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t ngx_http_upstream_keepalive_set_session(
@@ -438,6 +438,7 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
 
     ngx_queue_init(&kcf->cache);
     ngx_queue_init(&kcf->free);
+    ngx_queue_init(&kcf->dummy);
 
     for (i = 0; i < kcf->max_cached; i++) {
         ngx_queue_insert_head(&kcf->free, &cached[i].queue);
@@ -637,7 +638,7 @@ ngx_http_upstream_keepalive_get_peer_in_slice(ngx_peer_connection_t *pc,
 /* DONE */
 static ngx_int_t
 ngx_http_upstream_do_get_keepalive_peer(ngx_peer_connection_t *pc,
-    ngx_queue_t *free, ngx_queue_t *cache, off_t offset)
+    ngx_queue_t *cache, ngx_queue_t *free, off_t offset)
 {
     ngx_queue_t       *q;
     ngx_connection_t  *c;
