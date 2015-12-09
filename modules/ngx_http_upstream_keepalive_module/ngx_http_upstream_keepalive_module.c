@@ -2,6 +2,8 @@
 /*
  * Copyright (C) cfsego
  * Copyright (C) 2010-2015 Alibaba Group Holding Limited
+ * Copyright (C) Maxim Dounin
+ * Copyright (C) Nginx, Inc.
  */
 
 
