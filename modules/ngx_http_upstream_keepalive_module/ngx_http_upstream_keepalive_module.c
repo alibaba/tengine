@@ -186,11 +186,11 @@ typedef struct {
 
 
 static ngx_http_upstream_keepalive_param keepalive_params[] = {
-    { ngx_string("slice_key"), ngx_http_upstream_keepalive_param_skey },
-    { ngx_string("slice_conn"), ngx_http_upstream_keepalive_param_sconn },
-    { ngx_string("slice_dyn"), ngx_http_upstream_keepalive_param_dyn },
+    { ngx_string("slice_poolsize"), ngx_http_upstream_keepalive_param_psize },
     { ngx_string("slice_keylen"), ngx_http_upstream_keepalive_param_klen },
-    { ngx_string("slice_poolsize"), ngx_http_upstream_keepalive_param_psize }
+    { ngx_string("slice_conn"), ngx_http_upstream_keepalive_param_sconn },
+    { ngx_string("slice_key"), ngx_http_upstream_keepalive_param_skey },
+    { ngx_string("slice_dyn"), ngx_http_upstream_keepalive_param_dyn }
 };
 
 
@@ -279,6 +279,11 @@ ngx_http_upstream_keepalive_param_dyn(ngx_conf_t *cf, void *conf,
     ngx_str_t *val)
 {
     ngx_http_upstream_keepalive_srv_conf_t  *kcf = conf;
+
+    if (val->data[0] == '$') {
+        val->data++;
+        val->len--;
+    }
 
     kcf->slice_var_index = ngx_http_get_variable_index(cf, val);
 
@@ -374,10 +379,15 @@ ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 if (keepalive_params[j].cb(cf, kcf, &tmp) != NGX_OK) {
                     goto invalid;
                 }
+
+                goto next;
             }
         }
 
         goto invalid;
+
+next:
+        continue;
     }
 
     if (kcf->slice_key && kcf->slice_var_index == NGX_CONF_UNSET
@@ -446,10 +456,18 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
     }
 
     if (kcf->slice_key) {
+        kcf->index = ngx_palloc(cf->pool, sizeof(ngx_rbtree_t));
+        if (kcf->index == NULL) {
+            return NGX_ERROR;
+        }
+
         sentinel = ngx_pcalloc(cf->pool, sizeof(ngx_rbtree_node_t));
         if (sentinel == NULL) {
             return NGX_ERROR;
         }
+
+        ngx_rbtree_init(kcf->index, sentinel,
+                        ngx_http_upstream_keepalive_insert_value);
 
         size = offsetof(ngx_rbtree_node_t, color)
              + offsetof(ngx_http_upstream_keepalive_node_t, data)
@@ -467,9 +485,6 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
                               (index + offsetof(ngx_rbtree_node_t, color));
             ngx_queue_insert_head(&kcf->index_pool, &node->index);
         }
-            
-        ngx_rbtree_init(kcf->index, sentinel,
-                        ngx_http_upstream_keepalive_insert_value);
     }
 
     cln = ngx_pool_cleanup_add(cf->pool, 0);
@@ -545,7 +560,14 @@ ngx_http_upstream_init_keepalive_peer(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
+        if (kp->key.len > kcf->max_key_length) {
+            kp->key.len = kcf->max_key_length;
+        }
+
         kp->hash = ngx_murmur_hash2(kp->key.data, kp->key.len);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "init keepalive slice \"%V\"", &kp->key);
     }
 
     kp->upstream = r->upstream;
@@ -618,6 +640,9 @@ ngx_http_upstream_keepalive_get_peer_in_slice(ngx_peer_connection_t *pc,
     ukn = ngx_http_upstream_keepalive_lookup(kp);
 
     if (ukn) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                   "getting connection in slice \"%V\"", &kp->key);
+
         rc = ngx_http_upstream_do_get_keepalive_peer(
                     pc,
                     &ukn->cache,
@@ -810,7 +835,7 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
                          ((u_char *) ukn - offsetof(ngx_rbtree_node_t, color));
 
             node->key = kp->hash;
-            ukn->len = ngx_min(kp->conf->max_key_length, kp->key.len);
+            ukn->len = kp->key.len;
             ngx_memcpy(ukn->data, kp->key.data, ukn->len);
             ngx_rbtree_insert(kp->conf->index, node);
             ngx_queue_init(&ukn->cache);
@@ -841,6 +866,10 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
     item->connection = c;
     ngx_queue_insert_head(&kp->conf->cache, q);
     if (ukn) {
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+                       "saving connection in slice \"%V\"", &kp->key);
+
         ngx_queue_insert_head(&ukn->cache, &item->index);
         ukn->count++;
         item->node = ukn;
