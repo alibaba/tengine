@@ -52,7 +52,7 @@ The buckets are allocated from the pool, and the 'slice_poolsize' is its size, 2
 For each key defined by 'slice_key', the module cuts them off if the key length greater than the length defined by 'slice_keylen'. The default length is 40, I think it is enough at most cases, and the size of each bucket is 128B, em, a good size.
 
 
-**Syntax**: *keepalive_time timeout*
+**Syntax**: *keepalive_timeout timeout*
 
 **Default**: *none*
 
