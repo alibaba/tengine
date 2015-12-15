@@ -5282,6 +5282,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         goto invalid;
     }
 
+    us->name = u.url;
     us->addrs = u.addrs;
     us->naddrs = u.naddrs;
     us->host = u.host;
