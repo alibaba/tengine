@@ -1,3 +1,23 @@
+Chnages with Tengine 2.1.2                                         31 Dec 2015
+
+    *) Feature: ngx_http_reqstat_module now will trace requests if
+       they are redirected internally by 'rewrite' or 'error_page'. (cfsego)
+
+    *) Feature: porting HTTP/2 from nginx v1.9.7, and support for spdy
+       fallback. (PeterDaveHello, cfsego)
+
+    *) Feature: added ngx_debug_pool module to check nginx memory. (chobits)
+
+    *) Feature: porting $upstream_cookie from nginx.
+
+    *) Bugfix: fixed merging the duplicate peers for ngx_http_dyups_module.
+       (FqqCS, taoyuanyuan)
+
+    *) Bugfix: lua-upstream-nginx-module cann't compile successfully. (cfsego)
+
+    *) Bugfix: fixed ngx_http_concat_module that took no effect on javascript.
+       (IYism)
+
 Changes with Tengine 2.1.1                                         12 Aug 2015
 
     *) Feature: support for dynamic upstream update. (yzprofile)
@@ -6,25 +26,25 @@ Changes with Tengine 2.1.1                                         12 Aug 2015
 
     *) Feature: added ssl_verify_client_exception directive. (InfoHunter)
 
-    *) Change:  Reduced memory usage while parsing configuration. (ilexshen)
+    *) Change: Reduced memory usage while parsing configuration. (ilexshen)
 
-    *) Change:  added $trim_bytes and $trim_original_bytes. (taoyuanyuan)
+    *) Change: added $trim_bytes and $trim_original_bytes. (taoyuanyuan)
 
-    *) Change:  upgrade debian package to 2.1.0 (PeterDaveHello)
+    *) Change: upgrade debian package to 2.1.0 (PeterDaveHello)
 
-    *) Change:  support for auto compile for ngx_http_spdy_module. (chobits)
+    *) Change: support for auto compile for ngx_http_spdy_module. (chobits)
 
-    *) Change:  updated SPDY/3.1. (chobits)
+    *) Change: updated SPDY/3.1. (chobits)
 
-    *) Change:  disabled 'proxy_request_buffering' for SPDY. (chobits)
+    *) Change: disabled 'proxy_request_buffering' for SPDY. (chobits)
 
-    *) Change:  added configue options to support set linker. (tanguofu)
+    *) Change: added configue options to support set linker. (tanguofu)
 
-    *) Bugfix:  fixed Backport bug of SPDY (nginx official, ym)
+    *) Bugfix: fixed Backport bug of SPDY (nginx official, ym)
 
-    *) Bugfix:  fixed compile error with SSL. (ym)
+    *) Bugfix: fixed compile error with SSL. (ym)
 
-    *) Bugfix:  fixed bug of reuseport. (monadbobo)
+    *) Bugfix: fixed bug of reuseport. (monadbobo)
 
 
 Changes with Tengine 2.1.0                                         19 Dec 2014
