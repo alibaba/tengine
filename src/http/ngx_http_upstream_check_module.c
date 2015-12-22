@@ -95,6 +95,8 @@ typedef struct {
     ngx_uint_t                               busyness;
     ngx_uint_t                               access_count;
 
+    ngx_uint_t                               checksum; 
+
     struct sockaddr                         *sockaddr;
     socklen_t                                socklen;
 
@@ -1171,7 +1173,6 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
 
     ngx_shmtx_lock(&shpool->mutex);
 
-#if 0
     for (i = 0; i < peers_shm->number; i++) {
 
         /* TODO: lock the peer mutex */
@@ -1181,15 +1182,16 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
 
         /* TODO: check the peer configure */
         /* Merge the duplicate peer */
-        if (peer_addr->socklen == peer_shm[i].socklen &&
-            ngx_memcmp(peer_addr->sockaddr, peer_shm[i].sockaddr,
-                       peer_addr->socklen) == 0) {
-
-            ngx_shmtx_unlock(&shpool->mutex);
-            return i;
+        /* check the peer configure by check_type and check_send */
+        if (peer_addr->socklen == peer_shm[i].socklen
+            && ngx_memcmp(peer_addr->sockaddr, peer_shm[i].sockaddr,
+                          peer_addr->socklen) == 0
+            && peer_shm[i].checksum
+               == ngx_murmur_hash2(ucscf->send.data, ucscf->send.len)) {
+                ngx_shmtx_unlock(&shpool->mutex);
+                return i;
         }
     }
-#endif
 
     for (i = 0; i < peers_shm->number; i++) {
 
@@ -1226,6 +1228,9 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
     if (rc != NGX_OK) {
         goto fail;
     }
+
+    /* Set tag to peer_shm */
+    peer_shm[index].checksum = ngx_murmur_hash2(ucscf->send.data, ucscf->send.len);
 
     ngx_shmtx_unlock(&shpool->mutex);
     return index;
