@@ -3758,6 +3758,23 @@ ngx_http_upstream_check_http_send(ngx_conf_t *cf, ngx_command_t *cmd,
 
     ucscf = ngx_http_conf_get_module_srv_conf(cf,
                                               ngx_http_upstream_check_module);
+    if (ucscf->check_type_conf == NGX_CONF_UNSET_PTR)
+    {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid check_http_send should set [check] first");
+        return NGX_CONF_ERROR;
+    }
+
+    if (value[1].len
+        && (ucscf->check_type_conf->name.len != 4
+            || ngx_strncmp(ucscf->check_type_conf->name.data,
+                           "http", 4) != 0))
+    {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid check_http_send for type \"%V\"",
+                           &ucscf->check_type_conf->name);
+        return NGX_CONF_ERROR;
+    }
 
     ucscf->send = value[1];
 
