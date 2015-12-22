@@ -9,7 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#if (NGX_HTTP_HTTP2)
+#if (NGX_HTTP_V2)
 #include <v2/ngx_http_v2_module.h>
 #endif
 
