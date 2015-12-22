@@ -118,6 +118,9 @@ typedef enum {
 #define NGX_SSL_BUFFERED       0x01
 #define NGX_SPDY_BUFFERED      0x02
 
+#if (NGX_HTTP_V2)
+#define NGX_HTTP_V2_BUFFERED   NGX_SPDY_BUFFERED
+#endif
 
 struct ngx_connection_s {
     void               *data;

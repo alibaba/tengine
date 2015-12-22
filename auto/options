@@ -209,6 +209,7 @@ HTTP_CHARSET=YES
 HTTP_GZIP=YES
 HTTP_SSL=YES
 HTTP_SPDY=NO
+HTTP_V2=NO
 HTTP_SSI=YES
 HTTP_POSTPONE=NO
 HTTP_REALIP=NO
@@ -407,6 +408,7 @@ do
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
+        --build=*)                                 NGX_BUILD="$value"         ;;
         --builddir=*)                              NGX_OBJS="$value"          ;;
 
         --enable-mods-shared=all)                  NGX_SHARED_ALL_MODULES=YES ;;
@@ -445,6 +447,7 @@ do
 
         --with-http_ssl_module)                    HTTP_SSL=YES                      ;;
         --with-http_spdy_module)                   HTTP_SPDY=YES                     ;;
+        --with-http_v2_module)                     HTTP_V2=YES                       ;;
         --with-http_realip_module)                 HTTP_REALIP=YES                   ;;
         --with-http_addition_module)               HTTP_ADDITION=YES
                                                    HTTP_ADDITION_SHARED=NO           ;;
@@ -762,6 +765,7 @@ cat << END
   --without-dso                      disable dso module load
 
   --with-http_spdy_module            enable ngx_http_spdy_module
+  --with-http_v2_module              enable ngx_http_v2_module
   --with-http_realip_module          enable ngx_http_realip_module
   --with-http_addition_module        enable ngx_http_addition_filter_module
   --with-http_xslt_module            enable ngx_http_xslt_filter_module
@@ -1048,6 +1052,8 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
+    HTTP_SPDY=YES
+    HTTP_V2=YES
     HTTP_CACHE=YES
     HTTP_CHARSET=YES
     HTTP_GZIP=YES

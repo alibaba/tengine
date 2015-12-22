@@ -20,6 +20,10 @@ typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 
+#if (NGX_HTTP_V2)
+typedef struct ngx_http_v2_stream_s   ngx_http_v2_stream_t;
+#endif
+
 #if (NGX_HTTP_SPDY)
 typedef struct ngx_http_spdy_stream_s  ngx_http_spdy_stream_t;
 #endif
@@ -39,6 +43,9 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_busy_lock.h>
 #include <ngx_http_core_module.h>
 
+#if (NGX_HTTP_V2)
+#include <ngx_http_v2.h>
+#endif
 #if (NGX_HTTP_SPDY)
 #include <ngx_http_spdy.h>
 #endif
@@ -104,6 +111,8 @@ ngx_int_t ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
 ngx_int_t ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_uint_t allow_underscores);
 ngx_int_t ngx_http_parse_multi_header_lines(ngx_array_t *headers,
+    ngx_str_t *name, ngx_str_t *value);
+ngx_int_t ngx_http_parse_set_cookie_lines(ngx_array_t *headers,
     ngx_str_t *name, ngx_str_t *value);
 ngx_int_t ngx_http_arg(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);

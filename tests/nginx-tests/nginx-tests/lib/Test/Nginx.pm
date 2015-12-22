@@ -203,6 +203,14 @@ sub try_run($$) {
 	return $self;
 }
 
+sub todo_alerts() {
+        my ($self) = @_;
+
+        $self->{_alerts} = 0;
+
+        return $self;
+}
+
 sub plan($) {
 	my ($self, $plan) = @_;
 

@@ -11,6 +11,13 @@
 
 #if NGX_HTTP_SPDY
 #include <ngx_http_spdy_module.h>
+#else
+#define NGX_SPDY_NPN_ADVERTISE
+#endif
+#if (NGX_HTTP_V2)
+#include <v2/ngx_http_v2_module.h>
+#else
+#define NGX_HTTP_V2_ALPN_ADVERTISE
 #endif
 
 typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
@@ -71,6 +78,14 @@ static ngx_conf_enum_t  ngx_http_ssl_verify[] = {
     { ngx_null_string, 0 }
 };
 
+
+static ngx_str_t ngx_http_ssl_advertise[] = {
+    ngx_string(NGX_HTTP_NPN_ADVERTISE),
+    ngx_string(NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE),
+    ngx_string(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE),
+    ngx_string(NGX_HTTP_V2_ALPN_ADVERTISE NGX_SPDY_NPN_ADVERTISE
+               NGX_HTTP_NPN_ADVERTISE)
+};
 
 static ngx_str_t ngx_http_ssl_unknown_server_name = ngx_string("unknown");
 
@@ -329,13 +344,11 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 {
     unsigned int            srvlen;
     unsigned char          *srv;
-#if (NGX_DEBUG)
     unsigned int            i;
-#endif
-#if (NGX_HTTP_SPDY)
+#if (NGX_HTTP_SPDY || NGX_HTTP_V2)
     ngx_http_connection_t  *hc;
 #endif
-#if (NGX_HTTP_SPDY || NGX_DEBUG)
+#if (NGX_HTTP_SPDY || NGX_HTTP_V2 || NGX_DEBUG)
     ngx_connection_t       *c;
 
     c = ngx_ssl_get_connection(ssl_conn);
@@ -348,19 +361,21 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
     }
 #endif
 
-#if (NGX_HTTP_SPDY)
+#if (NGX_HTTP_SPDY || NGX_HTTP_V2)
     hc = c->data;
-
-    if (hc->addr_conf->spdy) {
-        srv = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-        srvlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-
-    } else
 #endif
-    {
-        srv = (unsigned char *) NGX_HTTP_NPN_ADVERTISE;
-        srvlen = sizeof(NGX_HTTP_NPN_ADVERTISE) - 1;
-    }
+
+    i = 0;
+#if (NGX_HTTP_SPDY)
+    i = (hc->addr_conf->spdy) ? 2 : 0;
+#endif
+
+#if (NGX_HTTP_V2)
+    i = (hc->addr_conf->http2) ? i + 1 : i;
+#endif
+
+    srv = ngx_http_ssl_advertise[i].data;
+    srvlen = ngx_http_ssl_advertise[i].len;
 
     if (SSL_select_next_proto((unsigned char **) out, outlen, srv, srvlen,
                               in, inlen)
@@ -384,35 +399,36 @@ static int
 ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
     const unsigned char **out, unsigned int *outlen, void *arg)
 {
-#if (NGX_HTTP_SPDY || NGX_DEBUG)
+    ngx_uint_t   i = 0;
+
+#if (NGX_HTTP_SPDY || NGX_HTTP_V2 || NGX_DEBUG)
     ngx_connection_t  *c;
 
     c = ngx_ssl_get_connection(ssl_conn);
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "SSL NPN advertised");
 #endif
 
-#if (NGX_HTTP_SPDY)
-    {
+#if (NGX_HTTP_SPDY || NGX_HTTP_V2)
     ngx_http_connection_t  *hc;
 
     hc = c->data;
-
-    if (hc->addr_conf->spdy) {
-        *out = (unsigned char *) NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-        *outlen = sizeof(NGX_SPDY_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-
-        return SSL_TLSEXT_ERR_OK;
-    }
-    }
 #endif
 
-    *out = (unsigned char *) NGX_HTTP_NPN_ADVERTISE;
-    *outlen = sizeof(NGX_HTTP_NPN_ADVERTISE) - 1;
+#if (NGX_HTTP_SPDY)
+    i = (hc->addr_conf->spdy) ? 2 : 0;
+#endif
+
+#if (NGX_HTTP_V2)
+    i = (hc->addr_conf->http2) ? i + 1 : i;
+#endif
+
+#endif
+
+    *out = ngx_http_ssl_advertise[i].data;
+    *outlen = ngx_http_ssl_advertise[i].len;
 
     return SSL_TLSEXT_ERR_OK;
 }
-
-#endif
 
 
 static ngx_int_t

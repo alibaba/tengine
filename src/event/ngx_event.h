@@ -74,6 +74,8 @@ struct ngx_event_s {
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
     unsigned         pending_eof:1;
 
+    unsigned         posted:1;
+
 #if !(NGX_THREADS)
     unsigned         posted_ready:1;
 #endif
