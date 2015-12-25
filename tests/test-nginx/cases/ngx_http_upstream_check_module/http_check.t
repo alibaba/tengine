@@ -2,6 +2,7 @@
 
 use lib 'lib';
 use Test::Nginx::LWP;
+use Test::Nginx::Socket;
 
 plan tests => repeat_each(2) * 2 * blocks();
 
@@ -332,7 +333,7 @@ GET /
 --- config
     location / {
         set $test "/";
-        proxy_pass http://www.taobao.com$test;
+        proxy_pass http://127.0.0.1:1970$test;
     }
 
 --- request
@@ -538,3 +539,61 @@ GET /
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
+
+
+=== TEST 19: the http_check with type!=http and check_http_send configured
+--- http_config
+    upstream test{
+        server 127.0.0.1:1970;
+        check_keepalive_requests 10;
+        check interval=3000 rise=1 fall=1 timeout=1000 type=tcp;
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+--- request
+GET /
+--- must_die
+--- error_log: invalid check_http_send for type
+
+
+=== TEST 20: the http_check with check_http_send configured before check
+--- http_config
+    upstream test{
+        server 127.0.0.1:1970;
+        check_keepalive_requests 10;
+        check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
+        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check_http_expect_alive http_2xx http_3xx;
+    }
+
+    server {
+        listen 1970;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+--- config
+    location / {
+        proxy_pass http://test;
+    }
+--- request
+GET /
+--- must_die
+--- error_log: invalid check_http_send should set
