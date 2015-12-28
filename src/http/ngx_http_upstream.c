@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -10,6 +9,10 @@
 #include <ngx_http.h>
 #include <ngx_md5.h>
 
+
+#if (NGX_HTTP_UPSTREAM_RBTREE && NGX_DYUPS)
+#include <ngx_http_dyups.h>
+#endif
 
 #if (NGX_HTTP_CACHE)
 static ngx_int_t ngx_http_upstream_cache(ngx_http_request_t *r,
@@ -185,6 +188,16 @@ static void ngx_http_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
 static ngx_http_upstream_srv_conf_t *
 ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
     ngx_str_t *host);
+
+#if (NGX_DYUPS)
+static ngx_dyups_add_upstream_filter_pt ngx_dyups_add_upstream_next_filter;
+static ngx_int_t ngx_dyups_add_upstream_rbtree_filter(
+    ngx_http_upstream_main_conf_t *umcf, ngx_http_upstream_srv_conf_t *uscf);
+
+static ngx_dyups_del_upstream_filter_pt ngx_dyups_del_upstream_next_filter;
+static ngx_int_t ngx_dyups_del_upstream_rbtree_filter(
+    ngx_http_upstream_main_conf_t *umcf, ngx_http_upstream_srv_conf_t *uscf);
+#endif
 #endif
 
 ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
@@ -1536,7 +1549,7 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
         }
- 
+
         /* abbreviated SSL handshake may interact badly with Nagle */
 
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -1758,7 +1771,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     for (cl = u->request_bufs; cl; cl = cl->next) {
         cl->buf->pos = cl->buf->start;
-     
+
         /* there is at most one file */
 
         if (cl->buf->in_file) {
@@ -2535,7 +2548,7 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
             ngx_http_internal_redirect(r, &uri, &args);
         }
-       
+
         ngx_http_finalize_request(r, NGX_DONE);
         return NGX_DONE;
     }
@@ -3924,7 +3937,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
             return;
         }
 
-        if (u->peer.tries == 0 
+        if (u->peer.tries == 0
             || !(u->conf->next_upstream & ft_type)
             || (u->request_sent && r->request_body_no_buffering)
             || (timeout && ngx_current_msec - u->peer.start_time >= timeout))
@@ -5596,7 +5609,7 @@ invalid:
                        "invalid parameter \"%V\"", &value[i]);
 
     return NGX_CONF_ERROR;
- 
+
 not_supported:
 
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -6278,6 +6291,14 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
         return NGX_CONF_ERROR;
     }
 
+#if (NGX_HTTP_UPSTREAM_RBTREE && NGX_DYUPS)
+    ngx_dyups_add_upstream_next_filter = ngx_dyups_add_upstream_top_filter;
+    ngx_dyups_add_upstream_top_filter = ngx_dyups_add_upstream_rbtree_filter;
+
+    ngx_dyups_del_upstream_next_filter = ngx_dyups_del_upstream_top_filter;
+    ngx_dyups_del_upstream_top_filter = ngx_dyups_del_upstream_rbtree_filter;
+#endif
+
     return NGX_CONF_OK;
 }
 
@@ -6325,3 +6346,24 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 
     return NGX_OK;
 }
+
+
+#if (NGX_HTTP_UPSTREAM_RBTREE && NGX_DYUPS)
+static ngx_int_t
+ngx_dyups_add_upstream_rbtree_filter(ngx_http_upstream_main_conf_t *umcf,
+    ngx_http_upstream_srv_conf_t *uscf)
+{
+    uscf->node.key = ngx_crc32_short(uscf->host.data, uscf->host.len);
+    ngx_rbtree_insert(&umcf->rbtree, &uscf->node);
+    return ngx_dyups_add_upstream_next_filter(umcf, uscf);
+}
+
+
+static ngx_int_t
+ngx_dyups_del_upstream_rbtree_filter(ngx_http_upstream_main_conf_t *umcf,
+    ngx_http_upstream_srv_conf_t *uscf)
+{
+    ngx_rbtree_delete(&umcf->rbtree, &uscf->node);
+    return ngx_dyups_del_upstream_next_filter(umcf, uscf);
+}
+#endif

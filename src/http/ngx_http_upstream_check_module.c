@@ -22,6 +22,10 @@ typedef struct ngx_http_upstream_check_srv_conf_s
 #error "ngx_http_upstream_check_module needs structure packing pragma support"
 #endif
 
+#if (NGX_DYUPS)
+#include <ngx_http_dyups.h>
+#endif
+
 typedef struct {
     u_char                                   major;
     u_char                                   minor;
@@ -362,6 +366,12 @@ static ngx_http_fastcgi_request_start_t  ngx_http_fastcgi_request_start = {
 #define PEER_NORMAL   0x00
 #define PEER_DELETING 0x01
 #define PEER_DELETED  0x02
+
+#if (NGX_DYUPS)
+static ngx_dyups_del_upstream_filter_pt ngx_dyups_del_upstream_next_filter;
+static ngx_int_t ngx_dyups_del_upstream_check_filter(
+    ngx_http_upstream_main_conf_t *umcf, ngx_http_upstream_srv_conf_t *uscf);
+#endif
 
 
 static ngx_uint_t ngx_http_upstream_check_add_dynamic_peer_shm(
@@ -4115,6 +4125,11 @@ ngx_http_upstream_check_init_main_conf(ngx_conf_t *cf, void *conf)
         }
     }
 
+#if (NGX_DYUPS)
+    ngx_dyups_del_upstream_next_filter = ngx_dyups_del_upstream_top_filter;
+    ngx_dyups_del_upstream_top_filter = ngx_dyups_del_upstream_check_filter;
+#endif
+
     return ngx_http_upstream_check_init_shm(cf, conf);
 }
 
@@ -4586,3 +4601,24 @@ ngx_http_upstream_check_init_process(ngx_cycle_t *cycle)
 {
     return ngx_http_upstream_check_add_timers(cycle);
 }
+
+
+#if (NGX_DYUPS)
+static ngx_int_t
+ngx_dyups_del_upstream_check_filter(
+    ngx_http_upstream_main_conf_t *umcf, ngx_http_upstream_srv_conf_t *uscf)
+{
+    ngx_uint_t                  i;
+    ngx_http_upstream_server_t  *us;
+
+    us = uscf->servers->elts;
+    for (i = 0; i < uscf->servers->nelts; i++) {
+        if (us[i].addrs) {
+            ngx_http_upstream_check_delete_dynamic_peer(&uscf->host,
+                                                        us[i].addrs);
+        }
+    }
+
+    return ngx_dyups_del_upstream_next_filter(umcf, uscf);
+}
+#endif
