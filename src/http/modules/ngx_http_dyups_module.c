@@ -94,6 +94,8 @@ static ngx_int_t ngx_http_dyups_pre_conf(ngx_conf_t *cf);
 static ngx_int_t ngx_http_dyups_init(ngx_conf_t *cf);
 static void *ngx_http_dyups_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_dyups_init_main_conf(ngx_conf_t *cf, void *conf);
+static char *ngx_http_dyups_cmd_deprecated(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static char *ngx_http_dyups_interface(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_dyups_interface_handler(ngx_http_request_t *r);
@@ -190,6 +192,13 @@ static ngx_command_t  ngx_http_dyups_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_MAIN_CONF_OFFSET,
       offsetof(ngx_http_dyups_main_conf_t, shm_size),
+      NULL },
+
+    { ngx_string("dyups_upstream_conf"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_http_dyups_cmd_deprecated,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      0,
       NULL },
 
     { ngx_string("dyups_trylock"),
@@ -2292,4 +2301,15 @@ ngx_dyups_del_upstream_filter(ngx_http_upstream_main_conf_t *umcf,
     ngx_http_upstream_srv_conf_t *uscf)
 {
     return NGX_OK;
+}
+
+
+static char *
+ngx_http_dyups_cmd_deprecated(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                       "invalid directive \"%V\" of ngx_http_dyups_module, "
+                       "it has been deprecated", &cmd->name);
+
+    return NGX_CONF_OK;
 }
