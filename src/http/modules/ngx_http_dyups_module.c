@@ -2292,6 +2292,12 @@ static ngx_int_t
 ngx_dyups_add_upstream_filter(ngx_http_upstream_main_conf_t *umcf,
     ngx_http_upstream_srv_conf_t *uscf)
 {
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    uscf->node.key = ngx_crc32_short(uscf->host.data, uscf->host.len);
+    ngx_rbtree_insert(&umcf->rbtree, &uscf->node);
+#endif
+
     return NGX_OK;
 }
 
@@ -2300,6 +2306,11 @@ static ngx_int_t
 ngx_dyups_del_upstream_filter(ngx_http_upstream_main_conf_t *umcf,
     ngx_http_upstream_srv_conf_t *uscf)
 {
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    ngx_rbtree_delete(&umcf->rbtree, &uscf->node);
+#endif
+
     return NGX_OK;
 }
 
