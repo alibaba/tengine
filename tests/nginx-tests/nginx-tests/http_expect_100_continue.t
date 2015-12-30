@@ -52,7 +52,7 @@ $t->run();
 
 ###############################################################################
 
-like(http_100_request('/', '1.1'), qr/100/, 'expect 100 continue');
+like(http_100_request('/', '1.1'), qr/100 Continue/, 'expect 100 continue');
 
 # From RFC 2616, 8.2.3 Use of the 100 (Continue) Status:
 #
@@ -62,7 +62,7 @@ like(http_100_request('/', '1.1'), qr/100/, 'expect 100 continue');
 #        100 (Continue) response if such a request comes from an HTTP/1.0
 #        (or earlier) client.
 
-unlike(http_100_request('/', '1.0'), qr/100/, 'no 100 continue via http 1.0');
+unlike(http_100_request('/', '1.0'), qr/100 Continue/, 'no 100 continue via http 1.0');
 
 ###############################################################################
 

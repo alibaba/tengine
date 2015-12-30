@@ -883,6 +883,7 @@ cat << END
   --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_dyups_module           enable ngx_http_dyups_module
+  --with-http_dyups_lua_api          enable lua api of ngx_http_dyups_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
@@ -1108,6 +1109,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_KEEPALIVE=YES
     HTTP_UPSTREAM_DYNAMIC=YES
     HTTP_DYNAMIC_UPSTREAM=YES
+    HTTP_DYNAMIC_UPSTREAM_LUA=YES
     HTTP_REQ_STATUS=YES
     HTTP_AUTH_REQUEST=YES
     MAIL=YES
