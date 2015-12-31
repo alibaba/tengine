@@ -786,41 +786,51 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
      && (defined TLSEXT_TYPE_application_layer_protocol_negotiation           \
          || defined TLSEXT_TYPE_next_proto_neg))
         {
-        unsigned int            len;
+        unsigned int            len, rc;
         const unsigned char    *data;
         ngx_http_connection_t  *hc;
 
         hc = c->data;
 
+        rc = 0;
+#if (NGX_HTTP_V2)
+        rc |= hc->addr_conf->http2;
+#endif
+#if (NGX_HTTP_SPDY)
+        rc |= hc->addr_conf->spdy;
+#endif
+        
+        if (rc) {
+
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
-        SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
+            SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
 
 #ifdef TLSEXT_TYPE_next_proto_neg
-        if (len == 0) {
-            SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
-        }
+            if (len == 0) {
+                SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
+            }
 #endif
 
 #else /* TLSEXT_TYPE_next_proto_neg */
-        SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
+            SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
 #endif
 
 #if (NGX_HTTP_SPDY)
-        if (len == sizeof(NGX_SPDY_NPN_NEGOTIATED) - 1
-            && ngx_strncmp(data, NGX_SPDY_NPN_NEGOTIATED, len) == 0)
-        {
-            ngx_http_spdy_init(c->read);
-            return;
-        }
+            if (len == sizeof(NGX_SPDY_NPN_NEGOTIATED) - 1
+                && ngx_strncmp(data, NGX_SPDY_NPN_NEGOTIATED, len) == 0)
+            {
+                ngx_http_spdy_init(c->read);
+                return;
+            }
 #endif
 
 #if (NGX_HTTP_V2)
-        if (len == 2 && data[0] == 'h' && data[1] == '2') {
-            ngx_http_v2_init(c->read);
-            return;
-        }
+            if (len == 2 && data[0] == 'h' && data[1] == '2') {
+                ngx_http_v2_init(c->read);
+                return;
+            }
 #endif
-
+        }
         }
 #endif
 
