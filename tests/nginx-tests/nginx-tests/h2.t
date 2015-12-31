@@ -31,7 +31,7 @@ eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 proxy cache/)
-	->has(qw/limit_conn rewrite realip shmem/)
+	->has(qw/limit_conn rewrite realip/)
 	->has_daemon('openssl')->plan(292);
 
 # Some systems may have also a bug in not treating zero writev iovcnt as EINVAL
