@@ -79,6 +79,8 @@ static ngx_conf_enum_t  ngx_http_ssl_verify[] = {
 };
 
 
+#if (defined TLSEXT_TYPE_application_layer_protocol_negotiation \
+    || defined TLSEXT_TYPE_next_proto_neg)
 static ngx_str_t ngx_http_ssl_advertise[] = {
     ngx_string(NGX_HTTP_NPN_ADVERTISE),
     ngx_string(NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE),
@@ -86,6 +88,7 @@ static ngx_str_t ngx_http_ssl_advertise[] = {
     ngx_string(NGX_HTTP_V2_ALPN_ADVERTISE NGX_SPDY_NPN_ADVERTISE
                NGX_HTTP_NPN_ADVERTISE)
 };
+#endif
 
 static ngx_str_t ngx_http_ssl_unknown_server_name = ngx_string("unknown");
 
@@ -422,13 +425,13 @@ ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
     i = (hc->addr_conf->http2) ? i + 1 : i;
 #endif
 
-#endif
-
     *out = ngx_http_ssl_advertise[i].data;
     *outlen = ngx_http_ssl_advertise[i].len;
 
     return SSL_TLSEXT_ERR_OK;
 }
+
+#endif
 
 
 static ngx_int_t
