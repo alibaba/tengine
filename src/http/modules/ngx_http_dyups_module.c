@@ -1557,7 +1557,8 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
 
     duscf->dynamic = 1;
     duscf->upstream = uscf;
-
+    
+    ngx_memzero(&cf, sizeof(ngx_conf_t));
     cf.module_type = NGX_HTTP_MODULE;
     cf.cmd_type = NGX_HTTP_MAIN_CONF;
     cf.pool = duscf->pool;
