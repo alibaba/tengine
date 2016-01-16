@@ -547,8 +547,11 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
                                                ngx_http_dyups_module);
 
     if (!dmcf || !dmcf->enable || ngx_process == NGX_PROCESS_HELPER) {
+        ngx_http_dyups_api_enable = 0;
         return NGX_OK;
     }
+
+    ngx_http_dyups_api_enable = 1;
 
     timer = &ngx_dyups_global_ctx.msg_timer;
     ngx_memzero(timer, sizeof(ngx_event_t));
@@ -731,6 +734,11 @@ ngx_dyups_delete_upstream(ngx_str_t *name, ngx_str_t *rv)
                                                ngx_http_dyups_module);
     timer = &ngx_dyups_global_ctx.msg_timer;
     shpool = ngx_dyups_global_ctx.shpool;
+
+    if (!ngx_http_dyups_api_enable) {
+        ngx_str_set(rv, "API disabled\n");
+        return NGX_HTTP_NOT_ALLOWED;
+    }
 
     if (!dmcf->trylock) {
 
@@ -1200,6 +1208,11 @@ ngx_dyups_update_upstream(ngx_str_t *name, ngx_buf_t *buf, ngx_str_t *rv)
                                                ngx_http_dyups_module);
     timer = &ngx_dyups_global_ctx.msg_timer;
     shpool = ngx_dyups_global_ctx.shpool;
+
+    if (!ngx_http_dyups_api_enable) {
+        ngx_str_set(rv, "API disabled\n");
+        return NGX_HTTP_NOT_ALLOWED;
+    }
 
     if (!dmcf->trylock) {
 
