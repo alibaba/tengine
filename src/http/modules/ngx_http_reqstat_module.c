@@ -341,7 +341,7 @@ ngx_http_reqstat_show_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     value = cf->args->elts;
-    user = rmcf->user_defined_str->elts;
+    user = rmcf->user_defined_str ? rmcf->user_defined_str->elts : NULL;
     for (i = 1; i < cf->args->nelts; i++) {
         valid = 0;
 
@@ -349,17 +349,20 @@ ngx_http_reqstat_show_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             value[i].data++;
             value[i].len--;
 
-            for (j = 0; j < rmcf->user_defined_str->nelts; j++) {
-                if (value[i].len != user[j].len
-                    || ngx_strncmp(value[i].data, user[j].data, value[i].len)
-                        != 0)
-                {
-                    continue;
-                }
+            if (user) {
+                for (j = 0; j < rmcf->user_defined_str->nelts; j++) {
+                    if (value[i].len != user[j].len
+                        || ngx_strncmp(value[i].data, user[j].data,
+                                       value[i].len)
+                            != 0)
+                    {
+                        continue;
+                    }
 
-                *index++ = NGX_HTTP_REQSTAT_RSRV + j;
-                valid = 1;
-                break;
+                    *index++ = NGX_HTTP_REQSTAT_RSRV + j;
+                    valid = 1;
+                    break;
+                }
             }
 
         } else {
