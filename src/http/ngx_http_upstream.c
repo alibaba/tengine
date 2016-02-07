@@ -645,10 +645,6 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 
         uscf = u->conf->upstream;
 
-#if (NGX_HTTP_SSL)
-        u->ssl_name = uscf->host;
-#endif
-
     } else {
 
         if (u->resolved->sockaddr) {
@@ -673,10 +669,6 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 #if (NGX_HTTP_UPSTREAM_RBTREE)
 
         uscf = ngx_http_upstream_rbtree_lookup(umcf, host);
-
-#if (NGX_HTTP_SSL)
-        u->ssl_name = uscf->host;
-#endif
 
         if (uscf != NULL && ((uscf->port == 0 && u->resolved->no_port)
             || uscf->port == u->resolved->port))
@@ -708,10 +700,6 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 #endif
 
             uscf = uscfp[i];
-
-#if (NGX_HTTP_SSL)
-            u->ssl_name = uscf->host;
-#endif
 
             if (uscf->host.len == host->len
                 && ((uscf->port == 0 && u->resolved->no_port)
@@ -773,6 +761,10 @@ found:
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
+
+#if (NGX_HTTP_SSL)
+    u->ssl_name = uscf->host;
+#endif
 
     if (uscf->peer.init(r, uscf) != NGX_OK) {
         ngx_http_upstream_finalize_request(r, u,
