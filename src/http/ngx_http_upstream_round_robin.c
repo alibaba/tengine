@@ -86,6 +86,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peers->peer[n].max_fails = server[i].max_fails;
                 peers->peer[n].fail_timeout = server[i].fail_timeout;
                 peers->peer[n].down = server[i].down;
+                peers->peer[n].server = server[i].name;
                 peers->peer[n].host = server[i].host;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
@@ -154,6 +155,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 backup->peer[n].fail_timeout = server[i].fail_timeout;
                 backup->peer[n].down = server[i].down;
                 backup->peer[n].host = server[i].host;
+                backup->peer[n].server = server[i].name;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
                 if (!server[i].down) {

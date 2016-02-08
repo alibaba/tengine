@@ -1,3 +1,59 @@
+Changes with nginx 1.7.2                                         17 Jun 2014
+
+    *) Feature: the "hash" directive inside the "upstream" block.
+
+    *) Feature: defragmentation of free shared memory blocks.
+       Thanks to Wandenberg Peixoto and Yichun Zhang.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       default value of the "access_log" directive was used; the bug had
+       appeared in 1.7.0.
+       Thanks to Piotr Sikora.
+
+    *) Bugfix: trailing slash was mistakenly removed from the last parameter
+       of the "try_files" directive.
+
+    *) Bugfix: nginx could not be built on OS X in some cases.
+
+    *) Bugfix: in the ngx_http_spdy_module.
+
+
+Changes with nginx 1.7.1                                         27 May 2014
+
+    *) Feature: the "$upstream_cookie_..." variables.
+
+    *) Feature: the $ssl_client_fingerprint variable.
+
+    *) Feature: the "error_log" and "access_log" directives now support
+       logging to syslog.
+
+    *) Feature: the mail proxy now logs client port on connect.
+
+    *) Bugfix: memory leak if the "ssl_stapling" directive was used.
+       Thanks to Filipe da Silva.
+
+    *) Bugfix: the "alias" directive used inside a location given by a
+       regular expression worked incorrectly if the "if" or "limit_except"
+       directives were used.
+
+    *) Bugfix: the "charset" directive did not set a charset to encoded
+       backend responses.
+
+    *) Bugfix: a "proxy_pass" directive without URI part might use original
+       request after the $args variable was set.
+       Thanks to Yichun Zhang.
+
+    *) Bugfix: in the "none" parameter in the "smtp_auth" directive; the bug
+       had appeared in 1.5.6.
+       Thanks to Svyatoslav Nikolsky.
+
+    *) Bugfix: if sub_filter and SSI were used together, then responses
+       might be transferred incorrectly.
+
+    *) Bugfix: nginx could not be built with the --with-file-aio option on
+       Linux/aarch64.
+
+
 Changes with nginx 1.7.0                                         24 Apr 2014
 
     *) Feature: backend SSL certificate verification.
