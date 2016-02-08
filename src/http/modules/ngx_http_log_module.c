@@ -1355,6 +1355,7 @@ ngx_http_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ssize_t                            size;
     ngx_int_t                          gzip;
+    ngx_int_t                          rc;
     ngx_uint_t                         i, n;
     ngx_msec_t                         flush;
     ngx_str_t                         *value, name, s, filter;
