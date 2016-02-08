@@ -1322,6 +1322,8 @@ ngx_http_log_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
+    ngx_memzero(log, sizeof(ngx_http_log_t));
+
     log->file = ngx_conf_open_file(cf->cycle, &ngx_http_access_log);
     if (log->file == NULL) {
         return NGX_CONF_ERROR;
