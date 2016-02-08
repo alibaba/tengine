@@ -572,7 +572,7 @@ ngx_resolve_name_done(ngx_resolver_ctx_t *ctx)
 
     /* lock name mutex */
 
-    if (ctx->state == NGX_AGAIN) {
+    if (ctx->state == NGX_AGAIN || ctx->state == NGX_RESOLVE_TIMEDOUT) {
 
         hash = ngx_crc32_short(ctx->name.data, ctx->name.len);
 
@@ -726,6 +726,20 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx)
 
         if (rn->waiting) {
 
+            if (ctx->event == NULL) {
+                ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+                if (ctx->event == NULL) {
+                    return NGX_ERROR;
+                }
+
+                ctx->event->handler = ngx_resolver_timeout_handler;
+                ctx->event->data = ctx;
+                ctx->event->log = r->log;
+                ctx->ident = -1;
+
+                ngx_add_timer(ctx->event, ctx->timeout);
+            }
+
             ctx->next = rn->waiting;
             rn->waiting = ctx;
             ctx->state = NGX_AGAIN;
@@ -819,9 +833,9 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx)
         }
 
         ctx->event->handler = ngx_resolver_timeout_handler;
-        ctx->event->data = rn;
+        ctx->event->data = ctx;
         ctx->event->log = r->log;
-        rn->ident = -1;
+        ctx->ident = -1;
 
         ngx_add_timer(ctx->event, ctx->timeout);
     }
@@ -949,6 +963,18 @@ ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
 
         if (rn->waiting) {
 
+            ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+            if (ctx->event == NULL) {
+                return NGX_ERROR;
+            }
+
+            ctx->event->handler = ngx_resolver_timeout_handler;
+            ctx->event->data = ctx;
+            ctx->event->log = r->log;
+            ctx->ident = -1;
+
+            ngx_add_timer(ctx->event, ctx->timeout);
+
             ctx->next = rn->waiting;
             rn->waiting = ctx;
             ctx->state = NGX_AGAIN;
@@ -1012,9 +1038,9 @@ ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
     }
 
     ctx->event->handler = ngx_resolver_timeout_handler;
-    ctx->event->data = rn;
+    ctx->event->data = ctx;
     ctx->event->log = r->log;
-    rn->ident = -1;
+    ctx->ident = -1;
 
     ngx_add_timer(ctx->event, ctx->timeout);
 
@@ -1104,7 +1130,7 @@ ngx_resolve_addr_done(ngx_resolver_ctx_t *ctx)
 
     /* lock addr mutex */
 
-    if (ctx->state == NGX_AGAIN) {
+    if (ctx->state == NGX_AGAIN || ctx->state == NGX_RESOLVE_TIMEDOUT) {
 
         switch (ctx->addr.sockaddr->sa_family) {
 
@@ -2945,21 +2971,13 @@ done:
 static void
 ngx_resolver_timeout_handler(ngx_event_t *ev)
 {
-    ngx_resolver_ctx_t   *ctx, *next;
-    ngx_resolver_node_t  *rn;
+    ngx_resolver_ctx_t  *ctx;
 
-    rn = ev->data;
-    ctx = rn->waiting;
-    rn->waiting = NULL;
+    ctx = ev->data;
 
-    do {
-        ctx->state = NGX_RESOLVE_TIMEDOUT;
-        next = ctx->next;
+    ctx->state = NGX_RESOLVE_TIMEDOUT;
 
-        ctx->handler(ctx);
-
-        ctx = next;
-    } while (ctx);
+    ctx->handler(ctx);
 }
 
 
