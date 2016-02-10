@@ -6,14 +6,8 @@
 ### STUB
 
 if [ $USE_THREADS != NO ]; then
-
-cat << END
-
-$0: error: the threads support is broken now.
-
-END
-        exit 1
-    fi
+    echo "  + using threads"
+fi
 
 ###
 

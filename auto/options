@@ -425,9 +425,9 @@ do
         --without-poll_module)                     EVENT_POLL=NONE            ;;
         --with-aio_module)                         EVENT_AIO=YES              ;;
 
-        #--with-threads)                            USE_THREADS=YES            ;;
-        #--with-threads=*)                          USE_THREADS="$value"       ;;
-        #--with-threads)                            USE_THREADS="pthreads"     ;;
+        --with-threads)                            USE_THREADS=YES            ;;
+        --with-threads=*)                          USE_THREADS="$value"       ;;
+        --with-threads)                            USE_THREADS="pthreads"     ;;
 
         # PROCS
         --without-procs)                            PROCS=NO                   ;;
@@ -769,7 +769,9 @@ cat << END
   --without-poll_module              disable poll module
 
   --without-procs                    disable procs module
-
+  
+  --with-threads                     enable thread pool support
+  
   --with-file-aio                    enable file AIO support
   --with-ipv6                        enable IPv6 support
 
