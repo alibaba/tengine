@@ -139,7 +139,7 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       NULL },
 
-#if (NGX_THREADS)
+#if (NGX_OLD_THREADS)
 
     { ngx_string("worker_threads"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,

@@ -146,7 +146,7 @@ extern ngx_uint_t             ngx_test_config;
 extern ngx_uint_t             ngx_show_modules;
 extern ngx_uint_t             ngx_show_directives;
 extern ngx_uint_t             ngx_quiet_mode;
-#if (NGX_THREADS)
+#if (NGX_OLD_THREADS)
 extern ngx_tls_key_t          ngx_core_tls_key;
 #endif
 
