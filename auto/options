@@ -426,8 +426,6 @@ do
         --with-aio_module)                         EVENT_AIO=YES              ;;
 
         --with-threads)                            USE_THREADS=YES            ;;
-        --with-threads=*)                          USE_THREADS="$value"       ;;
-        --with-threads)                            USE_THREADS="pthreads"     ;;
 
         # PROCS
         --without-procs)                            PROCS=NO                   ;;
