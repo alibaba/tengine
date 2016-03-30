@@ -310,6 +310,53 @@ ngx_pcalloc(ngx_pool_t *pool, size_t size)
 }
 
 
+void *
+ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
+{
+    void *new;
+    ngx_pool_t *node;
+
+    if (p == NULL) {
+        return ngx_palloc(pool, new_size);
+    }
+
+    if (new_size == 0) {
+        if ((u_char *) p + old_size == pool->d.last) {
+           pool->d.last = p;
+        } else {
+           ngx_pfree(pool, p);
+        }
+
+        return NULL;
+    }
+
+    if (old_size <= pool->max) {
+        for (node = pool; node; node = node->d.next) {
+            if ((u_char *)p + old_size == node->d.last
+                && (u_char *)p + new_size <= node->d.end) {
+                node->d.last = (u_char *)p + new_size;
+                return p;
+            }
+        }
+    }
+
+    if (new_size <= old_size) {
+       return p;
+    }
+
+    new = ngx_palloc(pool, new_size);
+    if (new == NULL) {
+        return NULL;
+    }
+
+    ngx_memcpy(new, p, old_size);
+
+    ngx_pfree(pool, p);
+
+    return new;
+}
+
+
 ngx_pool_cleanup_t *
 ngx_pool_cleanup_add(ngx_pool_t *p, size_t size)
 {
