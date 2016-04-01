@@ -992,7 +992,7 @@ ngx_http_tfs_process_upstream_request(ngx_http_request_t *r, ngx_http_tfs_t *t)
             return;
         }
 
-        n = c->recv_chain(c, chain);
+        n = c->recv_chain(c, chain, 0);
 
         if (n == NGX_AGAIN) {
             if (chain->buf->last == chain->buf->end) {
