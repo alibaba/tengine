@@ -1815,6 +1815,9 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 
     if (peer->state != NGX_HTTP_CHECK_SEND_DONE) {
 
+        if(ngx_http_upstream_check_peek_one_byte(c) != NGX_OK) {
+            goto check_recv_fail;
+        }
         if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
             goto check_recv_fail;
         }
