@@ -222,16 +222,14 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
     u_char                 *p;
 
     size_t                                 len;
-    ngx_http_upstream_srv_conf_t          *us;
     ngx_http_upstream_dynamic_srv_conf_t  *dscf;
+    ngx_http_upstream_dynamic_peer_data_t *bp;
 
-    r = ctx->data;
-
+    bp = ctx->data;
+    r = bp->request;
     u = r->upstream;
-    us = u->conf->upstream;
     pc = &u->peer;
-
-    dscf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_dynamic_module);
+    dscf = bp->conf;
 
     if (ctx->state) {
 
@@ -436,7 +434,7 @@ ngx_http_upstream_get_dynamic_peer(ngx_peer_connection_t *pc, void *data)
     // ctx->type = NGX_RESOLVE_A;
     /* END */
     ctx->handler = ngx_http_upstream_dynamic_handler;
-    ctx->data = r;
+    ctx->data = bp;
     ctx->timeout = clcf->resolver_timeout;
 
     u->dyn_resolve_ctx = ctx;
