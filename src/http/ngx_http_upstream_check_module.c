@@ -695,7 +695,7 @@ static ngx_check_conf_t  ngx_check_types[] = {
       NULL,
       NULL,
       0,
-      1 },
+      0 },
 
     { NGX_HTTP_CHECK_HTTP,
       ngx_string("http"),
