@@ -150,7 +150,7 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
     line = p;
 
     for (/* void */; p < end; p++) {
-        if (*p == CR || *p == LF || p == (end - 1)) {
+        if (*p == CR || *p == LF || p == (end - 1) || *(p + 1) == '#') {
 
             while (*line == ' ' || *line == '\t') {
                 line++;
