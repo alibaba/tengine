@@ -434,6 +434,7 @@ ngx_uint_t ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer);
 
 ngx_uint_t ngx_http_upstream_check_peer_down(ngx_uint_t index);
+ngx_uint_t ngx_http_upstream_check_upstream_down(ngx_str_t *upstream);
 
 void ngx_http_upstream_check_get_peer(ngx_uint_t index);
 void ngx_http_upstream_check_free_peer(ngx_uint_t index);
