@@ -1334,7 +1334,8 @@ ngx_http_upstream_check_upstream_down(ngx_str_t *upstream)
     peers = check_peers_ctx->peers.elts;
     for (i = 0; i < check_peers_ctx->peers.nelts; i++) {
         if (peers[i].upstream_name->len == upstream->len
-            && ngx_strncmp(peers[i].upstream_name->data, upstream->data, upstream->len) == 0) {
+            && ngx_strncmp(peers[i].upstream_name->data, upstream->data, upstream->len) == 0)
+        {
             if (!peers[i].shm->down) {
                 return 0;
             }
