@@ -1321,6 +1321,29 @@ ngx_http_upstream_check_peer_down(ngx_uint_t index)
 }
 
 
+ngx_uint_t
+ngx_http_upstream_check_upstream_down(ngx_str_t *upstream)
+{
+    ngx_uint_t i;
+    ngx_http_upstream_check_peer_t *peers;
+
+    if (check_peers_ctx == NULL) {
+        return 0;
+    }
+
+    peers = check_peers_ctx->peers.elts;
+    for (i = 0; i < check_peers_ctx->peers.nelts; i++) {
+        if (ngx_strncmp(peers[i].upstream_name->data, upstream->data, upstream->len) == 0) {
+            if (!peers[i].shm->down) {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
+
 /* TODO: this interface can count each peer's busyness */
 void
 ngx_http_upstream_check_get_peer(ngx_uint_t index)
