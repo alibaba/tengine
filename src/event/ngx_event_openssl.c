@@ -1768,6 +1768,21 @@ ngx_ssl_shutdown(ngx_connection_t *c)
     int        n, sslerr, mode;
     ngx_err_t  err;
 
+    //OpenSSL 1.0.2f+ bug fix: https://trac.nginx.org/nginx/changeset/062c189fee20c18fae5ac3716a7379143d64150e/nginx
+    if (!c->ssl->handshaked) {
+        /*
+         * OpenSSL 1.0.2f complains if SSL_shutdown() is called during
+         * an SSL handshake, while previous versions always return 0.
+         * Avoid calling SSL_shutdown() if handshake wasn't completed.
+         */
+
+        SSL_free(c->ssl->connection);
+        c->ssl = NULL;
+
+        return NGX_OK;
+    }
+
+
     if (c->timedout) {
         mode = SSL_RECEIVED_SHUTDOWN|SSL_SENT_SHUTDOWN;
         SSL_set_quiet_shutdown(c->ssl->connection, 1);
