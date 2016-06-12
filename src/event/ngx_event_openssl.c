@@ -1040,6 +1040,7 @@ ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
 
     sc->buffer = ((flags & NGX_SSL_BUFFER) != 0);
     sc->buffer_size = ssl->buffer_size;
+    sc->dyn_rec = ssl->dyn_rec;
 
     sc->session_ctx = ssl->ctx;
 
@@ -1576,6 +1577,35 @@ ngx_ssl_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
     for ( ;; ) {
 
+        /* Dynamic record resizing : 
+         * We want the initial records to fit into one tcp segment
+         * so we don't get TCP HoL blocking due to TCP Slow Start.
+         * A connect always starts with sall records which fit into on tcp segment,
+         * but after a given amount of records sent, we make the records larger to reduce header overhead.
+         * After a connection has idled for a given timeout,begin the process from the start. The actual paramenters
+         * are configurable. If dyn_rec_timeout is 0 ,we assume dyn_rec if off.
+         */
+        if (c->ssl->dyn_rec.timeout > 0 ) {
+            if ( (ngx_current_msec - c->ssl->dyn_rec_last_write) > c->ssl->dyn_rec.timeout) {
+                /* Echo connect starts with record of size_lo */
+                buf->end = buf->start + c->ssl->dyn_rec.size_lo;
+                c->ssl->dyn_rec_records_sent = 0; 
+            } else {
+                if (c->ssl->dyn_rec_records_sent > (c->ssl->dyn_rec.threshold * 2)) {
+                    /*When sent 2 * threshold's records incr record size to buffer size
+                     * That's mean sent 52 KB data with dyn_rec.size_lo and sent 152 KB data with dyn_rec.size_hi */
+                    buf->end = buf->start + c->ssl->buffer_size;
+                } else if (c->ssl->dyn_rec_records_sent > c->ssl->dyn_rec.threshold) {
+                    /*When sent 1 * threshlod's records incr record size to dyn_rec.size_hi
+                     * That's mean sent 52 KB data with dyn_rec_size.lo */
+                    buf->end = buf->start + c->ssl->dyn_rec.size_hi;
+                }  else { 
+                    buf->end = buf->start + c->ssl->dyn_rec.size_lo;
+                }
+            }
+                
+        }
+
         while (in && buf->last < buf->end && send < limit) {
             if (in->buf->last_buf || in->buf->flush) {
                 flush = 1;
@@ -1676,6 +1706,9 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_write: %d", n);
 
     if (n > 0) {
+
+        c->ssl->dyn_rec_records_sent++;
+        c->ssl->dyn_rec_last_write = ngx_current_msec;
 
         if (c->ssl->saved_read_handler) {
 
