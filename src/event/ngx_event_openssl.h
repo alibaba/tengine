@@ -238,4 +238,4 @@ extern int  ngx_ssl_stapling_index;
     PEM_read_bio_X509(b, x, cb, arg)
 #endif
 
-#endif /*_NGX_EVENT_OPENSSL_H_INCLUDED_ */
+#endif /* _NGX_EVENT_OPENSSL_H_INCLUDED_ */
