@@ -541,35 +541,35 @@ static ngx_conf_bitmask_t  ngx_check_http_expect_alive_masks[] = {
 static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
     { ngx_string("check"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
       ngx_http_upstream_check,
       0,
       0,
       NULL },
 
     { ngx_string("check_keepalive_requests"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
       ngx_http_upstream_check_keepalive_requests,
       0,
       0,
       NULL },
 
     { ngx_string("check_http_send"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
       ngx_http_upstream_check_http_send,
       0,
       0,
       NULL },
 
     { ngx_string("check_http_expect_alive"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
       ngx_http_upstream_check_http_expect_alive,
       0,
       0,
       NULL },
 
     { ngx_string("check_fastcgi_param"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE2,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_UPS_CONF|NGX_CONF_TAKE2,
       ngx_http_upstream_check_fastcgi_params,
       0,
       0,
@@ -803,7 +803,34 @@ static ngx_check_status_command_t ngx_check_status_commands[] =  {
 
 static ngx_uint_t ngx_http_upstream_check_shm_generation = 0;
 static ngx_http_upstream_check_peers_t *check_peers_ctx = NULL;
+static ngx_http_upstream_check_srv_conf_t *g_upstream_check_srv_conf = NULL;
 
+ngx_uint_t
+ngx_http_upstream_check_merge_srv_conf(void *parent, void *child)
+{
+    ngx_http_upstream_check_srv_conf_t  *prev = parent;
+    ngx_http_upstream_check_srv_conf_t  *conf = child;
+
+    ngx_conf_merge_uint_value(conf->port, prev->port, 0);
+    ngx_conf_merge_uint_value(conf->fall_count, prev->fall_count, 2);
+    ngx_conf_merge_uint_value(conf->rise_count, prev->rise_count, 5);
+    ngx_conf_merge_msec_value(conf->check_interval, prev->check_interval, 0);
+    ngx_conf_merge_msec_value(conf->check_timeout,
+                              prev->check_timeout, 1000);
+    ngx_conf_merge_uint_value(conf->check_keepalive_requests,
+                              prev->check_keepalive_requests, 1);
+    ngx_conf_merge_ptr_value(conf->check_type_conf,
+                             prev->check_type_conf, NULL);
+
+    ngx_conf_merge_str_value(conf->send, prev->send, "");
+    ngx_conf_merge_uint_value(conf->code.status_alive,
+                              prev->code.status_alive, 0);
+    ngx_conf_merge_ptr_value(conf->fastcgi_params, prev->fastcgi_params, NULL);
+    ngx_conf_merge_uint_value(conf->default_down, prev->default_down, 0);
+    ngx_conf_merge_uint_value(conf->unique, prev->unique, 0);
+
+    return NGX_OK;
+}
 
 ngx_uint_t
 ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
@@ -855,6 +882,8 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->conf = ucscf;
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
+
+    ngx_http_upstream_check_merge_srv_conf(g_upstream_check_srv_conf, ucscf);
 
     if (ucscf->port) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
@@ -4162,9 +4191,19 @@ ngx_http_upstream_check_create_srv_conf(ngx_conf_t *cf)
     ucscf->port = NGX_CONF_UNSET_UINT;
     ucscf->fall_count = NGX_CONF_UNSET_UINT;
     ucscf->rise_count = NGX_CONF_UNSET_UINT;
+    ucscf->check_interval = NGX_CONF_UNSET_MSEC;
     ucscf->check_timeout = NGX_CONF_UNSET_MSEC;
-    ucscf->check_keepalive_requests = 1;
+    ucscf->check_keepalive_requests = NGX_CONF_UNSET_UINT;
     ucscf->check_type_conf = NGX_CONF_UNSET_PTR;
+    ngx_str_null(&ucscf->send);
+    ucscf->code.status_alive = NGX_CONF_UNSET_UINT;
+    ucscf->fastcgi_params = NGX_CONF_UNSET_PTR;
+    ucscf->default_down = NGX_CONF_UNSET_UINT;
+    ucscf->unique = NGX_CONF_UNSET_UINT;
+
+    if (cf->cmd_type == NGX_MAIN_CONF) {
+        g_upstream_check_srv_conf = ucscf;
+    }
 
     return ucscf;
 }
