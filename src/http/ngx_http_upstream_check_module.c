@@ -3919,6 +3919,10 @@ ngx_http_upstream_check_shm_size(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "invalid value";
     }
 
+    if (check_peers_ctx) {
+        return "must be set in the first http block only";
+    }
+
     return NGX_CONF_OK;
 }
 
@@ -4347,34 +4351,79 @@ static char *
 ngx_http_upstream_check_init_shm(ngx_conf_t *cf, void *conf)
 {
     ngx_str_t                            *shm_name;
+    ngx_uint_t                            index, i;
     ngx_uint_t                            shm_size;
     ngx_shm_zone_t                       *shm_zone;
+    ngx_http_upstream_check_peer_t       *p;
+    ngx_http_upstream_check_peer_t       *peer;
+    ngx_http_upstream_check_peer_t       *peers;
     ngx_http_upstream_check_main_conf_t  *ucmcf = conf;
 
-    ngx_http_upstream_check_shm_generation++;
+    if (check_peers_ctx == NULL) {
 
-    shm_name = &ucmcf->peers->check_shm_name;
+        ngx_http_upstream_check_shm_generation++;
 
-    ngx_http_upstream_check_get_shm_name(shm_name, cf->pool,
-                                ngx_http_upstream_check_shm_generation);
+        shm_name = &ucmcf->peers->check_shm_name;
 
-    /* The default check shared memory size is 1M */
-    shm_size = 1 * 1024 * 1024;
+        ngx_http_upstream_check_get_shm_name(shm_name, cf->pool,
+                                    ngx_http_upstream_check_shm_generation);
 
-    shm_size = shm_size < ucmcf->check_shm_size ?
-                          ucmcf->check_shm_size : shm_size;
+        /* The default check shared memory size is 1M */
+        shm_size = 1 * 1024 * 1024;
 
-    shm_zone = ngx_shared_memory_add(cf, shm_name, shm_size,
-                                     &ngx_http_upstream_check_module);
+        shm_size = shm_size < ucmcf->check_shm_size ?
+                              ucmcf->check_shm_size : shm_size;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-                   "http upstream check, upsteam:%V, shm_zone size:%ui",
-                   shm_name, shm_size);
+        shm_zone = ngx_shared_memory_add(cf, shm_name, shm_size,
+                                         &ngx_http_upstream_check_module);
 
-    shm_zone->data = cf->pool;
-    check_peers_ctx = ucmcf->peers;
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, cf->log, 0,
+                       "http upstream check, upsteam:%V, shm_zone size:%ui",
+                       shm_name, shm_size);
 
-    shm_zone->init = ngx_http_upstream_check_init_shm_zone;
+        shm_zone->data = cf->pool;
+        check_peers_ctx = ucmcf->peers;
+
+        shm_zone->init = ngx_http_upstream_check_init_shm_zone;
+
+    } else {
+
+        index =  check_peers_ctx->peers.nelts;
+
+        peers = ucmcf->peers->peers.elts;
+
+        for (i = 0; i < ucmcf->peers->peers.nelts; i++) {
+
+            peer = &peers[i];
+
+            p = ngx_array_push(&check_peers_ctx->peers);
+            if (p == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            ngx_memzero(p, sizeof(ngx_http_upstream_check_peer_t));
+
+            p->state = peer->state;
+            p->pool = peer->pool;
+            p->index = index++;
+            p->max_busy = peer->max_busy;
+            p->upstream_name = peer->upstream_name;
+            p->check_peer_addr = peer->check_peer_addr;
+            p->peer_addr = peer->peer_addr;
+            p->check_ev = peer->check_ev;
+            p->check_timeout_ev = peer->check_timeout_ev;
+            p->pc = peer->pc;
+            p->check_data = peer->check_data;
+            p->send_handler = peer->send_handler;
+            p->recv_handler = peer->recv_handler;
+            p->init = peer->init;
+            p->parse = peer->parse;
+            p->reinit = peer->reinit;
+            p->shm = peer->shm;
+            p->conf = peer->conf;
+            p->delete = peer->delete;
+        }
+    }
 
     return NGX_CONF_OK;
 }
