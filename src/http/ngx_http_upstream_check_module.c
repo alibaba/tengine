@@ -164,6 +164,7 @@ typedef struct {
     ngx_str_t                                check_shm_name;
     ngx_uint_t                               checksum;
     ngx_array_t                              peers;
+    ngx_cycle_t                             *cycle;
     ngx_slab_pool_t                         *shpool;
 
     ngx_http_upstream_check_peers_shm_t     *peers_shm;
@@ -3919,7 +3920,7 @@ ngx_http_upstream_check_shm_size(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "invalid value";
     }
 
-    if (check_peers_ctx) {
+    if (check_peers_ctx && check_peers_ctx->cycle == ngx_cycle) {
         return "must be set in the first http block only";
     }
 
@@ -4359,7 +4360,7 @@ ngx_http_upstream_check_init_shm(ngx_conf_t *cf, void *conf)
     ngx_http_upstream_check_peer_t       *peers;
     ngx_http_upstream_check_main_conf_t  *ucmcf = conf;
 
-    if (check_peers_ctx == NULL) {
+    if (check_peers_ctx == NULL || check_peers_ctx->cycle != ngx_cycle) {
 
         ngx_http_upstream_check_shm_generation++;
 
@@ -4383,6 +4384,7 @@ ngx_http_upstream_check_init_shm(ngx_conf_t *cf, void *conf)
 
         shm_zone->data = cf->pool;
         check_peers_ctx = ucmcf->peers;
+        check_peers_ctx->cycle = (ngx_cycle_t *) ngx_cycle;
 
         shm_zone->init = ngx_http_upstream_check_init_shm_zone;
 
