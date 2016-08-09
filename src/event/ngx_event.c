@@ -870,10 +870,27 @@ ngx_event_process_init(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
-        } else {
-            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+            continue;
+        }
+
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+
+        if ((ngx_event_flags & NGX_USE_EPOLL_EVENT)
+            && ccf->worker_processes > 1)
+        {
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_EXCLUSIVE_EVENT)
+                == NGX_ERROR)
+            {
                 return NGX_ERROR;
             }
+
+            continue;
+        }
+
+#endif
+
+        if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+            return NGX_ERROR;
         }
 
 #endif
