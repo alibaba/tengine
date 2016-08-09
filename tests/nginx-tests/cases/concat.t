@@ -88,7 +88,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -135,7 +135,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -182,7 +182,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -229,7 +229,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -276,7 +276,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -324,7 +324,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -372,7 +372,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -420,7 +420,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -468,7 +468,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -515,7 +515,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -562,7 +562,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -609,7 +609,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -656,7 +656,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -703,7 +703,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -726,13 +726,13 @@ $t->run();
 ###############################################################################
 my $concat_message14 = qr/hello.htmlworld.htmljack.html/s;
 
-like(http_get('/concatFile/??hello.html,world.html,jack.html'), $concat_message14, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique on(fix)');
+like(http_get('/concatFile/??hello.html,world.html,jack.html'), $concat_message14, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique on(fix)');
 
 $t->stop();
 ###############################################################################
 ###############################################################################
 #Test15
-#concat_types application/x-javascript, text/css, text/html test -- concat_unique on(not fix)
+#concat_types application/javascript  , text/css, text/html test -- concat_unique on(not fix)
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -752,7 +752,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -775,13 +775,13 @@ $t->run();
 ###############################################################################
 my $concat_message15 = qr/400/s;
 
-like(http_get('/concatFile/??hello.jpeg,world.jpeg,jack.jpeg'), $concat_message15, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique on(not fix)');
+like(http_get('/concatFile/??hello.jpeg,world.jpeg,jack.jpeg'), $concat_message15, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique on(not fix)');
 
 $t->stop();
 ###############################################################################
 ###############################################################################
 #Test16
-#concat_types application/x-javascript, text/css, text/html test -- concat_unique on(fix)
+#concat_types application/javascript  , text/css, text/html test -- concat_unique on(fix)
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -801,7 +801,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -824,7 +824,7 @@ $t->run();
 ###############################################################################
 my $concat_message16 = qr/hello.htmlworld.htmjack.shtml/s;
 
-like(http_get('/concatFile/??hello.html,world.htm,jack.shtml'), $concat_message16, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique on(fix)');
+like(http_get('/concatFile/??hello.html,world.htm,jack.shtml'), $concat_message16, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique on(fix)');
 
 $t->stop();
 ###############################################################################
@@ -850,7 +850,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -873,7 +873,7 @@ $t->run();
 ###############################################################################
 my $concat_message17 = qr/hello.cssworld.cssjack.css/s;
 
-like(http_get('/concatFile/??hello.css,world.css,jack.css'), $concat_message17, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique on(fix)');
+like(http_get('/concatFile/??hello.css,world.css,jack.css'), $concat_message17, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique on(fix)');
 
 $t->stop();
 ###############################################################################
@@ -899,7 +899,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -922,7 +922,7 @@ $t->run();
 ###############################################################################
 my $concat_message18 = qr/hello.jsworld.jsjack.js/s;
 
-like(http_get('/concatFile/??hello.js,world.js,jack.js'), $concat_message18, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique on(fix)');
+like(http_get('/concatFile/??hello.js,world.js,jack.js'), $concat_message18, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique on(fix)');
 
 $t->stop();
 ###############################################################################
@@ -948,7 +948,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -971,13 +971,13 @@ $t->run();
 ###############################################################################
 my $concat_message19 = qr/400/s;
 
-like(http_get('/concatFile/??hello.js,world.html,jack.css,hello.jpeg'), $concat_message19, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique off(not fix)');
+like(http_get('/concatFile/??hello.js,world.html,jack.css,hello.jpeg'), $concat_message19, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique off(not fix)');
 
 $t->stop();
 ###############################################################################
 ###############################################################################
 #Test20
-#concat_types application/x-javascript, text/css, text/html test -- concat_unique off(fix)
+#concat_types application/javascript  , text/css, text/html test -- concat_unique off(fix)
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -997,7 +997,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1020,7 +1020,7 @@ $t->run();
 ###############################################################################
 my $concat_message20 = qr/hello.htmlworld.htmljack.html/s;
 
-like(http_get('/concatFile/??hello.html,world.html,jack.html'), $concat_message20, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique off(fix)');
+like(http_get('/concatFile/??hello.html,world.html,jack.html'), $concat_message20, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique off(fix)');
 
 $t->stop();
 ###############################################################################
@@ -1046,7 +1046,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1069,7 +1069,7 @@ $t->run();
 ###############################################################################
 my $concat_message21 = qr/400/s;
 
-like(http_get('/concatFile/??hello.jpeg,world.jpeg,jack.jpeg'), $concat_message21, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique off(fix)');
+like(http_get('/concatFile/??hello.jpeg,world.jpeg,jack.jpeg'), $concat_message21, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique off(fix)');
 
 $t->stop();
 ###############################################################################
@@ -1095,7 +1095,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1118,7 +1118,7 @@ $t->run();
 ###############################################################################
 my $concat_message22 = qr/400/s;
 
-like(http_get('/concatFile/??hello,world,jack'), $concat_message22, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique off(fix)');
+like(http_get('/concatFile/??hello,world,jack'), $concat_message22, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique off(fix)');
 
 $t->stop();
 ###############################################################################
@@ -1144,7 +1144,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1167,7 +1167,7 @@ $t->run();
 ###############################################################################
 my $concat_message23 = qr/hello.jsworld.htmljack.css/s;
 
-like(http_get('/concatFile/??hello.js,world.html,jack.css'), $concat_message23, 'concat - concat_types application/x-javascript, text/css, text/html test -- concat_unique off(fix)');
+like(http_get('/concatFile/??hello.js,world.html,jack.css'), $concat_message23, 'concat - concat_types application/javascript  , text/css, text/html test -- concat_unique off(fix)');
 
 $t->stop();
 ###############################################################################
@@ -1193,7 +1193,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         text/xml                              xml;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1240,7 +1240,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1287,7 +1287,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1336,7 +1336,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     server {
@@ -1381,7 +1381,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1429,7 +1429,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1477,7 +1477,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1525,7 +1525,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1573,7 +1573,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1621,7 +1621,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1669,7 +1669,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1717,7 +1717,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1765,7 +1765,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1813,7 +1813,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1861,7 +1861,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1909,7 +1909,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -1968,7 +1968,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2026,7 +2026,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2074,7 +2074,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2122,7 +2122,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2170,7 +2170,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2218,7 +2218,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -2266,7 +2266,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -2315,7 +2315,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -2363,7 +2363,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
 
     default_type application/octet-stream;
@@ -2463,7 +2463,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2525,7 +2525,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;
@@ -2635,7 +2635,7 @@ like($r, qr/^Content-Type: text\/html/m, 'concat - html type');
 
 $r = http_get('/??a.js,b.js');
 like($r, qr/javascriptajavascriptb/, 'concat - two javascript files');
-like($r, qr/^Content-Type: application\/x-javascript/m, 'concat - content type (javascript)');
+like($r, qr/^Content-Type: application\/javascript/m, 'concat - content type (javascript)');
 
 $r = http_get('/??foo.css,bar.css');
 like($r, qr/css1css2/, 'concat - two css files');
@@ -2658,7 +2658,7 @@ like($r, qr/^Content-Type: text\/css/m, 'concat - content type (default css)');
 
 $r = http_get('/cssjs/??1.js,2.js');
 like($r, qr/js1js2/, 'concat - js files (default)');
-like($r, qr/^Content-Type: application\/x-javascript/m, 'concat - content type (default js)');
+like($r, qr/^Content-Type: application\/javascript/m, 'concat - content type (default js)');
 
 $r = http_get('/cssjs/??1.html,2.html');
 like($r, qr/400/, 'concat - html files (default not support)');
@@ -2737,7 +2737,7 @@ http {
         text/html                             html htm shtml;
         text/css                              css;
         image/jpeg                            jpeg jpg;
-        application/x-javascript              js;
+        application/javascript                js;
     }
     
     default_type application/octet-stream;

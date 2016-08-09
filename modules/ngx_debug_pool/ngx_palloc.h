@@ -43,6 +43,9 @@ typedef struct ngx_pool_large_s  ngx_pool_large_t;
 struct ngx_pool_large_s {
     ngx_pool_large_t     *next;
     void                 *alloc;
+#if  (NGX_DEBUG_POOL)
+    size_t                size;
+#endif
 };
 
 
@@ -54,6 +57,26 @@ typedef struct {
 } ngx_pool_data_t;
 
 
+#if (NGX_DEBUG_POOL)
+
+#define NGX_POOL_STATS_MAX      997 /* prime */
+
+typedef struct ngx_pool_stat_s   ngx_pool_stat_t;
+
+struct ngx_pool_stat_s {
+    u_char               *func;
+    size_t                size;
+    size_t                num;      /* number of total pools */
+    size_t                cnum;     /* number of current used pools */
+    size_t                lnum;     /* number of calling ngx_palloc_large() */
+    ngx_pool_stat_t      *next;
+};
+
+extern ngx_pool_stat_t *ngx_pool_stats[NGX_POOL_STATS_MAX];
+extern ngx_int_t        ngx_pool_stats_num;
+#endif
+
+
 struct ngx_pool_s {
     ngx_pool_data_t       d;
     size_t                max;
@@ -62,6 +85,10 @@ struct ngx_pool_s {
     ngx_pool_large_t     *large;
     ngx_pool_cleanup_t   *cleanup;
     ngx_log_t            *log;
+#if  (NGX_DEBUG_POOL)
+    size_t                size;
+    ngx_pool_stat_t      *stat;
+#endif
 };
 
 
@@ -75,14 +102,19 @@ typedef struct {
 void *ngx_alloc(size_t size, ngx_log_t *log);
 void *ngx_calloc(size_t size, ngx_log_t *log);
 
+#if  (NGX_DEBUG_POOL)
+ngx_pool_t *__ngx_create_pool(size_t size, ngx_log_t *log, u_char *func, ngx_int_t line);
+#define ngx_create_pool(size, log) __ngx_create_pool(size, log, (u_char *) __func__, __LINE__)
+#else
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
+#endif
+
 void ngx_destroy_pool(ngx_pool_t *pool);
 void ngx_reset_pool(ngx_pool_t *pool);
 
 void *ngx_palloc(ngx_pool_t *pool, size_t size);
 void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
-void *ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size);
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
 ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
 

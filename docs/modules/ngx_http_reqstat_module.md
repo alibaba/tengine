@@ -40,10 +40,11 @@ If you use this module as a '.so', please make sure it is after 'ngx_http_lua_mo
 Example
 ===========
 
-    req_status_zone server "$host,$server_addr:$server_port" 10M;
-    req_status_zone_add_indicator server $limit;
-
     http {
+
+        req_status_zone server "$host,$server_addr:$server_port" 10M;
+        req_status_zone_add_indicator server $limit;
+
         server {
             location /us {
                 req_status_show;
@@ -117,7 +118,7 @@ req_status_zone
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 create shared memory for this module. 'zone_name' is the name of memory block.
 'value' defines the key, in which variables can be used.
@@ -139,7 +140,7 @@ req_status
 
 **Default**: *none*
 
-**Context**: *main、srv、loc*
+**Context**: *http、srv、loc*
 
 Enable monitoring. You can specify multiple zones to monitor.
 
@@ -175,7 +176,7 @@ req_status_zone_add_indicator
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 Add user-defined status by using nginx variables. The status will be appended at the end of each line on display.
 
@@ -187,7 +188,7 @@ req_status_zone_key_length
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 Define the maximun length of key for a zone. The default is 104.
 
@@ -199,7 +200,7 @@ req_status_zone_recycle
 
 **Default**: *none*
 
-**Context**: *main*
+**Context**: *http*
 
 Define the recycle threshold for a zone. Recycle will be switched on when the shared memory is exhausted,
 and will only take effect on imformation whose visit frequency is lower than the setting.

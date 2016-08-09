@@ -3,9 +3,9 @@
 #export DH_VERBOSE=1
 CFLAGS := $(shell dpkg-buildflags --get CFLAGS)
 LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
-WITH_SPDY := $(shell printf "Source: tengine\nBuild-Depends: libssl-dev (>= 1.0.1)\n" | \
+WITH_HTTP2 := $(shell printf "Source: tengine\nBuild-Depends: libssl-dev (>= 1.0.1)\n" | \
 	dpkg-checkbuilddeps - >/dev/null 2>&1 && \
-	echo "--with-http_spdy_module")
+	echo "--with-http_v2_module")
 
 %:
 	dh $@ 
@@ -48,7 +48,7 @@ override_dh_auto_build:
 		--with-mail \
 		--with-mail_ssl_module \
 		--with-file-aio \
-		$(WITH_SPDY) \
+		$(WITH_HTTP2) \
 		--with-cc-opt="$(CFLAGS)" \
 		--with-ld-opt="$(LDFLAGS)" \
 		--with-ipv6
@@ -85,7 +85,7 @@ configure_debug:
 		--with-mail \
 		--with-mail_ssl_module \
 		--with-file-aio \
-		$(WITH_SPDY) \
+		$(WITH_HTTP2) \
 		--with-cc-opt="$(CFLAGS)" \
 		--with-ld-opt="$(LDFLAGS)" \
 		--with-ipv6 \

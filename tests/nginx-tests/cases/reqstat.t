@@ -389,7 +389,7 @@ sleep 1;
 
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 
-warn $r;
+#warn $r;
 
 my @lines = split(m/\s/s, $r);
 my @content = @lines[-5,-4];

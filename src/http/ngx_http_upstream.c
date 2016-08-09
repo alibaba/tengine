@@ -485,8 +485,8 @@ ngx_http_upstream_init(ngx_http_request_t *r)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http init upstream, client timer: %d", c->read->timer_set);
 
-#if (NGX_HTTP_SPDY)
-    if (r->spdy_stream) {
+#if (NGX_HTTP_V2)
+    if (r->stream) {
         ngx_http_upstream_init_request(r);
         return;
     }
@@ -551,13 +551,22 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
 
         r->write_event_handler = ngx_http_request_empty_handler;
 
-        if (rc == NGX_DONE) {
-            return;
-        }
-
         if (rc == NGX_ERROR) {
             ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
+        }
+
+        if (rc == NGX_OK) {
+            rc = ngx_http_upstream_cache_send(r, u);
+
+            if (rc == NGX_DONE) {
+                return;
+            }
+
+            if (rc == NGX_HTTP_UPSTREAM_INVALID_HEADER) {
+                rc = NGX_DECLINED;
+                r->cached = 0;
+            }
         }
 
         if (rc != NGX_DECLINED) {
@@ -883,13 +892,7 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     case NGX_OK:
 
-        rc = ngx_http_upstream_cache_send(r, u);
-
-        if (rc != NGX_HTTP_UPSTREAM_INVALID_HEADER) {
-            return rc;
-        }
-
-        break;
+        return NGX_OK;
 
     case NGX_HTTP_CACHE_STALE:
 
@@ -1194,8 +1197,8 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
         return;
     }
 
-#if (NGX_HTTP_SPDY)
-    if (r->spdy_stream) {
+#if (NGX_HTTP_V2)
+    if (r->stream) {
         return;
     }
 #endif

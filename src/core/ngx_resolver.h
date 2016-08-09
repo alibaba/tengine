@@ -51,15 +51,13 @@ typedef void (*ngx_resolver_handler_pt)(ngx_resolver_ctx_t *ctx);
 
 
 typedef struct {
-     /* PTR: resolved name, A: name to resolve */
-    u_char                   *name;
+	ngx_rbtree_node_t         node;
 
     ngx_queue_t               queue;
 
-    /* event ident must be after 3 pointers as in ngx_connection_t */
-    ngx_int_t                 ident;
+    /* PTR: resolved name, A: name to resolve */
+    u_char                   *name;
 
-    ngx_rbtree_node_t         node;
 
 #if (NGX_HAVE_INET6)
     /* PTR: IPv6 address to resolve (IPv4 address is in rbtree node key) */
@@ -147,7 +145,7 @@ struct ngx_resolver_ctx_s {
     ngx_resolver_t           *resolver;
     ngx_udp_connection_t     *udp_connection;
 
-    /* ident must be after 3 pointers */
+    /* event ident must be after 3 pointers as in ngx_connection_t */
     ngx_int_t                 ident;
 
     ngx_int_t                 state;
@@ -165,6 +163,8 @@ struct ngx_resolver_ctx_s {
     ngx_uint_t                quick;  /* unsigned  quick:1; */
     ngx_uint_t                recursion;
     ngx_event_t              *event;
+
+    ngx_resolver_node_t      *node;
 };
 
 

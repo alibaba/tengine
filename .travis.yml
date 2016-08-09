@@ -18,6 +18,6 @@ before_install:
 #       so we can run `make`, `make test`, `make install`.
 
 script:
-  - ./configure --enable-mods-static=all --with-ipv6 --with-http_spdy_module
+  - ./configure --enable-mods-static=all --with-ipv6 --with-http_v2_module
   - make
   - sudo make install
