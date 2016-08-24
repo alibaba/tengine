@@ -534,10 +534,13 @@ finish:
     {
         cookie->len -= (end - st);
 
-        if (cookie->len > 0) {
-            while (end < last) {
-                *st++ = *end++;
-            }
+        if (cookie->len == 0) {
+            cookies[i]->hash = 0;
+            return NGX_OK;
+        }
+
+        while (end < last) {
+            *st++ = *end++;
         }
     }
 
