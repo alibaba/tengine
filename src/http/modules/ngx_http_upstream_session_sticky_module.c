@@ -299,7 +299,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 {
     time_t                           now;
     u_char                          *p, *v, *vv, *st, *last, *end;
-    ngx_int_t                        diff, delimiter, legal, rc;
+    ngx_int_t                        diff, delimiter, legal;
     ngx_str_t                       *cookie;
     ngx_uint_t                       i;
     ngx_table_elt_t                **cookies;
@@ -533,11 +533,10 @@ finish:
         & (NGX_HTTP_SESSION_STICKY_PREFIX | NGX_HTTP_SESSION_STICKY_INDIRECT))
     {
         cookie->len -= (end - st);
+
         if (cookie->len == 0) {
-            rc = ngx_list_delete(&r->headers_in.headers, cookies[i]);
-            if (rc != NGX_OK) {
-                return NGX_ERROR;
-            }
+            cookies[i]->hash = 0;
+            return NGX_OK;
         }
 
         while (end < last) {
