@@ -534,8 +534,10 @@ finish:
     {
         cookie->len -= (end - st);
 
-        while (end < last) {
-            *st++ = *end++;
+        if (cookie->len > 0) {
+            while (end < last) {
+                *st++ = *end++;
+            }
         }
     }
 
