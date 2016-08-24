@@ -400,7 +400,7 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define NGX_ONESHOT_EVENT  1
 
 
-#elif (NGX_HAVE_EPOLL)
+#elif (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
 
 #define NGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
 #define NGX_WRITE_EVENT    EPOLLOUT
@@ -412,6 +412,9 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define NGX_ONESHOT_EVENT  EPOLLONESHOT
 #endif
 
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+#define NGX_EXCLUSIVE_EVENT  EPOLLEXCLUSIVE
+#endif
 
 #elif (NGX_HAVE_POLL)
 
@@ -437,6 +440,11 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define NGX_IOCP_ACCEPT      0
 #define NGX_IOCP_IO          1
 #define NGX_IOCP_CONNECT     2
+#endif
+
+
+#if (NGX_TEST_BUILD_EPOLL)
+#define NGX_EXCLUSIVE_EVENT  0
 #endif
 
 

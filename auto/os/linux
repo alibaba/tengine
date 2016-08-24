@@ -56,6 +56,7 @@ ngx_feature_test="int efd = 0;
                   struct epoll_event ee;
                   ee.events = EPOLLIN|EPOLLOUT|EPOLLET;
                   ee.data.ptr = NULL;
+                  (void) ee;
                   efd = epoll_create(100);
                   if (efd == -1) return 1;"
 . auto/feature
@@ -82,6 +83,22 @@ if [ $ngx_found = yes ]; then
                       epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ee)"
     . auto/feature
 fi
+
+
+    # EPOLLEXCLUSIVE appeared in Linux 4.5, glibc 2.24
+
+    ngx_feature="EPOLLEXCLUSIVE"
+    ngx_feature_name="NGX_HAVE_EPOLLEXCLUSIVE"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/epoll.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="int efd = 0, fd = 0;
+                      struct epoll_event ee;
+                      ee.events = EPOLLIN|EPOLLEXCLUSIVE;
+                      ee.data.ptr = NULL;
+                      epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ee)"
+    . auto/feature
 
 
 # O_PATH and AT_EMPTY_PATH were introduced in 2.6.39, glibc 2.14

@@ -17,18 +17,19 @@
 #define EPOLLIN        0x001
 #define EPOLLPRI       0x002
 #define EPOLLOUT       0x004
+#define EPOLLERR       0x008
+#define EPOLLHUP       0x010
 #define EPOLLRDNORM    0x040
 #define EPOLLRDBAND    0x080
 #define EPOLLWRNORM    0x100
 #define EPOLLWRBAND    0x200
 #define EPOLLMSG       0x400
-#define EPOLLERR       0x008
-#define EPOLLHUP       0x010
 
 #define EPOLLRDHUP     0x2000
 
-#define EPOLLET        0x80000000
+#define EPOLLEXCLUSIVE 0x10000000
 #define EPOLLONESHOT   0x40000000
+#define EPOLLET        0x80000000
 
 #define EPOLL_CTL_ADD  1
 #define EPOLL_CTL_DEL  2
@@ -417,6 +418,17 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     } else {
         op = EPOLL_CTL_ADD;
     }
+
+    /**
+     * EPOLL_EXCLUSIVE can not used with EPOLL_CTL_MOD and
+     * they do not currently support nested exclusive wakeups
+     */
+
+#if (NGX_HAVE_EPOLLEXCLUSIVE && NGX_HAVE_EPOLLRDHUP)
+    if (flags & NGX_EXCLUSIVE_EVENT) {
+        events &= ~EPOLLRDHUP;
+    }
+#endif
 
     ee.events = events | (uint32_t) flags;
     ee.data.ptr = (void *) ((uintptr_t) c | ev->instance);
