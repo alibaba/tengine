@@ -1210,6 +1210,8 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
                                   ngx_close_file_n " \"%s\" failed",
                                   file[i].name.data);
                 }
+
+                continue;
             }
 
             if (fi.st_uid != user) {
@@ -1223,6 +1225,8 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
                                       ngx_close_file_n " \"%s\" failed",
                                       file[i].name.data);
                     }
+
+                    continue;
                 }
             }
 
@@ -1239,6 +1243,8 @@ ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user)
                                       ngx_close_file_n " \"%s\" failed",
                                       file[i].name.data);
                     }
+
+                    continue;
                 }
             }
         }

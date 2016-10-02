@@ -171,6 +171,8 @@ static ngx_int_t ngx_http_upstream_init_process(ngx_cycle_t *cycle);
 static void ngx_http_upstream_ssl_init_connection(ngx_http_request_t *,
     ngx_http_upstream_t *u, ngx_connection_t *c);
 static void ngx_http_upstream_ssl_handshake(ngx_connection_t *c);
+static ngx_int_t ngx_http_upstream_ssl_name(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_connection_t *c);
 #endif
 
 #if (NGX_HTTP_UPSTREAM_RBTREE)
@@ -759,6 +761,10 @@ found:
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
+
+#if (NGX_HTTP_SSL)
+    u->ssl_name = uscf->host;
+#endif
 
     if (uscf->peer.init(r, uscf) != NGX_OK) {
         ngx_http_upstream_finalize_request(r, u,
@@ -1472,6 +1478,14 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
     c->sendfile = 0;
     u->output.sendfile = 0;
 
+    if (u->conf->ssl_server_name || u->conf->ssl_verify) {
+        if (ngx_http_upstream_ssl_name(r, u, c) != NGX_OK) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+    }
+
     if (u->conf->ssl_session_reuse) {
         if (u->peer.set_session(&u->peer, u->peer.data) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
@@ -1496,6 +1510,7 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
 static void
 ngx_http_upstream_ssl_handshake(ngx_connection_t *c)
 {
+	long                  rc;
     ngx_http_request_t   *r;
     ngx_http_upstream_t  *u;
 
@@ -1503,6 +1518,24 @@ ngx_http_upstream_ssl_handshake(ngx_connection_t *c)
     u = r->upstream;
 
     if (c->ssl->handshaked) {
+
+        if (u->conf->ssl_verify) {
+            rc = SSL_get_verify_result(c->ssl->connection);
+
+            if (rc != X509_V_OK) {
+                ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                              "upstream SSL certificate verify error: (%l:%s)",
+                              rc, X509_verify_cert_error_string(rc));
+                goto failed;
+            }
+
+            if (ngx_ssl_check_host(c, &u->ssl_name) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                              "upstream SSL certificate does not match \"%V\"",
+                              &u->ssl_name);
+                goto failed;
+            }
+        }
 
         if (u->conf->ssl_session_reuse) {
             u->peer.save_session(&u->peer, u->peer.data);
@@ -1524,11 +1557,104 @@ ngx_http_upstream_ssl_handshake(ngx_connection_t *c)
         return;
     }
 
+failed:
+
     c = r->connection;
 
     ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
 
     ngx_http_run_posted_requests(c);
+}
+
+
+static ngx_int_t
+ngx_http_upstream_ssl_name(ngx_http_request_t *r, ngx_http_upstream_t *u,
+    ngx_connection_t *c)
+{
+    u_char     *p, *last;
+    ngx_str_t   name;
+
+    if (u->conf->ssl_name) {
+        if (ngx_http_complex_value(r, u->conf->ssl_name, &name) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+    } else {
+        name = u->ssl_name;
+    }
+
+    if (name.len == 0) {
+        goto done;
+    }
+
+    /*
+     * ssl name here may contain port, notably if derived from $proxy_host
+     * or $http_host; we have to strip it
+     */
+
+    p = name.data;
+    last = name.data + name.len;
+
+    if (*p == '[') {
+        p = ngx_strlchr(p, last, ']');
+
+        if (p == NULL) {
+            p = name.data;
+        }
+    }
+
+    p = ngx_strlchr(p, last, ':');
+
+    if (p != NULL) {
+        name.len = p - name.data;
+    }
+
+    if (!u->conf->ssl_server_name) {
+        goto done;
+    }
+
+#ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
+
+    /* as per RFC 6066, literal IPv4 and IPv6 addresses are not permitted */
+
+    if (name.len == 0 || *name.data == '[') {
+        goto done;
+    }
+
+    if (ngx_inet_addr(name.data, name.len) != INADDR_NONE) {
+        goto done;
+    }
+
+    /*
+     * SSL_set_tlsext_host_name() needs a null-terminated string,
+     * hence we explicitly null-terminate name here
+     */
+
+    p = ngx_pnalloc(r->pool, name.len + 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    (void) ngx_cpystrn(p, name.data, name.len + 1);
+
+    name.data = p;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "upstream SSL server name: \"%s\"", name.data);
+
+    if (SSL_set_tlsext_host_name(c->ssl->connection, name.data) == 0) {
+        ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "SSL_set_tlsext_host_name(\"%s\") failed", name.data);
+        return NGX_ERROR;
+    }
+
+#endif
+
+done:
+
+    u->ssl_name = name;
+
+    return NGX_OK;
 }
 
 #endif
