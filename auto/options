@@ -14,6 +14,7 @@ NGX_PID_PATH=
 NGX_LOCK_PATH=
 NGX_USER=
 NGX_GROUP=
+NGX_BUILD=
 
 NGX_DSO_PATH=
 NGX_DSO_TOOL_PATH=
@@ -252,6 +253,7 @@ HTTP_SLICE=NO
 HTTP_MP4=NO
 HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
+HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_TRIM=YES
@@ -611,6 +613,7 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_EMPTY_GIF_SHARED=NO   ;;
         --without-http_browser_module)   HTTP_BROWSER=NO
                                          HTTP_BROWSER_SHARED=NO     ;;
+        --without-http_upstream_hash_module) HTTP_UPSTREAM_HASH=NO  ;;
         --without-http_user_agent_module) HTTP_USER_AGENT=NO
                                           HTTP_USER_AGENT_SHARED=NO ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO
@@ -739,6 +742,7 @@ cat << END
   --group=GROUP                      set non-privileged group for
                                      worker processes
 
+  --build=NAME                       set build name
   --builddir=DIR                     set build directory
 
   --enable-mods-shared=all           enable all the modules to be shared
@@ -864,6 +868,8 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
+  --without-http_upstream_hash_module
+                                     disable ngx_http_upstream_hash_module
   --without-http_upstream_check_module
                                      disable ngx_http_upstream_check_module
   --without-http_upstream_least_conn_module

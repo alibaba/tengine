@@ -18,6 +18,7 @@ typedef struct {
     struct sockaddr                *sockaddr;
     socklen_t                       socklen;
     ngx_str_t                       name;
+    ngx_str_t                       server;
     ngx_str_t                       id;
     ngx_str_t                       host;
 
