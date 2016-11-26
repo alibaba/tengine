@@ -758,7 +758,7 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 }
 
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
 static void
 ngx_force_exit_timer_handler(ngx_event_t *ev)
 {
@@ -778,7 +778,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
     ngx_uint_t         i;
     ngx_connection_t  *c;
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
     ngx_event_t        ev;
     ngx_core_conf_t    *ccf;
 #endif
@@ -836,7 +836,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 ngx_close_listening_sockets(cycle);
                 ngx_exiting = 1;
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
                 ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
                 ngx_memzero(&ev, sizeof(ngx_event_t));
                 ev.handler = ngx_force_exit_timer_handler;

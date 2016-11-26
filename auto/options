@@ -435,6 +435,8 @@ do
         --with-file-aio)                           NGX_FILE_AIO=YES           ;;
         --with-ipv6)                               NGX_IPV6=YES               ;;
 
+        --with-force-exit)                         NGX_FORCE_EXIT=YES         ;;
+
         --with-syslog)                             NGX_SYSLOG=YES              ;;
         --without-syslog)                          NGX_SYSLOG=NO              ;;
 

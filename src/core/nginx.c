@@ -139,7 +139,7 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       NULL },
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
 
     { ngx_string("force_exit"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
@@ -1009,7 +1009,7 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
     ccf->user = (ngx_uid_t) NGX_CONF_UNSET_UINT;
     ccf->group = (ngx_gid_t) NGX_CONF_UNSET_UINT;
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
     ccf->force_exit_time = NGX_CONF_UNSET;
 #endif
 
@@ -1049,7 +1049,7 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_msec_value(ccf->timer_resolution, 0);
     ngx_conf_init_value(ccf->debug_points, 0);
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
     ngx_conf_init_value(ccf->force_exit_time, 0);
 #endif
 

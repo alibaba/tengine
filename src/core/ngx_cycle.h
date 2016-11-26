@@ -105,7 +105,7 @@ typedef struct {
      ngx_array_t              env;
      char                   **environment;
 
-#if (NGX_HAVE_FORCE_EXIT)
+#if (NGX_FORCE_EXIT)
      time_t                   force_exit_time;
 #endif
 
