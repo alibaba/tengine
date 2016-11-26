@@ -329,6 +329,10 @@ if [ $HTTP_AUTH_REQUEST = YES ]; then
     HTTP_SRCS="$HTTP_SRCS $HTTP_AUTH_REQUEST_SRCS"
 fi
 
+if [ $NGX_FORCE_EXIT = YES ]; then
+    have=NGX_FORCE_EXIT . auto/have
+fi
+
 if [ $HTTP_AUTH_BASIC = YES ]; then
     USE_MD5=YES
     USE_SHA1=YES
