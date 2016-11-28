@@ -182,8 +182,6 @@ ngx_time_update(void)
                        months[tm.ngx_tm_mon - 1], tm.ngx_tm_mday,
                        tm.ngx_tm_hour, tm.ngx_tm_min, tm.ngx_tm_sec);
 
-
-
     ngx_memory_barrier();
 
     ngx_cached_tm = &cached_http_log_tm[slot];

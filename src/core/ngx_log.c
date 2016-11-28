@@ -264,8 +264,10 @@ ngx_log_stderr(ngx_err_t err, const char *fmt, ...)
 
     last = errstr + NGX_MAX_ERROR_STR;
 
+    p = ngx_cpymem(errstr, "nginx: ", 7);
+
     va_start(args, fmt);
-    p = ngx_vslprintf(errstr, last, fmt, args);
+    p = ngx_vslprintf(p, last, fmt, args);
     va_end(args);
 
     if (err) {
@@ -402,7 +404,7 @@ ngx_int_t
 ngx_log_open_default(ngx_cycle_t *cycle)
 {
     ngx_log_t         *log;
-    static ngx_str_t  error_log = ngx_string(NGX_ERROR_LOG_PATH);
+    static ngx_str_t   error_log = ngx_string(NGX_ERROR_LOG_PATH);
 
     if (ngx_log_get_file_log(&cycle->new_log) != NULL) {
         return NGX_OK;
@@ -445,7 +447,8 @@ ngx_log_redirect_stderr(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
-    fd = cycle->log->file->fd;
+    /* file log always exists when we are called */
+    fd = ngx_log_get_file_log(cycle->log)->file->fd;
 
     if (fd != ngx_stderr) {
         if (ngx_set_stderr(fd) == NGX_FILE_ERROR) {
@@ -481,12 +484,12 @@ ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
     ngx_uint_t   i, n, d, found;
     ngx_str_t   *value;
 
-    value = cf->args->elts;
-
     if (cf->args->nelts == 2) {
         log->log_level = NGX_LOG_ERR;
         return NGX_CONF_OK;
     }
+
+    value = cf->args->elts;
 
     for (i = 2; i < cf->args->nelts; i++) {
         found = 0;
@@ -552,8 +555,8 @@ ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 char *
 ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 {
-    ngx_log_t  *new_log;
-    ngx_str_t  *value, name;
+    ngx_log_t          *new_log;
+    ngx_str_t          *value, name;
     ngx_syslog_peer_t  *peer;
 
     if (*head != NULL && (*head)->log_level == 0) {

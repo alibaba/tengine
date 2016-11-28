@@ -67,9 +67,10 @@ static ngx_cache_manager_ctx_t  ngx_cache_loader_ctx = {
 };
 
 
-static ngx_cycle_t        ngx_exit_cycle;
-static ngx_log_t          ngx_exit_log;
-static ngx_open_file_t    ngx_exit_log_file;
+static ngx_cycle_t      ngx_exit_cycle;
+static ngx_log_t        ngx_exit_log;
+static ngx_open_file_t  ngx_exit_log_file;
+
 
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
@@ -1071,7 +1072,7 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 
     ngx_exit_log = *ngx_log_get_file_log(ngx_cycle->log);
 
-    ngx_exit_log_file.fd = ngx_cycle->log->file->fd;
+    ngx_exit_log_file.fd = ngx_exit_log.file->fd;
     ngx_exit_log.file = &ngx_exit_log_file;
     ngx_exit_log.next = NULL;
     ngx_exit_log.writer = NULL;
