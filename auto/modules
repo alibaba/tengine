@@ -727,6 +727,10 @@ if [ $HTTP_UPSTREAM_RBTREE = YES ]; then
     NGX_DSO_ABI_COMPATIBILITY=$(($NGX_DSO_ABI_COMPATIBILITY|$NGX_DSO_UPSTREAM_RBTREE_TAG))
 fi
 
+if [ $NGX_FORCE_EXIT = YES ]; then
+    have=NGX_FORCE_EXIT . auto/have
+fi
+
 #if [ -r $NGX_OBJS/auto ]; then
 #    . $NGX_OBJS/auto
 #fi
