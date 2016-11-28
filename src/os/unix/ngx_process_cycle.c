@@ -874,12 +874,15 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 ngx_close_listening_sockets(cycle);
                 ngx_exiting = 1;
 
+#if (NGX_FORCE_EXIT)
                 ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                        ngx_core_module);
                 if (ccf->force_exit_time != 0) {
                     ngx_add_force_exit_timer(&ev, &force_exit_timer_ctx,
                                              ccf->force_exit_time, cycle);
                 }
+#endif
+
             }
         }
 
