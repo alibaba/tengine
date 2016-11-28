@@ -105,6 +105,10 @@ typedef struct {
      ngx_array_t              env;
      char                   **environment;
 
+#if (NGX_FORCE_EXIT)
+     time_t                   force_exit_time;
+#endif
+
 #if (NGX_OLD_THREADS)
      ngx_int_t                worker_threads;
      size_t                   thread_stack_size;
