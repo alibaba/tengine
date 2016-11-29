@@ -762,6 +762,7 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 #if (NGX_FORCE_EXIT)
 typedef struct {
     time_t         tm;
+    ngx_event_t    ev;
     ngx_cycle_t   *cycle;
 } ngx_force_exit_timer_ctx;
 
@@ -771,46 +772,46 @@ ngx_force_exit_timer_handler(ngx_event_t *ev)
 {
     ngx_force_exit_timer_ctx  *ctx;
 
-    if (ev && ev->data) {
-        ctx = (ngx_force_exit_timer_ctx *) ev->data;
-        ctx->tm -= 1000;
+    ctx = (ngx_force_exit_timer_ctx *) ev->data;
+    ctx->tm -= 1000;
 
-        if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel
-            || ctx->tm <= 0)
-        {
-            ngx_worker_process_exit(ctx->cycle);
-            return;
-        }
-
-        ngx_add_timer(ev, 1000);
+    if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel
+        || ctx->tm <= 0)
+    {
+        ngx_log_error(NGX_LOG_NOTICE, ev->log, 0, "force exit");
+        ngx_exiting = 0;    /* disable ngx_debug_quit */
+        ngx_worker_process_exit(ctx->cycle);
+        return;
     }
+
+    ngx_add_timer(ev, 1000);
 }
 
 
 static void
-ngx_add_force_exit_timer(time_t t, ngx_cycle_t *cycle)
+ngx_add_force_exit_timer(ngx_cycle_t *cycle)
 {
-    ngx_event_t               *ev;
+    ngx_core_conf_t           *ccf;
     ngx_force_exit_timer_ctx  *ctx;
 
-    ev = ngx_pcalloc(cycle->pool, sizeof(ngx_event_t));
-    if (ev == NULL) {
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    if (ccf->force_exit_time == 0) {
         return;
     }
 
-    ctx = ngx_palloc(cycle->pool, sizeof(ngx_force_exit_timer_ctx));
+    ctx = ngx_pcalloc(cycle->pool, sizeof(ngx_force_exit_timer_ctx));
     if (ctx == NULL) {
         return;
     }
 
-    ctx->tm = t;
+    ctx->tm = ccf->force_exit_time;
     ctx->cycle = cycle;
 
-    ev->handler = ngx_force_exit_timer_handler;
-    ev->log = cycle->log;
-    ev->data = ctx;
+    ctx->ev.handler = ngx_force_exit_timer_handler;
+    ctx->ev.log = cycle->log;
+    ctx->ev.data = ctx;
 
-    ngx_add_timer(ev, 1000);
+    ngx_add_timer(&ctx->ev, ngx_min(ctx->tm, 1000));
 }
 #endif
 
@@ -877,14 +878,8 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
                 ngx_exiting = 1;
 
 #if (NGX_FORCE_EXIT)
-                ngx_core_conf_t  *ccf;
-                ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
-                                                       ngx_core_module);
-                if (ccf->force_exit_time != 0) {
-                    ngx_add_force_exit_timer(ccf->force_exit_time, cycle);
-                }
+                ngx_add_force_exit_timer(cycle);
 #endif
-
             }
         }
 
