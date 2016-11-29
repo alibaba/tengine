@@ -774,6 +774,7 @@ cat << END
 
   --with-file-aio                    enable file AIO support
   --with-ipv6                        enable IPv6 support
+  --with-force-exit                  enable force_exit support
 
   --without-syslog                   disable syslog logging
 
