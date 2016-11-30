@@ -713,12 +713,6 @@ ngx_procs_process_exit(ngx_cycle_t *cycle, ngx_proc_module_t *module)
     ngx_uint_t         i;
     ngx_connection_t  *c;
 
-#if (NGX_THREADS)
-    ngx_terminate = 1;
-
-    ngx_wakeup_worker_threads(cycle);
-#endif
-
     if (module->exit) {
         module->exit(cycle);
     }
