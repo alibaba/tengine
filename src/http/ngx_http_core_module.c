@@ -4332,14 +4332,19 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
 
 #if (NGX_HAVE_REUSEPORT)
+    {
     ngx_event_conf_t    *ecf;
 
-    ecf = ngx_event_get_conf(cf->cycle->conf_ctx, ngx_event_core_module);
+    if (ngx_get_conf(cf->cycle->conf_ctx, ngx_events_module)) {
 
-    if (ecf && ecf->reuse_port == 1) {
-        lsopt.reuseport = 1;
-        lsopt.set = 1;
-        lsopt.bind = 1;
+        ecf = ngx_event_get_conf(cf->cycle->conf_ctx, ngx_event_core_module);
+
+        if (ecf && ecf->reuse_port == 1) {
+            lsopt.reuseport = 1;
+            lsopt.set = 1;
+            lsopt.bind = 1;
+        }
+    }
     }
 #endif
 
