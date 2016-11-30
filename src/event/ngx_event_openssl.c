@@ -18,9 +18,6 @@ typedef struct {
 } ngx_openssl_conf_t;
 
 
-typedef int (ngx_ssl_read_bio_handler_pt)(char *, int, int, void *);
-
-
 static int ngx_ssl_password_callback(char *buf, int size, int rwflag,
     void *userdata);
 static int ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store);
@@ -682,7 +679,7 @@ ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store)
 
     ngx_log_debug5(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "verify:%d, error:%d, depth:%d, "
-                   "subject:\"%s\", issuer: \"%s\"",
+                   "subject:\"%s\", issuer:\"%s\"",
                    ok, err, depth, subject, issuer);
 
     if (sname) {
@@ -3283,7 +3280,8 @@ ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     }
 
     return NGX_OK;
-} 
+}
+
 
 ngx_int_t
 ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
