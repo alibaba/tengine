@@ -1,3 +1,51 @@
+Changes with Tengine 2.2.0                                         29 Nov 2016
+
+    *) Security: a segmentation fault might occur in a worker process
+       while writing a specially crafted request body to a temporary file
+       (CVE-2016-4450) (0x7E)
+
+    *) Feature: the "force_exit" directive. (aholic, chobits)
+
+    *) Feature: debug pool module which can get memory usage of nginx memory
+       pool. (chobits)
+
+    *) Change:  merged HTTP/2 module, SPDY module is removed. (PeterDaveHello)
+
+    *) Change:  merged changes from nginx-1.8.1. (lhanjian, magicbear, chobits)
+
+    *) Change:  support for EPOLL_EXCLUSIVE. (cfsego)
+
+    *) Change:  export api: ngx_http_upstream_check_upstream_down. (detailyang)
+
+    *) Change:  disable "check_keepalive_requests" feature for TCP health check.
+       (cynron)
+
+    *) Change:  updated reqstatus module. (cfsego)
+
+    *) Bugfix:  remove duplicate code in ngx_http_named_location (innomentats)
+
+    *) Bugfix:  fixed bug of session-sticky module. (detailyang)
+
+    *) Bugfix:  fixed bug of resolve.conf parser. (zuopucuen)
+
+    *) Bugfix:  fixed the compile warning of tfs module. (monadbobo)
+
+    *) Bugfix:  fixed a segmentation fault of dynamic_resolver feature when
+       variable is used in proxy_pass directive. (chobits)
+
+    *) Bugfix:  fixed bug of invalid Set-Cookie value in session-sticky module.
+       (YanagiEiichi)
+
+    *) Bugfix:  fixed bug of uninitialized 'cf' variable in dyups module.
+       (wangfakang)
+
+    *) Bugfix:  fixed bug of duplicate peers in health check module.
+       (FqqCS, taoyuanyuan)
+
+    *) Bugfix:  fixed bug of wrong javascript content-type in concat module.
+       (IYism)
+
+
 Changes with Tengine 2.1.1                                         12 Aug 2015
 
     *) Feature: support for dynamic upstream update. (yzprofile)
@@ -56,7 +104,7 @@ Changes with Tengine 2.1.0                                         19 Dec 2014
     *) Feature: added wildcard support for 'include' directive in 'dso' block.
        (monadbobo)
 
-    *) Feature: added the 'gzip_clear_etag' directive. (taoyuanyuan) 
+    *) Feature: added the 'gzip_clear_etag' directive. (taoyuanyuan)
 
     *) Feature: added the 'unprintable' parameter to the 'log_escape' directive.
        (skoo87)
@@ -135,7 +183,7 @@ Changes with Tengine 2.0.1                                       06 March 2014
        http://trac.nginx.org/nginx/ticket/503 (Hao Chen)
 
     *) Bugfix: reduce nginx memory consumption when processing large files.
-       (cfsego) 
+       (cfsego)
 
     *) Bugfix: disabled redirects to named locations if URI is not set.
 
