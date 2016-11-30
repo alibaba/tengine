@@ -51,13 +51,11 @@ typedef void (*ngx_resolver_handler_pt)(ngx_resolver_ctx_t *ctx);
 
 
 typedef struct {
-	ngx_rbtree_node_t         node;
-
+    ngx_rbtree_node_t         node;
     ngx_queue_t               queue;
 
     /* PTR: resolved name, A: name to resolve */
     u_char                   *name;
-
 
 #if (NGX_HAVE_INET6)
     /* PTR: IPv6 address to resolve (IPv4 address is in rbtree node key) */
