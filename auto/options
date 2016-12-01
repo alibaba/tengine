@@ -162,7 +162,6 @@ NGX_DSO_ABI_ALL_TAG="
     with-http
     with-http-cache
     with-ipv6
-    with-syslog
     with-http-gzip
     with-http-gzip-static
     with-http-ssi
@@ -182,7 +181,6 @@ NGX_DSO_DEBUG_TAG=0x00000001
 NGX_DSO_HTTP_TAG=0x00000002
 NGX_DSO_CACHE_TAG=0x00000004
 NGX_DSO_IPV6_TAG=0x00000008
-NGX_DSO_SYSLOG_TAG=0x00000010
 NGX_DSO_GZIP_TAG=0x00000020
 NGX_DSO_GZIP_STATIC_TAG=0x00000040
 NGX_DSO_SSI_TAG=0x00000080
@@ -377,8 +375,6 @@ NGX_CPU_CACHE_LINE=
 
 NGX_FORCE_EXIT=NO
 
-NGX_SYSLOG=YES
-
 NGX_POST_CONF_MSG=
 
 
@@ -436,9 +432,6 @@ do
         --with-ipv6)                               NGX_IPV6=YES               ;;
 
         --with-force-exit)                         NGX_FORCE_EXIT=YES         ;;
-
-        --with-syslog)                             NGX_SYSLOG=YES              ;;
-        --without-syslog)                          NGX_SYSLOG=NO              ;;
 
         --without-dso)                             NGX_DSO=NO                 ;;
 
@@ -777,8 +770,6 @@ cat << END
   --with-file-aio                    enable file AIO support
   --with-ipv6                        enable IPv6 support
   --with-force-exit                  enable force_exit support
-
-  --without-syslog                   disable syslog logging
 
   --without-dso                      disable dso module load
 

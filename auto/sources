@@ -154,9 +154,6 @@ AIO_SRCS="src/event/modules/ngx_aio_module.c \
 FILE_AIO_SRCS="src/os/unix/ngx_file_aio_read.c"
 LINUX_AIO_SRCS="src/os/unix/ngx_linux_aio_read.c"
 
-#SYSLOG_DEPS="src/os/unix/ngx_syslog.h"
-#SYSLOG_SRCS="src/os/unix/ngx_syslog.c"
-
 PIPE_DEPS="src/os/unix/ngx_pipe.h"
 PIPE_SRCS="src/os/unix/ngx_pipe.c"
 

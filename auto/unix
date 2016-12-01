@@ -572,12 +572,6 @@ if [ $NGX_IPV6 = YES ]; then
 fi
 
 
-if [ $NGX_SYSLOG = YES ]; then
-    CORE_DEPS="$CORE_DEPS $SYSLOG_DEPS"
-    CORE_SRCS="$CORE_SRCS $SYSLOG_SRCS"
-fi
-
-
 if [ $NGX_BACKTRACE = YES ]; then
     ngx_feature="BACKTRACE"
     ngx_feature_name=
