@@ -15,7 +15,6 @@ Features
 * More load balancing methods, e.g., consistent hashing, and session persistence.
 * Input body filter support. It's quite handy to write Web Application Firewalls using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and makes it easy to extend core functionalities.
-* Logging enhancements. Syslog (local and remote), pipe logging, and log sampling are supported.
 * Limits retries for upstream servers (proxy, memcached, fastcgi, scgi, uwsgi).
 * Includes a mechanism to support standalone processes.
 * Protects the server in case system load or memory use goes too high.
