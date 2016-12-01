@@ -11,6 +11,8 @@ Changes with Tengine 2.2.0                                         29 Nov 2016
 
     *) Change:  merged HTTP/2 module, SPDY module is removed. (PeterDaveHello)
 
+    *) Change:  official nginx syslog support, tengine syslog support is removed.
+
     *) Change:  merged changes from nginx-1.8.1. (lhanjian, magicbear, chobits)
 
     *) Change:  support for EPOLL_EXCLUSIVE. (cfsego)
