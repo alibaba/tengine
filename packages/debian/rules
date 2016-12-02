@@ -8,7 +8,7 @@ WITH_HTTP2 := $(shell printf "Source: tengine\nBuild-Depends: libssl-dev (>= 1.0
 	echo "--with-http_v2_module")
 
 %:
-	dh $@ 
+	dh $@ --parallel
 
 override_dh_auto_configure: configure_debug
 
