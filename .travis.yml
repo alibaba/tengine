@@ -28,5 +28,5 @@ addons:
 
 script:
   - ./configure --enable-mods-static=all --with-ipv6 --with-http_v2_module
-  - make
+  - make -j2
   - sudo make install
