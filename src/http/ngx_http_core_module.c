@@ -4340,9 +4340,10 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ecf = ngx_event_get_conf(cf->cycle->conf_ctx, ngx_event_core_module);
 
         if (ecf && ecf->reuse_port == 1) {
+
+            /* set cmcf->ports[].addrs[].lsopt.reuseport */
+
             lsopt.reuseport = 1;
-            lsopt.set = 1;
-            lsopt.bind = 1;
         }
     }
     }
