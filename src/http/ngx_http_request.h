@@ -95,6 +95,7 @@
 #define NGX_HTTP_REQUEST_URI_TOO_LARGE     414
 #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
 #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
+#define NGX_HTTP_MISDIRECTED_REQUEST       421
 
 
 /* Our own HTTP codes */
@@ -283,6 +284,7 @@ typedef struct {
     ngx_chain_t                      *bufs;
     ngx_buf_t                        *buf;
     off_t                             rest;
+    off_t                             received;
     ngx_chain_t                      *free;
     ngx_chain_t                      *busy;
     ngx_http_chunked_t               *chunked;
@@ -436,9 +438,7 @@ struct ngx_http_request_s {
     ngx_uint_t                        us_tries;
 
     ngx_http_connection_t            *http_connection;
-#if (NGX_HTTP_V2)
     ngx_http_v2_stream_t             *stream;
-#endif
 
     ngx_http_log_handler_pt           log_handler;
 
