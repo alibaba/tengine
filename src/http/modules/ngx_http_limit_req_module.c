@@ -342,8 +342,6 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
         ngx_crc32_init(hash);
 
-        ngx_crc32_init(hash);
-
         total_len = ngx_http_limit_req_copy_variables(r, &hash, ctx, NULL);
         if (total_len == 0) {
             continue;
