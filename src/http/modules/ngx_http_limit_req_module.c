@@ -41,9 +41,11 @@ typedef struct {
     ngx_slab_pool_t             *shpool;
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   rate;
+    ngx_uint_t                   scale;
     ngx_http_complex_value_t     key;
     ngx_http_limit_req_node_t   *node;
     ngx_array_t                 *limit_vars;
+    ngx_str_t                   rate_name;
 } ngx_http_limit_req_ctx_t;
 
 
@@ -53,6 +55,7 @@ typedef struct {
     ngx_uint_t                   burst;
     ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
     ngx_str_t                    forbid_action;
+    ngx_str_t                    burst_name;
 } ngx_http_limit_req_limit_t;
 
 
@@ -89,7 +92,8 @@ static char *ngx_http_limit_req_whitelist(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_limit_req_init(ngx_conf_t *cf);
 
-
+ngx_http_variable_value_t *
+ngx_http_limit_req_get_variable(ngx_http_request_t *r, ngx_str_t var_name);
 
 static ngx_conf_enum_t  ngx_http_limit_req_log_levels[] = {
     { ngx_string("info"), NGX_LOG_INFO },
@@ -260,6 +264,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     size_t                         n, total_len;
     uint32_t                       hash;
     ngx_int_t                      rc;
+    ngx_int_t                      rate, burst;
     ngx_msec_t                     delay_time;
     ngx_uint_t                     excess, delay_excess, delay_postion,
                                    nodelay, i;
@@ -269,6 +274,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     ngx_http_limit_req_ctx_t      *ctx;
     ngx_http_limit_req_node_t     *lr;
     ngx_http_limit_req_conf_t     *lrcf;
+    ngx_http_variable_value_t     *vv_rate_name;
+    ngx_http_variable_value_t     *vv_burst_name;
 
     delay_excess = 0;
     excess = 0;
@@ -299,6 +306,41 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     limit_req = lrcf->rules->elts;
     for (i = 0; i < lrcf->rules->nelts; i++) {
         ctx = limit_req[i].shm_zone->data;
+
+        if (limit_req[i].burst_name.len > 0 && limit_req[i].burst_name.data != NULL) {
+
+            vv_burst_name = ngx_http_limit_req_get_variable(r, limit_req[i].burst_name);
+            if ( vv_burst_name != NULL && vv_burst_name->data != NULL
+                    && vv_burst_name->len > 0 )  {
+
+                burst = ngx_atoi(vv_burst_name->data, vv_burst_name->len);
+                if (burst == NGX_ERROR) {
+                    ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0,
+                                       "invalid burst rate \"%V\"", &vv_burst_name);
+                    return NGX_DECLINED;
+                }
+                limit_req[i].burst = burst * 1000;
+            }
+        }
+
+        if (ctx->rate_name.len > 0 && ctx->rate_name.data != NULL) {
+
+            vv_rate_name = ngx_http_limit_req_get_variable(r, ctx->rate_name);
+            if ( vv_rate_name != NULL && vv_rate_name->data != NULL
+                    && vv_rate_name->len > 0 ) {
+
+                rate = ngx_atoi(vv_rate_name->data, vv_rate_name->len);
+                if (rate <= 0) {
+                    ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0,
+                                       "invalid rate \"%V\"", &vv_rate_name);
+                    return NGX_DECLINED;
+                }
+                ctx->rate = rate * 1000 / ctx->scale;
+            }
+        }
+
+
+        ngx_crc32_init(hash);
 
         ngx_crc32_init(hash);
 
@@ -830,7 +872,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     u_char                         *p;
     size_t                          len;
     ssize_t                         size;
-    ngx_str_t                      *value, name, s;
+    ngx_str_t                      *value, name, s, rate_name;
     ngx_int_t                       rate, scale;
     ngx_uint_t                      i;
     ngx_array_t                    *variables;
@@ -846,6 +888,8 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     rate = 1;
     scale = 1;
     name.len = 0;
+    rate_name.len = 0;
+    rate_name.data = NULL;
 
     variables = ngx_array_create(cf->pool, 5,
                                  sizeof(ngx_http_limit_req_variable_t));
@@ -903,6 +947,13 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 len -= 3;
             }
 
+            if ( (value[i].data + 5)[0] == '$' ) {
+                rate_name.len = len - 6;
+                rate_name.data = value[i].data + 6;
+
+                continue;
+            }
+
             rate = ngx_atoi(value[i].data + 5, len - 5);
             if (rate <= 0) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -957,7 +1008,14 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
-    ctx->rate = rate * 1000 / scale;
+
+    if (rate_name.len > 0 && rate_name.data != NULL) {
+        ctx->rate_name = rate_name;
+        ctx->scale = scale;
+    }else {
+        ctx->rate = rate * 1000 / scale;
+    }
+
     ctx->limit_vars = variables;
 
     shm_zone = ngx_shared_memory_add(cf, &name, size,
@@ -987,7 +1045,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_limit_req_conf_t  *lrcf = conf;
 
     ngx_int_t                      burst;
-    ngx_str_t                     *value, s, forbid_action;
+    ngx_str_t                     *value, s, forbid_action, burst_name;
     ngx_uint_t                     i, nodelay;
     ngx_shm_zone_t                *shm_zone;
     ngx_http_limit_req_limit_t    *limit_req;
@@ -1024,6 +1082,13 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (ngx_strncmp(value[i].data, "burst=", 6) == 0) {
+
+            if ( (value[i].data + 6)[0] == '$' ) {
+                burst_name.len = value[i].len - 7;
+                burst_name.data = value[i].data + 7;
+
+                continue;
+            }
 
             burst = ngx_atoi(value[i].data + 6, value[i].len - 6);
             if (burst == NGX_ERROR) {
@@ -1099,7 +1164,11 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_memzero(limit_req, sizeof(ngx_http_limit_req_limit_t));
 
     limit_req->shm_zone = shm_zone;
-    limit_req->burst = burst * 1000;
+    if (burst_name.len > 0 && burst_name.data != NULL) {
+        limit_req->burst_name = burst_name;
+    }else {
+        limit_req->burst = burst * 1000;
+    }
     limit_req->nodelay = nodelay;
     limit_req->forbid_action = forbid_action;
 
@@ -1172,3 +1241,23 @@ ngx_http_limit_req_init(ngx_conf_t *cf)
 
     return NGX_OK;
 }
+
+
+ngx_http_variable_value_t *
+ngx_http_limit_req_get_variable(ngx_http_request_t *r, ngx_str_t var_name)
+{
+    ngx_uint_t                  hash;
+    ngx_http_variable_value_t   *vv;
+
+    hash = ngx_hash_key (var_name.data, var_name.len);
+    vv = ngx_http_get_variable(r, &var_name, hash);
+    if ( vv == NULL || vv->not_found ) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "\"%V\"  variable is not found", &var_name);
+
+        return NULL;
+    }
+
+    return vv;
+}
+
