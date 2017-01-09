@@ -338,7 +338,10 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
                 ctx->rate = rate * 1000 / ctx->scale;
             }
         }
-
+        
+        if (ctx->rate <= 0) {
+            return NGX_DECLINED;
+        }
 
         ngx_crc32_init(hash);
 
