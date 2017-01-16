@@ -104,9 +104,10 @@ ngx_reset_pool(ngx_pool_t *pool)
             ngx_free(l->alloc);
         }
     }
-
-    for (p = pool; p; p = p->d.next) {
-        p->d.last = (u_char *) p + sizeof(ngx_pool_t);
+    p = pool;
+    p->d.last = (u_char *) p + sizeof(ngx_pool_t);
+    for (p = pool->d.next; p; p = p->d.next) {
+        p->d.last = (u_char *) p + sizeof(ngx_pool_data_t);
         p->d.failed = 0;
     }
 
