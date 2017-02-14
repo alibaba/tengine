@@ -34,6 +34,10 @@ ngx_conf_open_pipe(ngx_cycle_t *cycle, ngx_str_t *cmd, const char *type)
     ngx_array_t      *argv_out;
 
     dup = ngx_pnalloc(cycle->pool, cmd->len + 1);
+    if (dup == NULL) {
+        return NULL;
+    }
+
     (void) ngx_cpystrn(dup, cmd->data, cmd->len + 1);
 
     for (cp = cmd->data; *cp == ' ' || *cp == '\t'; cp++);
@@ -85,6 +89,10 @@ ngx_conf_open_pipe(ngx_cycle_t *cycle, ngx_str_t *cmd, const char *type)
     }
 
     argi = (u_char **) ngx_array_push(argv_out);
+    if (argi == NULL) {
+        return NULL;
+    }
+
     *argi = NULL;
 
     for (i = 0, use = -1; i < ngx_last_pipe; i++) {
