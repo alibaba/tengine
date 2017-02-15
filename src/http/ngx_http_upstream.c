@@ -3929,7 +3929,8 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
         if (u->peer.tries == 0 
             || !(u->conf->next_upstream & ft_type)
-            || (u->request_sent && r->request_body_no_buffering)
+            || (u->request_sent && (r->request_body_no_buffering 
+                || u->conf->next_upstream & NGX_HTTP_UPSTREAM_FT_NO_REQUEST_SENT))
             || (timeout && ngx_current_msec - u->peer.start_time >= timeout))
         {
 
