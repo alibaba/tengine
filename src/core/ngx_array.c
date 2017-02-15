@@ -30,6 +30,9 @@ ngx_array_create(ngx_pool_t *p, ngx_uint_t n, size_t size)
 void
 ngx_array_destroy(ngx_array_t *a)
 {
+
+//如果array的内存申请来自ngx_pool_t 里面的ngx_palloc_block 或者 ngx_palloc_large 下面判断将失效
+//暂时没有解决办法
     ngx_pool_t  *p;
 
     p = a->pool;
