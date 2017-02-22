@@ -322,16 +322,27 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     cookie = NULL;
     now = ngx_time();
     cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
+    size_t cookielen;
+    u_char found = 0;
     for (i = 0; i < r->headers_in.cookies.nelts; i++) {
         cookie = &cookies[i]->value;
-        p = ngx_strnstr(cookie->data, (char *) sscf->cookie.data, cookie->len);
-        if (p == NULL) {
-            continue;
-        }
+        vv = cookie->data;
+        cookielen = cookie->len;
+        for (;;) {
+            p = ngx_strnstr(vv, (char *)sscf->cookie.data, cookielen);
+            if (!p) break;
 
-        if (*(p + sscf->cookie.len) == ' ' || *(p + sscf->cookie.len) == '=') {
-            break;
+            v = p + sscf->cookie.len;
+            if ((p == cookie->data || (p[-1] == ' ' && p > cookie->data + 1 && p[-2] == ';') || p[-1] == ';')
+                && (v == cookie->data + cookie->len || *v == '=' || *v == ';')) {
+                found = 1;
+                break;
+            }
+            if (v >= cookie->data + cookie->len) break;
+            vv = p + 1;
+            cookielen = cookie->len - (vv - cookie->data);
         }
+        if (found) break;
     }
 
     if (i >= r->headers_in.cookies.nelts) {
