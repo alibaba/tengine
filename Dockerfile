@@ -45,7 +45,7 @@ ENV CONFIG "\
       --with-mail \
       --with-mail_ssl_module \
       --with-jemalloc"
-      # --with-http_spdy_module \
+
 ADD . /root
 
 RUN \
@@ -63,8 +63,6 @@ RUN \
         linux-headers \
         jemalloc-dev \
         geoip-dev \
-        # libxslt-dev \
-        # libxml2-dev \
     && cd /root \
     && ./configure $CONFIG --with-debug \
     && make install \
