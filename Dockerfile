@@ -50,7 +50,7 @@ ADD . /root
 
 RUN \
     addgroup -S tengine \
-    && adduser -D -S -h /etc/tengine -s /sbin/nologin -G tengine tengine \
+    && adduser -D -S -h /var/lib/tengine -s /sbin/nologin -G tengine tengine \
     && addgroup -S www-data \
     && adduser tengine www-data \
     && apk add --update \
@@ -68,14 +68,14 @@ RUN \
     && make install \
     && chown tengine:www-data /var/log/tengine \
     && chmod 750 /var/log/tengine \
-    && install -d /var/lib/tengine /var/www/tengine \
+    && install -d /var/www/tengine \
     && chown tengine:www-data /var/www/tengine \
     # forward request and error logs to docker log collector
     && ln -sf /dev/stdout /var/log/tengine/access.log \
     && ln -sf /dev/stderr /var/log/tengine/error.log
 
 # Remove unneeded files
-RUN apk del gcc musl-dev linux-headers \
+RUN apk del gcc linux-headers make \
   && rm -rf ~/* ~/.git ~/.gitignore ~/.travis.yml ~/.ash_history \
   && rm -rf /var/cache/apk/*
 
