@@ -68,7 +68,7 @@ RUN \
     && make install \
     && chown tengine:www-data /var/log/tengine \
     && chmod 750 /var/log/tengine \
-    && install -d /var/www/tengine \
+    && install -d /var/lib/tengine /var/www/tengine \
     && chown tengine:www-data /var/www/tengine \
     # forward request and error logs to docker log collector
     && ln -sf /dev/stdout /var/log/tengine/access.log \
