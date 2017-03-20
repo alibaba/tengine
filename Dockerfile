@@ -74,7 +74,7 @@ RUN \
     && ln -sf /dev/stdout /var/log/tengine/access.log \
     && ln -sf /dev/stderr /var/log/tengine/error.log
 
-# Remove unneeded files
+# Remove unneeded packages/files
 RUN apk del gcc linux-headers make \
   && rm -rf ~/* ~/.git ~/.gitignore ~/.travis.yml ~/.ash_history \
   && rm -rf /var/cache/apk/*
