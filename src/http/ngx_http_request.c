@@ -428,7 +428,6 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     n = c->recv(c, b->last, size);
 
     if (n == NGX_AGAIN) {
-
         if (!rev->timer_set) {
             ngx_add_timer(rev, c->listening->post_accept_timeout);
             ngx_reusable_connection(c, 1);
