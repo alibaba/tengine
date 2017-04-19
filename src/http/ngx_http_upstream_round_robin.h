@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -59,6 +58,7 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_str_t                      *name;
 
     ngx_http_upstream_rr_peers_t   *next;
+    unsigned                        isstandby:1;
 
     ngx_http_upstream_rr_peer_t     peer[1];
 };
