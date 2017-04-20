@@ -935,7 +935,7 @@ ngx_connection_t *
 ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 {
     ngx_uint_t         instance;
-    ngx_event_t       *rev, *wev;
+    ngx_event_t       *rev, *wev, *oev;
     ngx_connection_t  *c;
 
     /* disable warning: Win32 SOCKET is u_int while UNIX socket is int */
@@ -972,11 +972,13 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     rev = c->read;
     wev = c->write;
+    oev = c->overall;
 
     ngx_memzero(c, sizeof(ngx_connection_t));
 
     c->read = rev;
     c->write = wev;
+    c->overall = oev;
     c->fd = s;
     c->log = log;
 
@@ -984,15 +986,19 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
     ngx_memzero(rev, sizeof(ngx_event_t));
     ngx_memzero(wev, sizeof(ngx_event_t));
+    ngx_memzero(oev, sizeof(ngx_event_t));
 
     rev->instance = !instance;
     wev->instance = !instance;
+    oev->instance = !instance;
 
     rev->index = NGX_INVALID_INDEX;
     wev->index = NGX_INVALID_INDEX;
+    oev->index = NGX_INVALID_INDEX;
 
     rev->data = c;
     wev->data = c;
+    oev->data = c;
 
     wev->write = 1;
 
@@ -1031,6 +1037,10 @@ ngx_close_connection(ngx_connection_t *c)
 
     if (c->write->timer_set) {
         ngx_del_timer(c->write);
+    }
+
+    if (c->overall->timer_set) {
+        ngx_del_timer(c->overall);
     }
 
     if (ngx_del_conn) {

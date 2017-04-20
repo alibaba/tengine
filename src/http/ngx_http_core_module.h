@@ -393,6 +393,9 @@ struct ngx_http_core_loc_conf_s {
     ngx_msec_t    lingering_timeout;       /* lingering_timeout */
     ngx_msec_t    resolver_timeout;        /* resolver_timeout */
 
+    ngx_msec_t    post_overall_timeout;    /* post_overall_timeout */
+    ngx_msec_t    send_overall_timeout;    /* send_overall_timeout */
+
     ngx_resolver_t  *resolver;             /* resolver */
 
     time_t        keepalive_header;        /* keepalive_timeout */

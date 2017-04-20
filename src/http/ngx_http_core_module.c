@@ -835,6 +835,20 @@ static ngx_command_t  ngx_http_core_commands[] = {
 
 #endif
 
+     { ngx_string("send_overall_timeout"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+       ngx_conf_set_msec_slot,
+       NGX_HTTP_LOC_CONF_OFFSET,
+       offsetof(ngx_http_core_loc_conf_t, send_overall_timeout),
+       NULL },
+
+     { ngx_string("post_overall_timeout"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+       ngx_conf_set_msec_slot,
+       NGX_HTTP_LOC_CONF_OFFSET,
+       offsetof(ngx_http_core_loc_conf_t, post_overall_timeout),
+       NULL },
+
       ngx_null_command
 };
 
@@ -3870,6 +3884,9 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
 #endif
 #endif
 
+    clcf->send_overall_timeout = NGX_CONF_UNSET_MSEC;
+    clcf->post_overall_timeout = NGX_CONF_UNSET_MSEC;
+
 #if (NGX_HAVE_OPENAT)
     clcf->disable_symlinks = NGX_CONF_UNSET_UINT;
     clcf->disable_symlinks_from = NGX_CONF_UNSET_PTR;
@@ -4270,6 +4287,9 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #endif
 #endif
+
+    ngx_conf_merge_msec_value(conf->send_overall_timeout, prev->send_overall_timeout, 0);
+    ngx_conf_merge_msec_value(conf->post_overall_timeout, prev->post_overall_timeout, 0);
 
 #if (NGX_HAVE_OPENAT)
     ngx_conf_merge_uint_value(conf->disable_symlinks, prev->disable_symlinks,

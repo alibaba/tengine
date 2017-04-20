@@ -60,6 +60,7 @@ struct ngx_cycle_s {
     ngx_connection_t         *connections;
     ngx_event_t              *read_events;
     ngx_event_t              *write_events;
+    ngx_event_t              *overall_events;
 
     ngx_cycle_t              *old_cycle;
 

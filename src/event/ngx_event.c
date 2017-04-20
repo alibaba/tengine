@@ -593,7 +593,7 @@ static ngx_int_t
 ngx_event_process_init(ngx_cycle_t *cycle)
 {
     ngx_uint_t           m, i;
-    ngx_event_t         *rev, *wev;
+    ngx_event_t         *rev, *wev, *oev;
     ngx_listening_t     *ls;
     ngx_connection_t    *c, *next, *old;
     ngx_core_conf_t     *ccf;
@@ -727,6 +727,21 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         wev[i].closed = 1;
     }
 
+    cycle->overall_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
+                                    cycle->log);
+    if (cycle->overall_events == NULL) {
+        return NGX_ERROR;
+    }
+
+    oev = cycle->overall_events;
+    for (i = 0; i < cycle->connection_n; i++) {
+        oev[i].closed = 1;
+#if (NGX_THREADS)
+        oev[i].lock = &c[i].lock;
+        oev[i].own_lock = &c[i].lock;
+#endif
+    }
+
     i = cycle->connection_n;
     next = NULL;
 
@@ -736,6 +751,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c[i].data = next;
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
+        c[i].overall = &cycle->overall_events[i];
         c[i].fd = (ngx_socket_t) -1;
 
         next = &c[i];

@@ -23,7 +23,7 @@ ngx_event_accept(ngx_event_t *ev)
     ngx_log_t         *log;
     ngx_uint_t         level;
     ngx_socket_t       s;
-    ngx_event_t       *rev, *wev;
+    ngx_event_t       *rev, *wev, *oev;
     ngx_listening_t   *ls;
     ngx_connection_t  *c, *lc;
     ngx_event_conf_t  *ecf;
@@ -229,6 +229,7 @@ ngx_event_accept(ngx_event_t *ev)
 
         rev = c->read;
         wev = c->write;
+        oev = c->overall;
 
         wev->ready = 1;
 
@@ -246,6 +247,7 @@ ngx_event_accept(ngx_event_t *ev)
 
         rev->log = log;
         wev->log = log;
+        oev->log = log;
 
         /*
          * TODO: MT: - ngx_atomic_fetch_add()

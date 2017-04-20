@@ -445,12 +445,23 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
+            if (clcf->post_overall_timeout && !c->overall->timer_set) {
+                ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->overall->log, 0,
+                                    "http add post overall timer: %M, \"%V?%V\"",
+                                    clcf->post_overall_timeout, &r->uri, &r->args);
+                ngx_add_timer(c->overall, clcf->post_overall_timeout);
+            }
+
             return NGX_AGAIN;
         }
     }
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
+    }
+
+    if (c->overall->timer_set) {
+        ngx_del_timer(c->overall);
     }
 
     if (rb->temp_file || r->request_body_in_file_only) {

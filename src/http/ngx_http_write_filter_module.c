@@ -312,6 +312,14 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     r->out = chain;
 
     if (chain) {
+
+        if (last && clcf->send_overall_timeout && !c->overall->timer_set) {
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->overall->log, 0,
+                                "http add send overall timer: %M, \"%V?%V\"",
+                                clcf->send_overall_timeout, &r->uri, &r->args);
+            ngx_add_timer(c->overall, clcf->send_overall_timeout);
+        }
+
         c->buffered |= NGX_HTTP_WRITE_BUFFERED;
         return NGX_AGAIN;
     }
