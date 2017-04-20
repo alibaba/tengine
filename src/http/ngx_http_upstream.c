@@ -6114,7 +6114,7 @@ ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
         }
     }
 
-    if (ngx_array_init(&hide_headers, cf->temp_pool, 4, sizeof(ngx_hash_key_t))
+    if (ngx_array_init(&hide_headers, cf->temp_pool, 8, sizeof(ngx_hash_key_t))
         != NGX_OK)
     {
         return NGX_ERROR;

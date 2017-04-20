@@ -3612,7 +3612,7 @@ ngx_http_core_create_main_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    if (ngx_array_init(&cmcf->servers, cf->pool, 4,
+    if (ngx_array_init(&cmcf->servers, cf->pool, 4 + MAX_SERVER_NUM,
                        sizeof(ngx_http_core_srv_conf_t *))
         != NGX_OK)
     {

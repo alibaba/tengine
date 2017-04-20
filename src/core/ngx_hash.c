@@ -790,7 +790,7 @@ ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
         }
 
     } else {
-        if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+        if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 8,
                            sizeof(ngx_str_t))
             != NGX_OK)
         {
@@ -845,7 +845,7 @@ wildcard:
             }
 
         } else {
-            if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+            if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 8,
                                sizeof(ngx_str_t))
                 != NGX_OK)
             {

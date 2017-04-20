@@ -1407,7 +1407,7 @@ ngx_http_add_server(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     ngx_http_core_srv_conf_t  **server;
 
     if (addr->servers.elts == NULL) {
-        if (ngx_array_init(&addr->servers, cf->temp_pool, 4,
+        if (ngx_array_init(&addr->servers, cf->temp_pool, 4 + MAX_SERVER_NUM,
                            sizeof(ngx_http_core_srv_conf_t *))
             != NGX_OK)
         {

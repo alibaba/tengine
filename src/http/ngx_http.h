@@ -12,6 +12,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+#ifndef MAX_SERVER_NUM
+#define MAX_SERVER_NUM 40000 /* hints for less mem usage */
+#endif
 
 typedef struct ngx_http_request_s     ngx_http_request_t;
 typedef struct ngx_http_upstream_s    ngx_http_upstream_t;
