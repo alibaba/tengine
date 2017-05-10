@@ -1218,7 +1218,8 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
 
     return NGX_OK;
 }
-#ifndef OPENSSL_IS_BORINGSSL
+
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
 static ngx_int_t
 ngx_ssl_read_early_data(ngx_connection_t *c,
                         u_char *buf,
@@ -1251,9 +1252,6 @@ ngx_ssl_read_early_data(ngx_connection_t *c,
 static ngx_int_t
 ngx_ssl_handshake_early_data(ngx_connection_t *c)
 {
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-    return 0;
-#else
     int sslerr, errret;
     size_t size, readbytes = 0;
     ngx_buf_t                 *b;
@@ -1327,9 +1325,7 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
     }
 
     return -1;
-#endif
 }
-
 #endif
 
 
@@ -1341,15 +1337,14 @@ ngx_ssl_handshake(ngx_connection_t *c)
 
     ngx_ssl_clear_error(c->log);
 
-#ifndef OPENSSL_IS_BORINGSSL
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     n = ngx_ssl_handshake_early_data(c);
     if (n == 0) {
 #endif
         n = SSL_do_handshake(c->ssl->connection);
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
         "SSL_do_handshake: %d", n);
-
-#ifndef OPENSSL_IS_BORINGSSL
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     }
 #endif
 
@@ -1436,8 +1431,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_get_error: %d", sslerr);
 
     if (sslerr == SSL_ERROR_WANT_READ
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
         || (sslerr == SSL_ERROR_NONE &&
-            c->ssl->read_early_state == SSL_READ_EARLY_DATA_SUCCESS)) {
+            c->ssl->read_early_state == SSL_READ_EARLY_DATA_SUCCESS)
+#endif
+        ) {
         c->read->ready = 0;
         c->read->handler = ngx_ssl_handshake_handler;
         c->write->handler = ngx_ssl_handshake_handler;
@@ -1679,8 +1677,11 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
     int        sslerr;
     ngx_err_t  err;
 
-    if (c->ssl->renegotiation &&
-        (SSL_version(c->ssl->connection) != TLS1_3_VERSION)) {
+    if (c->ssl->renegotiation
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+        && (SSL_version(c->ssl->connection) != TLS1_3_VERSION)
+#endif
+        ) {
         /*
          * disable renegotiation (CVE-2009-3555):
          * OpenSSL (at least up to 0.9.8l) does not handle disabled
@@ -1959,11 +1960,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
          SSL_EARLY_DATA_ACCEPTED)) {
         size_t wrttenbytes = 0;
         n = SSL_write_early_data(c->ssl->connection, data, size, &wrttenbytes);
-        /*
-        c->ssl->read_early_state = SSL_READ_EARLY_DATA_FINISH;
-        */
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
-            "SSL_write_early_data: %d written: %d", n, wrttenbytes);
+                       "SSL_write_early_data: %d written: %d", n, wrttenbytes);
         if (wrttenbytes > 0)
             n = wrttenbytes;
     } else
