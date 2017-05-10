@@ -1023,7 +1023,7 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-#if (NGX_HTTP_SSL)
+#if 0 && (NGX_HTTP_SSL)
     ngx_connection_t  *c;
     c = r->connection;
 
