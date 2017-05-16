@@ -1252,9 +1252,13 @@ ngx_ssl_read_early_data(ngx_connection_t *c,
 static ngx_int_t
 ngx_ssl_handshake_early_data(ngx_connection_t *c)
 {
-    int sslerr, errret;
-    size_t size, readbytes = 0;
-    ngx_buf_t                 *b;
+    int        sslerr, errret;
+    size_t     size, readbytes = 0;
+    ngx_buf_t *b;
+
+    if (SSL_get_options(c->ssl->connection) & SSL_OP_NO_TLSv1_3) {
+        return 0;
+    }
 
     if (!SSL_is_server(c->ssl->connection)) {
         return 0;
