@@ -1256,6 +1256,10 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
     size_t     size, readbytes = 0;
     ngx_buf_t *b;
 
+    if (!c->ssl->enable_early_data) {
+        return 0;
+    }
+
     if (SSL_get_options(c->ssl->connection) & SSL_OP_NO_TLSv1_3) {
         return 0;
     }
@@ -1297,7 +1301,7 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
 
 
     errret = ngx_ssl_read_early_data(c, b->last,
-                                      size, &readbytes);
+                                     size, &readbytes);
     if (readbytes > 0) {
         b->last += readbytes;
     }
@@ -1612,7 +1616,8 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
             return n;
         }
 
-        if (!SSL_is_init_finished(c->ssl->connection) &&
+        if (c->ssl->enable_early_data &&
+            !SSL_is_init_finished(c->ssl->connection) &&
             (c->ssl->read_early_state != SSL_READ_EARLY_DATA_FINISH) &&
             (SSL_get_early_data_status(c->ssl->connection) ==
               SSL_EARLY_DATA_ACCEPTED)) {
@@ -1959,7 +1964,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL to write: %uz", size);
 
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
-    if (!SSL_is_init_finished(c->ssl->connection) &&
+    if (c->ssl->enable_early_data &&
+        !SSL_is_init_finished(c->ssl->connection) &&
         (SSL_get_early_data_status(c->ssl->connection) ==
          SSL_EARLY_DATA_ACCEPTED)) {
         size_t wrttenbytes = 0;

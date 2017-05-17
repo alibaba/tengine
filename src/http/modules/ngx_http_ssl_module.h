@@ -55,6 +55,8 @@ typedef struct {
     ngx_str_t                       stapling_file;
     ngx_str_t                       stapling_responder;
 
+    ngx_flag_t                      early_data;
+
     u_char                         *file;
     ngx_uint_t                      line;
 } ngx_http_ssl_srv_conf_t;

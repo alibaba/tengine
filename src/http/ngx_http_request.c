@@ -727,6 +727,8 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
+            c->ssl->enable_early_data = sscf->early_data;
+
             rc = ngx_ssl_handshake(c);
 
             if (rc == NGX_AGAIN) {

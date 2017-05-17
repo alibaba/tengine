@@ -73,7 +73,9 @@ struct ngx_ssl_connection_s {
     ngx_int_t                   last;
     ngx_buf_t                  *buf;
     size_t                      buffer_size;
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     ngx_buf_t                  *early_buf;
+#endif
 
     ngx_connection_handler_pt   handler;
 
@@ -86,7 +88,10 @@ struct ngx_ssl_connection_s {
     unsigned                    no_wait_shutdown:1;
     unsigned                    no_send_shutdown:1;
     unsigned                    handshake_buffer_set:1;
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+    unsigned                    enable_early_data:1;
     int                         read_early_state;
+#endif
 };
 
 
