@@ -328,6 +328,9 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
     if (!(protocols & NGX_SSL_TLSv1_3)) {
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_3);
     }
+#ifdef OPENSSL_IS_BORINGSSL
+    SSL_CTX_set_max_proto_version(ssl->ctx, TLS1_3_VERSION);
+#endif
 #endif
 
 #ifdef SSL_OP_NO_COMPRESSION
@@ -1257,6 +1260,7 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
     ngx_buf_t *b;
 
     if (!c->ssl->enable_early_data) {
+        SSL_set_max_early_data(c->ssl->connection, 0);
         return 0;
     }
 
@@ -1345,13 +1349,17 @@ ngx_ssl_handshake(ngx_connection_t *c)
 
     ngx_ssl_clear_error(c->log);
 
+#ifdef OPENSSL_IS_BORINGSSL
+    SSL_set_early_data_enabled(c->ssl->connection, c->ssl->enable_early_data);
+#endif
+
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     n = ngx_ssl_handshake_early_data(c);
     if (n == 0) {
 #endif
         n = SSL_do_handshake(c->ssl->connection);
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
-        "SSL_do_handshake: %d", n);
+            "SSL_do_handshake: %d", n);
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     }
 #endif
@@ -1605,7 +1613,8 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     for ( ;; ) {
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
-        if (c->ssl->early_buf &&
+        if (c->ssl->enable_early_data &&
+            c->ssl->early_buf &&
             c->ssl->early_buf->start &&
             (c->ssl->early_buf->last > c->ssl->early_buf->pos)) {
             n = c->ssl->early_buf->last - c->ssl->early_buf->pos;
@@ -1632,6 +1641,12 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
         n = SSL_read(c->ssl->connection, buf, size);
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_read: %d", n);
+
+#ifdef OPENSSL_IS_BORINGSSL
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+            "SSL_early_data_accepted: %d",
+            SSL_early_data_accepted(c->ssl->connection));
+#endif
 
         if (n > 0) {
             bytes += n;
@@ -2063,12 +2078,13 @@ ngx_ssl_free_buffer(ngx_connection_t *c)
             c->ssl->buf->start = NULL;
         }
     }
-
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     if (c->ssl->early_buf && c->ssl->early_buf->start) {
         if (ngx_pfree(c->pool, c->ssl->early_buf->start) == NGX_OK) {
             c->ssl->early_buf->start = NULL;
         }
     }
+#endif
 }
 
 
