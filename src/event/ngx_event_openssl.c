@@ -1418,6 +1418,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
                            "SSL no shared ciphers");
         }
+#ifdef OPENSSL_IS_BORINGSSL
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+            "SSL_early_data_accepted: %d",
+            SSL_early_data_accepted(c->ssl->connection));
+#endif
         }
 #endif
 
@@ -1641,12 +1646,6 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
         n = SSL_read(c->ssl->connection, buf, size);
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_read: %d", n);
-
-#ifdef OPENSSL_IS_BORINGSSL
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
-            "SSL_early_data_accepted: %d",
-            SSL_early_data_accepted(c->ssl->connection));
-#endif
 
         if (n > 0) {
             bytes += n;
