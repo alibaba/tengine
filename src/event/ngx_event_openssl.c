@@ -1277,7 +1277,11 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
     }
 
     b = c->ssl->early_buf;
+#if (TLS1_3_VERSION_DRAFT == 0x7f12)
+    size = SSL_get_max_early_data(c->ssl->session_ctx);
+#else
     size = SSL_get_max_early_data(c->ssl->connection);
+#endif
     if (size == 0) {
         return 0;
     }
