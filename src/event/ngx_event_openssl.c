@@ -1309,7 +1309,7 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
 
 
     errret = ngx_ssl_read_early_data(c, b->last,
-                                     size, &readbytes);
+                                     b->end - b->last, &readbytes);
     if (readbytes > 0) {
         b->last += readbytes;
     }
