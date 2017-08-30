@@ -24,7 +24,7 @@ my $can_use_threads = eval 'use threads; 1';
 plan(skip_all => 'perl does not support threads') if (!$can_use_threads || threads->VERSION < 1.86);
 plan(skip_all => 'unsupported os') if (!(-e "/usr/bin/uptime" || -e "/usr/bin/free"));
 
-my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(19);
+my $t = Test::Nginx->new()->has(qw/http sysguard/)->plan(26);
 
 $t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
 $t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
@@ -62,6 +62,16 @@ http {
             sysguard_load load=%%load2%% action=/limit;
         }
 
+        location /cpu_limit {
+            root %%TESTDIR%%;
+            sysguard_cpu usage=%%cpu1%% period=1s action=/limit;
+        }
+
+        location /cpu_unlimit {
+            root %%TESTDIR%%;
+            sysguard_cpu usage=%%cpu2%% period=1s action=/limit;
+        }
+
         location /free_unlimit {
             root %%TESTDIR%%;
             sysguard_mem free=%%free1%%k action=/limit;
@@ -97,6 +107,25 @@ http {
             sysguard_load load=%%load2%% action=/limit;
             sysguard_mem free=%%free1%%k action=/limit;
         }
+
+        location /mem_cpu_limit {
+            root %%TESTDIR%%;
+            sysguard_cpu usage=%%cpu2%% action=/limit;
+            sysguard_mem free=%%free2%%k action=/limit;
+        }
+
+        location /mem_cpu_limit1 {
+            root %%TESTDIR%%;
+            sysguard_cpu usage=%%cpu1%% action=/limit;
+            sysguard_mem free=%%free1%%k action=/limit;
+        }
+
+        location /mem_cpu_limit2 {
+            root %%TESTDIR%%;
+            sysguard_cpu usage=%%cpu2%% action=/limit;
+            sysguard_mem free=%%free1%%k action=/limit;
+        }
+
 
         location /rt_limit {
             proxy_pass http://127.0.0.1:8081;
@@ -172,6 +201,21 @@ http {
             sysguard_mem free=%%free2%%k action=/limit;
         }
 
+        location /cpu_and_mem_limit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
+            sysguard_cpu usage=%%cpu1%% action=/limit;
+            sysguard_mem free=%%free2%%k action=/limit;
+        }
+
+        location /cpu_and_mem_unlimit {
+            proxy_pass http://127.0.0.1:8081;
+            sysguard_mode and;
+            sysguard_cpu usage=%%cpu2%% action=/limit;
+            sysguard_mem free=%%free2%%k action=/limit;
+        }
+
+
         location /limit {
             return 503;
         }
@@ -187,14 +231,28 @@ runload();
 my $load = getload($t);
 warn "load:".($load);
 
-my $load_less = $load - 4.0;
+my $load_less = $load - 10.0;
 if ($load_less lt 2) {
     $load_less = 0;
 }
 warn "load_less:".($load_less);
 
-my $load_up= $load + 4.0;
+my $load_up= $load + 10.0;
 warn "load_up:".($load_up);
+
+my $cpu = getcpu();
+my $cpu_less = int($cpu - 10);
+if ($cpu_less < 2) {
+    $cpu_less = 0;
+}
+
+my $cpu_up = int($cpu + 10);
+if ($cpu_up > 100) {
+    $cpu_up = 100;
+}
+warn "cpu:".$cpu;
+warn "cpu_less:".$cpu_less;
+warn "cpu_up:".$cpu_up;
 
 my $free = getfree($t);
 warn "free:".($free);
@@ -206,6 +264,8 @@ my $free_up = $free + 100000;
 warn "free_up:".($free_up);
 
 $content =~ s/%%load1%%/$load_less/gmse;
+$content =~ s/%%cpu1%%/$cpu_less/gmse;
+$content =~ s/%%cpu2%%/$cpu_up/gmse;
 $content =~ s/%%load2%%/$load_up/gmse;
 $content =~ s/%%free1%%/$free_less/gmse;
 $content =~ s/%%free2%%/$free_up/gmse;
@@ -218,7 +278,23 @@ $t->run();
 ###############################################################################
 
 like(http_get("/load_limit"), qr/503/, 'load_limit');
+
+
 like(http_get("/load_unlimit"), qr/404/, 'load_unlimit');
+
+http_get("/cpu_limit");
+# To expire cache (sysguard interval)
+sleep 2;
+http_get("/cpu_limit");
+sleep 2;
+like(http_get("/cpu_limit"), qr/503/, 'cpu_limit');
+
+http_get("/cpu_unlimit");
+# To expire cache (sysguard interval)
+sleep 2;
+http_get("/cpu_unlimit");
+sleep 2;
+like(http_get("/cpu_unlimit"), qr/404/, 'cpu_unlimit');
 
 like(http_get("/free_unlimit"), qr/404/, 'free_unlimit');
 like(http_get("/free_limit"), qr/503/, 'free_limit');
@@ -228,6 +304,14 @@ like(http_get("/mem_load_limit1"), qr/503/, 'mem_load_limit1');
 like(http_get("/mem_load_limit2"), qr/503/, 'mem_load_limit2');
 like(http_get("/mem_load_limit3"), qr/404/, 'mem_load_limit3');
 
+
+like(http_get("/mem_cpu_limit"), qr/503/, 'mem_cpu_limit');
+http_get("/mem_cpu_limit1");
+sleep 2;
+http_get("/mem_cpu_limit1");
+sleep 2;
+like(http_get("/mem_cpu_limit1"), qr/503/, 'mem_cpu_limit1');
+like(http_get("/mem_cpu_limit2"), qr/404/, 'mem_cpu_limit2');
 
 http_get("/rt_limit");
 # To expire cache (sysguard interval)
@@ -259,6 +343,19 @@ sleep 1;
 like(http_get("/load_and_mem_and_rt_limit"), qr/503/,
      'load_and_mem_and_rt_limit');
 
+http_get("/cpu_and_mem_limit");
+sleep 2;
+http_get("/cpu_and_mem_limit");
+sleep 2;
+like(http_get("/cpu_and_mem_limit"), qr/503/, 'cpu_and_mem_limit');
+
+http_get("/cpu_and_mem_unlimit");
+sleep 2;
+http_get("/cpu_and_mem_unlimit");
+sleep 2;
+like(http_get("/cpu_and_mem_unlimit"), qr/404/, 'cpu_and_mem_unlimit');
+
+
 closeload();
 
 sub getload
@@ -283,8 +380,8 @@ my $buffer;
 my $memfree;
 while(my $line = <$meminfo>) {
     if ($line =~ /^Cached:\s+(\d+)\skB$/) {
-        $cache = $1; 
-    } 
+        $cache = $1;
+    }
 
     if ($line =~ /^Buffers:\s+(\d+)\skB$/) {
         $buffer = $1;
@@ -330,6 +427,44 @@ sub closeload
     }
 }
 
+sub getcpu
+{
+    my $SLEEPTIME = 1;
+
+    if (-e "/tmp/stat") {
+        unlink "/tmp/stat";
+    }
+    my $JIFF_TMP;
+    open (JIFF_TMP, ">>/tmp/stat") || die "Can't open /proc/stat file!\n";
+    my $JIFF;
+    open (JIFF, "/proc/stat") || die "Can't open /proc/stat file!\n";
+    my @jiff_0=<JIFF>;
+    print JIFF_TMP $jiff_0[0];
+    close (JIFF);
+
+    sleep $SLEEPTIME;
+
+    open (JIFF, "/proc/stat") || die "Can't open /proc/stat file!\n";
+    my @jiff_1=<JIFF>;
+    print JIFF_TMP $jiff_1[0];
+    close (JIFF);
+    close (JIFF_TMP);
+
+    my @USER = `awk '{print \$2}' "/tmp/stat"`;
+    my @NICE = `awk '{print \$3}' "/tmp/stat"`;
+    my @SYSTEM = `awk '{print \$4}' "/tmp/stat"`;
+    my @IDLE = `awk '{print \$5}' "/tmp/stat"`;
+    my @IOWAIT = `awk '{print \$6}' "/tmp/stat"`;
+    my @IRQ = `awk '{print \$7}' "/tmp/stat"`;
+    my @SOFTIRQ = `awk '{print \$8}' "/tmp/stat"`;
+
+    my $JIFF_0 = $USER[0] + $NICE[0] + $SYSTEM[0] + $IDLE[0] + $IOWAIT[0] + $IRQ[0] + $SOFTIRQ[0];
+    my $JIFF_1 = $USER[1] + $NICE[1] + $SYSTEM[1] + $IDLE[1] + $IOWAIT[1] + $IRQ[1] + $SOFTIRQ[1];
+
+    my $SYS_USAGE = (($USER[0] + $NICE[0] + $SYSTEM[0]) - ($USER[1] + $NICE[1] + $SYSTEM[1])) * 100 / ($JIFF_0 - $JIFF_1);
+
+    return $SYS_USAGE;
+}
 
 sub http_daemon {
     my $server = IO::Socket::INET->new(

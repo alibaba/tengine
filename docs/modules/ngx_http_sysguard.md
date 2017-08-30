@@ -2,7 +2,7 @@
 
 ## Description
 
-This module monitors memory usage (including the swap partition), load of CPUs and average response time of requests of the system. If any guideline that is monitored exceeds the threshold set by user, the current request will be redirected to a specific url. To be clarified, this module can only be full functional when the system supports sysinfo function and loadavg function. The sysguard module also need to read memory information from /proc file system.
+This module monitors memory usage (including the swap partition), load of CPUs and average response time of requests of the system and cpu usage. If any guideline that is monitored exceeds the threshold set by user, the current request will be redirected to a specific url. To be clarified, this module can only be full functional when the system supports sysinfo function and loadavg function. The sysguard module also need to read memory information from /proc file system.
 
 ## Configuration
 
@@ -30,6 +30,10 @@ This module monitors memory usage (including the swap partition), load of CPUs a
         location /rtlimit {
             return 503;
         }
+        
+        location /cpulimit {
+            return 503;
+        }        
     }
 
 ## Directives
@@ -56,6 +60,28 @@ This directive tells the module to protect the system by monitoring the load of 
 <br/>
 <br/>
 
+**sysguard_cpu** `usage=num [period=time] [action=/url]`
+
+**Default:** `period=3s`
+
+**Context:** `http, server, location`
+
+This directive tells the module to protect the system by monitoring the CPU usage. When the system in the `period` (` units: s `) within the CPU reach to num (` note: ` the num is a integer. such as protection CPU is 50% and could be set the usage = 50), the incoming request will be redirected to the url specified by 'action' parameter. If the action is not configured, tengine will return 503 directly.
+
+
+```
+cpu usage formula：
+    cpu_usage = [(cur.usr + cur.nice + cur.sys) - (pre.usr + pre.nice + pre.sys)]/
+                [(cur.usr + cur.nice + cur.sys + cur.iowait + cur.irq 
+                 + cur.softirq + cur.idle)
+                 - (pre.usr + pre.nice + pre.sys + pre.iowait + pre.irq 
+                 + pre.softirq + pre.idle)] * 100
+```
+
+<br/>
+<br/>
+
+
 **sysguard_mem** `[swapratio=ratio%] [free=size] [action=/url]`
 
 **Default:** `-`
@@ -80,31 +106,31 @@ This directive is used to tell the module to protect the system by monitoring av
 
 **sysguard_mode** `and` | `or`
 
-**Default:**  'sysguard_mode or' 
+**Default:**  `sysguard_mode or` 
 
-**Context** 'http, server, location'
+**Context** `http, server, location`
 
 If there are more than one type of monitor, this directive is used to specified the relations among all the monitors which are: 'and' for all matching and 'or' for any matching.
 
 <br/>
 <br/>
 
-**sysguard_interval** 'time'
+**sysguard_interval** `time`
        
-**Default** 'sysguard_interval 1s'
+**Default** `sysguard_interval 1s`
          
-**Context** 'http, server, location'
+**Context** `http, server, location`
        
 Specify the time interval to update your system information.
 
 <br/>
 <br/>
 
-**sysguard_log_level** '[info | notice | warn | error]'
+**sysguard_log_level** `[info | notice | warn | error]`
        
-**Default** 'sysguard_log_level error'
+**Default** `sysguard_log_level error`
          
-**Context** 'http, server, location'
+**Context** `http, server, location`
        
 Specify the log level of sysguard.
 
