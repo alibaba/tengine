@@ -39,6 +39,9 @@
 #define NGX_SOCKADDRLEN       512
 #endif
 
+#if (T_NGX_DNS_RESOLVE_BACKUP)
+#define NGX_DNS_RESOLVE_BACKUP_PATH             "NGX_DNS_RESOLVE_BACKUP_PATH"
+#endif
 
 typedef struct {
     in_addr_t                 addr;

@@ -32,6 +32,19 @@ Set the number of worker processes.
 When set to 'auto', which is also the default behavior, Tengine will create the same number of worker processes as your CPUs.
 
 
+### master_env
+
+Syntax: **master_env** variable[=value];
+
+Default: -
+
+Context: main
+
+If use `master_env` directive to set `NGX_DNS_RESOLVE_BACKUP_PATH` environment variable and dns cache will be enabled.
+When the dns server is unavailable, it's will use the last dns cache.
+
+For example `master_env NGX_DNS_RESOLVE_BACKUP_PATH=/home/tengine/worker/dnscache/path`, the domain A record results will be saved to the file and path depends on  `NGX_DNS_RESOLVE_BACKUP_PATH`.
+
 ### worker_cpu_affinity
 
 Syntax: **worker_cpu_affinity** [mask1 mask2 mask3 ... | auto | off]
