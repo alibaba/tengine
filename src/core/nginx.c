@@ -1359,7 +1359,7 @@ ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (ngx_strncasecmp((u_char *) "auto", value[1].data, 4) == 0) {
 
-        ccf->worker_processes = 0;
+        ccf->worker_processes = ngx_ncpu;
 
         return NGX_CONF_OK;
     }
