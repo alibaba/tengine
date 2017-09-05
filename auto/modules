@@ -955,3 +955,6 @@ END
     done
 
 fi
+
+have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
+have=T_NGX_MASTER_ENV . auto/have

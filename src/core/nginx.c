@@ -23,6 +23,9 @@ static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (T_NGX_MASTER_ENV)
+static char *ngx_master_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+#endif
 
 
 static ngx_conf_enum_t  ngx_debug_points[] = {
@@ -138,6 +141,17 @@ static ngx_command_t  ngx_core_commands[] = {
       0,
       0,
       NULL },
+
+#if (T_NGX_MASTER_ENV)
+
+    { ngx_string("master_env"),
+      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
+      ngx_master_set_env,
+      0,
+      0,
+      NULL },
+
+#endif
 
 #if (NGX_FORCE_EXIT)
 
@@ -1303,6 +1317,49 @@ ngx_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+
+
+#if (T_NGX_MASTER_ENV)
+
+static char *
+ngx_master_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    size_t       klen, vlen;
+    u_char      *key, *v, *p;
+    ngx_str_t   *value;
+
+    value = cf->args->elts;
+    p = ngx_strlchr(value[1].data, value[1].data + value[1].len, '=');
+    if (p == NULL) {
+        klen = value[1].len;
+        v = (u_char *) "1";
+
+    } else {
+        klen = p - value[1].data;
+        vlen = value[1].len - klen - 1;
+        v = ngx_palloc(cf->pool, vlen + 1);
+        if (v == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        ngx_memcpy(v, p + 1, vlen);
+        v[vlen] = '\0';
+    }
+
+    key = ngx_palloc(cf->pool, klen + 1);
+    if (key == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memcpy(key, value[1].data, klen);
+    key[klen] = '\0';
+
+    setenv((char *) key, (char *) v, 0);
+
+    return NGX_CONF_OK;
+}
+
+#endif
 
 
 static char *

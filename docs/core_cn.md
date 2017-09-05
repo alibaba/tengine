@@ -30,6 +30,19 @@ Context: core
 为worker_processes增加参数auto。当设置成auto，tengine将自动启动与cpu数量相同的worker进程。
 
 
+
+### master_env
+
+Syntax: **master_env** variable[=value];
+
+Default: -
+
+Context: core
+
+当使用`master_env`指令设置`NGX_DNS_RESOLVE_BACKUP_PATH`环境变量后将会开启dns缓存容灾逻辑。即当dns服务器不可用时，使用上次dns缓存的A记录。
+比如设置`master_env NGX_DNS_RESOLVE_BACKUP_PATH=/home/tengine/worker/dnscache/path;`将会把配置中的域名解析结果缓存到`NGX_DNS_RESOLVE_BACKUP_PATH`所设置的路径下。
+
+
 ### worker_cpu_affinity
 
 Syntax: **worker_cpu_affinity** [mask1 mask2 mask3 ... | auto | off ]
