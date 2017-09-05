@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2010-2015 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2017 Alibaba Group Holding Limited
  */
 
 
@@ -228,6 +228,128 @@ ngx_getmeminfo(ngx_meminfo_t *meminfo, ngx_log_t *log)
 {
     ngx_log_error(NGX_LOG_EMERG, log, 0,
                   "getmeminfo is unsupported under current os");
+
+    return NGX_ERROR;
+}
+
+#endif
+
+#if (NGX_HAVE_PROC_STAT)
+
+static ngx_file_t                   ngx_cpuinfo_file;
+
+#define NGX_CPUINFO_FILE            "/proc/stat"
+
+
+ngx_int_t
+ngx_getcpuinfo(ngx_str_t *cpunumber, ngx_cpuinfo_t *cpuinfo, ngx_log_t *log)
+{
+    u_char              buf[1024 * 1024];
+    u_char             *p, *q, *last;
+    ssize_t             n;
+    ngx_fd_t            fd;
+    time_t              cputime;
+    enum {
+        sw_user = 0,
+        sw_nice,
+        sw_sys,
+        sw_idle,
+        sw_iowait,
+        sw_irq,
+        sw_softirq ,        
+    } state;
+
+    ngx_memzero(cpuinfo, sizeof(ngx_cpuinfo_t));
+
+    if (ngx_cpuinfo_file.fd == 0) {
+
+        fd = ngx_open_file(NGX_CPUINFO_FILE, NGX_FILE_RDONLY,
+                           NGX_FILE_OPEN,
+                           NGX_FILE_DEFAULT_ACCESS);
+
+        if (fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed",
+                          NGX_MEMINFO_FILE);
+
+            return NGX_ERROR;
+        }
+
+        ngx_cpuinfo_file.name.data = (u_char *) NGX_CPUINFO_FILE;
+        ngx_cpuinfo_file.name.len = ngx_strlen(NGX_CPUINFO_FILE);
+
+        ngx_cpuinfo_file.fd = fd;
+    }
+
+    ngx_cpuinfo_file.log = log;
+    n = ngx_read_file(&ngx_cpuinfo_file, buf, sizeof(buf) - 1, 0);
+    if (n == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_read_file_n " \"%s\" failed",
+                      NGX_MEMINFO_FILE);
+
+        return NGX_ERROR;
+    }
+
+    p = buf;
+    last = buf + n;
+    
+    for (; p < last; p++) {
+        while(*p == ' ' || *p == '\n') {
+            p++;
+        }
+        
+        if (ngx_strncasecmp((u_char *) cpunumber->data,
+                            (u_char *) p, cpunumber->len) == 0) 
+        {
+            
+            for (state = 0, p += cpunumber->len, 
+                 q = (u_char *) strtok((char *) p, " "); q; state++) 
+            {
+                cputime = ngx_atotm(q, strlen((char *) q));
+                        
+                switch (state) {
+                case sw_user:
+                    cpuinfo->usr = cputime;
+                    break;
+                case sw_nice:
+                    cpuinfo->nice = cputime;
+                    break;
+                case sw_sys:
+                    cpuinfo->sys = cputime;
+                    break;
+                case sw_idle:
+                    cpuinfo->idle = cputime;
+                    break;
+                case sw_iowait:
+                    cpuinfo->iowait = cputime;
+                    break;
+                case sw_irq:
+                    cpuinfo->irq = cputime;
+                    break;  
+                case sw_softirq:
+                    cpuinfo->softirq = cputime;
+                    break;                    
+                }    
+                
+                q = (u_char *) strtok(NULL, " ");
+            }
+        }
+        
+        break;
+        
+    }
+
+    return NGX_OK;
+}
+
+#else
+
+ngx_int_t
+ngx_getcpuinfo(ngx_str_t *cpunumber, ngx_cpuinfo_t *cpuinfo, ngx_log_t *log)
+{
+    ngx_log_error(NGX_LOG_EMERG, log, 0,
+                  "ngx_getcpuinfo is unsupported under current os");
 
     return NGX_ERROR;
 }

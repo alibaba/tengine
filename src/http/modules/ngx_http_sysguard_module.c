@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Alibaba Group Holding Limited
+ * Copyright (C) 2010-2017 Alibaba Group Holding Limited
  */
 
 
@@ -33,6 +33,8 @@ typedef struct {
 
     ngx_int_t                     load;
     ngx_str_t                     load_action;
+    ngx_int_t                     cpuusage;
+    ngx_str_t                     cpuusage_action;
     ngx_int_t                     swap;
     ngx_str_t                     swap_action;
     size_t                        free;
@@ -41,6 +43,7 @@ typedef struct {
     ngx_int_t                     rt_period;
     ngx_str_t                     rt_action;
     time_t                        interval;
+    time_t                        cpu_interval;
 
     ngx_uint_t                    log_level;
     ngx_uint_t                    mode;
@@ -53,6 +56,8 @@ static void *ngx_http_sysguard_create_conf(ngx_conf_t *cf);
 static char *ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
 static char *ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_http_sysguard_cpuusage(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_sysguard_mem(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -95,6 +100,13 @@ static ngx_command_t  ngx_http_sysguard_commands[] = {
     { ngx_string("sysguard_load"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_sysguard_load,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("sysguard_cpu"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
+      ngx_http_sysguard_cpuusage,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -162,11 +174,16 @@ ngx_module_t  ngx_http_sysguard_module = {
 };
 
 
-static time_t    ngx_http_sysguard_cached_load_exptime;
-static time_t    ngx_http_sysguard_cached_mem_exptime;
-static ngx_int_t ngx_http_sysguard_cached_load;
-static ngx_int_t ngx_http_sysguard_cached_swapstat;
-static size_t    ngx_http_sysguard_cached_free;
+static time_t        ngx_http_sysguard_cached_load_exptime;
+static time_t        ngx_http_sysguard_cached_mem_exptime;
+static time_t        ngx_http_sysguard_cached_cpuusage_exptime;
+static time_t        ngx_http_sysguard_cached_cpuinfo_exptime;
+static ngx_int_t     ngx_http_sysguard_cached_load;
+static ngx_int_t     ngx_http_sysguard_cached_cpuusage;
+static ngx_cpuinfo_t ngx_http_sysguard_cached_pre_cputime;
+static ngx_cpuinfo_t ngx_http_sysguard_cached_cur_cputime;
+static ngx_int_t     ngx_http_sysguard_cached_swapstat;
+static size_t        ngx_http_sysguard_cached_free;
 
 
 static ngx_int_t
@@ -187,6 +204,70 @@ ngx_http_sysguard_update_load(ngx_http_request_t *r, time_t exptime)
     ngx_http_sysguard_cached_load = load;
 
     return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_sysguard_update_cpuusage(ngx_http_request_t *r, time_t exptime)
+{
+    time_t         cpu_diff, total_diff;
+    ngx_cpuinfo_t  pre, cur;
+
+    pre = ngx_http_sysguard_cached_pre_cputime;
+    cur = ngx_http_sysguard_cached_cur_cputime;
+
+    ngx_http_sysguard_cached_cpuusage_exptime = ngx_time() + exptime;
+
+    cpu_diff = (cur.usr + cur.nice + cur.sys) - (pre.usr + pre.nice + pre.sys);
+
+    total_diff = (cur.usr + cur.nice + cur.sys + cur.iowait + cur.irq
+                 + cur.softirq + cur.idle)
+                 - (pre.usr + pre.nice + pre.sys + pre.iowait + pre.irq
+                 + pre.softirq + pre.idle);
+
+    if (total_diff == 0) {
+        total_diff = 1;
+    }
+
+    ngx_http_sysguard_cached_cpuusage = cpu_diff * 100 * 100 / total_diff;
+
+    return NGX_OK;
+}
+
+
+void
+ngx_http_sysguard_update_cpuinfo(ngx_http_request_t *r)
+{
+    ngx_int_t                       rc;
+    ngx_cpuinfo_t                   cpuinfo;
+    ngx_http_sysguard_conf_t       *glcf;
+    ngx_str_t                       cpunumber;
+
+    ngx_str_set(&cpunumber, "cpu");
+
+    glcf = ngx_http_get_module_loc_conf(r, ngx_http_sysguard_module);
+
+    if (!glcf->enable) {
+        return;
+    }
+
+    if (glcf->cpuusage == NGX_CONF_UNSET) {
+        return;
+    }
+
+    if (ngx_http_sysguard_cached_cpuinfo_exptime < ngx_time()) {
+        rc = ngx_getcpuinfo(&cpunumber, &cpuinfo, r->connection->log);
+        if (rc == NGX_ERROR) {
+            ngx_memzero(&cpuinfo, sizeof(ngx_cpuinfo_t));
+            return;
+        }
+
+        ngx_http_sysguard_cached_pre_cputime = ngx_http_sysguard_cached_cur_cputime;
+        ngx_http_sysguard_cached_cur_cputime = cpuinfo;
+        ngx_http_sysguard_cached_cpuinfo_exptime = ngx_time() + glcf->cpu_interval;
+    }
+
+    return;
 }
 
 
@@ -368,7 +449,8 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
 {
     ngx_http_sysguard_conf_t  *glcf;
     ngx_int_t                  load_log = 0, swap_log = 0,
-                               free_log = 0, rt_log = 0;
+                               free_log = 0, rt_log = 0,
+                               cpu_log = 0;
     ngx_str_t                 *action = NULL;
 
     if (r->main->sysguard_set) {
@@ -412,6 +494,44 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
                 action = &glcf->load_action;
                 load_log = 1;
             }
+        } else {
+            if (glcf->mode == NGX_HTTP_SYSGUARD_MODE_AND) {
+                goto out;
+            }
+        }
+    }
+
+    /* cpu */
+
+    if (glcf->cpuusage != NGX_CONF_UNSET) {
+
+        if (ngx_http_sysguard_cached_cpuusage_exptime < ngx_time()) {
+            ngx_http_sysguard_update_cpuusage(r, glcf->interval);
+        }
+
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http sysguard handler cpuusage: %d %d %V %V",
+                       ngx_http_sysguard_cached_cpuusage ,
+                       glcf->cpuusage,
+                       &r->uri,
+                       &glcf->cpuusage_action);
+
+        if (ngx_http_sysguard_cached_cpuusage > glcf->cpuusage) {
+
+            if (glcf->mode == NGX_HTTP_SYSGUARD_MODE_OR) {
+
+                ngx_log_error(glcf->log_level, r->connection->log, 0,
+                              "sysguard cpuusage limited, current:%d conf:%d",
+                              ngx_http_sysguard_cached_cpuusage,
+                              glcf->cpuusage);
+
+                return ngx_http_sysguard_do_redirect(r, &glcf->cpuusage_action);
+
+            } else {
+                action = &glcf->cpuusage_action;
+                cpu_log = 1;
+            }
+
         } else {
             if (glcf->mode == NGX_HTTP_SYSGUARD_MODE_AND) {
                 goto out;
@@ -538,6 +658,13 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
                           glcf->load * 1.0 / 1000);
         }
 
+        if (cpu_log) {
+            ngx_log_error(glcf->log_level, r->connection->log, 0,
+                          "sysguard cpu limited, current:%d conf:%1d",
+                          ngx_http_sysguard_cached_cpuusage,
+                          glcf->cpuusage);
+        }
+
         if (swap_log) {
             ngx_log_error(glcf->log_level, r->connection->log, 0,
                           "sysguard swap limited, current:%i conf:%i",
@@ -581,6 +708,7 @@ ngx_http_sysguard_create_conf(ngx_conf_t *cf)
      * set by ngx_pcalloc():
      *
      *     conf->load_action = {0, NULL};
+     *     conf->cpuusage_action = {0, NULL};
      *     conf->swap_action = {0, NULL};
      *     conf->rt_action = {0, NULL};
      *     conf->ring = NULL;
@@ -588,11 +716,13 @@ ngx_http_sysguard_create_conf(ngx_conf_t *cf)
 
     conf->enable = NGX_CONF_UNSET;
     conf->load = NGX_CONF_UNSET;
+    conf->cpuusage = NGX_CONF_UNSET;
     conf->swap = NGX_CONF_UNSET;
     conf->free = NGX_CONF_UNSET_SIZE;
     conf->rt = NGX_CONF_UNSET;
     conf->rt_period = NGX_CONF_UNSET;
     conf->interval = NGX_CONF_UNSET;
+    conf->cpu_interval = NGX_CONF_UNSET;
     conf->log_level = NGX_CONF_UNSET_UINT;
     conf->mode = NGX_CONF_UNSET_UINT;
 
@@ -608,15 +738,18 @@ ngx_http_sysguard_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_str_value(conf->load_action, prev->load_action, "");
+    ngx_conf_merge_str_value(conf->cpuusage_action, prev->cpuusage_action, "");
     ngx_conf_merge_str_value(conf->swap_action, prev->swap_action, "");
     ngx_conf_merge_str_value(conf->free_action, prev->free_action, "");
     ngx_conf_merge_str_value(conf->rt_action, prev->rt_action, "");
     ngx_conf_merge_value(conf->load, prev->load, NGX_CONF_UNSET);
+    ngx_conf_merge_value(conf->cpuusage, prev->cpuusage, NGX_CONF_UNSET);
     ngx_conf_merge_value(conf->swap, prev->swap, NGX_CONF_UNSET);
     ngx_conf_merge_size_value(conf->free, prev->free, NGX_CONF_UNSET_SIZE);
     ngx_conf_merge_value(conf->rt, prev->rt, NGX_CONF_UNSET);
     ngx_conf_merge_value(conf->rt_period, prev->rt_period, 1);
     ngx_conf_merge_value(conf->interval, prev->interval, 1);
+    ngx_conf_merge_value(conf->cpu_interval, prev->cpu_interval, 3);
     ngx_conf_merge_uint_value(conf->log_level, prev->log_level, NGX_LOG_ERR);
     ngx_conf_merge_uint_value(conf->mode, prev->mode,
                               NGX_HTTP_SYSGUARD_MODE_OR);
@@ -706,6 +839,84 @@ ngx_http_sysguard_load(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         return NGX_CONF_OK;
     }
+
+invalid:
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid parameter \"%V\"", &value[i]);
+
+    return NGX_CONF_ERROR;
+}
+
+
+static char *
+ngx_http_sysguard_cpuusage(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_sysguard_conf_t  *glcf = conf;
+
+    ngx_str_t  *value;
+    ngx_uint_t  i;
+
+    value = cf->args->elts;
+    glcf->cpu_interval = 3;
+
+    for (i = 1; i < cf->args->nelts; i++) {
+        if (ngx_strncmp(value[i].data, "usage=", 6) == 0) {
+
+            if (glcf->cpuusage != NGX_CONF_UNSET) {
+                return "is duplicate";
+            }
+
+            if (value[i].len == 6) {
+                goto invalid;
+            }
+
+            value[i].data += 6;
+            value[i].len -= 6;
+
+            glcf->cpuusage = ngx_atofp(value[i].data, value[i].len, 2);
+            if (glcf->cpuusage == NGX_ERROR) {
+                goto invalid;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "period=", 7) == 0) {
+
+            if (value[i].len == 7) {
+                goto invalid;
+            }
+
+            value[i].data += 7;
+            value[i].len -= 7;
+            glcf->cpu_interval = ngx_parse_time(&value[i], 1);
+            if (glcf->cpu_interval == (time_t) NGX_ERROR) {
+                goto invalid;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "action=", 7) == 0) {
+
+            if (value[i].len == 7) {
+                goto invalid;
+            }
+
+            if (value[i].data[7] != '/' && value[i].data[7] != '@') {
+                goto invalid;
+            }
+
+            glcf->cpuusage_action.data = value[i].data + 7;
+            glcf->cpuusage_action.len = value[i].len - 7;
+
+            continue;
+        }
+
+    }
+
+    return NGX_CONF_OK;
 
 invalid:
 
@@ -882,7 +1093,7 @@ static ngx_int_t
 ngx_http_sysguard_log_handler(ngx_http_request_t *r)
 {
     ngx_http_sysguard_update_rt_node(r);
-
+    ngx_http_sysguard_update_cpuinfo(r);
     return NGX_OK;
 }
 
