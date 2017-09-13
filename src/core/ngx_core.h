@@ -91,8 +91,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_connection.h>
 #include <ngx_syslog.h>
 #include <ngx_proxy_protocol.h>
+#if (T_PIPES)
 #include <ngx_pipe.h>
-
+#endif
 #if (NGX_PROCS)
 #include <ngx_proc.h>
 #endif

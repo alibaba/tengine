@@ -15,11 +15,29 @@ static ngx_uint_t       ngx_pipe_generation;
 static ngx_uint_t       ngx_last_pipe;
 static ngx_open_pipe_t  ngx_pipes[NGX_MAX_PROCESSES];
 
+#define MAX_BACKUP_NUM          128
+#define NGX_PIPE_DIR_ACCESS     S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH
+#define NGX_PIPE_FILE_ACCESS    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
+
+typedef struct {
+    ngx_int_t       time_now;
+    ngx_int_t       last_open_time;
+    ngx_int_t       backup_num;
+    ngx_int_t       log_max_size;
+    ngx_int_t       log_size;
+    char           *backup[MAX_BACKUP_NUM];
+    char           *logname;
+    ngx_int_t       interval;
+} ngx_pipe_rollback_conf_t;
 
 static void ngx_signal_pipe_broken(ngx_log_t *log, ngx_pid_t pid);
 static ngx_int_t ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op);
 static void ngx_close_pipe(ngx_open_pipe_t *pipe);
 
+static void ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op);
+static void ngx_pipe_do_rollback(ngx_cycle_t *cycle, ngx_pipe_rollback_conf_t *rbcf);
+static ngx_int_t ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle,
+    ngx_open_pipe_t *op, ngx_pipe_rollback_conf_t *rbcf);
 
 ngx_str_t ngx_log_error_backup = ngx_string(NGX_ERROR_LOG_PATH);
 ngx_str_t ngx_log_access_backup = ngx_string(NGX_HTTP_LOG_PATH);
@@ -311,24 +329,29 @@ ngx_pipe_broken_action(ngx_log_t *log, ngx_pid_t pid, ngx_int_t master)
                 is_stderr = 1;
             }
 
-            ngx_pipes[i].open_fd->name.len = ngx_pipes[i].backup.len;
-            ngx_pipes[i].open_fd->name.data = ngx_pipes[i].backup.data;
+            ngx_pipes[i].open_fd->fd = NGX_INVALID_FILE;
 
-            ngx_pipes[i].open_fd->fd = ngx_open_file(ngx_pipes[i].backup.data,
-                                                     NGX_FILE_APPEND,
-                                                     NGX_FILE_CREATE_OR_OPEN,
-                                                     NGX_FILE_DEFAULT_ACCESS);
+            if (ngx_pipes[i].backup.len > 0 && ngx_pipes[i].backup.data != NULL) {
 
-            if (ngx_pipes[i].open_fd->fd == NGX_INVALID_FILE) {
-                ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
-                              ngx_open_file_n " \"%s\" failed",
-                              ngx_pipes[i].backup.data);
-            }
+                ngx_pipes[i].open_fd->name.len = ngx_pipes[i].backup.len;
+                ngx_pipes[i].open_fd->name.data = ngx_pipes[i].backup.data;
 
-            if (fcntl(ngx_pipes[i].open_fd->fd, F_SETFD, FD_CLOEXEC) == -1) {
-                ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
-                              "fcntl(FD_CLOEXEC) \"%s\" failed",
-                              ngx_pipes[i].backup.data);
+                ngx_pipes[i].open_fd->fd = ngx_open_file(ngx_pipes[i].backup.data,
+                                                         NGX_FILE_APPEND,
+                                                         NGX_FILE_CREATE_OR_OPEN,
+                                                         NGX_FILE_DEFAULT_ACCESS);
+
+                if (ngx_pipes[i].open_fd->fd == NGX_INVALID_FILE) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                                  ngx_open_file_n " \"%s\" failed",
+                                  ngx_pipes[i].backup.data);
+                }
+
+                if (fcntl(ngx_pipes[i].open_fd->fd, F_SETFD, FD_CLOEXEC) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                                  "fcntl(FD_CLOEXEC) \"%s\" failed",
+                                  ngx_pipes[i].backup.data);
+                }
             }
 
             if (is_stderr) {
@@ -336,13 +359,15 @@ ngx_pipe_broken_action(ngx_log_t *log, ngx_pid_t pid, ngx_int_t master)
             }
 
             if (master) {
-                if (chown((const char *) ngx_pipes[i].backup.data,
-                          ngx_pipes[i].user, -1)
-                    == -1)
-                {
-                    ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
-                                  "chown() \"%s\" failed",
-                                  ngx_pipes[i].backup.data);
+                if (ngx_pipes[i].backup.len > 0 && ngx_pipes[i].backup.data != NULL) {
+                    if (chown((const char *) ngx_pipes[i].backup.data,
+                              ngx_pipes[i].user, -1)
+                        == -1)
+                    {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                                      "chown() \"%s\" failed",
+                                      ngx_pipes[i].backup.data);
+                    }
                 }
 
                 ngx_signal_pipe_broken(log, pid);
@@ -412,6 +437,8 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             close(op->pfd[1]);
         }
     } else {
+        ngx_close_listening_sockets(cycle);
+
         if (op->type == 1) {
             close(op->pfd[1]);
             if (op->pfd[0] != STDIN_FILENO) {
@@ -479,8 +506,14 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             exit(2);
         }
 
-        execv((const char *) argv[0], (char *const *) op->argv->elts);
-        exit(0);
+        if (ngx_strncmp(argv[0], "rollback", sizeof("rollback") - 1) == 0) {
+            ngx_pipe_log(cycle, op);
+            exit(0);
+
+        } else {
+            execv((const char *) argv[0], (char *const *) op->argv->elts);
+            exit(0);
+        }
     }
 
     return NGX_OK;
@@ -491,6 +524,316 @@ err:
     close(op->pfd[1]);
 
     return NGX_ERROR;
+}
+
+
+static void
+ngx_pipe_create_subdirs(char *filename, ngx_cycle_t *cycle)
+{
+    ngx_file_info_t stat_buf;
+    char            dirname[1024];
+    char           *p;
+
+    for (p = filename; (p = strchr(p, '/')); p++)
+    {
+        if (p == filename) {
+            continue;       // Don't bother with the root directory
+        }
+
+        ngx_memcpy(dirname, filename, p - filename);
+        dirname[p-filename] = '\0';
+
+        if (ngx_file_info(dirname, &stat_buf) < 0) {
+            if (errno != ENOENT) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              "stat [%s] failed", dirname);
+                exit(2);
+
+            } else {
+                if ((ngx_create_dir(dirname, NGX_PIPE_DIR_ACCESS) < 0) && (errno != EEXIST)) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                  "mkdir [%s] failed", dirname);
+                    exit(2);
+                }
+            }
+        }
+    }
+}
+
+static void
+ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
+{
+    ngx_int_t                   n_bytes_read;
+    u_char                     *read_buf;
+    size_t                      read_buf_len = 65536;
+    struct timeval              tv;
+    struct timezone             tz;
+    ngx_fd_t                    log_fd = NGX_INVALID_FILE;
+    size_t                      title_len;
+    ngx_pipe_rollback_conf_t    rbcf;
+    ngx_file_info_t             sb;
+
+    ngx_pid = ngx_getpid();
+
+    gettimeofday(&tv, &tz);
+    tv.tv_sec -= tz.tz_minuteswest * 60;
+    rbcf.last_open_time = tv.tv_sec;
+    rbcf.log_size = 0;
+
+    if (ngx_pipe_rollback_parse_args(cycle, op, &rbcf) != NGX_OK) {
+        return;
+    }
+
+    read_buf = ngx_pcalloc(cycle->pool, read_buf_len);
+    if (read_buf == NULL) {
+        return;
+    }
+
+    //set title
+    ngx_setproctitle((char *) op->cmd);
+    title_len = ngx_strlen(ngx_os_argv[0]);
+#if (NGX_SOLARIS)
+#else
+    ngx_memset((u_char *) ngx_os_argv[0], NGX_SETPROCTITLE_PAD, title_len);
+    ngx_cpystrn((u_char *) ngx_os_argv[0], op->cmd, title_len);
+#endif
+
+    for (;;)
+    {
+        if (ngx_terminate == 1) {
+            return;
+        }
+
+        n_bytes_read = ngx_read_fd(0, read_buf, read_buf_len);
+        if (n_bytes_read == 0) {
+            return;
+        }
+        if (errno == EINTR) {
+            continue;
+
+        } else if (n_bytes_read < 0) {
+            return;
+        }
+
+        ngx_time_update();
+
+        if (log_fd >= 0) {
+            if (rbcf.interval > 0) {
+                gettimeofday(&tv, &tz);
+                tv.tv_sec -= tz.tz_minuteswest * 60;
+                rbcf.time_now = tv.tv_sec;
+                if ((rbcf.time_now / rbcf.interval) >
+                        (rbcf.last_open_time / rbcf.interval)) {
+                    //need check rollback
+                    ngx_close_file(log_fd);
+                    log_fd = NGX_INVALID_FILE;
+                    ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                                  "need check rollback time [%s]", rbcf.logname);
+                    ngx_pipe_do_rollback(cycle, &rbcf);
+                }
+            }
+        }
+
+        if (log_fd >= 0 && rbcf.log_max_size > 0 &&
+                           rbcf.log_size >= rbcf.log_max_size) {
+            ngx_close_file(log_fd);
+            log_fd = NGX_INVALID_FILE;
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "need check rollback size [%s] [%d]",
+                          rbcf.logname, rbcf.log_size);
+            ngx_pipe_do_rollback(cycle, &rbcf);
+        }
+
+        if (log_fd < 0) {
+            ngx_pipe_create_subdirs(rbcf.logname, cycle);
+            log_fd = ngx_open_file(rbcf.logname, NGX_FILE_APPEND, NGX_FILE_CREATE_OR_OPEN,
+                          NGX_PIPE_FILE_ACCESS);
+            if (log_fd < 0) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              "open [%s] failed", rbcf.logname);
+                return;
+            }
+
+            gettimeofday(&tv, &tz);
+            tv.tv_sec -= tz.tz_minuteswest * 60;
+            rbcf.last_open_time = tv.tv_sec;
+            if (0 == ngx_fd_info(log_fd, &sb)) {
+                rbcf.log_size = sb.st_size;
+            }
+        }
+
+        if (ngx_write_fd(log_fd, read_buf, n_bytes_read) != n_bytes_read) {
+            if (errno != EINTR) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              "write to [%s] failed", rbcf.logname);
+                return;
+            }
+        }
+        rbcf.log_size += n_bytes_read;
+    }
+
+}
+
+ngx_int_t
+ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
+    ngx_pipe_rollback_conf_t *rbcf)
+{
+    u_char         **argv;
+    ngx_uint_t       i;
+    ngx_int_t        j;
+    size_t           len;
+    ngx_str_t        filename;
+    ngx_str_t        value;
+
+    if (op->argv->nelts < 3) {
+        //no logname
+        return NGX_ERROR;
+    }
+
+    //parse args
+    argv = op->argv->elts;
+
+    //set default param
+    filename.data = (u_char *) argv[1];
+    filename.len = ngx_strlen(filename.data);
+    if (ngx_conf_full_name(cycle, &filename, 0) != NGX_OK) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "get fullname failed");
+        return NGX_ERROR;
+    }
+    rbcf->logname = (char *) filename.data;
+    rbcf->backup_num = 1;
+    rbcf->log_max_size = -1;
+    rbcf->interval = -1;
+    memset(rbcf->backup, 0, sizeof(rbcf->backup));
+
+    for (i = 2; i < op->argv->nelts; i++) {
+        if (argv[i] == NULL) {
+            break;
+        }
+        if (ngx_strncmp((u_char *) "interval=", argv[i], 9) == 0) {
+            value.data = argv[i] + 9;
+            value.len = strlen((char *) argv[i]) - 9;
+            rbcf->interval = ngx_parse_time(&value, 1);
+            if (rbcf->interval <= 0) {
+                rbcf->interval = -1;
+            }
+
+        } else if (ngx_strncmp((u_char *) "baknum=", argv[i], 7) == 0) {
+            rbcf->backup_num = ngx_atoi(argv[i] + 7,
+                                        strlen((char *) argv[i]) - 7);
+            if (rbcf->backup_num <= 0) {
+                rbcf->backup_num = 1;
+
+            } else if (MAX_BACKUP_NUM < (size_t)rbcf->backup_num) {
+                rbcf->backup_num = MAX_BACKUP_NUM;
+            }
+
+        } else if (ngx_strncmp((u_char *) "maxsize=", argv[i], 8) == 0) {
+            value.data = argv[i] + 8;
+            value.len = strlen((char *) argv[i]) - 8;
+            rbcf->log_max_size = ngx_parse_size(&value);
+            if (rbcf->log_max_size <= 0) {
+                rbcf->log_max_size = -1;
+            }
+        }
+    }
+
+    len = strlen(rbcf->logname) + 5; //max is ".128"
+    for (j = 0; j < rbcf->backup_num; j++) {
+        rbcf->backup[j] = ngx_pcalloc(cycle->pool, len);
+        if (rbcf->backup[j] == NULL) {
+            return NGX_ERROR;
+        }
+        ngx_snprintf((u_char *) rbcf->backup[j], len, "%s.%i%Z", rbcf->logname, j + 1);
+    }
+
+    return NGX_OK;
+}
+
+void
+ngx_pipe_do_rollback(ngx_cycle_t *cycle, ngx_pipe_rollback_conf_t *rbcf)
+{
+    int             fd;
+    struct flock    lock;
+    int             ret;
+    ngx_int_t       i;
+    ngx_file_info_t sb;
+    ngx_int_t       need_do = 0;
+
+    fd = ngx_open_file(rbcf->logname, NGX_FILE_RDWR, NGX_FILE_OPEN, 0);
+    if (fd < 0) {
+        //open lock file failed just no need rollback
+        return;
+    }
+
+    lock.l_type     = F_WRLCK;
+    lock.l_whence   = SEEK_SET;
+    lock.l_start    = 0;
+    lock.l_len      = 0;
+
+    ret = fcntl(fd, F_SETLKW, &lock);
+    if (ret < 0) {
+        ngx_close_file(fd);
+        //lock failed just no need rollback
+        return;
+    }
+
+    //check time
+    if (rbcf->interval >= 0) {
+        if (ngx_file_info(rbcf->backup[0], &sb) == -1) {
+            need_do = 1;
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "need rollback [%s]: cannot open backup", rbcf->logname);
+
+        } else if (sb.st_ctime / rbcf->interval < rbcf->time_now / rbcf->interval) {
+            need_do = 1;
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "need rollback [%s]: time on [%d] [%d]",
+                          rbcf->logname, sb.st_ctime, rbcf->time_now);
+
+        } else {
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "no need rollback [%s]: time not on [%d] [%d]",
+                          rbcf->logname, sb.st_ctime, rbcf->time_now);
+        }
+
+    } else {
+        ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                      "no need check rollback [%s] time: no interval", rbcf->logname);
+    }
+
+    //check size
+    if (rbcf->log_max_size > 0) {
+        if (ngx_file_info(rbcf->logname, &sb) == 0 && (sb.st_size >= rbcf->log_max_size)) {
+            need_do = 1;
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "need rollback [%s]: size on [%d]", rbcf->logname, sb.st_size);
+
+        } else {
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                          "no need rollback [%s]: size not on", rbcf->logname);
+        }
+
+    } else {
+        ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
+                      "no need check rollback [%s] size: no max size", rbcf->logname);
+    }
+
+    if (need_do) {
+        for (i = 1; i < rbcf->backup_num; i++) {
+            ngx_rename_file(rbcf->backup[rbcf->backup_num - i - 1],
+                   rbcf->backup[rbcf->backup_num - i]);
+        }
+        if (ngx_rename_file(rbcf->logname, rbcf->backup[0]) < 0) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          "rname %s to %s failed", rbcf->logname, rbcf->backup[0]);
+        } else {
+            ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                          "rollback [%s] success", rbcf->logname);
+        }
+    }
+    ngx_close_file(fd);
 }
 
 #endif
