@@ -3917,6 +3917,13 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     if (status) {
         u->state->status = status;
+#if (T_TENGINE_FIX)
+        /* set r->us_tries = 1 for lua subrequest */
+        if (r->us_tries == 0) {
+            r->us_tries = 1;
+        }
+#endif
+
         timeout = u->conf->next_upstream_timeout;
 
         if (u->conf->upstream_tries != NGX_CONF_UNSET_UINT
