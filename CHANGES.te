@@ -1,3 +1,53 @@
+Changes with Tengine 2.2.1                                         27 Sep 2017
+
+    *) Security: range filter protect from total size overflows.
+       (CVE–2017–7529) (hongxiaolong)
+
+    *) Feature: added ngx_slab_stat module to show shared memory statistics.
+       (hongxiaolong)
+
+    *) Feature: added rollback parameter for pipe to support roll back log file
+       by time or file size. (MengqiWu)
+
+    *) Feature: added dns cache to avoid tengine reload、start or stop etc
+       failed when dns server is unavailable. (wangfakang)
+
+    *) Feature: added sysguard_cpu to protect the system by monitoring
+       the CPU usage. (wangfakang)
+
+    *) Change: Range filter: avoid negative range start. (jinjiu)
+
+    *) Change: updated ngx_slab from nginx-1.13.4 to enable slab slots and
+       free pages statistics. (hongxiaolong)
+
+    *) Change: update test cases: Nginx.pm and HTTP2.pm. (chobits)
+
+    *) Change: HTTP/2 updates from nginx v1.9.8~1.11.6. (PeterDaveHello)
+
+    *) Change: updated core document. (chobits)
+
+    *) Change: remove the warning message when using deprecated system OpenSSL
+       library on OS X. (chobits)
+
+    *) Change: updated travis.yml configure. (PeterDaveHello)
+
+    *) Bugfix: fixed "proxy_upstream_tries" number of retry backend
+       is incorrect for lua subrequest. (wangfakang)
+
+    *) Bugfix: fixed bug reuse_port and accept_mutex conflict. (gwtony)
+
+    *) Bugfix: fixed bug when the worker_processes is set to auto caused
+       reuse_port did not work. (wangfakang)
+
+    *) Bugfix: fixed bug of used reuse_port caused nginx -t failed. (chobits)
+
+    *) Bugfix: fixed bug of check return value of pipe module. (chobits)
+
+    *) Bugfix: fixed check configure error. (chobits)
+
+    *) Bugfix: fixed check aio configure option in auto/os/freebsd. (chobits)
+
+
 Changes with Tengine 2.2.0                                         29 Nov 2016
 
     *) Security: a segmentation fault might occur in a worker process
