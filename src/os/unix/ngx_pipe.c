@@ -406,9 +406,6 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     u_char          **argv;
     ngx_pid_t         pid;
     sigset_t          set;
-    ngx_core_conf_t  *ccf;
-
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     if (pipe(op->pfd) < 0) {
         return NGX_ERROR;
