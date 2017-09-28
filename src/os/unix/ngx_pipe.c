@@ -453,25 +453,28 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             }
         }
 
-        if (geteuid() == 0) {
-            if (setgid(ccf->group) == -1) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                              "setgid(%d) failed", ccf->group);
-                exit(2);
-            }
-
-            if (initgroups(ccf->username, ccf->group) == -1) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                              "initgroups(%s, %d) failed",
-                              ccf->username, ccf->group);
-            }
-
-            if (setuid(ccf->user) == -1) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                              "setuid(%d) failed", ccf->user);
-                exit(2);
-            }
-        }
+        /*
+         * //avoid pipe proccess cannot create or rollback log file limits of access
+         * if (geteuid() == 0) {
+         *     if (setgid(ccf->group) == -1) {
+         *         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+         *                 "setgid(%d) failed", ccf->group);
+         *         exit(2);
+         *     }
+         *
+         *     if (initgroups(ccf->username, ccf->group) == -1) {
+         *         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+         *                 "initgroups(%s, %d) failed",
+         *                 ccf->username, ccf->group);
+         *     }
+         *
+         *     if (setuid(ccf->user) == -1) {
+         *         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+         *                 "setuid(%d) failed", ccf->user);
+         *         exit(2);
+         *     }
+         * }
+         */
 
         /*
          * redirect stderr to /dev/null, because stderr will be connected with
