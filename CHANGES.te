@@ -9,7 +9,7 @@ Changes with Tengine 2.2.1                                         27 Sep 2017
     *) Feature: added rollback parameter for pipe to support roll back log file
        by time or file size. (MengqiWu)
 
-    *) Feature: added dns cache to avoid tengine reload、start or stop etc
+    *) Feature: added dns cache to avoid tengine reload, start or stop etc
        failed when dns server is unavailable. (wangfakang)
 
     *) Feature: added sysguard_cpu to protect the system by monitoring
