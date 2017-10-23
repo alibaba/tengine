@@ -569,7 +569,6 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     struct timeval              tv;
     struct timezone             tz;
     ngx_fd_t                    log_fd = NGX_INVALID_FILE;
-    size_t                      title_len;
     ngx_pipe_rollback_conf_t    rbcf;
     ngx_file_info_t             sb;
 
@@ -591,12 +590,6 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
 
     //set title
     ngx_setproctitle((char *) op->cmd);
-    title_len = ngx_strlen(ngx_os_argv[0]);
-#if (NGX_SOLARIS)
-#else
-    ngx_memset((u_char *) ngx_os_argv[0], NGX_SETPROCTITLE_PAD, title_len);
-    ngx_cpystrn((u_char *) ngx_os_argv[0], op->cmd, title_len);
-#endif
 
     for (;;)
     {
