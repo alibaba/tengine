@@ -135,6 +135,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
     ngx_connection_t          *fc;
     ngx_http_cleanup_t        *cln;
     ngx_http_v2_out_frame_t   *frame;
+    ngx_http_v2_connection_t  *h2c;
     ngx_http_core_loc_conf_t  *clcf;
     ngx_http_core_srv_conf_t  *cscf;
     struct sockaddr_in        *sin;
@@ -231,7 +232,11 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
         }
     }
 
-    len = status ? 1 : 1 + ngx_http_v2_literal_size("418");
+    h2c = r->stream->connection;
+
+    len = h2c->table_update ? 1 : 0;
+
+    len += status ? 1 : 1 + ngx_http_v2_literal_size("418");
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
@@ -425,6 +430,13 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     start = pos;
 
+    if (h2c->table_update) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                       "http2 table size update: 0");
+        *pos++ = (1 << 5) | 0;
+        h2c->table_update = 0;
+    }
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
                    "http2 output header: \":status: %03ui\"",
                    r->headers_out.status);
@@ -603,6 +615,8 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     ngx_http_v2_queue_blocked_frame(r->stream->connection, frame);
 
+    r->stream->queued = 1;
+
     cln = ngx_http_cleanup_add(r, 0);
     if (cln == NULL) {
         return NGX_ERROR;
@@ -610,8 +624,6 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     cln->handler = ngx_http_v2_filter_cleanup;
     cln->data = r->stream;
-
-    r->stream->queued = 1;
 
     fc->send_chain = ngx_http_v2_send_chain;
     fc->need_last_buf = 1;
@@ -753,6 +765,8 @@ ngx_http_v2_create_headers_frame(ngx_http_request_t *r, u_char *pos,
         rest -= frame_size;
 
         if (rest) {
+            frame->length += NGX_HTTP_V2_FRAME_HEADER_SIZE;
+
             type = NGX_HTTP_V2_CONTINUATION_FRAME;
             flags = NGX_HTTP_V2_NO_FLAG;
             continue;
@@ -1101,7 +1115,7 @@ ngx_http_v2_flow_control(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_stream_t *stream)
 {
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
-                   "http2:%ui available windows: conn:%uz stream:%z",
+                   "http2:%ui windows: conn:%uz stream:%z",
                    stream->node->id, h2c->send_window, stream->send_window);
 
     if (stream->send_window <= 0) {
@@ -1125,11 +1139,11 @@ ngx_http_v2_waiting_queue(ngx_http_v2_connection_t *h2c,
     ngx_queue_t           *q;
     ngx_http_v2_stream_t  *s;
 
-    if (stream->handled) {
+    if (stream->waiting) {
         return;
     }
 
-    stream->handled = 1;
+    stream->waiting = 1;
 
     for (q = ngx_queue_last(&h2c->waiting);
          q != ngx_queue_sentinel(&h2c->waiting);
@@ -1192,6 +1206,9 @@ ngx_http_v2_headers_frame_handler(ngx_http_v2_connection_t *h2c,
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                    "http2:%ui HEADERS frame %p was sent",
                    stream->node->id, frame);
+
+    stream->request->header_size += NGX_HTTP_V2_FRAME_HEADER_SIZE
+                                    + frame->length;
 
     ngx_http_v2_handle_frame(stream, frame);
 
@@ -1319,20 +1336,29 @@ static ngx_inline void
 ngx_http_v2_handle_stream(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_stream_t *stream)
 {
+    ngx_event_t       *wev;
     ngx_connection_t  *fc;
 
-    if (stream->handled || stream->blocked) {
+    if (stream->waiting || stream->blocked) {
         return;
     }
 
     fc = stream->request->connection;
 
-    if (!fc->error && (stream->exhausted || fc->write->delayed)) {
+    if (!fc->error && stream->exhausted) {
         return;
     }
 
-    stream->handled = 1;
-    ngx_queue_insert_tail(&h2c->posted, &stream->queue);
+    wev = fc->write;
+
+    wev->active = 0;
+    wev->ready = 1;
+
+    if (!fc->error && wev->delayed) {
+        return;
+    }
+
+    ngx_post_event(wev, &ngx_posted_events);
 }
 
 
@@ -1342,11 +1368,13 @@ ngx_http_v2_filter_cleanup(void *data)
     ngx_http_v2_stream_t *stream = data;
 
     size_t                     window;
+    ngx_event_t               *wev;
+    ngx_queue_t               *q;
     ngx_http_v2_out_frame_t   *frame, **fn;
     ngx_http_v2_connection_t  *h2c;
 
-    if (stream->handled) {
-        stream->handled = 0;
+    if (stream->waiting) {
+        stream->waiting = 0;
         ngx_queue_remove(&stream->queue);
     }
 
@@ -1380,9 +1408,26 @@ ngx_http_v2_filter_cleanup(void *data)
         fn = &frame->next;
     }
 
-    if (h2c->send_window == 0 && window && !ngx_queue_empty(&h2c->waiting)) {
-        ngx_queue_add(&h2c->posted, &h2c->waiting);
-        ngx_queue_init(&h2c->waiting);
+    if (h2c->send_window == 0 && window) {
+
+        while (!ngx_queue_empty(&h2c->waiting)) {
+            q = ngx_queue_head(&h2c->waiting);
+
+            ngx_queue_remove(q);
+
+            stream = ngx_queue_data(q, ngx_http_v2_stream_t, queue);
+
+            stream->waiting = 0;
+
+            wev = stream->request->connection->write;
+
+            wev->active = 0;
+            wev->ready = 1;
+
+            if (!wev->delayed) {
+                ngx_post_event(wev, &ngx_posted_events);
+            }
+        }
     }
 
     h2c->send_window += window;
