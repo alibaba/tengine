@@ -32,6 +32,10 @@ struct ngx_event_s {
 
     unsigned         write:1;
 
+#if (NGX_SSL)
+    unsigned         async:1;
+#endif
+
     unsigned         accept:1;
 
     /* used to detect the stale events in kqueue, rtsig, and epoll */
@@ -101,6 +105,9 @@ struct ngx_event_s {
 #endif
 
     ngx_event_handler_pt  handler;
+#if (NGX_SSL)
+    ngx_event_handler_pt  saved_handler;
+#endif
 
 
 #if (NGX_HAVE_AIO)
@@ -199,6 +206,9 @@ typedef struct {
 
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
+
+    ngx_int_t  (*add_async_conn)(ngx_connection_t *c);
+    ngx_int_t  (*del_async_conn)(ngx_connection_t *c, ngx_uint_t flags);
 } ngx_event_actions_t;
 
 
@@ -413,6 +423,8 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define ngx_del_event        ngx_event_actions.del
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
+#define ngx_add_async_conn   ngx_event_actions.add_async_conn
+#define ngx_del_async_conn   ngx_event_actions.del_async_conn
 
 #define ngx_notify           ngx_event_actions.notify
 
