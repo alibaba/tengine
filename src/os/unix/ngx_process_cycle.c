@@ -9,7 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 #include <ngx_channel.h>
-
+#include <openssl/rand.h>
 
 #if (T_PIPES)
 #define NGX_PIPE_STILL_NEEDED     0x02
@@ -655,7 +655,13 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 && !ngx_terminate
                 && !ngx_quit)
             {
-
+#if (NGX_SSL)
+                /* Delay added to give Quickassist Driver time to cleanup
+                * if worker exit with non-zero code. */
+                if(ngx_processes[i].status != 0) {
+                    usleep(2000000);
+                }
+#endif
                 if (ngx_spawn_process(cycle, ngx_processes[i].proc,
                                       ngx_processes[i].data,
                                       ngx_processes[i].name, i)
@@ -726,7 +732,6 @@ ngx_reap_children(ngx_cycle_t *cycle)
 
     return live;
 }
-
 
 static void
 ngx_master_process_exit(ngx_cycle_t *cycle)
@@ -1181,6 +1186,8 @@ ngx_channel_handler(ngx_event_t *ev)
         return;
     }
 
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
     c = ev->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel handler");
@@ -1194,6 +1201,14 @@ ngx_channel_handler(ngx_event_t *ev)
         if (n == NGX_ERROR) {
 
             if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+#if (NGX_SSL)
+                if (c->asynch && ngx_del_async_conn) {
+                    if (c->num_async_fds) {
+                        ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                        c->num_async_fds--;
+                    }
+                }
+#endif
                 ngx_del_conn(c, 0);
             }
 
