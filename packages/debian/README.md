@@ -21,6 +21,6 @@ DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -rfakeroot -uc -b
 replace the deb name with the current version
 
 ```
-sudo dpkg -i tengine_2.1.0-1_amd64.deb
+sudo dpkg -i tengine_2.2.1-1_amd64.deb
 ```
 
