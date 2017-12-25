@@ -36,11 +36,18 @@
 #define ngx_ssl_session_t       SSL_SESSION
 #define ngx_ssl_conn_t          SSL
 
+typedef struct {
+    ngx_msec_t                  timeout;
+    ngx_uint_t                  threshold;
+    size_t                      size_lo;
+    size_t                      size_hi;
+} ngx_ssl_dyn_rec_t;
 
 typedef struct {
     SSL_CTX                    *ctx;
     ngx_log_t                  *log;
     size_t                      buffer_size;
+    ngx_ssl_dyn_rec_t           dyn_rec;
 } ngx_ssl_t;
 
 
@@ -63,6 +70,10 @@ typedef struct {
     unsigned                    no_wait_shutdown:1;
     unsigned                    no_send_shutdown:1;
     unsigned                    handshake_buffer_set:1;
+
+    ngx_ssl_dyn_rec_t           dyn_rec;
+    ngx_msec_t                  dyn_rec_last_write;
+    ngx_uint_t                  dyn_rec_records_sent;
 } ngx_ssl_connection_t;
 
 
@@ -72,7 +83,8 @@ typedef struct {
 #define NGX_SSL_DFLT_BUILTIN_SCACHE  -5
 
 
-#define NGX_SSL_MAX_SESSION_SIZE  4096
+/*#define NGX_SSL_MAX_SESSION_SIZE   16*1024 */
+#define NGX_SSL_MAX_SESSION_SIZE  16384
 
 typedef struct ngx_ssl_sess_id_s  ngx_ssl_sess_id_t;
 
