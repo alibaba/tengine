@@ -61,6 +61,10 @@ typedef struct {
     ngx_uint_t                      line;
 } ngx_http_ssl_srv_conf_t;
 
+typedef struct {
+    ngx_flag_t                      verify_exception;
+} ngx_http_ssl_loc_conf_t;
+
 
 extern ngx_module_t  ngx_http_ssl_module;
 
