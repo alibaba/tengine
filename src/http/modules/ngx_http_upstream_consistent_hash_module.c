@@ -611,9 +611,11 @@ ngx_http_upstream_chash_set_peer_session(ngx_peer_connection_t *pc, void *data)
     ssl_session = uchpd->ssl_session;
     rc = ngx_ssl_set_session(pc->connection, ssl_session);
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "set session: %p:%d",
                    ssl_session, ssl_session ? ssl_session->references : 0);
+#endif
 
     return rc;
 }
@@ -632,16 +634,20 @@ ngx_http_upstream_chash_save_peer_session(ngx_peer_connection_t *pc, void *data)
         return;
     }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "save session: %p:%d", ssl_session, ssl_session->references);
+#endif
 
     old_ssl_session = uchpd->ssl_session;
     uchpd->ssl_session = ssl_session;
 
     if (old_ssl_session) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                        "old session: %p:%d",
                        old_ssl_session, old_ssl_session->references);
+#endif
 
         ngx_ssl_free_session(old_ssl_session);
     }
