@@ -184,7 +184,11 @@ ngx_event_module_t  ngx_eventport_module_ctx = {
         ngx_eventport_notify,              /* trigger a notify */
         ngx_eventport_process_events,      /* process the events */
         ngx_eventport_init,                /* init the events */
-        ngx_eventport_done,                /* done the events */
+        ngx_eventport_done                 /* done the events */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        ,NULL,                              /* add an async conn */
+        NULL                               /* del an async conn */
+#endif
     }
 
 };

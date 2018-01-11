@@ -246,6 +246,11 @@ ngx_event_accept(ngx_event_t *ev)
 
         rev->log = log;
         wev->log = log;
+#if (NGX_SSL)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        c->async->log = log;
+#endif
+#endif
 
         /*
          * TODO: MT: - ngx_atomic_fetch_add()
@@ -470,6 +475,16 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
 
 #endif
 
+#if (NGX_SSL)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        if (c->asynch && ngx_del_async_conn) {
+            if (c->num_async_fds) {
+                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                c->num_async_fds--;
+            }
+        }
+#endif
+#endif
 
         if (ngx_event_flags & NGX_USE_RTSIG_EVENT) {
             if (ngx_del_conn(c, NGX_DISABLE_EVENT) == NGX_ERROR) {

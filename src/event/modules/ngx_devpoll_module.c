@@ -91,7 +91,11 @@ ngx_event_module_t  ngx_devpoll_module_ctx = {
         NULL,                              /* trigger a notify */
         ngx_devpoll_process_events,        /* process the events */
         ngx_devpoll_init,                  /* init the events */
-        ngx_devpoll_done,                  /* done the events */
+        ngx_devpoll_done                   /* done the events */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        ,NULL,                              /* add an async conn */
+        NULL                               /* del an async conn */
+#endif
     }
 
 };

@@ -904,7 +904,8 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     case NGX_DECLINED:
 
-        if ((size_t) (u->buffer.end - u->buffer.start) < u->conf->buffer_size) {
+        if ((size_t) (unsigned) (u->buffer.end - u->buffer.start) \
+            < u->conf->buffer_size) {
             u->buffer.start = NULL;
 
         } else {
@@ -1181,7 +1182,16 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
         if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
 
             event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
-
+#if (NGX_HTTP_SSL)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+            if (c->asynch && ngx_del_async_conn) {
+                if (c->num_async_fds) {
+                    ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                    c->num_async_fds--;
+                }
+            }
+#endif
+#endif
             if (ngx_del_event(ev, event, 0) != NGX_OK) {
                 ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1304,7 +1314,16 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
 
         event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
-
+#if (NGX_HTTP_SSL)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        if (c->asynch && ngx_del_async_conn) {
+            if (c->num_async_fds) {
+                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                c->num_async_fds--;
+            }
+        }
+#endif
+#endif
         if (ngx_del_event(ev, event, 0) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -4111,7 +4130,8 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
             }
         }
 
-        ngx_http_file_cache_free(r->cache, u->pipe->temp_file);
+        if (u->pipe)
+            ngx_http_file_cache_free(r->cache, u->pipe->temp_file);
     }
 
 #endif
