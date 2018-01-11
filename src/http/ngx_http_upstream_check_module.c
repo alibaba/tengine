@@ -4609,5 +4609,12 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 static ngx_int_t
 ngx_http_upstream_check_init_process(ngx_cycle_t *cycle)
 {
+    ngx_http_upstream_check_main_conf_t *ucmcf;
+
+    ucmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_upstream_check_module);
+    if (ucmcf == NULL) {
+        return NGX_OK;
+    }
+
     return ngx_http_upstream_check_add_timers(cycle);
 }

@@ -11,8 +11,9 @@
 #include <ngx_channel.h>
 #include <openssl/rand.h>
 
-#define NGX_PIPE_STILL_NEEDED     2
-
+#if (T_PIPES)
+#define NGX_PIPE_STILL_NEEDED     0x02
+#endif
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
@@ -79,7 +80,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     u_char            *p;
     size_t             size;
     ngx_int_t          i;
-    ngx_uint_t         n, sigio, close_old_pipe;
+    ngx_uint_t         n, sigio;
+#if (T_PIPES)
+    ngx_uint_t         close_old_pipe;
+#endif
     sigset_t           set;
     struct itimerval   itv;
     ngx_uint_t         live;
@@ -140,7 +144,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 #endif
 
     ngx_new_binary = 0;
+#if (T_PIPES)
     close_old_pipe = 0;
+#endif
     delay = 0;
     sigio = 0;
     live = 1;
@@ -181,10 +187,12 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
             live = ngx_reap_children(cycle);
+#if (T_PIPES)
             if (!(live & NGX_PIPE_STILL_NEEDED) && close_old_pipe) {
                 ngx_close_old_pipes();
                 close_old_pipe = 0;
             }
+#endif
         }
 
         if (!live && (ngx_terminate || ngx_quit)) {
@@ -269,7 +277,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_msleep(100);
 
             live = 1;
+#if (T_PIPES)
             close_old_pipe = 1;
+#endif
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
@@ -670,8 +680,11 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 ch.fd = ngx_processes[ngx_process_slot].channel[0];
 
                 ngx_pass_open_channel(cycle, &ch);
-
+#if (T_PIPES)
                 live |= 1;
+#else
+                live = 1;
+#endif
 
                 continue;
             }
@@ -706,11 +719,15 @@ ngx_reap_children(ngx_cycle_t *cycle)
             }
 
         } else if (ngx_processes[i].exiting || !ngx_processes[i].detached) {
+#if (T_PIPES)
             live |= 1;
 
             if (ngx_processes[i].exiting) {
                 live |= NGX_PIPE_STILL_NEEDED;
             }
+#else
+            live = 1;
+#endif
         }
     }
 
@@ -756,11 +773,12 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
-
+#if (T_PIPES)
     /* Terminate all pipe processes */
 
     ngx_increase_pipe_generation();
     ngx_close_old_pipes();
+#endif
 
     exit(0);
 }
@@ -1254,9 +1272,11 @@ ngx_channel_handler(ngx_event_t *ev)
             ngx_processes[ch.slot].channel[0] = -1;
             break;
 
+#if (T_PIPES)
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
+#endif
         }
     }
 }

@@ -76,8 +76,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     ngx_time_update();
 
+#if (T_PIPES)
     ngx_increase_pipe_generation();
-
+#endif
 
     log = old_cycle->log;
 
@@ -404,17 +405,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     if (ngx_log_open_default(cycle) != NGX_OK) {
         goto failed;
     }
-
-
-    /* open pipes */
-
-    if (!ngx_is_init_cycle(old_cycle)) {
-        if (ngx_open_pipes(cycle) == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "can not open pipes");
-            goto failed;
-        }
-    }
-
 
     /* open the new files */
 
@@ -796,6 +786,16 @@ old_shm_zone_done:
 #endif
     }
 
+#if (T_PIPES)
+    /* open pipes */
+
+    if (!ngx_is_init_cycle(old_cycle)) {
+        if (ngx_open_pipes(cycle) == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "can not open pipes");
+            goto failed;
+        }
+    }
+#endif
 
     /* close the unnecessary open files */
 
@@ -924,7 +924,9 @@ failed:
         }
     }
 
+#if (T_PIPES)
     ngx_close_pipes();
+#endif
 
     if (ngx_test_config) {
         ngx_destroy_cycle_pools(&conf);

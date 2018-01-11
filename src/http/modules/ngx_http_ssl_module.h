@@ -34,9 +34,9 @@ typedef struct {
 
     time_t                          session_timeout;
 
-    ngx_str_t                       certificate;
-    ngx_str_t                       certificate_key;
-    ngx_str_t                       pass_phrase_dialog;
+    ngx_array_t                    *certificates;
+    ngx_array_t                    *certificate_keys;
+
     ngx_str_t                       dhparam;
     ngx_str_t                       ecdh_curve;
     ngx_str_t                       client_certificate;
@@ -56,6 +56,8 @@ typedef struct {
     ngx_flag_t                      stapling_verify;
     ngx_str_t                       stapling_file;
     ngx_str_t                       stapling_responder;
+
+    ngx_flag_t                      early_data;
 
     u_char                         *file;
     ngx_uint_t                      line;

@@ -513,10 +513,12 @@ ngx_process_get_status(void)
             }
         }
 
+#if (T_PIPES)
         if (i == ngx_last_process) {
             process = "pipe process";
             ngx_pipe_broken_action(ngx_cycle->log, pid, 1);
         }
+#endif
 
         if (WTERMSIG(status)) {
 #ifdef WCOREDUMP

@@ -698,10 +698,11 @@ ngx_procs_channel_handler(ngx_event_t *ev)
 
             ngx_processes[ch.slot].channel[0] = -1;
             break;
-
+#if (T_PIPES)
         case NGX_CMD_PIPE_BROKEN:
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
+#endif
         }
     }
 }
