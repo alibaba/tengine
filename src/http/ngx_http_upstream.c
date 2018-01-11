@@ -1732,7 +1732,11 @@ ngx_http_upstream_ssl_name(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "upstream SSL server name: \"%s\"", name.data);
 
-    if (SSL_set_tlsext_host_name(c->ssl->connection, name.data) == 0) {
+    if (SSL_set_tlsext_host_name(c->ssl->connection,
+#ifdef OPENSSL_IS_BORINGSSL
+	    (const char *)
+#endif
+	    name.data) == 0) {
         ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0,
                       "SSL_set_tlsext_host_name(\"%s\") failed", name.data);
         return NGX_ERROR;
@@ -3936,6 +3940,13 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     if (status) {
         u->state->status = status;
+#if (T_TENGINE_FIX)
+        /* set r->us_tries = 1 for lua subrequest */
+        if (r->us_tries == 0) {
+            r->us_tries = 1;
+        }
+#endif
+
         timeout = u->conf->next_upstream_timeout;
 
         if (u->conf->upstream_tries != NGX_CONF_UNSET_UINT

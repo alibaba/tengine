@@ -50,10 +50,8 @@ Documentation
 The homepage of Tengine is at [http://tengine.taobao.org/](http://tengine.taobao.org/)
 You can access [http://tengine.taobao.org/documentation.html](http://tengine.taobao.org/documentation.html) for more information.
 
-Mailing lists
+Contact
 =============
 
-Mailing lists are usually good places to ask questions. We highly recommend you subscribe to Tengine's mailing lists below:
-* [http://code.taobao.org/mailman/listinfo/tengine](http://code.taobao.org/mailman/listinfo/tengine) (English)
-* [http://code.taobao.org/mailman/listinfo/tengine-cn](http://code.taobao.org/mailman/listinfo/tengine-cn) (Chinese)
+[https://github.com/alibaba/tengine/issues](https://github.com/alibaba/tengine/issues)
 

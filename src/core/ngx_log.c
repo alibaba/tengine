@@ -657,6 +657,35 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         new_log->writer = ngx_syslog_writer;
         new_log->wdata = peer;
 
+#if (T_PIPES) && !(NGX_WIN32)
+    } else if (ngx_strncmp(value[1].data, "pipe:", 5) == 0) {
+
+        if (value[1].len == 5) {
+            return NGX_CONF_ERROR;
+        }
+
+        value[1].len -= 5;
+        value[1].data += 5;
+
+        ngx_open_pipe_t *pipe_conf = ngx_conf_open_pipe(cf->cycle, &value[1], "w");
+        if (pipe_conf == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        new_log->file = pipe_conf->open_fd;
+
+#ifdef LOG_PIPE_NEED_BACKUP
+        if (new_log->file != NULL) {
+            name = ngx_log_error_backup;
+            if (ngx_conf_full_name(cf->cycle, &name, 0) != NGX_OK) {
+                return "fail to set backup";
+            }
+
+            new_log->file->name = name;
+        }
+#endif
+#endif
+
     } else {
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
         if (new_log->file == NULL) {
