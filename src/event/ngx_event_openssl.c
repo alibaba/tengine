@@ -1421,19 +1421,19 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
             case SSL_READ_EARLY_DATA_FINISH:
                 return 1;
             case SSL_READ_EARLY_DATA_SUCCESS:
-                return 1; 
+                return 1;
             }
         } else {
             return 0;
         }
     }
 
-    sslerr = SSL_get_error(c->ssl->connection, 0); 
+    sslerr = SSL_get_error(c->ssl->connection, 0);
     switch (sslerr) {
     case SSL_ERROR_WANT_WRITE:
     case SSL_ERROR_WANT_ASYNC:
     case SSL_ERROR_WANT_READ:
-            break; 
+            break;
     default:
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
             "SSL_get_error: %d while reading early data\n", sslerr);
@@ -1448,8 +1448,9 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
 ngx_int_t
 ngx_ssl_handshake(ngx_connection_t *c)
 {
-    int        n, sslerr;
-    ngx_err_t  err;
+    int         n, sslerr;
+    ngx_err_t   err;
+    ngx_time_t *tp;
 
     ngx_ssl_clear_error(c->log);
 
@@ -1535,6 +1536,9 @@ ngx_ssl_handshake(ngx_connection_t *c)
 #endif
 
         c->ssl->handshaked = 1;
+
+        tp = ngx_timeofday();
+        c->ssl->handshake_end_msec = tp->sec * 1000 + tp->msec;
 
         c->recv = ngx_ssl_recv;
         c->send = ngx_ssl_write;
@@ -4666,6 +4670,41 @@ ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     s->len = ngx_sprintf(s->data, "%T", (end - now) / 86400) - s->data;
 
     X509_free(cert);
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    ngx_msec_int_t   ms;
+    u_char          *p;
+    ngx_time_t      *tp;
+
+    if (c->ssl == NULL) {
+        ngx_str_null(s);
+
+        return NGX_OK;
+    }
+
+    tp = ngx_timeofday();
+
+    if (c->ssl->handshake_end_msec == 0) {
+        ms = tp->sec * 1000 + tp->sec - c->ssl->handshake_start_msec;
+    } else {
+        ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
+    }
+
+    ms = ngx_max(ms, 0);
+
+    p = ngx_pnalloc(pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    s->len = ngx_sprintf(p, "%i", ms) - p;
+    s->data = p;
 
     return NGX_OK;
 }
