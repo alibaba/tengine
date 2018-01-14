@@ -633,6 +633,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
     ssize_t                   n;
     ngx_err_t                 err;
     ngx_int_t                 rc;
+    ngx_time_t               *tp;
     ngx_connection_t         *c;
     ngx_http_connection_t    *hc;
     ngx_http_ssl_srv_conf_t  *sscf;
@@ -735,6 +736,10 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 ngx_http_close_connection(c);
                 return;
             }
+
+            /* ssl handshake start time */
+            tp = ngx_timeofday();
+            c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
 
             c->ssl->enable_early_data = sscf->early_data;
 
