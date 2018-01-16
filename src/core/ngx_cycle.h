@@ -60,7 +60,7 @@ struct ngx_cycle_s {
     ngx_connection_t         *connections;
     ngx_event_t              *read_events;
     ngx_event_t              *write_events;
-#if (NGX_SSL)
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_event_t              *async_events;
 #endif
 

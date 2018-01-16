@@ -17,9 +17,9 @@ Description
 配置项
 ===========
 
-**语法**:     ssl_asynch on | off;
+**语法**:     ssl_async on | off;
 
-**默认值**:  ssl_asynch off;
+**默认值**:  ssl_async off;
 
 **作用域**:    http, server
 
@@ -31,7 +31,7 @@ Description
 配置文件: conf/nginx.conf
 '''
     http {
-        ssl_asynch  on;
+        ssl_async  on;
         server {
             ...
             }
@@ -42,7 +42,7 @@ Description
 '''
     http {
         server {
-            ssl_asynch  on;
+            ssl_async  on;
             }
         }
     }

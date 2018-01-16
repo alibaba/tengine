@@ -540,7 +540,7 @@ ngx_http_memcached_filter(void *data, ssize_t bytes)
 
     last += (size_t) (u->length - NGX_HTTP_MEMCACHED_END);
 
-    if (ngx_strncmp(last, ngx_http_memcached_end,(unsigned)(b->last - last)) != 0) {
+    if (ngx_strncmp(last, ngx_http_memcached_end, (b->last - last)) != 0) {
         ngx_log_error(NGX_LOG_ERR, ctx->request->connection->log, 0,
                       "memcached sent invalid trailer");
 

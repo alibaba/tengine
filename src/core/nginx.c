@@ -236,7 +236,6 @@ main(int argc, char *const *argv)
     ngx_log_t        *log;
     ngx_cycle_t      *cycle, init_cycle;
     ngx_core_conf_t  *ccf;
-    ngx_int_t         ret_int_num;
 
 
     ngx_debug_init();
@@ -397,9 +396,7 @@ main(int argc, char *const *argv)
     }
 
     if (ngx_signal) {
-        ret_int_num = ngx_signal_process(cycle, ngx_signal);
-        ngx_destroy_pool(cycle->pool);
-        return ret_int_num;
+        return ngx_signal_process(cycle, ngx_signal);
     }
 
     ngx_os_status(cycle->log);
@@ -419,7 +416,7 @@ main(int argc, char *const *argv)
     }
 
     if (!ngx_inherited && ccf->daemon) {
-        if (ngx_daemon(cycle) != NGX_OK) {
+        if (ngx_daemon(cycle->log) != NGX_OK) {
             return 1;
         }
 
@@ -822,7 +819,6 @@ ngx_get_options(int argc, char *const *argv)
                 return NGX_ERROR;
 
             case 's':
-                ngx_no_ssl_init = 1;
                 if (*p) {
                     ngx_signal = (char *) p;
 

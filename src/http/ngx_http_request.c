@@ -448,18 +448,14 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
          * is still in progress.
          */
 
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if ((c->asynch && !ngx_ssl_waiting_for_async(c)) || !c->asynch) {
-#endif
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+        if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable) {
 #endif
             if (ngx_pfree(c->pool, b->start) == NGX_OK) {
                 b->start = NULL;
             }
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
-#endif
 #endif
 
         return;
@@ -1424,13 +1420,11 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         return n;
     }
 
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if(c->asynch)
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    if(c->async_enable)
         n = c->recv(c, r->header_in->last,
                r->header_in->end - r->header_in->last);
     else {
-#endif
 #endif
         if (rev->ready) {
             n = c->recv(c, r->header_in->last,
@@ -1438,10 +1432,8 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         } else {
             n = NGX_AGAIN;
         }
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     }
-#endif
 #endif
 
     if (n == NGX_AGAIN) {
@@ -1505,8 +1497,8 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
     cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
 
     if (r->state != 0
-        && (size_t) (unsigned) (r->header_in->pos - old) \
-                  >= cscf->large_client_header_buffers.size)
+        && (size_t) (r->header_in->pos - old) \
+                                     >= cscf->large_client_header_buffers.size)
     {
         return NGX_DECLINED;
     }
@@ -3010,10 +3002,8 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
      * is still in progress.
      */
 
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if ((c->asynch && !ngx_ssl_waiting_for_async(c)) || !c->asynch)
-#endif
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
     {
 #endif
         b = c->buffer;
@@ -3052,7 +3042,7 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
             hc->nbusy = 0;
         }
-#if (NGX_HTTP_SSL)
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     }
 
     if (c->ssl) {
@@ -3063,15 +3053,13 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     rev->handler = ngx_http_keepalive_handler;
 
     if (wev->active && (ngx_event_flags & NGX_USE_LEVEL_EVENT)) {
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_del_async_conn) {
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_del_async_conn) {
             if (c->num_async_fds) {
                 ngx_del_async_conn(c, NGX_DISABLE_EVENT);
                 c->num_async_fds--;
             }
         }
-#endif
 #endif
         if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) != NGX_OK) {
             ngx_http_close_connection(c);
@@ -3202,10 +3190,8 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
          * frees the buffer between invocations as may end up with a buffer that is at a
          * different address */
 
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if ((c->asynch && !ngx_ssl_waiting_for_async(c)) || !c->asynch)
-#endif
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+        if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
         {
 #endif
             if (ngx_pfree(c->pool, b->start) == NGX_OK) {
@@ -3216,7 +3202,7 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
 
                 b->pos = NULL;
             }
-#if (NGX_HTTP_SSL)
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
 #endif
 
@@ -3288,15 +3274,13 @@ ngx_http_set_lingering_close(ngx_http_request_t *r)
     wev->handler = ngx_http_empty_handler;
 
     if (wev->active && (ngx_event_flags & NGX_USE_LEVEL_EVENT)) {
-#if (NGX_HTTP_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_del_async_conn) {
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_del_async_conn) {
             if (c->num_async_fds) {
                 ngx_del_async_conn(c, NGX_DISABLE_EVENT);
                 c->num_async_fds--;
             }
         }
-#endif
 #endif
         if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) != NGX_OK) {
             ngx_http_close_request(r, 0);
