@@ -93,8 +93,10 @@ ngx_event_module_t  ngx_kqueue_module_ctx = {
         ngx_kqueue_process_events,         /* process the events */
         ngx_kqueue_init,                   /* init the events */
         ngx_kqueue_done,                   /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)        
         NULL,                              /* add an async conn */
-        NULL                               /* del an async conn */
+        NULL,                              /* del an async conn */
+#endif
     }
 
 };

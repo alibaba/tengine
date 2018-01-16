@@ -1497,7 +1497,7 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
     cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
 
     if (r->state != 0
-        && (size_t) (r->header_in->pos - old) \
+        && (size_t) (r->header_in->pos - old)
                                      >= cscf->large_client_header_buffers.size)
     {
         return NGX_DECLINED;
