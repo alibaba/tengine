@@ -105,7 +105,7 @@ struct ngx_event_s {
 #endif
 
     ngx_event_handler_pt  handler;
-#if (NGX_SSL)
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_event_handler_pt  saved_handler;
 #endif
 

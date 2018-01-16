@@ -17,7 +17,9 @@
 typedef struct {
     ngx_flag_t                      enable;
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     ngx_flag_t                      async_enable;
+#endif
 
     ngx_ssl_t                       ssl;
 

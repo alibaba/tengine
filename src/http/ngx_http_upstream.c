@@ -904,8 +904,7 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     case NGX_DECLINED:
 
-        if ((size_t) (u->buffer.end - u->buffer.start) \
-            < u->conf->buffer_size) {
+        if ((size_t) (u->buffer.end - u->buffer.start) < u->conf->buffer_size) {
             u->buffer.start = NULL;
 
         } else {
