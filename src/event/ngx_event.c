@@ -190,7 +190,7 @@ ngx_event_module_t  ngx_event_core_module_ctx = {
     &event_core_name,
     ngx_event_core_create_conf,            /* create configuration */
     ngx_event_core_init_conf,              /* init configuration */
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 #else
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
@@ -597,10 +597,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 {
     ngx_uint_t           m, i;
     ngx_event_t         *rev, *wev;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_event_t         *aev;
-#endif
 #endif
     ngx_listening_t     *ls;
     ngx_connection_t    *c, *next, *old;
@@ -740,8 +738,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         wev[i].closed = 1;
     }
 
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     cycle->async_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
                                     cycle->log);
     if (cycle->async_events == NULL) {
@@ -754,7 +751,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         aev[i].instance = 1;
     }
 #endif
-#endif
 
     i = cycle->connection_n;
     next = NULL;
@@ -766,11 +762,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
         c[i].fd = (ngx_socket_t) -1;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
         c[i].async = &cycle->async_events[i];
         c[i].async_fd = (ngx_socket_t) -1;
-#endif
 #endif
 
         next = &c[i];

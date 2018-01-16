@@ -17,9 +17,9 @@ Build Nginx with configuration item '--with-http_ssl_module'
 Directives
 ===========
 
-**Syntax**:     ssl_asynch on | off;
+**Syntax**:     ssl_async on | off;
 
-**Default**:  ssl_asynch off;
+**Default**:  ssl_async off;
 
 **Context**:    http, server
 
@@ -31,7 +31,7 @@ Example
 file: conf/nginx.conf
 '''
     http {
-        ssl_asynch  on;
+        ssl_async  on;
         server {
             ...
             }
@@ -42,7 +42,7 @@ OR
 '''
     http {
         server {
-            ssl_asynch  on;
+            ssl_async  on;
             }
         }
     }

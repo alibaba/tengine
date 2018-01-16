@@ -125,17 +125,13 @@ struct ngx_connection_s {
     void               *data;
     ngx_event_t        *read;
     ngx_event_t        *write;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_event_t        *async;
-#endif
 #endif
 
     ngx_socket_t        fd;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_socket_t        async_fd;
-#endif
 #endif
     ngx_recv_pt         recv;
     ngx_send_pt         send;
@@ -159,8 +155,8 @@ struct ngx_connection_s {
 
 #if (NGX_SSL)
     ngx_ssl_connection_t  *ssl;
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    ngx_flag_t          asynch;
+#if (NGX_SSL_ASYNC)
+    ngx_flag_t          async_enable;
 #endif
 #endif
 
@@ -194,10 +190,8 @@ struct ngx_connection_s {
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
 
     unsigned            need_last_buf:1;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     unsigned            num_async_fds:8;
-#endif
 #endif
 #if (NGX_HAVE_IOCP)
     unsigned            accept_context_updated:1;

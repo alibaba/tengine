@@ -69,7 +69,7 @@ static void *ngx_openssl_create_conf(ngx_cycle_t *cycle);
 static char *ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_openssl_exit(ngx_cycle_t *cycle);
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void ngx_ssl_handshake_async_handler(ngx_event_t * aev);
 static void ngx_ssl_read_async_handler(ngx_event_t * aev);
 static void ngx_ssl_write_async_handler(ngx_event_t * aev);
@@ -122,7 +122,7 @@ int  ngx_ssl_certificate_name_index;
 int  ngx_ssl_stapling_index;
 
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void
 ngx_ssl_empty_handler(ngx_event_t *aev)
 {
@@ -361,8 +361,8 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
     SSL_CTX_set_mode(ssl->ctx, SSL_MODE_NO_AUTO_CHAIN);
 #endif
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if(ssl->asynch) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if(ssl->async_enable) {
         SSL_CTX_set_mode(ssl->ctx, SSL_MODE_ASYNC);
     }
 #endif
@@ -1226,8 +1226,8 @@ ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
     }
 
     c->ssl = sc;
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    c->asynch = ssl->asynch;
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    c->async_enable = ssl->async_enable;
 #endif
     return NGX_OK;
 }
@@ -1247,7 +1247,7 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
 }
 
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 ngx_int_t
 ngx_ssl_async_process_fds(ngx_connection_t *c)
 {
@@ -1470,8 +1470,8 @@ ngx_ssl_handshake(ngx_connection_t *c)
 #endif
 
     if (n == 1) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if(c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if(c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1566,8 +1566,8 @@ ngx_ssl_handshake(ngx_connection_t *c)
             c->ssl->read_early_state == SSL_READ_EARLY_DATA_SUCCESS)
 #endif
         ) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1587,8 +1587,8 @@ ngx_ssl_handshake(ngx_connection_t *c)
     }
 
     if (sslerr == SSL_ERROR_WANT_WRITE) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1607,8 +1607,8 @@ ngx_ssl_handshake(ngx_connection_t *c)
         return NGX_AGAIN;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (c->asynch && sslerr == SSL_ERROR_WANT_ASYNC)
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (c->async_enable && sslerr == SSL_ERROR_WANT_ASYNC)
     {
         c->async->handler = ngx_ssl_handshake_async_handler;
         c->read->saved_handler = c->read->handler;
@@ -1645,7 +1645,7 @@ ngx_ssl_handshake(ngx_connection_t *c)
     return NGX_ERROR;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void
 ngx_ssl_handshake_async_handler(ngx_event_t *aev)
 {
@@ -1687,7 +1687,7 @@ ngx_ssl_handshake_handler(ngx_event_t *ev)
         return;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     /*
      * empty the handler of async event to avoid
      * going back to previous ssl handshake state
@@ -1893,8 +1893,8 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
     }
 
     if (n > 0) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1921,8 +1921,8 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_get_error: %d", sslerr);
 
     if (sslerr == SSL_ERROR_WANT_READ) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1935,8 +1935,8 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "peer started SSL renegotiation");
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -1959,8 +1959,8 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
         return NGX_AGAIN;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (c->asynch && sslerr == SSL_ERROR_WANT_ASYNC) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (c->async_enable && sslerr == SSL_ERROR_WANT_ASYNC) {
         c->async->handler = ngx_ssl_read_async_handler;
         c->read->saved_handler = c->read->handler;
         c->read->handler = ngx_ssl_empty_handler;
@@ -1989,7 +1989,7 @@ ngx_ssl_handle_recv(ngx_connection_t *c, int n)
     return NGX_ERROR;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void
 ngx_ssl_read_async_handler(ngx_event_t *aev)
 {
@@ -2210,8 +2210,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
 
     if (n > 0) {
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -2240,8 +2240,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_get_error: %d", sslerr);
 
     if (sslerr == SSL_ERROR_WANT_WRITE) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -2253,8 +2253,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
 
         ngx_log_error(NGX_LOG_INFO, c->log, 0,
                       "peer started SSL renegotiation");
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -2277,8 +2277,8 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
         return NGX_AGAIN;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if(c->asynch && sslerr == SSL_ERROR_WANT_ASYNC) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if(c->async_enable && sslerr == SSL_ERROR_WANT_ASYNC) {
         c->async->handler = ngx_ssl_write_async_handler;
         c->read->saved_handler = c->read->handler;
         c->read->handler = ngx_ssl_empty_handler;
@@ -2302,7 +2302,7 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     return NGX_ERROR;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void
 ngx_ssl_write_async_handler(ngx_event_t *aev)
 {
@@ -2366,8 +2366,8 @@ ngx_ssl_shutdown(ngx_connection_t *c)
          * an SSL handshake, while previous versions always return 0.
          * Avoid calling SSL_shutdown() if handshake wasn't completed.
          */
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if(c->asynch) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if(c->async_enable) {
             /* Check if there is inflight request */
             if (SSL_want_async(c->ssl->connection) && !c->timedout) {
                 c->async->handler = ngx_ssl_shutdown_async_handler;
@@ -2428,8 +2428,8 @@ ngx_ssl_shutdown(ngx_connection_t *c)
     /* before 0.9.8m SSL_shutdown() returned 0 instead of -1 on errors */
 
     if (n != 1 && ERR_peek_error()) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -2438,16 +2438,16 @@ ngx_ssl_shutdown(ngx_connection_t *c)
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
                        "SSL_get_error: %d", sslerr);
     }
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    else if (c->asynch && n == -1) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    else if (c->async_enable && n == -1) {
         sslerr = SSL_get_error(c->ssl->connection, n);
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
                        "SSL_get_error async: %d", sslerr);
     }
 #endif
     if (n == 1 || sslerr == 0 || sslerr == SSL_ERROR_ZERO_RETURN) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-         if(c->asynch) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+         if(c->async_enable) {
             /* Ignore errors from ngx_ssl_async_process_fds as
                we want to carry on and close the SSL connection
                anyway. */
@@ -2468,8 +2468,8 @@ ngx_ssl_shutdown(ngx_connection_t *c)
     }
 
     if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-        if (c->asynch && ngx_ssl_async_process_fds(c) == 0) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        if (c->async_enable && ngx_ssl_async_process_fds(c) == 0) {
             return NGX_ERROR;
         }
 #endif
@@ -2499,8 +2499,8 @@ ngx_ssl_shutdown(ngx_connection_t *c)
         return NGX_AGAIN;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if(c->asynch) {
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if(c->async_enable) {
         if (sslerr == SSL_ERROR_WANT_ASYNC) {
             c->async->handler = ngx_ssl_shutdown_async_handler;
             c->read->saved_handler = ngx_ssl_shutdown_handler;
@@ -2539,7 +2539,7 @@ ngx_ssl_shutdown(ngx_connection_t *c)
     return NGX_ERROR;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static void
 ngx_ssl_shutdown_async_handler(ngx_event_t *aev)
 {
@@ -2587,7 +2587,7 @@ ngx_ssl_shutdown_handler(ngx_event_t *ev)
         return;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     /*
      * empty the handler of async event to avoid
      * going back to previous ssl shutdown state

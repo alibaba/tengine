@@ -37,7 +37,7 @@ ngx_int_t ngx_os_init(ngx_log_t *log);
 void ngx_os_status(ngx_log_t *log);
 ngx_int_t ngx_os_specific_init(ngx_log_t *log);
 void ngx_os_specific_status(ngx_log_t *log);
-ngx_int_t ngx_daemon(ngx_cycle_t *cycle);
+ngx_int_t ngx_daemon(ngx_log_t *log);
 ngx_int_t ngx_os_signal_process(ngx_cycle_t *cycle, char *sig, ngx_int_t pid);
 
 

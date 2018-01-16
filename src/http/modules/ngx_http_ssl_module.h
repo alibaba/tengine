@@ -17,7 +17,7 @@
 typedef struct {
     ngx_flag_t                      enable;
 
-    ngx_flag_t                      enable_asynch;
+    ngx_flag_t                      async_enable;
 
     ngx_ssl_t                       ssl;
 

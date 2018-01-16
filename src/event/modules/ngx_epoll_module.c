@@ -118,12 +118,10 @@ static ngx_int_t ngx_epoll_notify(ngx_event_handler_pt handler);
 #endif
 static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static ngx_int_t ngx_epoll_add_async_connection(ngx_connection_t *c);
 static ngx_int_t ngx_epoll_del_async_connection(ngx_connection_t *c,
     ngx_uint_t flags);
-#endif
 #endif
 
 #if (NGX_HAVE_FILE_AIO)
@@ -194,15 +192,10 @@ ngx_event_module_t  ngx_epoll_module_ctx = {
 #endif
         ngx_epoll_process_events,        /* process the events */
         ngx_epoll_init,                  /* init the events */
-        ngx_epoll_done                   /* done the events */
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-#if (NGX_SSL)
-        ,ngx_epoll_add_async_connection,  /* add an async conn */
+        ngx_epoll_done,                  /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        ngx_epoll_add_async_connection,  /* add an async conn */
         ngx_epoll_del_async_connection   /* del an async conn */
-#else
-        NULL,                            /* add an async conn */
-        NULL                             /* del an async conn */
-#endif
 #endif
     }
 };
@@ -556,11 +549,13 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "epoll add event: fd:%d op:%d ev:%08XD",
                    c->fd, op, ee.events);
+
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
-                      "socket add event epoll_ctl(%d, %d) failed", op, c->fd);
+                      "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
+
     ev->active = 1;
 #if 0
     ev->oneshot = (flags & NGX_ONESHOT_EVENT) ? 1 : 0;
@@ -615,11 +610,13 @@ ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "epoll del event: fd:%d op:%d ev:%08XD",
                    c->fd, op, ee.events);
+
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
-                      "socket del event epoll_ctl(%d, %d) failed", op, c->fd);
+                      "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
+
     ev->active = 0;
 
     return NGX_OK;
@@ -636,11 +633,13 @@ ngx_epoll_add_connection(ngx_connection_t *c)
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "epoll add connection: fd:%d ev:%08XD", c->fd, ee.events);
+
     if (epoll_ctl(ep, EPOLL_CTL_ADD, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno,
-                      "socket add_conn epoll_ctl(EPOLL_CTL_ADD, %d) failed", c->fd);
+                      "epoll_ctl(EPOLL_CTL_ADD, %d) failed", c->fd);
         return NGX_ERROR;
     }
+
     c->read->active = 1;
     c->write->active = 1;
 
@@ -675,7 +674,7 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
 
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno,
-                     "socket del conn epoll_ctl(%d, %d) failed", op, c->fd);
+                     "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
@@ -685,8 +684,7 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
     return NGX_OK;
 }
 
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 static ngx_int_t
 ngx_epoll_add_async_connection(ngx_connection_t *c)
 {
@@ -733,7 +731,6 @@ ngx_epoll_del_async_connection(ngx_connection_t *c, ngx_uint_t flags)
     return NGX_OK;
 }
 #endif
-#endif
 
 #if (NGX_HAVE_EVENTFD)
 
@@ -767,11 +764,9 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_event_t       *rev, *wev;
     ngx_queue_t       *queue;
     ngx_connection_t  *c;
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_int_t          async;
     ngx_event_t       *aev;
-#endif
 #endif
 
     /* NGX_TIMER_INFINITE == INFTIM */
@@ -820,7 +815,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
         instance = (uintptr_t) c & 1;
 #if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL_ASYNC)
         async = ((uintptr_t) c & 2) >> 1;
 #endif
         c = (ngx_connection_t *) ((uintptr_t) c & (uintptr_t) ~3);
@@ -874,7 +869,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             revents |= EPOLLIN|EPOLLOUT;
         }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
         if ((revents & EPOLLIN) && rev->active && !async) {
 #else
         if ((revents & EPOLLIN) && rev->active) {
@@ -901,7 +896,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
         wev = c->write;
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
         if ((revents & EPOLLOUT) && wev->active && !async) {
 #else
         if ((revents & EPOLLOUT) && wev->active) {
@@ -929,8 +924,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             }
         }
 
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
         aev = c->async;
 
         if ((revents & EPOLLIN) && aev->active && async) {
@@ -955,7 +949,6 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                 aev->handler(aev);
             }
         }
-#endif
 #endif
     }
 

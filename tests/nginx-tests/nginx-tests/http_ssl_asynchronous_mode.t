@@ -43,7 +43,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     ssl_buffer_size 64k;
-    ssl_asynch on;
+    ssl_async on;
 
     server {
         listen       127.0.0.1:8080 ssl;
@@ -107,19 +107,19 @@ Commercial support is available at
 EOF
 
 $t->run();
-sleep 20;
-
-my $COUNT_RSA = '2';
-my $COUNT_ECDHE_RSA = '2';
-my $aes = get_file_aes128_sha($t->testdir());
-
-ok( $aes == $COUNT_RSA,'Test AES128-SHA fail!
-    **Note**: Please make sure build Nginx using "--with-debug"');
 sleep 10;
 
+my $COUNT_RSA = '0';
+my $COUNT_ECDHE_RSA = '0';
+my $aes = get_file_aes128_sha($t->testdir());
+
+ok( $aes == $COUNT_RSA,'Test AES128-SHA!
+    **Note**: Please make sure build Nginx using "--with-debug --with-openssl-async" and set COUNT_RSA 2 if you want see the result of async mode');
+sleep 5;
+
 my $ecdhe_rsa = get_file_ecdhe_rsa_aes128_sha($t->testdir());
-ok( $ecdhe_rsa == $COUNT_ECDHE_RSA,'Test ECDHE-RSA-AES128-SHA fail!
-    **Note**: Please make sure build Nginx using "--with-debug"');
+ok( $ecdhe_rsa == $COUNT_ECDHE_RSA,'Test ECDHE-RSA-AES128-SHA!
+    **Note**: Please make sure build Nginx using "--with-debug" and "--with-openssl-async" and set COUNT_ECDHE_RSA 2 if you want see the result of async mode');
 
 $t->stop();
 ################################################################################

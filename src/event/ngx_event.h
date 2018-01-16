@@ -32,10 +32,8 @@ struct ngx_event_s {
 
     unsigned         write:1;
 
-#if (NGX_SSL)
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     unsigned         async:1;
-#endif
 #endif
 
     unsigned         accept:1;
@@ -209,7 +207,7 @@ typedef struct {
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_int_t  (*add_async_conn)(ngx_connection_t *c);
     ngx_int_t  (*del_async_conn)(ngx_connection_t *c, ngx_uint_t flags);
 #endif
@@ -428,7 +426,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if (NGX_SSL && NGX_SSL_ASYNC)
 #define ngx_add_async_conn   ngx_event_actions.add_async_conn
 #define ngx_del_async_conn   ngx_event_actions.del_async_conn
 #endif
