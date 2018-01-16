@@ -1441,7 +1441,6 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
     }
 
     return -1;
-
 }
 #endif
 
@@ -2724,6 +2723,7 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
     ngx_ssl_error(level, c->log, err, text);
 }
 
+
 static void
 ngx_ssl_clear_error(ngx_log_t *log)
 {
@@ -2956,6 +2956,7 @@ failed:
 
     return NGX_ERROR;
 }
+
 
 ngx_int_t
 ngx_ssl_session_cache_init(ngx_shm_zone_t *shm_zone, void *data)
