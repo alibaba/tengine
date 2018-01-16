@@ -74,7 +74,7 @@ with nginx by using --with-openssl=<path> option.
 END
         exit 1
     fi
- 
+
     OPENSSL_ASYNC=
     if [ "$NGX_SSL_ASYNC" != NO ]; then
 

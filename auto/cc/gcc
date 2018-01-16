@@ -181,9 +181,6 @@ CFLAGS="$CFLAGS -g"
 # DragonFly's gcc3 generates DWARF
 #CFLAGS="$CFLAGS -g -gstabs"
 
-CFLAGS="$CFLAGS -fstack-protector -fPIE -fPIC -Wformat -Wformat-security"
-CORE_LINK="-z noexecstack -z relro -z now -pie"
-
 if [ ".$CPP" = "." ]; then
     CPP="$CC -E"
 fi
