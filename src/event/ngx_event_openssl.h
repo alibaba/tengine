@@ -82,8 +82,10 @@ struct ngx_ssl_connection_s {
     ngx_event_handler_pt        saved_read_handler;
     ngx_event_handler_pt        saved_write_handler;
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
     ngx_msec_t                  handshake_start_msec;
     ngx_msec_t                  handshake_end_msec;
+#endif
 
     unsigned                    handshaked:1;
     unsigned                    renegotiation:1;
