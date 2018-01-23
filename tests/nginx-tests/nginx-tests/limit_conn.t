@@ -29,6 +29,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }

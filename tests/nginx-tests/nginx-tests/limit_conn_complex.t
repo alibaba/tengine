@@ -39,7 +39,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    limit_req_zone   $binary_remote_addr$arg_r  zone=req:1m rate=30r/m;
+    limit_req_zone   $binary_remote_addr $arg_r  zone=req:1m rate=30r/m;
     limit_req_zone   $binary_remote_addr        zone=re2:1m rate=30r/m;
     limit_conn_zone  $binary_remote_addr$arg_c  zone=conn:1m;
 
@@ -81,7 +81,10 @@ http_get('/req');
 # limit_req tests
 
 $s = http_get('/req', start => 1);
+SKIP: { 
+skip 'Tengine does not count when the variable arg_r is null ';
 ok(!IO::Select->new($s)->can_read(0.1), 'limit_req same key');
+}
 
 $s = http_get('/req?r=2', start => 1);
 ok(IO::Select->new($s)->can_read(0.1), 'limit_req different key');

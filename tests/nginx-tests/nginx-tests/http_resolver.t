@@ -29,6 +29,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -225,9 +226,10 @@ sleep 2;
 
 like(http_host_header('cname_a_ttl2.example.net', '/'), qr/502 Bad/,
 	'CNAME + A with expired CNAME ttl');
-
+SKIP: { 
+skip 'Tengine using the default is /etc/resolv.conf';
 like(http_host_header('example.net', '/invalid'), qr/502 Bad/, 'no resolver');
-
+}
 like(http_end($s), qr/200 OK/, 'resend after malformed response');
 
 $s = http_get('/bad', start => 1);

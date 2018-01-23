@@ -139,7 +139,7 @@ like(http_get('/verify'), qr/X-Verify: SUCCESS/ms, 'verify certificate');
 like(http_get('/fail'), qr/X-Verify: FAILED/ms, 'fail certificate');
 like(http_get('/encrypted'), qr/X-Verify: SUCCESS/ms, 'with encrypted key');
 
-like(http_get('/verify'), qr!X-Name: /CN=1.example!, 'valid certificate');
+like(http_get('/verify'), qr!X-Name: CN=1.example!, 'valid certificate');
 unlike(http_get('/fail'), qr!X-Name: /CN=1.example!, 'invalid certificate');
 
 ###############################################################################
