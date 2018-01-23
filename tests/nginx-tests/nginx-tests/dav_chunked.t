@@ -70,7 +70,7 @@ a
 EOF
 
 like($r, qr/201 Created.*(Content-Length|\x0d\0a0\x0d\x0a)/ms, 'put chunked');
-is(read_file($t->testdir() . '/file'), '1234567890', 'put content');
+is($t->read_file('file'), '1234567890', 'put content');
 
 $r = http(<<EOF);
 PUT /file HTTP/1.1
@@ -83,7 +83,7 @@ Transfer-Encoding: chunked
 EOF
 
 like($r, qr/204 No Content/, 'put chunked empty');
-is(read_file($t->testdir() . '/file'), '', 'put empty content');
+is($t->read_file('file'), '', 'put empty content');
 
 my $body = ('a' . CRLF . '1234567890' . CRLF) x 1024 . '0' . CRLF . CRLF;
 
@@ -97,18 +97,6 @@ $body
 EOF
 
 like($r, qr/204 No Content/, 'put chunked big');
-is(read_file($t->testdir() . '/file'), '1234567890' x 1024, 'put big content');
-
-###############################################################################
-
-sub read_file {
-	my ($file) = @_;
-	open FILE, $file
-		or return "$!";
-	local $/;
-	my $content = <FILE>;
-	close FILE;
-	return $content;
-}
+is($t->read_file('file'), '1234567890' x 1024, 'put big content');
 
 ###############################################################################

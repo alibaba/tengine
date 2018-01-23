@@ -23,7 +23,7 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new();
 
-$t->write_file_expand('nginx.conf', <<'EOF')->has(qw/http proxy ssi/)->plan(7);
+$t->write_file_expand('nginx.conf', <<'EOF')->has(qw/http proxy ssi/)->plan(9);
 
 %%TEST_GLOBALS%%
 
@@ -42,6 +42,10 @@ http {
         location /store- {
             proxy_pass http://127.0.0.1:8080/;
             proxy_store on;
+        }
+        location /store-string- {
+            proxy_pass http://127.0.0.1:8080/;
+            proxy_store %%TESTDIR%%$uri;
         }
         location /ssi.html {
             ssi on;
@@ -67,6 +71,10 @@ $t->run();
 
 like(http_get('/store-index.html'), qr/SEE-THIS/, 'proxy request');
 ok(-e $t->testdir() . '/store-index.html', 'result stored');
+
+like(http_get('/store-string-index.html'), qr/SEE-THIS/,
+	'proxy string path request');
+ok(-e $t->testdir() . '/store-string-index.html', 'string path result stored');
 
 like(http_head('/store-index-nostore.html'), qr/200 OK/, 'head request');
 ok(!-e $t->testdir() . '/store-index-nostore.html', 'result not stored');

@@ -96,7 +96,6 @@ http {
             userid_expires max;
 
             location /expires_max/off {
-                error_log %%TESTDIR%%/error_expires_max_off debug;
                 userid_expires off;
             }
         }
@@ -154,7 +153,7 @@ is($cookie{'path'}, '/', 'path default');
 is($cookie{'domain'}, undef, 'domain default');
 is($cookie{'expires'}, undef, 'expires default');
 like($cookie{'uid'}, '/\w+={0,2}$/', 'mark default');
-unlike(http_get('/'), qr/P3P/, 'p3p default');
+unlike(http_get('/'), qr/^P3P/m, 'p3p default');
 like(http_get('/'), qr/X-Reset: 0/, 'uid reset variable default');
 
 # name, path, domain and p3p
@@ -182,7 +181,7 @@ is(get_cookie('/expires_off', 'expires'), undef, 'expires off');
 
 # redefinition
 
-unlike(get_cookie('/expires_max/off'), qr/expires/, 'redefine expires');
+unlike(http_get('/expires_max/off'), qr/expires/, 'redefine expires');
 like(http_get('/path/r'), qr!/9876543210!, 'redefine path');
 
 # requests

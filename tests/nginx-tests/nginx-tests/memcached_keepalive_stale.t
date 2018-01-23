@@ -25,7 +25,7 @@ eval { require Cache::Memcached; };
 plan(skip_all => 'Cache::Memcached not installed') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http memcached upstream_keepalive rewrite/)
-	->has_daemon('memcached')->plan(2)
+	->has_daemon('memcached')->plan(1)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -72,6 +72,11 @@ if ($memhelp =~ /-U/) {
 
 	push @memopts1, '-U', '0';
 }
+if ($memhelp =~ /-t/) {
+	# for connection stats consistency in threaded memcached 1.3+
+
+	push @memopts1, '-t', '1';
+}
 
 $t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8081', @memopts1);
 
@@ -82,7 +87,8 @@ $t->waitforsocket('127.0.0.1:8081')
 
 ###############################################################################
 
-my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ]);
+my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ],
+	connect_timeout => 1.0);
 
 # It's possible that stale events occur, i.e. read event handler called
 # for just saved upstream connection without any data available for
@@ -111,9 +117,5 @@ for (1 .. 100) {
 
 cmp_ok($memd1->stats()->{total}->{total_connections}, '<=', $total + 2,
 	'only one connection per worker used');
-
-$t->stop();
-
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 
 ###############################################################################

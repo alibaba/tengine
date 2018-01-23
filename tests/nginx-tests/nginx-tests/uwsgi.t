@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http uwsgi/)->has_daemon('uwsgi')->plan(3)
+my $t = Test::Nginx->new()->has(qw/http uwsgi/)->has_daemon('uwsgi')->plan(5)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -34,6 +34,10 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    upstream u {
+        server 127.0.0.1:8081;
+    }
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
@@ -42,6 +46,11 @@ http {
             uwsgi_pass 127.0.0.1:8081;
             uwsgi_param SERVER_PROTOCOL $server_protocol;
             uwsgi_param HTTP_X_BLAH "blah";
+        }
+
+        location /var {
+            uwsgi_pass $arg_b;
+            uwsgi_param SERVER_PROTOCOL $server_protocol;
         }
     }
 }
@@ -81,11 +90,14 @@ unlike(http_head('/head'), qr/SEE-THIS/, 'no data in HEAD');
 like(http_get_headers('/headers'), qr/SEE-THIS/,
 	'uwsgi request with many ignored headers');
 
+like(http_get('/var?b=127.0.0.1:8081'), qr/SEE-THIS/, 'uwsgi with variables');
+like(http_get('/var?b=u'), qr/SEE-THIS/, 'uwsgi with variables to upstream');
+
 ###############################################################################
 
 sub http_get_headers {
-        my ($url, %extra) = @_;
-        return http(<<EOF, %extra);
+	my ($url, %extra) = @_;
+	return http(<<EOF, %extra);
 GET $url HTTP/1.0
 Host: localhost
 X-Blah: ignored header

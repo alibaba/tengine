@@ -73,7 +73,7 @@ $t1 =~ m/Last-Modified: (.*)/m;
 my $last = $1;
 
 $t1 = http_get_range('/t1.html', "Range: bytes=0-9\nIf-Range: $last");
-like($t1, qr/206/, 'if-range');
+like($t1, qr/ 206 /, 'if-range');
 
 # If-Range + add_header Last-Modified ""
 
@@ -90,7 +90,7 @@ like($t1, qr/Last-Modified: Mon, 28 Sep 1970 06:00:00 GMT/,
 
 $t1 = http_get_range('/t3.html',
 	"Range: bytes=0-9\nIf-Range: Mon, 28 Sep 1970 06:00:00 GMT");
-like($t1, qr/206/, 'if-range time');
+like($t1, qr/ 206 /, 'if-range time');
 
 ###############################################################################
 

@@ -62,8 +62,8 @@ like(http_get_headers('/'), qr/SEE-THIS/,
 ###############################################################################
 
 sub http_get_headers {
-        my ($url, %extra) = @_;
-        return http(<<EOF, %extra);
+	my ($url, %extra) = @_;
+	return http(<<EOF, %extra);
 GET $url HTTP/1.0
 Host: localhost
 X-Blah: ignored header

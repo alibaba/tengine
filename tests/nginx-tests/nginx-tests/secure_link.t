@@ -24,7 +24,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http secure_link rewrite/)->plan(9);
+my $t = Test::Nginx->new()->has(qw/http secure_link rewrite/)->plan(10);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -65,6 +65,8 @@ http {
         location = /expires.html {
             # new style with expires
             # /test.html?hash=BASE64URL&expires=12345678
+
+            add_header X-Expires $secure_link_expires;
 
             secure_link      $arg_hash,$arg_expires;
             secure_link_md5  secret$uri$arg_expires;
@@ -135,12 +137,14 @@ my ($expires, $hash);
 $expires = time() + 86400;
 $hash = encode_base64url(md5("secret/expires.html$expires"));
 like(http_get('/expires.html?hash=' . $hash . '&expires=' . $expires),
-        qr/PASSED/, 'request md5 not expired');
+	qr/PASSED/, 'request md5 not expired');
+like(http_get('/expires.html?hash=' . $hash . '&expires=' . $expires),
+	qr/X-Expires: $expires/, 'secure_link_expires variable');
 
 $expires = time() - 86400;
 $hash = encode_base64url(md5("secret/expires.html$expires"));
 like(http_get('/expires.html?hash=' . $hash . '&expires=' . $expires),
-        qr/^HTTP.*403/, 'request md5 expired');
+	qr/^HTTP.*403/, 'request md5 expired');
 
 # old style
 
@@ -154,10 +158,10 @@ like(http_get('/inheritance/test'), qr/PASSED/, 'inheritance');
 ###############################################################################
 
 sub encode_base64url {
-    my $e = encode_base64(shift, "");
-    $e =~ s/=+\z//;
-    $e =~ tr[+/][-_];
-    return $e;
+	my $e = encode_base64(shift, "");
+	$e =~ s/=+\z//;
+	$e =~ tr[+/][-_];
+	return $e;
 }
 
 ###############################################################################

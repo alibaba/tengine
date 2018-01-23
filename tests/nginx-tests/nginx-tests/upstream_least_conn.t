@@ -11,12 +11,10 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ CRLF /;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_end /;
 
 ###############################################################################
 
@@ -30,7 +28,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -66,7 +63,14 @@ $t->waitforsocket('127.0.0.1:8082');
 ###############################################################################
 
 is(many('/', 10), '8081: 5, 8082: 5', 'balanced');
-is(parallel('/w', 10), '8081: 1, 8082: 9', 'least conn');
+
+my @sockets;
+push(@sockets, http_get('/w', start => 1));
+push(@sockets, http_get('/w', start => 1));
+
+select undef, undef, undef, 0.2;
+
+is(many('/w', 10), '8082: 10', 'least conn');
 
 ###############################################################################
 
@@ -82,72 +86,6 @@ sub many {
 	}
 
 	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
-}
-
-sub parallel {
-	my ($uri, $count, %opts) = @_;
-	my (@sockets, %ports);
-
-	for (1 .. $count) {
-		push(@sockets, http_start($uri));
-		select undef, undef, undef, 0.1;
-	}
-
-	for (1 .. $count) {
-		if (http_end(pop(@sockets)) =~ /X-Port: (\d+)/) {
-			$ports{$1} = 0 unless defined $ports{$1};
-			$ports{$1}++;
-		}
-	}
-
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
-}
-
-sub http_start {
-	my ($uri) = @_;
-
-	my $s;
-	my $request = "GET $uri HTTP/1.0" . CRLF . CRLF;
-
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(3);
-		$s = IO::Socket::INET->new(
-			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:8080'
-		);
-		log_out($request);
-		$s->print($request);
-		alarm(0);
-	};
-	alarm(0);
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
-	return $s;
-}
-
-sub http_end {
-	my ($s) = @_;
-	my $reply;
-
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(3);
-		local $/;
-		$reply = $s->getline();
-		log_in($reply);
-		alarm(0);
-	};
-	alarm(0);
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
-	return $reply;
 }
 
 ###############################################################################
@@ -180,8 +118,8 @@ sub http_daemon {
 		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
 
 		if ($uri eq '/w' && $port == 8081) {
-			Test::Nginx::log_core('||', "$port: sleep(3)");
-			select undef, undef, undef, 3;
+			Test::Nginx::log_core('||', "$port: sleep(2.5)");
+			select undef, undef, undef, 2.5;
 		}
 
 		Test::Nginx::log_core('||', "$port: response, 200");

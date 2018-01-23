@@ -65,13 +65,7 @@ $t->run();
 
 ###############################################################################
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.6');
-
 like(http_get('/a'), qr/301 Moved/, 'auto redirect');
-
-}
-
 like(http_get('/a/'), qr/X-Location: unset/, 'match a');
 like(http_get('/a-a'), qr/X-Location: a-a/, 'match a-a');
 like(http_get('/a-b'), qr/X-Location: a-b/, 'match a-b');

@@ -58,7 +58,7 @@ $t->run()->waitforsocket('127.0.0.1:8081');
 ###############################################################################
 
 like(http_get('/'), qr/SEE-THIS/, 'fastcgi request');
-like(http_get('/redir'), qr/302/, 'fastcgi redirect');
+like(http_get('/redir'), qr/ 302 /, 'fastcgi redirect');
 like(http_get('/'), qr/^request: 3$/m, 'fastcgi third request');
 
 like(http_get('/single'), qr/^connection: 1$/m, 'single connection used');

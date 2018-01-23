@@ -55,7 +55,7 @@ http {
             proxy_pass  http://$host:8080/backend;
         }
         location /valid {
-            resolver    127.0.0.1:8081 valid=3s;
+            resolver    127.0.0.1:8081 valid=5s;
             proxy_pass  http://$host:8080/backend;
         }
         location /case {
@@ -63,7 +63,6 @@ http {
             proxy_pass  http://$http_x_name:8080/backend;
         }
         location /invalid {
-            resolver    127.0.0.1:8081;
             proxy_pass  http://$host:8080/backend;
         }
         location /resend {
@@ -209,7 +208,7 @@ sleep 2;
 like(http_host_header('ttl.example.net', '/valid'), qr/200 OK/,
 	'valid overrides ttl');
 
-sleep 2;
+sleep 4;
 
 # expired "valid" value causes nginx to make actual query
 
@@ -236,6 +235,7 @@ my $s2 = http_get('/bad', start => 1);
 
 http_end($s);
 ok(http_end($s2), 'timeout handler on 2nd request');
+
 ###############################################################################
 
 sub http_host_header {
@@ -312,7 +312,7 @@ sub reply_handler {
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
 	} elsif ($name eq 'awide.example.net' && $type == A) {
-		push @rdata, pack '(w/a*)3x n2N nC4',
+		push @rdata, pack '(C/a*)3x n2N nC4',
 			('awide', 'example', 'net'), A, IN, $ttl,
 			4, (127, 0, 0, 1);
 
@@ -338,7 +338,7 @@ sub reply_handler {
 
 		my @dname = ('example', 'net');
 		my $rdlen = length(join '', @dname) + @dname + 1;
-		push @rdata, pack("n3N n(w/a*)* x", 0xc012, DNAME, IN, $ttl,
+		push @rdata, pack("n3N n(C/a*)* x", 0xc012, DNAME, IN, $ttl,
 			$rdlen, @dname);
 
 		# alias.example.com. 3600 IN CNAME alias.example.net.
@@ -429,7 +429,7 @@ sub reply_handler {
 	}
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 

@@ -150,7 +150,7 @@ sub http_fake_daemon {
 
 		next unless $uri;
 
-		select(undef, undef, undef, 0.5);
+		select(undef, undef, undef, 1.1);
 
 		$num++;
 		print $client <<"EOF";

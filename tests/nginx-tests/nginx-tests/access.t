@@ -25,8 +25,6 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy access ipv6/);
 
-plan(skip_all => 'new syntax "unix:"') unless $t->has_version('1.5.1');
-
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -82,14 +80,7 @@ http {
 
 EOF
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no inet6 and/or unix support') if $@;
-
-$t->plan(12);
+$t->try_run('no inet6 and/or unix support')->plan(12);
 
 ###############################################################################
 

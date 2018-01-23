@@ -25,11 +25,9 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy upstream_keepalive ssi rewrite/)
-	->plan(50)->write_file_expand('nginx.conf', <<'EOF');
+	->plan(49)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
-
-worker_processes 1;
 
 daemon off;
 
@@ -48,7 +46,6 @@ http {
         listen       127.0.0.1:8080;
         server_name  localhost;
 
-        proxy_read_timeout 2s;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
@@ -82,7 +79,7 @@ $t->waitforsocket('127.0.0.1:8081')
 
 ###############################################################################
 
-# There are 3 mostly independend modes of upstream operation:
+# There are 3 mostly independent modes of upstream operation:
 #
 # 1. Buffered, i.e. normal mode with "proxy_buffering on;"
 # 2. Unbuffered, i.e. "proxy_buffering off;".
@@ -211,7 +208,6 @@ like(http_get('/inmemory/closed2'), qr/200 OK/, 'inmemory closed 2');
 
 # check for errors, shouldn't be any
 
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 like(`grep -F '[error]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no errors');
 
 ###############################################################################
