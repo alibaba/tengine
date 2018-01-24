@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)
+my $t = Test::Nginx->new()->has(qw/http rewrite symlink/)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -154,13 +154,6 @@ http {
 
 EOF
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no disable_symlinks') if $@;
-
 my $uid = getuid();
 my ($extfile) = grep { -f "$_" && $uid != (stat($_))[4] }
 	('/etc/resolv.conf', '/etc/protocols', '/etc/host.conf');
@@ -168,9 +161,9 @@ my ($extfile) = grep { -f "$_" && $uid != (stat($_))[4] }
 plan(skip_all => 'no external file found')
 	if !defined $extfile;
 
-my $d = $t->testdir();
+$t->try_run('no disable_symlinks')->plan(28);
 
-$t->plan(28);
+my $d = $t->testdir();
 
 mkdir("$d/on");
 mkdir("$d/not_owner");
@@ -266,10 +259,11 @@ like(http_get('/complex/3/empty.html'), qr!200 OK!, 'complex root 3');
 # tests to pass as openat() will correctly fail with ENOTDIR
 
 chmod(0700, "$d/link");
+my $rc = $^O eq 'darwin' ? 200 : 404;
 
 like(http_get('/link/tail'), qr!40[34] !, 'file with trailing /, on');
 like(http_get('/link/tailowner'), qr!404 !, 'file with trailing /, owner');
-like(http_get('/link/tailoff'), qr!404 !, 'file with trailing /, off');
+like(http_get('/link/tailoff'), qr!$rc !, 'file with trailing /, off');
 
 like(http_get('/dirlink'), qr!404 !, 'directory without /');
 like(http_get('/dirlink/'), qr!404 !, 'directory with trailing /');

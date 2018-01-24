@@ -2,9 +2,9 @@
 
 # (C) Maxim Dounin
 
-# Tests for http proxy upgrade support.  In contrast to proxy_websocket.t
-# this test doesn't try to use binary WebSocket protocol, but uses simple
-# plain text protocol instead.
+# Tests for http proxy upgrade support.
+# In contrast to proxy_websocket.t, this test doesn't try to use binary
+# WebSocket protocol, but uses simple plain text protocol instead.
 
 ###############################################################################
 
@@ -15,7 +15,6 @@ use Test::More;
 
 use IO::Poll;
 use IO::Select;
-use IO::Socket::INET;
 use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
@@ -29,7 +28,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy/)
-	->write_file_expand('nginx.conf', <<'EOF')->plan(27);
+	->write_file_expand('nginx.conf', <<'EOF')->plan(30);
 
 %%TEST_GLOBALS%%
 
@@ -40,6 +39,9 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    log_format test "$bytes_sent $body_bytes_sent";
+    access_log %%TESTDIR%%/cc.log test;
 
     server {
         listen       127.0.0.1:8080;
@@ -58,6 +60,8 @@ http {
 
 EOF
 
+my $d = $t->testdir();
+
 $t->run_daemon(\&upgrade_fake_daemon);
 $t->run();
 
@@ -68,6 +72,7 @@ $t->waitforsocket('127.0.0.1:8081')
 
 # establish connection
 
+my @r;
 my $s = upgrade_connect();
 ok($s, "handshake");
 
@@ -97,10 +102,12 @@ SKIP: {
 	}
 }
 
+push @r, $s ? ${*$s}->{_upgrade_private}->{r} : 'failed';
+undef $s;
+
 # establish connection with some pipelined data
 # and make sure they are correctly passed upstream
 
-undef $s;
 $s = upgrade_connect(message => "foo");
 ok($s, "handshake pipelined");
 
@@ -113,12 +120,25 @@ SKIP: {
 	is(upgrade_read($s), "bar", "next to pipelined");
 }
 
+push @r, $s ? ${*$s}->{_upgrade_private}->{r} : 'failed';
+undef $s;
+
 # connection should not be upgraded unless upgrade was actually
 # requested and allowed by configuration
 
-undef $s;
 $s = upgrade_connect(noheader => 1);
 ok(!$s, "handshake noupgrade");
+
+# bytes sent on upgraded connection
+# verify with 1) data actually read by client, 2) expected data from backend
+
+$t->stop();
+
+open my $f, '<', "$d/cc.log" or die "Can't open cc.log: $!";
+
+is($f->getline(), shift (@r) . " 540793\n", 'log - bytes');
+is($f->getline(), shift (@r) . " 22\n", 'log - bytes pipelined');
+like($f->getline(), qr/\d+ 0\n/, 'log - bytes noupgrade');
 
 ###############################################################################
 
@@ -127,7 +147,7 @@ sub upgrade_connect {
 
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => '127.0.0.1:8080'
+		PeerAddr => '127.0.0.1:8080',
 	)
 		or die "Can't connect to nginx: $!\n";
 
@@ -174,7 +194,7 @@ sub upgrade_getline {
 	my ($s) = @_;
 	my ($h, $buf, $line);
 
-	${*$s}->{_upgrade_private} ||= { b => ''};
+	${*$s}->{_upgrade_private} ||= { b => '', r => 0 };
 	$h = ${*$s}->{_upgrade_private};
 
 	if ($h->{b} =~ /^(.*?\x0a)(.*)/ms) {
@@ -188,6 +208,7 @@ sub upgrade_getline {
 		last unless $n;
 
 		$h->{b} .= $buf;
+		$h->{r} += $n;
 
 		if ($h->{b} =~ /^(.*?\x0a)(.*)/ms) {
 			$h->{b} = $2;
@@ -237,7 +258,7 @@ sub upgrade_fake_daemon {
 
 	while (my $client = $server->accept()) {
 		upgrade_handle_client($client);
-        }
+	}
 }
 
 sub upgrade_handle_client {

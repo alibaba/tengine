@@ -26,7 +26,7 @@ plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/http limit_req/);
 
-$t->plan(58)->write_file_expand('nginx.conf', <<'EOF');
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -72,7 +72,8 @@ http {
             access_log syslog:server=127.0.0.1:8080,facility=user;
         }
         location /as {
-            access_log syslog:server=127.0.0.1:8080,severity=alert;
+            # put severity inside to catch possible parsing programming errors
+            access_log syslog:severity=alert,server=127.0.0.1:8080;
         }
         location /at {
             access_log syslog:server=127.0.0.1:8080,tag=SEETHIS;
@@ -90,6 +91,10 @@ http {
         }
         location /if {
             access_log syslog:server=127.0.0.1:8085 logf if=$arg_logme;
+        }
+
+        location /nohostname {
+            access_log syslog:server=127.0.0.1:8080,nohostname;
         }
 
         location /debug {
@@ -141,7 +146,7 @@ $t->waitforfile($t->testdir . '/s_glob.log');
 $t->waitforfile($t->testdir . '/s_http.log');
 $t->waitforfile($t->testdir . '/s_if.log');
 
-$t->run();
+$t->try_run('no syslog nohostname')->plan(59);
 
 ###############################################################################
 
@@ -208,6 +213,14 @@ get_syslog('/a');
 
 like($t->read_file('s_if.log'), qr/good:404.*work:404/s, 'syslog if success');
 unlike($t->read_file('s_if.log'), qr/(if:|empty:|zero:)404/, 'syslog if fail');
+
+like(get_syslog('/nohostname'),
+	qr/^<(\d{1,3})>				# PRI
+	([A-Z][a-z]{2})\s			# mon
+	([ \d]\d)\s(\d{2}):(\d{2}):(\d{2})\s	# date
+	(\w{1,32}):\s				# tag
+	(.*)/x,					# MSG
+	'nohostname');
 
 ###############################################################################
 

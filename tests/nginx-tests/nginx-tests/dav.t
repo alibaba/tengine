@@ -142,11 +142,6 @@ EOF
 
 like($r, qr/204 No Content/, 'copy file escaped');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.9');
-
 is(-s $t->testdir() . '/file-moved escape', 10, 'file copied unescaped');
-
-}
 
 ###############################################################################

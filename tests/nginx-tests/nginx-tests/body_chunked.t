@@ -28,7 +28,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
-worker_processes 1;
 daemon off;
 
 events {
@@ -132,7 +131,7 @@ like(http_get_body('/discard', '0123456789' x 128, '0123456789' x 512,
 # proxy_next_upstream
 
 like(http_get_body('/next', '0123456789'),
-        qr/X-Body: 0123456789\x0d?$/ms, 'body chunked next upstream');
+	qr/X-Body: 0123456789\x0d?$/ms, 'body chunked next upstream');
 
 ###############################################################################
 

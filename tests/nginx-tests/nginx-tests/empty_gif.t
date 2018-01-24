@@ -62,7 +62,7 @@ EOF
 is(http_get_body('/'), $gif, 'empty gif');
 like(http_get('/'), qr!Content-Type: image/gif!i, 'get content type');
 like(http_head('/'), qr!Content-Type: image/gif!i, 'head content type');
-like(http('PUT / HTTP/1.0' . CRLF . CRLF), qr!405 Method Not Allowed!i, 'put');
+like(http('PUT / HTTP/1.0' . CRLF . CRLF), qr!405 Not Allowed!i, 'put');
 
 ###############################################################################
 

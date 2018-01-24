@@ -21,9 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'no symlinks on win32') if $^O eq 'MSWin32';
-
-my $t = Test::Nginx->new()->has(qw/http autoindex charset/)->plan(16)
+my $t = Test::Nginx->new()->has(qw/http autoindex charset symlink/)->plan(16)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -91,7 +89,7 @@ unlike($r, qr!href="test-colon:blah"!ms, 'colon not scheme');
 like($r, qr!test-long-0{37}\.\.&gt;!ms, 'long name');
 
 like($r, qr!href="test-escape-url-%25"!ms, 'escaped url');
-like($r, qr!href="test-escape-url2-%3F"!ms, 'escaped ? in url');
+like($r, qr!href="test-escape-url2-%3f"!msi, 'escaped ? in url');
 like($r, qr!test-escape-html-&lt;&gt;&amp;!ms, 'escaped html');
 like($r, qr!test-long-(&gt;){37}\.\.&gt;!ms, 'long escaped html');
 

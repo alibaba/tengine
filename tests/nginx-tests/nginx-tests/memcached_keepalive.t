@@ -25,13 +25,12 @@ eval { require Cache::Memcached; };
 plan(skip_all => 'Cache::Memcached not installed') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http memcached upstream_keepalive rewrite/)
-	->has_daemon('memcached')->plan(16)
+	->has_daemon('memcached')->plan(15)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -102,6 +101,12 @@ if ($memhelp =~ /-U/) {
 	push @memopts1, '-U', '0';
 	push @memopts2, '-U', '0';
 }
+if ($memhelp =~ /-t/) {
+	# for connection stats consistency in threaded memcached 1.3+
+
+	push @memopts1, '-t', '1';
+	push @memopts2, '-t', '1';
+}
 
 $t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8081', @memopts1);
 $t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8082', @memopts2);
@@ -115,8 +120,10 @@ $t->waitforsocket('127.0.0.1:8082')
 
 ###############################################################################
 
-my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ]);
-my $memd2 = Cache::Memcached->new(servers => [ '127.0.0.1:8082' ]);
+my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ],
+	connect_timeout => 1.0);
+my $memd2 = Cache::Memcached->new(servers => [ '127.0.0.1:8082' ],
+	connect_timeout => 1.0);
 
 $memd1->set('/', 'SEE-THIS');
 $memd2->set('/', 'SEE-THIS');
@@ -125,8 +132,8 @@ $memd1->set('/big', 'X' x 1000000);
 my $total = $memd1->stats()->{total}->{total_connections};
 
 like(http_get('/'), qr/SEE-THIS/, 'keepalive memcached request');
-like(http_get('/notfound'), qr/404/, 'keepalive memcached not found');
-like(http_get('/next'), qr/404/,
+like(http_get('/notfound'), qr/ 404 /, 'keepalive memcached not found');
+like(http_get('/next'), qr/ 404 /,
 	'keepalive not found with memcached_next_upstream');
 like(http_get('/'), qr/SEE-THIS/, 'keepalive memcached request again');
 like(http_get('/'), qr/SEE-THIS/, 'keepalive memcached request again');
@@ -182,9 +189,5 @@ http_get('/memd4');
 is($memd1->stats()->{total}->{total_connections} +
 	$memd2->stats()->{total}->{total_connections}, $total + 2,
 	'connection per backend');
-
-$t->stop();
-
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 
 ###############################################################################

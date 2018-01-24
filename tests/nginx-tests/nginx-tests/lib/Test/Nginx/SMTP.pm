@@ -15,35 +15,52 @@ use Socket qw/ CRLF /;
 
 use Test::Nginx;
 
-use base qw/ IO::Socket::INET /;
-
 sub new {
-	my $class = shift;
+	my $self = {};
+	bless $self, shift @_;
 
-	my $self = return $class->SUPER::new(
+	$self->{_socket} = IO::Socket::INET->new(
 		Proto => "tcp",
 		PeerAddr => "127.0.0.1:8025",
 		@_
 	)
 		or die "Can't connect to nginx: $!\n";
 
-	$self->autoflush(1);
+	if ({@_}->{'SSL'}) {
+		require IO::Socket::SSL;
+		IO::Socket::SSL->start_SSL($self->{_socket}, @_)
+			or die $IO::Socket::SSL::SSL_ERROR . "\n";
+	}
+
+	$self->{_socket}->autoflush(1);
 
 	return $self;
+}
+
+sub eof {
+	my $self = shift;
+	return $self->{_socket}->eof();
+}
+
+sub print {
+	my ($self, $cmd) = @_;
+	log_out($cmd);
+	$self->{_socket}->print($cmd);
 }
 
 sub send {
 	my ($self, $cmd) = @_;
 	log_out($cmd);
-	$self->print($cmd . CRLF);
+	$self->{_socket}->print($cmd . CRLF);
 }
 
 sub read {
 	my ($self) = @_;
+	my $socket = $self->{_socket};
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		alarm(3);
-		while (<$self>) {
+		while (<$socket>) {
 			log_in($_);
 			next if m/^\d\d\d-/;
 			last;
@@ -110,7 +127,7 @@ sub smtp_test_daemon {
 			} else {
 				print $client "500 unknown command" . CRLF;
 			}
-                }
+		}
 
 		close $client;
 	}

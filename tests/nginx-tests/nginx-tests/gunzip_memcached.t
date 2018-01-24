@@ -71,14 +71,7 @@ if ($memhelp =~ /-U/) {
 
 $t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8081', @memopts);
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no memcached_gzip_flag') if $@;
-
-$t->plan(2);
+$t->run()->plan(2);
 
 $t->waitforsocket('127.0.0.1:8081')
 	or die "Can't start memcached";
@@ -87,9 +80,9 @@ $t->waitforsocket('127.0.0.1:8081')
 # set and compressed value to be at least 20% less than original one.
 
 my $memd = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ],
-	compress_threshold => 1);
+	compress_threshold => 1, connect_timeout => 1.0);
 $memd->set('/', 'TEST' x 10)
-        or die "can't put value into memcached: $!";
+	or die "can't put value into memcached: $!";
 
 ###############################################################################
 

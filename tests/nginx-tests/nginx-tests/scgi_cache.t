@@ -25,7 +25,7 @@ select STDOUT; $| = 1;
 eval { require SCGI; };
 plan(skip_all => 'SCGI not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http scgi cache/)->plan(10)
+my $t = Test::Nginx->new()->has(qw/http scgi cache shmem/)->plan(10)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -70,12 +70,7 @@ like(http_get('/nolen'), qr/MISS/, 'no length');
 like(http_get('/nolen'), qr/HIT/, 'no length cached');
 
 like(http_get('/len/empty'), qr/MISS/, 'empty length');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/len/empty'), qr/HIT/, 'empty length cached');
-}
 
 like(http_get('/nolen/empty'), qr/MISS/, 'empty no length');
 like(http_get('/nolen/empty'), qr/HIT/, 'empty no length cached');

@@ -86,14 +86,7 @@ $t->write_file('x1', '<root>data</root>');
 $t->write_file('x2', '<root>data</root>');
 $t->write_file('x3', '<root>data</root>');
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-
-plan(skip_all => 'no xslt_param') if $@;
-$t->plan(3);
+$t->run()->plan(3);
 
 ###############################################################################
 

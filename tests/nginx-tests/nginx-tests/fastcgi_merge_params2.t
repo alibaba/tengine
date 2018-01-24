@@ -25,7 +25,7 @@ eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http fastcgi cache/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/http fastcgi cache shmem/)->plan(4)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -39,7 +39,9 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     fastcgi_cache_path  %%TESTDIR%%/cache  levels=1:2
-                        keys_zone=NAME:10m;
+                        keys_zone=NAME:1m;
+
+    fastcgi_cache_key   stub;
 
     # no fastcgi_param at all, cache switched on at server level
 

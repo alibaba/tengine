@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(19)
+my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(21)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -43,6 +43,11 @@ http {
         location / {
             auth_basic           "closed site";
             auth_basic_user_file %%TESTDIR%%/htpasswd;
+
+            location /inner {
+                auth_basic off;
+                alias %%TESTDIR%%/;
+            }
         }
     }
 }
@@ -115,14 +120,17 @@ like(http_get_auth('/', 'ssha3', '1'), qr!401 Unauthorized!, 'ssha broken 2');
 like(http_get_auth('/', 'sha2', '1'), qr!401 Unauthorized!, 'sha broken 1');
 like(http_get_auth('/', 'sha3', '1'), qr!401 Unauthorized!, 'sha broken 2');
 
+like(http_get_auth('/', 'notfound', '1'), qr!401 Unauthorized!, 'not found');
+like(http_get('/inner/'), qr!SEETHIS!, 'inner off');
+
 ###############################################################################
 
 sub http_get_auth {
 	my ($url, $user, $password) = @_;
 
-	my $auth = encode_base64($user . ':' . $password);
+	my $auth = encode_base64($user . ':' . $password, '');
 
-        my $r = http(<<EOF);
+	return http(<<EOF);
 GET $url HTTP/1.0
 Host: localhost
 Authorization: Basic $auth

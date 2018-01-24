@@ -137,14 +137,7 @@ ok(!valid('/simple', 'http://www.example.' . 'a' x 256), 'long hostname');
 ok(!valid('/wc', 'http://example.' . 'a' x 256), 'long hostname wildcard');
 
 ok(valid('/long', 'http://' . 'a' x 255), 'long hostname 255');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.5');
-
 ok(valid('/long', 'http://' . 'a' x 256), 'long hostname 256');
-
-}
-
 ok(!valid('/long', 'http://' . 'a' x 257), 'long hostname 257');
 
 ok(valid('/uri', 'http://www.example.org/uri'), 'uri');
@@ -163,28 +156,15 @@ ok(!valid('/regex', 'http://www.eXample.net'), 'regex case mismatch');
 ok(valid('/regex2', 'http://www.example.org/uri'), 'regex 2 uri');
 ok(!valid('/regex2', 'http://www.example.org'), 'regex 2 no uri');
 ok(valid('/regex2', 'http://www.example.org/uRI'), 'regex 2 uri caseless');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.4');
-
 ok(valid('/regex3', 'https://www.eXample.org'), 'regex https');
-
-}
 
 ok(valid('/sn', 'http://localhost'), 'server_names');
 ok(valid('/sn', 'http://localHost'), 'server_names caseless');
 ok(valid('/sn', 'http://localhost/uri'), 'server_names uri');
 ok(valid('/sn', 'http://foobar'), 'server_names regex');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.5');
-
 ok(valid('/sn', 'http://foobAr'), 'server_names regex caseless');
 ok(valid('/sn', 'http://foobAr/uri'), 'server_names regex caseless uri');
 ok(valid('/sn', 'http://anchoredre/uri'), 'server_names regex anchored');
-
-}
-
 ok(valid('/sn', 'http://foobar/uri'), 'server_names regex uri');
 ok(!valid('/sn', 'localhost'), 'server_names no scheme');
 ok(!valid('/sn', 'foobar'), 'server_names regex no scheme');
@@ -200,12 +180,7 @@ ok(valid('/', 'http://another', 'another'), 'server context');
 
 # server_name below valid_referers
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.5');
-
 ok(valid('/', 'http://below', 'below'), 'server below');
-
-}
 
 ###############################################################################
 

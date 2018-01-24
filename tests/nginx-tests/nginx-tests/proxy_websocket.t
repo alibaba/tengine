@@ -14,7 +14,6 @@ use Test::More;
 use IO::Poll;
 use IO::Select;
 use IO::Socket::INET;
-use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -219,7 +218,7 @@ sub websocket_fake_daemon {
 
 	while (my $client = $server->accept()) {
 		websocket_handle_client($client);
-        }
+	}
 }
 
 sub websocket_handle_client {
