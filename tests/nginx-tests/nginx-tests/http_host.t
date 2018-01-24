@@ -112,31 +112,31 @@ is(http_absolute_path('[::123.45.67.89]'), '[::123.45.67.89]',
 is(http_absolute_path('[::ffff:12.30.67.89]:4321'), '[::ffff:12.30.67.89]',
 	'ipv4-mapped ipv6 w/port (absolute request)');
 
-like(http_host_header('example.com/\:552', 1), qr/400/,
+like(http_host_header('example.com/\:552', 1), qr/ 400 /,
 	'domain w/ path separators (host header)');
-like(http_absolute_path('\e/xample.com', 1), qr/400/,
+like(http_absolute_path('\e/xample.com', 1), qr/ 400 /,
 	'domain w/ path separators (absolute request)');
 
-like(http_host_header('..examp-LE.com', 1), qr/400/,
+like(http_host_header('..examp-LE.com', 1), qr/ 400 /,
 	'domain w/ double dot (host header)');
-like(http_absolute_path('com.exa-m.45..:', 1), qr/400/,
+like(http_absolute_path('com.exa-m.45..:', 1), qr/ 400 /,
 	'domain w/ double dot (absolute request)');
 
 
-like(http_host_header('[abcd::e\f98:0/:7654:321]', 1), qr/400/,
+like(http_host_header('[abcd::e\f98:0/:7654:321]', 1), qr/ 400 /,
 	'ipv6 literal w/ path separators (host header)');
-like(http_absolute_path('[abcd\::ef98:0:7654:321/]:12', 1), qr/400/,
+like(http_absolute_path('[abcd\::ef98:0:7654:321/]:12', 1), qr/ 400 /,
 	'ipv6 literal w/ path separators (absolute request)');
 
-like(http_host_header('[abcd::ef98:0:7654:321]..:98', 1), qr/400/,
+like(http_host_header('[abcd::ef98:0:7654:321]..:98', 1), qr/ 400 /,
 	'ipv6 literal w/ double dot (host header)');
-like(http_absolute_path('[ab..cd::ef98:0:7654:321]', 1), qr/400/,
+like(http_absolute_path('[ab..cd::ef98:0:7654:321]', 1), qr/ 400 /,
 	'ipv6 literal w/ double dot (absolute request)');
 
 
-like(http_host_header('[abcd::ef98:0:7654:321]..:98', 1), qr/400/,
+like(http_host_header('[abcd::ef98:0:7654:321]..:98', 1), qr/ 400 /,
 	'ipv6 literal w/ double dot (host header)');
-like(http_absolute_path('[ab..cd::ef98:0:7654:321]', 1), qr/400/,
+like(http_absolute_path('[ab..cd::ef98:0:7654:321]', 1), qr/ 400 /,
 	'ipv6 literal w/ double dot (absolute request)');
 
 

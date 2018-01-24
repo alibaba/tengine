@@ -69,7 +69,6 @@ http {
 
         location /tries/resolver {
             resolver 127.0.0.1:8083;
-            resolver_timeout 1s;
 
             proxy_pass http://$host:8081;
             proxy_next_upstream_tries 2;
@@ -92,7 +91,6 @@ http {
 
         location /timeout/resolver {
             resolver 127.0.0.1:8083;
-            resolver_timeout 1s;
 
             proxy_pass http://$host:8081/w2;
             proxy_next_upstream_timeout 3800ms;
@@ -220,7 +218,7 @@ sub reply_handler {
 	@rdata = map { rd_addr($ttl, '127.0.0.1') } (1 .. 3) if $type == A;
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 

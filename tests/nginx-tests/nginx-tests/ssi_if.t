@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http ssi/)->plan(44);
+my $t = Test::Nginx->new()->has(qw/http ssi/)->plan(43);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -269,8 +269,5 @@ like(http_get('/zigzag_block.html?1=t&3=t&5=t&7=t&9=t&11=t&13=t&15=t'),
 	qr/^xGOODx$/m, 'zagzig block');
 
 }
-
-
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 
 ###############################################################################

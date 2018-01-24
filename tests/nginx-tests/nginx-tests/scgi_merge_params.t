@@ -24,7 +24,7 @@ select STDOUT; $| = 1;
 eval { require SCGI; };
 plan(skip_all => 'SCGI not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http scgi cache/)->plan(9)
+my $t = Test::Nginx->new()->has(qw/http scgi cache shmem/)->plan(9)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -38,7 +38,9 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     scgi_cache_path  %%TESTDIR%%/cache  levels=1:2
-                     keys_zone=NAME:10m;
+                     keys_zone=NAME:1m;
+
+    scgi_cache_key   stub;
 
     scgi_param SCGI 1;
     scgi_param HTTP_X_BLAH "blah";

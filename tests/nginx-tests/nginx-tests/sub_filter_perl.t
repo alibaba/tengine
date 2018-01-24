@@ -11,8 +11,6 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ CRLF /;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -93,30 +91,14 @@ like(http_get('/flush'), qr/^replaced$/m, 'flush');
 
 like(http_get('/multi?a=a&b=ab'), qr/^_replaced$/m, 'aab in a + ab');
 like(http_get('/multi?a=a&b=aaab'), qr/^aa_replaced$/m, 'aab in a + aaab');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/multi?a=a&b=aab'), qr/^a_replaced$/m, 'aab in a + aab');
 like(http_get('/multi?a=a&b=aaaab'), qr/^aaa_replaced$/m, 'aab in a + aaaab');
-
-}
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/multi?a=aa&b=ab'), qr/^a_replaced$/m, 'aab in aa + ab');
 like(http_get('/multi?a=aa&b=aab'), qr/^aa_replaced$/m, 'aab in aa + aab');
 like(http_get('/multi?a=aa&b=aaab'), qr/^aaa_replaced$/m, 'aab in aa + aaab');
-
-}
-
 like(http_get('/multi?a=aa&b=aaaab'), qr/^aaaa_replaced$/m, 'aab in aa + aaaab');
 
 # full backtracking
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
 
 like(http_get('/multi?a=aa&b=xaaab'), qr/^aaxa_replaced$/m, 'aab in aa + xaaab');
 like(http_get('/multi?a=aa&b=axaaab'), qr/^aaaxa_replaced$/m,
@@ -124,32 +106,16 @@ like(http_get('/multi?a=aa&b=axaaab'), qr/^aaaxa_replaced$/m,
 like(http_get('/multi?a=aa&b=aaxaaab'), qr/^aaaaxa_replaced$/m,
 	'aab in aa + aaxaaab');
 
-}
-
 # short pattern
 
 like(http_get('/short?a=a&b=b'), qr/^_replaced$/m, 'ab in a + b');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/short?a=a&b=ab'), qr/^a_replaced$/m, 'ab in a + ab');
-
-}
-
 like(http_get('/short?a=a&b=aab'), qr/^aa_replaced$/m, 'ab in a + aab');
 like(http_get('/short?a=a&b=aaab'), qr/^aaa_replaced$/m, 'ab in a + aaab');
 like(http_get('/short?a=a&b=aaaab'), qr/^aaaa_replaced$/m, 'ab in a + aaaab');
 
 like(http_get('/short?a=aa&b=b'), qr/^a_replaced$/m, 'ab in aa + b');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/short?a=aa&b=ab'), qr/^aa_replaced$/m, 'ab in aa + ab');
-
-}
-
 like(http_get('/short?a=aa&b=aab'), qr/^aaa_replaced$/m, 'ab in aa + aab');
 like(http_get('/short?a=aa&b=aaab'), qr/^aaaa_replaced$/m, 'ab in aa + aaab');
 like(http_get('/short?a=aa&b=aaaab'), qr/^aaaaa_replaced$/m, 'ab in aa + aaaab');

@@ -21,9 +21,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
-
-my $t = Test::Nginx->new()->has(qw/http proxy cache gzip/)->plan(11)
+my $t = Test::Nginx->new()->has(qw/http proxy cache gzip shmem/)->plan(13)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -37,7 +35,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     proxy_cache_path   %%TESTDIR%%/cache  levels=1:2
-                       keys_zone=NAME:10m;
+                       keys_zone=NAME:1m;
 
     server {
         listen       127.0.0.1:8080;
@@ -51,7 +49,7 @@ http {
 
             proxy_cache   NAME;
 
-            proxy_cache_valid   200 302  1s;
+            proxy_cache_valid   200 302  2s;
             proxy_cache_valid   301      1d;
             proxy_cache_valid   any      1m;
 
@@ -59,6 +57,8 @@ http {
 
             proxy_cache_use_stale  error timeout invalid_header http_500
                                    http_404;
+
+            add_header X-Cache-Status $upstream_cache_status;
         }
     }
     server {
@@ -89,29 +89,32 @@ unlike(http_head('/t2.html'), qr/SEE-THIS/, 'head request');
 like(http_get('/t2.html'), qr/SEE-THIS/, 'get after head');
 unlike(http_head('/t2.html'), qr/SEE-THIS/, 'head after get');
 
+like(http_head('/empty.html?head'), qr/MISS/, 'empty head first');
+like(http_head('/empty.html?head'), qr/HIT/, 'empty head second');
+
 like(http_get_range('/t.html', 'Range: bytes=4-'), qr/^THIS/m, 'cached range');
 like(http_get_range('/t.html', 'Range: bytes=0-2,4-'), qr/^SEE.*^THIS/ms,
 	'cached multipart range');
 
-like(http_get('/empty.html'), qr/HTTP/, 'empty get first');
-like(http_get('/empty.html'), qr/HTTP/, 'empty get second');
+like(http_get('/empty.html'), qr/MISS/, 'empty get first');
+like(http_get('/empty.html'), qr/HIT/, 'empty get second');
 
-select(undef, undef, undef, 1.1);
+select(undef, undef, undef, 3.1);
 unlink $t->testdir() . '/t.html';
 like(http_gzip_request('/t.html'),
-	qr/HTTP.*1c\x0d\x0a.{28}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
+	qr/HTTP.*STALE.*1c\x0d\x0a.{28}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
 	'non-empty get stale');
 
 unlink $t->testdir() . '/empty.html';
 like(http_gzip_request('/empty.html'),
-	qr/HTTP.*14\x0d\x0a.{20}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
+	qr/HTTP.*STALE.*14\x0d\x0a.{20}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
 	'empty get stale');
 
 ###############################################################################
 
 sub http_get_range {
-        my ($url, $extra) = @_;
-        return http(<<EOF);
+	my ($url, $extra) = @_;
+	return http(<<EOF);
 GET $url HTTP/1.1
 Host: localhost
 Connection: close
