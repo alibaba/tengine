@@ -216,6 +216,10 @@ ngx_uint_t          ngx_dump_config;
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
+/* indicate that nginx start without ngx_ssl_init()
+ * which will involve OpenSSL configuration file to
+ * start OpenSSL engine */
+static ngx_uint_t   ngx_no_ssl_init;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -232,6 +236,7 @@ main(int argc, char *const *argv)
     ngx_log_t        *log;
     ngx_cycle_t      *cycle, init_cycle;
     ngx_core_conf_t  *ccf;
+
 
     ngx_debug_init();
 
@@ -315,7 +320,8 @@ main(int argc, char *const *argv)
 
     /* STUB */
 #if (NGX_OPENSSL)
-    ngx_ssl_init(log);
+    if(!ngx_no_ssl_init)
+        ngx_ssl_init(log);
 #endif
 
     /*
@@ -325,6 +331,7 @@ main(int argc, char *const *argv)
 
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
+    init_cycle.no_ssl_init = ngx_no_ssl_init;
     ngx_cycle = &init_cycle;
 
     init_cycle.pool = ngx_create_pool(1024, log);
@@ -757,10 +764,12 @@ ngx_get_options(int argc, char *const *argv)
 
             case 't':
                 ngx_test_config = 1;
+                ngx_no_ssl_init = 1;
                 break;
 
             case 'd':
                 ngx_dump_config = 1;
+                ngx_no_ssl_init = 1;
                 break;
 
             case 'q':
@@ -840,6 +849,7 @@ ngx_get_options(int argc, char *const *argv)
 
             default:
                 ngx_log_stderr(0, "invalid option: \"%c\"", *(p - 1));
+                ngx_no_ssl_init = 1;
                 return NGX_ERROR;
             }
         }

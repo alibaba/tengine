@@ -75,4 +75,33 @@ END
         exit 1
     fi
 
+    OPENSSL_ASYNC=
+    if [ "$NGX_SSL_ASYNC" != NO ]; then
+
+        OPENSSL_ASYNC=NO
+
+        ngx_feature="OpenSSL library"
+        ngx_feature_name=
+        ngx_feature_run=no
+        ngx_feature_incs="#include <openssl/ssl.h>"
+        ngx_feature_path=
+        ngx_feature_libs="-lssl -lcrypto"
+        ngx_feature_test="#ifndef SSL_MODE_ASYNC
+        error: not define async
+        #endif
+        "
+        . auto/feature
+        if [ $ngx_found = yes ]; then
+            have=NGX_SSL_ASYNC . auto/have
+            OPENSSL_ASYNC=YES
+        fi
+    fi
+
+    if [ -n "$OPENSSL_ASYNC"  -a  "$OPENSSL_ASYNC" != YES  ]; then
+cat << END
+$1: error: For using asynchronous mode, The OpenSSL must be version 1.1.0 or greater.
+
+END
+        exit 1
+    fi
 fi

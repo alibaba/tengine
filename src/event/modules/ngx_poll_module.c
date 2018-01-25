@@ -42,7 +42,11 @@ ngx_event_module_t  ngx_poll_module_ctx = {
         NULL,                              /* trigger a notify */
         ngx_poll_process_events,           /* process the events */
         ngx_poll_init,                     /* init the events */
-        ngx_poll_done                      /* done the events */
+        ngx_poll_done,                     /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        NULL,                              /* add an async conn */
+        NULL,                              /* del an async conn */
+#endif
     }
 
 };

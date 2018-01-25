@@ -173,6 +173,7 @@ struct ngx_conf_s {
 
     ngx_conf_handler_pt   handler;
     char                 *handler_conf;
+    ngx_flag_t            no_ssl_init;
 };
 
 
