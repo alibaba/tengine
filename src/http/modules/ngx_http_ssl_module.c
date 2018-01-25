@@ -893,10 +893,8 @@ static char *
 ngx_http_ssl_enable_async(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_ssl_srv_conf_t *sscf = conf;
-
-    char  *rv;
-
-    ngx_flag_t       *pssl, *pssl_async;
+    char                    *rv;
+    ngx_flag_t              *pssl, *pssl_async;
 
     rv = ngx_conf_set_flag_slot(cf, cmd, conf);
 

@@ -1423,15 +1423,15 @@ ngx_http_read_request_header(ngx_http_request_t *r)
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     if(c->async_enable)
         n = c->recv(c, r->header_in->last,
-               r->header_in->end - r->header_in->last);
+                    r->header_in->end - r->header_in->last);
     else {
 #endif
-        if (rev->ready) {
-            n = c->recv(c, r->header_in->last,
-                    r->header_in->end - r->header_in->last);
-        } else {
-            n = NGX_AGAIN;
-        }
+            if (rev->ready) {
+                n = c->recv(c, r->header_in->last,
+                            r->header_in->end - r->header_in->last);
+            } else {
+                 n = NGX_AGAIN;
+            }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     }
 #endif

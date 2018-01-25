@@ -12,7 +12,7 @@ Description
 编译支持
 ===========
 
-启用--with-http_ssl_module编译选项
+启--with-openssl-async用编译选项
 
 配置项
 ===========

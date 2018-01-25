@@ -552,7 +552,7 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
-                     "epoll_ctl(%d, %d) failed", op, c->fd);
+                      "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
@@ -613,7 +613,7 @@ ngx_epoll_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
-                     "epoll_ctl(%d, %d) failed", op, c->fd);
+                      "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
@@ -674,7 +674,7 @@ ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
 
     if (epoll_ctl(ep, op, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno,
-                     "epoll_ctl(%d, %d) failed", op, c->fd);
+                      "epoll_ctl(%d, %d) failed", op, c->fd);
         return NGX_ERROR;
     }
 
