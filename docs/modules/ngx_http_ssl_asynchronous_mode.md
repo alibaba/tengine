@@ -12,7 +12,7 @@ Provide information about how to enable SSL/TLS asynchronous in Nginx.
 Compilation
 ===========
 
-Build Nginx with configuration item '--with-http_ssl_module'
+Build Nginx with configuration item '--with-openssl-async'
 
 Directives
 ===========
