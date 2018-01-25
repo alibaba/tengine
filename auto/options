@@ -25,6 +25,7 @@ CPP=
 NGX_OBJS=objs
 
 NGX_DEBUG=NO
+NGX_SSL_ASYNC=NO
 NGX_CC_OPT=
 NGX_LD_OPT=
 NGX_EXTEND_LD_OPT=
@@ -682,7 +683,7 @@ use the \"--without-http_limit_conn_module\" option instead"
         --with-ld-opt=*)                 NGX_LD_OPT="$value"        ;;
         --with-cpu-opt=*)                CPU="$value"               ;;
         --with-debug)                    NGX_DEBUG=YES              ;;
-
+        --with-openssl-async)            NGX_SSL_ASYNC=YES          ;;
         --without-pcre)                  USE_PCRE=DISABLED          ;;
         --with-pcre)                     USE_PCRE=YES               ;;
         --with-pcre=*)                   PCRE="$value"              ;;

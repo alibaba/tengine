@@ -44,6 +44,10 @@ static char *ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf,
 
 static char *ngx_http_ssl_enable(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+static char *ngx_http_ssl_enable_async(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+#endif
 static char *ngx_http_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -80,6 +84,15 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, enable),
       NULL },
+
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    { ngx_string("ssl_async"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_http_ssl_enable_async,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, async_enable),
+      NULL },
+#endif
 
     { ngx_string("ssl_certificate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
@@ -557,6 +570,9 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
      */
 
     sscf->enable = NGX_CONF_UNSET;
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    sscf->async_enable = NGX_CONF_UNSET;
+#endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
     sscf->verify = NGX_CONF_UNSET_UINT;
@@ -611,6 +627,18 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    if (conf->async_enable == NGX_CONF_UNSET) {
+        if (prev->async_enable == NGX_CONF_UNSET) {
+            conf->async_enable = 0;
+
+        } else {
+            conf->async_enable = prev->async_enable;
+            conf->file = prev->file;
+            conf->line = prev->line;
+        }
+    }
+#endif
     ngx_conf_merge_value(conf->session_timeout,
                          prev->session_timeout, 300);
 
@@ -673,6 +701,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           conf->file, conf->line);
             return NGX_CONF_ERROR;
         }
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+        conf->ssl.async_enable = conf->async_enable;
+#endif
 
         if (conf->certificate_keys->nelts < conf->certificates->nelts) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
@@ -857,6 +888,36 @@ ngx_http_ssl_enable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+static char *
+ngx_http_ssl_enable_async(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_ssl_srv_conf_t *sscf = conf;
+    char                    *rv;
+    ngx_flag_t              *pssl, *pssl_async;
+
+    rv = ngx_conf_set_flag_slot(cf, cmd, conf);
+
+    if (rv != NGX_CONF_OK) {
+        return rv;
+    }
+
+    /* If ssl_async on is configured, then ssl on is configured by default
+     * This will align 'ssl_async on;' and 'listen port ssl' diretives
+     * */
+    pssl = (ngx_flag_t *) ((char *)conf + offsetof(ngx_http_ssl_srv_conf_t, enable));
+    pssl_async = (ngx_flag_t *) ((char *)conf + cmd->offset);
+
+    if(*pssl_async && *pssl != 1) {
+        *pssl = *pssl_async;
+    }
+
+    sscf->file = cf->conf_file->file.name.data;
+    sscf->line = cf->conf_file->line;
+
+    return NGX_CONF_OK;
+}
+#endif
 
 static char *
 ngx_http_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
