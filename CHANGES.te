@@ -1,3 +1,27 @@
+Changes with Tengine 2.2.2                                         26 Jan 2018
+
+    *) Feature: support asynchronous SSL/TLS mode, Could use QAT to
+       offload and accelerated SSL. (mrpre)
+
+    *) Feature: support TLS1.3 and 0-RTT data. (jlijian3) 
+
+    *) Feature: enabled "include" inside http upstreams. (wangfakang)
+
+    *) Change: update and fixed the test cases. (wangfakang)
+
+    *) Change: restore the functionality of the ssl_verify_client_exception
+       directive. (jinjiu)
+
+    *) Change: updated the Debian package version number. (PeterDaveHello)
+
+    *) Change: updated README document. (taoyuanyuan)
+
+    *) Bugfix: fixed bug that the upstream_check module could trigger a segment
+       while reload. (yongjianchn)
+
+    *) Bugfix: fixed compiler error for pipe module on FreeBSD. (MengqiWu)
+
+
 Changes with Tengine 2.2.1                                         27 Sep 2017
 
     *) Security: range filter protect from total size overflows.
