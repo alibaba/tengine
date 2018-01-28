@@ -72,7 +72,9 @@ struct ngx_cycle_s {
     ngx_str_t                 prefix;
     ngx_str_t                 lock_file;
     ngx_str_t                 hostname;
+#if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_flag_t                no_ssl_init;
+#endif
 };
 
 
