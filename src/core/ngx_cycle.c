@@ -97,7 +97,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     cycle->pool = pool;
     cycle->log = log;
     cycle->old_cycle = old_cycle;
+#if (NGX_SSL && NGX_SSL_ASYNC)
     cycle->no_ssl_init = old_cycle->no_ssl_init;
+#endif
 
     cycle->conf_prefix.len = old_cycle->conf_prefix.len;
     cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix);
@@ -266,7 +268,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     conf.log = log;
     conf.module_type = NGX_CORE_MODULE;
     conf.cmd_type = NGX_MAIN_CONF;
+#if (NGX_SSL && NGX_SSL_ASYNC)
     conf.no_ssl_init = cycle->no_ssl_init;
+#endif
 
 #if 0
     log->log_level = NGX_LOG_DEBUG_ALL;
