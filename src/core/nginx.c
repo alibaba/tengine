@@ -216,10 +216,12 @@ ngx_uint_t          ngx_dump_config;
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
+#if (NGX_SSL && NGX_SSL_ASYNC)
 /* indicate that nginx start without ngx_ssl_init()
  * which will involve OpenSSL configuration file to
  * start OpenSSL engine */
 static ngx_uint_t   ngx_no_ssl_init;
+#endif
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
@@ -320,8 +322,13 @@ main(int argc, char *const *argv)
 
     /* STUB */
 #if (NGX_OPENSSL)
-    if(!ngx_no_ssl_init)
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (!ngx_no_ssl_init) {
+#endif
         ngx_ssl_init(log);
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    }
+#endif
 #endif
 
     /*
@@ -331,7 +338,9 @@ main(int argc, char *const *argv)
 
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
+#if (NGX_SSL && NGX_SSL_ASYNC)
     init_cycle.no_ssl_init = ngx_no_ssl_init;
+#endif
     ngx_cycle = &init_cycle;
 
     init_cycle.pool = ngx_create_pool(1024, log);
@@ -764,12 +773,16 @@ ngx_get_options(int argc, char *const *argv)
 
             case 't':
                 ngx_test_config = 1;
+#if (NGX_SSL && NGX_SSL_ASYNC)
                 ngx_no_ssl_init = 1;
+#endif
                 break;
 
             case 'd':
                 ngx_dump_config = 1;
+#if (NGX_SSL && NGX_SSL_ASYNC)
                 ngx_no_ssl_init = 1;
+#endif
                 break;
 
             case 'q':
@@ -819,6 +832,9 @@ ngx_get_options(int argc, char *const *argv)
                 return NGX_ERROR;
 
             case 's':
+#if (NGX_SSL && NGX_SSL_ASYNC)
+                ngx_no_ssl_init = 1;
+#endif
                 if (*p) {
                     ngx_signal = (char *) p;
 
@@ -849,7 +865,9 @@ ngx_get_options(int argc, char *const *argv)
 
             default:
                 ngx_log_stderr(0, "invalid option: \"%c\"", *(p - 1));
+#if (NGX_SSL && NGX_SSL_ASYNC)
                 ngx_no_ssl_init = 1;
+#endif
                 return NGX_ERROR;
             }
         }
