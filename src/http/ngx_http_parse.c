@@ -1382,6 +1382,7 @@ ngx_http_parse_complex_uri(ngx_http_request_t *r, ngx_uint_t merge_slashes)
                 goto done;
             case '+':
                 r->plus_in_uri = 1;
+                /* fall through */
             default:
                 state = sw_usual;
                 *u++ = ch;
@@ -1423,6 +1424,7 @@ ngx_http_parse_complex_uri(ngx_http_request_t *r, ngx_uint_t merge_slashes)
                 goto done;
             case '+':
                 r->plus_in_uri = 1;
+                /* fall through */
             default:
                 state = sw_usual;
                 *u++ = ch;
@@ -1470,6 +1472,7 @@ ngx_http_parse_complex_uri(ngx_http_request_t *r, ngx_uint_t merge_slashes)
                 goto done;
             case '+':
                 r->plus_in_uri = 1;
+                /* fall through */
             default:
                 state = sw_usual;
                 *u++ = ch;
