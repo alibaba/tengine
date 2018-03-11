@@ -960,3 +960,4 @@ have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
 have=T_NGX_MASTER_ENV . auto/have
 have=T_PIPES . auto/have
 have=T_TENGINE_FIX . auto/have
+have=T_NGX_INPUT_BODY_FILTER . auto/have

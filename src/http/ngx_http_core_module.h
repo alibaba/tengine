@@ -547,8 +547,11 @@ ngx_int_t ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name);
 ngx_http_cleanup_t *ngx_http_cleanup_add(ngx_http_request_t *r, size_t size);
 
 
+#if (T_NGX_INPUT_BODY_FILTER)
 typedef ngx_int_t (*ngx_http_input_body_filter_pt)
     (ngx_http_request_t *r, ngx_buf_t *buf);
+#endif
+
 typedef ngx_int_t (*ngx_http_output_header_filter_pt)(ngx_http_request_t *r);
 typedef ngx_int_t (*ngx_http_output_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
