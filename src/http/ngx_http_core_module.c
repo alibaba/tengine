@@ -74,8 +74,10 @@ static char *ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (T_NGX_RESOLVER_FILE)
 static char *ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#endif
 static char *ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #if (NGX_HTTP_GZIP)
@@ -764,12 +766,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+#if (T_NGX_RESOLVER_FILE)
     { ngx_string("resolver_file"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_core_resolver_file,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
+#endif
 
     { ngx_string("resolver_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -5523,6 +5527,7 @@ ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+#if (T_NGX_RESOLVER_FILE)
 static char *
 ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -5548,6 +5553,7 @@ ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+#endif
 
 
 #if (NGX_HTTP_GZIP)
