@@ -376,8 +376,8 @@ struct ngx_http_core_loc_conf_s {
     off_t         directio;                /* directio */
     off_t         directio_alignment;      /* directio_alignment */
 
+#if (T_DEPRECATED)
     ngx_bufs_t    client_body_buffers;
-#if (T_NGX_CLIENT_BODY_POSTPONE_SIZE)
     size_t        client_body_postpone_size;
 #endif
     size_t        client_body_buffer_size; /* client_body_buffer_size */
