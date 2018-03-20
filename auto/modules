@@ -963,4 +963,4 @@ have=T_TENGINE_FIX . auto/have
 have=T_NGX_INPUT_BODY_FILTER . auto/have
 have=T_NGX_GZIP_CLEAR_ETAG . auto/have
 have=T_NGX_RESOLVER_FILE . auto/have
-have=T_NGX_CLIENT_BODY_POSTPONE_SIZE . auto/have
+have=T_DEPRECATED . auto/have
