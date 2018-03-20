@@ -383,12 +383,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_buffers),
       NULL },
 
+#if (T_NGX_CLIENT_BODY_POSTPONE_SIZE)
     { ngx_string("client_body_postpone_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_core_loc_conf_t, client_body_postpone_size),
       NULL },
+#endif
 
     { ngx_string("client_body_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -3804,7 +3806,9 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->error_pages = NGX_CONF_UNSET_PTR;
     clcf->client_max_body_size = NGX_CONF_UNSET;
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
+#if (T_NGX_CLIENT_BODY_POSTPONE_SIZE)
     clcf->client_body_postpone_size = NGX_CONF_UNSET_SIZE;
+#endif
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
     clcf->satisfy = NGX_CONF_UNSET_UINT;
     clcf->if_modified_since = NGX_CONF_UNSET_UINT;
@@ -4080,9 +4084,11 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->client_body_buffers,
                               16, ngx_pagesize);
 
+#if (T_NGX_CLIENT_BODY_POSTPONE_SIZE)
     ngx_conf_merge_size_value(conf->client_body_postpone_size,
                               prev->client_body_postpone_size,
                               64 * 1024);
+#endif
 
     if (conf->client_max_body_size &&
          (conf->client_max_body_size <
@@ -4100,6 +4106,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                              conf->client_body_buffers.size);
     }
 
+#if (T_NGX_CLIENT_BODY_POSTPONE_SIZE)
     if ((off_t)conf->client_body_postpone_size > conf->client_max_body_size
          && conf->client_max_body_size != 0)
     {
@@ -4119,6 +4126,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->client_body_buffers.num = 1 + (conf->client_body_postpone_size /
                                              conf->client_body_buffers.size);
     }
+#endif
 
     if (conf->client_body_buffers.num < 2) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
