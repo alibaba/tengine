@@ -1,0 +1,92 @@
+# Contributor: Yao Leilei <sgub@sina.com>
+# Maintainer: Yao Leilei <sgub@sina.com>
+
+_tengx_prefix="/var/lib/nginx"
+_tengx_sbin_path="/usr/sbin/nginx"
+_tengx_conf_dir="/etc/nginx"
+_tengx_conf_path="$_tengx_conf_dir/nginx.conf"
+_tengx_log_dir="/var/log/nginx"
+_tengx_error_log="$_tengx_log_dir/error.log"
+_tengx_access_log="$_tengx_log_dir/access.log"
+_tengx_pid_path="/run/nginx/nginx.pid"
+_tengx_lock_path="/var/lock/subsys/nginx"
+_tengx_home="$_tengx_prefix/tmp"
+_tengx_tmp_http="$_tengx_home/client_body/"
+_tengx_tmp_proxy="$_tengx_home/proxy/"
+_tengx_tmp_fcgi="$_tengx_home/fastcgi/"
+_tengx_tmp_scgi="$_tengx_home/scgi/"
+_tengx_tmp_uwsgi="$_tengx_home/uwsgi/"
+_tengx_user_group=www
+
+pkgname=tengine
+pkgver=2.2.2
+pkgrel=0
+pkgdesc="Tengine is a web server originated by Taobao, based on the Nginx HTTP server and has many advanced features."
+url="https://github.com/alibaba/$pkgname"
+arch="all"
+license="BSD-2-Clause"
+depends=""
+replaces="nginx"
+makedepends="linux-headers gd-dev geoip-dev libxml2-dev libxslt-dev libressl-dev paxmark pcre-dev perl-dev pkgconf zlib-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/alibaba/tengine/archive/$pkgname-$pkgver.tar.gz
+	nginx.conf
+	default.conf
+	nginx.logrotate
+	nginx.initd"
+options="!check"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	# rename source dir name due to github archive naming scheme.
+	cd $srcdir
+	mv $pkgname-$pkgname-$pkgver $pkgname-$pkgver
+}
+
+build() {
+        cd "$builddir"
+
+	./configure                                     \
+		--prefix=$_tengx_prefix                      \
+		--sbin-path=$_tengx_sbin_path                   \
+		--conf-path=$_tengx_conf_path                 \
+		--error-log-path=$_tengx_error_log            \
+		--http-log-path=$_tengx_access_log            \
+		--pid-path=$_tengx_pid_path                   \
+		--lock-path=$_tengx_lock_path                 \
+		--http-client-body-temp-path=$_tengx_tmp_http \
+		--http-proxy-temp-path=$_tengx_tmp_proxy      \
+		--http-fastcgi-temp-path=$_tengx_tmp_fcgi     \
+		--http-uwsgi-temp-path=$_tengx_tmp_uwsgi      \
+		--http-scgi-temp-path=$_tengx_tmp_scgi        \
+		--user=$_tengx_user_group --group=$_tengx_user_group     \
+		--with-pcre                     \
+		--with-http_sub_module                     \
+		--with-http_realip_module                        \
+		--with-http_realip_module			\
+		--with-http_v2_module				\
+		--with-http_gunzip_module         \
+		--with-http_ssl_module		\
+		--with-ipv6
+
+        make
+}
+
+package() {
+        cd "$builddir"
+
+        make DESTDIR="$pkgdir" install
+
+	cd "$pkgdir"
+
+	install -Dm644 "$srcdir"/nginx.conf ./etc/nginx/nginx.conf
+	install -Dm644 "$srcdir"/default.conf ./etc/nginx/conf.d/default.conf
+	install -Dm755 "$srcdir"/nginx.initd ./etc/init.d/nginx
+	install -Dm644 "$srcdir"/nginx.logrotate ./etc/logrotate.d/nginx
+
+}
+
+sha512sums="c07bfd4280976e7fb61b76080a39006029d7d8a5c5c56abeb0ce3861d699ac120e68f15c9db58f8a4931ac9b1a90e1a0472ffb4135c4e4f91d498226d6517cc5  tengine-2.2.2.tar.gz
+	eb183860cd511361346e4079c1fcf470985e1c3b2a034a57f8b2a92ba851fed99256261f9b779770a5f57e3750e9e71bd1550a9d19ad9bf3a4d288864f0374a2  nginx.initd
+	09b110693e3f4377349ccea3c43cb8199c8579ee351eae34283299be99fdf764b0c1bddd552e13e4d671b194501618b29c822e1ad53b34101a73a63954363dbb  nginx.logrotate
+	0907f69dc2d3dc1bad3a04fb6673f741f1a8be964e22b306ef9ae2f8e736e1f5733a8884bfe54f3553fff5132a0e5336716250f54272c3fec2177d6ba16986f3  default.conf
+	ac7e3153ab698b4cde077f0d5d7ac0a58897927eb36cf3b58cb01268ca0296f1d589c0a5b4f889b96b5b4a57bef05b17c59be59a9d7c4d7a3d3be58f101f7f41  nginx.conf"
