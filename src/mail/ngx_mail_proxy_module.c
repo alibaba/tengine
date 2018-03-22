@@ -608,9 +608,12 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
                        &s->smtp_helo)
                    - line.data;
 
-        s->mail_state = (s->auth_method == NGX_MAIL_AUTH_NONE) ?
-                            ngx_smtp_helo_from : ngx_smtp_helo;
-
+        if (s->auth_method == NGX_MAIL_AUTH_NONE) {
+            s->mail_state = ngx_smtp_helo_from;  
+        } else {
+            s->mail_state = ngx_smtp_helo;
+        }
+            
         break;
 
     case ngx_smtp_helo_from:
