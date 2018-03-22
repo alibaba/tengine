@@ -15,7 +15,9 @@
 typedef struct {
     ngx_flag_t           enable;
     ngx_flag_t           no_buffer;
+#if (T_NGX_GZIP_CLEAR_ETAG)
     ngx_flag_t           clear_etag;
+#endif
 
     ngx_hash_t           types;
 
@@ -194,12 +196,14 @@ static ngx_command_t  ngx_http_gzip_filter_commands[] = {
       offsetof(ngx_http_gzip_conf_t, min_length),
       NULL },
 
+#if (T_NGX_GZIP_CLEAR_ETAG)
     { ngx_string("gzip_clear_etag"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_gzip_conf_t, clear_etag),
       NULL },
+#endif
 
       ngx_null_command
 };
@@ -314,12 +318,12 @@ ngx_http_gzip_header_filter(ngx_http_request_t *r)
 
     ngx_http_clear_content_length(r);
     ngx_http_clear_accept_ranges(r);
-
+#if (T_NGX_GZIP_CLEAR_ETAG)
     if (conf->clear_etag) {
         ngx_http_clear_etag(r);
-    } else {
-        ngx_http_weak_etag(r);
-    }
+    } else
+#endif
+    ngx_http_weak_etag(r);
 
     return ngx_http_next_header_filter(r);
 }
@@ -1144,7 +1148,9 @@ ngx_http_gzip_create_conf(ngx_conf_t *cf)
 
     conf->enable = NGX_CONF_UNSET;
     conf->no_buffer = NGX_CONF_UNSET;
+#if (T_NGX_GZIP_CLEAR_ETAG)
     conf->clear_etag = NGX_CONF_UNSET;
+#endif
 
     conf->postpone_gzipping = NGX_CONF_UNSET_SIZE;
     conf->level = NGX_CONF_UNSET;
@@ -1164,7 +1170,9 @@ ngx_http_gzip_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_value(conf->no_buffer, prev->no_buffer, 0);
+#if (T_NGX_GZIP_CLEAR_ETAG)
     ngx_conf_merge_value(conf->clear_etag, prev->clear_etag, 0);
+#endif
 
     ngx_conf_merge_bufs_value(conf->bufs, prev->bufs,
                               (128 * 1024) / ngx_pagesize, ngx_pagesize);

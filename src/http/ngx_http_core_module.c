@@ -74,8 +74,10 @@ static char *ngx_http_core_internal(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (T_NGX_RESOLVER_FILE)
 static char *ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#endif
 static char *ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #if (NGX_HTTP_GZIP)
@@ -374,6 +376,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, client_body_buffer_size),
       NULL },
 
+#if (T_DEPRECATED)
     { ngx_string("client_body_buffers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
       ngx_conf_set_bufs_slot,
@@ -387,6 +390,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_core_loc_conf_t, client_body_postpone_size),
       NULL },
+#endif
 
     { ngx_string("client_body_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -764,12 +768,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
       0,
       NULL },
 
+#if (T_NGX_RESOLVER_FILE)
     { ngx_string("resolver_file"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_core_resolver_file,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
+#endif
 
     { ngx_string("resolver_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -3800,7 +3806,9 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->error_pages = NGX_CONF_UNSET_PTR;
     clcf->client_max_body_size = NGX_CONF_UNSET;
     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
+#if (T_DEPRECATED)
     clcf->client_body_postpone_size = NGX_CONF_UNSET_SIZE;
+#endif
     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
     clcf->satisfy = NGX_CONF_UNSET_UINT;
     clcf->if_modified_since = NGX_CONF_UNSET_UINT;
@@ -4072,6 +4080,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->client_body_buffer_size,
                               prev->client_body_buffer_size,
                               (size_t) 2 * ngx_pagesize);
+#if (T_DEPRECATED)
     ngx_conf_merge_bufs_value(conf->client_body_buffers,
                               prev->client_body_buffers,
                               16, ngx_pagesize);
@@ -4121,6 +4130,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                            "there must be at least 2 \"client_body_buffers\"");
         conf->client_body_buffers.num = 2;
     }
+#endif
 
     ngx_conf_merge_msec_value(conf->client_body_timeout,
                               prev->client_body_timeout, 60000);
@@ -5523,6 +5533,7 @@ ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+#if (T_NGX_RESOLVER_FILE)
 static char *
 ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -5548,6 +5559,7 @@ ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+#endif
 
 
 #if (NGX_HTTP_GZIP)
