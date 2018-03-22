@@ -9,7 +9,7 @@ To build the package in alpine linux, install alpine-sdk and depends listed in t
 abuild checksum && abuild -r
 ```
 
-Reference
+References
 ===
 * Detailed [abuild instuctions](https://wiki.alpinelinux.org/wiki/Abuild_and_Helpers)
 * APKBUILD file for [Alpine nginx ports](https://github.com/alpinelinux/aports/tree/master/main/nginx)
