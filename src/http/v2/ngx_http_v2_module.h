@@ -30,6 +30,9 @@ typedef struct {
     ngx_uint_t                      streams_index_mask;
     ngx_msec_t                      recv_timeout;
     ngx_msec_t                      idle_timeout;
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_flag_t                      enable;
+#endif
 } ngx_http_v2_srv_conf_t;
 
 

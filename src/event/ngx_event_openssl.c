@@ -1450,7 +1450,9 @@ ngx_ssl_handshake(ngx_connection_t *c)
 {
     int         n, sslerr;
     ngx_err_t   err;
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
     ngx_time_t *tp;
+#endif
 
     ngx_ssl_clear_error(c->log);
 
@@ -1537,8 +1539,10 @@ ngx_ssl_handshake(ngx_connection_t *c)
 
         c->ssl->handshaked = 1;
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
         tp = ngx_timeofday();
         c->ssl->handshake_end_msec = tp->sec * 1000 + tp->msec;
+#endif
 
         c->recv = ngx_ssl_recv;
         c->send = ngx_ssl_write;
@@ -4675,6 +4679,7 @@ ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 }
 
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
 ngx_int_t
 ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
@@ -4708,6 +4713,7 @@ ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 
     return NGX_OK;
 }
+#endif
 
 
 static time_t
