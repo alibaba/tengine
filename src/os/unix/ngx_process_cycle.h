@@ -30,6 +30,10 @@
 #define NGX_PROCESS_HELPER     4
 #define NGX_PROCESS_PROC       5
 
+#if (T_PIPES)
+#define NGX_PROCESS_PIPE       6
+#endif
+
 
 typedef struct {
     ngx_event_handler_pt       handler;
