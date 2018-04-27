@@ -27,7 +27,7 @@ arch="all"
 license="BSD-2-Clause"
 depends=""
 replaces="nginx"
-makedepends="linux-headers gd-dev geoip-dev libxml2-dev libxslt-dev libressl-dev paxmark pcre-dev perl-dev pkgconf zlib-dev"
+makedepends="linux-headers gd-dev geoip-dev libxml2-dev libxslt-dev openssl-dev paxmark pcre-dev perl-dev pkgconf zlib-dev"
 source="$pkgname-$pkgver.tar.gz::https://github.com/alibaba/tengine/archive/$pkgname-$pkgver.tar.gz
 	nginx.conf
 	default.conf
@@ -45,9 +45,9 @@ prepare() {
 build() {
         cd "$builddir"
 
-	./configure                                     \
-		--prefix=$_tengx_prefix                      \
-		--sbin-path=$_tengx_sbin_path                   \
+	./configure   \
+		--prefix=$_tengx_prefix                       \
+		--sbin-path=$_tengx_sbin_path                 \
 		--conf-path=$_tengx_conf_path                 \
 		--error-log-path=$_tengx_error_log            \
 		--http-log-path=$_tengx_access_log            \
@@ -58,13 +58,14 @@ build() {
 		--http-fastcgi-temp-path=$_tengx_tmp_fcgi     \
 		--http-uwsgi-temp-path=$_tengx_tmp_uwsgi      \
 		--http-scgi-temp-path=$_tengx_tmp_scgi        \
-		--user=$_tengx_user_group --group=$_tengx_user_group     \
+		--user=$_tengx_user_group --group=$_tengx_user_group \
 		--with-pcre                     \
-		--with-http_sub_module                     \
-		--with-http_realip_module                        \
-		--with-http_realip_module			\
-		--with-http_v2_module				\
-		--with-http_gunzip_module         \
+		--with-syslog			\
+		--with-http_sub_module          \
+		--with-http_realip_module       \
+		--with-http_realip_module	\
+		--with-http_v2_module		\
+		--with-http_gunzip_module       \
 		--with-http_ssl_module		\
 		--with-ipv6
 
