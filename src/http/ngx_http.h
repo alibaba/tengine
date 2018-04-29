@@ -186,7 +186,9 @@ extern ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
 extern ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
 extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 
+#if (T_NGX_INPUT_BODY_FILTER)
 extern ngx_http_input_body_filter_pt     ngx_http_top_input_body_filter;
+#endif
 
 
 #endif /* _NGX_HTTP_H_INCLUDED_ */
