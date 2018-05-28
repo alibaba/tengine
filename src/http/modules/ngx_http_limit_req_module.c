@@ -37,13 +37,14 @@ typedef struct {
 
 
 typedef struct {
-    ngx_http_limit_req_shctx_t  *sh;
-    ngx_slab_pool_t             *shpool;
+    ngx_http_limit_req_shctx_t   *sh;
+    ngx_slab_pool_t              *shpool;
     /* integer value, 1 corresponds to 0.001 r/s */
-    ngx_uint_t                   rate;
-    ngx_http_complex_value_t     key;
-    ngx_http_limit_req_node_t   *node;
-    ngx_array_t                 *limit_vars;
+    ngx_uint_t                    rate;
+    ngx_http_limit_req_variable_t rate_var;
+    ngx_http_complex_value_t      key;
+    ngx_http_limit_req_node_t    *node;
+    ngx_array_t                  *limit_vars;
 } ngx_http_limit_req_ctx_t;
 
 
@@ -207,11 +208,53 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
 {
     u_char                        *p;
     size_t                         len, total_len;
-    ngx_uint_t                     j;
+    ngx_uint_t                     j, rate, scale;
     ngx_http_variable_value_t     *vv;
     ngx_http_limit_req_variable_t *lrv;
 
+    rate = 1;
+    scale = 1;
     total_len = 0;
+    p = NULL;
+
+    if (ctx->rate_var.var.len != 0) {
+        vv = ngx_http_get_indexed_variable(r, ctx->rate_var.index);
+        if (vv == NULL || vv->not_found || vv->len == 0) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "the value of the \"%V\" variable "
+                          "for limit rate is wrong",
+                          &ctx->rate_var.var);
+        }
+
+        if (vv->len > 65535) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "the value of the \"%V\" variable "
+                          "is more than 65535 bytes: \"%V\"",
+                          &ctx->rate_var.var, vv);
+        }
+
+        len = vv->len;
+        p = vv->data + len - 3;
+
+        if (ngx_strcmp(p, "r/s", 3) == 0) {
+            scale = 1;
+
+        } else if (ngx_strcmp(p, "r/m", 3) == 0) {
+            scale = 60;
+        }
+
+        rate = ngx_atoi(vv->data, vv->len - 3);
+        if (rate <= 0) {
+            ngx_log_error(NGX_LOG_ERROR, r->connection->log, 0,
+                          "the value of rate is wrong",
+                          &ctx->rate_var.var);
+            total_len = 0;
+            return total_len;
+        }
+
+        ctx->rate = rate * 1000 / scale;
+    }
+
     p = NULL;
 
     if (node != NULL) {
@@ -836,7 +879,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_array_t                    *variables;
     ngx_shm_zone_t                 *shm_zone;
     ngx_http_limit_req_ctx_t       *ctx;
-    ngx_http_limit_req_variable_t  *v;
+    ngx_http_limit_req_variable_t  *v, rate_var;
 
     value = cf->args->elts;
 
@@ -846,6 +889,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     rate = 1;
     scale = 1;
     name.len = 0;
+    rate_var.var.len = 0;
 
     variables = ngx_array_create(cf->pool, 5,
                                  sizeof(ngx_http_limit_req_variable_t));
@@ -891,23 +935,37 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (ngx_strncmp(value[i].data, "rate=", 5) == 0) {
 
-            len = value[i].len;
-            p = value[i].data + len - 3;
+            if (value[i].data[5] == '$') {
 
-            if (ngx_strncmp(p, "r/s", 3) == 0) {
-                scale = 1;
-                len -= 3;
+                value[i].data += 6;
+                value[i].len -= 6;
+                rate_var.index = ngx_http_get_variable_index(cf, &value[i]);
 
-            } else if (ngx_strncmp(p, "r/m", 3) == 0) {
-                scale = 60;
-                len -= 3;
-            }
+                if (rate_var.index == NGX_ERROR) {
+                    return NGX_CONF_ERROR;
+                }
+                rate_var.var = value[i];
+            
+            } else {
+                
+                len = value[i].len;
+                p = value[i].data + len - 3;
 
-            rate = ngx_atoi(value[i].data + 5, len - 5);
-            if (rate <= 0) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "invalid rate \"%V\"", &value[i]);
-                return NGX_CONF_ERROR;
+                if (ngx_strncmp(p, "r/s", 3) == 0) {
+                    scale = 1;
+                    len -= 3;
+
+                } else if (ngx_strncmp(p, "r/m", 3) == 0) {
+                    scale = 60;
+                    len -= 3;
+                }
+
+                rate = ngx_atoi(value[i].data + 5, len - 5);
+                if (rate <= 0) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "invalid rate \"%V\"", &value[i]);
+                    return NGX_CONF_ERROR;
+                }
             }
 
             continue;
@@ -958,6 +1016,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
     ctx->rate = rate * 1000 / scale;
+    ctx->rate_var = rate_var;
     ctx->limit_vars = variables;
 
     shm_zone = ngx_shared_memory_add(cf, &name, size,
