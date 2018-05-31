@@ -332,6 +332,9 @@ ngx_signal_handler(int signo)
 
     case NGX_PROCESS_MASTER:
     case NGX_PROCESS_SINGLE:
+#if (T_PIPES)
+    case NGX_PROCESS_PIPE:
+#endif
         switch (signo) {
 
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
