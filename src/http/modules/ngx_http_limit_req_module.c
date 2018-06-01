@@ -224,6 +224,7 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
                           "the value of the \"%V\" variable "
                           "for limit rate is wrong",
                           &ctx->rate_var.var);
+            return total_len;
         }
 
         if (vv->len > 65535) {
@@ -231,24 +232,24 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
                           "the value of the \"%V\" variable "
                           "is more than 65535 bytes: \"%V\"",
                           &ctx->rate_var.var, vv);
+            return total_len;
         }
 
         len = vv->len;
         p = vv->data + len - 3;
 
-        if (ngx_strcmp(p, "r/s", 3) == 0) {
+        if (ngx_strncmp(p, "r/s", 3) == 0) {
             scale = 1;
 
-        } else if (ngx_strcmp(p, "r/m", 3) == 0) {
+        } else if (ngx_strncmp(p, "r/m", 3) == 0) {
             scale = 60;
         }
 
         rate = ngx_atoi(vv->data, vv->len - 3);
         if (rate <= 0) {
-            ngx_log_error(NGX_LOG_ERROR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "the value of rate is wrong",
                           &ctx->rate_var.var);
-            total_len = 0;
             return total_len;
         }
 
