@@ -15,7 +15,7 @@ Directives
 limit_req_zone
 -------------
 
-**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate | rate=$limit_count*
+**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate | rate=$limit_variable*
 
 **Default**: *none*
 
@@ -50,20 +50,20 @@ For example:
     limit_req_zone $binary_remote_addr zone=one:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $uri zone=two:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $request_uri zone=three:3m rate=1r/s;
-	limit_req_zone $binary_remote_addr $request_uri zone=four:3m rate=$limit_count;
+    limit_req_zone $binary_remote_addr $request_uri zone=four:3m rate=$limit_count;
 
     location / {
         limit_req zone=one burst=5;
         limit_req zone=two forbid_action=@test1;
         limit_req zone=three burst=3 forbid_action=@test2;
         set $limit_count "10r/s"
-		if ($http_user_agent ~* "Android") {
-			set $limit_count "1r/s";
+        if ($http_user_agent ~* "Android") {
+            set $limit_count "1r/s";
         }
-		if ($http_user_agent ~* "Iphone") {
-			set $limit_count "100r/s";
+        if ($http_user_agent ~* "Iphone") {
+            set $limit_count "100r/s";
         }
-		limit_req zone=four burst=3 forbid_action=@test2;
+        limit_req zone=four burst=3 forbid_action=@test2;
     }
 
     location /off {
