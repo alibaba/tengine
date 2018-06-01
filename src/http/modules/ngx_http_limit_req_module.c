@@ -219,7 +219,7 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
 
     if (ctx->rate_var.var.len != 0) {
         vv = ngx_http_get_indexed_variable(r, ctx->rate_var.index);
-        if (vv == NULL || vv->not_found || vv->len == 0) {
+        if (vv == NULL || vv->not_found || vv->len <= 3) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "the value of the \"%V\" variable "
                           "for limit rate is wrong",
