@@ -15,7 +15,7 @@ Directives
 limit_req_zone
 -------------
 
-**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate*
+**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate|$limit_count*
 
 **Default**: *none*
 
@@ -25,8 +25,10 @@ Support more than one limit variables. For example:
 
     limit_req_zone $binary_remote_addr $uri zone=one:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $request_uri zone=two:3m rate=1r/s;
+    limit_req_zone $binary_remote_addr zone=three:3m rate=$limit_count;
     
-The last line of the above example indicates a client can access a specific URI only once in a second.
+The 2nd line of the above example indicates a client can access a specific URI only once in a second.
+And the last line shows how to assign rate with another variable.
 
 limit_req
 ------------------------
