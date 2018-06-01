@@ -15,7 +15,7 @@ Directives
 limit_req_zone
 -------------
 
-**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate|$limit_count*
+**Syntax**: *limit_req_zone $session_variable1 $session_variable2 ... zone=name_of_zone:size rate=rate | rate=$limit_count*
 
 **Default**: *none*
 
@@ -25,10 +25,12 @@ Support more than one limit variables. For example:
 
     limit_req_zone $binary_remote_addr $uri zone=one:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $request_uri zone=two:3m rate=1r/s;
-    limit_req_zone $binary_remote_addr zone=three:3m rate=$limit_count;
     
-The 2nd line of the above example indicates a client can access a specific URI only once in a second.
-And the last line shows how to assign rate with another variable.
+The last line of the above example indicates a client can access a specific URI only once in a second.
+
+Support variable for rate. For example:
+
+    limit_req_zone $binary_remote_addr zone=three:3m rate=$limit_count;
 
 limit_req
 ------------------------
@@ -48,11 +50,20 @@ For example:
     limit_req_zone $binary_remote_addr zone=one:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $uri zone=two:3m rate=1r/s;
     limit_req_zone $binary_remote_addr $request_uri zone=three:3m rate=1r/s;
+	limit_req_zone $binary_remote_addr $request_uri zone=four:3m rate=$limit_count;
 
     location / {
         limit_req zone=one burst=5;
         limit_req zone=two forbid_action=@test1;
         limit_req zone=three burst=3 forbid_action=@test2;
+        set $limit_count "10r/s"
+		if ($http_user_agent ~* "Android") {
+			set $limit_count "1r/s";
+        }
+		if ($http_user_agent ~* "Iphone") {
+			set $limit_count "100r/s";
+        }
+		limit_req zone=four burst=3 forbid_action=@test2;
     }
 
     location /off {
