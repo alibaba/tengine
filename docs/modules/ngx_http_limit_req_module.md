@@ -56,7 +56,7 @@ For example:
         limit_req zone=one burst=5;
         limit_req zone=two forbid_action=@test1;
         limit_req zone=three burst=3 forbid_action=@test2;
-        set $limit_count "10r/s"
+        set $limit_count "10r/s";
         if ($http_user_agent ~* "Android") {
             set $limit_count "1r/s";
         }
