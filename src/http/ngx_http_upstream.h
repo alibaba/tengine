@@ -177,7 +177,9 @@ typedef struct {
 
     ngx_uint_t                       ignore_headers;
     ngx_uint_t                       next_upstream;
+#if (T_UPSTREAM_TRIES)
     ngx_uint_t                       upstream_tries;
+#endif
     ngx_uint_t                       store_access;
     ngx_uint_t                       next_upstream_tries;
     ngx_flag_t                       buffering;

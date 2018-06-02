@@ -123,12 +123,14 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       offsetof(ngx_http_memcached_loc_conf_t, gzip_flag),
       NULL },
 
+#if (T_UPSTREAM_TRIES)
     { ngx_string("memcached_upstream_tries"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_memcached_loc_conf_t, upstream.upstream_tries),
       NULL },
+#endif
 
       ngx_null_command
 };
@@ -612,7 +614,9 @@ ngx_http_memcached_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.buffer_size = NGX_CONF_UNSET_SIZE;
 
+#if (T_UPSTREAM_TRIES)
     conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
+#endif
 
     /* the hardcoded values */
     conf->upstream.cyclic_temp_file = 0;
@@ -674,9 +678,11 @@ ngx_http_memcached_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                        |NGX_HTTP_UPSTREAM_FT_OFF;
     }
 
+#if (T_UPSTREAM_TRIES)
     ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
                               prev->upstream.upstream_tries,
                               NGX_CONF_UNSET_UINT);
+#endif
 
     if (conf->upstream.upstream == NULL) {
         conf->upstream.upstream = prev->upstream.upstream;
