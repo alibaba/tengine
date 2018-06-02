@@ -435,7 +435,9 @@ struct ngx_http_request_s {
 
     ngx_uint_t                        err_status;
 
+#if (T_UPSTREAM_TRIES)
     ngx_uint_t                        us_tries;
+#endif
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
