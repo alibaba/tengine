@@ -1553,7 +1553,7 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
         }
- 
+
         /* abbreviated SSL handshake may interact badly with Nagle */
 
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -1779,7 +1779,7 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     for (cl = u->request_bufs; cl; cl = cl->next) {
         cl->buf->pos = cl->buf->start;
-     
+
         /* there is at most one file */
 
         if (cl->buf->in_file) {
@@ -2556,7 +2556,7 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
             ngx_http_internal_redirect(r, &uri, &args);
         }
-       
+
         ngx_http_finalize_request(r, NGX_DONE);
         return NGX_DONE;
     }
@@ -3935,7 +3935,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     if (status) {
         u->state->status = status;
-#if (T_TENGINE_FIX)
+#if (T_UPSTREAM_TRIES)
         /* set r->us_tries = 1 for lua subrequest */
         if (r->us_tries == 0) {
             r->us_tries = 1;
@@ -3944,6 +3944,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
         timeout = u->conf->next_upstream_timeout;
 
+#if (T_UPSTREAM_TRIES)
         if (u->conf->upstream_tries != NGX_CONF_UNSET_UINT
             && u->conf->upstream_tries != 0
             && r->us_tries++ >= u->conf->upstream_tries)
@@ -3951,8 +3952,9 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
             ngx_http_upstream_finalize_request(r, u, status);
             return;
         }
+#endif
 
-        if (u->peer.tries == 0 
+        if (u->peer.tries == 0
             || !(u->conf->next_upstream & ft_type)
             || (u->request_sent && r->request_body_no_buffering)
             || (timeout && ngx_current_msec - u->peer.start_time >= timeout))
@@ -5624,7 +5626,7 @@ invalid:
                        "invalid parameter \"%V\"", &value[i]);
 
     return NGX_CONF_ERROR;
- 
+
 not_supported:
 
     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,

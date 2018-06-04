@@ -959,10 +959,10 @@ fi
 have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
 have=T_NGX_MASTER_ENV . auto/have
 have=T_PIPES . auto/have
-have=T_TENGINE_FIX . auto/have
 have=T_NGX_INPUT_BODY_FILTER . auto/have
 have=T_NGX_GZIP_CLEAR_ETAG . auto/have
 have=T_NGX_RESOLVER_FILE . auto/have
 have=T_DEPRECATED . auto/have
 have=T_UPSTREAM_KEEPALIVE_TIMEOUT . auto/have
 have=T_NGX_HTTP_STUB_STATUS . auto/have
+have=T_UPSTREAM_TRIES  . auto/have
