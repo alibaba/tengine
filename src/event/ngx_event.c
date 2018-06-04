@@ -74,8 +74,11 @@ ngx_atomic_t   ngx_stat_writing0;
 ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
 ngx_atomic_t   ngx_stat_waiting0;
 ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
+
+#if (T_NGX_HTTP_STUB_STATUS)
 ngx_atomic_t   ngx_stat_request_time0;
 ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
+#endif
 
 #endif
 
@@ -518,7 +521,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
            + cl          /* ngx_stat_reading */
            + cl          /* ngx_stat_writing */
            + cl          /* ngx_stat_waiting */
-#if (TENGINE_STAT_STUB)
+#if (T_NGX_HTTP_STUB_STATUS)
            + cl         /* ngx_stat_request_time */
 #endif
            ;
@@ -569,7 +572,10 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_stat_reading = (ngx_atomic_t *) (shared + 7 * cl);
     ngx_stat_writing = (ngx_atomic_t *) (shared + 8 * cl);
     ngx_stat_waiting = (ngx_atomic_t *) (shared + 9 * cl);
+
+#if (T_NGX_HTTP_STUB_STATUS)
     ngx_stat_request_time = (ngx_atomic_t *) (shared + 10 * cl);
+#endif
 
 #endif
 
