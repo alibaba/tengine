@@ -592,7 +592,9 @@ ngx_http_create_request(ngx_connection_t *c)
     r->main = r;
     r->count = 1;
 
+#if (T_UPSTREAM_TRIES)
     r->us_tries = 1;
+#endif
 
     if (clcf->request_time_cache) {
         tp = ngx_timeofday();
