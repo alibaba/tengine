@@ -41,8 +41,10 @@ static ngx_int_t ngx_http_variable_request_line(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#if (T_NGX_VARS)
 static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#endif
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_decode_base64(ngx_http_request_t *r,
@@ -147,15 +149,19 @@ static ngx_int_t ngx_http_variable_pid(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_msec(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_variable_dollar(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_variable_host_comment(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_time_iso8601(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_time_local(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_time_http(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_int_t t, ngx_int_t len);
+
+#if (T_NGX_VARS)
+static ngx_int_t ngx_http_variable_dollar(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_host_comment(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_http_variable_unix_time(ngx_http_request_t *r,
@@ -175,10 +181,8 @@ static ngx_int_t ngx_http_variable_hour12(ngx_http_request_t *r,
 static ngx_int_t ngx_http_variable_minute(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_second(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_int_t t, ngx_int_t len);
-
+        ngx_http_variable_value_t *v, uintptr_t data);
+#endif
 
 /*
  * TODO:
@@ -380,6 +384,7 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("msec"), NULL, ngx_http_variable_msec,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
+#if (T_NGX_VARS)
     { ngx_string("dollar"), NULL, ngx_http_variable_dollar,
       0, 0, 0 },
 
@@ -412,6 +417,8 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
 
     { ngx_string("second"), NULL, ngx_http_variable_second,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+#endif
 
     { ngx_string("time_iso8601"), NULL, ngx_http_variable_time_iso8601,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
@@ -728,6 +735,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
         return NULL;
     }
 
+#if (T_NGX_VARS)
     if (ngx_strncmp(name->data, "sent_cookie_", 12) == 0) {
 
         if (ngx_http_variable_sent_cookie(r, vv, (uintptr_t) name) == NGX_OK) {
@@ -736,6 +744,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
         return NULL;
     }
+#endif
 
     if (ngx_strncmp(name->data, "base64_decode_", 14) == 0) {
 
@@ -1122,6 +1131,7 @@ ngx_http_variable_cookie(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 }
 
 
+#if (T_NGX_VARS)
 static ngx_int_t
 ngx_http_variable_sent_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -1193,6 +1203,7 @@ ngx_http_variable_sent_cookie(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+#endif
 
 
 static ngx_int_t
@@ -2867,6 +2878,7 @@ ngx_http_variable_msec(ngx_http_request_t *r,
 }
 
 
+#if (T_NGX_VARS)
 static ngx_int_t
 ngx_http_variable_dollar(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -3016,7 +3028,7 @@ ngx_http_variable_second(ngx_http_request_t *r,
 {
     return ngx_http_variables_time_fmt(r, v, ngx_cached_tm->ngx_tm_sec, 2);
 }
-
+#endif
 
 static ngx_int_t
 ngx_http_variables_time_fmt(ngx_http_request_t *r,
@@ -3462,12 +3474,14 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
             continue;
         }
 
+#if (T_NGX_VARS)
         if (ngx_strncmp(v[i].name.data, "sent_cookie_", 12) == 0) {
             v[i].get_handler = ngx_http_variable_sent_cookie;
             v[i].data = (uintptr_t) &v[i].name;
 
             continue;
         }
+#endif
 
         if (ngx_strncmp(v[i].name.data, "base64_decode_", 14) == 0) {
             v[i].get_handler = ngx_http_variable_decode_base64;
