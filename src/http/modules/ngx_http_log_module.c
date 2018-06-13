@@ -116,10 +116,12 @@ static u_char *ngx_http_log_msec(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static u_char *ngx_http_log_request_time(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
+#if (T_NGX_VARS)
 static u_char *ngx_http_log_request_time_msec(ngx_http_request_t *r,
     u_char *buf, ngx_http_log_op_t *op);
 static u_char *ngx_http_log_request_time_usec(ngx_http_request_t *r,
     u_char *buf, ngx_http_log_op_t *op);
+#endif
 static u_char *ngx_http_log_status(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static u_char *ngx_http_log_bytes_sent(ngx_http_request_t *r, u_char *buf,
@@ -230,10 +232,12 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
     { ngx_string("msec"), NGX_TIME_T_LEN + 4, ngx_http_log_msec },
     { ngx_string("request_time"), NGX_TIME_T_LEN + 4,
                           ngx_http_log_request_time },
+#if (T_NGX_VARS)
     { ngx_string("request_time_msec"), NGX_TIME_T_LEN,
                           ngx_http_log_request_time_msec },
     { ngx_string("request_time_usec"), NGX_TIME_T_LEN,
                           ngx_http_log_request_time_usec },
+#endif
     { ngx_string("status"), NGX_INT_T_LEN, ngx_http_log_status },
     { ngx_string("bytes_sent"), NGX_OFF_T_LEN, ngx_http_log_bytes_sent },
     { ngx_string("body_bytes_sent"), NGX_OFF_T_LEN,
@@ -860,6 +864,7 @@ ngx_http_log_request_time(ngx_http_request_t *r, u_char *buf,
 }
 
 
+#if (T_NGX_VARS)
 static u_char *
 ngx_http_log_request_time_msec(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op)
@@ -892,6 +897,7 @@ ngx_http_log_request_time_usec(ngx_http_request_t *r, u_char *buf,
 
     return ngx_sprintf(buf, "%T", (time_t) us);
 }
+#endif
 
 
 static u_char *
