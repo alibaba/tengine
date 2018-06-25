@@ -8,10 +8,6 @@ Description
 
 This module can be used to update your upstream-list without reloadding Nginx.
 
-TODO:
-
-It can not work with common `nginx_upstream_check_module`.
-
 
 Compilation
 ===========
