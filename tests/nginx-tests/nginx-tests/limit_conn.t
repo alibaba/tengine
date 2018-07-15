@@ -21,15 +21,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req shmem/)
-	->plan(8);
+my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req/);
 
-$t->write_file_expand('nginx.conf', <<'EOF');
+$t->write_file_expand('nginx.conf', <<'EOF')->plan(8);
 
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
