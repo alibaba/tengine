@@ -25,7 +25,7 @@ select STDOUT; $| = 1;
 eval { require IO::Compress::Gzip; };
 plan(skip_all => "IO::Compress::Gzip not found") if $@;
 
-my $t = Test::Nginx->new()->has(qw/http gunzip proxy gzip_static rewrite/);
+my $t = Test::Nginx->new()->has(qw/http gunzip gzip_static rewrite/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
