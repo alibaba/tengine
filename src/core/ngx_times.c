@@ -82,9 +82,12 @@ ngx_time_update(void)
     u_char          *p0, *p1, *p2, *p3, *p4;
     ngx_tm_t         tm, gmt;
     time_t           sec;
-    ngx_uint_t       msec, usec;
+    ngx_uint_t       msec;
     ngx_time_t      *tp;
     struct timeval   tv;
+#if (T_NGX_RET_CACHE)
+    ngx_uint_t       usec;
+#endif
 
     if (!ngx_trylock(&ngx_time_lock)) {
         return;
@@ -94,7 +97,9 @@ ngx_time_update(void)
 
     sec = tv.tv_sec;
     msec = tv.tv_usec / 1000;
+#if (T_NGX_RET_CACHE)
     usec = tv.tv_usec % 1000;
+#endif
 
     ngx_current_msec = (ngx_msec_t) sec * 1000 + msec;
 
@@ -102,7 +107,9 @@ ngx_time_update(void)
 
     if (tp->sec == sec) {
         tp->msec = msec;
+#if (T_NGX_RET_CACHE)
         tp->usec = usec;
+#endif
         ngx_unlock(&ngx_time_lock);
         return;
     }
@@ -117,7 +124,9 @@ ngx_time_update(void)
 
     tp->sec = sec;
     tp->msec = msec;
+#if (T_NGX_RET_CACHE)
     tp->usec = usec;
+#endif
 
     ngx_gmtime(sec, &gmt);
 
