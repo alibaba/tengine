@@ -117,7 +117,8 @@ $t->run();
 
 ok(valid('/simple', 'http://www.example.org'), 'simple');
 ok(valid('/simple', 'http://www.example.org/uri'), 'simple uri');
-ok(valid('/simple', 'http://www.example.org:8080/uri'), 'simple port uri');
+ok(valid('/simple', 'http://www.example.org:' . port(8080) . '/uri'),
+	'simple port uri');
 ok(!valid('/simple', 'localhost'), 'simple invalid');
 ok(valid('/simple', 'https://www.example.org'), 'https');
 ok(!valid('/simple', 'example.com'), 'no scheme');
@@ -143,7 +144,7 @@ ok(!valid('/long', 'http://' . 'a' x 257), 'long hostname 257');
 ok(valid('/uri', 'http://www.example.org/uri'), 'uri');
 ok(valid('/uri', 'http://www.example.org/urii'), 'uri prefix');
 ok(!valid('/uri', 'http://www.example.org/uRi'), 'uri case');
-ok(valid('/uri', 'http://www.example.org:8080/urii'), 'uri port');
+ok(valid('/uri', 'http://www.example.org:' . port(8080) . '/urii'), 'uri port');
 ok(!valid('/uri', 'http://www.example.org/ur'), 'uri invalid len');
 ok(!valid('/uri', 'http://www.example.org/urd'), 'uri invalid cmp');
 
