@@ -427,7 +427,9 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    server_info;             /* server_info */
     ngx_flag_t    chunked_transfer_encoding; /* chunked_transfer_encoding */
     ngx_flag_t    etag;                    /* etag */
+#if (T_NGX_RET_CACHE)
     ngx_flag_t    request_time_cache;      /* request_time_cache */
+#endif
 
     ngx_uint_t    server_tag_type;         /* server tag type */
     ngx_str_t     server_tag;              /* customized server tag */
