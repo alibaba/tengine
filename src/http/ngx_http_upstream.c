@@ -32,7 +32,12 @@ static void ngx_http_upstream_rd_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     ngx_event_t *ev);
-void ngx_http_upstream_connect(ngx_http_request_t *r,
+#if (T_UPSTREAM_DYNAMIC_DNS)
+void
+#else
+static void
+#endif
+ngx_http_upstream_connect(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
@@ -89,7 +94,12 @@ static void ngx_http_upstream_dummy_handler(ngx_http_request_t *r,
 static void ngx_http_upstream_next(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t ft_type);
 static void ngx_http_upstream_cleanup(void *data);
-void ngx_http_upstream_finalize_request(ngx_http_request_t *r,
+#if (T_UPSTREAM_DYNAMIC_DNS)
+void
+#else
+static void
+#endif
+ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc);
 
 static ngx_int_t ngx_http_upstream_process_header_line(ngx_http_request_t *r,
@@ -1362,8 +1372,11 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     }
 }
 
-
+#if (T_UPSTREAM_DYNAMIC_DNS)
 void
+#else
+static void
+#endif
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
     ngx_int_t          rc;
@@ -1393,9 +1406,11 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->header_sec = (time_t) NGX_ERROR;
 
     rc = ngx_event_connect_peer(&u->peer);
+#if (T_UPSTREAM_DYNAMIC_DNS)
     if (rc == NGX_YIELD) {
         return;
     }
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http upstream connect: %i", rc);
@@ -4006,7 +4021,9 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->peer.connection = NULL;
     }
 
+#if (T_UPSTREAM_DYNAMIC_DNS)
     u->peer.resolved = 0;
+#endif
     ngx_http_upstream_connect(r, u);
 }
 
@@ -4022,8 +4039,11 @@ ngx_http_upstream_cleanup(void *data)
     ngx_http_upstream_finalize_request(r, r->upstream, NGX_DONE);
 }
 
-
+#if (T_UPSTREAM_DYNAMIC_DNS)
 void
+#else
+static void
+#endif
 ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc)
 {
@@ -4047,10 +4067,12 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         u->resolved->ctx = NULL;
     }
 
+#if (T_UPSTREAM_DYNAMIC_DNS)
     if (u->dyn_resolve_ctx) {
         ngx_resolve_name_done(u->dyn_resolve_ctx);
         u->dyn_resolve_ctx = NULL;
     }
+#endif
 
     if (u->state && u->state->response_sec) {
         tp = ngx_timeofday();
@@ -5612,7 +5634,9 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->name = u.url;
     us->addrs = u.addrs;
     us->naddrs = u.naddrs;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     us->host = u.host;
+#endif
     us->weight = weight;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;

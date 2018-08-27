@@ -315,7 +315,9 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = best->sockaddr;
     pc->socklen = best->socklen;
     pc->name = &best->name;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     pc->host = &best->host;
+#endif
 
     lcp->rrp.current = p;
 

@@ -254,7 +254,9 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     pc->host = &peer->host;
+#endif
 
     if (now - peer->checked > peer->fail_timeout) {
         peer->checked = now;

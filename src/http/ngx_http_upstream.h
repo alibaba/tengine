@@ -105,7 +105,9 @@ typedef struct {
     ngx_uint_t                       max_fails;
     time_t                           fail_timeout;
     ngx_str_t                        id;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     ngx_str_t                        host;
+#endif
 
     unsigned                         down:1;
     unsigned                         backup:1;
@@ -334,7 +336,9 @@ struct ngx_http_upstream_s {
     ngx_http_upstream_headers_in_t   headers_in;
 
     ngx_http_upstream_resolved_t    *resolved;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     ngx_resolver_ctx_t              *dyn_resolve_ctx;
+#endif
 
     ngx_buf_t                        from_client;
 

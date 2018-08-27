@@ -20,7 +20,9 @@ typedef struct {
     ngx_str_t                       name;
     ngx_str_t                       server;
     ngx_str_t                       id;
+#if (T_UPSTREAM_DYNAMIC_DNS)
     ngx_str_t                       host;
+#endif
 
     ngx_int_t                       current_weight;
     ngx_int_t                       effective_weight;
