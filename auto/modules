@@ -968,3 +968,5 @@ have=T_NGX_VARS . auto/have
 have=T_NGX_HTTP_STUB_STATUS . auto/have
 have=T_UPSTREAM_TRIES  . auto/have
 have=T_GEO . auto/have
+have=T_NGX_RET_CACHE  . auto/have
+
