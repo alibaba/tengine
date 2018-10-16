@@ -12,7 +12,10 @@
 
 typedef struct {
     ngx_uint_t                         max_cached;
+
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
     ngx_msec_t                         keepalive_timeout;
+#endif
 
     ngx_queue_t                        cache;
     ngx_queue_t                        free;
@@ -75,8 +78,11 @@ static void ngx_http_upstream_keepalive_save_session(ngx_peer_connection_t *pc,
 static void *ngx_http_upstream_keepalive_create_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
 static char *ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
+#endif
 
 
 static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
@@ -88,12 +94,16 @@ static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
       0,
       NULL },
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
+
     { ngx_string("keepalive_timeout"),
       NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
       ngx_http_upstream_keepalive_timeout,
       0,
       0,
       NULL },
+
+#endif
 
       ngx_null_command
 };
@@ -264,9 +274,12 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
             c->write->log = pc->log;
             c->pool->log = pc->log;
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
+
             if (c->read->timer_set) {
                 ngx_del_timer(c->read);
             }
+#endif
 
             pc->connection = c;
             pc->cached = 1;
@@ -348,11 +361,15 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
         ngx_del_timer(c->write);
     }
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
+
     if (kp->conf->keepalive_timeout != NGX_CONF_UNSET_MSEC &&
         kp->conf->keepalive_timeout != 0)
     {
         ngx_add_timer(c->read, kp->conf->keepalive_timeout);
     }
+
+#endif
 
     c->write->handler = ngx_http_upstream_keepalive_dummy_handler;
     c->read->handler = ngx_http_upstream_keepalive_close_handler;
@@ -404,11 +421,13 @@ ngx_http_upstream_keepalive_close_handler(ngx_event_t *ev)
         goto close;
     }
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
     if (c->read->timedout) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0,
                        "keepalive max idle timeout");
         goto close;
     }
+#endif
 
     n = recv(c->fd, buf, 1, MSG_PEEK);
 
@@ -499,7 +518,10 @@ ngx_http_upstream_keepalive_create_conf(ngx_conf_t *cf)
      */
 
     conf->max_cached = 1;
+
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
     conf->keepalive_timeout = NGX_CONF_UNSET_MSEC;
+#endif
 
     return conf;
 }
@@ -564,6 +586,8 @@ invalid:
 }
 
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
+
 static char *
 ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)
@@ -595,3 +619,4 @@ ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
+#endif

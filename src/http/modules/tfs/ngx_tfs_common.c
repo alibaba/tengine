@@ -891,11 +891,15 @@ ngx_http_tfs_get_request_time(ngx_http_tfs_t *t)
 {
     ngx_time_t                *tp;
     ngx_msec_int_t             ms;
-    struct timeval             tv;
     ngx_http_request_t        *r;
+#if (T_NGX_RET_CACHE)
+    struct timeval             tv;
     ngx_http_core_loc_conf_t  *clcf;
+#endif
 
     r = t->data;
+
+#if (T_NGX_RET_CACHE)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     if (clcf->request_time_cache) {
         tp = ngx_timeofday();
@@ -906,6 +910,13 @@ ngx_http_tfs_get_request_time(ngx_http_tfs_t *t)
         ms = (tv.tv_sec - r->start_sec) * 1000
                  + (tv.tv_usec / 1000 - r->start_msec);
     }
+
+#else 
+
+    tp = ngx_timeofday();
+    ms = (ngx_msec_int_t)
+             ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));
+#endif
 
     ms = ngx_max(ms, 0);
 

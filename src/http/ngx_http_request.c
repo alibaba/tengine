@@ -538,7 +538,9 @@ ngx_http_create_request(ngx_connection_t *c)
 {
     ngx_pool_t                 *pool;
     ngx_time_t                 *tp;
+#if (T_NGX_RET_CACHE)
     struct timeval              tv;
+#endif
     ngx_http_request_t         *r;
     ngx_http_log_ctx_t         *ctx;
     ngx_http_connection_t      *hc;
@@ -613,8 +615,11 @@ ngx_http_create_request(ngx_connection_t *c)
     r->main = r;
     r->count = 1;
 
+#if (T_UPSTREAM_TRIES)
     r->us_tries = 1;
+#endif
 
+#if (T_NGX_RET_CACHE)
     if (clcf->request_time_cache) {
         tp = ngx_timeofday();
         r->start_sec = tp->sec;
@@ -627,6 +632,12 @@ ngx_http_create_request(ngx_connection_t *c)
         r->start_msec = tv.tv_usec / 1000;
         r->start_usec = tv.tv_usec % 1000;
     }
+
+#else
+    tp = ngx_timeofday();
+    r->start_sec = tp->sec;
+    r->start_msec = tp->msec;
+#endif
 
     r->method = NGX_HTTP_UNKNOWN;
     r->http_version = NGX_HTTP_VERSION_10;

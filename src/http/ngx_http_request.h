@@ -391,7 +391,9 @@ struct ngx_http_request_s {
     time_t                            lingering_time;
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
+#if (T_NGX_RET_CACHE)
     ngx_usec_t                        start_usec;
+#endif
 
     ngx_uint_t                        method;
     ngx_uint_t                        http_version;
@@ -435,7 +437,9 @@ struct ngx_http_request_s {
 
     ngx_uint_t                        err_status;
 
+#if (T_UPSTREAM_TRIES)
     ngx_uint_t                        us_tries;
+#endif
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;

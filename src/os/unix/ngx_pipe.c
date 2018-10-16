@@ -434,6 +434,12 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             close(op->pfd[1]);
         }
     } else {
+
+       /*
+        * Set correct process type since closing listening Unix domain socket
+        * in a master process also removes the Unix domain socket file.
+        */
+        ngx_process = NGX_PROCESS_PIPE;
         ngx_close_listening_sockets(cycle);
 
         if (op->type == 1) {
