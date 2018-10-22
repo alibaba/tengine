@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
+#include <ngx_http_v2_module.h>
+#endif
 
 typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
     ngx_pool_t *pool, ngx_str_t *s);
@@ -357,6 +360,11 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
     { ngx_string("ssl_client_v_remain"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+    { ngx_string("ssl_handshakd_time"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time, NGX_HTTP_VAR_CHANGEABLE, 0 },
+#endif
+
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
 };
 
@@ -378,6 +386,9 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 #endif
 #if (NGX_HTTP_V2)
     ngx_http_connection_t  *hc;
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_http_v2_srv_conf_t *h2scf;
+#endif
 #endif
 #if (NGX_HTTP_V2 || NGX_DEBUG)
     ngx_connection_t       *c;
@@ -396,7 +407,20 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 #if (NGX_HTTP_V2)
     hc = c->data;
 
-    if (hc->addr_conf->http2) {
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
+    if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        (
+#endif
+        hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+        )
+    {
         srv =
            (unsigned char *) NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
         srvlen = sizeof(NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
@@ -440,10 +464,26 @@ ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
 #if (NGX_HTTP_V2)
     {
     ngx_http_connection_t  *hc;
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_http_v2_srv_conf_t *h2scf;
+#endif
 
     hc = c->data;
 
-    if (hc->addr_conf->http2) {
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
+    if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        (
+#endif
+        hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+        )
+    {
         *out =
             (unsigned char *) NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
         *outlen = sizeof(NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;

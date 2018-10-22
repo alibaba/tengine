@@ -9,6 +9,10 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
+#include <ngx_http_v2_module.h>
+#endif
+
 
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
 static void ngx_http_process_request_line(ngx_event_t *rev);
@@ -205,6 +209,10 @@ ngx_http_init_connection(ngx_connection_t *c)
     struct sockaddr_in6    *sin6;
     ngx_http_in6_addr_t    *addr6;
 #endif
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_http_v2_srv_conf_t *h2scf;
+#endif
+
 
     hc = ngx_pcalloc(c->pool, sizeof(ngx_http_connection_t));
     if (hc == NULL) {
@@ -312,8 +320,21 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev->handler = ngx_http_wait_request_handler;
     c->write->handler = ngx_http_empty_handler;
 
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
 #if (NGX_HTTP_V2)
-    if (hc->addr_conf->http2) {
+    if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        (
+#endif
+         hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+         && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+       )
+    {
         rev->handler = ngx_http_v2_init;
     }
 #endif
@@ -656,6 +677,9 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
     ssize_t                   n;
     ngx_err_t                 err;
     ngx_int_t                 rc;
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+    ngx_time_t               *tp;
+#endif
     ngx_connection_t         *c;
     ngx_http_connection_t    *hc;
     ngx_http_ssl_srv_conf_t  *sscf;
@@ -759,6 +783,12 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+            /* ssl handshake start time */
+            tp = ngx_timeofday();
+            c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
+#endif
+
             c->ssl->enable_early_data = sscf->early_data;
 
             rc = ngx_ssl_handshake(c);
@@ -818,9 +848,25 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
         const unsigned char    *data;
         ngx_http_connection_t  *hc;
 
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        ngx_http_v2_srv_conf_t *h2scf;
+#endif
         hc = c->data;
 
-        if (hc->addr_conf->http2) {
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
+        if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+            (
+#endif
+             hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+             && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+           )
+        {
 
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
             SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
