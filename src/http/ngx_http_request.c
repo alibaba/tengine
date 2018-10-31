@@ -1946,7 +1946,8 @@ ngx_http_process_request(ngx_http_request_t *r)
 
     c = r->connection;
 
-#if 0 && (NGX_HTTP_SSL)
+
+#if (NGX_HTTP_SSL && !T_NGX_HTTP_SSL_VCE)
 
     if (r->http_connection->ssl) {
         long                      rc;
