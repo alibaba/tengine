@@ -972,3 +972,4 @@ have=T_NGX_RET_CACHE  . auto/have
 have=T_NGX_HTTP2_SRV_ENABLE . auto/have
 have=T_NGX_HTTP_SSL_HANDSHAKE_TIME . auto/have
 have=T_NGX_HTTP_IMPROVED_IF . auto/have
+have=T_NGX_HTTP_UPSTREAM_RETRY_CC . auto/have

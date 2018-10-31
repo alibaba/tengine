@@ -409,7 +409,9 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_flag_t    client_body_in_single_buffer;
                                            /* client_body_in_singe_buffer */
+#if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
     ngx_flag_t    retry_cached_connection;
+#endif
     ngx_flag_t    internal;                /* internal */
     ngx_flag_t    sendfile;                /* sendfile */
     ngx_flag_t    aio;                     /* aio */
