@@ -106,6 +106,7 @@ static ngx_resolver_node_t *ngx_resolver_lookup_addr6(ngx_resolver_t *r,
 #endif
 
 
+#if (T_NGX_RESOLVER_FILE)
 static ngx_int_t
 ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
     ngx_str_t **names, ngx_uint_t *num)
@@ -242,6 +243,7 @@ ngx_resolver_read_resolv_file(ngx_conf_t *cf, ngx_str_t *filename, ngx_str_t **n
 
     return rc;
 }
+#endif
 
 
 ngx_resolver_t *
@@ -254,7 +256,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     ngx_pool_cleanup_t    *cln;
     ngx_udp_connection_t  *uc;
 
-#ifdef NGX_RESOLVER_FILE
+#if (T_NGX_RESOLVER_FILE)
     ngx_str_t default_file = ngx_string(NGX_RESOLVER_FILE);
 #endif
 
@@ -312,7 +314,7 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     r->log = &cf->cycle->new_log;
     r->log_level = NGX_LOG_ERR;
 
-#ifdef NGX_RESOLVER_FILE
+#if (T_NGX_RESOLVER_FILE)
     if (names == NULL) {
         if (ngx_resolver_read_resolv_file(cf, &default_file, &names, &n) != NGX_OK) {
             return NULL;
