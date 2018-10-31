@@ -209,7 +209,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     struct sockaddr_in6    *sin6;
     ngx_http_in6_addr_t    *addr6;
 #endif
-#if (T_NGX_HTTP2_SRV_ENABLE)
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
     ngx_http_v2_srv_conf_t *h2scf;
 #endif
 
@@ -320,7 +320,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev->handler = ngx_http_wait_request_handler;
     c->write->handler = ngx_http_empty_handler;
 
-#if (T_NGX_HTTP2_SRV_ENABLE)
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 #endif
 
