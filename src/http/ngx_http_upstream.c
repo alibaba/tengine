@@ -8,7 +8,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 #include <ngx_md5.h>
+#endif
 
 
 #if (NGX_HTTP_CACHE)
@@ -168,7 +170,9 @@ static ngx_addr_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
 static void *ngx_http_upstream_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf);
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 static ngx_int_t ngx_http_upstream_init_process(ngx_cycle_t *cycle);
+#endif
 
 #if (NGX_HTTP_SSL)
 static void ngx_http_upstream_ssl_init_connection(ngx_http_request_t *,
@@ -358,7 +362,11 @@ ngx_module_t  ngx_http_upstream_module = {
     NGX_HTTP_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
     ngx_http_upstream_init_process,        /* init process */
+#else
+    NULL,                                  /* init process */
+#endif
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -6320,6 +6328,7 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 }
 
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 static ngx_int_t
 ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 {
@@ -6363,3 +6372,4 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 
     return NGX_OK;
 }
+#endif
