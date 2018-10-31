@@ -508,7 +508,9 @@ struct ngx_http_request_s {
      */
     unsigned                          limit_conn_set:1;
     unsigned                          limit_req_set:1;
+#if (T_NGX_HTTP_SYSGUARD)
     unsigned                          sysguard_set:1;
+#endif
 
 #if 0
     unsigned                          cacheable:1;
