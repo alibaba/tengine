@@ -1439,6 +1439,7 @@ ngx_http_script_equal_code(ngx_http_script_engine_t *e)
 }
 
 
+#if (T_NGX_HTTP_IMPROVED_IF)
 void
 ngx_http_script_greater_code(ngx_http_script_engine_t *e)
 {
@@ -1593,6 +1594,7 @@ ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e)
 
     *res = ngx_http_variable_null_value;
 }
+#endif
 
 
 void
