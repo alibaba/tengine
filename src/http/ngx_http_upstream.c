@@ -5789,7 +5789,9 @@ not_found:
             uscf = uscfp[i];
 
             ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
+#if (T_NGX_IMPROVED_LIST)
             ngx_list_delete(&umcf->implicit_upstreams, &uscfp[i]);
+#endif
 
             return uscf;
 
