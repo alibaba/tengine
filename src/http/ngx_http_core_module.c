@@ -78,8 +78,10 @@ static char *ngx_http_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_core_resolver_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
+#if (T_NGX_SERVER_INFO)
 static char *ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#endif
 #if (NGX_HTTP_GZIP)
 static ngx_int_t ngx_http_gzip_accept_encoding(ngx_str_t *ae);
 static ngx_uint_t ngx_http_gzip_quantity(u_char *p, u_char *last);
@@ -656,12 +658,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, server_tokens),
       NULL },
 
+#if (T_NGX_SERVER_INFO)
     { ngx_string("server_tag"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_set_server_tag,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
+#endif
 
     { ngx_string("if_modified_since"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -786,6 +790,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       offsetof(ngx_http_core_loc_conf_t, resolver_timeout),
       NULL },
 
+#if (T_NGX_SERVER_INFO)
     { ngx_string("server_admin"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -799,6 +804,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_core_loc_conf_t, server_info),
       NULL },
+#endif
 
 #if (NGX_HTTP_GZIP)
 
@@ -3732,7 +3738,9 @@ ngx_http_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_bufs_value(conf->large_client_header_buffers,
                               prev->large_client_header_buffers,
                               4, 8192);
+#if (T_NGX_SERVER_INFO)
     ngx_conf_merge_str_value(conf->server_admin, prev->server_admin, "");
+#endif
 
     if (conf->large_client_header_buffers.size < conf->connection_pool_size) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -3865,7 +3873,9 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->log_subrequest = NGX_CONF_UNSET;
     clcf->recursive_error_pages = NGX_CONF_UNSET;
     clcf->server_tokens = NGX_CONF_UNSET;
+#if (T_NGX_SERVER_INFO)
     clcf->server_info = NGX_CONF_UNSET;
+#endif
 #if (T_NGX_RET_CACHE)
     clcf->request_time_cache = NGX_CONF_UNSET;
 #endif
@@ -3880,7 +3890,9 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
     clcf->open_file_cache_errors = NGX_CONF_UNSET;
     clcf->open_file_cache_events = NGX_CONF_UNSET;
 
+#if (T_NGX_SERVER_INFO)
     clcf->server_tag_type = NGX_CONF_UNSET_UINT;
+#endif
 
 #if (NGX_HTTP_GZIP)
     clcf->gzip_vary = NGX_CONF_UNSET;
@@ -4085,11 +4097,13 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->default_type,
                               prev->default_type, "text/plain");
 
+#if (T_NGX_SERVER_INFO)
     ngx_conf_merge_uint_value(conf->server_tag_type, prev->server_tag_type,
                               NGX_HTTP_SERVER_TAG_ON);
     ngx_conf_merge_str_value(conf->server_tag, prev->server_tag, "");
     ngx_conf_merge_str_value(conf->server_tag_header,
                              prev->server_tag_header, "");
+#endif
 
     ngx_conf_merge_off_value(conf->client_max_body_size,
                               prev->client_max_body_size, 1 * 1024 * 1024);
@@ -4250,7 +4264,9 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->recursive_error_pages,
                               prev->recursive_error_pages, 0);
     ngx_conf_merge_value(conf->server_tokens, prev->server_tokens, 1);
+#if (T_NGX_SERVER_INFO)
     ngx_conf_merge_value(conf->server_info, prev->server_info, 1);
+#endif
     ngx_conf_merge_value(conf->chunked_transfer_encoding,
                               prev->chunked_transfer_encoding, 1);
 #if (T_NGX_RET_CACHE)
@@ -5830,6 +5846,7 @@ ngx_http_core_pool_size(ngx_conf_t *cf, void *post, void *data)
 }
 
 
+#if (T_NGX_SERVER_INFO)
 static char *
 ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -5862,3 +5879,4 @@ ngx_http_set_server_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+#endif
