@@ -30,7 +30,9 @@ volatile ngx_str_t       ngx_cached_http_time;
 volatile ngx_str_t       ngx_cached_http_log_time;
 volatile ngx_str_t       ngx_cached_http_log_iso8601;
 volatile ngx_str_t       ngx_cached_syslog_time;
+#if (T_NGX_RET_CACHE)
 volatile ngx_tm_t       *ngx_cached_tm;
+#endif
 
 #if !(NGX_WIN32)
 
@@ -43,7 +45,9 @@ volatile ngx_tm_t       *ngx_cached_tm;
 static ngx_int_t         cached_gmtoff;
 #endif
 
+#if (T_NGX_RET_CACHE)
 static ngx_tm_t          cached_http_log_tm[NGX_TIME_SLOTS];
+#endif
 static ngx_time_t        cached_time[NGX_TIME_SLOTS];
 static u_char            cached_err_log_time[NGX_TIME_SLOTS]
                                     [sizeof("1970/09/28 12:00:00")];
@@ -70,7 +74,9 @@ ngx_time_init(void)
     ngx_cached_syslog_time.len = sizeof("Sep 28 12:00:00") - 1;
 
     ngx_cached_time = &cached_time[0];
+#if (T_NGX_RET_CACHE)
     ngx_cached_tm = &cached_http_log_tm[0];
+#endif
 
     ngx_time_update();
 }
@@ -157,7 +163,9 @@ ngx_time_update(void)
 
 #endif
 
+#if (T_NGX_RET_CACHE)
     cached_http_log_tm[slot] = tm;
+#endif
 
     p1 = &cached_err_log_time[slot][0];
 
@@ -193,7 +201,9 @@ ngx_time_update(void)
 
     ngx_memory_barrier();
 
+#if (T_NGX_RET_CACHE)
     ngx_cached_tm = &cached_http_log_tm[slot];
+#endif
     ngx_cached_time = tp;
     ngx_cached_http_time.data = p0;
     ngx_cached_err_log_time.data = p1;
