@@ -501,8 +501,9 @@ extern ngx_atomic_t  *ngx_stat_active;
 extern ngx_atomic_t  *ngx_stat_reading;
 extern ngx_atomic_t  *ngx_stat_writing;
 extern ngx_atomic_t  *ngx_stat_waiting;
+#if (T_NGX_HTTP_STUB_STATUS)
 extern ngx_atomic_t  *ngx_stat_request_time;
-
+#endif
 #endif
 
 
