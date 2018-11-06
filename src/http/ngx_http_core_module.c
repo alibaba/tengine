@@ -2753,19 +2753,26 @@ ngx_http_subrequest(ngx_http_request_t *r,
         tp = ngx_timeofday();
         sr->start_sec = tp->sec;
         sr->start_msec = tp->msec;
+#if (T_NGX_VARS)
         sr->start_usec = tp->usec;
+#endif
 
     } else {
         ngx_gettimeofday(&tv);
         sr->start_sec = tv.tv_sec;
         sr->start_msec = tv.tv_usec / 1000;
+#if (T_NGX_VARS)
         sr->start_usec = tv.tv_usec % 1000;
+#endif
     }
 
 #else
     tp = ngx_timeofday();
     sr->start_sec = tp->sec;
     sr->start_msec = tp->msec;
+#if (T_NGX_VARS)
+    sr->start_usec = tp.usec;
+#endif
 #endif
 
     r->main->count++;

@@ -1181,6 +1181,7 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
         r->uri.data = r->uri_start;
     }
 
+#if (T_NGX_VARS)
     if (r->args_start) {
         r->raw_uri.len = r->args_start - 1 - r->uri_start;
 
@@ -1188,6 +1189,7 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
         r->raw_uri.len = r->uri_end - r->uri_start;
     }
     r->raw_uri.data = r->uri_start;
+#endif
 
     r->unparsed_uri.len = r->uri_end - r->uri_start;
     r->unparsed_uri.data = r->uri_start;

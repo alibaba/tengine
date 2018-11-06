@@ -262,8 +262,10 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("request_uri"), NULL, ngx_http_variable_request,
       offsetof(ngx_http_request_t, unparsed_uri), 0, 0 },
 
+#if (T_NGX_VARS)
     { ngx_string("raw_uri"), NULL, ngx_http_variable_request,
       offsetof(ngx_http_request_t, raw_uri), 0, 0 },
+#endif
 
     { ngx_string("uri"), NULL, ngx_http_variable_request,
       offsetof(ngx_http_request_t, uri),

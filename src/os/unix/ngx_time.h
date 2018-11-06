@@ -17,8 +17,10 @@ typedef ngx_rbtree_key_t      ngx_msec_t;
 #if (T_NGX_RET_CACHE)
 typedef ngx_rbtree_key_t      ngx_usec_t;
 #endif
+#if (T_NGX_VARS)
 typedef ngx_rbtree_key_int_t  ngx_msec_int_t;
 typedef ngx_rbtree_key_int_t  ngx_usec_int_t;
+#endif
 
 typedef struct tm             ngx_tm_t;
 
