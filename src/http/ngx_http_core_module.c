@@ -4218,7 +4218,11 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->keepalive_requests,
                               prev->keepalive_requests, 100);
     ngx_conf_merge_uint_value(conf->lingering_close,
+#if (T_NGX_MODIFY_DEFAULT_VALUE)
                               prev->lingering_close, NGX_HTTP_LINGERING_OFF);
+#else
+                              prev->lingering_close, NGX_HTTP_LINGERING_ON);
+#endif
     ngx_conf_merge_msec_value(conf->lingering_time,
                               prev->lingering_time, 30000);
     ngx_conf_merge_msec_value(conf->lingering_timeout,
@@ -4257,7 +4261,12 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->server_name_in_redirect,
                               prev->server_name_in_redirect, 0);
     ngx_conf_merge_value(conf->port_in_redirect, prev->port_in_redirect, 1);
-    ngx_conf_merge_value(conf->msie_padding, prev->msie_padding, 0);
+    ngx_conf_merge_value(conf->msie_padding, prev->msie_padding,
+#if (T_NGX_MODIFY_DEFAULT_VALUE)
+                         0);
+#else 
+                         1);
+#endif
     ngx_conf_merge_value(conf->msie_refresh, prev->msie_refresh, 0);
     ngx_conf_merge_value(conf->log_not_found, prev->log_not_found, 1);
     ngx_conf_merge_value(conf->log_subrequest, prev->log_subrequest, 0);
