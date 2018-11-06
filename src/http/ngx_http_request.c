@@ -495,7 +495,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     }
 
     b->last += n;
+#if (T_NGX_REQ_STATUS)
     c->received += n;
+#endif
 
     if (hc->proxy_protocol) {
         hc->proxy_protocol = 0;
@@ -1523,7 +1525,9 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
+#if (T_NGX_REQ_STATUS)
     c->received += n;
+#endif
 
     return n;
 }
@@ -3035,8 +3039,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
         c->sent = 0;
 
+#if (T_NGX_REQ_STATUS)
         /* bytes in the buffer have already been counted */
         c->received = 0;
+#endif
 
         c->destroyed = 0;
 
@@ -3298,7 +3304,9 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     }
 
     c->sent = 0;
+#if (T_NGX_REQ_STATUS)
     c->received = n;
+#endif
     c->destroyed = 0;
 
     ngx_del_timer(rev);
@@ -3398,7 +3406,9 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
             return;
         }
 
+#if (T_NGX_REQ_STATUS)
         c->received += n;
+#endif
 
     } while (rev->ready);
 
