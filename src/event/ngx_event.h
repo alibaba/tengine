@@ -215,6 +215,11 @@ typedef struct {
 
 
 extern ngx_event_actions_t   ngx_event_actions;
+#if (T_NGX_ACCEPT_FILTER)
+typedef ngx_int_t (*ngx_event_accept_filter_pt) (ngx_connection_t *c);
+void ngx_close_accepted_connection(ngx_connection_t *c);
+extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
+#endif
 
 
 /*
