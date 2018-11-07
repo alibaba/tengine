@@ -9,7 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <nginx.h>
+#if (T_NGX_VARS)
 #include <ngx_md5.h>
+#endif
 #include <ctype.h>
 
 
@@ -47,6 +49,7 @@ static ngx_int_t ngx_http_variable_sent_cookie(ngx_http_request_t *r,
 #endif
 static ngx_int_t ngx_http_variable_argument(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#if (T_NGX_VARS)
 static ngx_int_t ngx_http_variable_decode_base64(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_md5(ngx_http_request_t *r,
@@ -55,6 +58,7 @@ static ngx_int_t ngx_http_variable_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_ascii(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+#endif
 
 
 #if (NGX_HAVE_TCP_INFO)
@@ -745,7 +749,6 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
         return NULL;
     }
-#endif
 
     if (ngx_strncmp(name->data, "base64_decode_", 14) == 0) {
 
@@ -783,6 +786,7 @@ ngx_http_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_uint_t key)
 
         return NULL;
     }
+#endif
 
     vv->not_found = 1;
 
@@ -1235,6 +1239,7 @@ ngx_http_variable_argument(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 }
 
 
+#if (T_NGX_VARS)
 static ngx_int_t
 ngx_http_variable_decode_base64(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
@@ -1456,6 +1461,7 @@ ngx_http_variable_ascii(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+#endif
 
 
 #if (NGX_HAVE_TCP_INFO)
@@ -3483,7 +3489,6 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
             continue;
         }
-#endif
 
         if (ngx_strncmp(v[i].name.data, "base64_decode_", 14) == 0) {
             v[i].get_handler = ngx_http_variable_decode_base64;
@@ -3512,6 +3517,7 @@ ngx_http_variables_init_vars(ngx_conf_t *cf)
 
             continue;
         }
+#endif
 
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                       "unknown \"%V\" variable", &v[i].name);
