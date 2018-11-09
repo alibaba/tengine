@@ -185,6 +185,15 @@ static ngx_command_t  ngx_http_v2_commands[] = {
       0,
       NULL },
 
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    { ngx_string("http2"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_v2_srv_conf_t, enable),
+      NULL },
+#endif
+
       ngx_null_command
 };
 
@@ -341,6 +350,10 @@ ngx_http_v2_create_srv_conf(ngx_conf_t *cf)
     h2scf->recv_timeout = NGX_CONF_UNSET_MSEC;
     h2scf->idle_timeout = NGX_CONF_UNSET_MSEC;
 
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf->enable = NGX_CONF_UNSET;
+#endif
+
     return h2scf;
 }
 
@@ -371,6 +384,12 @@ ngx_http_v2_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->recv_timeout, 30000);
     ngx_conf_merge_msec_value(conf->idle_timeout,
                               prev->idle_timeout, 180000);
+
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    if (conf->enable == NGX_CONF_UNSET) {
+        conf->enable = prev->enable;
+    }
+#endif
 
     return NGX_CONF_OK;
 }
