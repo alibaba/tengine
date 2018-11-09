@@ -677,6 +677,7 @@ ngx_http_v2_handle_connection(ngx_http_v2_connection_t *h2c)
 
     h2c->pool = NULL;
     h2c->free_frames = NULL;
+    h2c->frames = 0;
     h2c->free_fake_connections = NULL;
 
 #if (NGX_HTTP_SSL)
@@ -1991,6 +1992,14 @@ ngx_http_v2_state_settings(ngx_http_v2_connection_t *h2c, u_char *pos,
         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_SIZE_ERROR);
     }
 
+    h2c->frames++;
+    if (h2c->frames >= 10000) {
+        ngx_log_error(NGX_LOG_ERR, h2c->connection->log, 0,
+                      "http2 flood detected");
+
+        h2c->connection->error = 1;
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_INTERNAL_ERROR);
+    }
     ngx_http_v2_send_settings(h2c, 1);
 
     return ngx_http_v2_state_settings_params(h2c, pos, end);
@@ -2658,7 +2667,7 @@ ngx_http_v2_get_frame(ngx_http_v2_connection_t *h2c, size_t length,
 
         frame->blocked = 0;
 
-    } else {
+    } else if (h2c->frames < 10000) {
         pool = h2c->pool ? h2c->pool : h2c->connection->pool;
 
         frame = ngx_pcalloc(pool, sizeof(ngx_http_v2_out_frame_t));
@@ -2682,6 +2691,15 @@ ngx_http_v2_get_frame(ngx_http_v2_connection_t *h2c, size_t length,
         frame->last = frame->first;
 
         frame->handler = ngx_http_v2_frame_handler;
+
+        h2c->frames++;
+
+    } else {
+        ngx_log_error(NGX_LOG_ERR, h2c->connection->log, 0,
+                      "http2 flood detected");
+
+        h2c->connection->error = 1;
+        return NULL;
     }
 
 #if (NGX_DEBUG)
@@ -4207,11 +4225,19 @@ ngx_http_v2_idle_handler(ngx_event_t *rev)
 
 #endif
 
-    c->destroyed = 0;
-    ngx_reusable_connection(c, 0);
-
     h2scf = ngx_http_get_module_srv_conf(h2c->http_connection->conf_ctx,
                                          ngx_http_v2_module);
+
+    if (h2c->idle++ > 10000) {
+        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                      "http2 flood detected");
+        ngx_http_v2_finalize_connection(h2c, NGX_HTTP_V2_NO_ERROR);
+        return;
+    }
+
+    c->destroyed = 0;
+    c->idle = 0;
+    ngx_reusable_connection(c, 0);
 
     h2c->pool = ngx_create_pool(h2scf->pool_size, h2c->connection->log);
     if (h2c->pool == NULL) {
