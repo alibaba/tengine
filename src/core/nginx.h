@@ -20,8 +20,8 @@
 #endif
 
 #define TENGINE            "Tengine"
-#define tengine_version    2002002
-#define TENGINE_VERSION    "2.2.2"
+#define tengine_version    2002003
+#define TENGINE_VERSION    "2.2.3"
 #define TENGINE_VER        TENGINE "/" TENGINE_VERSION
 
 #define NGINX_VAR          "NGINX"
