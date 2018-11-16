@@ -890,7 +890,8 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     rate = 1;
     scale = 1;
     name.len = 0;
-    rate_var.var.len = 0;
+
+    memset(&rate_var, 0x0, sizeof(rate_var));
 
     variables = ngx_array_create(cf->pool, 5,
                                  sizeof(ngx_http_limit_req_variable_t));
