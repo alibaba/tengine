@@ -969,5 +969,7 @@ have=T_NGX_HTTP_STUB_STATUS . auto/have
 have=T_UPSTREAM_TRIES  . auto/have
 have=T_GEO . auto/have
 have=T_NGX_RET_CACHE  . auto/have
-have=T_NGX_HTTP2_SRV_ENABLE . auto/have
+if [ $HTTP_V2 = YES ]; then
+    have=T_NGX_HTTP2_SRV_ENABLE . auto/have
+fi
 have=T_NGX_HTTP_SSL_HANDSHAKE_TIME . auto/have
