@@ -274,9 +274,12 @@ ngx_http_upstream_get_keepalive_peer(ngx_peer_connection_t *pc, void *data)
             c->write->log = pc->log;
             c->pool->log = pc->log;
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
+
             if (c->read->timer_set) {
                 ngx_del_timer(c->read);
             }
+#endif
 
             pc->connection = c;
             pc->cached = 1;
@@ -418,11 +421,13 @@ ngx_http_upstream_keepalive_close_handler(ngx_event_t *ev)
         goto close;
     }
 
+#if (T_UPSTREAM_KEEPALIVE_TIMEOUT)
     if (c->read->timedout) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ev->log, 0,
                        "keepalive max idle timeout");
         goto close;
     }
+#endif
 
     n = recv(c->fd, buf, 1, MSG_PEEK);
 

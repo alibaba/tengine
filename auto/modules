@@ -971,4 +971,5 @@ have=T_GEO . auto/have
 have=T_NGX_RET_CACHE  . auto/have
 have=T_LIMIT_REQ  . auto/have
 have=T_LIMIT_REQ_RATE_VAR  . auto/have
-
+have=T_NGX_HTTP2_SRV_ENABLE . auto/have
+have=T_NGX_HTTP_SSL_HANDSHAKE_TIME . auto/have
