@@ -33,14 +33,14 @@ typedef struct {
 
 static ngx_command_t  ngx_errlog_commands[] = {
 
-    {ngx_string("error_log"),
-     NGX_MAIN_CONF|NGX_CONF_1MORE,
-     ngx_error_log,
-     0,
-     0,
-     NULL},
+    { ngx_string("error_log"),
+      NGX_MAIN_CONF|NGX_CONF_1MORE,
+      ngx_error_log,
+      0,
+      0,
+      NULL },
 
-    ngx_null_command
+      ngx_null_command
 };
 
 
@@ -86,7 +86,7 @@ static ngx_str_t err_levels[] = {
 
 static const char *debug_levels[] = {
     "debug_core", "debug_alloc", "debug_mutex", "debug_event",
-    "debug_http", "debug_mail", "debug_mysql"
+    "debug_http", "debug_mail", "debug_stream"
 };
 
 
@@ -379,7 +379,7 @@ ngx_log_init(u_char *prefix)
                                     NGX_FILE_CREATE_OR_OPEN,
                                     NGX_FILE_DEFAULT_ACCESS);
 
-    if (ngx_log_file.fd == NGX_INVALID_FILE && !ngx_dump_config) {
+    if (ngx_log_file.fd == NGX_INVALID_FILE) {
         ngx_log_stderr(ngx_errno,
                        "[alert] could not open error log file: "
                        ngx_open_file_n " \"%s\" failed", name);
@@ -585,7 +585,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
             return NGX_CONF_ERROR;
         }
 
-     } else if (ngx_strncmp(value[1].data, "memory:", 7) == 0) {
+    } else if (ngx_strncmp(value[1].data, "memory:", 7) == 0) {
 
 #if (NGX_DEBUG)
         size_t                 size, needed;
@@ -609,7 +609,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
             return NGX_CONF_ERROR;
         }
 
-        buf = ngx_palloc(cf->pool, sizeof(ngx_log_memory_buf_t));
+        buf = ngx_pcalloc(cf->pool, sizeof(ngx_log_memory_buf_t));
         if (buf == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -644,7 +644,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         return NGX_CONF_ERROR;
 #endif
 
-     } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) {
+    } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) {
         peer = ngx_pcalloc(cf->pool, sizeof(ngx_syslog_peer_t));
         if (peer == NULL) {
             return NGX_CONF_ERROR;
@@ -656,35 +656,6 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
         new_log->writer = ngx_syslog_writer;
         new_log->wdata = peer;
-
-#if (T_PIPES) && !(NGX_WIN32)
-    } else if (ngx_strncmp(value[1].data, "pipe:", 5) == 0) {
-
-        if (value[1].len == 5) {
-            return NGX_CONF_ERROR;
-        }
-
-        value[1].len -= 5;
-        value[1].data += 5;
-
-        ngx_open_pipe_t *pipe_conf = ngx_conf_open_pipe(cf->cycle, &value[1], "w");
-        if (pipe_conf == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        new_log->file = pipe_conf->open_fd;
-
-#ifdef LOG_PIPE_NEED_BACKUP
-        if (new_log->file != NULL) {
-            name = ngx_log_error_backup;
-            if (ngx_conf_full_name(cf->cycle, &name, 0) != NGX_OK) {
-                return "fail to set backup";
-            }
-
-            new_log->file->name = name;
-        }
-#endif
-#endif
 
     } else {
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);

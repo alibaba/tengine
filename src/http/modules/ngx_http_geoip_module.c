@@ -20,9 +20,6 @@
 
 typedef struct {
     GeoIP        *country;
-#if (T_GEO)
-    GeoIP        *region;
-#endif
     GeoIP        *org;
     GeoIP        *city;
     ngx_array_t  *proxies;    /* array of ngx_cidr_t */
@@ -69,10 +66,6 @@ ngx_http_geoip_variable_handler_v6_pt ngx_http_geoip_country_v6_functions[] = {
 
 static ngx_int_t ngx_http_geoip_country_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
-#if (T_GEO)
-static ngx_int_t ngx_http_geoip_region_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-#endif
 static ngx_int_t ngx_http_geoip_org_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_geoip_city_variable(ngx_http_request_t *r,
@@ -90,10 +83,6 @@ static void *ngx_http_geoip_create_conf(ngx_conf_t *cf);
 static char *ngx_http_geoip_init_conf(ngx_conf_t *cf, void *conf);
 static char *ngx_http_geoip_country(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-#if (T_GEO)
-static char *ngx_http_geoip_region(ngx_conf_t *cf, ngx_command_t *cmd,
-    void *conf);
-#endif
 static char *ngx_http_geoip_org(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_geoip_city(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -113,15 +102,6 @@ static ngx_command_t  ngx_http_geoip_commands[] = {
       NGX_HTTP_MAIN_CONF_OFFSET,
       0,
       NULL },
-
-#if (T_GEO)
-    { ngx_string("geoip_region"),
-      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE12,
-      ngx_http_geoip_region,
-      NGX_HTTP_MAIN_CONF_OFFSET,
-      0,
-      NULL },
-#endif
 
     { ngx_string("geoip_org"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE12,
@@ -200,16 +180,6 @@ static ngx_http_variable_t  ngx_http_geoip_vars[] = {
       ngx_http_geoip_country_variable,
       NGX_GEOIP_COUNTRY_NAME, 0, 0 },
 
-#if (T_GEO)
-    { ngx_string("geoip_region_country_code"), NULL,
-      ngx_http_geoip_region_variable,
-      offsetof(GeoIPRegion, country_code), 0, 0 },
-
-    { ngx_string("geoip_region_region"), NULL,
-      ngx_http_geoip_region_variable,
-      offsetof(GeoIPRegion, region), 0, 0 },
-#endif
-
     { ngx_string("geoip_org"), NULL,
       ngx_http_geoip_org_variable,
       0, 0, 0 },
@@ -262,7 +232,7 @@ static ngx_http_variable_t  ngx_http_geoip_vars[] = {
       ngx_http_geoip_city_int_variable,
       offsetof(GeoIPRecord, area_code), 0, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_http_null_variable
 };
 
 
@@ -467,65 +437,6 @@ not_found:
 
     return NGX_OK;
 }
-
-
-#if (T_GEO)
-static ngx_int_t
-ngx_http_geoip_region_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    char         *val;
-    size_t        len;
-    GeoIPRegion  *gr;
-
-    ngx_http_geoip_conf_t  *gcf;
-
-    gcf = ngx_http_get_module_main_conf(r, ngx_http_geoip_module);
-
-    if (gcf->region == NULL) {
-        goto not_found;
-    }
-
-    gr = GeoIP_region_by_ipnum(gcf->region, ngx_http_geoip_addr(r, gcf));
-
-    if (gr == NULL) {
-        goto not_found;
-    }
-
-    val = (char *) gr + data;
-    if (val == NULL) {
-        goto no_value;
-    }
-
-    len = ngx_strlen(val);
-    v->data = ngx_pnalloc(r->pool, len);
-    if (v->data == NULL) {
-        GeoIPRegion_delete(gr);
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, val, len);
-
-    v->len = len;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    GeoIPRegion_delete(gr);
-
-    return NGX_OK;
-
-no_value:
-
-    GeoIPRegion_delete(gr);
-
-not_found:
-
-    v->not_found = 1;
-
-    return NGX_OK;
-}
-#endif
 
 
 static ngx_int_t
@@ -817,54 +728,6 @@ ngx_http_geoip_country(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-#if (T_GEO)
-static char *
-ngx_http_geoip_region(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_http_geoip_conf_t  *gcf = conf;
-
-    ngx_str_t  *value;
-
-    if (gcf->region) {
-        return "is duplicate";
-    }
-
-    value = cf->args->elts;
-
-    gcf->region = GeoIP_open((char *) value[1].data, GEOIP_MEMORY_CACHE);
-
-    if (gcf->region == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "GeoIP_open(\"%V\") failed", &value[1]);
-
-        return NGX_CONF_ERROR;
-    }
-
-    if (cf->args->nelts == 3) {
-        if (ngx_strcmp(value[2].data, "utf8") == 0) {
-            GeoIP_set_charset (gcf->region, GEOIP_CHARSET_UTF8);
-
-        } else {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid parameter \"%V\"", &value[2]);
-            return NGX_CONF_ERROR;
-        }
-    }
-
-    switch (gcf->region->databaseType) {
-        case GEOIP_REGION_EDITION_REV0:
-        case GEOIP_REGION_EDITION_REV1:
-            return NGX_CONF_OK;
-    default:
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid GeoIP database \"%V\" type:%d",
-                           &value[1], gcf->region->databaseType);
-        return NGX_CONF_ERROR;
-    }
-}
-#endif
-
-
 static char *
 ngx_http_geoip_org(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -1051,12 +914,6 @@ ngx_http_geoip_cleanup(void *data)
     if (gcf->country) {
         GeoIP_delete(gcf->country);
     }
-
-#if (T_GEO)
-    if (gcf->region) {
-        GeoIP_delete(gcf->region);
-    }
-#endif
 
     if (gcf->org) {
         GeoIP_delete(gcf->org);

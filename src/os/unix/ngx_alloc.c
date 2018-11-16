@@ -46,23 +46,6 @@ ngx_calloc(size_t size, ngx_log_t *log)
 }
 
 
-void *
-ngx_realloc(void *p, size_t size, ngx_log_t *log)
-{
-    void *new;
-
-    new = realloc(p, size);
-    if (new == NULL) {
-        ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
-                      "realloc(%p:%uz) failed", p, size);
-    }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_ALLOC, log, 0, "realloc: %p:%uz", new, size);
-
-    return new;
-}
-
-
 #if (NGX_HAVE_POSIX_MEMALIGN)
 
 void *

@@ -137,6 +137,13 @@ ngx_thread_pool_init(ngx_thread_pool_t *tp, ngx_log_t *log, ngx_pool_t *pool)
         return NGX_ERROR;
     }
 
+    err = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (err) {
+        ngx_log_error(NGX_LOG_ALERT, log, err,
+                      "pthread_attr_setdetachstate() failed");
+        return NGX_ERROR;
+    }
+
 #if 0
     err = pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN);
     if (err) {
@@ -345,6 +352,8 @@ ngx_thread_pool_cycle(void *data)
         *ngx_thread_pool_done.last = task;
         ngx_thread_pool_done.last = &task->next;
 
+        ngx_memory_barrier();
+
         ngx_unlock(&ngx_thread_pool_done_lock);
 
         (void) ngx_notify(ngx_thread_pool_handler);
@@ -365,6 +374,8 @@ ngx_thread_pool_handler(ngx_event_t *ev)
     task = ngx_thread_pool_done.first;
     ngx_thread_pool_done.first = NULL;
     ngx_thread_pool_done.last = &ngx_thread_pool_done.first;
+
+    ngx_memory_barrier();
 
     ngx_unlock(&ngx_thread_pool_done_lock);
 

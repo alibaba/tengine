@@ -109,12 +109,6 @@ void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args);
 ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_http_chunked_t *ctx);
-ngx_int_t ngx_http_chunked_output_filter(ngx_http_request_t *r, ngx_chain_t *in,
-    ngx_chain_t **output, ngx_chain_t **free, ngx_buf_tag_t tag);
-ngx_int_t ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
-    ngx_str_t *value);
-ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
-    ngx_str_t *value);
 
 
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
@@ -133,9 +127,6 @@ void ngx_http_empty_handler(ngx_event_t *wev);
 void ngx_http_request_empty_handler(ngx_http_request_t *r);
 
 
-#define ngx_http_ephemeral(r)  (void *) (&r->uri_start)
-
-
 #define NGX_HTTP_LAST   1
 #define NGX_HTTP_FLUSH  2
 
@@ -152,11 +143,6 @@ ngx_int_t ngx_http_special_response_handler(ngx_http_request_t *r,
 ngx_int_t ngx_http_filter_finalize_request(ngx_http_request_t *r,
     ngx_module_t *m, ngx_int_t error);
 void ngx_http_clean_header(ngx_http_request_t *r);
-
-
-time_t ngx_http_parse_time(u_char *value, size_t len);
-size_t ngx_http_get_time(char *buf, time_t t);
-
 
 
 ngx_int_t ngx_http_discard_request_body(ngx_http_request_t *r);
@@ -185,10 +171,6 @@ extern ngx_str_t  ngx_http_html_default_types[];
 extern ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
 extern ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
 extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
-
-#if (T_NGX_INPUT_BODY_FILTER)
-extern ngx_http_input_body_filter_pt     ngx_http_top_input_body_filter;
-#endif
 
 
 #endif /* _NGX_HTTP_H_INCLUDED_ */

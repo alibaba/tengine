@@ -86,6 +86,20 @@ static ngx_http_v2_header_t  ngx_http_v2_static_table[] = {
      / sizeof(ngx_http_v2_header_t))
 
 
+ngx_str_t *
+ngx_http_v2_get_static_name(ngx_uint_t index)
+{
+    return &ngx_http_v2_static_table[index - 1].name;
+}
+
+
+ngx_str_t *
+ngx_http_v2_get_static_value(ngx_uint_t index)
+{
+    return &ngx_http_v2_static_table[index - 1].value;
+}
+
+
 ngx_int_t
 ngx_http_v2_get_indexed_header(ngx_http_v2_connection_t *h2c, ngx_uint_t index,
     ngx_uint_t name_only)
@@ -102,7 +116,7 @@ ngx_http_v2_get_indexed_header(ngx_http_v2_connection_t *h2c, ngx_uint_t index,
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                    "http2 get indexed %s: %ui",
-                   name_only ? "header" : "header name", index);
+                   name_only ? "name" : "header", index);
 
     index--;
 
@@ -180,7 +194,7 @@ ngx_http_v2_add_header(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_header_t  *entry, **entries;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
-                   "http2 add header to hpack table: \"%V: %V\"",
+                   "http2 table add: \"%V: %V\"",
                    &header->name, &header->value);
 
     if (h2c->hpack.entries == NULL) {
@@ -293,7 +307,7 @@ ngx_http_v2_table_account(ngx_http_v2_connection_t *h2c, size_t size)
     size += 32;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
-                   "http2 hpack table account: %uz free:%uz",
+                   "http2 table account: %uz free:%uz",
                    size, h2c->hpack.free);
 
     if (size <= h2c->hpack.free) {

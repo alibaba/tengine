@@ -17,6 +17,11 @@ ngx_parse_size(ngx_str_t *line)
     ssize_t  size, scale, max;
 
     len = line->len;
+
+    if (len == 0) {
+        return NGX_ERROR;
+    }
+
     unit = line->data[len - 1];
 
     switch (unit) {
@@ -32,13 +37,6 @@ ngx_parse_size(ngx_str_t *line)
         len--;
         max = NGX_MAX_SIZE_T_VALUE / (1024 * 1024);
         scale = 1024 * 1024;
-        break;
-
-    case 'G':
-    case 'g':
-        len--;
-        max = NGX_MAX_SIZE_T_VALUE / (1024 * 1024 * 1024);
-        scale = 1024 * 1024 * 1024;
         break;
 
     default:
@@ -65,6 +63,11 @@ ngx_parse_offset(ngx_str_t *line)
     size_t  len;
 
     len = line->len;
+
+    if (len == 0) {
+        return NGX_ERROR;
+    }
+
     unit = line->data[len - 1];
 
     switch (unit) {
@@ -131,7 +134,6 @@ ngx_parse_time(ngx_str_t *line, ngx_uint_t is_sec)
     cutoff = NGX_MAX_INT_T_VALUE / 10;
     cutlim = NGX_MAX_INT_T_VALUE % 10;
     step = is_sec ? st_start : st_month;
-    scale = is_sec ? 1 : 1000;
 
     p = line->data;
     last = p + line->len;

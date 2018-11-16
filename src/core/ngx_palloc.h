@@ -72,9 +72,6 @@ typedef struct {
 } ngx_pool_cleanup_file_t;
 
 
-void *ngx_alloc(size_t size, ngx_log_t *log);
-void *ngx_calloc(size_t size, ngx_log_t *log);
-
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
 void ngx_destroy_pool(ngx_pool_t *pool);
 void ngx_reset_pool(ngx_pool_t *pool);
@@ -82,7 +79,6 @@ void ngx_reset_pool(ngx_pool_t *pool);
 void *ngx_palloc(ngx_pool_t *pool, size_t size);
 void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
-void *ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size);
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
 ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
 

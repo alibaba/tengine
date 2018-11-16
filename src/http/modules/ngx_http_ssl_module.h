@@ -17,13 +17,10 @@
 typedef struct {
     ngx_flag_t                      enable;
 
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-    ngx_flag_t                      async_enable;
-#endif
-
     ngx_ssl_t                       ssl;
 
     ngx_flag_t                      prefer_server_ciphers;
+    ngx_flag_t                      early_data;
 
     ngx_uint_t                      protocols;
 
@@ -59,15 +56,9 @@ typedef struct {
     ngx_str_t                       stapling_file;
     ngx_str_t                       stapling_responder;
 
-    ngx_flag_t                      early_data;
-
     u_char                         *file;
     ngx_uint_t                      line;
 } ngx_http_ssl_srv_conf_t;
-
-typedef struct {
-    ngx_flag_t                      verify_exception;
-} ngx_http_ssl_loc_conf_t;
 
 
 extern ngx_module_t  ngx_http_ssl_module;

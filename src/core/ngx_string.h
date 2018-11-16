@@ -60,6 +60,8 @@ void ngx_strlow(u_char *dst, u_char *src, size_t n);
 #define ngx_strstr(s1, s2)  strstr((const char *) s1, (const char *) s2)
 #define ngx_strlen(s)       strlen((const char *) s)
 
+size_t ngx_strnlen(u_char *p, size_t n);
+
 #define ngx_strchr(s1, c)   strchr((const char *) s1, (int) c)
 
 static ngx_inline u_char *
@@ -170,7 +172,6 @@ ngx_int_t ngx_dns_strcmp(u_char *s1, u_char *s2);
 ngx_int_t ngx_filename_cmp(u_char *s1, u_char *s2, size_t n);
 
 ngx_int_t ngx_atoi(u_char *line, size_t n);
-long long ngx_atoll(u_char *line, size_t n);
 ngx_int_t ngx_atofp(u_char *line, size_t n, size_t point);
 ssize_t ngx_atosz(u_char *line, size_t n);
 off_t ngx_atoof(u_char *line, size_t n);
@@ -200,11 +201,9 @@ u_char *ngx_utf8_cpystrn(u_char *dst, u_char *src, size_t n, size_t len);
 #define NGX_ESCAPE_REFRESH        4
 #define NGX_ESCAPE_MEMCACHED      5
 #define NGX_ESCAPE_MAIL_AUTH      6
-#define NGX_ESCAPE_WWW_FORM       7
 
 #define NGX_UNESCAPE_URI       1
 #define NGX_UNESCAPE_REDIRECT  2
-#define NGX_UNESCAPE_WWW_FORM  4
 
 uintptr_t ngx_escape_uri(u_char *dst, u_char *src, size_t size,
     ngx_uint_t type);
