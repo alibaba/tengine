@@ -839,9 +839,6 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
     ngx_int_t worker = (intptr_t) data;
 
-    ngx_uint_t         i;
-    ngx_connection_t  *c;
-
     ngx_process = NGX_PROCESS_WORKER;
     ngx_worker = worker;
 
@@ -852,18 +849,6 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
     for ( ;; ) {
 
         if (ngx_exiting) {
-
-            c = cycle->connections;
-
-            for (i = 0; i < cycle->connection_n; i++) {
-
-                /* THREAD: lock */
-
-                if (c[i].fd != -1 && c[i].idle) {
-                    c[i].close = 1;
-                    c[i].read->handler(c[i].read);
-                }
-            }
 
             ngx_event_cancel_timers();
 
@@ -892,8 +877,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             ngx_setproctitle("worker process is shutting down");
 
             if (!ngx_exiting) {
-                ngx_close_listening_sockets(cycle);
                 ngx_exiting = 1;
+                ngx_close_listening_sockets(cycle);
+                ngx_close_idle_connections(cycle);
 
 #if (NGX_FORCE_EXIT)
                 ngx_add_force_exit_timer(cycle);
