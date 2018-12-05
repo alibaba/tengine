@@ -64,6 +64,10 @@ static ngx_int_t ngx_http_variable_content_length(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_host(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_loc_mod(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_loc_name(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_binary_remote_addr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_remote_addr(ngx_http_request_t *r,
@@ -178,11 +182,6 @@ static ngx_int_t ngx_http_variable_second(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_int_t t, ngx_int_t len);
-
-static ngx_int_t ngx_http_variable_loc_mod(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_variable_loc_name(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
 
 
 /*
