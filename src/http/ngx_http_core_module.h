@@ -330,6 +330,7 @@ struct ngx_http_core_loc_conf_s {
 
 #if (NGX_PCRE)
     ngx_http_regex_t  *regex;
+    unsigned          caseless:1;
 #endif
 
     unsigned      noname:1;   /* "if () {}" block or limit_except */

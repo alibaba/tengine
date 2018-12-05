@@ -179,6 +179,11 @@ static ngx_int_t ngx_http_variable_second(ngx_http_request_t *r,
 static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_int_t t, ngx_int_t len);
 
+static ngx_int_t ngx_http_variable_loc_mod(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_loc_name(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+
 
 /*
  * TODO:
@@ -435,6 +440,12 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("tcpinfo_rcv_space"), NULL, ngx_http_variable_tcpinfo,
       3, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 #endif
+
+    { ngx_string("loc_mod"), NULL, ngx_http_variable_loc_mod,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    
+    { ngx_string("loc_name"), NULL, ngx_http_variable_loc_name,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
 };
@@ -3104,6 +3115,91 @@ ngx_http_variable_time_http(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
     v->data = p;
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_variable_loc_mod(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_core_loc_conf_t *clcf;
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->exact_match) {
+
+        v->len = 1;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = (u_char *) "=";
+
+    } else if (clcf->noregex) {
+
+        v->len = 2;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = (u_char *) "^~";
+
+#if (NGX_PCRE)
+    } else if (clcf->regex) {
+
+        if (clcf->caseless) {
+
+            v->len = 2;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+            v->data = (u_char *) "~*";
+
+        } else {
+
+            v->len = 1;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+            v->data = (u_char *) "~";
+
+        }
+
+#endif
+    } else if (clcf->named) {
+
+        v->len = 1;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = (u_char *) "@";
+
+    } else {
+        v->not_found = 1;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_loc_name(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_core_loc_conf_t *clcf;
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+    if (clcf->noname) {
+
+        v->not_found = 1;
+
+    } else {
+
+        v->len = clcf->name.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = clcf->name.data;
+
+    }
 
     return NGX_OK;
 }

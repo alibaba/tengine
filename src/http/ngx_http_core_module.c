@@ -3335,6 +3335,8 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
                 return NGX_CONF_ERROR;
             }
 
+            clcf->caseless = 1;
+
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid location modifier \"%V\"", &value[1]);
@@ -3370,6 +3372,8 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
                 if (ngx_http_core_regex_location(cf, clcf, name, 1) != NGX_OK) {
                     return NGX_CONF_ERROR;
                 }
+
+                clcf->caseless = 1;
 
             } else {
                 if (ngx_http_core_regex_location(cf, clcf, name, 0) != NGX_OK) {
