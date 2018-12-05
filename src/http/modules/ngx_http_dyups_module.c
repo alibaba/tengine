@@ -1384,6 +1384,7 @@ ngx_dyups_add_server(ngx_http_dyups_srv_conf_t *duscf, ngx_buf_t *buf)
     ngx_http_upstream_init_pt            init;
     ngx_http_upstream_srv_conf_t        *uscf;
     ngx_http_dyups_upstream_srv_conf_t  *dscf;
+    ngx_http_upstream_rr_peers_t        *peers, *backup;
 
     uscf = duscf->upstream;
 
@@ -1424,6 +1425,14 @@ ngx_dyups_add_server(ngx_http_dyups_srv_conf_t *duscf, ngx_buf_t *buf)
 
     if (init(&cf, uscf) != NGX_OK) {
         return NGX_ERROR;
+    }
+   
+    /*add init_number initialization*/
+    peers = uscf->peer.data;
+    peers->init_number = ngx_random() % peers->number;
+    backup = peers->next;
+    if (backup) {
+        backup->init_number = ngx_random() % backup->number;
     }
 
     dscf = uscf->srv_conf[ngx_http_dyups_module.ctx_index];
