@@ -22,7 +22,9 @@ typedef struct {
 
 
 static ngx_int_t ngx_http_core_find_location(ngx_http_request_t *r);
+#if (T_NGX_HTTP_IMPROVED_REWRITE)
 static ngx_int_t ngx_http_core_find_named_location(ngx_http_request_t *r);
+#endif
 static ngx_int_t ngx_http_core_find_static_location(ngx_http_request_t *r,
     ngx_http_location_tree_node_t *node);
 
@@ -1674,9 +1676,11 @@ ngx_http_core_find_location(ngx_http_request_t *r)
 
     pclcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+#if (T_NGX_HTTP_IMPROVED_REWRITE)
     if (r->uri.len && r->uri.data[0] == '@') {
         return ngx_http_core_find_named_location(r);
     }
+#endif
 
     rc = ngx_http_core_find_static_location(r, pclcf->static_locations);
 
@@ -1819,6 +1823,7 @@ ngx_http_core_find_static_location(ngx_http_request_t *r,
 }
 
 
+#if (T_NGX_HTTP_IMPROVED_REWRITE)
 static ngx_int_t
 ngx_http_core_find_named_location(ngx_http_request_t *r)
 {
@@ -1853,6 +1858,7 @@ ngx_http_core_find_named_location(ngx_http_request_t *r)
 
     return NGX_DECLINED;
 }
+#endif
 
 
 void *
