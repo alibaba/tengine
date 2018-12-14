@@ -88,7 +88,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peer[n].socklen = server[i].addrs[j].socklen;
                 peer[n].name = server[i].addrs[j].name;
+#if (T_NGX_HTTP_UPSTREAM_ID)
                 peer[n].id = server[i].id;
+#endif                
                 peer[n].weight = server[i].weight;
                 peer[n].effective_weight = server[i].weight;
                 peer[n].current_weight = 0;
@@ -157,7 +159,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peer[n].socklen = server[i].addrs[j].socklen;
                 peer[n].name = server[i].addrs[j].name;
+#if (T_NGX_HTTP_UPSTREAM_ID)
                 peer[n].id = server[i].id;
+#endif
                 peer[n].weight = server[i].weight;
                 peer[n].effective_weight = server[i].weight;
                 peer[n].current_weight = 0;
@@ -231,8 +235,10 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peer[i].sockaddr = u.addrs[i].sockaddr;
         peer[i].socklen = u.addrs[i].socklen;
         peer[i].name = u.addrs[i].name;
+#if (T_NGX_HTTP_UPSTREAM_ID)
         peer[i].id.len = 0;
         peer[i].id.data = NULL;
+#endif
         peer[i].weight = 1;
         peer[i].effective_weight = 1;
         peer[i].current_weight = 0;
@@ -349,8 +355,10 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
         peer[0].sockaddr = ur->sockaddr;
         peer[0].socklen = ur->socklen;
         peer[0].name = ur->host;
+#if (T_NGX_HTTP_UPSTREAM_ID)
         peer[0].id.len = 0;
         peer[0].id.data = NULL;
+#endif
         peer[0].weight = 1;
         peer[0].effective_weight = 1;
         peer[0].current_weight = 0;
@@ -394,8 +402,10 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
             peer[i].socklen = socklen;
             peer[i].name.len = len;
             peer[i].name.data = p;
+#if (T_NGX_HTTP_UPSTREAM_ID)
             peer[i].id.len = 0;
             peer[i].id.data = NULL;
+#endif
             peer[i].weight = 1;
             peer[i].effective_weight = 1;
             peer[i].current_weight = 0;

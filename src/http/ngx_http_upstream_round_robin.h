@@ -19,7 +19,9 @@ typedef struct {
     socklen_t                       socklen;
     ngx_str_t                       name;
     ngx_str_t                       server;
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                       id;
+#endif
     ngx_str_t                       host;
 
     ngx_int_t                       current_weight;
