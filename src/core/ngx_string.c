@@ -926,6 +926,7 @@ ngx_atoi(u_char *line, size_t n)
 }
 
 
+#if (T_NGX_HTTP_IMPROVED_IF)
 long long
 ngx_atoll(u_char *line, size_t n)
 {
@@ -950,6 +951,7 @@ ngx_atoll(u_char *line, size_t n)
         return value;
     }
 }
+#endif
 
 
 /* parse a fixed point number, e.g., ngx_atofp("10.5", 4, 2) returns 1050 */

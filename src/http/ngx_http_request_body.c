@@ -391,6 +391,9 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
             rb->buf->last += n;
             r->request_length += n;
+#if (T_NGX_REQ_STATUS)
+            c->received += n;
+#endif
 
             if (n == rest) {
                 /* pass buffer to request body filter chain */

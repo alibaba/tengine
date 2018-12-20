@@ -215,6 +215,11 @@ typedef struct {
 
 
 extern ngx_event_actions_t   ngx_event_actions;
+#if (T_NGX_ACCEPT_FILTER)
+typedef ngx_int_t (*ngx_event_accept_filter_pt) (ngx_connection_t *c);
+void ngx_close_accepted_connection(ngx_connection_t *c);
+extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
+#endif
 
 
 /*
@@ -501,8 +506,9 @@ extern ngx_atomic_t  *ngx_stat_active;
 extern ngx_atomic_t  *ngx_stat_reading;
 extern ngx_atomic_t  *ngx_stat_writing;
 extern ngx_atomic_t  *ngx_stat_waiting;
+#if (T_NGX_HTTP_STUB_STATUS)
 extern ngx_atomic_t  *ngx_stat_request_time;
-
+#endif
 #endif
 
 

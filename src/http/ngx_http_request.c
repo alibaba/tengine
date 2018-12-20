@@ -209,7 +209,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     struct sockaddr_in6    *sin6;
     ngx_http_in6_addr_t    *addr6;
 #endif
-#if (T_NGX_HTTP2_SRV_ENABLE)
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
     ngx_http_v2_srv_conf_t *h2scf;
 #endif
 
@@ -320,7 +320,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev->handler = ngx_http_wait_request_handler;
     c->write->handler = ngx_http_empty_handler;
 
-#if (T_NGX_HTTP2_SRV_ENABLE)
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 #endif
 
@@ -495,7 +495,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     }
 
     b->last += n;
+#if (T_NGX_REQ_STATUS)
     c->received += n;
+#endif
 
     if (hc->proxy_protocol) {
         hc->proxy_protocol = 0;
@@ -1181,6 +1183,7 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
         r->uri.data = r->uri_start;
     }
 
+#if (T_NGX_VARS)
     if (r->args_start) {
         r->raw_uri.len = r->args_start - 1 - r->uri_start;
 
@@ -1188,6 +1191,7 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
         r->raw_uri.len = r->uri_end - r->uri_start;
     }
     r->raw_uri.data = r->uri_start;
+#endif
 
     r->unparsed_uri.len = r->uri_end - r->uri_start;
     r->unparsed_uri.data = r->uri_start;
@@ -1521,7 +1525,9 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
+#if (T_NGX_REQ_STATUS)
     c->received += n;
+#endif
 
     return n;
 }
@@ -1946,7 +1952,8 @@ ngx_http_process_request(ngx_http_request_t *r)
 
     c = r->connection;
 
-#if 0 && (NGX_HTTP_SSL)
+
+#if (NGX_HTTP_SSL && !T_NGX_HTTP_SSL_VCE)
 
     if (r->http_connection->ssl) {
         long                      rc;
@@ -3032,8 +3039,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 
         c->sent = 0;
 
+#if (T_NGX_REQ_STATUS)
         /* bytes in the buffer have already been counted */
         c->received = 0;
+#endif
 
         c->destroyed = 0;
 
@@ -3295,7 +3304,9 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     }
 
     c->sent = 0;
+#if (T_NGX_REQ_STATUS)
     c->received = n;
+#endif
     c->destroyed = 0;
 
     ngx_del_timer(rev);
@@ -3395,7 +3406,9 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
             return;
         }
 
+#if (T_NGX_REQ_STATUS)
         c->received += n;
+#endif
 
     } while (rev->ready);
 

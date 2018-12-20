@@ -41,7 +41,9 @@ static ngx_int_t ngx_http_ssl_variable(ngx_http_request_t *r,
 
 static ngx_int_t ngx_http_ssl_add_variables(ngx_conf_t *cf);
 static void *ngx_http_ssl_create_srv_conf(ngx_conf_t *cf);
+#if (T_NGX_HTTP_SSL_VCE)
 static void *ngx_http_ssl_create_loc_conf(ngx_conf_t *cf);
+#endif
 static char *ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
@@ -160,12 +162,14 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, verify),
       &ngx_http_ssl_verify },
 
+#if (T_NGX_HTTP_SSL_VCE)
     { ngx_string("ssl_verify_client_exception"),
       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_ssl_loc_conf_t, verify_exception),
       NULL },
+#endif
 
     { ngx_string("ssl_verify_depth"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
@@ -279,7 +283,11 @@ static ngx_http_module_t  ngx_http_ssl_module_ctx = {
     ngx_http_ssl_create_srv_conf,          /* create server configuration */
     ngx_http_ssl_merge_srv_conf,           /* merge server configuration */
 
+#if (T_NGX_HTTP_SSL_VCE)
     ngx_http_ssl_create_loc_conf,          /* create location configuration */
+#else
+    NULL,                                  /* create location configuration */
+#endif
     NULL                                   /* merge location configuration */
 };
 
@@ -632,6 +640,7 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
 }
 
 
+#if (T_NGX_HTTP_SSL_VCE)
 static void *
 ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
 {
@@ -646,6 +655,7 @@ ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
 
     return slcf;
 }
+#endif
 
 
 static char *
