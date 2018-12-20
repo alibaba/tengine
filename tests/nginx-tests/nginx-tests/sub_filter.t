@@ -138,16 +138,11 @@ like(http_get('/single/many?b=AA'), qr/BB/, 'single many begin');
 like(http_get('/single/many?b=CAAC'), qr/CBBC/, 'single many middle');
 like(http_get('/single/many?b=CA'), qr/CB/, 'single many end');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.9.4');
-
 like(http_get('/var/string?a=foo&b=Xfoo'), qr/_replaced/, 'complex string');
 like(http_get('/var/string?a=foo&b=XFOO'), qr/_replaced/,
 	'complex string caseless');
 like(http_get('/var/string?a=abcdefghijklmnopq&b=Xabcdefghijklmnopq'),
 	qr/_replaced/, 'complex string long');
-
-}
 
 like(http_get('/var/replacement?a=ee&b=aaab'), qr/aee_replaced/,
 	'complex replacement');

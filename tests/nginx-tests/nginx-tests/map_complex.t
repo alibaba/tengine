@@ -3,7 +3,7 @@
 # (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
-# Test for sub_filter inheritance from http context.
+# Tests for map module with complex value.
 
 ###############################################################################
 
@@ -22,9 +22,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http sub/);
+my $t = Test::Nginx->new()->has(qw/http map rewrite/);
 
-$t->plan(1)->write_file_expand('nginx.conf', <<'EOF');
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -36,23 +36,36 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    sub_filter foo bar;
+    map $args $x {
+        var      foo:$y;
+        var2     $y:foo;
+        default  foo:$y;
+    }
+
+    map $args $y {
+        default  bar;
+        same     baz;
+    }
 
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
 
-        location / { }
+        location / {
+            add_header X-Foo $x;
+            return 204;
+        }
     }
 }
 
 EOF
 
-$t->write_file('foo.html', 'foo');
-$t->run();
+$t->run()->plan(3);
 
 ###############################################################################
 
-like(http_get('/foo.html'), qr/bar/, 'sub_filter inheritance');
+like(http_get('/?var'), qr/foo:bar/, 'map cv');
+like(http_get('/?var2'), qr/bar:foo/, 'map cv 2');
+like(http_get('/?same'), qr/foo:baz/, 'map cv key');
 
 ###############################################################################

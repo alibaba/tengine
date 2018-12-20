@@ -11,7 +11,7 @@ use strict;
 
 use base qw/ Exporter /;
 
-our @EXPORT = qw/ log_in log_out http http_get http_head /;
+our @EXPORT = qw/ log_in log_out http http_get http_head port /;
 our @EXPORT_OK = qw/ http_gzip_request http_gzip_like http_start http_end /;
 our %EXPORT_TAGS = (
 	gzip => [ qw/ http_gzip_request http_gzip_like / ]
@@ -20,6 +20,7 @@ our %EXPORT_TAGS = (
 ###############################################################################
 
 use File::Path qw/ rmtree /;
+use File::Spec qw//;
 use File::Temp qw/ tempdir /;
 use IO::Socket;
 use POSIX qw/ waitpid WNOHANG /;
@@ -30,6 +31,7 @@ use Test::More qw//;
 
 our $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
 	: '../nginx/objs/nginx';
+our %ports = ();
 
 sub new {
 	my $self = {};
@@ -65,9 +67,26 @@ sub DESTROY {
 	if (Test::More->builder->expected_tests) {
 		local $Test::Nginx::TODO = 'alerts' unless $self->{_alerts};
 
-		my $alerts = $self->read_file('error.log');
-		$alerts = join "\n", $alerts =~ /.+\[alert\].+/gm;
-		Test::More::is($alerts, '', 'no alerts');
+		my @alerts = $self->read_file('error.log') =~ /.+\[alert\].+/gm;
+
+		if ($^O eq 'solaris') {
+			$Test::Nginx::TODO = 'alerts' if @alerts
+				&& ! grep { $_ !~ /phantom event/ } @alerts;
+		}
+		if ($^O eq 'MSWin32') {
+			my $re = qr/CloseHandle|TerminateProcess/;
+			$Test::Nginx::TODO = 'alerts' if @alerts
+				&& ! grep { $_ !~ $re } @alerts;
+		}
+
+		Test::More::is(join("\n", @alerts), '', 'no alerts');
+	}
+
+	if (Test::More->builder->expected_tests) {
+		local $Test::Nginx::TODO;
+		my $errors = $self->read_file('error.log');
+		$errors = join "\n", $errors =~ /.+Sanitizer.+/gm;
+		Test::More::is($errors, '', 'no sanitizer errors');
 	}
 
 	if ($ENV{TEST_NGINX_CATLOG}) {
@@ -101,14 +120,17 @@ sub has_module($) {
 
 	my %regex = (
 		sni	=> 'TLS SNI support enabled',
-		mail	=> '--with-mail(?!\S)',
+		mail	=> '--with-mail((?!\S)|=dynamic)',
 		flv	=> '--with-http_flv_module',
 		perl	=> '--with-http_perl_module',
 		auth_request
 			=> '--with-http_auth_request_module',
+		realip	=> '--with-http_realip_module',
+		sub	=> '--with-http_sub_module',
 		charset	=> '(?s)^(?!.*--without-http_charset_module)',
 		gzip	=> '(?s)^(?!.*--without-http_gzip_module)',
 		ssi	=> '(?s)^(?!.*--without-http_ssi_module)',
+		mirror	=> '(?s)^(?!.*--without-http_mirror_module)',
 		userid	=> '(?s)^(?!.*--without-http_userid_module)',
 		access	=> '(?s)^(?!.*--without-http_access_module)',
 		auth_basic
@@ -123,6 +145,7 @@ sub has_module($) {
 		fastcgi	=> '(?s)^(?!.*--without-http_fastcgi_module)',
 		uwsgi	=> '(?s)^(?!.*--without-http_uwsgi_module)',
 		scgi	=> '(?s)^(?!.*--without-http_scgi_module)',
+		grpc	=> '(?s)^(?!.*--without-http_grpc_module)',
 		memcached
 			=> '(?s)^(?!.*--without-http_memcached_module)',
 		limit_conn
@@ -138,6 +161,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
 		upstream_least_conn
 			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
+		upstream_random
+			=> '(?s)^(?!.*--without-http_upstream_random_module)',
 		upstream_keepalive
 			=> '(?s)^(?!.*--without-http_upstream_keepalive_modu)',
 		upstream_zone
@@ -150,14 +175,27 @@ sub has_module($) {
 		pcre	=> '(?s)^(?!.*--without-pcre)',
 		split_clients
 			=> '(?s)^(?!.*--without-http_split_clients_module)',
-		stream	=> '--with-stream(?!\S)',
-		stream_access => '(?s)^(?!.*--without-stream_access_module)',
+		stream	=> '--with-stream((?!\S)|=dynamic)',
+		stream_access
+			=> '(?s)^(?!.*--without-stream_access_module)',
+		stream_geo
+			=> '(?s)^(?!.*--without-stream_geo_module)',
 		stream_limit_conn
 			=> '(?s)^(?!.*--without-stream_limit_conn_module)',
+		stream_map
+			=> '(?s)^(?!.*--without-stream_map_module)',
+		stream_return
+			=> '(?s)^(?!.*--without-stream_return_module)',
+		stream_split_clients
+			=> '(?s)^(?!.*--without-stream_split_clients_module)',
+		stream_ssl
+			=> '--with-stream_ssl_module',
 		stream_upstream_hash
 			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
 		stream_upstream_least_conn
 			=> '(?s)^(?!.*--without-stream_upstream_least_conn_m)',
+		stream_upstream_random
+			=> '(?s)^(?!.*--without-stream_upstream_random_modul)',
 		stream_upstream_zone
 			=> '(?s)^(?!.*--without-stream_upstream_zone_module)',
 	);
@@ -168,7 +206,28 @@ sub has_module($) {
 	$self->{_configure_args} = `$NGINX -V 2>&1`
 		if !defined $self->{_configure_args};
 
-	return ($self->{_configure_args} =~ $re) ? 1 : 0;
+	return 1 if $self->{_configure_args} =~ $re;
+
+	my %modules = (
+		http_geoip
+			=> 'ngx_http_geoip_module',
+		image_filter
+			=> 'ngx_http_image_filter_module',
+		perl	=> 'ngx_http_perl_module',
+		xslt	=> 'ngx_http_xslt_filter_module',
+		mail	=> 'ngx_mail_module',
+		stream	=> 'ngx_stream_module',
+		stream_geoip
+			=> 'ngx_stream_geoip_module',
+	);
+
+	my $module = $modules{$feature};
+	if (defined $module && defined $ENV{TEST_NGINX_GLOBALS}) {
+		$re = qr/load_module\s+[^;]*\Q$module\E[-\w]*\.so\s*;/;
+		return 1 if $ENV{TEST_NGINX_GLOBALS} =~ $re;
+	}
+
+	return 0;
 }
 
 sub has_feature($) {
@@ -178,11 +237,11 @@ sub has_feature($) {
 		return $^O ne 'MSWin32';
 	}
 
-	if ($feature eq 'shmem') {
-		return $^O ne 'MSWin32' || $self->has_version('1.9.0');
+	if ($feature eq 'unix') {
+		return $^O ne 'MSWin32';
 	}
 
-	if ($feature eq 'unix') {
+	if ($feature eq 'udp') {
 		return $^O ne 'MSWin32';
 	}
 
@@ -213,7 +272,8 @@ sub has_daemon($) {
 	my ($self, $daemon) = @_;
 
 	if ($^O eq 'MSWin32') {
-		Test::More::plan(skip_all => "win32");
+		`for %i in ($daemon.exe) do \@echo | set /p x=%~\$PATH:i`
+			or Test::More::plan(skip_all => "$daemon not found");
 		return $self;
 	}
 
@@ -238,14 +298,26 @@ sub try_run($$) {
 		open STDERR, ">&", \*OLDERR;
 	};
 
-	Test::More::plan(skip_all => $message) if $@;
+	return $self unless $@;
+
+	if ($ENV{TEST_NGINX_VERBOSE}) {
+		my $path = $self->{_configure_args} =~ m!--error-log-path=(\S+)!
+			? $1 : 'logs/error.log';
+		$path = "$self->{_testdir}/$path" if index($path, '/');
+
+		open F, '<', $path or die "Can't open $path: $!";
+		log_core($_) while (<F>);
+		close F;
+	}
+
+	Test::More::plan(skip_all => $message);
 	return $self;
 }
 
 sub plan($) {
 	my ($self, $plan) = @_;
 
-	Test::More::plan(tests => $plan + 1);
+	Test::More::plan(tests => $plan + 2);
 
 	return $self;
 }
@@ -284,8 +356,59 @@ sub run(;$) {
 	$self->waitforfile("$testdir/nginx.pid", $pid)
 		or die "Can't start nginx";
 
+	for (1 .. 50) {
+		last if $^O ne 'MSWin32';
+		last if $self->read_file('error.log') =~ /create thread/;
+		select undef, undef, undef, 0.1;
+	}
+
 	$self->{_started} = 1;
 	return $self;
+}
+
+sub port {
+	my ($num, %opts) = @_;
+	my ($sock, $lock, $port);
+
+	goto done if defined $ports{$num};
+
+	my $socket = sub {
+		IO::Socket::INET->new(
+			Proto => 'tcp',
+			LocalAddr => '127.0.0.1:' . shift,
+			Listen => 1,
+			Reuse => ($^O ne 'MSWin32'),
+		);
+	};
+
+	my $socketl = sub {
+		IO::Socket::INET->new(
+			Proto => 'udp',
+			LocalAddr => '127.0.0.1:' . shift,
+		);
+	};
+
+	($socket, $socketl) = ($socketl, $socket) if $opts{udp};
+
+	$port = $num;
+
+	for (1 .. 10) {
+		$port = int($port / 500) * 500 + int(rand(500)) unless $_ == 1;
+
+		$lock = $socketl->($port) or next;
+		$sock = $socket->($port) and last;
+	}
+
+	die "Port limit exceeded" unless defined $lock and defined $sock;
+
+	$ports{$num} = {
+		port => $port,
+		socket => $lock
+	};
+
+done:
+	return $ports{$num}{socket} if $opts{socket};
+	return $ports{$num}{port};
 }
 
 sub dump_config() {
@@ -338,16 +461,35 @@ sub waitforsocket($) {
 	return undef;
 }
 
+sub reload() {
+	my ($self) = @_;
+
+	return $self unless $self->{_started};
+
+	my $pid = $self->read_file('nginx.pid');
+
+	if ($^O eq 'MSWin32') {
+		my $testdir = $self->{_testdir};
+		my @globals = $self->{_test_globals} ?
+			() : ('-g', "pid $testdir/nginx.pid; "
+			. "error_log $testdir/error.log debug;");
+		system($NGINX, '-p', $testdir, '-c', "nginx.conf",
+			'-s', 'reload', @globals) == 0
+			or die "system() failed: $?\n";
+
+	} else {
+		kill 'HUP', $pid;
+	}
+
+	return $self;
+}
+
 sub stop() {
 	my ($self) = @_;
 
 	return $self unless $self->{_started};
 
-	local $/;
-	open F, '<' . $self->{_testdir} . '/nginx.pid'
-		or die "Can't open nginx.pid: $!";
-	my $pid = <F>;
-	close F;
+	my $pid = $self->read_file('nginx.pid');
 
 	if ($^O eq 'MSWin32') {
 		my $testdir = $self->{_testdir};
@@ -413,6 +555,11 @@ sub write_file_expand($$) {
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
 
+	$content =~ s/127\.0\.0\.1:(8\d\d\d)/'127.0.0.1:' . port($1)/gmse;
+
+	$content =~ s/%%PORT_(\d+)%%/port($1)/gmse;
+	$content =~ s/%%PORT_(\d+)_UDP%%/port($1, udp => 1)/gmse;
+
 	return $self->write_file($name, $content);
 }
 
@@ -457,7 +604,64 @@ sub test_globals() {
 	$s .= $ENV{TEST_NGINX_GLOBALS}
 		if $ENV{TEST_NGINX_GLOBALS};
 
+	$s .= $self->test_globals_modules();
+	$s .= $self->test_globals_perl5lib() if $s !~ /env PERL5LIB/;
+
 	$self->{_test_globals} = $s;
+}
+
+sub test_globals_modules() {
+	my ($self) = @_;
+
+	my $modules = $ENV{TEST_NGINX_MODULES};
+
+	if (!defined $modules) {
+		my ($volume, $dir) = File::Spec->splitpath($NGINX);
+		$modules = File::Spec->catpath($volume, $dir, '');
+	}
+
+	$modules = File::Spec->rel2abs($modules);
+	$modules =~ s!\\!/!g if $^O eq 'MSWin32';
+
+	my $s = '';
+
+	$s .= "load_module $modules/ngx_http_geoip_module.so;\n"
+		if $self->has_module('http_geoip\S+=dynamic');
+
+	$s .= "load_module $modules/ngx_http_image_filter_module.so;\n"
+		if $self->has_module('image_filter\S+=dynamic');
+
+	$s .= "load_module $modules/ngx_http_perl_module.so;\n"
+		if $self->has_module('perl\S+=dynamic');
+
+	$s .= "load_module $modules/ngx_http_xslt_filter_module.so;\n"
+		if $self->has_module('xslt\S+=dynamic');
+
+	$s .= "load_module $modules/ngx_mail_module.so;\n"
+		if $self->has_module('mail=dynamic');
+
+	$s .= "load_module $modules/ngx_stream_module.so;\n"
+		if $self->has_module('stream=dynamic');
+
+	$s .= "load_module $modules/ngx_stream_geoip_module.so;\n"
+		if $self->has_module('stream_geoip\S+=dynamic');
+
+	return $s;
+}
+
+sub test_globals_perl5lib() {
+	my ($self) = @_;
+
+	return '' unless $self->has_module('perl');
+
+	my ($volume, $dir) = File::Spec->splitpath($NGINX);
+	my $objs = File::Spec->catpath($volume, $dir, '');
+
+	$objs = File::Spec->rel2abs($objs);
+	$objs =~ s!\\!/!g if $^O eq 'MSWin32';
+
+	return "env PERL5LIB=$objs/src/http/modules/perl:"
+		. "$objs/src/http/modules/perl/blib/arch;\n";
 }
 
 sub test_globals_http() {
@@ -580,7 +784,7 @@ sub http_start($;%) {
 
 		$s = $extra{socket} || IO::Socket::INET->new(
 			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:8080'
+			PeerAddr => '127.0.0.1:' . port(8080)
 		)
 			or die "Can't connect to nginx: $!\n";
 

@@ -25,7 +25,6 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
 	->has(qw/http rewrite proxy cache fastcgi auth_basic auth_request/)
-	->has(qw/shmem/)
 	->plan(19);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -194,7 +193,7 @@ SKIP: {
 	skip 'win32', 2 if $^O eq 'MSWin32';
 
 	$t->run_daemon(\&fastcgi_daemon);
-	$t->waitforsocket('127.0.0.1:8081');
+	$t->waitforsocket('127.0.0.1:' . port(8081));
 
 	like(http_get('/fastcgi'), qr/ 404 /, 'fastcgi auth open');
 	unlike(http_get('/fastcgi'), qr/INVISIBLE/, 'fastcgi auth no content');
@@ -239,7 +238,7 @@ sub http_post_big {
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

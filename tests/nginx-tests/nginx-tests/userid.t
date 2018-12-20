@@ -56,6 +56,7 @@ http {
         userid on;
 
         location / {
+            error_log %%TESTDIR%%/error.log debug;
             error_log %%TESTDIR%%/error_reset.log info;
         }
 
@@ -181,10 +182,7 @@ is(get_cookie('/expires_off', 'expires'), undef, 'expires off');
 
 # redefinition
 
-SKIP: {
-skip 'the page include req url to cause the error match, when the request returns 4xx';
 unlike(http_get('/expires_max/off'), qr/expires/, 'redefine expires');
-}
 like(http_get('/path/r'), qr!/9876543210!, 'redefine path');
 
 # requests
