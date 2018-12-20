@@ -35,6 +35,11 @@ static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
 static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
+#if (T_NGX_ACCEPT_FILTER)
+static ngx_int_t ngx_event_dummy_accept_filter(ngx_connection_t *c);
+ngx_int_t  (*ngx_event_top_accept_filter) (ngx_connection_t *c);
+#endif
+
 
 static ngx_uint_t     ngx_timer_resolution;
 sig_atomic_t          ngx_event_timer_alarm;
@@ -989,6 +994,10 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+#if (T_NGX_ACCEPT_FILTER)
+    ngx_event_top_accept_filter = ngx_event_dummy_accept_filter;
+#endif
+
     pcf = *cf;
     cf->ctx = ctx;
     cf->module_type = NGX_EVENT_MODULE;
@@ -1352,7 +1361,12 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 0);
-    ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
+    ngx_conf_init_msec_value(ecf->accept_mutex_delay,
+#if (T_NGX_MODIFY_DEFAULT_VALUE)
+                            100);
+#else
+                            500);
+#endif
 
 #if (NGX_HAVE_REUSEPORT)
     ngx_conf_init_value(ecf->reuse_port, 0);
@@ -1386,3 +1400,13 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #endif
 }
+
+
+#if (T_NGX_ACCEPT_FILTER)
+static ngx_int_t
+ngx_event_dummy_accept_filter(ngx_connection_t *c)
+{
+    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0, "event dummy accept filter");
+    return NGX_OK;
+}
+#endif

@@ -46,10 +46,11 @@
 #define NGX_HTTP_IMS_EXACT              1
 #define NGX_HTTP_IMS_BEFORE             2
 
-
+#if (T_NGX_SERVER_INFO)
 #define NGX_HTTP_SERVER_TAG_ON          0
 #define NGX_HTTP_SERVER_TAG_OFF         1
 #define NGX_HTTP_SERVER_TAG_CUSTOMIZED  2
+#endif
 
 
 #define NGX_HTTP_KEEPALIVE_DISABLE_NONE    0x0002
@@ -199,7 +200,9 @@ typedef struct {
     ngx_http_conf_ctx_t        *ctx;
 
     ngx_str_t                   server_name;
+#if (T_NGX_SERVER_INFO)
     ngx_str_t                   server_admin;
+#endif
 
     size_t                      connection_pool_size;
     size_t                      request_pool_size;
@@ -409,7 +412,9 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_flag_t    client_body_in_single_buffer;
                                            /* client_body_in_singe_buffer */
+#if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
     ngx_flag_t    retry_cached_connection;
+#endif
     ngx_flag_t    internal;                /* internal */
     ngx_flag_t    sendfile;                /* sendfile */
     ngx_flag_t    aio;                     /* aio */
@@ -424,16 +429,20 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    log_subrequest;          /* log_subrequest */
     ngx_flag_t    recursive_error_pages;   /* recursive_error_pages */
     ngx_flag_t    server_tokens;           /* server_tokens */
+#if (T_NGX_SERVER_INFO)
     ngx_flag_t    server_info;             /* server_info */
+#endif
     ngx_flag_t    chunked_transfer_encoding; /* chunked_transfer_encoding */
     ngx_flag_t    etag;                    /* etag */
 #if (T_NGX_RET_CACHE)
     ngx_flag_t    request_time_cache;      /* request_time_cache */
 #endif
 
+#if (T_NGX_SERVER_INFO)
     ngx_uint_t    server_tag_type;         /* server tag type */
     ngx_str_t     server_tag;              /* customized server tag */
     ngx_str_t     server_tag_header;       /* server tag header */
+#endif
 
 #if (NGX_HTTP_GZIP)
     ngx_flag_t    gzip_vary;               /* gzip_vary */

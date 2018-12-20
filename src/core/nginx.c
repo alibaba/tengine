@@ -1086,7 +1086,12 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
         ccf->worker_processes = NGX_CONF_UNSET;
     }
 
-    ngx_conf_init_value(ccf->worker_processes, ngx_ncpu);
+    ngx_conf_init_value(ccf->worker_processes,
+#if (T_NGX_MODIFY_DEFAULT_VALUE)
+                        ngx_ncpu);
+#else
+                        1);
+#endif
 
     ngx_conf_init_value(ccf->daemon, 1);
     ngx_conf_init_value(ccf->master, 1);

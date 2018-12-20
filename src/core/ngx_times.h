@@ -33,7 +33,9 @@ void ngx_gmtime(time_t t, ngx_tm_t *tp);
 time_t ngx_next_time(time_t when);
 #define ngx_next_time_n      "mktime()"
 
+#if (T_NGX_RET_CACHE)
 extern volatile ngx_tm_t    *ngx_cached_tm;
+#endif
 extern volatile ngx_time_t  *ngx_cached_time;
 
 #define ngx_time()           ngx_cached_time->sec

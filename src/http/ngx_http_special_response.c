@@ -16,13 +16,16 @@ static ngx_int_t ngx_http_send_error_page(ngx_http_request_t *r,
 static ngx_int_t ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err);
 static ngx_int_t ngx_http_send_refresh(ngx_http_request_t *r);
+#if (T_NGX_SERVER_INFO)
 static ngx_buf_t *ngx_http_set_server_info(ngx_http_request_t *r);
+#endif
 
 
 static u_char ngx_http_error_doctype[] =
 "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">" CRLF;
 
 
+#if (T_NGX_SERVER_INFO)
 static u_char ngx_http_server_info_head[] =
 " Sorry for the inconvenience.<br/>" CRLF
 "Please report this message and include the following information to us.<br/>"
@@ -67,6 +70,7 @@ static u_char ngx_http_server_info_tail[] =
 "</tr>" CRLF
 "</table>" CRLF
 ;
+#endif
 
 
 static u_char ngx_http_error_banner[] =
@@ -717,10 +721,20 @@ ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err)
 {
     ngx_int_t     rc;
-    ngx_buf_t    *b, *ib;
-    ngx_uint_t    i, msie_padding;
+    ngx_buf_t    *b;
+    ngx_uint_t    msie_padding;
+#if (T_NGX_SERVER_INFO)
     ngx_chain_t   out[7];
+    ngx_buf_t    *ib;
+    ngx_uint_t    i;
 
+#else 
+    u_char       *tail;
+    size_t        len;
+    ngx_chain_t   out[3];
+#endif
+
+#if (T_NGX_SERVER_INFO)
     if (clcf->server_info && err >= NGX_HTTP_OFF_4XX) {
         ib = ngx_http_set_server_info(r);
         if (ib == NULL) {
@@ -731,9 +745,21 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         ib = NULL;
     }
 
+#else 
+    if (clcf->server_tokens) {
+        len = sizeof(ngx_http_error_full_tail) - 1;
+        tail = ngx_http_error_full_tail;
+
+    } else {
+        len = sizeof(ngx_http_error_tail) - 1;
+        tail = ngx_http_error_tail;
+    }
+#endif
+
     msie_padding = 0;
 
     if (ngx_http_error_pages[err].len) {
+#if (T_NGX_SERVER_INFO)
         r->headers_out.content_length_n = sizeof(ngx_http_error_doctype) - 1
                                           + ngx_http_error_pages[err].len
                                           + (ib ? (ib->last - ib->pos) : 0)
@@ -749,6 +775,9 @@ ngx_http_send_special_response(ngx_http_request_t *r,
                                                - 1;
             r->headers_out.content_length_n += clcf->server_tag.len;
         }
+#else
+        r->headers_out.content_length_n = ngx_http_error_pages[err].len + len;
+#endif
 
         if (clcf->msie_padding
             && (r->headers_in.msie || r->headers_in.chrome)
@@ -787,6 +816,7 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         return ngx_http_send_special(r, NGX_HTTP_LAST);
     }
 
+#if (T_NGX_SERVER_INFO)
     i = 0;
 
     b = ngx_calloc_buf(r->pool);
@@ -801,6 +831,7 @@ ngx_http_send_special_response(ngx_http_request_t *r,
     out[i].buf = b;
     out[i].next = &out[i + 1];
     i++;
+#endif
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
@@ -811,6 +842,7 @@ ngx_http_send_special_response(ngx_http_request_t *r,
     b->pos = ngx_http_error_pages[err].data;
     b->last = ngx_http_error_pages[err].data + ngx_http_error_pages[err].len;
 
+#if (T_NGX_SERVER_INFO)
     out[i].buf = b;
     out[i].next = &out[i + 1];
     i++;
@@ -872,6 +904,11 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         i++;
     }
 
+#else
+    out[0].buf = b;
+    out[0].next = &out[1];
+#endif
+
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
         return NGX_ERROR;
@@ -879,11 +916,19 @@ ngx_http_send_special_response(ngx_http_request_t *r,
 
     b->memory = 1;
 
+#if (T_NGX_SERVER_INFO)
     b->pos = ngx_http_error_tail;
     b->last = ngx_http_error_tail + sizeof(ngx_http_error_tail) - 1;
 
     out[i].buf = b;
     out[i].next = NULL;
+#else
+    b->pos = tail;
+    b->last = tail + len;
+
+    out[1].buf = b;
+    out[1].next = NULL;
+#endif
 
     if (msie_padding) {
         b = ngx_calloc_buf(r->pool);
@@ -895,10 +940,16 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         b->pos = ngx_http_msie_padding;
         b->last = ngx_http_msie_padding + sizeof(ngx_http_msie_padding) - 1;
 
+#if (T_NGX_SERVER_INFO)
         out[i].next = &out[i + 1];
         i++;
         out[i].buf = b;
         out[i].next = NULL;
+#else
+        out[1].next = &out[2];
+        out[2].buf = b;
+        out[2].next = NULL;
+#endif
     }
 
     if (r == r->main) {
@@ -984,6 +1035,7 @@ ngx_http_send_refresh(ngx_http_request_t *r)
 }
 
 
+#if (T_NGX_SERVER_INFO)
 static ngx_buf_t *
 ngx_http_set_server_info(ngx_http_request_t *r)
 {
@@ -1117,3 +1169,4 @@ ngx_http_set_server_info(ngx_http_request_t *r)
 
     return b;
 }
+#endif

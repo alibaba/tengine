@@ -15,7 +15,9 @@
 
 void *ngx_alloc(size_t size, ngx_log_t *log);
 void *ngx_calloc(size_t size, ngx_log_t *log);
+#if (T_DEPRECATED)
 void *ngx_realloc(void *p, size_t size, ngx_log_t *log);
+#endif
 
 #define ngx_free          free
 
