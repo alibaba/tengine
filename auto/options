@@ -255,7 +255,6 @@ HTTP_UPSTREAM_RBTREE=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
-HTTP_REQ_STATUS=YES
 
 # shared modules
 HTTP_XSLT_SHARED=NO
@@ -293,7 +292,6 @@ HTTP_UPSTREAM_HASH_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
-HTTP_REQ_STATUS_SHARED=NO
 
 MAIL=NO
 MAIL_SSL=NO
@@ -517,8 +515,6 @@ do
         --with-http_upstream_least_conn_module=shared)
                                                    HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
                                                    HTTP_UPSTREAM_LEAST_CONN=NO       ;;
-        --with-http_reqstat_module=shared)         HTTP_REQ_STATUS=NO
-                                                   HTTP_REQ_STATUS_SHARED=YES        ;;
 
         --with-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=YES  ;;
         --with-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=YES  ;;
@@ -537,8 +533,6 @@ do
                                          HTTP_AUTOINDEX_SHARED=NO   ;;
         --without-http_status_module)    HTTP_STATUS=NO
                                          HTTP_STATUS_SHARED=NO      ;;
-        --without-http_reqstat_module)   HTTP_REQ_STATUS=NO
-                                         HTTP_REQ_STATUS_SHARED=NO  ;;
         --without-http_geo_module)       HTTP_GEO=NO                ;;
         --without-http_map_module)       HTTP_MAP=NO
                                          HTTP_MAP_SHARED=NO         ;;
@@ -778,7 +772,6 @@ cat << END
                                      enable ngx_http_upstream_ip_hash_module (shared)
   --with-http_upstream_least_conn_module=shared
                                      enable ngx_http_upstream_least_conn_module (shared)
-  --with-http_reqstat_module=shared  enable ngx_http_reqstat_module (shared)
 
   --without-http_charset_module      disable ngx_http_charset_filter_module
   --without-http_gzip_module         disable ngx_http_gzip_filter_module
@@ -812,7 +805,6 @@ cat << END
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_stub_status_module  disable ngx_http_stub_status_module
-  --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_dyups_module           enable ngx_http_dyups_module
   --with-http_dyups_lua_api          enable ngx_http_dyups_lua_api
@@ -942,7 +934,6 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
-    HTTP_REQ_STATUS_SHARED=YES
 
     HTTP_XSLT=NO
     HTTP_IMAGE_FILTER=NO
@@ -977,7 +968,6 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
-    HTTP_REQ_STATUS=NO
 
 elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_V2=YES
@@ -1032,7 +1022,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_KEEPALIVE=YES
     HTTP_DYNAMIC_UPSTREAM=YES
 #    HTTP_DYNAMIC_UPSTREAM_LUA=NO
-    HTTP_REQ_STATUS=YES
     HTTP_AUTH_REQUEST=YES
     MAIL=YES
 
@@ -1070,7 +1059,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
-    HTTP_REQ_STATUS_SHARED=NO
 fi
 
 

@@ -549,10 +549,6 @@ HTTP_DYUPS_LUA_SRCS="src/http/modules/ngx_http_dyups_lua.c"
 HTTP_DYUPS_LUA_DEPS="src/http/modules/ngx_http_dyups_lua.h"
 
 
-HTTP_REQ_STATUS_MODULE=ngx_http_reqstat_module
-HTTP_REQ_STATUS_SRCS=src/http/modules/ngx_http_reqstat_module.c
-HTTP_REQ_STATUS_DEPS=src/http/modules/ngx_http_reqstat.h
-
 
 MAIL_INCS="src/mail"
 
