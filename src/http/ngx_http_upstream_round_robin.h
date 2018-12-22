@@ -19,7 +19,9 @@ typedef struct {
     socklen_t                       socklen;
     ngx_str_t                       name;
     ngx_str_t                       server;
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                       id;
+#endif
     ngx_str_t                       host;
 
     ngx_int_t                       current_weight;
@@ -49,7 +51,9 @@ typedef struct ngx_http_upstream_rr_peers_s  ngx_http_upstream_rr_peers_t;
 
 struct ngx_http_upstream_rr_peers_s {
     ngx_uint_t                      number;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
     ngx_uint_t                      init_number;
+#endif
 
     ngx_uint_t                      total_weight;
 

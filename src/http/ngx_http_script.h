@@ -244,10 +244,12 @@ void ngx_http_script_return_code(ngx_http_script_engine_t *e);
 void ngx_http_script_break_code(ngx_http_script_engine_t *e);
 void ngx_http_script_if_code(ngx_http_script_engine_t *e);
 void ngx_http_script_equal_code(ngx_http_script_engine_t *e);
+#if (T_NGX_HTTP_IMPROVED_IF)
 void ngx_http_script_greater_code(ngx_http_script_engine_t *e);
 void ngx_http_script_less_code(ngx_http_script_engine_t *e);
 void ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e);
 void ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e);
+#endif
 void ngx_http_script_not_equal_code(ngx_http_script_engine_t *e);
 void ngx_http_script_file_code(ngx_http_script_engine_t *e);
 void ngx_http_script_complex_value_code(ngx_http_script_engine_t *e);

@@ -121,22 +121,22 @@ my $kv = qr!\s*$string\s*:\s*($string|$number)\s*!;
 like($r, qr!Content-Type: application/json!, 'json content type');
 like($r, qr!{$kv(,$kv)*}!, 'json format');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-file".*?})!;
+($data) = $r =~ qr!(\{[^}]*?"name"\s*:\s*"test-file".*?})!;
 like($data, qr!"type"\s*:\s*"file"!, 'json file');
 like($data, $mtime, 'json file mtime');
 like($data, qr!"size"\s*:\s*42!, 'json file size');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-file-link".*?})!;
+($data) = $r =~ qr!(\{[^}]*?"name"\s*:\s*"test-file-link".*?})!;
 like($data, qr!"type"\s*:\s*"file"!, 'json file link');
 like($data, $mtime, 'json file link mtime');
 like($data, qr!"size"\s*:\s*42!, 'json file link size');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-dir".*?})!;
+($data) = $r =~ qr!(\{[^}]*?"name"\s*:\s*"test-dir".*?})!;
 like($data, qr!"type"\s*:\s*"directory"!, 'json dir');
 like($data, $mtime, 'json dir mtime');
 unlike($data, qr!"size"\s*:\s*$number!, 'json dir size');
 
-($data) = $r =~ qr!({[^}]*?"name"\s*:\s*"test-dir-link".*?})!;
+($data) = $r =~ qr!(\{[^}]*?"name"\s*:\s*"test-dir-link".*?})!;
 like($data, qr!"type"\s*:\s*"directory"!, 'json dir link');
 like($data, $mtime, 'json dir link mtime');
 unlike($data, qr!"size"\s*:\s*$number!, 'json dir link size');

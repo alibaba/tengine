@@ -732,6 +732,7 @@ ngx_http_rewrite_if_condition(ngx_conf_t *cf, ngx_http_rewrite_loc_conf_t *lcf)
             return NGX_CONF_OK;
         }
 
+#if (T_NGX_HTTP_IMPROVED_IF)
         if (len == 1 && p[0] == '>') {
 
             if (ngx_http_rewrite_value(cf, lcf, &value[last]) != NGX_CONF_OK) {
@@ -799,6 +800,7 @@ ngx_http_rewrite_if_condition(ngx_conf_t *cf, ngx_http_rewrite_loc_conf_t *lcf)
             return NGX_CONF_OK;
 
         }
+#endif
 
         if (len == 2 && p[0] == '!' && p[1] == '=') {
 

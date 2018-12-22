@@ -8,7 +8,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 #include <ngx_md5.h>
+#endif
 
 
 #if (NGX_HTTP_CACHE)
@@ -168,7 +170,9 @@ static ngx_addr_t *ngx_http_upstream_get_local(ngx_http_request_t *r,
 static void *ngx_http_upstream_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf);
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 static ngx_int_t ngx_http_upstream_init_process(ngx_cycle_t *cycle);
+#endif
 
 #if (NGX_HTTP_SSL)
 static void ngx_http_upstream_ssl_init_connection(ngx_http_request_t *,
@@ -358,7 +362,11 @@ ngx_module_t  ngx_http_upstream_module = {
     NGX_HTTP_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
     ngx_http_upstream_init_process,        /* init process */
+#else
+    NULL,                                  /* init process */
+#endif
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -3862,7 +3870,9 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
 {
     ngx_msec_t                 timeout;
     ngx_uint_t                 status, state;
+#if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
     ngx_http_core_loc_conf_t  *clcf;
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http next upstream, %xi", ft_type);
@@ -3887,11 +3897,17 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
                       "upstream timed out");
     }
 
+#if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+#endif
 
-    if (clcf->retry_cached_connection
-        && u->peer.cached && ft_type == NGX_HTTP_UPSTREAM_FT_ERROR
-        && (!u->request_sent || !r->request_body_no_buffering)) {
+    if (u->peer.cached && ft_type == NGX_HTTP_UPSTREAM_FT_ERROR
+        && (!u->request_sent || !r->request_body_no_buffering)
+#if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
+        && clcf->retry_cached_connection
+#endif
+       )
+    {
         status = 0;
 
         /* TODO: inform balancer instead */
@@ -5773,7 +5789,9 @@ not_found:
             uscf = uscfp[i];
 
             ngx_rbtree_insert(&umcf->rbtree, &uscfp[i]->node);
+#if (T_NGX_IMPROVED_LIST)
             ngx_list_delete(&umcf->implicit_upstreams, &uscfp[i]);
+#endif
 
             return uscf;
 
@@ -6312,6 +6330,7 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 }
 
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
 static ngx_int_t
 ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 {
@@ -6355,3 +6374,4 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
 
     return NGX_OK;
 }
+#endif

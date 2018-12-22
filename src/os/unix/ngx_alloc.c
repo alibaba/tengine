@@ -46,6 +46,7 @@ ngx_calloc(size_t size, ngx_log_t *log)
 }
 
 
+#if (T_DEPRECATED)
 void *
 ngx_realloc(void *p, size_t size, ngx_log_t *log)
 {
@@ -61,6 +62,7 @@ ngx_realloc(void *p, size_t size, ngx_log_t *log)
 
     return new;
 }
+#endif
 
 
 #if (NGX_HAVE_POSIX_MEMALIGN)
