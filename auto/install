@@ -236,7 +236,7 @@ cat << END                                                    >> $NGX_MAKEFILE
 END
 
 
-if [ $HTTP_USER_AGENT = YES ] || [ $HTTP_USER_AGENT_SHARED = YES ]; then
+if [ $HTTP_USER_AGENT = YES ]; then
     cat << END                                                >> $NGX_MAKEFILE
 
 	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/browsers' \
