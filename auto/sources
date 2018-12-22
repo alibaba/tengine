@@ -598,9 +598,6 @@ NGX_GOOGLE_PERFTOOLS_SRCS=src/misc/ngx_google_perftools_module.c
 
 NGX_CPP_TEST_SRCS=src/misc/ngx_cpp_test_module.cpp
 
-NGX_BACKTRACE_MODULE=ngx_backtrace_module
-NGX_BACKTRACE_SRCS=src/misc/ngx_backtrace_module.c
-
 NGX_HTTP_LUA_MODULE=ngx_http_lua_module
 NGX_HTTP_LUA_MODULE_SRCS="modules/ngx_http_lua_module/src/ngx_http_lua_script.c \
                           modules/ngx_http_lua_module/src/ngx_http_lua_log.c \

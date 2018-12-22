@@ -139,8 +139,7 @@ NGX_ALL_MODULES="
     ngx_mail_smtp_module
     ngx_mail_auth_http_module
     ngx_mail_proxy_module
-    ngx_google_perftools_module
-    ngx_backtrace_module"
+    ngx_google_perftools_module"
 
 # dso shared
 NGX_SHARED_MODULES=
@@ -620,7 +619,6 @@ use the \"--without-http_limit_conn_module\" option instead"
 
         --with-google_perftools_module)  NGX_GOOGLE_PERFTOOLS=YES   ;;
         --with-cpp_test_module)          NGX_CPP_TEST=YES           ;;
-        --with-backtrace_module)         NGX_BACKTRACE=YES          ;;
 
         --add-module=*)                  NGX_ADDONS="$NGX_ADDONS $value" ;;
 
@@ -865,7 +863,6 @@ cat << END
 
   --with-google_perftools_module     enable ngx_google_perftools_module
   --with-cpp_test_module             enable ngx_cpp_test_module
-  --with-backtrace_module            enable ngx_backtrace_module
 
   --add-module=PATH                  enable an external module
 
