@@ -401,9 +401,6 @@ HTTP_REALIP_SRCS=src/http/modules/ngx_http_realip_module.c
 HTTP_ADDITION_FILTER_MODULE=ngx_http_addition_filter_module
 HTTP_ADDITION_SRCS=src/http/modules/ngx_http_addition_filter_module.c
 
-HTTP_FOOTER_FILTER_MODULE=ngx_http_footer_filter_module
-HTTP_FOOTER_FILTER_SRCS=src/http/modules/ngx_http_footer_filter_module.c
-
 HTTP_DAV_MODULE=ngx_http_dav_module
 HTTP_DAV_SRCS=src/http/modules/ngx_http_dav_module.c
 

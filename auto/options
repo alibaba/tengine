@@ -128,7 +128,6 @@ NGX_ALL_MODULES="
     ngx_http_sub_filter_module
     ngx_http_addition_filter_module
     ngx_http_userid_filter_module
-    ngx_http_footer_filter_module
     ngx_http_headers_filter_module
     ngx_http_copy_filter_module
     ngx_http_range_body_filter_module
@@ -248,7 +247,6 @@ HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
-HTTP_FOOTER=YES
 HTTP_TRIM=YES
 HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
@@ -281,7 +279,6 @@ HTTP_SLICE_SHARED=NO
 HTTP_MP4_SHARED=NO
 HTTP_CHARSET_SHARED=NO
 HTTP_USERID_SHARED=NO
-HTTP_FOOTER_SHARED=NO
 HTTP_TRIM_SHARED=NO
 HTTP_ACCESS_SHARED=NO
 HTTP_AUTOINDEX_SHARED=NO
@@ -491,8 +488,6 @@ do
                                                    HTTP_CHARSET=NO                   ;;
         --with-http_userid_filter_module=shared)   HTTP_USERID_SHARED=YES
                                                    HTTP_USERID=NO                    ;;
-        --with-http_footer_filter_module=shared)   HTTP_FOOTER_SHARED=YES
-                                                   HTTP_FOOTER=NO                    ;;
         --with-http_access_module=shared)          HTTP_ACCESS_SHARED=YES
                                                    HTTP_ACCESS=NO                    ;;
         --with-http_autoindex_module=shared)       HTTP_AUTOINDEX_SHARED=YES
@@ -546,8 +541,6 @@ do
         --without-http_ssl_module)       HTTP_SSL=NO                ;;
         --without-http_userid_module)    HTTP_USERID=NO
                                          HTTP_USERID_SHARED=NO      ;;
-        --without-http_footer_filter_module) HTTP_FOOTER=NO
-                                             HTTP_FOOTER_SHARED=NO  ;;
         --without-http_access_module)    HTTP_ACCESS=NO
                                          HTTP_ACCESS_SHARED=NO      ;;
         --without-http_auth_basic_module) HTTP_AUTH_BASIC=NO        ;;
@@ -775,8 +768,6 @@ cat << END
                                      enable ngx_http_charset_filter_module (shared)
   --with-http_userid_filter_module=shared
                                      enable ngx_http_userid_filter_module (shared)
-  --with-http_footer_filter_module=shared
-                                     enable ngx_http_footer_filter_module (shared)
   --with-http_access_module=shared   enable ngx_http_access_module (shared)
   --with-http_autoindex_module=shared
                                      enable ngx_http_autoindex_module (shared)
@@ -810,8 +801,6 @@ cat << END
   --without-http_ssi_module          disable ngx_http_ssi_module
   --without-http_ssl_module          disable ngx_http_ssl_module
   --without-http_userid_module       disable ngx_http_userid_filter_module
-  --without-http_footer_filter_module
-                                     disable ngx_http_footer_filter_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
   --without-http_autoindex_module    disable ngx_http_autoindex_module
@@ -955,7 +944,6 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_MP4_SHARED=YES
     HTTP_CHARSET_SHARED=YES
     HTTP_USERID_SHARED=YES
-    HTTP_FOOTER_SHARED=YES
     HTTP_TRIM_SHARED=YES
     HTTP_ACCESS_SHARED=YES
     HTTP_AUTOINDEX_SHARED=YES
@@ -991,7 +979,6 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_MP4=NO
     HTTP_CHARSET=NO
     HTTP_USERID=NO
-    HTTP_FOOTER=NO
     HTTP_TRIM=NO
     HTTP_ACCESS=NO
     HTTP_AUTOINDEX=NO
@@ -1059,7 +1046,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_GUNZIP=YES
     HTTP_UPSTREAM_HASH=YES
     HTTP_UPSTREAM_IP_HASH=YES
-    HTTP_FOOTER=YES
     HTTP_TRIM=YES
     HTTP_UPSTREAM_CHECK=YES
     HTTP_UPSTREAM_LEAST_CONN=YES
@@ -1086,7 +1072,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_MP4_SHARED=NO
     HTTP_CHARSET_SHARED=NO
     HTTP_USERID_SHARED=NO
-    HTTP_FOOTER_SHARED=NO
     HTTP_TRIM_SHARED=NO
     HTTP_ACCESS_SHARED=NO
     HTTP_AUTOINDEX_SHARED=NO
