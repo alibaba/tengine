@@ -114,7 +114,6 @@ NGX_ALL_MODULES="
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
     ngx_http_upstream_dynamic_module
-    ngx_http_upstream_check_module
     ngx_http_upstream_consistent_hash_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
@@ -468,7 +467,6 @@ do
         --with-http_secure_link_module)            HTTP_SECURE_LINK=YES
                                                    HTTP_SECURE_LINK_SHARED=NO        ;;
         --with-http_degradation_module)            HTTP_DEGRADATION=YES              ;;
-        --with-http_upstream_check_module)         HTTP_UPSTREAM_CHECK=YES           ;;
         --with-http_upstream_consistent_hash_module)
                                                    HTTP_UPSTREAM_CONSISTENT_HASH=YES ;;
 
@@ -602,7 +600,6 @@ use the \"--without-http_limit_conn_module\" option instead"
                                                 HTTP_UPSTREAM_HASH_SHARED=NO ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO
                                                 HTTP_UPSTREAM_IP_HASH_SHARED=NO ;;
-        --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO
                                          HTTP_UPSTREAM_LEAST_CONN_SHARED=NO ;;
@@ -842,8 +839,6 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
-  --without-http_upstream_check_module
-                                     disable ngx_http_upstream_check_module
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
   --without-http_upstream_keepalive_module
