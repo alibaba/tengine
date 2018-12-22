@@ -137,7 +137,6 @@ fi
 #         ngx_http_gunzip_filter
 #         ngx_http_userid_filter
 #         ngx_http_footer_filter
-#         ngx_http_trim_filter
 #         ngx_http_headers_filter
 #     ngx_http_copy_filter
 #     ngx_http_range_body_filter
