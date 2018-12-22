@@ -114,7 +114,6 @@ fi
 #     ngx_http_autoindex_module
 #     ngx_http_index_module
 #     ngx_http_random_index_module
-#     ngx_http_concat_module
 #
 #     ngx_http_access_module
 #     ngx_http_realip_module

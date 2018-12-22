@@ -108,7 +108,6 @@ NGX_ALL_MODULES="
     ngx_http_flv_module
     ngx_http_mp4_module
     ngx_http_slice_module
-    ngx_http_concat_module
     ngx_http_tfs_module
     ngx_http_upstream_hash_module
     ngx_http_upstream_ip_hash_module
@@ -464,8 +463,6 @@ do
         --with-http_gunzip_module)                 HTTP_GUNZIP=YES                   ;;
         --with-http_gzip_static_module)            HTTP_GZIP_STATIC=YES              ;;
         --with-http_auth_request_module)           HTTP_AUTH_REQUEST=YES             ;;
-        --with-http_concat_module)                 HTTP_CONCAT=YES
-                                                   HTTP_CONCAT_SHARED=NO             ;;
         --with-http_random_index_module)           HTTP_RANDOM_INDEX=YES
                                                    HTTP_RANDOM_INDEX_SHARED=NO       ;;
         --with-http_secure_link_module)            HTTP_SECURE_LINK=YES
@@ -491,8 +488,6 @@ do
                                                    HTTP_SLICE=NO                     ;;
         --with-http_mp4_module=shared)             HTTP_MP4_SHARED=YES
                                                    HTTP_MP4=NO                       ;;
-        --with-http_concat_module=shared)          HTTP_CONCAT_SHARED=YES
-                                                   HTTP_CONCAT=NO                    ;;
         --with-http_random_index_module=shared)    HTTP_RANDOM_INDEX_SHARED=YES
                                                    HTTP_RANDOM_INDEX=NO              ;;
         --with-http_secure_link_module=shared)     HTTP_SECURE_LINK_SHARED=YES
@@ -769,7 +764,6 @@ cat << END
   --with-http_gunzip_module          enable ngx_http_gunzip_module
   --with-http_gzip_static_module     enable ngx_http_gzip_static_module
   --with-http_auth_request_module    enable ngx_http_auth_request_module
-  --with-http_concat_module          enable ngx_http_concat_module
   --with-http_random_index_module    enable ngx_http_random_index_module
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
@@ -783,7 +777,6 @@ cat << END
   --with-http_flv_module=shared      enable ngx_http_flv_module (shared)
   --with-http_slice_module=shared    enable ngx_http_slice_module (shared)
   --with-http_mp4_module=shared      enable ngx_http_mp4_module (shared)
-  --with-http_concat_module=shared   enable ngx_http_concat_module (shared)
   --with-http_random_index_module=shared
                                      enable ngx_http_random_index_module (shared)
   --with-http_secure_link_module=shared
