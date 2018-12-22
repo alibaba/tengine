@@ -112,7 +112,6 @@ NGX_ALL_MODULES="
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
-    ngx_http_upstream_dynamic_module
     ngx_http_stub_status_module
     ngx_http_write_filter_module
     ngx_http_header_filter_module
@@ -250,7 +249,6 @@ HTTP_UPSTREAM_CHECK=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_SESSION_STICKY=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
-HTTP_UPSTREAM_DYNAMIC=YES
 HTTP_DYNAMIC_UPSTREAM=NO
 HTTP_DYNAMIC_UPSTREAM_LUA=NO
 HTTP_UPSTREAM_RBTREE=YES
@@ -581,7 +579,6 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_UPSTREAM_LEAST_CONN=NO
                                          HTTP_UPSTREAM_LEAST_CONN_SHARED=NO ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
-        --without-http_upstream_dynamic_module) HTTP_UPSTREAM_DYNAMIC=NO ;;
 
         --without-http_dyups_module)        HTTP_DYNAMIC_UPSTREAM=NO  ;;
         --without-http_dyups_lua_api)       HTTP_DYNAMIC_UPSTREAM_LUA=NO  ;;
@@ -810,8 +807,6 @@ cat << END
                                      disable ngx_http_upstream_least_conn_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
-  --without-http_upstream_dynamic_module
-                                     disable ngx_http_upstream_dynamic_module
   --without-http_upstream_hash_module
                                      disable ngx_http_upstream_hash_module
   --without-http_upstream_ip_hash_module
@@ -1035,7 +1030,6 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_UPSTREAM_LEAST_CONN=YES
     HTTP_UPSTREAM_SESSION_STICKY=YES
     HTTP_UPSTREAM_KEEPALIVE=YES
-    HTTP_UPSTREAM_DYNAMIC=YES
     HTTP_DYNAMIC_UPSTREAM=YES
 #    HTTP_DYNAMIC_UPSTREAM_LUA=NO
     HTTP_REQ_STATUS=YES
