@@ -222,6 +222,10 @@ ngx_mail_imap_auth_state(ngx_event_t *rev)
         case ngx_imap_auth_cram_md5:
             rc = ngx_mail_auth_cram_md5(s, c);
             break;
+
+        case ngx_imap_auth_external:
+            rc = ngx_mail_auth_external(s, c, 0);
+            break;
         }
 
     } else if (rc == NGX_IMAP_NEXT) {
@@ -352,6 +356,8 @@ ngx_mail_imap_authenticate(ngx_mail_session_t *s, ngx_connection_t *c)
     }
 #endif
 
+    iscf = ngx_mail_get_module_srv_conf(s, ngx_mail_imap_module);
+
     rc = ngx_mail_auth_parse(s, c);
 
     switch (rc) {
@@ -379,8 +385,6 @@ ngx_mail_imap_authenticate(ngx_mail_session_t *s, ngx_connection_t *c)
 
     case NGX_MAIL_AUTH_CRAM_MD5:
 
-        iscf = ngx_mail_get_module_srv_conf(s, ngx_mail_imap_module);
-
         if (!(iscf->auth_methods & NGX_MAIL_AUTH_CRAM_MD5_ENABLED)) {
             return NGX_MAIL_PARSE_INVALID_COMMAND;
         }
@@ -399,6 +403,17 @@ ngx_mail_imap_authenticate(ngx_mail_session_t *s, ngx_connection_t *c)
         }
 
         return NGX_ERROR;
+
+    case NGX_MAIL_AUTH_EXTERNAL:
+
+        if (!(iscf->auth_methods & NGX_MAIL_AUTH_EXTERNAL_ENABLED)) {
+            return NGX_MAIL_PARSE_INVALID_COMMAND;
+        }
+
+        ngx_str_set(&s->out, imap_username);
+        s->mail_state = ngx_imap_auth_external;
+
+        return NGX_OK;
     }
 
     return rc;
