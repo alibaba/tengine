@@ -58,7 +58,7 @@ NGX_HTTP_SCGI_TEMP_PATH=
 HTTP_CACHE=YES
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
-HTTP_SSL=NO
+HTTP_SSL=YES
 HTTP_V2=NO
 HTTP_SSI=YES
 HTTP_POSTPONE=NO
@@ -70,7 +70,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
-HTTP_AUTH_REQUEST=NO
+HTTP_AUTH_REQUEST=YES
 HTTP_MIRROR=YES
 HTTP_USERID=YES
 HTTP_SLICE=NO
@@ -110,7 +110,7 @@ HTTP_UPSTREAM_RBTREE=YES
 HTTP_UPSTREAM_ZONE=YES
 
 # STUB
-HTTP_STUB_STATUS=NO
+HTTP_STUB_STATUS=YES
 
 MAIL=NO
 MAIL_SSL=NO
@@ -500,6 +500,7 @@ cat << END
   --without-http_charset_module      disable ngx_http_charset_module
   --without-http_gzip_module         disable ngx_http_gzip_module
   --without-http_ssi_module          disable ngx_http_ssi_module
+  --without-http_ssl_module          disable ngx_http_ssl_module
   --without-http_userid_module       disable ngx_http_userid_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
@@ -520,6 +521,7 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
+  --without-http_stub_status_module  disable ngx_http_stub_status_module
   --without-http_upstream_hash_module
                                      disable ngx_http_upstream_hash_module
   --without-http_upstream_ip_hash_module
