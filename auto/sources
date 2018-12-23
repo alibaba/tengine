@@ -122,6 +122,11 @@ EPOLL_SRCS=src/event/modules/ngx_epoll_module.c
 IOCP_MODULE=ngx_iocp_module
 IOCP_SRCS=src/event/modules/ngx_iocp_module.c
 
+
+PROCS_MODULES="ngx_procs_module ngx_proc_core_module"
+PROCS_DEPS="src/proc/ngx_proc.h"
+PROCS_INCS="src/proc"
+PROCS_SRCS="src/proc/ngx_proc.c"
 FILE_AIO_SRCS="src/os/unix/ngx_file_aio_read.c"
 LINUX_AIO_SRCS="src/os/unix/ngx_linux_aio_read.c"
 

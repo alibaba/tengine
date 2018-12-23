@@ -56,6 +56,17 @@ if [ $NGX_TEST_BUILD_SOLARIS_SENDFILEV = YES ]; then
 fi
 
 
+# add proc
+if [ $PROCS = YES ]; then
+    have=NGX_PROCS . auto/have
+    CORE_SRCS="$CORE_SRCS $PROCS_SRCS"
+    CORE_DEPS="$CORE_DEPS $PROCS_DEPS"
+    CORE_INCS="$CORE_INCS $PROCS_INCS"
+else
+    PROCS_MODULES=
+fi
+
+
 if [ $HTTP = YES ]; then
     HTTP_MODULES=
     HTTP_DEPS=
@@ -1281,8 +1292,8 @@ if [ $USE_PCRE = YES ]; then
     . auto/module
 fi
 
-
-modules="$CORE_MODULES $EVENT_MODULES"
+# add proc
+modules="$CORE_MODULES $EVENT_MODULES $PROCS_MODULES"
 
 
 # thread pool module should be initialized after events

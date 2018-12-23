@@ -116,6 +116,9 @@ MAIL_POP3=YES
 MAIL_IMAP=YES
 MAIL_SMTP=YES
 
+# procs module
+PROCS=YES
+
 STREAM=NO
 STREAM_SSL=NO
 STREAM_REALIP=NO
@@ -206,6 +209,9 @@ do
         --without-poll_module)           EVENT_POLL=NONE            ;;
 
         --with-threads)                  USE_THREADS=YES            ;;
+
+        # PROCS
+        --without-procs)                 PROCS=NO                   ;;
 
         --with-file-aio)                 NGX_FILE_AIO=YES           ;;
 
@@ -435,6 +441,8 @@ cat << END
   --without-select_module            disable select module
   --with-poll_module                 enable poll module
   --without-poll_module              disable poll module
+
+  --without-procs                    disable procs module
 
   --with-threads                     enable thread pool support
 
