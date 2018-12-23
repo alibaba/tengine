@@ -1026,6 +1026,51 @@ ngx_feature_test='struct addrinfo *res;
                   freeaddrinfo(res)'
 . auto/feature
 
+
+ngx_feature="sysinfo()"
+ngx_feature_name="NGX_HAVE_SYSINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/sysinfo.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct sysinfo s;
+                  sysinfo(&s);"
+. auto/feature
+
+
+ngx_feature="getloadavg()"
+ngx_feature_name="NGX_HAVE_GETLOADAVG"
+ngx_feature_run=no
+ngx_feature_incs="#include <stdlib.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="double loadavg[1];
+                  getloadavg(loadavg, 1);"
+. auto/feature
+
+
+ngx_feature="/proc/meminfo"
+ngx_feature_name="NGX_HAVE_PROC_MEMINFO"
+ngx_feature_run=yes
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='int fd;
+                  if (open("/proc/meminfo", O_RDONLY) == -1) return 1;'
+. auto/feature
+
+
+ngx_feature="/proc/stat"
+ngx_feature_name="NGX_HAVE_PROC_STAT"
+ngx_feature_run=yes
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='int fd;
+                  if (open("/proc/stat", O_RDONLY) == -1) return 1;'
+. auto/feature
+
+
 # Auto read nameserver from /etc/resolv.conf.
  if [ -f "/etc/resolv.conf" ]; then
     have=NGX_RESOLVER_FILE
