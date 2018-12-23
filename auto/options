@@ -89,6 +89,7 @@ HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_GRPC=YES
 HTTP_PERL=NO
+HTTP_LUA=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
@@ -159,6 +160,14 @@ ZLIB_ASM=NO
 
 USE_PERL=NO
 NGX_PERL=perl
+
+LUAJIT_INC=$LUAJIT_INC
+LUAJIT_LIB=$LUAJIT_LIB
+LUA_INC=$LUA_INC
+LUA_LIB=$LUA_LIB
+
+LIBYAJL_INC=
+LIBYAJL_LIB=
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -291,6 +300,13 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-http_perl_module=dynamic) HTTP_PERL=DYNAMIC          ;;
         --with-perl_modules_path=*)      NGX_PERL_MODULES="$value"  ;;
         --with-perl=*)                   NGX_PERL="$value"          ;;
+
+        # LUA
+        --with-http_lua_module)          HTTP_LUA=YES               ;;
+        --with-luajit-inc=*)             LUAJIT_INC="$value"        ;;
+        --with-luajit-lib=*)             LUAJIT_LIB="$value"        ;;
+        --with-lua-inc=*)                LUA_INC="$value"           ;;
+        --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
         # STUB
         --with-http_stub_status_module)  HTTP_STUB_STATUS=YES       ;;
@@ -513,6 +529,11 @@ cat << END
   --with-perl_modules_path=PATH      set Perl modules path
   --with-perl=PATH                   set perl binary pathname
 
+  --with-http_lua_module             enable ngx_http_lua_module (will also enable --with-md5 and --with-sha1)
+  --with-luajit-inc=PATH             set LuaJIT headers path (where lua.h/lauxlib.h/... are located)
+  --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
+  --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
+  --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
                                      http client request body temporary files

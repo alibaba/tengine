@@ -777,6 +777,10 @@ if [ $HTTP = YES ]; then
         . auto/module
     fi
 
+    if [ $HTTP_LUA = YES ]; then
+         NGX_ADDONS="$NGX_ADDONS modules/ngx_http_lua_module"
+    fi
+
     if [ $HTTP_MEMCACHED = YES ]; then
         ngx_module_name=ngx_http_memcached_module
         ngx_module_incs=
