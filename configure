@@ -11,7 +11,7 @@ export LC_ALL
 . auto/init
 . auto/sources
 
-test -d $NGX_OBJS || mkdir $NGX_OBJS
+test -d $NGX_OBJS || mkdir -p $NGX_OBJS
 
 echo > $NGX_AUTO_HEADERS_H
 echo > $NGX_AUTOCONF_ERR
@@ -22,6 +22,7 @@ echo "#define NGX_CONFIGURE \"$NGX_CONFIGURE\"" > $NGX_AUTO_CONFIG_H
 if [ $NGX_DEBUG = YES ]; then
     have=NGX_DEBUG . auto/have
 fi
+
 
 if test -z "$NGX_PLATFORM"; then
     echo "checking for OS"
@@ -35,7 +36,7 @@ if test -z "$NGX_PLATFORM"; then
     NGX_PLATFORM="$NGX_SYSTEM:$NGX_RELEASE:$NGX_MACHINE";
 
     case "$NGX_SYSTEM" in
-        MINGW32_*)
+        MINGW32_* | MINGW64_* | MSYS_*)
             NGX_PLATFORM=win32
         ;;
     esac
@@ -107,5 +108,9 @@ have=NGX_HTTP_SCGI_TEMP_PATH value="\"$NGX_HTTP_SCGI_TEMP_PATH\""
 
 have=NGX_USER value="\"$NGX_USER\"" . auto/define
 have=NGX_GROUP value="\"$NGX_GROUP\"" . auto/define
+
+if [ ".$NGX_BUILD" != "." ]; then
+    have=NGX_BUILD value="\"$NGX_BUILD\"" . auto/define
+fi
 
 . auto/summary
