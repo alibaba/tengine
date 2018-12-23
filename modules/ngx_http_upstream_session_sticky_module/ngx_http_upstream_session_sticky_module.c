@@ -603,8 +603,8 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
             ctx->sid.len = server[i].sid.len;
             ctx->sid.data = server[i].sid.data;
-
-            sspd->rrp.current = i;
+            /* TODO support */
+            /* sspd->rrp.current = i; */
             ctx->tries--;
 
             return NGX_OK;
@@ -1351,8 +1351,7 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 
     sscf->number = number;
 
-    for (i = 0; i < number; i++) {
-        peer = &peers->peer[i];
+    for (peer = peers->peer, i = 0; peer; peer = peer->next, i++) {
 
         sscf->server[i].name = &peer->name;
         sscf->server[i].sockaddr = peer->sockaddr;
