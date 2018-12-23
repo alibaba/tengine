@@ -806,138 +806,6 @@ static ngx_http_upstream_check_peers_t *check_peers_ctx = NULL;
 
 
 ngx_uint_t
-ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
-    ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer_addr)
-{
-    ngx_uint_t                            index;
-    ngx_http_upstream_check_peer_t       *peer;
-    ngx_http_upstream_check_peers_t      *peers;
-    ngx_http_upstream_check_srv_conf_t   *ucscf;
-    ngx_http_upstream_check_main_conf_t  *ucmcf;
-
-    if (us->srv_conf == NULL) {
-        return NGX_ERROR;
-    }
-
-    ucscf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_check_module);
-
-    if(ucscf->check_interval == 0) {
-        return NGX_ERROR;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0,
-                   "http upstream check add upstream process: %ui",
-                   ngx_process);
-
-    if (ngx_process == NGX_PROCESS_WORKER) {
-        return ngx_http_upstream_check_add_dynamic_peer(cf->pool, us, peer_addr);
-    }
-
-    ucmcf = ngx_http_conf_get_module_main_conf(cf,
-                                               ngx_http_upstream_check_module);
-    peers = ucmcf->peers;
-
-    if (ucscf->unique) {
-        index = ngx_http_upstream_check_unique_peer(peers, peer_addr, ucscf);
-        if (index != (ngx_uint_t) NGX_ERROR) {
-            return index;
-        }
-    }
-
-    peer = ngx_array_push(&peers->peers);
-    if (peer == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_memzero(peer, sizeof(ngx_http_upstream_check_peer_t));
-
-    peer->index = peers->peers.nelts - 1;
-    peer->conf = ucscf;
-    peer->upstream_name = &us->host;
-    peer->peer_addr = peer_addr;
-
-    if (ucscf->port) {
-        peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
-        if (peer->check_peer_addr == NULL) {
-            return NGX_ERROR;
-        }
-
-        if (ngx_http_upstream_check_addr_change_port(cf->pool,
-                peer->check_peer_addr, peer_addr, ucscf->port)
-            != NGX_OK) {
-
-            return NGX_ERROR;
-        }
-
-    } else {
-        peer->check_peer_addr = peer->peer_addr;
-    }
-
-    peers->checksum +=
-        ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
-
-    return peer->index;
-}
-
-
-static ngx_int_t
-ngx_http_upstream_check_addr_change_port(ngx_pool_t *pool, ngx_addr_t *dst,
-    ngx_addr_t *src, ngx_uint_t port)
-{
-    size_t                len;
-    u_char               *p;
-    struct sockaddr_in   *sin;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6  *sin6;
-#endif
-
-    dst->socklen = src->socklen;
-    dst->sockaddr = ngx_palloc(pool, dst->socklen);
-    if (dst->sockaddr == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(dst->sockaddr, src->sockaddr, dst->socklen);
-
-    switch (dst->sockaddr->sa_family) {
-
-    case AF_INET:
-
-        len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
-        sin = (struct sockaddr_in *) dst->sockaddr;
-        sin->sin_port = htons(port);
-
-        break;
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-
-        len = NGX_INET6_ADDRSTRLEN + sizeof(":65535") - 1;
-        sin6 = (struct sockaddr_in6 *) dst->sockaddr;
-        sin6->sin6_port = htons(port);
-
-        break;
-#endif
-
-    default:
-        return NGX_ERROR;
-    }
-
-    p = ngx_pnalloc(pool, len);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
-
-    len = ngx_sock_ntop(dst->sockaddr, dst->socklen, p, len, 1);
-
-    dst->name.len = len;
-    dst->name.data = p;
-
-    return NGX_OK;
-}
-
-
-ngx_uint_t
 ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer_addr)
 {
@@ -1078,6 +946,138 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
         ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
 
     return peer->index;
+}
+
+
+ngx_uint_t
+ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
+    ngx_http_upstream_srv_conf_t *us, ngx_addr_t *peer_addr)
+{
+    ngx_uint_t                            index;
+    ngx_http_upstream_check_peer_t       *peer;
+    ngx_http_upstream_check_peers_t      *peers;
+    ngx_http_upstream_check_srv_conf_t   *ucscf;
+    ngx_http_upstream_check_main_conf_t  *ucmcf;
+
+    if (us->srv_conf == NULL) {
+        return NGX_ERROR;
+    }
+
+    ucscf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_check_module);
+
+    if(ucscf->check_interval == 0) {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, cf->log, 0,
+                   "http upstream check add upstream process: %ui",
+                   ngx_process);
+
+    if (ngx_process == NGX_PROCESS_WORKER) {
+        return ngx_http_upstream_check_add_dynamic_peer(cf->pool, us, peer_addr);
+    }
+
+    ucmcf = ngx_http_conf_get_module_main_conf(cf,
+                                               ngx_http_upstream_check_module);
+    peers = ucmcf->peers;
+
+    if (ucscf->unique) {
+        index = ngx_http_upstream_check_unique_peer(peers, peer_addr, ucscf);
+        if (index != (ngx_uint_t) NGX_ERROR) {
+            return index;
+        }
+    }
+
+    peer = ngx_array_push(&peers->peers);
+    if (peer == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memzero(peer, sizeof(ngx_http_upstream_check_peer_t));
+
+    peer->index = peers->peers.nelts - 1;
+    peer->conf = ucscf;
+    peer->upstream_name = &us->host;
+    peer->peer_addr = peer_addr;
+
+    if (ucscf->port) {
+        peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
+        if (peer->check_peer_addr == NULL) {
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_upstream_check_addr_change_port(cf->pool,
+                peer->check_peer_addr, peer_addr, ucscf->port)
+            != NGX_OK) {
+
+            return NGX_ERROR;
+        }
+
+    } else {
+        peer->check_peer_addr = peer->peer_addr;
+    }
+
+    peers->checksum +=
+        ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
+
+    return peer->index;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_check_addr_change_port(ngx_pool_t *pool, ngx_addr_t *dst,
+    ngx_addr_t *src, ngx_uint_t port)
+{
+    size_t                len;
+    u_char               *p;
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6  *sin6;
+#endif
+
+    dst->socklen = src->socklen;
+    dst->sockaddr = ngx_palloc(pool, dst->socklen);
+    if (dst->sockaddr == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(dst->sockaddr, src->sockaddr, dst->socklen);
+
+    switch (dst->sockaddr->sa_family) {
+
+    case AF_INET:
+
+        len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+        sin = (struct sockaddr_in *) dst->sockaddr;
+        sin->sin_port = htons(port);
+
+        break;
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+
+        len = NGX_INET6_ADDRSTRLEN + sizeof(":65535") - 1;
+        sin6 = (struct sockaddr_in6 *) dst->sockaddr;
+        sin6->sin6_port = htons(port);
+
+        break;
+#endif
+
+    default:
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(pool, len);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    len = ngx_sock_ntop(dst->sockaddr, dst->socklen, p, len, 1);
+
+    dst->name.len = len;
+    dst->name.data = p;
+
+    return NGX_OK;
 }
 
 
