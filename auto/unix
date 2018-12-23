@@ -1025,3 +1025,11 @@ ngx_feature_test='struct addrinfo *res;
                   if (getaddrinfo("localhost", NULL, NULL, &res) != 0) return 1;
                   freeaddrinfo(res)'
 . auto/feature
+
+# Auto read nameserver from /etc/resolv.conf.
+ if [ -f "/etc/resolv.conf" ]; then
+    have=NGX_RESOLVER_FILE
+    value=\"/etc/resolv.conf\"
+    . auto/define
+fi
+
