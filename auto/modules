@@ -940,6 +940,10 @@ if [ $HTTP = YES ]; then
 
         . auto/module
     fi
+
+    if [ $HTTP_UPSTREAM_RBTREE = YES ]; then
+        have=NGX_HTTP_UPSTREAM_RBTREE . auto/have
+    fi
 fi
 
 

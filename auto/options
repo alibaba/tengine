@@ -106,6 +106,7 @@ HTTP_UPSTREAM_IP_HASH=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_RANDOM=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
+HTTP_UPSTREAM_RBTREE=YES
 HTTP_UPSTREAM_ZONE=YES
 
 # STUB
@@ -420,6 +421,9 @@ $0: warning: the \"--with-sha1-asm\" option is deprecated"
 
         --with-jemalloc)                 USE_JEMALLOC=YES           ;;
         --with-jemalloc=*)               JEMALLOC="$value"          ;;
+
+        --without-http-upstream-rbtree)  HTTP_UPSTREAM_RBTREE=NO    ;;
+
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
         --test-build-epoll)              NGX_TEST_BUILD_EPOLL=YES   ;;
@@ -533,6 +537,8 @@ cat << END
   --with-http_perl_module=dynamic    enable dynamic ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
   --with-perl=PATH                   set perl binary pathname
+
+  --without-http-upstream-rbtree     disable using rbtree for upstream lookup
 
   --with-http_lua_module             enable ngx_http_lua_module (will also enable --with-md5 and --with-sha1)
   --with-luajit-inc=PATH             set LuaJIT headers path (where lua.h/lauxlib.h/... are located)
