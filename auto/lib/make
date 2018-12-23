@@ -22,3 +22,8 @@ fi
 if [ $USE_PERL != NO ]; then
     . auto/lib/perl/make
 fi
+
+if [ $JEMALLOC != NONE ]; then
+    . auto/lib/jemalloc/make
+fi
+

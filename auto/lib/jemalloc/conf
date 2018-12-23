@@ -1,0 +1,56 @@
+
+# Copyright (C) 2010-2015 Alibaba Group Holding Limited
+
+
+if [ $JEMALLOC != NONE ]; then
+
+    case "$NGX_CC_NAME" in
+
+        *)
+            have=NGX_JEMALLOC . auto/have
+            LINK_DEPS="$LINK_DEPS $JEMALLOC/lib/libjemalloc.a"
+            CORE_LIBS="$CORE_LIBS $JEMALLOC/lib/libjemalloc.a -lpthread"
+            CFLAGS="$CFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"
+        ;;
+
+    esac
+
+elif [ $USE_JEMALLOC = YES ]; then
+    
+    if [ "$NGX_PLATFORM" != win32 ]; then
+        JEMALLOC=NO
+
+        # FreeBSD, Mac OS X, Linux
+
+        ngx_feature="jemalloc library"
+        ngx_feature_name="NGX_JEMALLOC"
+        ngx_feature_run=no
+        ngx_feature_incs=
+        ngx_feature_path=
+        ngx_feature_libs="-ljemalloc"
+        ngx_feature_test=
+        . auto/feature
+
+
+        if [ $ngx_found = yes ]; then
+            if [ $CC = gcc ]; then
+                CFLAGS="$CFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"
+            fi        
+            CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+            JEMALLOC=YES
+        fi
+    fi
+
+    if [ $JEMALLOC != YES ]; then
+cat << END
+
+$0: error: the --with-jemalloc requires the jemalloc library.
+You can either do not enable this feature, or install the jemalloc 
+library into the system, or build the jemalloc library statically from 
+the source with nginx by using --with-jemalloc=<path> option.
+
+END
+        exit 1
+    fi
+
+fi

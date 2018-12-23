@@ -52,3 +52,8 @@ fi
 if [ $NGX_LIBATOMIC != NO ]; then
     . auto/lib/libatomic/conf
 fi
+
+if [ $JEMALLOC != NO ]; then
+    . auto/lib/jemalloc/conf
+fi
+

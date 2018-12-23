@@ -40,6 +40,16 @@ case $NGX_LIBATOMIC in
     *)     echo "  + using libatomic_ops library: $NGX_LIBATOMIC" ;;
 esac
 
+if [ $USE_JEMALLOC = NO ]; then
+    
+    case $JEMALLOC in
+        NONE)  echo "  + jemalloc library is disabled" ;;
+        *)     echo "  + using jemalloc library: $JEMALLOC" ;;
+    esac
+else
+    echo "  + using system jemalloc library"
+fi
+
 echo
 
 

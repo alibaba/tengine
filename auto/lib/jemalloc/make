@@ -1,0 +1,27 @@
+
+# Copyright (C) 2010-2015 Alibaba Group Holding Limited
+
+
+done=NO
+
+
+case "$NGX_PLATFORM" in
+
+    *)
+        cat << END                                            >> $NGX_MAKEFILE
+
+$JEMALLOC/Makefile:	$NGX_MAKEFILE
+	cd $JEMALLOC \\
+	&& if [ -f Makefile ]; then \$(MAKE) distclean; fi \\
+	&& CC="\$(CC)" \\
+	./configure
+
+$JEMALLOC/lib/libjemalloc.a:	$JEMALLOC/Makefile
+	cd $JEMALLOC \\
+	&& \$(MAKE)
+
+END
+
+    ;;
+
+esac
