@@ -16,9 +16,6 @@ NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
 NGX_ERR=$NGX_OBJS/autoconf.err
 MAKEFILE=$NGX_OBJS/Makefile
 
-# dso
-NGX_DSO_COMPILE=$NGX_OBJS/dso_tool
-NGX_MODULE_STUBS=$NGX_OBJS/module_stubs
 
 NGX_PCH=
 NGX_USE_PCH=
