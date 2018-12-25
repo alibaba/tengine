@@ -101,6 +101,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_proc.h>
 #endif
 
+
 #define LF     (u_char) '\n'
 #define CR     (u_char) '\r'
 #define CRLF   "\r\n"

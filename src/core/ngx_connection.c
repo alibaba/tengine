@@ -1054,6 +1054,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
                         }
                     }
 #endif
+
                     ngx_del_event(c->read, NGX_READ_EVENT, 0);
 
                 } else {

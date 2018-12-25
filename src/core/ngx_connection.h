@@ -133,6 +133,7 @@ struct ngx_connection_s {
 #if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_socket_t        async_fd;
 #endif
+
     ngx_recv_pt         recv;
     ngx_send_pt         send;
     ngx_recv_chain_pt   recv_chain;
