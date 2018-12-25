@@ -108,7 +108,9 @@ typedef struct {
     time_t                           fail_timeout;
     ngx_msec_t                       slow_start;
     ngx_uint_t                       down;
+#if (T_NGX_HTTP_UPSTREAM_ID)    
     ngx_str_t                        id;
+#endif
     ngx_str_t                        host;
 
     unsigned                         backup:1;
