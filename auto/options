@@ -312,6 +312,9 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-lua-inc=*)                LUA_INC="$value"           ;;
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
 
+        --with-libyajl-inc=*)            LIBYAJL_INC="$value"       ;;
+        --with-libyajl-lib=*)            LIBYAJL_LIB="$value"       ;;
+
         # STUB
         --with-http_stub_status_module)  HTTP_STUB_STATUS=YES       ;;
 
@@ -547,6 +550,8 @@ cat << END
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
+  --with-libyajl-inc=PATH            set libyajl headers path (where yajl.h is located)
+  --with-libyajl-lib=PATH            set libyajl library path (where libyajl.{a,so} is located)
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
                                      http client request body temporary files

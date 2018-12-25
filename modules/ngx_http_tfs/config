@@ -1,0 +1,56 @@
+ngx_addon_name="ngx_http_tfs_module"
+HTTP_MODULES="$HTTP_MODULES ngx_http_tfs_module"
+
+HTTP_TFS=YES
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS 
+                      $ngx_addon_dir/ngx_tfs_common.c \
+                      $ngx_addon_dir/ngx_http_tfs.c \
+                      $ngx_addon_dir/ngx_http_tfs_module.c \
+                      $ngx_addon_dir/ngx_http_tfs_restful.c \
+                      $ngx_addon_dir/ngx_http_tfs_serialization.c \
+                      $ngx_addon_dir/ngx_http_connection_pool.c \
+                      $ngx_addon_dir/ngx_http_tfs_json.c \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_info.c \
+                      $ngx_addon_dir/ngx_http_tfs_raw_fsname.c \
+                      $ngx_addon_dir/ngx_http_tfs_tair_helper.c \
+                      $ngx_addon_dir/ngx_http_tfs_duplicate.c \
+                      $ngx_addon_dir/ngx_http_tfs_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_local_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_remote_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_timers.c \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_name_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_data_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_root_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_meta_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_peer_connection.c \
+                      $ngx_addon_dir/ngx_http_tfs_server_handler.c "
+
+
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir"
+
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_http_tfs.h \
+                      $ngx_addon_dir/ngx_http_tfs_errno.h \
+                      $ngx_addon_dir/ngx_tfs_common.h \
+                      $ngx_addon_dir/ngx_http_tfs_restful.h \
+                      $ngx_addon_dir/ngx_http_tfs_restful.h \
+                      $ngx_addon_dir/ngx_http_tfs_protocol.h \
+                      $ngx_addon_dir/ngx_http_tfs_serialization.h \
+                      $ngx_addon_dir/ngx_http_connection_pool.h \
+                      $ngx_addon_dir/ngx_http_tfs_json.h \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_info.h \
+                      $ngx_addon_dir/ngx_http_tfs_raw_fsname.h \
+                      $ngx_addon_dir/ngx_http_tfs_tair_helper.h \
+                      $ngx_addon_dir/ngx_http_tfs_duplicate.h \
+                      $ngx_addon_dir/ngx_http_tfs_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_local_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_remote_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_timers.h \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_name_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_data_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_root_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_meta_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_peer_connection.h \
+                      $ngx_addon_dir/ngx_http_tfs_server_handler.h "
