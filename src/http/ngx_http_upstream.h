@@ -111,7 +111,10 @@ typedef struct {
 #if (T_NGX_HTTP_UPSTREAM_ID)    
     ngx_str_t                        id;
 #endif
+
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     ngx_str_t                        host;
+#endif
 
     unsigned                         backup:1;
 
@@ -362,7 +365,9 @@ struct ngx_http_upstream_s {
     ngx_http_upstream_headers_in_t   headers_in;
 
     ngx_http_upstream_resolved_t    *resolved;
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     ngx_resolver_ctx_t              *dyn_resolve_ctx;
+#endif
 
     ngx_buf_t                        from_client;
 

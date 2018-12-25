@@ -38,6 +38,9 @@ static void ngx_http_upstream_rd_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     ngx_event_t *ev);
+#if (!T_NGX_HTTP_DYNAMIC_RESOLVE)
+static
+#endif
 void ngx_http_upstream_connect(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
@@ -102,6 +105,9 @@ static void ngx_http_upstream_dummy_handler(ngx_http_request_t *r,
 static void ngx_http_upstream_next(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_uint_t ft_type);
 static void ngx_http_upstream_cleanup(void *data);
+#if (!T_NGX_HTTP_DYNAMIC_RESOLVE)
+static
+#endif
 void ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc);
 
@@ -1561,6 +1567,9 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 }
 
 
+#if (!T_NGX_HTTP_DYNAMIC_RESOLVE)
+static
+#endif
 void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
@@ -1587,6 +1596,11 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->header_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
+    if (rc == NGX_YIELD) {
+        return;
+    }    
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http upstream connect: %i", rc);
@@ -4326,7 +4340,9 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->peer.connection = NULL;
     }
 
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
     u->peer.resolved = 0;
+#endif
     ngx_http_upstream_connect(r, u);
 }
 
@@ -4343,6 +4359,9 @@ ngx_http_upstream_cleanup(void *data)
 }
 
 
+#if (!T_NGX_HTTP_DYNAMIC_RESOLVE)
+static
+#endif
 void
 ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_int_t rc)
@@ -4366,10 +4385,12 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         u->resolved->ctx = NULL;
     }
 
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     if (u->dyn_resolve_ctx) {
         ngx_resolve_name_done(u->dyn_resolve_ctx);
         u->dyn_resolve_ctx = NULL;
     }
+#endif    
 
     if (u->state && u->state->response_time) {
         u->state->response_time = ngx_current_msec - u->state->response_time;
@@ -6008,6 +6029,10 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->fail_timeout = fail_timeout;
 #if (T_NGX_HTTP_UPSTREAM_ID) 
     us->id = id;
+#endif    
+
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE) 
+    us->host = u.host;
 #endif    
 
     return NGX_CONF_OK;

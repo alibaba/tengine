@@ -24,7 +24,10 @@ struct ngx_http_upstream_rr_peer_s {
 #if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                       id;
 #endif
+
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     ngx_str_t                       host;
+#endif
 
     ngx_int_t                       current_weight;
     ngx_int_t                       effective_weight;
