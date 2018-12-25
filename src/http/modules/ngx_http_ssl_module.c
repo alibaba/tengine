@@ -262,12 +262,14 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, stapling_verify),
       NULL },
 
+#if (T_NGX_SSL_EARLY_DATA)
     { ngx_string("ssl_early_data"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, early_data),
       NULL },
+#endif
 
       ngx_null_command
 };
@@ -634,7 +636,9 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->session_ticket_keys = NGX_CONF_UNSET_PTR;
     sscf->stapling = NGX_CONF_UNSET;
     sscf->stapling_verify = NGX_CONF_UNSET;
+#if (T_NGX_SSL_EARLY_DATA)
     sscf->early_data = NGX_CONF_UNSET;
+#endif
 
     return sscf;
 }
@@ -730,7 +734,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->stapling_responder,
                          prev->stapling_responder, "");
 
+#if (T_NGX_SSL_EARLY_DATA)
     ngx_conf_merge_value(conf->early_data, prev->early_data, 1);
+#endif
 
     conf->ssl.log = cf->log;
 

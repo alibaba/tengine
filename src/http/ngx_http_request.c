@@ -800,7 +800,9 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
 #endif
 
+#if (T_NGX_SSL_EARLY_DATA)
             c->ssl->enable_early_data = sscf->early_data;
+#endif
 
             rc = ngx_ssl_handshake(c);
 
