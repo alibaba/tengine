@@ -57,7 +57,3 @@ if [ $JEMALLOC != NO ]; then
     . auto/lib/jemalloc/conf
 fi
 
-if [ $HTTP_TFS = YES ]; then
-    . auto/lib/libyajl/conf
-fi
-
