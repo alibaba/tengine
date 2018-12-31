@@ -55,6 +55,7 @@ static u_char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
 static u_char ngx_http_server_build_string[] = "Server: " NGINX_VER_BUILD CRLF;
 #endif
 
+
 static ngx_str_t ngx_http_status_lines[] = {
 
     ngx_string("200 OK"),

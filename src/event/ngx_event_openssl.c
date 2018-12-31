@@ -1449,8 +1449,9 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
 ngx_int_t
 ngx_ssl_handshake(ngx_connection_t *c)
 {
-    int         n, sslerr;
-    ngx_err_t   err;
+    int        n, sslerr;
+    ngx_err_t  err;
+
 #if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
     ngx_time_t *tp;
 #endif

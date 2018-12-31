@@ -1389,6 +1389,7 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
                 }
             }
 #endif
+
             if (ngx_del_event(ev, event, 0) != NGX_OK) {
                 ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1523,6 +1524,7 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
             }
         }
 #endif
+
         if (ngx_del_event(ev, event, 0) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1941,10 +1943,9 @@ ngx_http_upstream_ssl_name(ngx_http_request_t *r, ngx_http_upstream_t *u,
                    "upstream SSL server name: \"%s\"", name.data);
 
     if (SSL_set_tlsext_host_name(c->ssl->connection,
-#ifdef OPENSSL_IS_BORINGSSL
-	    (const char *)
-#endif
-	    name.data) == 0) {
+                                 (char *) name.data)
+        == 0)
+    {
         ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0,
                       "SSL_set_tlsext_host_name(\"%s\") failed", name.data);
         return NGX_ERROR;
@@ -4184,8 +4185,9 @@ static void
 ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t ft_type)
 {
-    ngx_msec_t                 timeout;
-    ngx_uint_t                 status, state;
+    ngx_msec_t  timeout;
+    ngx_uint_t  status, state;
+
 #if (T_NGX_HTTP_UPSTREAM_RETRY_CC)
     ngx_http_core_loc_conf_t  *clcf;
 #endif
