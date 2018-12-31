@@ -425,7 +425,7 @@ main(int argc, char *const *argv)
 static void
 ngx_show_version_info(void)
 {
-#if (T_NGX_INFO) 
+#if (T_NGX_SERVER_INFO) 
     ngx_write_stderr("Tengine version: " TENGINE_VER " (" NGINX_VER ")"
                      NGX_LINEFEED);
 #else
