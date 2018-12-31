@@ -757,9 +757,13 @@ ngx_http_send_special_response(ngx_http_request_t *r,
     }
 
 #else 
-    if (clcf->server_tokens) {
+    if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
         len = sizeof(ngx_http_error_full_tail) - 1;
         tail = ngx_http_error_full_tail;
+
+    } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+        len = sizeof(ngx_http_error_build_tail) - 1;
+        tail = ngx_http_error_build_tail;
 
     } else {
         len = sizeof(ngx_http_error_tail) - 1;
