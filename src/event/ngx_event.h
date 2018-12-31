@@ -249,7 +249,7 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define NGX_USE_LOWAT_EVENT      0x00000010
 
 /*
- * The event filter requires to do i/o operation until EAGAIN: epoll, rtsig.
+ * The event filter requires to do i/o operation until EAGAIN: epoll.
  */
 #define NGX_USE_GREEDY_EVENT     0x00000020
 
