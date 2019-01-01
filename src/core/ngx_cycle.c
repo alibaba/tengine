@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 
+#if (T_NGX_SHOW_INFO)
+extern ngx_uint_t  ngx_modules_n;
+#endif
 
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
@@ -28,6 +31,10 @@ static ngx_event_t     ngx_shutdown_event;
 ngx_uint_t             ngx_test_config;
 ngx_uint_t             ngx_dump_config;
 ngx_uint_t             ngx_quiet_mode;
+#if (T_NGX_SHOW_INFO)
+ngx_uint_t             ngx_show_modules;
+ngx_uint_t             ngx_show_directives;
+#endif
 
 
 /* STUB NAME */
@@ -286,6 +293,39 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
+
+#if (T_NGX_SHOW_INFO)
+    ngx_command_t     *cmd;
+    if (ngx_show_directives) {
+        ngx_log_stderr(0, "all available directives:");
+
+        for (i = 0; i < cycle->modules_n; i++) {
+            ngx_log_stderr(0, "%s:", cycle->modules[i]->name);
+
+            cmd = cycle->modules[i]->commands;
+            if(cmd == NULL) {
+                continue;
+            }
+
+            for ( /* void */ ; cmd->name.len; cmd++) {
+                ngx_log_stderr(0, "    %V", &cmd->name);
+            }
+        }
+    }
+
+    if (ngx_show_modules) {
+        ngx_log_stderr(0, "loaded modules:");
+
+        for (i = 0; i < cycle->modules_n; i++) {
+            if (i < ngx_modules_n) {
+                ngx_log_stderr(0, "    %s (static)", cycle->modules[i]->name);
+
+            } else {
+                ngx_log_stderr(0, "    %s (dynamic)", cycle->modules[i]->name);
+            }
+        }
+    }
+#endif
 
     if (ngx_test_config && !ngx_quiet_mode) {
         ngx_log_stderr(0, "the configuration file %s syntax is ok",

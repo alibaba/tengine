@@ -459,6 +459,10 @@ ngx_show_version_info(void)
                                ")" NGX_LINEFEED
             "  -g directives : set global directives out of configuration "
                                "file" NGX_LINEFEED NGX_LINEFEED
+#if (T_NGX_SHOW_INFO)
+            "  -m            : show all modules and exit" NGX_LINEFEED
+            "  -l            : show all directives and exit" NGX_LINEFEED
+#endif
         );
     }
 
@@ -831,6 +835,20 @@ ngx_get_options(int argc, char *const *argv)
             case 'q':
                 ngx_quiet_mode = 1;
                 break;
+
+#if (T_NGX_SHOW_INFO)
+            case 'l':
+                ngx_test_config = 1;
+                ngx_show_version = 1;
+                ngx_show_directives = 1;
+                break;
+
+            case 'm':
+                ngx_test_config = 1;
+                ngx_show_version = 1;
+                ngx_show_modules = 1;
+                break;
+#endif
 
             case 'p':
                 if (*p) {

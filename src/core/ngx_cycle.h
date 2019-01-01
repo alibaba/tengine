@@ -148,6 +148,10 @@ extern ngx_module_t           ngx_core_module;
 extern ngx_uint_t             ngx_test_config;
 extern ngx_uint_t             ngx_dump_config;
 extern ngx_uint_t             ngx_quiet_mode;
+#if (T_NGX_SHOW_INFO)
+extern ngx_uint_t             ngx_show_modules;
+extern ngx_uint_t             ngx_show_directives;
+#endif
 
 
 #endif /* _NGX_CYCLE_H_INCLUDED_ */
