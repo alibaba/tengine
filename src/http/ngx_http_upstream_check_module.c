@@ -1811,6 +1811,14 @@ ngx_http_upstream_check_send_handler(ngx_event_t *event)
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http check send done.");
         peer->state = NGX_HTTP_CHECK_SEND_DONE;
         c->requests++;
+        
+        if(c->read->ready == 1) {
+            c->read->active = 0;
+            c->read->ready = 0;
+            if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                goto check_send_fail;
+            }
+        }
     }
 
     return;
@@ -1840,6 +1848,9 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
 
     if (peer->state != NGX_HTTP_CHECK_SEND_DONE) {
 
+        if(ngx_http_upstream_check_peek_one_byte(c) != NGX_OK) {
+            goto check_recv_fail;
+        }
         if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
             goto check_recv_fail;
         }
