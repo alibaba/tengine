@@ -249,6 +249,7 @@ struct ngx_http_upstream_check_srv_conf_s {
 
     ngx_check_conf_t                        *check_type_conf;
     ngx_str_t                                send;
+    ngx_str_t                                expect;
 
     union {
         ngx_uint_t                           return_code;
@@ -395,6 +396,9 @@ static ngx_int_t ngx_http_upstream_check_http_parse(
 static ngx_int_t ngx_http_upstream_check_parse_status_line(
     ngx_http_upstream_check_ctx_t *ctx, ngx_buf_t *b,
     ngx_http_status_t *status);
+static ngx_int_t ngx_http_upstream_check_parse_body_line(
+    ngx_http_upstream_check_ctx_t *ctx, ngx_buf_t *b,
+    ngx_str_t expect);
 static void ngx_http_upstream_check_http_reinit(
     ngx_http_upstream_check_peer_t *peer);
 
@@ -474,6 +478,8 @@ static char *ngx_http_upstream_check(ngx_conf_t *cf,
 static char *ngx_http_upstream_check_keepalive_requests(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_upstream_check_http_send(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
+static char *ngx_http_upstream_check_http_expect(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_upstream_check_http_expect_alive(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
@@ -560,6 +566,13 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
       0,
       0,
       NULL },
+    { ngx_string("check_http_expect"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_http_upstream_check_http_expect,
+      0,
+      0,
+      NULL },
+
 
     { ngx_string("check_http_expect_alive"),
       NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
@@ -1972,13 +1985,36 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 {
     ngx_int_t                            rc;
     ngx_uint_t                           code, code_n;
+    ngx_str_t                            expect;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     ucscf = peer->conf;
     ctx = peer->check_data;
+    expect = ucscf->expect; 
+
 
     if ((ctx->recv.last - ctx->recv.pos) > 0) {
+
+        if ((&expect)->data) {
+
+            rc = ngx_http_upstream_check_parse_body_line(ctx,
+                                                         &ctx->recv,
+                                                         expect); 
+
+            if (rc == NGX_AGAIN) {
+                return rc;
+            }
+
+            if (rc == NGX_ERROR) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "http parse body line error with peer: %V ",
+                    &peer->check_peer_addr->name);
+                return rc;
+            }
+
+	}
+	
 
         rc = ngx_http_upstream_check_parse_status_line(ctx,
                                                        &ctx->recv,
@@ -2735,6 +2771,55 @@ done:
     ctx->state = sw_start;
 
     return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_upstream_check_parse_body_line(ngx_http_upstream_check_ctx_t *ctx,
+    ngx_buf_t *b, ngx_str_t expect)
+{
+    u_char *p;
+    ngx_int_t crlf;
+
+    /* very simple response parser: ignore CR and only count consecutive LFs,
+     * stop with contentptr pointing to first char after the double CRLF or
+     * to '\0' if crlf < 2.
+     */
+    crlf = 0;
+    for (p = b->pos; p < b->last; p++) {
+        if (crlf >= 2)
+            break;
+        if (*p == CR)
+            continue;
+        else if (*p == LF)
+            crlf++;
+        else
+            crlf = 0;
+    }
+
+    /* Check that response contains a body... */
+   if (crlf < 2) {
+       ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "HTTP content check could not find a response body");
+
+       return NGX_ERROR;
+   }
+
+    /* Check that response body is not empty... */
+   if (*p == '\0') {
+       ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "HTTP content check found empty response body");
+
+       return NGX_ERROR;
+   }
+
+
+    /* Check the response content against the supplied string */
+    if (ngx_strstr(p, (&expect)->data) != NULL) {
+
+         return NGX_OK;	
+    }
+
+    return NGX_AGAIN;
 }
 
 
@@ -3803,6 +3888,23 @@ ngx_http_upstream_check_http_send(ngx_conf_t *cf, ngx_command_t *cmd,
     }
 
     ucscf->send = value[1];
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_http_upstream_check_http_expect(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
+{
+    ngx_str_t                           *value;
+    ngx_http_upstream_check_srv_conf_t  *ucscf;
+
+    value = cf->args->elts;
+
+    ucscf = ngx_http_conf_get_module_srv_conf(cf,
+                                              ngx_http_upstream_check_module);
+
+    ucscf->expect = value[1];
 
     return NGX_CONF_OK;
 }
