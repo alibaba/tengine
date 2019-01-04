@@ -1,4 +1,3 @@
-
 Introduction
 ------------
 Tengine is a web server originated by Taobao, the largest e-commerce website in Asia. It is based on the Nginx HTTP server and has many advanced features. Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including taobao.com and tmall.com.
@@ -42,6 +41,11 @@ To install Tengine, just follow these three steps:
 By default, it will be installed to /usr/local/nginx. You can use the '--prefix' option to specify the root directory.
 If you want to know all the 'configure' options, you should run './configure --help' for help.
 
+Or use rpmbuild to make a rpm to install,example:
+    $ rpmbuild -tb tengine-1.4.4.tar.gz
+     + Wrote: ~/rpmbuild/RPMS/x86_64/tengine-1.4.4-2.el6.x86_64.rpm
+     + Wrote: ~/rpmbuild/RPMS/x86_64/tengine-debuginfo-1.4.4-2.el6.x86_64.rpm
+    $ rpm -ivh -vvv ~/rpmbuild/RPMS/x86_64/tengine-1.4.4-2.el6.x86_64.rpm
 
 Documentation
 -------------
