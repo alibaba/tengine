@@ -69,6 +69,7 @@ typedef struct ngx_dyups_status_s {
 
 typedef struct ngx_dyups_shctx_s {
     ngx_queue_t                          msg_queue;
+    ngx_queue_t                          hist_msg_queue;
     ngx_uint_t                           version;
     ngx_dyups_status_t                  *status;
 } ngx_dyups_shctx_t;
@@ -133,6 +134,9 @@ static ngx_int_t ngx_http_dyups_init_process(ngx_cycle_t *cycle);
 static void ngx_http_dyups_exit_process(ngx_cycle_t *cycle);
 static void ngx_http_dyups_read_msg(ngx_event_t *ev);
 static void ngx_http_dyups_read_msg_locked(ngx_event_t *ev);
+static void ngx_dyups_restore_upstreams_from_hist_queue();
+static ngx_int_t ngx_http_dyups_record_msg(ngx_str_t *name, ngx_buf_t *body,
+    ngx_uint_t flag);
 static ngx_int_t ngx_http_dyups_send_msg(ngx_str_t *name, ngx_buf_t *body,
     ngx_uint_t flag);
 static void ngx_dyups_destroy_msg(ngx_slab_pool_t *shpool,
@@ -398,6 +402,7 @@ ngx_http_dyups_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
     ngx_dyups_global_ctx.shpool = shpool;
 
     ngx_queue_init(&sh->msg_queue);
+    ngx_queue_init(&sh->hist_msg_queue);
 
     sh->version = 0;
     sh->status = NULL;
@@ -621,6 +626,12 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
         }
     }
 
+    ngx_shmtx_lock(&shpool->mutex);
+
+    ngx_dyups_restore_upstreams_from_hist_queue();
+
+    ngx_shmtx_unlock(&shpool->mutex);
+
     return NGX_OK;
 }
 
@@ -741,6 +752,13 @@ ngx_dyups_delete_upstream(ngx_str_t *name, ngx_str_t *rv)
     rc = ngx_http_dyups_send_msg(name, NULL, NGX_DYUPS_DELETE);
     if (rc != NGX_OK) {
         ngx_str_set(rv, "alert: delte success but not sync to other process");
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "[dyups] %V", &rv);
+        status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    rc = ngx_http_dyups_record_msg(name, NULL, NGX_DYUPS_DELETE);
+    if (rc != NGX_OK) {
+        ngx_str_set(rv, "alert, delete success but not record to history message queue");
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "[dyups] %V", &rv);
         status = NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -1214,6 +1232,11 @@ ngx_dyups_update_upstream(ngx_str_t *name, ngx_buf_t *buf, ngx_str_t *rv)
         if (ngx_http_dyups_send_msg(name, buf, NGX_DYUPS_ADD)) {
             ngx_str_set(rv, "alert: update success "
                         "but not sync to other process");
+            status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+       
+        if (ngx_http_dyups_record_msg(name, buf, NGX_DYUPS_ADD)) {
+            ngx_str_set(rv, "alert: update success but not record to history message queue");
             status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
     }
@@ -2119,6 +2142,141 @@ ngx_http_dyups_read_msg_locked(ngx_event_t *ev)
     ngx_destroy_pool(pool);
 
     return;
+}
+
+
+static void ngx_dyups_restore_upstreams_from_hist_queue()
+{
+    ngx_slab_pool_t    *shpool;
+    ngx_dyups_msg_t    *msg;
+    ngx_queue_t        *q;
+    ngx_pool_t         *pool;
+    ngx_str_t           name, content;
+    ngx_int_t           rc;
+
+    sh = ngx_dyups_global_ctx.sh;
+    shpool = ngx_dyups_global_ctx.shpool;
+
+    if (ngx_queue_empty(&sh->hist_msg_queue)) {
+        return;
+    }
+
+    pool = ngx_create_pool(ngx_pagesize, ngx_cycle->log);
+    if (pool == NULL) {
+        return;
+    }
+
+    for (q = ngx_queue_last(&sh->hist_msg_queue);
+         q != ngx_queue_sentinel(&sh->hist_msg_queue);
+         q = ngx_queue_prev(q))
+    {
+        msg = ngx_queue_data(q, ngx_dyups_msg_t, queue);
+
+        name = msg->name;
+        content = msg->content;
+
+        rc = ngx_dyups_sync_cmd(pool, &name, &content, msg->flag);
+
+        if (rc != NGX_OK) {
+            ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, 
+                         "[dyups] restore from hist message queue err, name: %V, content: %V",
+                         &name, &content);
+        }
+    }
+
+    ngx_destroy_pool(pool);
+
+    return;
+}
+
+
+static ngx_int_t
+ngx_http_dyups_record_msg(ngx_str_t *name, ngx_buf_t *body, ngx_uint_t flag)
+{
+    ngx_slab_pool_t    *shpool;
+    ngx_dyups_msg_t    *hmsg, *msg;
+    ngx_dyups_shctx_t  *sh;
+    ngx_queue_t        *q;
+    ngx_int_t           n;
+
+    sh = ngx_dyups_global_ctx.sh;
+    shpool = ngx_dyups_global_ctx.shpool;
+
+    for (q = ngx_queue_last(&sh->hist_msg_queue);
+         q != ngx_queue_sentinel(&sh->hist_msg_queue);
+         q = ngx_queue_prev(q))
+    {
+        msg = ngx_queue_data(q, ngx_dyups_msg_t, queue);
+
+        n = ngx_memn2cmp(name->data, msg->name.data,
+                        name->len, msg->name.len);
+        if (n != 0) continue;
+
+        msg->flag = flag;
+
+        if (msg->content.data) {
+            ngx_slab_free_locked(shpool, msg->content.data);
+        }
+
+        if (body) {
+            msg->content.data = ngx_slab_alloc_locked(shpool,
+                                                    body->last - body->pos);
+            if (msg->content.data == NULL) {
+                goto failed;
+            }
+
+            ngx_memcpy(hmsg->content.data, body->pos, body->last - body->pos);
+            msg->content.len = body->last - body->pos;
+        } else {
+            msg->content.data = NULL;
+            msg->content.len = 0;
+        }
+
+        return NGX_OK;
+    }
+
+    hmsg = ngx_slab_alloc_locked(shpool, sizeof(ngx_dyups_msg_t));
+    if (hmsg == NULL) {
+        goto failed;
+    }
+
+    ngx_memzero(msg, sizeof(ngx_dyups_msg_t));
+
+    hmsg->flag = flag;
+
+    hmsg->name.data = ngx_slab_alloc_locked(shpool, name->len);
+    if (hmsg->name.data == NULL) {
+        goto failed;
+    }
+
+    ngx_memcpy(hmsg->name.data, name->data, name->len);
+    hmsg->name.len = name->len;
+
+    if (body) {
+        hmsg->content.data = ngx_slab_alloc_locked(shpool,
+                                                  body->last - body->pos);
+        if (hmsg->content.data == NULL) {
+            goto failed;
+        }
+
+        ngx_memcpy(hmsg->content.data, body->pos, body->last - body->pos);
+        hmsg->content.len = body->last - body->pos;
+
+    } else {
+        hmsg->content.data = NULL;
+        hmsg->content.len = 0;
+    }
+
+    ngx_queue_insert_head(&sh->hist_msg_queue, &hmsg->queue);
+
+    return NGX_OK;
+
+failed:
+    if (hmsg) {
+        ngx_dyups_destroy_msg(shpool, hmsg);
+    }
+
+    return NGX_ERROR;
 }
 
 
