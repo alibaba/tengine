@@ -24,7 +24,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req/)
+my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req shmem/)
 	->plan(4);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -39,8 +39,8 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    limit_req_zone   $binary_remote_addr$arg_r  zone=req:1m rate=1r/m;
-    limit_req_zone   $binary_remote_addr        zone=re2:1m rate=1r/m;
+    limit_req_zone   $binary_remote_addr $arg_r  zone=req:1m rate=30r/m;
+    limit_req_zone   $binary_remote_addr        zone=re2:1m rate=30r/m;
     limit_conn_zone  $binary_remote_addr$arg_c  zone=conn:1m;
 
     server {
@@ -68,7 +68,6 @@ http {
 
 EOF
 
-$t->write_file('req', '');
 $t->run();
 
 ###############################################################################
@@ -82,9 +81,13 @@ http_get('/req');
 # limit_req tests
 
 $s = http_get('/req', start => 1);
-ok(!IO::Select->new($s)->can_read(1), 'limit_req same key');
+SKIP: { 
+skip 'Tengine does not count when the variable arg_r is null ';
+ok(!IO::Select->new($s)->can_read(0.1), 'limit_req same key');
+}
 
-like(http_get('/req?r=2'), qr/200 OK/, 'limit_req different key');
+$s = http_get('/req?r=2', start => 1);
+ok(IO::Select->new($s)->can_read(0.1), 'limit_req different key');
 
 # limit_conn tests
 
