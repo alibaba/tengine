@@ -182,7 +182,10 @@ is(get_cookie('/expires_off', 'expires'), undef, 'expires off');
 
 # redefinition
 
+SKIP: {
+skip 'the page include req url to cause the error match, when the request returns 4xx';
 unlike(http_get('/expires_max/off'), qr/expires/, 'redefine expires');
+}
 like(http_get('/path/r'), qr!/9876543210!, 'redefine path');
 
 # requests

@@ -14,6 +14,12 @@ CORE_SRCS="$UNIX_SRCS $DARWIN_SRCS"
 ngx_spacer='
 '
 
+MAIN_LINK=
+MODULE_LINK="-shared -Wl,-undefined,dynamic_lookup"
+
+CC_AUX_FLAGS="$CC_AUX_FLAGS -D__APPLE_USE_RFC_3542"
+
+
 # kqueue
 
 echo " + kqueue found"
@@ -83,7 +89,6 @@ ngx_feature_test="int  kq;
 
 # sendfile()
 
-CC_AUX_FLAGS="$CC_AUX_FLAGS"
 ngx_feature="sendfile()"
 ngx_feature_name="NGX_HAVE_SENDFILE"
 ngx_feature_run=yes
@@ -100,7 +105,6 @@ ngx_feature_test="int s = 0, fd = 1;
 . auto/feature
 
 if [ $ngx_found = yes ]; then
-    have=NGX_HAVE_SENDFILE . auto/have
     CORE_SRCS="$CORE_SRCS $DARWIN_SENDFILE_SRCS"
 fi
 
@@ -111,6 +115,6 @@ ngx_feature_run=no
 ngx_feature_incs="#include <libkern/OSAtomic.h>"
 ngx_feature_path=
 ngx_feature_libs=
-ngx_feature_test="int32_t  lock, n;
-                  n = OSAtomicCompareAndSwap32Barrier(0, 1, &lock)"
+ngx_feature_test="int32_t  lock = 0;
+                  if (!OSAtomicCompareAndSwap32Barrier(0, 1, &lock)) return 1"
 . auto/feature

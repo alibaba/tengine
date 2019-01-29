@@ -9,6 +9,9 @@
 #define _NGX_DARWIN_CONFIG_H_INCLUDED_
 
 
+#define __APPLE_USE_RFC_3542    /* IPV6_PKTINFO */
+
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -47,6 +50,8 @@
 
 #include <sys/sysctl.h>
 #include <xlocale.h>
+
+#include <dlfcn.h>
 
 
 #ifndef IOV_MAX

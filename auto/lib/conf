@@ -7,7 +7,7 @@ if [ $USE_PCRE = YES -o $PCRE != NONE ]; then
     . auto/lib/pcre/conf
 
 else
-    if [ $USE_PCRE = DISABLED -a $HTTP_REWRITE = YES ]; then
+    if [ $USE_PCRE = DISABLED -a $HTTP = YES -a $HTTP_REWRITE = YES ]; then
 
 cat << END
 
@@ -25,60 +25,23 @@ if [ $USE_OPENSSL = YES ]; then
     . auto/lib/openssl/conf
 fi
 
-if [ $USE_MD5 = YES ]; then
-
-    if [ $USE_OPENSSL = YES ]; then
-        have=NGX_HAVE_OPENSSL_MD5_H . auto/have
-        have=NGX_OPENSSL_MD5 . auto/have
-        have=NGX_HAVE_MD5 . auto/have
-        MD5=YES
-        MD5_LIB=OpenSSL
-
-    else
-        . auto/lib/md5/conf
-    fi
-
-fi
-
-if [ $USE_SHA1 = YES ]; then
-
-    if [ $USE_OPENSSL = YES ]; then
-        have=NGX_HAVE_OPENSSL_SHA1_H . auto/have
-        have=NGX_HAVE_SHA1 . auto/have
-        SHA1=YES
-        SHA1_LIB=OpenSSL
-
-    else
-        . auto/lib/sha1/conf
-    fi
-
-fi
-
 if [ $USE_ZLIB = YES ]; then
     . auto/lib/zlib/conf
 fi
 
-if [ $USE_LIBXSLT = YES ]; then
+if [ $USE_LIBXSLT != NO ]; then
     . auto/lib/libxslt/conf
 fi
 
-if [ $USE_LIBGD = YES ]; then
+if [ $USE_LIBGD != NO ]; then
     . auto/lib/libgd/conf
 fi
 
-if [ $USE_PERL = YES ]; then
+if [ $USE_PERL != NO ]; then
     . auto/lib/perl/conf
 fi
 
-if [ $HTTP_LUA_SHARED = YES ]; then
-    . auto/lib/lua/conf
-fi
-
-if [ $HTTP_TFS = YES ] || [ $HTTP_TFS_SHARED = YES ]; then
-    . auto/lib/libyajl/conf
-fi
-
-if [ $HTTP_GEOIP = YES ] || [ $HTTP_GEOIP_SHARED = YES ]; then
+if [ $USE_GEOIP != NO ]; then
     . auto/lib/geoip/conf
 fi
 
@@ -93,3 +56,4 @@ fi
 if [ $JEMALLOC != NO ]; then
     . auto/lib/jemalloc/conf
 fi
+
