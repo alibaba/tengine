@@ -26,6 +26,7 @@
 typedef struct {
     ngx_str_t                           sid;
     ngx_str_t                          *name;
+    ngx_http_upstream_rr_peer_t        *peer;
     struct sockaddr                    *sockaddr;
     socklen_t                           socklen;
 
@@ -603,8 +604,7 @@ ngx_http_upstream_session_sticky_get_peer(ngx_peer_connection_t *pc, void *data)
 
             ctx->sid.len = server[i].sid.len;
             ctx->sid.data = server[i].sid.data;
-            /* TODO support */
-            /* sspd->rrp.current = i; */
+            sspd->rrp.current = server[i].peer;
             ctx->tries--;
 
             return NGX_OK;
@@ -1356,6 +1356,8 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
         sscf->server[i].name = &peer->name;
         sscf->server[i].sockaddr = peer->sockaddr;
         sscf->server[i].socklen = peer->socklen;
+
+        sscf->server[i].peer = peer;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
         sscf->server[i].check_index = peer->check_index;
