@@ -24,9 +24,6 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http sub/);
 
-plan(skip_all => 'leaves coredump') unless $ENV{TEST_NGINX_UNSAFE}
-	or $t->has_version('1.9.5');
-
 $t->plan(1)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%

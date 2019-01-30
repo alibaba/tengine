@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite sub/)
+my $t = Test::Nginx->new()->has(qw/http rewrite sub/)->plan(7)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -60,7 +60,7 @@ http {
 
 EOF
 
-$t->try_run('no multiple sub_filter')->plan(7);
+$t->run();
 
 ###############################################################################
 

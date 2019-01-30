@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
+#include <ngx_http_v2_module.h>
+#endif
 
 typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
     ngx_pool_t *pool, ngx_str_t *s);
@@ -38,7 +41,9 @@ static ngx_int_t ngx_http_ssl_variable(ngx_http_request_t *r,
 
 static ngx_int_t ngx_http_ssl_add_variables(ngx_conf_t *cf);
 static void *ngx_http_ssl_create_srv_conf(ngx_conf_t *cf);
+#if (T_NGX_HTTP_SSL_VCE)
 static void *ngx_http_ssl_create_loc_conf(ngx_conf_t *cf);
+#endif
 static char *ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
@@ -157,12 +162,14 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, verify),
       &ngx_http_ssl_verify },
 
+#if (T_NGX_HTTP_SSL_VCE)
     { ngx_string("ssl_verify_client_exception"),
       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_ssl_loc_conf_t, verify_exception),
       NULL },
+#endif
 
     { ngx_string("ssl_verify_depth"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
@@ -255,12 +262,14 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, stapling_verify),
       NULL },
 
+#if (T_NGX_SSL_EARLY_DATA)
     { ngx_string("ssl_early_data"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, early_data),
       NULL },
+#endif
 
       ngx_null_command
 };
@@ -276,7 +285,11 @@ static ngx_http_module_t  ngx_http_ssl_module_ctx = {
     ngx_http_ssl_create_srv_conf,          /* create server configuration */
     ngx_http_ssl_merge_srv_conf,           /* merge server configuration */
 
+#if (T_NGX_HTTP_SSL_VCE)
     ngx_http_ssl_create_loc_conf,          /* create location configuration */
+#else
+    NULL,                                  /* create location configuration */
+#endif
     NULL                                   /* merge location configuration */
 };
 
@@ -357,6 +370,11 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
     { ngx_string("ssl_client_v_remain"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+    { ngx_string("ssl_handshakd_time"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time, NGX_HTTP_VAR_CHANGEABLE, 0 },
+#endif
+
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
 };
 
@@ -378,6 +396,9 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 #endif
 #if (NGX_HTTP_V2)
     ngx_http_connection_t  *hc;
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_http_v2_srv_conf_t *h2scf;
+#endif
 #endif
 #if (NGX_HTTP_V2 || NGX_DEBUG)
     ngx_connection_t       *c;
@@ -396,7 +417,20 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 #if (NGX_HTTP_V2)
     hc = c->data;
 
-    if (hc->addr_conf->http2) {
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
+    if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        (
+#endif
+        hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+        )
+    {
         srv =
            (unsigned char *) NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
         srvlen = sizeof(NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
@@ -440,10 +474,26 @@ ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
 #if (NGX_HTTP_V2)
     {
     ngx_http_connection_t  *hc;
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    ngx_http_v2_srv_conf_t *h2scf;
+#endif
 
     hc = c->data;
 
-    if (hc->addr_conf->http2) {
+#if (T_NGX_HTTP2_SRV_ENABLE)
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+#endif
+
+    if (
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        (
+#endif
+        hc->addr_conf->http2
+#if (T_NGX_HTTP2_SRV_ENABLE)
+        && h2scf->enable != 0) || h2scf->enable == 1
+#endif
+        )
+    {
         *out =
             (unsigned char *) NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
         *outlen = sizeof(NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
@@ -586,12 +636,15 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->session_ticket_keys = NGX_CONF_UNSET_PTR;
     sscf->stapling = NGX_CONF_UNSET;
     sscf->stapling_verify = NGX_CONF_UNSET;
+#if (T_NGX_SSL_EARLY_DATA)
     sscf->early_data = NGX_CONF_UNSET;
+#endif
 
     return sscf;
 }
 
 
+#if (T_NGX_HTTP_SSL_VCE)
 static void *
 ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
 {
@@ -606,6 +659,7 @@ ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
 
     return slcf;
 }
+#endif
 
 
 static char *
@@ -680,7 +734,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->stapling_responder,
                          prev->stapling_responder, "");
 
+#if (T_NGX_SSL_EARLY_DATA)
     ngx_conf_merge_value(conf->early_data, prev->early_data, 1);
+#endif
 
     conf->ssl.log = cf->log;
 

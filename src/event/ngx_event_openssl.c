@@ -35,7 +35,6 @@ static void ngx_ssl_clear_error(ngx_log_t *log);
 
 static ngx_int_t ngx_ssl_session_id_context(ngx_ssl_t *ssl,
     ngx_str_t *sess_ctx);
-ngx_int_t ngx_ssl_session_cache_init(ngx_shm_zone_t *shm_zone, void *data);
 static int ngx_ssl_new_session(ngx_ssl_conn_t *ssl_conn,
     ngx_ssl_session_t *sess);
 static ngx_ssl_session_t *ngx_ssl_get_cached_session(ngx_ssl_conn_t *ssl_conn,
@@ -344,9 +343,10 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
     if (!(protocols & NGX_SSL_TLSv1_3)) {
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_3);
     }
+#endif
+
 #ifdef OPENSSL_IS_BORINGSSL
     SSL_CTX_set_max_proto_version(ssl->ctx, TLS1_3_VERSION);
-#endif
 #endif
 
 #ifdef SSL_OP_NO_COMPRESSION
@@ -949,6 +949,7 @@ ngx_ssl_read_password_file(ngx_conf_t *cf, ngx_str_t *file)
     cln->data = passwords;
 
     fd = ngx_open_file(file->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+
     if (fd == NGX_INVALID_FILE) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
                            ngx_open_file_n " \"%s\" failed", file->data);
@@ -1421,19 +1422,19 @@ ngx_ssl_handshake_early_data(ngx_connection_t *c)
             case SSL_READ_EARLY_DATA_FINISH:
                 return 1;
             case SSL_READ_EARLY_DATA_SUCCESS:
-                return 1; 
+                return 1;
             }
         } else {
             return 0;
         }
     }
 
-    sslerr = SSL_get_error(c->ssl->connection, 0); 
+    sslerr = SSL_get_error(c->ssl->connection, 0);
     switch (sslerr) {
     case SSL_ERROR_WANT_WRITE:
     case SSL_ERROR_WANT_ASYNC:
     case SSL_ERROR_WANT_READ:
-            break; 
+            break;
     default:
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
             "SSL_get_error: %d while reading early data\n", sslerr);
@@ -1450,6 +1451,10 @@ ngx_ssl_handshake(ngx_connection_t *c)
 {
     int        n, sslerr;
     ngx_err_t  err;
+
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+    ngx_time_t *tp;
+#endif
 
     ngx_ssl_clear_error(c->log);
 
@@ -1535,6 +1540,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
 #endif
 
         c->ssl->handshaked = 1;
+
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+        tp = ngx_timeofday();
+        c->ssl->handshake_end_msec = tp->sec * 1000 + tp->msec;
+#endif
 
         c->recv = ngx_ssl_recv;
         c->send = ngx_ssl_write;
@@ -1795,7 +1805,10 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
             return n;
         }
 
-        if (c->ssl->enable_early_data &&
+        if (
+#if (T_NGX_SSL_EARLY_DATA)
+            c->ssl->enable_early_data &&
+#endif
             !SSL_is_init_finished(c->ssl->connection) &&
             (c->ssl->read_early_state != SSL_READ_EARLY_DATA_FINISH) &&
             (SSL_get_early_data_status(c->ssl->connection) ==
@@ -2192,7 +2205,10 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL to write: %uz", size);
 
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
-    if (c->ssl->enable_early_data &&
+    if (
+#if (T_NGX_SSL_EARLY_DATA)
+        c->ssl->enable_early_data &&
+#endif
         !SSL_is_init_finished(c->ssl->connection) &&
         (SSL_get_early_data_status(c->ssl->connection) ==
          SSL_EARLY_DATA_ACCEPTED)) {
@@ -2205,6 +2221,7 @@ ngx_ssl_write(ngx_connection_t *c, u_char *data, size_t size)
     } else
 #endif
     n = SSL_write(c->ssl->connection, data, size);
+
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_write: %d", n);
 
     if (n > 0) {
@@ -2355,10 +2372,6 @@ ngx_ssl_shutdown(ngx_connection_t *c)
     int        n, sslerr, mode;
     ngx_err_t  err;
 
-    if (!c->ssl) {
-        return NGX_OK;
-    }
-
     if (SSL_in_init(c->ssl->connection)) {
         /*
          * OpenSSL 1.0.2f complains if SSL_shutdown() is called during
@@ -2475,10 +2488,6 @@ ngx_ssl_shutdown(ngx_connection_t *c)
         c->read->handler = ngx_ssl_shutdown_handler;
         c->write->handler = ngx_ssl_shutdown_handler;
 
-        //Work around: Readd write event on shutdown;
-        c->write->ready = 0;
-        c->write->active = 0;
-
         if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -2489,10 +2498,6 @@ ngx_ssl_shutdown(ngx_connection_t *c)
 
         if (sslerr == SSL_ERROR_WANT_READ) {
             ngx_add_timer(c->read, 30000);
-        }
-
-        if (sslerr == SSL_ERROR_WANT_WRITE) {
-            ngx_add_timer(c->write, 10000);
         }
 
         return NGX_AGAIN;
@@ -3487,7 +3492,9 @@ ngx_ssl_session_ticket_keys(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_array_t *paths)
         file.name = path[i];
         file.log = cf->log;
 
-        file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY, 0, 0);
+        file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
+                                NGX_FILE_OPEN, 0);
+
         if (file.fd == NGX_INVALID_FILE) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
                                ngx_open_file_n " \"%V\" failed", &file.name);
@@ -3710,7 +3717,7 @@ ngx_ssl_session_ticket_keys(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_array_t *paths)
 {
     if (paths) {
         ngx_log_error(NGX_LOG_WARN, ssl->log, 0,
-                      "\"ssl_session_ticket_keys\" ignored, not supported");
+                      "\"ssl_session_ticket_key\" ignored, not supported");
     }
 
     return NGX_OK;
@@ -4130,13 +4137,22 @@ ngx_ssl_get_server_name(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
 #ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
 
-    const char  *servername;
+    size_t       len;
+    const char  *name;
 
-    servername = SSL_get_servername(c->ssl->connection,
-                                    TLSEXT_NAMETYPE_host_name);
-    if (servername) {
-        s->data = (u_char *) servername;
-        s->len = ngx_strlen(servername);
+    name = SSL_get_servername(c->ssl->connection, TLSEXT_NAMETYPE_host_name);
+
+    if (name) {
+        len = ngx_strlen(name);
+
+        s->len = len;
+        s->data = ngx_pnalloc(pool, len);
+        if (s->data == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(s->data, name, len);
+
         return NGX_OK;
     }
 
@@ -4236,6 +4252,36 @@ ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
             *p++ = '\t';
         }
     }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s)
+{
+    ngx_str_t  cert;
+    uintptr_t  n;
+
+    if (ngx_ssl_get_raw_certificate(c, pool, &cert) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (cert.len == 0) {
+        s->len = 0;
+        return NGX_OK;
+    }
+
+    n = ngx_escape_uri(NULL, cert.data, cert.len, NGX_ESCAPE_URI_COMPONENT);
+
+    s->len = cert.len + n * 2;
+    s->data = ngx_pnalloc(pool, s->len);
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_escape_uri(s->data, cert.data, cert.len, NGX_ESCAPE_URI_COMPONENT);
 
     return NGX_OK;
 }
@@ -4671,6 +4717,44 @@ ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 }
 
 
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+ngx_int_t
+ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    ngx_msec_int_t   ms;
+    u_char          *p;
+    ngx_time_t      *tp;
+
+    if (c->ssl == NULL) {
+        ngx_str_null(s);
+
+        return NGX_OK;
+    }
+
+    tp = ngx_timeofday();
+
+    if (c->ssl->handshake_end_msec == 0) {
+        ms = tp->sec * 1000 + tp->sec - c->ssl->handshake_start_msec;
+
+    } else {
+        ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
+    }
+
+    ms = ngx_max(ms, 0);
+
+    p = ngx_pnalloc(pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    s->len = ngx_sprintf(p, "%i", ms) - p;
+    s->data = p;
+
+    return NGX_OK;
+}
+#endif
+
+
 static time_t
 ngx_ssl_parse_time(
 #if OPENSSL_VERSION_NUMBER > 0x10100000L
@@ -4744,10 +4828,6 @@ ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     oscf->engine = 1;
-
-    if (cf->no_ssl_init) {
-        return NGX_CONF_OK;
-    }
 
     value = cf->args->elts;
 

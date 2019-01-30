@@ -22,7 +22,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http charset gzip_static/)->plan(13)
+my $t = Test::Nginx->new()->has(qw/http proxy charset gzip_static/)->plan(13)
 	->write_file_expand('nginx.conf', <<'EOF')->run();
 
 %%TEST_GLOBALS%%
@@ -90,7 +90,7 @@ $t->write_file('t1.html', '');
 $t->write_file('t1.html.gz', '');
 
 my $in = 'X' x 99;
-my $out;
+my $out = '';
 
 eval {
 	require IO::Compress::Gzip;

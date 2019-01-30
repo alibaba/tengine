@@ -42,7 +42,7 @@ static u_char  smtp_username[] = "334 VXNlcm5hbWU6" CRLF;
 static u_char  smtp_password[] = "334 UGFzc3dvcmQ6" CRLF;
 static u_char  smtp_invalid_command[] = "500 5.5.1 Invalid command" CRLF;
 static u_char  smtp_invalid_pipelining[] =
-   "503 5.5.0 Improper use of SMTP command pipelining" CRLF;
+    "503 5.5.0 Improper use of SMTP command pipelining" CRLF;
 static u_char  smtp_invalid_argument[] = "501 5.5.4 Invalid argument" CRLF;
 static u_char  smtp_auth_required[] = "530 5.7.1 Authentication required" CRLF;
 static u_char  smtp_bad_sequence[] = "503 5.5.1 Bad sequence of commands" CRLF;
@@ -485,6 +485,10 @@ ngx_mail_smtp_auth_state(ngx_event_t *rev)
         case ngx_smtp_auth_cram_md5:
             rc = ngx_mail_auth_cram_md5(s, c);
             break;
+
+        case ngx_smtp_auth_external:
+            rc = ngx_mail_auth_external(s, c, 0);
+            break;
         }
     }
 
@@ -605,6 +609,8 @@ ngx_mail_smtp_auth(ngx_mail_session_t *s, ngx_connection_t *c)
         return NGX_OK;
     }
 
+    sscf = ngx_mail_get_module_srv_conf(s, ngx_mail_smtp_module);
+
     rc = ngx_mail_auth_parse(s, c);
 
     switch (rc) {
@@ -632,8 +638,6 @@ ngx_mail_smtp_auth(ngx_mail_session_t *s, ngx_connection_t *c)
 
     case NGX_MAIL_AUTH_CRAM_MD5:
 
-        sscf = ngx_mail_get_module_srv_conf(s, ngx_mail_smtp_module);
-
         if (!(sscf->auth_methods & NGX_MAIL_AUTH_CRAM_MD5_ENABLED)) {
             return NGX_MAIL_PARSE_INVALID_COMMAND;
         }
@@ -652,6 +656,17 @@ ngx_mail_smtp_auth(ngx_mail_session_t *s, ngx_connection_t *c)
         }
 
         return NGX_ERROR;
+
+    case NGX_MAIL_AUTH_EXTERNAL:
+
+        if (!(sscf->auth_methods & NGX_MAIL_AUTH_EXTERNAL_ENABLED)) {
+            return NGX_MAIL_PARSE_INVALID_COMMAND;
+        }
+
+        ngx_str_set(&s->out, smtp_username);
+        s->mail_state = ngx_smtp_auth_external;
+
+        return NGX_OK;
     }
 
     return rc;
