@@ -1,5 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -116,4 +116,3 @@ GET /time
 --- request
 GET /time
 --- response_body_like: ^\d{10,}(\.\d{1,3})?$
-

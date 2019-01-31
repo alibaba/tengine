@@ -111,7 +111,10 @@ ngx_http_lua_ngx_req_get_uri_args(lua_State *L)
 
     ngx_http_lua_check_fake_request(L, r);
 
-    lua_createtable(L, 0, 4);
+    if (r->args.len == 0) {
+        lua_createtable(L, 0, 0);
+        return 1;
+    }
 
     /* we copy r->args over to buf to simplify
      * unescaping query arg keys and values */
@@ -120,6 +123,8 @@ ngx_http_lua_ngx_req_get_uri_args(lua_State *L)
     if (buf == NULL) {
         return luaL_error(L, "no memory");
     }
+
+    lua_createtable(L, 0, 4);
 
     ngx_memcpy(buf, r->args.data, r->args.len);
 
@@ -178,12 +183,13 @@ ngx_http_lua_ngx_req_get_post_args(lua_State *L)
     }
 
     if (r->request_body->temp_file) {
-        return luaL_error(L, "requesty body in temp file not supported");
+        lua_pushnil(L);
+        lua_pushliteral(L, "request body in temp file not supported");
+        return 2;
     }
 
-    lua_createtable(L, 0, 4);
-
     if (r->request_body->bufs == NULL) {
+        lua_createtable(L, 0, 0);
         return 1;
     }
 
@@ -197,10 +203,17 @@ ngx_http_lua_ngx_req_get_post_args(lua_State *L)
 
     dd("post body length: %d", (int) len);
 
+    if (len == 0) {
+        lua_createtable(L, 0, 0);
+        return 1;
+    }
+
     buf = ngx_palloc(r->pool, len);
     if (buf == NULL) {
         return luaL_error(L, "no memory");
     }
+
+    lua_createtable(L, 0, 4);
 
     p = buf;
     for (cl = r->request_body->bufs; cl; cl = cl->next) {
@@ -298,10 +311,11 @@ ngx_http_lua_parse_args(lua_State *L, u_char *buf, u_char *last, int max)
             }
 
             if (max > 0 && ++count == max) {
+                lua_pushliteral(L, "truncated");
+
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                                "lua hit query args limit %d", max);
-
-                return 1;
+                return 2;
             }
 
         } else {
@@ -374,14 +388,17 @@ ngx_http_lua_ffi_req_get_querystring_len(ngx_http_request_t *r)
 
 
 int
-ngx_http_lua_ffi_req_get_uri_args_count(ngx_http_request_t *r, int max)
+ngx_http_lua_ffi_req_get_uri_args_count(ngx_http_request_t *r, int max,
+    int *truncated)
 {
     int                      count;
     u_char                  *p, *last;
 
-    if (r->connection->fd == -1) {
+    if (r->connection->fd == (ngx_socket_t) -1) {
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
+
+    *truncated = 0;
 
     if (max < 0) {
         max = NGX_HTTP_LUA_MAX_ARGS;
@@ -404,6 +421,7 @@ ngx_http_lua_ffi_req_get_uri_args_count(ngx_http_request_t *r, int max)
     if (count) {
         if (max > 0 && count > max) {
             count = max;
+            *truncated = 1;
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "lua hit query args limit %d", max);
         }

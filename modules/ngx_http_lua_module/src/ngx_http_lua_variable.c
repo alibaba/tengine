@@ -185,7 +185,7 @@ ngx_http_lua_var_set(lua_State *L)
 
         val = ngx_palloc(r->pool, len);
         if (val == NULL) {
-            return luaL_error(L, "memory allocation erorr");
+            return luaL_error(L, "memory allocation error");
         }
 
         ngx_memcpy(val, p, len);
@@ -307,7 +307,7 @@ ngx_http_lua_ffi_var_get(ngx_http_request_t *r, u_char *name_data,
         return NGX_ERROR;
     }
 
-    if ((r)->connection->fd == -1) {
+    if ((r)->connection->fd == (ngx_socket_t) -1) {
         *err = "API disabled in the current context";
         return NGX_ERROR;
     }
@@ -364,7 +364,7 @@ ngx_http_lua_ffi_var_get(ngx_http_request_t *r, u_char *name_data,
 int
 ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
     size_t name_len, u_char *lowcase_buf, u_char *value, size_t value_len,
-    u_char *errbuf, size_t errlen)
+    u_char *errbuf, size_t *errlen)
 {
     u_char                      *p;
     ngx_uint_t                   hash;
@@ -373,12 +373,15 @@ ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
     ngx_http_core_main_conf_t   *cmcf;
 
     if (r == NULL) {
-        ngx_snprintf(errbuf, errlen, "no request object found");
+        *errlen = ngx_snprintf(errbuf, *errlen, "no request object found")
+                  - errbuf;
         return NGX_ERROR;
     }
 
-    if ((r)->connection->fd == -1) {
-        ngx_snprintf(errbuf, errlen, "API disabled in the current context");
+    if ((r)->connection->fd == (ngx_socket_t) -1) {
+        *errlen = ngx_snprintf(errbuf, *errlen,
+                               "API disabled in the current context")
+                  - errbuf;
         return NGX_ERROR;
     }
 
@@ -395,8 +398,10 @@ ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
     if (v) {
         if (!(v->flags & NGX_HTTP_VAR_CHANGEABLE)) {
             dd("variable not changeable");
-            ngx_snprintf(errbuf, errlen, "variable \"%*s\" not changeable",
-                         name_len, lowcase_buf);
+            *errlen = ngx_snprintf(errbuf, *errlen,
+                                   "variable \"%*s\" not changeable",
+                                   name_len, lowcase_buf)
+                      - errbuf;
             return NGX_ERROR;
         }
 
@@ -405,8 +410,8 @@ ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
             dd("set variables with set_handler");
 
             if (value != NULL && value_len) {
-                vv = ngx_pnalloc(r->pool, sizeof(ngx_http_variable_value_t)
-                                 + value_len);
+                vv = ngx_palloc(r->pool, sizeof(ngx_http_variable_value_t)
+                                + value_len);
                 if (vv == NULL) {
                     goto nomem;
                 }
@@ -460,6 +465,7 @@ ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
                 if (p == NULL) {
                     goto nomem;
                 }
+
                 ngx_memcpy(p, value, value_len);
                 value = p;
 
@@ -474,23 +480,27 @@ ngx_http_lua_ffi_var_set(ngx_http_request_t *r, u_char *name_data,
             return NGX_OK;
         }
 
-        ngx_snprintf(errbuf, errlen, "variable \"%*s\" cannot be assigned "
-                     "a value", name_len, lowcase_buf);
+        *errlen = ngx_snprintf(errbuf, *errlen,
+                               "variable \"%*s\" cannot be assigned "
+                               "a value", name_len, lowcase_buf)
+                  - errbuf;
         return NGX_ERROR;
     }
 
     /* variable not found */
 
-    ngx_snprintf(errbuf, errlen, "variable \"%*s\" not found for writing; "
-                 "maybe it is a built-in variable that is not changeable "
-                 "or you forgot to use \"set $%*s '';\" "
-                 "in the config file to define it first",
-                 name_len, lowcase_buf, name_len, lowcase_buf);
+    *errlen = ngx_snprintf(errbuf, *errlen,
+                           "variable \"%*s\" not found for writing; "
+                           "maybe it is a built-in variable that is not "
+                           "changeable or you forgot to use \"set $%*s '';\" "
+                           "in the config file to define it first",
+                           name_len, lowcase_buf, name_len, lowcase_buf)
+              - errbuf;
     return NGX_ERROR;
 
 nomem:
 
-    ngx_snprintf(errbuf, errlen, "no memory");
+    *errlen = ngx_snprintf(errbuf, *errlen, "no memory") - errbuf;
     return NGX_ERROR;
 }
 #endif /* NGX_LUA_NO_FFI_API */

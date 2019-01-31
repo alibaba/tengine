@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -784,7 +783,6 @@ server: failed to get raw req socket: pending request body reading in some other
 
 
 === TEST 15: read chunked request body with raw req socket
---- main_config
 --- config
     location = /t {
         content_by_lua '
@@ -878,4 +876,3 @@ request body: hey, hello world
 --- no_error_log
 [error]
 [alert]
-

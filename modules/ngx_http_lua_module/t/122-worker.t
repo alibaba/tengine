@@ -79,4 +79,3 @@ worker pid: \d+
 worker pid is correct\.
 --- no_error_log
 [error]
-

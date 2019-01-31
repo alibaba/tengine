@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -28,7 +27,7 @@ __DATA__
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { method = ngx.HTTP_DELETE });
 
             ngx.print(res.body)
@@ -55,7 +54,7 @@ DELETE
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_DELETE });
 
             ngx.print(res.body)
@@ -83,7 +82,7 @@ DELETE
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_POST });
 
             ngx.print(res.body)
@@ -106,7 +105,7 @@ POST
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { method = ngx.HTTP_HEAD });
 
             ngx.print(res.body)
@@ -132,7 +131,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_GET });
 
             ngx.print(res.body)
@@ -159,7 +158,7 @@ GET
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo")
+            local res = ngx.location.capture("/foo")
 
             ngx.print(res.body)
         ';
@@ -185,7 +184,7 @@ GET
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo", {})
+            local res = ngx.location.capture("/foo", {})
 
             ngx.print(res.body)
         ';
@@ -214,7 +213,7 @@ GET
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_PUT, body = "hello" });
 
             ngx.print(res.body)
@@ -242,7 +241,7 @@ hello
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { method = ngx.HTTP_PUT, body = "hello" });
 
             ngx.print(res.body)
@@ -277,7 +276,7 @@ hello
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { method = ngx.HTTP_PUT, body = "hello" });
 
             ngx.print(res.body)
@@ -314,7 +313,7 @@ GET
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { method = ngx.HTTP_POST, body = "hello" });
 
             ngx.print(res.body)
@@ -346,7 +345,7 @@ hello
         access_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             ngx.say("GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -387,7 +386,7 @@ cached: hello
             ngx.location.capture("/flush",
                 { share_all_vars = true });
 
-            res = ngx.location.capture("/memc",
+            local res = ngx.location.capture("/memc",
                 { share_all_vars = true });
             ngx.say("GET: " .. res.status);
 
@@ -410,7 +409,7 @@ cached: hello
 
 
 
-=== TEST 14: emtpy args option table
+=== TEST 14: empty args option table
 --- config
     location /foo {
         echo $query_string;
@@ -418,7 +417,7 @@ cached: hello
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = {} })
             ngx.print(res.body)
         ';
@@ -438,7 +437,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = { ["fo="] = "=>" } })
             ngx.print(res.body)
         ';
@@ -459,7 +458,7 @@ fo%3D=%3D%3E
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = { ["fo="] = "=>",
                     ["="] = ":" } })
             ngx.print(res.body)
@@ -481,7 +480,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = { foo = 3,
                     bar = "hello" } })
             ngx.print(res.body)
@@ -503,7 +502,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = { [57] = "hi" } })
             ngx.print(res.body)
         ';
@@ -524,7 +523,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo",
+            local res = ngx.location.capture("/foo",
                 { args = { "hi" } })
             ngx.print(res.body)
         ';
@@ -545,7 +544,7 @@ GET /lua
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo?a=3",
+            local res = ngx.location.capture("/foo?a=3",
                 { args = { b = 4 } })
             ngx.print(res.body)
         ';
@@ -566,7 +565,7 @@ a=3&b=4
 
     location /lua {
         access_by_lua '
-            res = ngx.location.capture("/foo?a=3",
+            local res = ngx.location.capture("/foo?a=3",
                 { args = "b=4" })
             ngx.print(res.body)
         ';
@@ -600,4 +599,3 @@ the nginx core requires the patch https://github.com/agentzh/ngx_openresty/blob/
     GET /t
 --- response_body
 done
-

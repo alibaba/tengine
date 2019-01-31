@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -421,7 +420,7 @@ ngx_slab_alloc() failed: no memory in lua_shared_dict zone
             ngx.say(dogs:get(key))
 
             key = string.rep("a", 65536)
-            ok, err = dogs:set(key, "world")
+            local ok, err = dogs:set(key, "world")
             if not ok then
                 ngx.say("not ok: ", err)
                 return
@@ -586,7 +585,7 @@ hello, world
 --- request
 GET /test
 --- response_body_like
-^true nil true\nabort at (?:139|140)$
+^true nil true\nabort at (?:141|140)$
 --- no_error_log
 [error]
 
@@ -817,7 +816,7 @@ foo = hello
 
 
 
-=== TEST 31: incr key (key exists)
+=== TEST 31: replace key (key exists)
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -951,7 +950,7 @@ foo = 10534
 
 
 
-=== TEST 36: replace key (key not exists)
+=== TEST 36: incr key (key not exists)
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -974,7 +973,7 @@ foo = nil
 
 
 
-=== TEST 37: replace key (key expired)
+=== TEST 37: incr key (key expired)
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -1585,7 +1584,7 @@ cur value:  hello hello hello hello hello hello hello hello hello hello1
         content_by_lua '
             local dogs = ngx.shared.dogs
             dogs:set("foo", 32, 0.01)
-            dogs:set("blah", 33, 0.1)
+            dogs:set("blah", 33, 0.3)
             ngx.sleep(0.02)
             local val, flags, stale = dogs:get_stale("foo")
             ngx.say(val, ", ", flags, ", ", stale)
@@ -2049,7 +2048,7 @@ get_stale ok: false, stale: false
                 ngx.say("get not ok: ", err)
                 return
             end
-            flags = err
+            local flags = err
             ngx.say("get_stale ok: ", data, ", flags: ", flags,
                     ", stale: ", stale)
 
@@ -2298,3 +2297,177 @@ foo = nil
 --- no_error_log
 [error]
 
+
+
+=== TEST 86: the lightuserdata ngx.null has no methods of shared dicts.
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local lightuserdata = ngx.null
+            lightuserdata:set("foo", 1)
+        ';
+    }
+--- request
+GET /test
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- grep_error_log chop
+attempt to index local 'lightuserdata' (a userdata value)
+--- grep_error_log_out
+attempt to index local 'lightuserdata' (a userdata value)
+--- error_log
+[error]
+--- no_error_log
+bad "zone" argument
+
+
+
+=== TEST 87: set bad zone table
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs.set({1}, "foo", 1)
+        ';
+    }
+--- request
+GET /test
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+bad "zone" argument
+
+
+
+=== TEST 88: get bad zone table
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs.get({1}, "foo")
+        ';
+    }
+--- request
+GET /test
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+bad "zone" argument
+
+
+
+=== TEST 89: incr bad zone table
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs.incr({1}, "foo", 32)
+        ';
+    }
+--- request
+GET /test
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+
+
+
+=== TEST 90: check the type of the shdict object
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            ngx.say("type: ", type(ngx.shared.dogs))
+        ';
+    }
+--- request
+GET /test
+--- response_body
+type: table
+--- no_error_log
+[error]
+
+
+
+=== TEST 91: dogs, cat mixing
+--- http_config
+    lua_shared_dict dogs 1m;
+    lua_shared_dict cats 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs:set("foo", 32)
+            dogs:set("bah", 10502)
+            local val = dogs:get("foo")
+            ngx.say(val, " ", type(val))
+            val = dogs:get("bah")
+            ngx.say(val, " ", type(val))
+
+            local cats = ngx.shared.cats
+            val = cats:get("foo")
+            ngx.say(val or "nil")
+            val = cats:get("bah")
+            ngx.say(val or "nil")
+        ';
+    }
+--- request
+GET /test
+--- response_body
+32 number
+10502 number
+nil
+nil
+--- no_error_log
+[error]
+
+
+
+=== TEST 92: invalid expire time
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            dogs:set("foo", 32, -1)
+        ';
+    }
+--- request
+GET /test
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+bad "exptime" argument
+
+
+
+=== TEST 93: duplicate zones
+--- http_config
+    lua_shared_dict dogs 1m;
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua '
+            local dogs = ngx.shared.dogs
+            ngx.say("error")
+        ';
+    }
+--- request
+    GET /test
+--- request_body_unlike
+error
+--- must_die
+--- error_log
+lua_shared_dict "dogs" is already defined as "dogs"
+--- error_log
+[emerg]

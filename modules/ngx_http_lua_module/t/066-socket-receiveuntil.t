@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -246,7 +245,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabd")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -317,7 +316,7 @@ close: 1 nil
             local reader = sock:receiveuntil("aa")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -388,7 +387,7 @@ close: 1 nil
             local reader = sock:receiveuntil("aaa")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -459,7 +458,7 @@ close: 1 nil
             local reader = sock:receiveuntil("aaaaad")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -531,7 +530,7 @@ close: 1 nil
             local reader = sock:receiveuntil("aaaaad")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -603,7 +602,7 @@ close: 1 nil
             local reader = sock:receiveuntil("aaaaad")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -674,7 +673,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabdabcabe")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -745,7 +744,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabdabcabe")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -816,7 +815,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabdabcabe")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -887,7 +886,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabdabcabe")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -958,7 +957,7 @@ close: 1 nil
             local reader = sock:receiveuntil("--abc")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -1029,7 +1028,7 @@ close: 1 nil
             local reader = sock:receiveuntil("--abc")
 
             for i = 1, 7 do
-                line, err, part = reader(4)
+                local line, err, part = reader(4)
                 if line then
                     ngx.say("read: ", line)
 
@@ -1106,7 +1105,7 @@ close: 1 nil
             local reader = sock:receiveuntil("--abc")
 
             for i = 1, 7 do
-                line, err, part = reader(4)
+                local line, err, part = reader(4)
                 if line then
                     ngx.say("read: ", line)
 
@@ -1183,7 +1182,7 @@ close: 1 nil
             local reader = sock:receiveuntil("--abc")
 
             for i = 1, 7 do
-                line, err, part = reader(4)
+                local line, err, part = reader(4)
                 if line then
                     ngx.say("read: ", line)
 
@@ -1271,7 +1270,7 @@ close: 1 nil
             local reader = sock:receiveuntil("abcabd")
 
             for i = 1, 2 do
-                line, err, part = reader()
+                local line, err, part = reader()
                 if line then
                     ngx.say("read: ", line)
 
@@ -1330,4 +1329,3 @@ this exposed a memory leak in receiveuntil
 ok
 --- no_error_log
 [error]
-

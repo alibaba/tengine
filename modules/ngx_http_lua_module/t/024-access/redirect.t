@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -123,4 +122,3 @@ GET /read
 --- raw_response_headers_like: Location: /foo\r\n
 --- response_body_like: 302 Found
 --- error_code: 302
-

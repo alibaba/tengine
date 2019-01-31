@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 use t::StapThread;
 
@@ -24,7 +23,7 @@ __DATA__
 --- config
     location /lua {
         rewrite_by_lua '
-            function f()
+            local function f()
                 ngx.req.set_uri("/foo", true)
             end
 
@@ -59,7 +58,7 @@ i am foo
 --- config
     location /lua {
         rewrite_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.req.set_uri("/foo", true)
             end
@@ -94,7 +93,7 @@ i am foo
 --- config
     location /lua {
         rewrite_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.req.set_uri("/foo", true)
             end
@@ -176,12 +175,12 @@ hello foo
 --- config
     location /lua {
         rewrite_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.req.set_uri("/foo", true)
             end
 
-            function g()
+            local function g()
                 ngx.sleep(1)
             end
 
@@ -259,6 +258,7 @@ free request
 hello foo
 --- no_error_log
 [error]
+--- wait: 0.1
 
 
 
@@ -267,7 +267,7 @@ hello foo
     location /lua {
         client_body_timeout 12000ms;
         rewrite_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.req.set_uri("/foo", true)
             end
@@ -345,4 +345,3 @@ free request
 end
 --- error_log
 attempt to abort with pending subrequests
-

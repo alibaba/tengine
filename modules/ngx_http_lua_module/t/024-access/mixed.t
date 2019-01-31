@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -36,7 +35,7 @@ __DATA__
         access_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             print("access GET: ", res.status);
 
             res = ngx.location.capture("/memc",
@@ -50,7 +49,7 @@ __DATA__
         content_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             ngx.say("content GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -188,7 +187,7 @@ world\x03\x04\xff
         rewrite_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             print("rewrite GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -202,7 +201,7 @@ world\x03\x04\xff
         access_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             print("access GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -216,7 +215,7 @@ world\x03\x04\xff
         content_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             ngx.say("content GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -246,3 +245,17 @@ access cached: hello
 
 --- log_level: info
 
+
+
+=== TEST 7: I/O in access shortcuts content automatically
+--- config
+    location = /t {
+        access_by_lua_block {
+            ngx.print("")
+        }
+
+        echo ok;
+    }
+--- request
+    GET /t
+--- response_body

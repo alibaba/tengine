@@ -60,7 +60,7 @@ ngx_http_lua_access_handler(ngx_http_request_t *r)
 #endif
 
         if (cur_ph < last_ph) {
-            dd("swaping the contents of cur_ph and last_ph...");
+            dd("swapping the contents of cur_ph and last_ph...");
 
             tmp = *cur_ph;
 
@@ -176,7 +176,8 @@ ngx_http_lua_access_handler_inline(ngx_http_request_t *r)
     L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua inline script (w/ cache) sp = 1 */
-    rc = ngx_http_lua_cache_loadbuffer(r, L, llcf->access_src.value.data,
+    rc = ngx_http_lua_cache_loadbuffer(r->connection->log, L,
+                                       llcf->access_src.value.data,
                                        llcf->access_src.value.len,
                                        llcf->access_src_key,
                                        (const char *) llcf->access_chunkname);
@@ -215,7 +216,8 @@ ngx_http_lua_access_handler_file(ngx_http_request_t *r)
     L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua script file (w/ cache)        sp = 1 */
-    rc = ngx_http_lua_cache_loadfile(r, L, script_path, llcf->access_src_key);
+    rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
+                                     llcf->access_src_key);
     if (rc != NGX_OK) {
         if (rc < NGX_HTTP_SPECIAL_RESPONSE) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -236,7 +238,9 @@ ngx_http_lua_access_by_chunk(lua_State *L, ngx_http_request_t *r)
 {
     int                  co_ref;
     ngx_int_t            rc;
+    ngx_uint_t           nreqs;
     lua_State           *co;
+    ngx_event_t         *rev;
     ngx_connection_t    *c;
     ngx_http_lua_ctx_t  *ctx;
     ngx_http_cleanup_t  *cln;
@@ -257,9 +261,11 @@ ngx_http_lua_access_by_chunk(lua_State *L, ngx_http_request_t *r)
     /*  move code closure to new coroutine */
     lua_xmove(L, co, 1);
 
+#ifndef OPENRESTY_LUAJIT
     /*  set closure's env table to new coroutine's globals table */
     ngx_http_lua_get_globals_table(co);
     lua_setfenv(co, -2);
+#endif
 
     /*  save nginx request in coroutine globals table */
     ngx_http_lua_set_req(co, r);
@@ -306,9 +312,28 @@ ngx_http_lua_access_by_chunk(lua_State *L, ngx_http_request_t *r)
     if (llcf->check_client_abort) {
         r->read_event_handler = ngx_http_lua_rd_check_broken_connection;
 
+#if (NGX_HTTP_V2)
+        if (!r->stream) {
+#endif
+
+        rev = r->connection->read;
+
+        if (!rev->active) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, 0) != NGX_OK) {
+                return NGX_ERROR;
+            }
+        }
+
+#if (NGX_HTTP_V2)
+        }
+#endif
+
     } else {
         r->read_event_handler = ngx_http_block_reading;
     }
+
+    c = r->connection;
+    nreqs = c->requests;
 
     rc = ngx_http_lua_run_thread(L, r, ctx, 0);
 
@@ -318,10 +343,8 @@ ngx_http_lua_access_by_chunk(lua_State *L, ngx_http_request_t *r)
         return rc;
     }
 
-    c = r->connection;
-
     if (rc == NGX_AGAIN) {
-        rc = ngx_http_lua_run_posted_threads(c, L, r, ctx);
+        rc = ngx_http_lua_run_posted_threads(c, L, r, ctx, nreqs);
 
         if (rc == NGX_ERROR || rc == NGX_DONE || rc > NGX_OK) {
             return rc;
@@ -334,7 +357,7 @@ ngx_http_lua_access_by_chunk(lua_State *L, ngx_http_request_t *r)
     } else if (rc == NGX_DONE) {
         ngx_http_lua_finalize_request(r, NGX_DONE);
 
-        rc = ngx_http_lua_run_posted_threads(c, L, r, ctx);
+        rc = ngx_http_lua_run_posted_threads(c, L, r, ctx, nreqs);
 
         if (rc == NGX_ERROR || rc == NGX_DONE || rc > NGX_OK) {
             return rc;
