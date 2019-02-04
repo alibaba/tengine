@@ -76,7 +76,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -103,7 +103,7 @@ like(http_get_body('/', '0123456789' x 128, '0123456789' x 512, '0123456789',
 
 # interactive tests
 
-my $s = get_body('/preread', 8082, 10);
+my $s = get_body('/preread', port(8082), 10);
 ok($s, 'no preread');
 
 SKIP: {
@@ -116,7 +116,7 @@ like($s->{http_end}(), qr/200 OK/, 'no preread - response');
 
 }
 
-$s = get_body('/preread', 8082, 10, '01234');
+$s = get_body('/preread', port(8082), 10, '01234');
 ok($s, 'preread');
 
 SKIP: {
@@ -155,8 +155,7 @@ sub http_get_body {
 
 sub fastcgi_read_record($) {
 	my ($buf) = @_;
-
-	my ($n, $h, $header);
+	my $h;
 
 	return undef unless length $$buf;
 
@@ -241,6 +240,8 @@ EOF
 
 		$client = $server->accept();
 
+		log2c("(new connection $client)");
+
 		alarm(0);
 	};
 	alarm(0);
@@ -250,6 +251,8 @@ EOF
 	}
 
 	$client->sysread(my $buf, 1024);
+	log2i($buf);
+
 	$body = '';
 
 	while (my $h = fastcgi_read_record(\$buf)) {
@@ -271,8 +274,12 @@ EOF
 			local $SIG{PIPE} = sub { die "sigpipe\n" };
 			alarm(5);
 
+			log_out($buf);
 			$s->write($buf);
+
 			$client->sysread($buf, 1024);
+			log2i($buf);
+
 			$body = '';
 
 			while (my $h = fastcgi_read_record(\$buf)) {
@@ -296,7 +303,12 @@ EOF
 	$f->{http_end} = sub {
 		my $buf = '';
 
-		fastcgi_respond($client, $version, $id, <<EOF);
+		eval {
+			local $SIG{ALRM} = sub { die "timeout\n" };
+			local $SIG{PIPE} = sub { die "sigpipe\n" };
+			alarm(5);
+
+			fastcgi_respond($client, $version, $id, <<EOF);
 Status: 200 OK
 Connection: close
 X-Port: $port
@@ -304,14 +316,10 @@ X-Port: $port
 OK
 EOF
 
-		$client->close;
-
-		eval {
-			local $SIG{ALRM} = sub { die "timeout\n" };
-			local $SIG{PIPE} = sub { die "sigpipe\n" };
-			alarm(5);
+			$client->close;
 
 			$s->sysread($buf, 1024);
+			log_in($buf);
 
 			alarm(0);
 		};
@@ -326,10 +334,14 @@ EOF
 	return $f;
 }
 
+sub log2i { Test::Nginx::log_core('|| <<', @_); }
+sub log2o { Test::Nginx::log_core('|| >>', @_); }
+sub log2c { Test::Nginx::log_core('||', @_); }
+
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 
@@ -346,7 +358,7 @@ sub fastcgi_daemon {
 		}
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Body: $body
 
