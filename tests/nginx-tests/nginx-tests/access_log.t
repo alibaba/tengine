@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+# (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
 # Tests for access_log.
@@ -21,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(9)
+my $t = Test::Nginx->new()->has(qw/http rewrite gzip/)->plan(18)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -31,10 +32,18 @@ daemon off;
 events {
 }
 
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
+
 http {
     %%TEST_GLOBALS_HTTP%%
 
     log_format test "$uri:$status";
+    log_format long "long line $uri:$status";
+    log_format binary $binary_remote_addr;
+
+    log_format default  escape=default  $arg_a$arg_b$arg_c;
+    log_format none     escape=none     $arg_a$arg_b$arg_c;
+    log_format json     escape=json     $arg_a$arg_b$arg_c;
 
     server {
         listen       127.0.0.1:8080;
@@ -79,6 +88,7 @@ http {
         location /multi {
             access_log %%TESTDIR%%/multi1.log test;
             access_log %%TESTDIR%%/multi2.log test;
+            access_log %%TESTDIR%%/long.log long;
             return 200 OK;
         }
 
@@ -86,10 +96,30 @@ http {
             access_log %%TESTDIR%%/varlog_${arg_logname} test;
             return 200 OK;
         }
+
+        location /cache {
+            open_log_file_cache max=3 inactive=20s valid=1m min_uses=2;
+            access_log %%TESTDIR%%/dir/cache_${arg_logname} test;
+            return 200 OK;
+        }
+
+        location /binary {
+            access_log %%TESTDIR%%/binary.log binary;
+        }
+
+        location /escape {
+            access_log %%TESTDIR%%/test.log default;
+            access_log %%TESTDIR%%/none.log none;
+            access_log %%TESTDIR%%/json.log json;
+        }
     }
 }
 
 EOF
+
+my $d = $t->testdir();
+
+mkdir "$d/dir";
 
 $t->run();
 
@@ -127,11 +157,31 @@ http_get('/varlog?logname=');
 http_get('/varlog?logname=0');
 http_get('/varlog?logname=filename');
 
+http_get('/binary');
+
+http_get('/escape?a="1 \\ ' . pack("n", 0x1b1c) . ' "&c=2');
+
+http_get('/cache?logname=lru');
+http_get('/cache?logname=lru');
+http_get('/cache?logname=once');
+http_get('/cache?logname=first');
+http_get('/cache?logname=first');
+http_get('/cache?logname=second');
+http_get('/cache?logname=second');
+
+rename "$d/dir", "$d/dir_moved";
+
+http_get('/cache?logname=lru');
+http_get('/cache?logname=once');
+http_get('/cache?logname=first');
+http_get('/cache?logname=second');
+
+rename "$d/dir_moved",  "$d/dir";
 
 # wait for file to appear with nonzero size thanks to the flush parameter
 
 for (1 .. 10) {
-	last if -s $t->testdir() . '/compressed.log';
+	last if -s "$d/compressed.log";
 	select undef, undef, undef, 0.1;
 }
 
@@ -157,8 +207,7 @@ $t->stop();
 
 my $addr = IO::Socket::INET->new(LocalAddr => '127.0.0.1')->sockhost();
 
-$log = $t->read_file('combined.log');
-like($log,
+like($t->read_file('combined.log'),
 	qr!^\Q$addr - - [\E .*
 		\Q] "GET /combined HTTP/1.0" 200 2 "-" "-"\E$!x,
 	'default log format');
@@ -167,7 +216,6 @@ like($log,
 
 $log = $t->read_file('filtered.log');
 is($log, "/filtered/good:200\n/filtered/work:200\n", 'log filtering');
-
 
 # verify "if=" argument works with complex value
 
@@ -180,34 +228,53 @@ my $exp_complex = <<'EOF';
 /filtered/complex/either4:200
 EOF
 
-$log = $t->read_file('complex.log');
-is($log, $exp_complex, 'if with complex value');
-
+is($t->read_file('complex.log'), $exp_complex, 'if with complex value');
 
 # buffer created with false "if" is not reused among multiple access_log
 
-$log = $t->read_file('/noreuse.log');
+$log = $t->read_file('noreuse.log');
 is($log, "/filtered/noreuse1/good:200\n/filtered/noreuse2/good:200\n",
 	'log filtering with buffering');
 
-
 # multiple logs in a same location
 
-$log = $t->read_file('multi1.log');
-is($log, "/multi:200\n", 'multiple logs 1');
+is($t->read_file('multi1.log'), "/multi:200\n", 'multiple logs 1');
 
 # same content in the second log
 
-$log = $t->read_file('multi2.log');
-is($log, "/multi:200\n", 'multiple logs 2');
+is($t->read_file('multi2.log'), "/multi:200\n", 'multiple logs 2');
 
+is($t->read_file('long.log'), "long line /multi:200\n", 'long line format');
 
 # test log destinations with variables
 
-$log = $t->read_file('varlog_0');
-is($log, "/varlog:200\n", 'varlog literal zero name');
+is($t->read_file('varlog_0'), "/varlog:200\n", 'varlog literal zero name');
+is($t->read_file('varlog_filename'), "/varlog:200\n", 'varlog good name');
 
-$log = $t->read_file('varlog_filename');
-is($log, "/varlog:200\n", 'varlog good name');
+# binary data is escaped
+# that's "\\x7F\\x00\\x00\\x01\n" in $binary_remote_addr for "127.0.0.1"
+
+my $expected = join '', map { sprintf "\\x%02X", $_ } split /\./, $addr;
+
+is($t->read_file('binary.log'), "$expected\n", 'binary');
+
+# characters escaping
+
+is($t->read_file('test.log'),
+	'\x221 \x5C \x1B\x1C \x22-2' . "\n", 'escape - default');
+is($t->read_file('none.log'),
+	'"1 \\ ' . pack("n", 0x1b1c) . " \"2\n", 'escape - none');
+is($t->read_file('json.log'),
+	'\"1 \\\\ \u001B\u001C \"2' . "\n", 'escape - json');
+
+SKIP: {
+skip 'win32', 4 if $^O eq 'MSWin32';
+
+is(@{[$t->read_file('/dir/cache_lru') =~ /\//g]}, 2, 'cache - closed lru');
+is(@{[$t->read_file('/dir/cache_once') =~ /\//g]}, 1, 'cache - min_uses');
+is(@{[$t->read_file('/dir/cache_first') =~ /\//g]}, 3, 'cache - cached 1');
+is(@{[$t->read_file('/dir/cache_second') =~ /\//g]}, 3, 'cache - cached 2');
+
+}
 
 ###############################################################################
