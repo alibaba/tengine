@@ -31,7 +31,7 @@ eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite proxy/)
-	->has_daemon('openssl')->plan(21);
+	->has_daemon('openssl')->plan(23);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -41,6 +41,8 @@ daemon off;
 
 events {
 }
+
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 http {
     %%TEST_GLOBALS_HTTP%%
@@ -75,10 +77,13 @@ http {
             return 200 "body $ssl_protocol";
         }
         location /issuer {
-            return 200 "body $ssl_client_i_dn";
+            return 200 "body $ssl_client_i_dn:$ssl_client_i_dn_legacy";
         }
         location /subject {
-            return 200 "body $ssl_client_s_dn";
+            return 200 "body $ssl_client_s_dn:$ssl_client_s_dn_legacy";
+        }
+        location /time {
+            return 200 "body $ssl_client_v_start!$ssl_client_v_end!$ssl_client_v_remain";
         }
 
         location /body {
@@ -132,6 +137,9 @@ http {
 
         location / {
             return 200 "body $ssl_session_reused";
+        }
+        location /ciphers {
+            return 200 "body $ssl_ciphers";
         }
     }
 }
@@ -241,10 +249,13 @@ like(get('/', 8081), qr/^body \.$/m, 'session timeout');
 like(get('/id', 8085), qr/^body \w{64}$/m, 'session id');
 unlike(http_get('/id'), qr/body \w/, 'session id no ssl');
 like(get('/cipher', 8085), qr/^body [\w-]+$/m, 'cipher');
+my $re = $t->has_module('BoringSSL') ? '' : qr/[:\w-]+/;
+like(get('/ciphers', 8084), qr/^body $re$/m, 'ciphers');
 like(get('/client_verify', 8085), qr/^body NONE$/m, 'client verify');
 like(get('/protocol', 8085), qr/^body (TLS|SSL)v(\d|\.)+$/m, 'protocol');
-like(cert('/issuer', 8085), qr!^body CN=issuer$!m, 'issuer');
-like(cert('/subject', 8085), qr!^body CN=subject$!m, 'subject');
+like(cert('/issuer', 8085), qr!^body CN=issuer:/CN=issuer$!m, 'issuer');
+like(cert('/subject', 8085), qr!^body CN=subject:/CN=subject$!m, 'subject');
+like(cert('/time', 8085), qr/^body [:\s\w]+![:\s\w]+![23]$/m, 'time');
 
 # c->read->ready handling bug in ngx_ssl_recv(), triggered with chunked body
 
@@ -291,7 +302,7 @@ sub get_ssl_socket {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1',

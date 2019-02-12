@@ -3,7 +3,7 @@
 # (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
-# Tests for http ssl module with certificate chain.
+# Tests for http ssl module, ssl_verify_depth.
 
 ###############################################################################
 
@@ -28,7 +28,7 @@ eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)
-	->has_daemon('openssl')->plan(3);
+	->has_daemon('openssl')->plan(2);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -42,28 +42,18 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    ssl_certificate_key  localhost.key;
+    ssl_certificate localhost.crt;
+
+    ssl_verify_client on;
+    ssl_client_certificate int-root.crt;
+
+    add_header X-Verify $ssl_client_verify;
+
     server {
         listen       127.0.0.1:8080 ssl;
         server_name  localhost;
-
-        ssl_certificate_key end.key;
-        ssl_certificate end.crt;
-    }
-
-    server {
-        listen       127.0.0.1:8081 ssl;
-        server_name  localhost;
-
-        ssl_certificate_key int.key;
-        ssl_certificate int.crt;
-    }
-
-    server {
-        listen       127.0.0.1:8082 ssl;
-        server_name  localhost;
-
-        ssl_certificate_key end.key;
-        ssl_certificate end-int.crt;
+        ssl_verify_depth 0;
     }
 }
 
@@ -90,16 +80,12 @@ default_md = sha1
 policy = myca_policy
 serial = $d/certserial
 default_days = 1
-x509_extensions = myca_extensions
 
 [ myca_policy ]
 commonName = supplied
-
-[ myca_extensions ]
-basicConstraints = critical,CA:TRUE
 EOF
 
-foreach my $name ('root') {
+foreach my $name ('root', 'localhost') {
 	system('openssl req -x509 -new '
 		. "-config $d/openssl.conf -subj /CN=$name/ "
 		. "-out $d/$name.crt -keyout $d/$name.key "
@@ -130,22 +116,28 @@ system("openssl ca -batch -config $d/ca.conf "
 	. ">>$d/openssl.out 2>&1") == 0
 	or die "Can't sign certificate for end: $!\n";
 
-$t->write_file('end-int.crt',
-	$t->read_file('end.crt') . $t->read_file('int.crt'));
+$t->write_file('int-root.crt',
+	$t->read_file('int.crt') . $t->read_file('root.crt'));
 
+$t->write_file('t', '');
 $t->run();
 
 ###############################################################################
 
-is(get_ssl_socket(port(8080)), undef, 'incomplete chain');
-ok(get_ssl_socket(port(8081)), 'intermediate');
-ok(get_ssl_socket(port(8082)), 'intermediate server');
+like(get(8080, 'root'), qr/SUCCESS/, 'verify depth');
+like(get(8080, 'end'), qr/400 Bad Request/, 'verify depth limited');
 
 ###############################################################################
 
+sub get {
+	my ($port, $cert) = @_;
+	my $s = get_ssl_socket($port, $cert) or return;
+	http_get('/t', socket => $s);
+}
+
 sub get_ssl_socket {
-	my ($port) = @_;
-	my ($s, $verify);
+	my ($port, $cert) = @_;
+	my ($s);
 
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
@@ -154,14 +146,10 @@ sub get_ssl_socket {
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1',
-			PeerPort => $port,
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_PEER(),
-			SSL_ca_file => "$d/root.crt",
-			SSL_verify_callback => sub {
-				my ($ok) = @_;
-				$verify = $ok;
-				return $ok;
-			},
+			PeerPort => port($port),
+			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+			SSL_cert_file => "$d/$cert.crt",
+			SSL_key_file => "$d/$cert.key",
 			SSL_error_trap => sub { die $_[1] }
 		);
 		alarm(0);
@@ -173,7 +161,7 @@ sub get_ssl_socket {
 		return undef;
 	}
 
-	return $verify;
+	return $s;
 }
 
 ###############################################################################
