@@ -23,6 +23,7 @@ typedef struct {
     ngx_int_t       time_now;
     ngx_int_t       last_open_time;
     ngx_int_t       log_size;
+    ngx_int_t       last_suit_time;
 
     char           *logname;
     char           *backup[MAX_BACKUP_NUM];
@@ -31,8 +32,8 @@ typedef struct {
     ngx_int_t       log_max_size;
     ngx_int_t       interval;
     char           *suitpath;
-    ngx_int_t       last_suit_time;
     ngx_int_t       adjust_time;
+    ngx_int_t       adjust_time_raw;
 } ngx_pipe_rollback_conf_t;
 
 static void ngx_signal_pipe_broken(ngx_log_t *log, ngx_pid_t pid);
@@ -482,7 +483,7 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             }
         }
 #ifdef T_PIPE_USE_USER
-        //use root avoid pipe proccess cannot create or rollback log file limits of access
+        //use root avoid pipe process cannot create or rollback log file limits of access
         if (geteuid() == 0) {
             if (setgid(ccf->group) == -1) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -673,7 +674,8 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     }
 
     //set title
-#if T_PIPE_NO_DISPLAY
+    ngx_setproctitle((char *)op->cmd);
+#ifdef T_PIPE_NO_DISPLAY
     title_len = ngx_strlen(ngx_os_argv[0]);
 #if (NGX_SOLARIS)
 #else
@@ -681,7 +683,6 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     ngx_cpystrn((u_char *) ngx_os_argv[0], op->cmd, title_len);
 #endif
 #endif
-    ngx_setproctitle((char *)op->cmd);
 
     for (;;)
     {
@@ -737,8 +738,11 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
          *   */
         if (log_fd < 0) {
             ngx_pipe_create_subdirs(rbcf.logname, cycle);
-            if (rbcf.interval > 0 && rbcf.last_open_time == 0) {
-                //first
+            if (rbcf.interval > 0 && rbcf.last_open_time == 0 
+                    && ((rbcf.time_now - rbcf.adjust_time_raw) / rbcf.interval < rbcf.time_now / rbcf.interval)) { /*just check
+                when time is after interval and befor adjust_time_raw, fix when no backup file, do rollback
+                */
+                //need check last rollback time, because other process may do rollback after when it adjust time more than this process
                 ngx_pipe_get_last_rollback_time(&rbcf);
             } else {
                 rbcf.last_open_time = ngx_pipe_get_now_sec();
@@ -779,6 +783,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
     size_t           len;
     ngx_str_t        filename;
     ngx_str_t        value;
+    uint32_t         hash;
 
     if (op->argv->nelts < 3) {
         //no logname
@@ -802,6 +807,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
     rbcf->interval = -1;
     rbcf->suitpath = NULL;
     rbcf->adjust_time = 60;
+    rbcf->adjust_time_raw = 60;
     memset(rbcf->backup, 0, sizeof(rbcf->backup));
 
     for (i = 2; i < op->argv->nelts; i++) {
@@ -810,7 +816,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
         }
         if (ngx_strncmp((u_char *) "interval=", argv[i], 9) == 0) {
             value.data = argv[i] + 9;
-            value.len = strlen((char *) argv[i]) - 9;
+            value.len = ngx_strlen((char *) argv[i]) - 9;
 #ifdef T_PIPE_OLD_CONF
             //just compatibility
             rbcf->interval = ngx_atoi(value.data, value.len);
@@ -826,7 +832,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
 
         } else if (ngx_strncmp((u_char *) "baknum=", argv[i], 7) == 0) {
             rbcf->backup_num = ngx_atoi(argv[i] + 7,
-                                        strlen((char *) argv[i]) - 7);
+                                        ngx_strlen((char *) argv[i]) - 7);
             if (rbcf->backup_num <= 0) {
                 rbcf->backup_num = 1;
 
@@ -836,7 +842,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
 
         } else if (ngx_strncmp((u_char *) "maxsize=", argv[i], 8) == 0) {
             value.data = argv[i] + 8;
-            value.len = strlen((char *) argv[i]) - 8;
+            value.len = ngx_strlen((char *) argv[i]) - 8;
 #ifdef T_PIPE_OLD_CONF
             //just compatibility
             rbcf->log_max_size = ngx_atoi(value.data, value.len);
@@ -863,15 +869,15 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
             ngx_pipe_create_suitpath(cycle, rbcf);
         } else if (ngx_strncmp((u_char *) "adjust=", argv[i], 7) == 0) {
             value.data =argv[i] + 7;
-            value.len = strlen((char *) argv[i]) - 7;
-            rbcf->interval = ngx_parse_time(&value, 1);
+            value.len = ngx_strlen((char *) argv[i]) - 7;
+            rbcf->adjust_time_raw = ngx_parse_time(&value, 1);
             if (rbcf->interval <= 0) {
                 rbcf->interval = -1;
             }
         }
     } 
 
-    len = strlen(rbcf->logname) + 5; //max is ".128"
+    len = ngx_strlen(rbcf->logname) + 5; //max is ".128"
     for (j = 0; j < rbcf->backup_num; j++) {
         rbcf->backup[j] = ngx_pcalloc(cycle->pool, len);
         if (rbcf->backup[j] == NULL) {
@@ -880,12 +886,14 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
         ngx_snprintf((u_char *) rbcf->backup[j], len, "%s.%i%Z", rbcf->logname, j + 1);
     }
 
-    srand(ngx_pid);
-    rbcf->adjust_time = rand()%rbcf->adjust_time;
+    //use same seed for same log file, when reload may have same adjust time
+    hash = ngx_crc32_short((u_char*)rbcf->logname, ngx_strlen(rbcf->logname));
+    srand(hash);
+    rbcf->adjust_time = rand()%rbcf->adjust_time_raw;
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
-                  "log rollback param: num [%i], interval %i(S), size %i(B), adjust %i(S)", 
-                  rbcf->backup_num, rbcf->interval, rbcf->log_max_size, rbcf->adjust_time);
+                  "log rollback param: num [%i], interval %i(S), size %i(B), adjust %i/%i(S)", 
+                  rbcf->backup_num, rbcf->interval, rbcf->log_max_size, rbcf->adjust_time, rbcf->adjust_time_raw);
 
     return NGX_OK;
 }
@@ -921,7 +929,7 @@ void ngx_pipe_get_last_rollback_time(ngx_pipe_rollback_conf_t *rbcf)
     //check time
     if (rbcf->interval > 0) {
         if (ngx_file_info(rbcf->backup[0], &sb) == -1) {
-            //need rollback just set 1
+            //no backup file ,so need rollback just set 1
             rbcf->last_open_time = 1;
         } else if (sb.st_ctime/rbcf->interval < ngx_time()/rbcf->interval) {
             //need rollback just set 1
