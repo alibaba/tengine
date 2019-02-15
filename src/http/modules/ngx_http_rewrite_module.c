@@ -560,21 +560,21 @@ ngx_http_rewrite_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_HTTP_MODULE) {
+    for (i = 0; cf->cycle->modules[i]; i++) {
+        if (cf->cycle->modules[i]->type != NGX_HTTP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[i]->ctx;
+        module = cf->cycle->modules[i]->ctx;
 
         if (module->create_loc_conf) {
 
             mconf = module->create_loc_conf(cf);
             if (mconf == NULL) {
-                 return NGX_CONF_ERROR;
+                return NGX_CONF_ERROR;
             }
 
-            ctx->loc_conf[ngx_modules[i]->ctx_index] = mconf;
+            ctx->loc_conf[cf->cycle->modules[i]->ctx_index] = mconf;
         }
     }
 
@@ -612,7 +612,7 @@ ngx_http_rewrite_if(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     save = *cf;
     cf->ctx = ctx;
 
-    if (pclcf->name.len == 0) {
+    if (cf->cmd_type == NGX_HTTP_SRV_CONF) {
         if_code->loc_conf = NULL;
         cf->cmd_type = NGX_HTTP_SIF_CONF;
 
@@ -987,7 +987,8 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value[1].len--;
     value[1].data++;
 
-    v = ngx_http_add_variable(cf, &value[1], NGX_HTTP_VAR_CHANGEABLE);
+    v = ngx_http_add_variable(cf, &value[1],
+                              NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_WEAK);
     if (v == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -997,15 +998,7 @@ ngx_http_rewrite_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (v->get_handler == NULL
-        && ngx_strncasecmp(value[1].data, (u_char *) "http_", 5) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "sent_http_", 10) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "upstream_http_", 14) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "cookie_", 7) != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "upstream_cookie_", 16)
-           != 0
-        && ngx_strncasecmp(value[1].data, (u_char *) "arg_", 4) != 0)
-    {
+    if (v->get_handler == NULL) {
         v->get_handler = ngx_http_rewrite_var;
         v->data = index;
     }

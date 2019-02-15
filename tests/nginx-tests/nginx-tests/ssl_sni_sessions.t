@@ -21,9 +21,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl sni rewrite/)
-	->has_daemon('openssl')
-	->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->has(qw/http http_ssl sni rewrite/);
+
+$t->has_daemon('openssl')->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -39,7 +39,7 @@ http {
     ssl_certificate localhost.crt;
 
     server {
-        listen       127.0.0.1:8443 ssl;
+        listen       127.0.0.1:8080 ssl;
         server_name  default;
 
         ssl_session_tickets off;
@@ -51,7 +51,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8443;
+        listen       127.0.0.1:8080;
         server_name  nocache;
 
         ssl_session_tickets off;
@@ -63,7 +63,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8444 ssl;
+        listen       127.0.0.1:8081 ssl;
         server_name  default;
 
         ssl_session_ticket_key ticket1.key;
@@ -74,7 +74,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8444;
+        listen       127.0.0.1:8081;
         server_name  tickets;
 
         ssl_session_ticket_key ticket2.key;
@@ -108,7 +108,7 @@ $t->plan(6);
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -118,8 +118,8 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -135,8 +135,8 @@ $t->run();
 
 my $ctx = get_ssl_context();
 
-like(get('default', 8443, $ctx), qr!default:\.!, 'default server');
-like(get('default', 8443, $ctx), qr!default:r!, 'default server reused');
+like(get('default', port(8080), $ctx), qr!default:\.!, 'default server');
+like(get('default', port(8080), $ctx), qr!default:r!, 'default server reused');
 
 # check that sessions are still properly saved and restored
 # when using an SNI-based virtual server with different session cache;
@@ -150,16 +150,16 @@ like(get('default', 8443, $ctx), qr!default:r!, 'default server reused');
 
 $ctx = get_ssl_context();
 
-like(get('nocache', 8443, $ctx), qr!nocache:\.!, 'without cache');
-like(get('nocache', 8443, $ctx), qr!nocache:r!, 'without cache reused');
+like(get('nocache', port(8080), $ctx), qr!nocache:\.!, 'without cache');
+like(get('nocache', port(8080), $ctx), qr!nocache:r!, 'without cache reused');
 
 # make sure tickets can be used if an SNI-based virtual server
 # uses a different set of session ticket keys explicitly set
 
 $ctx = get_ssl_context();
 
-like(get('tickets', 8444, $ctx), qr!tickets:\.!, 'tickets');
-like(get('tickets', 8444, $ctx), qr!tickets:r!, 'tickets reused');
+like(get('tickets', port(8081), $ctx), qr!tickets:\.!, 'tickets');
+like(get('tickets', port(8081), $ctx), qr!tickets:r!, 'tickets reused');
 
 ###############################################################################
 
@@ -177,7 +177,7 @@ sub get_ssl_socket {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
 			PeerAddr => '127.0.0.1',
@@ -201,11 +201,15 @@ sub get_ssl_socket {
 sub get {
 	my ($host, $port, $ctx) = @_;
 
-	return http(<<EOF, socket => get_ssl_socket($host, $port, $ctx));
+	my $s = get_ssl_socket($host, $port, $ctx) or return;
+	my $r = http(<<EOF, socket => $s);
 GET / HTTP/1.0
 Host: $host
 
 EOF
+
+	$s->close();
+	return $r;
 }
 
 ###############################################################################

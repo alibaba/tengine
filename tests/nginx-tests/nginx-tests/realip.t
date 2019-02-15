@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http realip/);
+my $t = Test::Nginx->new()->has(qw/http realip rewrite/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -58,6 +58,13 @@ http {
             real_ip_recursive on;
         }
     }
+
+    server {
+        listen       127.0.0.1:8081;
+        server_name  localhost;
+
+        return 204;
+    }
 }
 
 EOF
@@ -71,7 +78,7 @@ $t->run();
 plan(skip_all => 'no 127.0.0.1 on host')
 	if http_get('/') !~ /X-IP: 127.0.0.1/m;
 
-$t->plan(7);
+$t->plan(8);
 
 ###############################################################################
 
@@ -110,6 +117,14 @@ Host: localhost
 X-Forwarded-For: 10.0.1.1
 X-Forwarded-For: 192.0.2.1
 X-Forwarded-For: 127.0.0.1
+
+EOF
+
+my $s = IO::Socket::INET->new('127.0.0.1:' . port(8081));
+like(http(<<EOF, socket => $s), qr/ 204 .*192.0.2.1/s, 'realip post read');
+GET / HTTP/1.0
+Host: localhost
+X-Real-IP: 192.0.2.1
 
 EOF
 

@@ -42,8 +42,13 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream u {
-        server 127.0.0.1:8081 max_fails=0;
-        server 127.0.0.1:8082;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082 backup;
+    }
+
+    upstream u2 {
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082 backup;
     }
 
     server {
@@ -59,7 +64,7 @@ http {
         }
 
         location /in_memory {
-            fastcgi_pass u;
+            fastcgi_pass u2;
             fastcgi_param REQUEST_URI $request_uri;
             fastcgi_param CONTENT_LENGTH $content_length;
             # fastcgi_next_upstream error timeout;
@@ -71,21 +76,17 @@ http {
 
 EOF
 
-$t->run_daemon(\&fastcgi_daemon, 8081);
-$t->run_daemon(\&fastcgi_daemon, 8082);
+$t->run_daemon(\&fastcgi_daemon, port(8081));
+$t->run_daemon(\&fastcgi_daemon, port(8082));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
 like(http_get_length('/', 'x' x 102400), qr/X-Length: 102400/,
 	'body length - in file');
-
-# force quick recovery, so that the next request wouldn't fail
-
-http_get('/');
 
 like(http_get_length('/in_memory', 'x' x 102400), qr/X-Length: 102400/,
 	'body length - in memory');
@@ -112,16 +113,14 @@ sub fastcgi_daemon {
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 
-	my ($body, $len);
-
 	while( $request->Accept() >= 0 ) {
-		read(STDIN, $body, $ENV{'CONTENT_LENGTH'});
+		read(STDIN, my $body, $ENV{'CONTENT_LENGTH'});
 		my $len = length $body;
 
-		sleep 3 if $port == 8081;
+		sleep 3 if $port == port(8081);
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Length: $len
 

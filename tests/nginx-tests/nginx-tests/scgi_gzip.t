@@ -54,7 +54,7 @@ http {
 EOF
 
 $t->run_daemon(\&scgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -65,7 +65,7 @@ like(http_gzip_request('/'), qr/Content-Encoding: gzip/, 'scgi request');
 sub scgi_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8081',
+		LocalHost => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -74,7 +74,8 @@ sub scgi_daemon {
 	my $scgi = SCGI->new($server, blocking => 1);
 
 	while (my $request = $scgi->accept()) {
-		$request->read_env();
+		eval { $request->read_env(); };
+		next if $@;
 
 		$request->connection()->print(<<EOF);
 Content-Type: text/html

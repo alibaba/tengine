@@ -63,7 +63,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -76,7 +76,7 @@ like(http_get('/info.php/path/info'), qr/X-Path-Info: \/path\/info/ms,
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

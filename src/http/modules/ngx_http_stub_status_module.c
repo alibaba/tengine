@@ -24,7 +24,7 @@ static ngx_int_t ngx_http_stub_status_init(ngx_conf_t *cf);
 static ngx_command_t  ngx_http_status_commands[] = {
 
     { ngx_string("stub_status"),
-      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS|NGX_CONF_TAKE1,
       ngx_http_set_stub_status,
       0,
       0,
@@ -32,7 +32,6 @@ static ngx_command_t  ngx_http_status_commands[] = {
 
       ngx_null_command
 };
-
 
 
 static ngx_http_module_t  ngx_http_stub_status_module_ctx = {
@@ -84,7 +83,7 @@ static ngx_http_variable_t  ngx_http_stub_status_vars[] = {
     { ngx_string("connections_waiting"), NULL, ngx_http_stub_status_variable,
       3, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_http_null_variable
 };
 
 
@@ -101,7 +100,7 @@ ngx_http_stub_status_handler(ngx_http_request_t *r)
     ngx_atomic_int_t   rt;
 #endif
 
-    if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
+    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
