@@ -27,8 +27,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)
-	->write_file_expand('nginx.conf', <<'EOF')->plan(30);
+my $t = Test::Nginx->new()->has(qw/http proxy ssi/)
+	->write_file_expand('nginx.conf', <<'EOF')->plan(31);
 
 %%TEST_GLOBALS%%
 
@@ -55,6 +55,10 @@ http {
             proxy_read_timeout 2s;
             send_timeout 2s;
         }
+
+        location /ssi.html {
+            ssi on;
+        }
     }
 }
 
@@ -62,10 +66,12 @@ EOF
 
 my $d = $t->testdir();
 
+$t->write_file('ssi.html', '<!--#include virtual="/upgrade" --> SEE-THIS');
+
 $t->run_daemon(\&upgrade_fake_daemon);
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Can't start test backend";
 
 ###############################################################################
@@ -92,8 +98,8 @@ SKIP: {
 	# send multiple frames
 
 	for my $i (1 .. 10) {
-		upgrade_write($s, ('foo' x 16384) . $i);
-		upgrade_write($s, 'bazz' . $i);
+		upgrade_write($s, ('foo' x 16384) . $i, continue => 1);
+		upgrade_write($s, 'bazz' . $i, continue => $i != 10);
 	}
 
 	for my $i (1 .. 10) {
@@ -129,6 +135,17 @@ undef $s;
 $s = upgrade_connect(noheader => 1);
 ok(!$s, "handshake noupgrade");
 
+# connection upgrade in subrequests shouldn't cause a segfault
+
+SKIP: {
+skip 'leaves coredump', 1 unless $t->has_version('1.13.7')
+	or $ENV{TEST_NGINX_UNSAFE};
+
+$s = upgrade_connect(uri => '/ssi.html');
+ok(!$s, "handshake in subrequests");
+
+}
+
 # bytes sent on upgraded connection
 # verify with 1) data actually read by client, 2) expected data from backend
 
@@ -147,18 +164,20 @@ sub upgrade_connect {
 
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => '127.0.0.1:8080',
+		PeerAddr => '127.0.0.1:' . port(8080),
 	)
 		or die "Can't connect to nginx: $!\n";
 
 	# send request, $h->to_string
 
-	my $buf = "GET / HTTP/1.1" . CRLF
+	my $uri = $opts{uri} || '/';
+
+	my $buf = "GET $uri HTTP/1.1" . CRLF
 		. "Host: localhost" . CRLF
 		. ($opts{noheader} ? '' : "Upgrade: foo" . CRLF)
 		. "Connection: Upgrade" . CRLF . CRLF;
 
-	$buf .= $opts{message} . CRLF if defined $opts{message};
+	$buf .= $opts{message} . CRLF . 'FIN' if defined $opts{message};
 
 	local $SIG{PIPE} = 'IGNORE';
 
@@ -192,7 +211,7 @@ sub upgrade_connect {
 
 sub upgrade_getline {
 	my ($s) = @_;
-	my ($h, $buf, $line);
+	my ($h, $buf);
 
 	${*$s}->{_upgrade_private} ||= { b => '', r => 0 };
 	$h = ${*$s}->{_upgrade_private};
@@ -203,7 +222,7 @@ sub upgrade_getline {
 	}
 
 	$s->blocking(0);
-	while (IO::Select->new($s)->can_read(1.5)) {
+	while (IO::Select->new($s)->can_read(3)) {
 		my $n = $s->sysread($buf, 1024);
 		last unless $n;
 
@@ -218,9 +237,10 @@ sub upgrade_getline {
 }
 
 sub upgrade_write {
-	my ($s, $message) = @_;
+	my ($s, $message, %extra) = @_;
 
 	$message = $message . CRLF;
+	$message = $message . 'FIN' unless $extra{continue};
 
 	local $SIG{PIPE} = 'IGNORE';
 
@@ -250,7 +270,7 @@ sub upgrade_read {
 sub upgrade_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -306,7 +326,8 @@ sub upgrade_handle_client {
 
 			$unfinished .= $chunk;
 
-			if ($unfinished =~ m/\x0d?\x0a\z/) {
+			if ($unfinished =~ m/\x0d?\x0aFIN\z/) {
+				$unfinished =~ s/FIN\z//;
 				$unfinished =~ s/foo/bar/g;
 				log2o($unfinished);
 				$buffer .= $unfinished;

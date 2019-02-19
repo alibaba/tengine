@@ -82,11 +82,6 @@ Content-Length: 10
 
 EOF
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.9.10');
-
 like(http_get('/t1'), qr/200 OK.*SEE/ms, 'keepalive after discarded');
-
-}
 
 ###############################################################################

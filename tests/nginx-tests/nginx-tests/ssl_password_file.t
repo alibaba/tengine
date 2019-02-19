@@ -54,7 +54,7 @@ http {
     ssl_password_file password_http;
 
     server {
-        listen       127.0.0.1:8443 ssl;
+        listen       127.0.0.1:8081 ssl;
         listen       127.0.0.1:8080;
         server_name  localhost;
 
@@ -92,7 +92,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -103,12 +103,12 @@ mkfifo("$d/password_fifo", 0700);
 
 foreach my $name ('localhost', 'inherits') {
 	system("openssl genrsa -out $d/$name.key -passout pass:$name "
-		. "-aes128 2048 >>$d/openssl.out 2>&1") == 0
+		. "-aes128 1024 >>$d/openssl.out 2>&1") == 0
 		or die "Can't create private key: $!\n";
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' "
-		. "-key '$d/$name.key' -passin pass:$name"
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt "
+		. "-key $d/$name.key -passin pass:$name"
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -117,7 +117,8 @@ $t->write_file('password', 'localhost');
 $t->write_file('password_many', "wrong$CRLF" . "localhost$CRLF");
 $t->write_file('password_http', 'inherits');
 
-fork() || exec("echo localhost > $d/password_fifo");
+my $p = fork();
+exec("echo localhost > $d/password_fifo") if $p == 0;
 
 # do not mangle with try_run()
 # we need to distinguish ssl_password_file support vs its brokenness
@@ -127,6 +128,7 @@ eval {
 	$t->run();
 	open STDERR, ">&", \*OLDERR;
 };
+kill 'INT', $p if $@;
 
 ###############################################################################
 
@@ -145,10 +147,10 @@ sub get_ssl_socket {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:8443',
+			PeerAddr => '127.0.0.1:' . port(8081),
 			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
 			SSL_error_trap => sub { die $_[1] }
 		);

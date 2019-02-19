@@ -114,20 +114,28 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
             send += file_size;
 
-            /* create the trailer iovec and coalesce the neighbouring bufs */
+            if (send < limit) {
 
-            cl = ngx_output_chain_to_iovec(&trailer, cl, limit - send, c->log);
+                /*
+                 * create the trailer iovec and coalesce the neighbouring bufs
+                 */
 
-            if (cl == NGX_CHAIN_ERROR) {
-                return NGX_CHAIN_ERROR;
+                cl = ngx_output_chain_to_iovec(&trailer, cl, limit - send,
+                                               c->log);
+                if (cl == NGX_CHAIN_ERROR) {
+                    return NGX_CHAIN_ERROR;
+                }
+
+                send += trailer.size;
+
+            } else {
+                trailer.count = 0;
             }
-
-            send += trailer.size;
 
             if (ngx_freebsd_use_tcp_nopush
                 && c->tcp_nopush == NGX_TCP_NOPUSH_UNSET)
             {
-                if (ngx_tcp_nopush(c->fd) == NGX_ERROR) {
+                if (ngx_tcp_nopush(c->fd) == -1) {
                     err = ngx_socket_errno;
 
                     /*
@@ -247,6 +255,19 @@ ngx_freebsd_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 #if (NGX_HAVE_AIO_SENDFILE)
 
         if (ebusy) {
+            if (aio->event.active) {
+                /*
+                 * tolerate duplicate calls; they can happen due to subrequests
+                 * or multiple calls of the next body filter from a filter
+                 */
+
+                if (sent) {
+                    c->busy_count = 0;
+                }
+
+                return in;
+            }
+
             if (sent == 0) {
                 c->busy_count++;
 

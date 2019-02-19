@@ -1,0 +1,4 @@
+ddon_name=ngx_http_upstream_dynamic_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_upstream_dynamic_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_upstream_dynamic_module.c"
+have=T_NGX_HTTP_DYNAMIC_RESOLVE  . auto/have
