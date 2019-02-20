@@ -27,7 +27,8 @@ select STDOUT; $| = 1;
 eval { require IO::Socket::SSL; };
 plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl/)->has_daemon('openssl');
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl/)->has_daemon('openssl')
+	->plan(2);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -58,7 +59,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -68,26 +69,28 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->run_daemon(\&stream_daemon_ssl, 8081, path => $d, pp => 1);
-$t->run_daemon(\&stream_daemon_ssl, 8083, path => $d, pp => 0);
-$t->try_run('no stream proxy_protocol')->plan(2);
+$t->run_daemon(\&stream_daemon_ssl, port(8081), path => $d, pp => 1);
+$t->run_daemon(\&stream_daemon_ssl, port(8083), path => $d, pp => 0);
+$t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8083');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8083));
 
 ###############################################################################
 
-my %r = pp_get('test');
-is($r{'data'}, "PROXY TCP4 127.0.0.1 127.0.0.1 $r{'sp'} 8080" . CRLF . 'test',
+my $dp = port(8080);
+
+my %r = pp_get('test', '127.0.0.1:' . $dp);
+is($r{'data'}, "PROXY TCP4 127.0.0.1 127.0.0.1 $r{'sp'} $dp" . CRLF . 'test',
 	'protocol on');
 
-%r = pp_get('test', '127.0.0.1:8082');
+%r = pp_get('test', '127.0.0.1:' . port(8082));
 is($r{'data'}, 'test', 'protocol off');
 
 ###############################################################################
@@ -105,7 +108,7 @@ sub getconn {
 	my $peer = shift;
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
+		PeerAddr => $peer
 	)
 		or die "Can't connect to nginx: $!\n";
 

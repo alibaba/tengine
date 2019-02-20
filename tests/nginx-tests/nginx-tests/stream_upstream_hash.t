@@ -39,57 +39,58 @@ events {
 stream {
     upstream hash {
         hash $remote_addr;
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8088;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
     }
 
     upstream cons {
         hash $remote_addr consistent;
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8088;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
     }
 
     server {
-        listen      127.0.0.1:8081;
+        listen      127.0.0.1:8080;
         proxy_pass  hash;
     }
 
     server {
-        listen      127.0.0.1:8082;
+        listen      127.0.0.1:8081;
         proxy_pass  cons;
     }
 }
 
 EOF
 
-$t->run_daemon(\&stream_daemon, 8087);
-$t->run_daemon(\&stream_daemon, 8088);
+$t->run_daemon(\&stream_daemon, port(8082));
+$t->run_daemon(\&stream_daemon, port(8083));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8087');
-$t->waitforsocket('127.0.0.1:8088');
+$t->waitforsocket('127.0.0.1:' . port(8082));
+$t->waitforsocket('127.0.0.1:' . port(8083));
 
 ###############################################################################
 
-is(many('.', 10, peer => '127.0.0.1:8081'), '8088: 10', 'hash');
-is(many('.', 10, peer => '127.0.0.1:8082'), '8088: 10', 'hash consistent');
+my @ports = my ($port2, $port3) = (port(8082), port(8083));
+
+is(many(10, port(8080)), "$port3: 10", 'hash');
+like(many(10, port(8081)), qr/($port2|$port3): 10/, 'hash consistent');
 
 ###############################################################################
 
 sub many {
-	my ($data, $count, %opts) = @_;
-	my (%ports, $peer);
-
-	$peer = $opts{peer};
+	my ($count, $port) = @_;
+	my (%ports);
 
 	for (1 .. $count) {
-		if (stream($peer)->io($data) =~ /(\d+)/) {
+		if (stream("127.0.0.1:$port")->io('.') =~ /(\d+)/) {
 			$ports{$1} = 0 unless defined $ports{$1};
 			$ports{$1}++;
 		}
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################

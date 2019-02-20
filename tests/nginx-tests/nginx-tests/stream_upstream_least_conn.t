@@ -50,42 +50,45 @@ stream {
 
 EOF
 
-$t->run_daemon(\&stream_daemon, 8081);
-$t->run_daemon(\&stream_daemon, 8082);
+$t->run_daemon(\&stream_daemon, port(8081));
+$t->run_daemon(\&stream_daemon, port(8082));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
-is(many('.', 10), '8081: 5, 8082: 5', 'balanced');
+my @ports = my ($port1, $port2) = (port(8081), port(8082));
+
+is(many(10), "$port1: 5, $port2: 5", 'balanced');
 
 my @sockets;
 for (1 .. 2) {
-	my $s = stream();
+	my $s = stream('127.0.0.1:' . port(8080));
 	$s->write('w');
 	push @sockets, $s;
 }
 
 select undef, undef, undef, 0.2;
 
-is(many('.', 10), '8082: 10', 'least_conn');
+is(many(10), "$port2: 10", 'least_conn');
 
 ###############################################################################
 
 sub many {
-	my ($data, $count, %opts) = @_;
+	my ($count) = @_;
 	my (%ports);
 
 	for (1 .. $count) {
-		if (stream()->io($data) =~ /(\d+)/) {
+		if (stream('127.0.0.1:' . port(8080))->io('.') =~ /(\d+)/) {
 			$ports{$1} = 0 unless defined $ports{$1};
 			$ports{$1}++;
 		}
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################
@@ -132,7 +135,7 @@ sub stream_handle_client {
 
 	my $port = $client->sockport();
 
-	if ($buffer =~ /w/ && $port == 8081) {
+	if ($buffer =~ /w/ && $port == port(8081)) {
 		Test::Nginx::log_core('||', "$port: sleep(2.5)");
 		select undef, undef, undef, 2.5;
 	}

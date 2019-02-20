@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 
-# (C) Sergey Kandaurov
+# (C) Andrey Zelenkov
 # (C) Nginx, Inc.
 
-# Tests for stream proxy module, proxy_next_upstream directive and friends.
+# Simple tests for stream with unix socket.
 
 ###############################################################################
 
@@ -23,7 +23,10 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream/)->plan(3);
+eval { require IO::Socket::UNIX; };
+plan(skip_all => 'IO::Socket::UNIX not installed') if $@;
+
+my $t = Test::Nginx->new()->has(qw/stream unix/)->plan(2);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -36,58 +39,47 @@ events {
 
 stream {
     upstream u {
-        server 127.0.0.1:8083 max_fails=0;
-        server 127.0.0.1:8084 max_fails=0;
-        server 127.0.0.1:8085 backup;
-    }
-
-    upstream u2 {
-        server 127.0.0.1:8083;
-        server 127.0.0.1:8085 backup;
-    }
-
-    proxy_connect_timeout 1s;
-
-    server {
-        listen      127.0.0.1:8080;
-        proxy_pass  u;
-        proxy_next_upstream off;
+        server unix:%%TESTDIR%%/unix.sock;
     }
 
     server {
-        listen      127.0.0.1:8081;
-        proxy_pass  u2;
-        proxy_next_upstream on;
+        listen       127.0.0.1:8080;
+        proxy_pass   unix:%%TESTDIR%%/unix.sock;
     }
 
     server {
-        listen      127.0.0.1:8082;
-        proxy_pass  u;
-        proxy_next_upstream on;
-        proxy_next_upstream_tries 2;
+        listen       127.0.0.1:8081;
+        proxy_pass   u;
     }
 }
 
 EOF
 
-$t->run_daemon(\&stream_daemon);
-$t->run()->waitforsocket('127.0.0.1:' . port(8085));
+my $path = $t->testdir() . '/unix.sock';
+
+$t->run_daemon(\&stream_daemon, $path);
+$t->run();
+
+# wait for unix socket to appear
+
+for (1 .. 50) {
+	last if -S $path;
+	select undef, undef, undef, 0.1;
+}
 
 ###############################################################################
 
-is(stream('127.0.0.1:' . port(8080))->io('.'), '', 'next off');
-is(stream('127.0.0.1:' . port(8081))->io('.'), 'SEE-THIS', 'next on');
+my $str = 'SEE-THIS';
 
-# make sure backup is not tried
-
-is(stream('127.0.0.1:' . port(8082))->io('.'), '', 'next tries');
+is(stream('127.0.0.1:' . port(8080))->io($str), $str, 'proxy');
+is(stream('127.0.0.1:' . port(8081))->io($str), $str, 'upstream');
 
 ###############################################################################
 
 sub stream_daemon {
-	my $server = IO::Socket::INET->new(
+	my $server = IO::Socket::UNIX->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:' . port(8085),
+		Local => shift,
 		Listen => 5,
 		Reuse => 1
 	)
@@ -104,13 +96,10 @@ sub stream_daemon {
 
 		log2i("$client $buffer");
 
-		$buffer = 'SEE-THIS';
-
 		log2o("$client $buffer");
 
 		$client->syswrite($buffer);
 
-	} continue {
 		close $client;
 	}
 }

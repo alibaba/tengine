@@ -3,7 +3,7 @@
 # (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
-# Stream tests for access_log with escape parameter.
+# Tests for stream proxy module with datagrams, source address selection.
 
 ###############################################################################
 
@@ -16,13 +16,20 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use Test::Nginx::Stream qw/ dgram /;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_map stream_return/)
+plan(skip_all => '127.0.0.2 local address required')
+	unless defined IO::Socket::INET->new( LocalAddr => '127.0.0.2' );
+
+plan(skip_all => 'listen on wildcard address')
+	unless $ENV{TEST_NGINX_UNSAFE};
+
+my $t = Test::Nginx->new()->has(qw/stream stream_return udp/)->plan(1)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -33,33 +40,28 @@ events {
 }
 
 stream {
-    map $pid $a {
-        default '" \ "';
-    }
-    map $pid $b {
-        default "foo";
-    }
-
-    log_format none     escape=none     $a$b$upstream_addr;
-
     server {
-        listen       127.0.0.1:8080;
-        return       ok;
-
-        access_log %%TESTDIR%%/none.log none;
+        listen  %%PORT_8999_UDP%% udp;
+        return  $server_addr;
     }
 }
 
 EOF
 
-$t->try_run('no escape=none')->plan(1);
+$t->run();
 
 ###############################################################################
 
-http_get('/');
+my $s = dgram(
+	LocalAddr => '127.0.0.1',
+	PeerAddr  => '127.0.0.2:' . port(8999)
+);
 
-$t->stop();
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.13.0');
 
-is($t->read_file('none.log'), '" \\ "foo' . "\n", 'none');
+is($s->io('test'), '127.0.0.2', 'stream udp wildcard');
+
+}
 
 ###############################################################################

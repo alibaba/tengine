@@ -3,7 +3,8 @@
 # (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
-# Stream tests for proxy to ssl backend.
+# Stream tests for proxy to ssl backend, use of Server Name Indication
+# (proxy_ssl_name, proxy_ssl_server_name directives) with complex value.
 
 ###############################################################################
 
@@ -23,9 +24,8 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl http http_ssl/)
-	->has(qw/stream_return/)
-	->has_daemon('openssl')->plan(6);
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return sni/)
+	->has_daemon('openssl');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,44 +38,23 @@ events {
 
 stream {
     proxy_ssl on;
-    proxy_ssl_session_reuse on;
-    proxy_connect_timeout 2s;
+    proxy_ssl_session_reuse off;
 
     server {
         listen      127.0.0.1:8081;
-        proxy_pass  127.0.0.1:8083;
-        proxy_ssl_session_reuse off;
-    }
-
-    server {
         listen      127.0.0.1:8082;
-        proxy_pass  127.0.0.1:8083;
+        proxy_pass  127.0.0.1:8085;
+
+        proxy_ssl_server_name on;
+        proxy_ssl_name x${server_port}x;
     }
 
     server {
-        listen      127.0.0.1:8083 ssl;
-        return      $ssl_session_reused;
-
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
-        ssl_session_cache builtin;
-    }
 
-    server {
-        listen      127.0.0.1:8080;
-        proxy_pass  127.0.0.1:8084;
-    }
-}
-
-http {
-    %%TEST_GLOBALS_HTTP%%
-
-    server {
-        listen       127.0.0.1:8084 ssl;
-        server_name  localhost;
-
-        ssl_certificate_key localhost.key;
-        ssl_certificate localhost.crt;
+        listen  127.0.0.1:8085 ssl;
+        return  $ssl_server_name;
     }
 }
 
@@ -89,8 +68,6 @@ distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
 EOF
 
-$t->write_file('index.html', '');
-
 my $d = $t->testdir();
 
 foreach my $name ('localhost') {
@@ -101,21 +78,13 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->run();
+$t->run()->plan(2);
 
 ###############################################################################
 
-is(stream('127.0.0.1:' . port(8081))->read(), '.', 'ssl');
-is(stream('127.0.0.1:' . port(8081))->read(), '.', 'ssl 2');
+my ($p1, $p2) = (port(8081), port(8082));
 
-is(stream('127.0.0.1:' . port(8082))->read(), '.', 'ssl session new');
-is(stream('127.0.0.1:' . port(8082))->read(), 'r', 'ssl session reused');
-is(stream('127.0.0.1:' . port(8082))->read(), 'r', 'ssl session reused 2');
-
-my $s = http('', start => 1);
-
-sleep 3;
-
-like(http_get('/', socket => $s), qr/200 OK/, 'proxy connect timeout');
+is(stream("127.0.0.1:$p1")->read(), "x${p1}x", 'name 1');
+is(stream("127.0.0.1:$p2")->read(), "x${p2}x", 'name 2');
 
 ###############################################################################
