@@ -36,32 +36,32 @@ events {
 
 stream {
     upstream u {
-        server 127.0.0.1:8087 max_fails=0;
-        server 127.0.0.1:8088 max_fails=0;
-        server 127.0.0.1:8089 backup;
+        server 127.0.0.1:8083 max_fails=0;
+        server 127.0.0.1:8084 max_fails=0;
+        server 127.0.0.1:8085 backup;
     }
 
     upstream u2 {
-        server 127.0.0.1:8087;
-        server 127.0.0.1:8089 backup;
+        server 127.0.0.1:8083;
+        server 127.0.0.1:8085 backup;
     }
 
     proxy_connect_timeout 1s;
 
     server {
-        listen      127.0.0.1:8081;
+        listen      127.0.0.1:8080;
         proxy_pass  u;
         proxy_next_upstream off;
     }
 
     server {
-        listen      127.0.0.1:8082;
+        listen      127.0.0.1:8081;
         proxy_pass  u2;
         proxy_next_upstream on;
     }
 
     server {
-        listen      127.0.0.1:8083;
+        listen      127.0.0.1:8082;
         proxy_pass  u;
         proxy_next_upstream on;
         proxy_next_upstream_tries 2;
@@ -71,23 +71,23 @@ stream {
 EOF
 
 $t->run_daemon(\&stream_daemon);
-$t->run()->waitforsocket('127.0.0.1:8089');
+$t->run()->waitforsocket('127.0.0.1:' . port(8085));
 
 ###############################################################################
 
-is(stream('127.0.0.1:8081')->io('.'), '', 'next off');
-is(stream('127.0.0.1:8082')->io('.'), 'SEE-THIS', 'next on');
+is(stream('127.0.0.1:' . port(8080))->io('.'), '', 'next off');
+is(stream('127.0.0.1:' . port(8081))->io('.'), 'SEE-THIS', 'next on');
 
 # make sure backup is not tried
 
-is(stream('127.0.0.1:8083')->io('.'), '', 'next tries');
+is(stream('127.0.0.1:' . port(8082))->io('.'), '', 'next tries');
 
 ###############################################################################
 
 sub stream_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8089',
+		LocalHost => '127.0.0.1:' . port(8085),
 		Listen => 5,
 		Reuse => 1
 	)

@@ -16,14 +16,15 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use Test::Nginx::Stream qw/ stream /;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl http http_ssl/)
-	->has(qw/stream_upstream_zone/)->has_daemon('openssl')->plan(8);
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return/)
+	->has(qw/stream_upstream_zone/)->has_daemon('openssl')->plan(9);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -39,14 +40,14 @@ stream {
     proxy_ssl_session_reuse on;
 
     upstream u {
-        zone u 32k;
-        server 127.0.0.1:8087;
+        zone u 1m;
+        server 127.0.0.1:8084;
     }
 
     upstream u2 {
-        zone u2 32k;
-        server 127.0.0.1:8087 backup;
-        server 127.0.0.1:8088 down;
+        zone u2 1m;
+        server 127.0.0.1:8084 backup;
+        server 127.0.0.1:8085 down;
     }
 
     server {
@@ -70,21 +71,14 @@ stream {
         listen      127.0.0.1:8083;
         proxy_pass  u2;
     }
-}
-
-http {
-    %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen 127.0.0.1:8087 ssl;
+        listen      127.0.0.1:8084 ssl;
+        return      $ssl_session_reused;
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
         ssl_session_cache builtin;
-
-        location / {
-            add_header X-Session $ssl_session_reused;
-        }
     }
 }
 
@@ -92,20 +86,18 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
 EOF
 
-$t->write_file('index.html', '');
-
 my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -114,37 +106,23 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/', socket => getconn('127.0.0.1:8080')),
-	qr/200 OK.*X-Session: \./s, 'ssl');
-like(http_get('/', socket => getconn('127.0.0.1:8081')),
-	qr/200 OK.*X-Session: \./s, 'ssl 2');
+TODO: {
+todo_skip 'leaves coredump', 9 unless $^O ne 'MSWin32'
+	or $ENV{TEST_NGINX_UNSAFE} or $t->has_version('1.13.4');
 
-like(http_get('/', socket => getconn('127.0.0.1:8080')),
-	qr/200 OK.*X-Session: \./s, 'ssl reuse session');
-like(http_get('/', socket => getconn('127.0.0.1:8081')),
-	qr/200 OK.*X-Session: r/s, 'ssl reuse session 2');
+is(stream('127.0.0.1:' . port(8080))->read(), '.', 'ssl');
+is(stream('127.0.0.1:' . port(8080))->read(), '.', 'ssl 2');
 
-like(http_get('/', socket => getconn('127.0.0.1:8082')),
-	qr/200 OK.*X-Session: \./s, 'ssl backup');
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
-	qr/200 OK.*X-Session: \./s, 'ssl backup 2');
+is(stream('127.0.0.1:' . port(8081))->read(), '.', 'ssl session new');
+is(stream('127.0.0.1:' . port(8081))->read(), 'r', 'ssl session reused');
+is(stream('127.0.0.1:' . port(8081))->read(), 'r', 'ssl session reused 2');
 
-like(http_get('/', socket => getconn('127.0.0.1:8082')),
-	qr/200 OK.*X-Session: \./s, 'ssl reuse session backup');
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
-	qr/200 OK.*X-Session: r/s, 'ssl reuse session backup 2');
+is(stream('127.0.0.1:' . port(8082))->read(), '.', 'backup ssl');
+is(stream('127.0.0.1:' . port(8082))->read(), '.', 'backup ssl 2');
 
-###############################################################################
+is(stream('127.0.0.1:' . port(8083))->read(), '.', 'backup ssl session new');
+is(stream('127.0.0.1:' . port(8083))->read(), 'r', 'backup ssl session reused');
 
-sub getconn {
-	my $peer = shift;
-	my $s = IO::Socket::INET->new(
-		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
-	)
-		or die "Can't connect to nginx: $!\n";
-
-	return $s;
 }
 
 ###############################################################################

@@ -28,8 +28,6 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/stream/);
 
-plan(skip_all => 'no tcp_nodelay') unless $t->has_version('1.9.4');
-
 $t->plan(2)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -58,16 +56,16 @@ stream {
 EOF
 
 $t->run_daemon(\&stream_daemon);
-$t->run()->waitforsocket('127.0.0.1:8080');
+$t->run()->waitforsocket('127.0.0.1:' . port(8080));
 
 ###############################################################################
 
 my $str = '1234567890' x 10 . 'F';
 my $length = length($str);
 
-is(stream('127.0.0.1:8081')->io($str, length => $length), $str,
+is(stream('127.0.0.1:' . port(8081))->io($str, length => $length), $str,
 	'tcp_nodelay off');
-is(stream('127.0.0.1:8082')->io($str, length => $length), $str,
+is(stream('127.0.0.1:' . port(8082))->io($str, length => $length), $str,
 	'tcp_nodelay on');
 
 ###############################################################################
@@ -75,7 +73,7 @@ is(stream('127.0.0.1:8082')->io($str, length => $length), $str,
 sub stream_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8080',
+		LocalAddr => '127.0.0.1:' . port(8080),
 		Listen => 5,
 		Reuse => 1
 	)

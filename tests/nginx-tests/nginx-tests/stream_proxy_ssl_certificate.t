@@ -40,24 +40,24 @@ stream {
     proxy_ssl_session_reuse off;
 
     server {
-        listen      127.0.0.1:8083;
-        proxy_pass  127.0.0.1:8081;
+        listen      127.0.0.1:8082;
+        proxy_pass  127.0.0.1:8080;
 
         proxy_ssl_certificate 1.example.com.crt;
         proxy_ssl_certificate_key 1.example.com.key;
     }
 
     server {
-        listen      127.0.0.1:8084;
-        proxy_pass  127.0.0.1:8081;
+        listen      127.0.0.1:8083;
+        proxy_pass  127.0.0.1:8080;
 
         proxy_ssl_certificate 2.example.com.crt;
         proxy_ssl_certificate_key 2.example.com.key;
     }
 
     server {
-        listen      127.0.0.1:8085;
-        proxy_pass  127.0.0.1:8082;
+        listen      127.0.0.1:8084;
+        proxy_pass  127.0.0.1:8081;
 
         proxy_ssl_certificate 3.example.com.crt;
         proxy_ssl_certificate_key 3.example.com.key;
@@ -69,7 +69,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8081 ssl;
+        listen       127.0.0.1:8080 ssl;
         server_name  localhost;
 
         ssl_certificate 2.example.com.crt;
@@ -85,7 +85,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 ssl;
+        listen       127.0.0.1:8081 ssl;
         server_name  localhost;
 
         ssl_certificate 1.example.com.crt;
@@ -114,23 +114,25 @@ my $d = $t->testdir();
 
 foreach my $name ('1.example.com', '2.example.com') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
 
 foreach my $name ('3.example.com') {
 	system("openssl genrsa -out $d/$name.key -passout pass:$name "
-		. "-aes128 2048 >>$d/openssl.out 2>&1") == 0
+		. "-aes128 1024 >>$d/openssl.out 2>&1") == 0
 		or die "Can't create private key: $!\n";
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' "
-		. "-key '$d/$name.key' -passin pass:$name"
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt "
+		. "-key $d/$name.key -passin pass:$name"
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
+
+sleep 1 if $^O eq 'MSWin32';
 
 $t->write_file('password', '3.example.com');
 $t->write_file('index.html', '');
@@ -139,17 +141,17 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8082))),
 	qr/X-Verify: SUCCESS/ms, 'verify certificate');
-like(http_get('/', socket => getconn('127.0.0.1:8084')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8083))),
 	qr/X-Verify: FAILED/ms, 'fail certificate');
-like(http_get('/', socket => getconn('127.0.0.1:8085')),
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8084))),
 	qr/X-Verify: SUCCESS/ms, 'with encrypted key');
 
-like(http_get('/', socket => getconn('127.0.0.1:8083')),
-	qr!X-Name: /CN=1.example!, 'valid certificate');
-unlike(http_get('/', socket => getconn('127.0.0.1:8084')),
-	qr!X-Name: /CN=1.example!, 'invalid certificate');
+like(http_get('/', socket => getconn('127.0.0.1:' . port(8082))),
+	qr!X-Name: /?CN=1.example!, 'valid certificate');
+unlike(http_get('/', socket => getconn('127.0.0.1:' . port(8083))),
+	qr!X-Name: /?CN=1.example!, 'invalid certificate');
 
 ###############################################################################
 
@@ -157,7 +159,7 @@ sub getconn {
 	my $peer = shift;
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
+		PeerAddr => $peer
 	)
 		or die "Can't connect to nginx: $!\n";
 
