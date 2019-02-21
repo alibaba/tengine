@@ -1,15 +1,14 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
 #master_on();
 #workers(2);
-log_level('warn');
+#log_level('warn');
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 16);
+plan tests => repeat_each() * (blocks() * 2 + 17);
 
 #no_diff();
 no_long_string();
@@ -502,7 +501,7 @@ s: aa
 
 === TEST 23: just hit match limit
 --- http_config
-    lua_regex_match_limit 5600;
+    lua_regex_match_limit 5000;
 --- config
     location /re {
         content_by_lua_file html/a.lua;
@@ -512,7 +511,7 @@ s: aa
 >>> a.lua
 local re = [==[(?i:([\s'\"`´’‘\(\)]*)?([\d\w]+)([\s'\"`´’‘\(\)]*)?(?:=|<=>|r?like|sounds\s+like|regexp)([\s'\"`´’‘\(\)]*)?\2|([\s'\"`´’‘\(\)]*)?([\d\w]+)([\s'\"`´’‘\(\)]*)?(?:!=|<=|>=|<>|<|>|\^|is\s+not|not\s+like|not\s+regexp)([\s'\"`´’‘\(\)]*)?(?!\6)([\d\w]+))]==]
 
-s = string.rep([[ABCDEFG]], 10)
+local s = string.rep([[ABCDEFG]], 10)
 
 local start = ngx.now()
 
@@ -539,7 +538,7 @@ error: pcre_exec() failed: -8
 
 === TEST 24: just not hit match limit
 --- http_config
-    lua_regex_match_limit 5700;
+    lua_regex_match_limit 5100;
 --- config
     location /re {
         content_by_lua_file html/a.lua;
@@ -675,3 +674,26 @@ GET /t
 --- no_error_log
 [error]
 
+
+
+=== TEST 29: function replace (false for groups)
+--- config
+    location /re {
+        content_by_lua '
+            local repl = function (m)
+                print("group 1: ", m[2])
+                return "[" .. m[0] .. "] [" .. m[1] .. "]"
+            end
+
+            local s, n = ngx.re.gsub("hello, 34", "([0-9])|(world)", repl)
+            ngx.say(s)
+            ngx.say(n)
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hello, [3] [3][4] [4]
+2
+--- error_log
+group 1: false

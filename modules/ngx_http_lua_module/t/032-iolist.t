@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -77,4 +76,3 @@ GET /lua
 GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
-

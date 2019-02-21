@@ -10,7 +10,7 @@ my %opts;
 getopts('f', \%opts) or
     die "Usage: $0 [-f]
 Options:
-    -f          Override exising symbolic links with force
+    -f          Override existing symbolic links with force
 ";
 
 my $root = shift || 'src';

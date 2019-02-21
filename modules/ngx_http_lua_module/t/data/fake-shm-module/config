@@ -1,0 +1,3 @@
+ngx_addon_name=ngx_http_lua_shm_fake_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_lua_fake_shm_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_lua_fake_shm_module.c"

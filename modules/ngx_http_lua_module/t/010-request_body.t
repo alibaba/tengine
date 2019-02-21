@@ -1,10 +1,10 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
 #master_process_enabled(1);
-log_level('debug'); # to ensure any log-level can be outputed
+log_level('debug'); # to ensure any log-level can be outputted
 
 repeat_each(2);
 
@@ -270,4 +270,3 @@ Expect: 100-Continue
 http finalize request: 500, "/echo_body?" a:1, c:2
 http finalize request: 500, "/echo_body?" a:1, c:0
 --- log_level: debug
-

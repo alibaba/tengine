@@ -176,4 +176,3 @@ GET /lua
 init_worker
 --- no_error_log
 [error]
-

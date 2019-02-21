@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -113,7 +112,7 @@ GET /report/listBidwordPrices4lzExtra.htm?words=123,156,2532
     }
     location = /main {
         content_by_lua '
-            res = ngx.location.capture("/memc?c=get&k=foo&v=")
+            local res = ngx.location.capture("/memc?c=get&k=foo&v=")
             ngx.say("1: ", res.body)
 
             res = ngx.location.capture("/memc?c=set&k=foo&v=bar");
@@ -205,7 +204,7 @@ https://github.com/chaoslawful/lua-nginx-module/issues/37
         content_by_lua '
             -- local yajl = require "yajl"
             ngx.header["Set-Cookie"] = {}
-            res = ngx.location.capture("/sub")
+            local res = ngx.location.capture("/sub")
 
             for i,j in pairs(res.header) do
                 ngx.header[i] = j
@@ -232,7 +231,7 @@ Set-Cookie: TestCookie2=bar.*"
     }
 --- user_files
 >>> foo.lua
-res = {}
+local res = {}
 res = {'good 1', 'good 2', 'good 3'}
 return ngx.redirect("/somedir/" .. ngx.escape_uri(res[math.random(1,#res)]))
 --- request
@@ -580,7 +579,7 @@ $s
 
 
 
-=== TEST 26: unexpected globals sharing by using _G
+=== TEST 26: globals sharing by using _G
 --- config
     location /test {
         content_by_lua '
@@ -594,12 +593,12 @@ $s
     }
 --- pipelined_requests eval
 ["GET /test", "GET /test", "GET /test"]
---- response_body eval
-["0", "0", "0"]
+--- response_body_like eval
+[qr/\A[036]\z/, qr/\A[147]\z/, qr/\A[258]\z/]
 
 
 
-=== TEST 27: unexpected globals sharing by using _G (set_by_lua*)
+=== TEST 27: globals sharing by using _G (set_by_lua*)
 --- config
     location /test {
         set_by_lua $a '
@@ -614,12 +613,12 @@ $s
     }
 --- pipelined_requests eval
 ["GET /test", "GET /test", "GET /test"]
---- response_body eval
-["0", "0", "0"]
+--- response_body_like eval
+[qr/\A[036]\z/, qr/\A[147]\z/, qr/\A[258]\z/]
 
 
 
-=== TEST 28: unexpected globals sharing by using _G (log_by_lua*)
+=== TEST 28: globals sharing by using _G (log_by_lua*)
 --- http_config
     lua_shared_dict log_dict 100k;
 --- config
@@ -634,19 +633,19 @@ $s
             if _G.t then
                 _G.t = _G.t + 1
             else
-                _G.t = 0
+                _G.t = 1
             end
             log_dict:set("cnt", t)
         ';
     }
 --- pipelined_requests eval
 ["GET /test", "GET /test", "GET /test"]
---- response_body eval
-["0", "0", "0"]
+--- response_body_like eval
+[qr/\A[036]\z/, qr/\A[147]\z/, qr/\A[258]\z/]
 
 
 
-=== TEST 29: unexpected globals sharing by using _G (header_filter_by_lua*)
+=== TEST 29: globals sharing by using _G (header_filter_by_lua*)
 --- config
     location /test {
         header_filter_by_lua '
@@ -664,12 +663,12 @@ $s
     }
 --- pipelined_requests eval
 ["GET /test", "GET /test", "GET /test"]
---- response_body eval
-["0", "0", "0"]
+--- response_body_like eval
+[qr/\A[036]\z/, qr/\A[147]\z/, qr/\A[258]\z/]
 
 
 
-=== TEST 30: unexpected globals sharing by using _G (body_filter_by_lua*)
+=== TEST 30: globals sharing by using _G (body_filter_by_lua*)
 --- config
     location /test {
         body_filter_by_lua '
@@ -687,8 +686,9 @@ $s
     }
 --- request
 GET /test
---- response_body
-a0
+--- response_body_like eval
+qr/\Aa[036]
+\z/
 --- no_error_log
 [error]
 
@@ -850,7 +850,7 @@ ok
     "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
 --- config
     location /t {
-        resolver $TEST_NGINX_RESOLVER;
+        resolver $TEST_NGINX_RESOLVER ipv6=off;
         set $myhost 'agentzh.org.';
         proxy_pass http://$myhost/misc/.vimrc;
     }
@@ -1019,4 +1019,3 @@ write timer set: 1
 --- no_error_log
 [error]
 [alert]
-

@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -227,4 +226,3 @@ qr/pcre JIT compiling result: \d+/
 error: pcre_compile() failed: missing ) in "(abc"
 --- no_error_log
 [error]
-

@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 worker_connections(1014);
@@ -210,4 +209,3 @@ something important
 --- error_code: 200
 --- no_error_log
 [error]
-

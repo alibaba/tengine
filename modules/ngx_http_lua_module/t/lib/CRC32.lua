@@ -157,7 +157,7 @@ end
 -- CRC32.lua
 --
 -- A pure Lua implementation of a CRC32 hashing algorithm. Slower than using a C implemtation,
--- but useful having no other dependancies.
+-- but useful having no other dependencies.
 --
 --
 -- Synopsis

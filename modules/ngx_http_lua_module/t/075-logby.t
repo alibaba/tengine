@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -221,7 +220,7 @@ failed to run log_by_lua*: unknown reason
 
 
 
-=== TEST 11: globals get cleared for every single request
+=== TEST 11: globals sharing
 --- config
     location /lua {
         echo ok;
@@ -229,6 +228,7 @@ failed to run log_by_lua*: unknown reason
             if not foo then
                 foo = 1
             else
+                ngx.log(ngx.INFO, "old foo: ", foo)
                 foo = foo + 1
             end
             ngx.log(ngx.WARN, "foo = ", foo)
@@ -238,8 +238,9 @@ failed to run log_by_lua*: unknown reason
 GET /lua
 --- response_body
 ok
---- error_log
-foo = 1
+--- grep_error_log eval: qr/old foo: \d+/
+--- grep_error_log_out eval
+["", "old foo: 1\n"]
 
 
 
@@ -496,7 +497,8 @@ API disabled in the context of log_by_lua*
     location /t {
         echo ok;
         log_by_lua '
-            function foo()
+            local bar
+            local function foo()
                 bar()
             end
 
@@ -582,4 +584,3 @@ qr{log_by_lua\(nginx\.conf:\d+\):1: content-type: text/plain}
 
 --- no_error_log
 [error]
-

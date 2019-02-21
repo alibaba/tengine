@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -124,3 +123,42 @@ GET /read
 --- response_body_like: 302 Found
 --- error_code: 302
 
+
+
+=== TEST 7: internal redirects that do not clear module ctx
+--- http_config
+    rewrite_by_lua_no_postpone on;
+--- config
+	rewrite_by_lua_block {
+        -- this is empty by intention
+	}
+
+	location /url1 {
+		rewrite ^ /url2;
+	}
+--- request
+GET /url1
+--- response_body_like: 404 Not Found
+--- error_log eval
+qr{\[error\] .*?/html/url2".*?No such file or directory}
+--- error_code: 404
+
+
+
+=== TEST 8: internal redirects that do not clear module ctx (yield in rewrite handler)
+--- http_config
+    rewrite_by_lua_no_postpone on;
+--- config
+	rewrite_by_lua_block {
+        ngx.sleep(0.001)
+	}
+
+	location /url1 {
+		rewrite ^ /url2;
+	}
+--- request
+GET /url1
+--- response_body_like: 404 Not Found
+--- error_log eval
+qr{\[error\] .*?/html/url2".*?No such file or directory}
+--- error_code: 404

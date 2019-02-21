@@ -12,5 +12,7 @@ dyups_lua() {
     NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_http_dyups_lua.h"
 }
 
-echo $HTTP_AUX_FILTER_MODULES | grep "ngx_http_lua_module" > /dev/null && dyups_lua
+if [ $HTTP_LUA = YES ]; then
+    dyups_lua
+fi
 
