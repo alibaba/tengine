@@ -36,6 +36,8 @@ daemon off;
 events {
 }
 
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
+
 stream {
     proxy_ssl on;
     proxy_ssl_session_reuse on;
