@@ -71,7 +71,7 @@ stream {
 
 EOF
 
-$t->try_run('no stream realip hostnames support');
+$t->run();
 
 plan(skip_all => 'no 127.0.0.1 on host')
 	if http_get('/') ne '127.0.0.1';

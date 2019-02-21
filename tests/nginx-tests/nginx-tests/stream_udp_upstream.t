@@ -23,13 +23,13 @@ use Test::Nginx::Stream qw/ dgram /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(5)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 events {
 }
@@ -96,14 +96,15 @@ my @ports = my ($port4, $port5) = (port(8984), port(8985));
 
 is(many(10, port(8980)), "$port4: 5, $port5: 5", 'balanced');
 
-# no next upstream for dgram
-
 TODO: {
 local $TODO = 'not yet' unless $t->has_version('1.15.0');
 
-is(many(10, port(8981)), "$port4: 5, $port5: 4", 'failures');
+is(dgram('127.0.0.1:' . port(8981))->io('.', read_timeout => 0.5), '',
+	'no next upstream for dgram');
 
 }
+
+is(many(10, port(8981)), "$port4: 5, $port5: 5", 'failures');
 
 is(many(9, port(8982)), "$port4: 3, $port5: 6", 'weight');
 is(many(10, port(8983)), "$port4: 10", 'backup');

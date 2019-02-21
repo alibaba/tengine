@@ -57,11 +57,6 @@ my $s = dgram(
 	PeerAddr  => '127.0.0.2:' . port(8999)
 );
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.13.0');
-
 is($s->io('test'), '127.0.0.2', 'stream udp wildcard');
-
-}
 
 ###############################################################################

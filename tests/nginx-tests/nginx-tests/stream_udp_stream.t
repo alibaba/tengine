@@ -33,7 +33,7 @@ events {
 }
 
 stream {
-    proxy_timeout   500ms;
+    proxy_timeout   1s;
 
     server {
         listen      127.0.0.1:%%PORT_8980_UDP%% udp;
@@ -47,7 +47,6 @@ stream {
 }
 
 EOF
-
 
 $t->run();
 
@@ -74,6 +73,8 @@ is($s2->io('1'), $data2, 'udp_stream another session 2');
 
 }
 
-sleep 1;
+select undef, undef, undef, 1.1;
 
 isnt($s->io('1'), $data, 'udp_stream new session');
+
+###############################################################################

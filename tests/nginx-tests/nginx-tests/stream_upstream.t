@@ -31,7 +31,7 @@ my $t = Test::Nginx->new()->has(qw/stream/)
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 events {
 }
