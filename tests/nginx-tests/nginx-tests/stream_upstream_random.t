@@ -182,7 +182,7 @@ my @ports = my ($port1, $port2) = (port(8081), port(8082));
 like(get(8080, '/'), qr/X-Port: ($port1|$port2)/, 'random');
 like(get(8083, '/'), qr/X-Port: ($port1|$port2)/, 'random two');
 
-my $s = get(8083, '/w', start => 1, sleep => 0.2);
+my $s = get(8083, '/w', start => 1, sleep => 0.5);
 my $r = get(8083, '/');
 my ($p) = http_end($s) =~ /X-Port: (\d+)/;
 like($r, qr/X-Port: (?!$p)/, 'random wait');

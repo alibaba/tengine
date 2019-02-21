@@ -106,10 +106,6 @@ $t->run();
 
 ###############################################################################
 
-TODO: {
-todo_skip 'leaves coredump', 9 unless $^O ne 'MSWin32'
-	or $ENV{TEST_NGINX_UNSAFE} or $t->has_version('1.13.4');
-
 is(stream('127.0.0.1:' . port(8080))->read(), '.', 'ssl');
 is(stream('127.0.0.1:' . port(8080))->read(), '.', 'ssl 2');
 
@@ -122,7 +118,5 @@ is(stream('127.0.0.1:' . port(8082))->read(), '.', 'backup ssl 2');
 
 is(stream('127.0.0.1:' . port(8083))->read(), '.', 'backup ssl session new');
 is(stream('127.0.0.1:' . port(8083))->read(), 'r', 'backup ssl session reused');
-
-}
 
 ###############################################################################

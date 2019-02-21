@@ -82,6 +82,8 @@ plan(skip_all => 'IO::Socket::SSL with OpenSSL ALPN support required') if $@;
 eval { exists &Net::SSLeay::P_alpn_selected or die; };
 plan(skip_all => 'Net::SSLeay with OpenSSL ALPN support required') if $@;
 
+$t->plan(5);
+
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
 default_bits = 1024
@@ -100,7 +102,7 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->try_run('no ssl_preread_alpn_protocols')->plan(5);
+$t->run();
 
 ###############################################################################
 
@@ -125,7 +127,7 @@ sub get_ssl {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		IO::Socket::SSL->start_SSL($s->{_socket},
 			SSL_alpn_protocols => [ @alpn ],
 			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
