@@ -345,11 +345,11 @@ ngx_pipe_broken_action(ngx_log_t *log, ngx_pid_t pid, ngx_int_t master)
             ngx_pipes[i].open_fd->fd = NGX_INVALID_FILE;
 
 #ifdef T_PIPES_OUTPUT_ON_BROKEN
-            if (0 < ngx_pipes[i].backup.len && NULL != ngx_pipes[i].backup.data) {
+            if (ngx_pipes[i].backup.len > 0 && ngx_pipes[i].backup.data != NULL) {
 #else
-            //just write to /dev/null
-            ngx_pipes[i].backup.data = ngx_pipe_dev_null_file.data;
-            ngx_pipes[i].backup.len = ngx_pipe_dev_null_file.len;
+                //just write to /dev/null
+                ngx_pipes[i].backup.data = ngx_pipe_dev_null_file.data;
+                ngx_pipes[i].backup.len = ngx_pipe_dev_null_file.len;
 #endif
                 ngx_pipes[i].open_fd->name.len = ngx_pipes[i].backup.len;
                 ngx_pipes[i].open_fd->name.data = ngx_pipes[i].backup.data;
@@ -483,7 +483,6 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
             }
         }
 #ifdef T_PIPE_USE_USER
-        //use root avoid pipe process cannot create or rollback log file limits of access
         if (geteuid() == 0) {
             if (setgid(ccf->group) == -1) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -674,7 +673,7 @@ ngx_pipe_log(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     }
 
     //set title
-    ngx_setproctitle((char *)op->cmd);
+    ngx_setproctitle((char *) op->cmd);
 #ifdef T_PIPE_NO_DISPLAY
     title_len = ngx_strlen(ngx_os_argv[0]);
 #if (NGX_SOLARIS)
@@ -856,7 +855,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
                 rbcf->log_max_size = -1;
             } 
         } else if (ngx_strncmp((u_char *) "suitpath=", argv[i], 9) == 0) {
-            filename.data = (u_char*)(argv[i]+9);
+            filename.data = (u_char*)(argv[i] + 9);
             filename.len = ngx_strlen(filename.data);
             if (ngx_conf_full_name(cycle, &filename, 0) != NGX_OK) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -871,8 +870,8 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
             value.data =argv[i] + 7;
             value.len = ngx_strlen((char *) argv[i]) - 7;
             rbcf->adjust_time_raw = ngx_parse_time(&value, 1);
-            if (rbcf->interval <= 0) {
-                rbcf->interval = -1;
+            if (rbcf->adjust_time_raw < 1) {
+                rbcf->adjust_time_raw = 1;
             }
         }
     } 
@@ -889,7 +888,7 @@ ngx_pipe_rollback_parse_args(ngx_cycle_t *cycle, ngx_open_pipe_t *op,
     //use same seed for same log file, when reload may have same adjust time
     hash = ngx_crc32_short((u_char*)rbcf->logname, ngx_strlen(rbcf->logname));
     srand(hash);
-    rbcf->adjust_time = rand()%rbcf->adjust_time_raw;
+    rbcf->adjust_time = rand() % rbcf->adjust_time_raw;
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0,
                   "log rollback param: num [%i], interval %i(S), size %i(B), adjust %i/%i(S)", 
@@ -931,7 +930,7 @@ void ngx_pipe_get_last_rollback_time(ngx_pipe_rollback_conf_t *rbcf)
         if (ngx_file_info(rbcf->backup[0], &sb) == -1) {
             //no backup file ,so need rollback just set 1
             rbcf->last_open_time = 1;
-        } else if (sb.st_ctime/rbcf->interval < ngx_time()/rbcf->interval) {
+        } else if (sb.st_ctime / rbcf->interval < ngx_time() / rbcf->interval) {
             //need rollback just set 1
             rbcf->last_open_time = 1;
         } else {
