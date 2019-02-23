@@ -53,11 +53,14 @@ http {
 
 EOF
 
-$t->write_file('ssi.html', '<!--#include virtual="/" set="blah" -->blah: <!--#echo var="blah" -->');
+$t->write_file('ssi.html',
+	'<!--#include virtual="/" set="blah" -->' .
+	'blah: <!--#echo var="blah" -->');
+
 $t->run_daemon(\&memcached_fake_daemon);
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Can't start fake memcached";
 
 ###############################################################################
@@ -66,14 +69,14 @@ like(http_get('/'), qr/SEE-THIS/, 'memcached split trailer');
 
 like(http_get('/ssi.html'), qr/SEE-THIS/, 'memcached ssi var');
 
-like(`grep -F '[error]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no error');
+like(`grep -F '[error]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no errors');
 
 ###############################################################################
 
 sub memcached_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

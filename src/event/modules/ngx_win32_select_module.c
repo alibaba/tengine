@@ -34,9 +34,9 @@ static ngx_uint_t     nevents;
 static ngx_event_t  **event_index;
 
 
-static ngx_str_t    select_name = ngx_string("select");
+static ngx_str_t           select_name = ngx_string("select");
 
-ngx_event_module_t  ngx_select_module_ctx = {
+static ngx_event_module_t  ngx_select_module_ctx = {
     &select_name,
     NULL,                                  /* create configuration */
     ngx_select_init_conf,                  /* init configuration */
@@ -51,7 +51,11 @@ ngx_event_module_t  ngx_select_module_ctx = {
         NULL,                              /* trigger a notify */
         ngx_select_process_events,         /* process the events */
         ngx_select_init,                   /* init the events */
-        ngx_select_done                    /* done the events */
+        ngx_select_done,                   /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        NULL,                              /* add an async conn */
+        NULL,                              /* del an async conn */
+#endif
     }
 
 };

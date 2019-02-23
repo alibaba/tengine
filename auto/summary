@@ -2,11 +2,12 @@
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
 
+
 echo
 echo "Configuration summary"
 
 
-if [ $USE_THREADS != NO ]; then
+if [ $USE_THREADS = YES ]; then
     echo "  + using threads"
 fi
 
@@ -25,20 +26,6 @@ case $OPENSSL in
     YES)   echo "  + using system OpenSSL library" ;;
     NONE)  echo "  + OpenSSL library is not used" ;;
     *)     echo "  + using OpenSSL library: $OPENSSL" ;;
-esac
-
-case $MD5 in
-    YES)   echo "  + md5: using $MD5_LIB library" ;;
-    NONE)  echo "  + md5 library is not used" ;;
-    NO)    echo "  + using builtin md5 code" ;;
-    *)     echo "  + using md5 library: $MD5" ;;
-esac
-
-case $SHA1 in
-    YES)   echo "  + sha1: using $SHA1_LIB library" ;;
-    NONE)  echo "  + sha1 library is not used" ;;
-    NO)    echo "  + sha1 library is not found" ;;
-    *)     echo "  + using sha1 library: $SHA1" ;;
 esac
 
 case $ZLIB in
@@ -69,6 +56,7 @@ echo
 cat << END
   nginx path prefix: "$NGX_PREFIX"
   nginx binary file: "$NGX_SBIN_PATH"
+  nginx modules path: "$NGX_MODULES_PATH"
   nginx configuration prefix: "$NGX_CONF_PREFIX"
   nginx configuration file: "$NGX_CONF_PATH"
   nginx pid file: "$NGX_PID_PATH"
@@ -84,10 +72,6 @@ cat << END
   nginx http access log file: "$NGX_HTTP_LOG_PATH"
   nginx http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"
 END
-
-if [ $NGX_DSO = YES ]; then
-    echo "  nginx dso module path: \"$NGX_DSO_PATH\""
-fi
 
 if [ $HTTP_PROXY = YES ]; then
     echo "  nginx http proxy temporary files: \"$NGX_HTTP_PROXY_TEMP_PATH\""

@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -1097,4 +1096,3 @@ done
 --- grep_error_log_out
 lua finalize socket
 GC cycle done
-

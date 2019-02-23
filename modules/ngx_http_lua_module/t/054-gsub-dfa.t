@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -9,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 5);
+plan tests => repeat_each() * (blocks() * 2 + 7);
 
 #no_diff();
 no_long_string();
@@ -200,3 +199,38 @@ s: aa
 --- no_error_log
 [error]
 
+
+
+=== TEST 9: gsub with d
+--- config
+    location /re {
+        content_by_lua '
+            ngx.say(ngx.re.gsub("hello", "(he|hell)", function (m) ngx.say(m[0]) ngx.say(m[1]) return "x" end, "d"))
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+xo1
+--- no_error_log
+[error]
+
+
+
+=== TEST 10: gsub with d + o
+--- config
+    location /re {
+        content_by_lua '
+            ngx.say(ngx.re.gsub("hello", "(he|hell)", function (m) ngx.say(m[0]) ngx.say(m[1]) return "x" end, "do"))
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+xo1
+--- no_error_log
+[error]

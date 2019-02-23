@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 use t::StapThread;
 
@@ -547,7 +546,7 @@ client prematurely closed connection
                 return
             end
 
-            ok, err = sock:connect("127.0.0.1", $TEST_NGINX_REDIS_PORT)
+            local ok, err = sock:connect("127.0.0.1", $TEST_NGINX_REDIS_PORT)
             if not ok then
                 ngx.log(ngx.ERR, "failed to connect: ", err)
                 return
@@ -851,4 +850,3 @@ delete thread 1
 --- no_error_log
 [error]
 [alert]
-

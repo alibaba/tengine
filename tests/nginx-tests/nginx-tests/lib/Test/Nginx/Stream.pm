@@ -41,7 +41,6 @@ sub new {
 	$self->{_socket} = IO::Socket::INET->new(
 		Proto => "tcp",
 		PeerAddr => '127.0.0.1',
-		PeerPort => port(8080),
 		@_
 	)
 		or die "Can't connect to nginx: $!\n";

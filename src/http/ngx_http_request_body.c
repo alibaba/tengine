@@ -34,7 +34,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     ssize_t                    size;
     ngx_int_t                  rc;
     ngx_buf_t                 *b;
-    ngx_chain_t                out, *cl;
+    ngx_chain_t                out;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
 
@@ -46,20 +46,9 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-#if (NGX_HTTP_V2)
-    if (r->stream) {
-        rc = ngx_http_v2_read_request_body(r, post_handler);
-        goto done;
-    }
-#endif
-
     if (ngx_http_test_expect(r) != NGX_OK) {
         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
         goto done;
-    }
-
-    if (r->request_body_no_buffering) {
-        r->request_body_in_file_only = 0;
     }
 
     rb = ngx_pcalloc(r->pool, sizeof(ngx_http_request_body_t));
@@ -88,6 +77,13 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         post_handler(r);
         return NGX_OK;
     }
+
+#if (NGX_HTTP_V2)
+    if (r->stream) {
+        rc = ngx_http_v2_read_request_body(r);
+        goto done;
+    }
+#endif
 
     preread = r->header_in->last - r->header_in->pos;
 
@@ -147,40 +143,8 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
 
     if (rb->rest == 0) {
         /* the whole request body was pre-read */
-
-        if (r->request_body_in_file_only) {
-            if (ngx_http_write_request_body(r) != NGX_OK) {
-                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                goto done;
-            }
-
-            if (rb->temp_file->file.offset != 0) {
-
-                cl = ngx_chain_get_free_buf(r->pool, &rb->free);
-                if (cl == NULL) {
-                    rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                    goto done;
-                }
-
-                b = cl->buf;
-
-                ngx_memzero(b, sizeof(ngx_buf_t));
-
-                b->in_file = 1;
-                b->file_last = rb->temp_file->file.offset;
-                b->file = &rb->temp_file->file;
-
-                rb->bufs = cl;
-
-            } else {
-                rb->bufs = NULL;
-            }
-        }
-
         r->request_body_no_buffering = 0;
-
         post_handler(r);
-
         return NGX_OK;
     }
 
@@ -303,8 +267,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
     size_t                     size;
     ssize_t                    n;
     ngx_int_t                  rc;
-    ngx_buf_t                 *b;
-    ngx_chain_t               *cl, out;
+    ngx_chain_t                out;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
@@ -391,6 +354,9 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
             rb->buf->last += n;
             r->request_length += n;
+#if (T_NGX_REQ_STATUS)
+            c->received += n;
+#endif
 
             if (n == rest) {
                 /* pass buffer to request body filter chain */
@@ -451,36 +417,6 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
-    }
-
-    if (rb->temp_file || r->request_body_in_file_only) {
-
-        /* save the last part */
-
-        if (ngx_http_write_request_body(r) != NGX_OK) {
-            return NGX_HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        if (rb->temp_file->file.offset != 0) {
-
-            cl = ngx_chain_get_free_buf(r->pool, &rb->free);
-            if (cl == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            b = cl->buf;
-
-            ngx_memzero(b, sizeof(ngx_buf_t));
-
-            b->in_file = 1;
-            b->file_last = rb->temp_file->file.offset;
-            b->file = &rb->temp_file->file;
-
-            rb->bufs = cl;
-
-        } else {
-            rb->bufs = NULL;
-        }
     }
 
     if (!r->request_body_no_buffering) {
@@ -872,7 +808,11 @@ ngx_http_test_expect(ngx_http_request_t *r)
 
     if (r->expect_tested
         || r->headers_in.expect == NULL
-        || r->http_version < NGX_HTTP_VERSION_11)
+        || r->http_version < NGX_HTTP_VERSION_11
+#if (NGX_HTTP_V2)
+        || r->stream != NULL
+#endif
+       )
     {
         return NGX_OK;
     }
@@ -901,6 +841,8 @@ ngx_http_test_expect(ngx_http_request_t *r)
     }
 
     /* we assume that such small packet should be send successfully */
+
+    r->connection->error = 1;
 
     return NGX_ERROR;
 }
@@ -1144,15 +1086,15 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
 ngx_int_t
 ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
-#if (NGX_DEBUG)
+    ngx_buf_t                 *b;
     ngx_chain_t               *cl;
-#endif
     ngx_http_request_body_t   *rb;
 
     rb = r->request_body;
 
 #if (NGX_DEBUG)
 
+#if 0
     for (cl = rb->bufs; cl; cl = cl->next) {
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, r->connection->log, 0,
                        "http body old buf t:%d f:%d %p, pos %p, size: %z "
@@ -1163,6 +1105,7 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
                        cl->buf->file_pos,
                        cl->buf->file_last - cl->buf->file_pos);
     }
+#endif
 
     for (cl = in; cl; cl = cl->next) {
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, r->connection->log, 0,
@@ -1183,12 +1126,75 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    if (rb->rest > 0
-        && rb->buf && rb->buf->last == rb->buf->end
-        && !r->request_body_no_buffering)
+#if (T_NGX_INPUT_BODY_FILTER)
     {
+    ngx_int_t                  rc;
+    ngx_chain_t               *cl;
+
+    for (cl = in; cl; cl = cl->next) {
+        rc = ngx_http_top_input_body_filter(r, cl->buf);
+        if (rc != NGX_OK) {
+            if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "input filter: return code 1xx or 2xx "
+                              "will cause trouble and is converted to 500");
+            }
+
+            /**
+             * NGX_OK: success and continue;
+             * NGX_ERROR: failed and exit;
+             * NGX_AGAIN: not ready and retry later.
+             */
+
+            if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
+                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            return rc;
+        }
+    }
+    }
+#endif
+
+    if (r->request_body_no_buffering) {
+        return NGX_OK;
+    }
+
+    if (rb->rest > 0) {
+
+        if (rb->buf && rb->buf->last == rb->buf->end
+            && ngx_http_write_request_body(r) != NGX_OK)
+        {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        return NGX_OK;
+    }
+
+    /* rb->rest == 0 */
+
+    if (rb->temp_file || r->request_body_in_file_only) {
+
         if (ngx_http_write_request_body(r) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if (rb->temp_file->file.offset != 0) {
+
+            cl = ngx_chain_get_free_buf(r->pool, &rb->free);
+            if (cl == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b = cl->buf;
+
+            ngx_memzero(b, sizeof(ngx_buf_t));
+
+            b->in_file = 1;
+            b->file_last = rb->temp_file->file.offset;
+            b->file = &rb->temp_file->file;
+
+            rb->bufs = cl;
         }
     }
 

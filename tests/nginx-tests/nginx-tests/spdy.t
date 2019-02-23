@@ -37,7 +37,11 @@ plan(skip_all => 'Compress::Raw::Zlib not installed') if $@;
 my $t = Test::Nginx->new()
 	->has(qw/http proxy cache limit_conn rewrite spdy realip shmem/);
 
-$t->plan(82)->write_file_expand('nginx.conf', <<'EOF');
+# Some systems have a bug in not treating zero writev iovcnt as EINVAL
+
+$t->todo_alerts() if $^O eq 'darwin';
+
+$t->plan(84)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -121,6 +125,8 @@ $t->run()->waitforsocket('127.0.0.1:8083');
 
 $t->write_file('t1.html',
 	join('', map { sprintf "X%04dXXX", $_ } (1 .. 8202)));
+$t->write_file('tbig.html',
+	join('', map { sprintf "XX%06dXX", $_ } (1 .. 100000)));
 
 $t->write_file('t2.html', 'SEE-THIS');
 $t->write_file('t3.html', 'SEE-THIS');
@@ -425,6 +431,23 @@ spdy_window($sess, 1, $sid1);
 $frames = spdy_read($sess, all => [{ sid => $sid1, length => 1 }]);
 is(@$frames, 1, 'positive window - data');
 is(@$frames[0]->{length}, 1, 'positive window - data length');
+
+# ask write handler in sending large response
+
+$sid1 = spdy_stream($sess, { path => '/tbig.html' });
+
+spdy_window($sess, 2**30, $sid1);
+spdy_window($sess, 2**30);
+
+sleep 1;
+$frames = spdy_read($sess, all => [{ sid => $sid1, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "SYN_REPLY" } @$frames;
+is($frame->{headers}->{':status'}, 200, 'large response - HEADERS');
+
+@data = grep { $_->{type} eq "DATA" } @$frames;
+$sum = eval join '+', map { $_->{length} } @data;
+is($sum, 1000000, 'large response - DATA');
 
 # stream multiplexing
 

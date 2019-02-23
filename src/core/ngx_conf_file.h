@@ -45,12 +45,12 @@
 #define NGX_CONF_ANY         0x00000400
 #define NGX_CONF_1MORE       0x00000800
 #define NGX_CONF_2MORE       0x00001000
-#define NGX_CONF_MULTI       0x00000000  /* compatibility */
 
 #define NGX_DIRECT_CONF      0x00010000
 
 #define NGX_MAIN_CONF        0x01000000
-#define NGX_ANY_CONF         0x0F000000
+#define NGX_ANY_CONF         0x1F000000
+
 
 
 #define NGX_CONF_UNSET       -1
@@ -95,62 +95,18 @@ struct ngx_open_file_s {
 };
 
 
-#define NGX_NUMBER_MAJOR  3
-#define NGX_NUMBER_MINOR  1
-
-#define NGX_MODULE_V1          0, 0, 0, 0,                              \
-        NGX_DSO_ABI_COMPATIBILITY, NGX_NUMBER_MAJOR, NGX_NUMBER_MINOR
-#define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
-
-struct ngx_module_s {
-    ngx_uint_t            ctx_index;
-    ngx_uint_t            index;
-
-    ngx_uint_t            spare0;
-    ngx_uint_t            spare1;
-    ngx_uint_t            abi_compatibility;
-
-    ngx_uint_t            major_version;
-    ngx_uint_t            minor_version;
-
-    void                 *ctx;
-    ngx_command_t        *commands;
-    ngx_uint_t            type;
-
-    ngx_int_t           (*init_master)(ngx_log_t *log);
-
-    ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
-
-    ngx_int_t           (*init_process)(ngx_cycle_t *cycle);
-    ngx_int_t           (*init_thread)(ngx_cycle_t *cycle);
-    void                (*exit_thread)(ngx_cycle_t *cycle);
-    void                (*exit_process)(ngx_cycle_t *cycle);
-
-    void                (*exit_master)(ngx_cycle_t *cycle);
-
-    uintptr_t             spare_hook0;
-    uintptr_t             spare_hook1;
-    uintptr_t             spare_hook2;
-    uintptr_t             spare_hook3;
-    uintptr_t             spare_hook4;
-    uintptr_t             spare_hook5;
-    uintptr_t             spare_hook6;
-    uintptr_t             spare_hook7;
-};
+typedef struct {
+    ngx_file_t            file;
+    ngx_buf_t            *buffer;
+    ngx_buf_t            *dump;
+    ngx_uint_t            line;
+} ngx_conf_file_t;
 
 
 typedef struct {
     ngx_str_t             name;
-    void               *(*create_conf)(ngx_cycle_t *cycle);
-    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
-} ngx_core_module_t;
-
-
-typedef struct {
-    ngx_file_t            file;
     ngx_buf_t            *buffer;
-    ngx_uint_t            line;
-} ngx_conf_file_t;
+} ngx_conf_dump_t;
 
 
 typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
@@ -172,7 +128,7 @@ struct ngx_conf_s {
     ngx_uint_t            cmd_type;
 
     ngx_conf_handler_pt   handler;
-    char                 *handler_conf;
+    void                 *handler_conf;
 };
 
 
@@ -334,13 +290,6 @@ char *ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-
-
-extern ngx_uint_t     ngx_dump_config;
-extern ngx_uint_t     ngx_max_module;
-extern ngx_module_t  *ngx_modules[];
-extern u_char        *ngx_module_names[];
-extern const char    *ngx_all_module_names[];
 
 
 #endif /* _NGX_CONF_FILE_H_INCLUDED_ */

@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http ssi/)->plan(2);
+my $t = Test::Nginx->new()->has(qw/http ssi/)->plan(1);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -58,7 +58,5 @@ $t->run();
 ###############################################################################
 
 like(http_get('/'), qr/^xFIRSTxWAITEDxSECONDx$/m, 'waited non-active');
-
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
 
 ###############################################################################

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+    level=0
+else
+    level="$1"
+fi
+
+#echo '{' '}' '\[=*\[' '--\[=*\[' '\]=*\]' '--[^\n]*' '"(?:\\[^\n]|[^"\n\\])*"' $'\'(?:\\\\[^\\n]|[^\'\\n\\\\])*\''
+
+# we need the re.pl script here:
+#   https://github.com/openresty/sregex/blob/dfa-multi-re/re.pl
+re.pl -W --no-main -c --cc="clang -O2" \
+    --func-name ngx_http_lua_lex \
+    --header ngx_http_lua_lex.h -o src/ngx_http_lua_lex.c \
+    --debug=$level -n 8 \
+    -- '{' '}' '\[=*\[' '--\[=*\[' '\]=*\]' '--[^\n]*' '"(?:\\[^\n]|[^"\n\\])*"' $'\'(?:\\\\[^\\n]|[^\'\\n\\\\])*\'' \
+    || exit 1

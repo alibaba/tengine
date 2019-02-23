@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(10);
@@ -152,7 +151,7 @@ res2.body = b
 
     location /main {
         content_by_lua '
-            res = ngx.location.capture("/foo?n=1")
+            local res = ngx.location.capture("/foo?n=1")
             ngx.say("top res.status = " .. res.status)
             ngx.say("top res.body = [" .. res.body .. "]")
         ';
@@ -753,4 +752,3 @@ proxy_cache_path conf/cache levels=1:2 keys_zone=STATIC:10m inactive=10m max_siz
     GET /foo
 --- response_body
 ok
-

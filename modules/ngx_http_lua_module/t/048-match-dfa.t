@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -21,64 +20,7 @@ __DATA__
 --- config
     location /re {
         content_by_lua '
-            m = ngx.re.match("hello", "(he|hell)", "d")
-            if m then
-                ngx.say(m[0])
-            else
-                ngx.say("not matched!")
-            end
-        ';
-    }
---- request
-    GET /re
---- response_body
-hell
-
-
-
-=== TEST 2: matched with d + j
---- config
-    location /re {
-        content_by_lua '
-            m = ngx.re.match("hello", "(he|hell)", "jd")
-            if m then
-                ngx.say(m[0])
-            else
-                ngx.say("not matched!")
-            end
-        ';
-    }
---- request
-    GET /re
---- response_body
-hell
-
-
-
-=== TEST 3: not matched with j
---- config
-    location /re {
-        content_by_lua '
-            m = ngx.re.match("world", "(he|hell)", "d")
-            if m then
-                ngx.say(m[0])
-            else
-                ngx.say("not matched!")
-            end
-        ';
-    }
---- request
-    GET /re
---- response_body
-not matched!
-
-
-
-=== TEST 4: matched with do
---- config
-    location /re {
-        content_by_lua '
-            m = ngx.re.match("hello", "he|hell", "do")
+            local m = ngx.re.match("hello", "(he|hell)", "d")
             if m then
                 ngx.say(m[0])
                 ngx.say(m[1])
@@ -97,11 +39,53 @@ nil
 
 
 
-=== TEST 5: not matched with do
+=== TEST 2: matched with d + o
 --- config
     location /re {
         content_by_lua '
-            m = ngx.re.match("world", "([0-9]+)", "do")
+            local m = ngx.re.match("hello", "(he|hell)", "do")
+            if m then
+                ngx.say(m[0])
+                ngx.say(m[1])
+                ngx.say(m[2])
+            else
+                ngx.say("not matched!")
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+nil
+
+
+
+=== TEST 3: matched with d + j
+--- config
+    location /re {
+        content_by_lua '
+            local m = ngx.re.match("hello", "(he|hell)", "jd")
+            if m then
+                ngx.say(m[0])
+            else
+                ngx.say("not matched!")
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+
+
+
+=== TEST 4: not matched with j
+--- config
+    location /re {
+        content_by_lua '
+            local m = ngx.re.match("world", "(he|hell)", "d")
             if m then
                 ngx.say(m[0])
             else
@@ -116,7 +100,49 @@ not matched!
 
 
 
-=== TEST 6: UTF-8 mode without UTF-8 sequence checks
+=== TEST 5: matched with do
+--- config
+    location /re {
+        content_by_lua '
+            local m = ngx.re.match("hello", "he|hell", "do")
+            if m then
+                ngx.say(m[0])
+                ngx.say(m[1])
+                ngx.say(m[2])
+            else
+                ngx.say("not matched!")
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+nil
+
+
+
+=== TEST 6: not matched with do
+--- config
+    location /re {
+        content_by_lua '
+            local m = ngx.re.match("world", "([0-9]+)", "do")
+            if m then
+                ngx.say(m[0])
+            else
+                ngx.say("not matched!")
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+not matched!
+
+
+
+=== TEST 7: UTF-8 mode without UTF-8 sequence checks
 --- config
     location /re {
         content_by_lua '
@@ -150,7 +176,7 @@ exec opts: 2000
 
 
 
-=== TEST 7: UTF-8 mode with UTF-8 sequence checks
+=== TEST 8: UTF-8 mode with UTF-8 sequence checks
 --- config
     location /re {
         content_by_lua '
@@ -181,4 +207,3 @@ exec opts: 0
 你
 --- no_error_log
 [error]
-

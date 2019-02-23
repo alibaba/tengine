@@ -14,6 +14,8 @@
 
 void ngx_http_lua_inject_misc_api(lua_State *L);
 
+void ngx_http_lua_inject_req_misc_api(lua_State *L);
+
 
 #endif /* _NGX_HTTP_LUA_MISC_H_INCLUDED_ */
 

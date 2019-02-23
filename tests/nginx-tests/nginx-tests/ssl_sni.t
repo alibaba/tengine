@@ -37,7 +37,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8443 ssl;
+        listen       127.0.0.1:8080 ssl;
         server_name  localhost;
 
         ssl_certificate_key localhost.key;
@@ -49,7 +49,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8443;
+        listen       127.0.0.1:8080;
         server_name  example.com;
 
         ssl_certificate_key example.com.key;
@@ -84,7 +84,7 @@ $t->plan(6);
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -94,8 +94,8 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost', 'example.com') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -133,10 +133,10 @@ sub get_ssl_socket {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		$s = IO::Socket::SSL->new(
 			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:8443',
+			PeerAddr => '127.0.0.1:' . port(8080),
 			SSL_hostname => $host,
 			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
 			SSL_error_trap => sub { die $_[1] }

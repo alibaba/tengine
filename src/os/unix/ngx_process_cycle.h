@@ -28,7 +28,14 @@
 #define NGX_PROCESS_SIGNALLER  2
 #define NGX_PROCESS_WORKER     3
 #define NGX_PROCESS_HELPER     4
+
+#if (NGX_PROCS)
 #define NGX_PROCESS_PROC       5
+#endif
+
+#if (T_PIPES)
+#define NGX_PROCESS_PIPE       6
+#endif
 
 
 typedef struct {

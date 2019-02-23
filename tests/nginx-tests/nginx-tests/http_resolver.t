@@ -12,6 +12,8 @@ use strict;
 
 use Test::More;
 
+use IO::Select;
+
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -29,6 +31,7 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -41,9 +44,9 @@ http {
         server_name  localhost;
 
         location / {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8981_UDP%%;
             resolver_timeout 1s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
 
             proxy_next_upstream http_504 timeout error;
             proxy_intercept_errors on;
@@ -51,30 +54,47 @@ http {
             error_page 504 502 /50x;
         }
         location /two {
-            resolver    127.0.0.1:8081 127.0.0.1:8082;
-            proxy_pass  http://$host:8080/backend;
+            resolver    127.0.0.1:%%PORT_8981_UDP%% 127.0.0.1:%%PORT_8982_UDP%%;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /valid {
-            resolver    127.0.0.1:8081 valid=3s;
-            proxy_pass  http://$host:8080/backend;
+            resolver    127.0.0.1:%%PORT_8981_UDP%% valid=5s;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /case {
-            resolver    127.0.0.1:8081;
-            proxy_pass  http://$http_x_name:8080/backend;
+            resolver    127.0.0.1:%%PORT_8981_UDP%%;
+            proxy_pass  http://$http_x_name:%%PORT_8080%%/backend;
         }
         location /invalid {
-            resolver    127.0.0.1:8081;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
+        }
+        location /long {
+            resolver    127.0.0.1:%%PORT_8981_UDP%%;
+            resolver_timeout 4s;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /resend {
-            resolver    127.0.0.1:8081;
+            resolver    127.0.0.1:%%PORT_8981_UDP%%;
             resolver_timeout 8s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
         }
         location /bad {
-            resolver    127.0.0.1:8089;
+            resolver    127.0.0.1:%%PORT_8984_UDP%%;
             resolver_timeout 1s;
-            proxy_pass  http://$host:8080/backend;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
+        }
+        location /tcp {
+            resolver    127.0.0.1:%%PORT_8983_UDP%% 127.0.0.1:%%PORT_8982_UDP%%;
+            resolver_timeout 1s;
+            proxy_pass  http://$host:%%PORT_8080%%/backend;
+            proxy_connect_timeout 1s;
+            add_header X-IP $upstream_addr;
+            error_page 504 502 /50x;
+
+            location /tcp2 {
+                resolver_timeout 8s;
+                proxy_pass  http://$host:%%PORT_8080%%/backend;
+            }
         }
 
         location /backend {
@@ -88,21 +108,29 @@ http {
 
 EOF
 
-$t->run_daemon(\&dns_daemon, 8081, $t);
-$t->run_daemon(\&dns_daemon, 8082, $t);
-$t->run_daemon(\&dns_daemon, 8089, $t);
+$t->run_daemon(\&dns_daemon, port(8981), $t);
+$t->run_daemon(\&dns_daemon, port(8982), $t);
 
-$t->run()->plan(32);
+$t->run_daemon(\&dns_daemon, port(8983), $t, tcp => 1);
+$t->waitforfile($t->testdir . '/' . port(8983));
+port(8983, socket => 1)->close();
 
-$t->waitforfile($t->testdir . '/8081');
-$t->waitforfile($t->testdir . '/8082');
-$t->waitforfile($t->testdir . '/8089');
+$t->run_daemon(\&dns_daemon, port(8984), $t);
+
+$t->run()->plan(38);
+
+$t->waitforfile($t->testdir . '/' . port(8981));
+$t->waitforfile($t->testdir . '/' . port(8982));
+$t->waitforfile($t->testdir . '/' . port(8984));
 
 ###############################################################################
+
+my $p0 = port(8080);
 
 # schedule resend test, which takes about 5 seconds to complete
 
 my $s = http_host_header('id.example.net', '/resend', start => 1);
+my $fe = http_host_header('fe.example.net', '/resend', start => 1);
 
 like(http_host_header('a.example.net', '/'), qr/200 OK/, 'A');
 
@@ -141,11 +169,11 @@ like(http_host_header('alias.example.com', '/'), qr/200 OK/, 'DNAME');
 # nonexisting IPs enumerated with proxy_next_upstream
 
 like(http_host_header('many.example.net', '/'),
-	qr/^127.0.0.20(1:8080, 127.0.0.202:8080|2:8080, 127.0.0.201:8080)$/m,
+	qr/^127.0.0.20(1:$p0, 127.0.0.202:$p0|2:$p0, 127.0.0.201:$p0)$/m,
 	'A many');
 
 like(http_host_header('many.example.net', '/'),
-	qr/^127.0.0.20(1:8080, 127.0.0.202:8080|2:8080, 127.0.0.201:8080)$/m,
+	qr/^127.0.0.20(1:$p0, 127.0.0.202:$p0|2:$p0, 127.0.0.201:$p0)$/m,
 	'A many cached');
 
 # tests for several resolvers specified in directive
@@ -209,7 +237,7 @@ sleep 2;
 like(http_host_header('ttl.example.net', '/valid'), qr/200 OK/,
 	'valid overrides ttl');
 
-sleep 2;
+sleep 4;
 
 # expired "valid" value causes nginx to make actual query
 
@@ -227,15 +255,41 @@ sleep 2;
 like(http_host_header('cname_a_ttl2.example.net', '/'), qr/502 Bad/,
 	'CNAME + A with expired CNAME ttl');
 
+SKIP: {
+skip 'no resolver';
 like(http_host_header('example.net', '/invalid'), qr/502 Bad/, 'no resolver');
-
+}
 like(http_end($s), qr/200 OK/, 'resend after malformed response');
+like(http_end($fe), qr/200 OK/, 'resend after format error');
 
 $s = http_get('/bad', start => 1);
 my $s2 = http_get('/bad', start => 1);
 
 http_end($s);
 ok(http_end($s2), 'timeout handler on 2nd request');
+
+like(http_host_header('fe_id.example.net', '/'), qr/502 Bad/, 'format error');
+
+# several requests waiting on same name query
+# 1st request aborts before name is resolved
+# 2nd request completes on resolver timeout
+
+$s = http_host_header('timeout.example.net', '/long', start => 1);
+$s2 = http_host_header('timeout.example.net', '/long', start => 1);
+
+select undef, undef, undef, 1.1;
+
+close $s;
+
+like(http_end($s2), qr/502 Bad/, 'timeout after aborted request');
+
+# resend DNS query over TCP once UDP response came truncated
+
+unlike(http_host_header('tcp.example.net', '/tcp'), qr/127.0.0.201/, 'tc');
+like(http_host_header('tcp.example.net', '/tcp'), qr/X-IP: 127.0.0.1/, 'tcp');
+like(http_host_header('tcp2.example.net', '/tcp2'), qr/X-IP: 127.0.0.1/,
+	'tcp with resend');
+
 ###############################################################################
 
 sub http_host_header {
@@ -259,11 +313,12 @@ EOF
 ###############################################################################
 
 sub reply_handler {
-	my ($recv_data, $port, $state) = @_;
+	my ($recv_data, $port, $state, %extra) = @_;
 
 	my (@name, @rdata);
 
 	use constant NOERROR	=> 0;
+	use constant FORMERR	=> 1;
 	use constant SERVFAIL	=> 2;
 	use constant NXDOMAIN	=> 3;
 
@@ -271,7 +326,7 @@ sub reply_handler {
 	use constant CNAME	=> 5;
 	use constant DNAME	=> 39;
 
-	use constant IN 	=> 1;
+	use constant IN		=> 1;
 
 	# default values
 
@@ -297,6 +352,17 @@ sub reply_handler {
 			push @rdata, rd_addr($ttl, '127.0.0.1');
 		}
 
+	} elsif ($name eq 'fe.example.net' && $type == A) {
+		if (++$state->{fecnt} > 1) {
+			$rcode = FORMERR;
+		}
+
+		push @rdata, rd_addr($ttl, '127.0.0.1');
+
+	} elsif ($name eq 'fe_id.example.net' && $type == A) {
+		$id = 42;
+		$rcode = FORMERR;
+
 	} elsif ($name eq 'case.example.net' && $type == A) {
 		if (++$state->{casecnt} > 1) {
 			$rcode = SERVFAIL;
@@ -312,7 +378,7 @@ sub reply_handler {
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
 	} elsif ($name eq 'awide.example.net' && $type == A) {
-		push @rdata, pack '(w/a*)3x n2N nC4',
+		push @rdata, pack '(C/a*)3x n2N nC4',
 			('awide', 'example', 'net'), A, IN, $ttl,
 			4, (127, 0, 0, 1);
 
@@ -338,7 +404,7 @@ sub reply_handler {
 
 		my @dname = ('example', 'net');
 		my $rdlen = length(join '', @dname) + @dname + 1;
-		push @rdata, pack("n3N n(w/a*)* x", 0xc012, DNAME, IN, $ttl,
+		push @rdata, pack("n3N n(C/a*)* x", 0xc012, DNAME, IN, $ttl,
 			$rdlen, @dname);
 
 		# alias.example.com. 3600 IN CNAME alias.example.net.
@@ -349,10 +415,14 @@ sub reply_handler {
 	} elsif ($name eq 'cname.example.net') {
 		$state->{cnamecnt}++;
 		if ($state->{cnamecnt} > 2) {
-		        $rcode = SERVFAIL;
+			$rcode = SERVFAIL;
 		}
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 			8, 5, 'alias', 0xc012);
+
+	} elsif ($name eq 'timeout.example.net') {
+		select undef, undef, undef, 2.1;
+		return;
 
 	} elsif ($name eq 'cname_a.example.net') {
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
@@ -369,7 +439,7 @@ sub reply_handler {
 		push @rdata, pack("n3N nCa18n", 0xc00c, CNAME, IN, 1,
 			21, 18, 'cname_a_ttl2_alias', 0xc019);
 		if (++$state->{cttl2cnt} >= 2) {
-		        $rcode = SERVFAIL;
+			$rcode = SERVFAIL;
 		}
 		push @rdata, pack('n3N nC4', 0xc036, A, IN, $ttl,
 			4, split(/\./, '127.0.0.1'));
@@ -416,7 +486,7 @@ sub reply_handler {
 		push @rdata, rd_addr(0, '127.0.0.1');
 
 	} elsif ($name eq '2.example.net') {
-		if ($port == 8081) {
+		if ($port == port(8981)) {
 			$state->{twocnt}++;
 		}
 		if ($state->{twocnt} & 1) {
@@ -426,10 +496,16 @@ sub reply_handler {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.1');
 		}
+
+	} elsif ($name =~ /tcp2?.example.net/) {
+		$rcode = FORMERR if $port == port(8982);
+		$hdr |= 0x0300 unless $extra{tcp};
+		push @rdata, rd_addr($ttl, $extra{tcp}
+			? '127.0.0.1' : '127.0.0.201') if $type == A;
 	}
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 
@@ -444,28 +520,39 @@ sub rd_addr {
 }
 
 sub dns_daemon {
-	my ($port, $t) = @_;
+	my ($port, $t, %extra) = @_;
 
 	my ($data, $recv_data);
 	my $socket = IO::Socket::INET->new(
-		LocalAddr    => '127.0.0.1',
-		LocalPort    => $port,
-		Proto        => 'udp',
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
 	)
 		or die "Can't create listening socket: $!\n";
+
+	my $sel = IO::Select->new($socket);
+	my $tcp = 0;
+
+	if ($extra{tcp}) {
+		$tcp = port(8983, socket => 1);
+		$sel->add($tcp);
+	}
+
+	local $SIG{PIPE} = 'IGNORE';
 
 	# track number of relevant queries
 
 	my %state = (
-		cnamecnt     => 0,
-		twocnt       => 0,
-		ttlcnt       => 0,
-		ttl0cnt      => 0,
-		cttlcnt      => 0,
-		cttl2cnt     => 0,
-		manycnt      => 0,
-		casecnt      => 0,
-		idcnt        => 0,
+		cnamecnt	=> 0,
+		twocnt		=> 0,
+		ttlcnt		=> 0,
+		ttl0cnt		=> 0,
+		cttlcnt		=> 0,
+		cttl2cnt	=> 0,
+		manycnt		=> 0,
+		casecnt		=> 0,
+		idcnt		=> 0,
+		fecnt		=> 0,
 	);
 
 	# signal we are ready
@@ -473,11 +560,38 @@ sub dns_daemon {
 	open my $fh, '>', $t->testdir() . '/' . $port;
 	close $fh;
 
-	while (1) {
-		$socket->recv($recv_data, 65536);
-		next if $port == 8089;
-		$data = reply_handler($recv_data, $port, \%state);
-		$socket->send($data);
+	while (my @ready = $sel->can_read) {
+		foreach my $fh (@ready) {
+			if ($tcp == $fh) {
+				my $new = $fh->accept;
+				$new->autoflush(1);
+				$sel->add($new);
+
+			} elsif ($socket == $fh) {
+				$fh->recv($recv_data, 65536);
+				$data = reply_handler($recv_data, $port,
+					\%state);
+				$fh->send($data);
+
+			} else {
+				$fh->recv($recv_data, 65536);
+				unless (length $recv_data) {
+					$sel->remove($fh);
+					$fh->close;
+					next;
+				}
+
+again:
+				my $len = unpack("n", $recv_data);
+				$data = substr $recv_data, 2, $len;
+				$data = reply_handler($data, $port, \%state,
+					tcp => 1);
+				$data = pack("n", length $data) . $data;
+				$fh->send($data);
+				$recv_data = substr $recv_data, 2 + $len;
+				goto again if length $recv_data;
+			}
+		}
 	}
 }
 

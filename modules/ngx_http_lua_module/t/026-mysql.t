@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -67,7 +66,7 @@ __DATA__
 ^status = 504
 thread id = \d+
 kill status = 200
-kill body = {"errcode":0}$
+kill body = \{"errcode":0\}$
 --- error_log eval
 qr{upstream timed out \(\d+: Connection timed out\) while sending query to drizzle upstream}
 
@@ -127,6 +126,5 @@ qr{upstream timed out \(\d+: Connection timed out\) while sending query to drizz
 ^status = 504
 thread id = \d+
 kill status = 200
-kill body = {"errcode":0}$
+kill body = \{"errcode":0\}$
 --- SKIP
-

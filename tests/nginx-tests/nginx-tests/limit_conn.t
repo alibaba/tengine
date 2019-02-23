@@ -21,15 +21,14 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-#plan(skip_all => 'win32') if $^O eq 'MSWin32';
+my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req/);
 
-my $t = Test::Nginx->new()->has(qw/http proxy limit_conn limit_req/)->plan(8-1);
-
-$t->write_file_expand('nginx.conf', <<'EOF');
+$t->write_file_expand('nginx.conf', <<'EOF')->plan(8);
 
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -107,11 +106,10 @@ unlike(http_get('/1'), qr/^HTTP\/1.. 503 /, 'passed');
 $s = http_get('/custom/w', start => 1);
 like(http_get('/custom'), qr/^HTTP\/1.. 501 /, 'limit_conn_status');
 
-#like($t->read_file('error.log'),
-#qr/\[info\].*limiting connections by zone "custom"/,
-#'limit_conn_log_level');
+like($t->read_file('error.log'),
+	qr/\[info\].*limiting connections by zone "custom"/,
+	'limit_conn_log_level');
 
-# limit_zone
 # limited after unlimited
 
 $s = http_get('/w', start => 1);

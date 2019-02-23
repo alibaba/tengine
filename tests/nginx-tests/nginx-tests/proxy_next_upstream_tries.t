@@ -68,10 +68,9 @@ http {
         }
 
         location /tries/resolver {
-            resolver 127.0.0.1:8083;
-            resolver_timeout 1s;
+            resolver 127.0.0.1:%%PORT_8982_UDP%%;
 
-            proxy_pass http://$host:8081;
+            proxy_pass http://$host:%%PORT_8081%%;
             proxy_next_upstream_tries 2;
         }
 
@@ -91,10 +90,9 @@ http {
         }
 
         location /timeout/resolver {
-            resolver 127.0.0.1:8083;
-            resolver_timeout 1s;
+            resolver 127.0.0.1:%%PORT_8982_UDP%%;
 
-            proxy_pass http://$host:8081/w2;
+            proxy_pass http://$host:%%PORT_8081%%/w2;
             proxy_next_upstream_timeout 3800ms;
         }
 
@@ -111,12 +109,12 @@ http {
 
 EOF
 
-$t->run_daemon(\&http_daemon, 8081);
-$t->run_daemon(\&dns_daemon, 8083, $t);
+$t->run_daemon(\&http_daemon, port(8081));
+$t->run_daemon(\&dns_daemon, port(8982), $t);
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforfile($t->testdir . '/8083');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforfile($t->testdir . '/' . port(8982));
 
 ###############################################################################
 
@@ -197,7 +195,7 @@ sub reply_handler {
 
 	use constant NOERROR	=> 0;
 	use constant A		=> 1;
-	use constant IN 	=> 1;
+	use constant IN		=> 1;
 
 	# default values
 
@@ -220,7 +218,7 @@ sub reply_handler {
 	@rdata = map { rd_addr($ttl, '127.0.0.1') } (1 .. 3) if $type == A;
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 
@@ -239,9 +237,9 @@ sub dns_daemon {
 
 	my ($data, $recv_data);
 	my $socket = IO::Socket::INET->new(
-		LocalAddr    => '127.0.0.1',
-		LocalPort    => $port,
-		Proto        => 'udp',
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
 	)
 		or die "Can't create listening socket: $!\n";
 

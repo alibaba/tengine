@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -29,7 +28,7 @@ __DATA__
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { dog = "hello", cat = 32 }});
 
             ngx.print(res.body)
@@ -83,7 +82,7 @@ qr/variable "(dog|cat)" cannot be assigned a value \(maybe you forgot to define 
     location /lua {
         set $dog '';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { dog = "hello", cat = 32 }});
 
             ngx.print(res.body)
@@ -111,7 +110,7 @@ variable "cat" cannot be assigned a value (maybe you forgot to define it first?)
         set $dog '';
         set $cat '';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { dog = "hello", cat = 32 }});
 
             ngx.print(res.body)
@@ -138,7 +137,7 @@ cat = 32
         set $dog '';
         set $cat '';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = "hello" });
 
             ngx.print(res.body)
@@ -166,7 +165,7 @@ Bad vars option value
         set $dog '';
         set $cat '';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { cat = true } });
 
             ngx.print(res.body)
@@ -189,7 +188,7 @@ attempt to use bad variable value type boolean
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { args = "a=hello&b=32" }});
 
             ngx.print(res.body)
@@ -235,7 +234,7 @@ variable "query_string" not changeable
     location /lua {
         set $dog 'hello';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { copy_all_vars = true });
 
             ngx.print(res.body)
@@ -260,7 +259,7 @@ GET /lua
     location /lua {
         set $dog 'hello';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { share_all_vars = true });
 
             ngx.print(res.body)
@@ -285,7 +284,7 @@ GET /lua
     location /lua {
         set $dog 'hello';
         content_by_lua '
-            res = ngx.location.capture("/other",
+            local res = ngx.location.capture("/other",
                 { vars = { dog = "hiya" }, copy_all_vars = true });
 
             ngx.print(res.body)
@@ -337,4 +336,3 @@ dog = hiya
 cat = 56
 parent dog: blah
 parent cat: foo
-

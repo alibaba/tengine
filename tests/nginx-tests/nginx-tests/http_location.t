@@ -122,18 +122,11 @@ SKIP: {
 		'casefull regex do not match wrong case');
 }
 
-# on case-insensitive systems a request to "/UPPERCASE" fails,
-# as location search tree is incorrectly sorted if uppercase
+# on case-insensitive systems a request to "/UPPERCASE" might fail,
+# if location search tree is incorrectly sorted and uppercase
 # characters are used in location directives (ticket #90)
 
 like(http_get('/lowercase'), qr/X-Location: lowercase/, 'lowercase');
-
-TODO: {
-local $TODO = 'fails on caseless oses'
-	if ($^O eq 'MSWin32' or $^O eq 'darwin') and !$t->has_version('1.5.6');
-
 like(http_get('/UPPERCASE'), qr/X-Location: uppercase/, 'uppercase');
-
-}
 
 ###############################################################################

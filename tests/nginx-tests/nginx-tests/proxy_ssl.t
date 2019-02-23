@@ -22,11 +22,12 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy http_ssl/)->has_daemon('openssl')
-	->plan(4)->write_file_expand('nginx.conf', <<'EOF');
+	->plan(5)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -39,13 +40,16 @@ http {
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
+        ssl_session_cache builtin;
+
+        location / {
+            add_header X-Session $ssl_session_reused;
+        }
     }
 
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
-
-        add_header X-Foo ssl;
 
         location /ssl_reuse {
             proxy_pass https://127.0.0.1:8081/;
@@ -55,6 +59,11 @@ http {
         location /ssl {
             proxy_pass https://127.0.0.1:8081/;
             proxy_ssl_session_reuse off;
+        }
+
+        location /timeout {
+            proxy_pass https://127.0.0.1:8081/;
+            proxy_connect_timeout 2s;
         }
     }
 }
@@ -85,9 +94,15 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/ssl'), qr/200 OK.*X-Foo: ssl/ms, 'ssl');
-like(http_get('/ssl'), qr/200 OK.*X-Foo: ssl/ms, 'ssl 2');
-like(http_get('/ssl_reuse'), qr/200 OK.*X-Foo: ssl/ms, 'ssl reuse session');
-like(http_get('/ssl_reuse'), qr/200 OK.*X-Foo: ssl/ms, 'ssl reuse session 2');
+like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl');
+like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl 2');
+like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: \./s, 'ssl reuse session');
+like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: r/s, 'ssl reuse session 2');
+
+my $s = http('', start => 1);
+
+sleep 3;
+
+like(http_get('/timeout', socket => $s), qr/200 OK/, 'proxy connect timeout');
 
 ###############################################################################

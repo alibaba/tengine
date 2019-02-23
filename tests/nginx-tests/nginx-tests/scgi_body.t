@@ -52,7 +52,7 @@ http {
 EOF
 
 $t->run_daemon(\&scgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -87,9 +87,9 @@ EOF
 ###############################################################################
 
 sub http_get_length {
-        my ($url, $body) = @_;
-        my $length = length $body;
-        return http(<<EOF);
+	my ($url, $body) = @_;
+	my $length = length $body;
+	return http(<<EOF);
 GET $url HTTP/1.1
 Host: localhost
 Connection: close
@@ -104,7 +104,7 @@ EOF
 sub scgi_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8081',
+		LocalHost => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -114,12 +114,14 @@ sub scgi_daemon {
 	my $body;
 
 	while (my $request = $scgi->accept()) {
-		$request->read_env();
+		eval { $request->read_env(); };
+		next if $@;
+
 		read($request->connection, $body,
 			$request->env->{CONTENT_LENGTH});
 
 		$request->connection()->print(<<EOF);
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Body: $body
 

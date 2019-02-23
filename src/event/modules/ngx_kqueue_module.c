@@ -73,7 +73,7 @@ static ngx_command_t  ngx_kqueue_commands[] = {
 };
 
 
-ngx_event_module_t  ngx_kqueue_module_ctx = {
+static ngx_event_module_t  ngx_kqueue_module_ctx = {
     &kqueue_name,
     ngx_kqueue_create_conf,                /* create configuration */
     ngx_kqueue_init_conf,                  /* init configuration */
@@ -92,7 +92,11 @@ ngx_event_module_t  ngx_kqueue_module_ctx = {
 #endif
         ngx_kqueue_process_events,         /* process the events */
         ngx_kqueue_init,                   /* init the events */
-        ngx_kqueue_done                    /* done the events */
+        ngx_kqueue_done,                   /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)        
+        NULL,                              /* add an async conn */
+        NULL,                              /* del an async conn */
+#endif
     }
 
 };
@@ -579,7 +583,7 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         if (event_list[i].flags & EV_ERROR) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, event_list[i].data,
                           "kevent() error on %d filter:%d flags:%04Xd",
-                          event_list[i].ident, event_list[i].filter,
+                          (int) event_list[i].ident, event_list[i].filter,
                           event_list[i].flags);
             continue;
         }
@@ -676,13 +680,20 @@ ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 static ngx_inline void
 ngx_kqueue_dump_event(ngx_log_t *log, struct kevent *kev)
 {
-    ngx_log_debug6(NGX_LOG_DEBUG_EVENT, log, 0,
-                   (kev->ident > 0x8000000 && kev->ident != (unsigned) -1) ?
-                    "kevent: %p: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p":
-                    "kevent: %d: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p",
-                    kev->ident, kev->filter,
-                    kev->flags, kev->fflags,
-                    kev->data, kev->udata);
+    if (kev->ident > 0x8000000 && kev->ident != (unsigned) -1) {
+        ngx_log_debug6(NGX_LOG_DEBUG_EVENT, log, 0,
+                       "kevent: %p: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p",
+                       (void *) kev->ident, kev->filter,
+                       kev->flags, kev->fflags,
+                       (int) kev->data, kev->udata);
+
+    } else {
+        ngx_log_debug6(NGX_LOG_DEBUG_EVENT, log, 0,
+                       "kevent: %d: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p",
+                       (int) kev->ident, kev->filter,
+                       kev->flags, kev->fflags,
+                       (int) kev->data, kev->udata);
+    }
 }
 
 

@@ -22,8 +22,8 @@ static ngx_int_t ngx_event_pipe_drain_chains(ngx_event_pipe_t *p);
 ngx_int_t
 ngx_event_pipe(ngx_event_pipe_t *p, ngx_int_t do_write)
 {
-    u_int         flags;
     ngx_int_t     rc;
+    ngx_uint_t    flags;
     ngx_event_t  *rev, *wev;
 
     for ( ;; ) {
@@ -111,6 +111,27 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
     if (p->upstream_eof || p->upstream_error || p->upstream_done) {
         return NGX_OK;
     }
+
+#if (NGX_THREADS)
+
+    if (p->aio) {
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                       "pipe read upstream: aio");
+        return NGX_AGAIN;
+    }
+
+    if (p->writing) {
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                       "pipe read upstream: writing");
+
+        rc = ngx_event_pipe_write_chain_to_temp_file(p);
+
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
+
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0,
                    "pipe read upstream: %d", p->upstream->read->ready);
@@ -258,19 +279,6 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
                     break;
                 }
 
-                if (rc == NGX_AGAIN) {
-                    if (ngx_event_flags & NGX_USE_LEVEL_EVENT
-                        && p->upstream->read->active
-                        && p->upstream->read->ready)
-                    {
-                        if (ngx_del_event(p->upstream->read, NGX_READ_EVENT, 0)
-                            == NGX_ERROR)
-                        {
-                            return NGX_ABORT;
-                        }
-                    }
-                }
-
                 if (rc != NGX_OK) {
                     return rc;
                 }
@@ -305,7 +313,7 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
 
             if (n == NGX_ERROR) {
                 p->upstream_error = 1;
-                return NGX_ERROR;
+                break;
             }
 
             if (n == NGX_AGAIN) {
@@ -439,7 +447,7 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
             /* STUB */ cl->buf->num = p->num++;
 
             if (p->input_filter(p, cl->buf) == NGX_ERROR) {
-                 return NGX_ABORT;
+                return NGX_ABORT;
             }
 
             ngx_free_chain(p->pool, cl);
@@ -475,8 +483,10 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, p->log, 0,
                        "pipe write chain");
 
-        if (ngx_event_pipe_write_chain_to_temp_file(p) == NGX_ABORT) {
-            return NGX_ABORT;
+        rc = ngx_event_pipe_write_chain_to_temp_file(p);
+
+        if (rc != NGX_OK) {
+            return rc;
         }
     }
 
@@ -498,6 +508,18 @@ ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
 
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0,
                    "pipe write downstream: %d", downstream->write->ready);
+
+#if (NGX_THREADS)
+
+    if (p->writing) {
+        rc = ngx_event_pipe_write_chain_to_temp_file(p);
+
+        if (rc == NGX_ABORT) {
+            return NGX_ABORT;
+        }
+    }
+
+#endif
 
     flushed = 0;
 
@@ -530,6 +552,10 @@ ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
                 }
 
                 p->out = NULL;
+            }
+
+            if (p->writing) {
+                break;
             }
 
             if (p->in) {
@@ -608,7 +634,7 @@ ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
 
                 p->out = p->out->next;
 
-            } else if (!p->cacheable && p->in) {
+            } else if (!p->cacheable && !p->writing && p->in) {
                 cl = p->in;
 
                 ngx_log_debug3(NGX_LOG_DEBUG_EVENT, p->log, 0,
@@ -647,7 +673,7 @@ ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
     flush:
 
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, p->log, 0,
-                       "pipe write: out:%p, f:%d", out, flush);
+                       "pipe write: out:%p, f:%ui", out, flush);
 
         if (out == NULL) {
 
@@ -710,12 +736,38 @@ ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
     ssize_t       size, bsize, n;
     ngx_buf_t    *b;
     ngx_uint_t    prev_last_shadow;
-    ngx_chain_t  *cl, *tl, *next, *out, **ll, **last_out, **last_free, fl;
+    ngx_chain_t  *cl, *tl, *next, *out, **ll, **last_out, **last_free;
+
+#if (NGX_THREADS)
+
+    if (p->writing) {
+
+        if (p->aio) {
+            return NGX_AGAIN;
+        }
+
+        out = p->writing;
+        p->writing = NULL;
+
+        n = ngx_write_chain_to_temp_file(p->temp_file, NULL);
+
+        if (n == NGX_ERROR) {
+            return NGX_ABORT;
+        }
+
+        goto done;
+    }
+
+#endif
 
     if (p->buf_to_file) {
-        fl.buf = p->buf_to_file;
-        fl.next = p->in;
-        out = &fl;
+        out = ngx_alloc_chain_link(p->pool);
+        if (out == NULL) {
+            return NGX_ABORT;
+        }
+
+        out->buf = p->buf_to_file;
+        out->next = p->in;
 
     } else {
         out = p->in;
@@ -762,12 +814,12 @@ ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
         }
 
         if (cl) {
-           p->in = cl;
-           *ll = NULL;
+            p->in = cl;
+            *ll = NULL;
 
         } else {
-           p->in = NULL;
-           p->last_in = &p->in;
+            p->in = NULL;
+            p->last_in = &p->in;
         }
 
     } else {
@@ -775,11 +827,32 @@ ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
         p->last_in = &p->in;
     }
 
+#if (NGX_THREADS)
+    if (p->thread_handler) {
+        p->temp_file->thread_write = 1;
+        p->temp_file->file.thread_task = p->thread_task;
+        p->temp_file->file.thread_handler = p->thread_handler;
+        p->temp_file->file.thread_ctx = p->thread_ctx;
+    }
+#endif
+
     n = ngx_write_chain_to_temp_file(p->temp_file, out);
 
     if (n == NGX_ERROR) {
         return NGX_ABORT;
     }
+
+#if (NGX_THREADS)
+
+    if (n == NGX_AGAIN) {
+        p->writing = out;
+        p->thread_task = p->temp_file->file.thread_task;
+        return NGX_AGAIN;
+    }
+
+done:
+
+#endif
 
     if (p->buf_to_file) {
         p->temp_file->offset = p->buf_to_file->last - p->buf_to_file->pos;

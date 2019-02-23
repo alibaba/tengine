@@ -22,6 +22,7 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
 #endif
@@ -33,29 +34,64 @@
 #define NGX_SSL_NAME     "OpenSSL"
 
 
+#if (defined LIBRESSL_VERSION_NUMBER && OPENSSL_VERSION_NUMBER == 0x20000000L)
+#undef OPENSSL_VERSION_NUMBER
+#define OPENSSL_VERSION_NUMBER  0x1000107fL
+#endif
+
+
+#if (OPENSSL_VERSION_NUMBER >= 0x10100001L)
+
+#define ngx_ssl_version()       OpenSSL_version(OPENSSL_VERSION)
+
+#else
+
+#define ngx_ssl_version()       SSLeay_version(SSLEAY_VERSION)
+
+#endif
+
+
 #define ngx_ssl_session_t       SSL_SESSION
 #define ngx_ssl_conn_t          SSL
 
 
-typedef struct {
+#if (OPENSSL_VERSION_NUMBER < 0x10002000L)
+#define SSL_is_server(s)        (s)->server
+#endif
+
+
+struct ngx_ssl_s {
     SSL_CTX                    *ctx;
     ngx_log_t                  *log;
     size_t                      buffer_size;
-} ngx_ssl_t;
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    ngx_flag_t                  async_enable;
+#endif
+};
 
 
-typedef struct {
+struct ngx_ssl_connection_s {
     ngx_ssl_conn_t             *connection;
     SSL_CTX                    *session_ctx;
 
     ngx_int_t                   last;
     ngx_buf_t                  *buf;
     size_t                      buffer_size;
+#if (T_NGX_SSL_EARLY_DATA)
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+    ngx_buf_t                  *early_buf;
+#endif
+#endif
 
     ngx_connection_handler_pt   handler;
 
     ngx_event_handler_pt        saved_read_handler;
     ngx_event_handler_pt        saved_write_handler;
+
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+    ngx_msec_t                  handshake_start_msec;
+    ngx_msec_t                  handshake_end_msec;
+#endif
 
     unsigned                    handshaked:1;
     unsigned                    renegotiation:1;
@@ -63,7 +99,13 @@ typedef struct {
     unsigned                    no_wait_shutdown:1;
     unsigned                    no_send_shutdown:1;
     unsigned                    handshake_buffer_set:1;
-} ngx_ssl_connection_t;
+#if (T_NGX_SSL_EARLY_DATA)
+    unsigned                    enable_early_data:1;
+#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+    int                         read_early_state;
+#endif
+#endif
+};
 
 
 #define NGX_SSL_NO_SCACHE            -2
@@ -100,9 +142,10 @@ typedef struct {
 #ifdef SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB
 
 typedef struct {
+    size_t                      size;
     u_char                      name[16];
-    u_char                      aes_key[16];
-    u_char                      hmac_key[16];
+    u_char                      hmac_key[32];
+    u_char                      aes_key[32];
 } ngx_ssl_session_ticket_key_t;
 
 #endif
@@ -113,6 +156,7 @@ typedef struct {
 #define NGX_SSL_TLSv1    0x0008
 #define NGX_SSL_TLSv1_1  0x0010
 #define NGX_SSL_TLSv1_2  0x0020
+#define NGX_SSL_TLSv1_3  0x0040
 
 
 #define NGX_SSL_BUFFER   1
@@ -123,8 +167,12 @@ typedef struct {
 
 ngx_int_t ngx_ssl_init(ngx_log_t *log);
 ngx_int_t ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data);
+ngx_int_t ngx_ssl_certificates(ngx_conf_t *cf, ngx_ssl_t *ssl,
+    ngx_array_t *certs, ngx_array_t *keys, ngx_array_t *passwords);
 ngx_int_t ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_str_t *cert, ngx_str_t *key, ngx_array_t *passwords);
+ngx_int_t ngx_ssl_ciphers(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *ciphers,
+    ngx_uint_t prefer_server_ciphers);
 ngx_int_t ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_str_t *cert, ngx_int_t depth);
 ngx_int_t ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
@@ -165,10 +213,17 @@ ngx_int_t ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session);
 
 ngx_int_t ngx_ssl_check_host(ngx_connection_t *c, ngx_str_t *name);
 
+#if (NGX_SSL && NGX_SSL_ASYNC)
+#define ngx_ssl_waiting_for_async(c) SSL_waiting_for_async(c->ssl->connection)
+#endif
 
 ngx_int_t ngx_ssl_get_protocol(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_cipher_name(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_ciphers(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_curves(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_session_id(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
@@ -180,9 +235,15 @@ ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_issuer_dn(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_subject_dn_legacy(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_issuer_dn_legacy(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_serial_number(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
@@ -190,6 +251,16 @@ ngx_int_t ngx_ssl_get_fingerprint(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_client_verify(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+ngx_int_t ngx_ssl_get_client_v_start(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_client_v_end(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_client_v_remain(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+ngx_int_t ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+#endif
 
 
 ngx_int_t ngx_ssl_handshake(ngx_connection_t *c);
@@ -204,12 +275,17 @@ void ngx_cdecl ngx_ssl_error(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     char *fmt, ...);
 void ngx_ssl_cleanup_ctx(void *data);
 
+#if (NGX_SSL && NGX_SSL_ASYNC)
+ngx_int_t ngx_ssl_async_process_fds(ngx_connection_t *c) ;
+#endif
 
 extern int  ngx_ssl_connection_index;
 extern int  ngx_ssl_server_conf_index;
 extern int  ngx_ssl_session_cache_index;
 extern int  ngx_ssl_session_ticket_keys_index;
 extern int  ngx_ssl_certificate_index;
+extern int  ngx_ssl_next_certificate_index;
+extern int  ngx_ssl_certificate_name_index;
 extern int  ngx_ssl_stapling_index;
 
 

@@ -13,6 +13,7 @@
 
 #include "ngx_http_lua_log.h"
 #include "ngx_http_lua_util.h"
+#include "ngx_http_lua_log_ringbuf.h"
 
 
 static int ngx_http_lua_print(lua_State *L);
@@ -160,6 +161,16 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
 
                 break;
 
+            case LUA_TTABLE:
+                if (!luaL_callmeta(L, i, "__tostring")) {
+                    return luaL_argerror(L, i, "expected table to have "
+                                         "__tostring metamethod");
+                }
+
+                lua_tolstring(L, -1, &len);
+                size += len;
+                break;
+
             case LUA_TLIGHTUSERDATA:
                 if (lua_touserdata(L, i) == NULL) {
                     size += sizeof("null") - 1;
@@ -225,6 +236,12 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
                     *p++ = 'e';
                 }
 
+                break;
+
+            case LUA_TTABLE:
+                luaL_callmeta(L, i, "__tostring");
+                q = (u_char *) lua_tolstring(L, -1, &len);
+                p = ngx_copy(p, q, len);
                 break;
 
             case LUA_TLIGHTUSERDATA:
@@ -296,5 +313,144 @@ ngx_http_lua_inject_log_consts(lua_State *L)
     lua_setfield(L, -2, "DEBUG");
     /* }}} */
 }
+
+
+#ifdef HAVE_INTERCEPT_ERROR_LOG_PATCH
+ngx_int_t
+ngx_http_lua_capture_log_handler(ngx_log_t *log,
+    ngx_uint_t level, u_char *buf, size_t n)
+{
+    ngx_http_lua_log_ringbuf_t  *ringbuf;
+
+    dd("enter");
+
+    ringbuf = (ngx_http_lua_log_ringbuf_t  *)
+                    ngx_cycle->intercept_error_log_data;
+
+    if (level > ringbuf->filter_level) {
+        return NGX_OK;
+    }
+
+    ngx_http_lua_log_ringbuf_write(ringbuf, level, buf, n);
+
+    dd("capture log: %s\n", buf);
+
+    return NGX_OK;
+}
+#endif
+
+
+#ifndef NGX_LUA_NO_FFI_API
+int
+ngx_http_lua_ffi_errlog_set_filter_level(int level, u_char *err, size_t *errlen)
+{
+#ifdef HAVE_INTERCEPT_ERROR_LOG_PATCH
+    ngx_http_lua_log_ringbuf_t     *ringbuf;
+
+    ringbuf = ngx_cycle->intercept_error_log_data;
+
+    if (ringbuf == NULL) {
+        *errlen = ngx_snprintf(err, *errlen,
+                               "directive \"lua_capture_error_log\" is not set")
+                  - err;
+        return NGX_ERROR;
+    }
+
+    if (level > NGX_LOG_DEBUG || level < NGX_LOG_STDERR) {
+        *errlen = ngx_snprintf(err, *errlen, "bad log level: %d", level)
+                  - err;
+        return NGX_ERROR;
+    }
+
+    ringbuf->filter_level = level;
+    return NGX_OK;
+#else
+    *errlen = ngx_snprintf(err, *errlen,
+                           "missing the capture error log patch for nginx")
+              - err;
+    return NGX_ERROR;
+#endif
+}
+
+
+int
+ngx_http_lua_ffi_errlog_get_msg(char **log, int *loglevel, u_char *err,
+    size_t *errlen, double *log_time)
+{
+#ifdef HAVE_INTERCEPT_ERROR_LOG_PATCH
+    ngx_uint_t           loglen;
+
+    ngx_http_lua_log_ringbuf_t     *ringbuf;
+
+    ringbuf = ngx_cycle->intercept_error_log_data;
+
+    if (ringbuf == NULL) {
+        *errlen = ngx_snprintf(err, *errlen,
+                               "directive \"lua_capture_error_log\" is not set")
+                  - err;
+        return NGX_ERROR;
+    }
+
+    if (ringbuf->count == 0) {
+        return NGX_DONE;
+    }
+
+    ngx_http_lua_log_ringbuf_read(ringbuf, loglevel, (void **) log, &loglen,
+                                  log_time);
+    return loglen;
+#else
+    *errlen = ngx_snprintf(err, *errlen,
+                           "missing the capture error log patch for nginx")
+              - err;
+    return NGX_ERROR;
+#endif
+}
+
+
+int
+ngx_http_lua_ffi_errlog_get_sys_filter_level(ngx_http_request_t *r)
+{
+    ngx_log_t                   *log;
+    int                          log_level;
+
+    if (r && r->connection && r->connection->log) {
+        log = r->connection->log;
+
+    } else {
+        log = ngx_cycle->log;
+    }
+
+    log_level = log->log_level;
+    if (log_level == NGX_LOG_DEBUG_ALL) {
+        log_level = NGX_LOG_DEBUG;
+    }
+
+    return log_level;
+}
+
+
+int
+ngx_http_lua_ffi_raw_log(ngx_http_request_t *r, int level, u_char *s,
+    size_t s_len)
+{
+    ngx_log_t           *log;
+
+    if (level > NGX_LOG_DEBUG || level < NGX_LOG_STDERR) {
+        return NGX_ERROR;
+    }
+
+    if (r && r->connection && r->connection->log) {
+        log = r->connection->log;
+
+    } else {
+        log = ngx_cycle->log;
+    }
+
+    ngx_log_error((unsigned) level, log, 0, "%*s", s_len, s);
+
+    return NGX_OK;
+}
+
+#endif
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

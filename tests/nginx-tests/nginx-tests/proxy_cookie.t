@@ -73,14 +73,7 @@ http {
 
 EOF
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no proxy_cookie') if $@;
-
-$t->plan(8);
+$t->run()->plan(8);
 
 ###############################################################################
 

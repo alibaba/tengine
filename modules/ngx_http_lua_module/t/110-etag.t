@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -82,4 +81,3 @@ If-Modified-Since: Thu, 10 May 2012 07:50:59 GMT
 --- no_error_log
 [error]
 --- skip_nginx: 3: < 1.3.3
-

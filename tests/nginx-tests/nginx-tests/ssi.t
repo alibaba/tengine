@@ -21,9 +21,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
-
-my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)->plan(27);
+my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite shmem/)
+	->plan(27);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,7 +37,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     proxy_cache_path       %%TESTDIR%%/cache levels=1:2
-                           keys_zone=NAME:10m;
+                           keys_zone=NAME:1m;
 
     server {
         listen       127.0.0.1:8080;
@@ -64,17 +63,21 @@ http {
             ssi off;
             alias %%TESTDIR%%/;
         }
+        location = /test-empty-postpone.html {
+            ssi on;
+            postpone_output 0;
+        }
         location /var {
             ssi on;
-            add_header X-Var $date_gmt;
+            add_header X-Var x${date_gmt}x;
         }
         location /var_noformat {
             ssi on;
-            add_header X-Var $date_gmt;
+            add_header X-Var x${date_gmt}x;
             return 200;
         }
         location /var_nossi {
-            add_header X-Var $date_gmt;
+            add_header X-Var x${date_gmt}x;
             return 200;
         }
     }
@@ -94,9 +97,11 @@ $t->write_file('test-empty2.html',
 	'X<!--#include virtual="/local/empty.html" -->X');
 $t->write_file('test-empty3.html',
 	'X<!--#include virtual="/cache/empty.html" -->X');
+$t->write_file('test-empty-postpone.html',
+	'X<!--#include virtual="/proxy/empty.html" -->X');
 $t->write_file('empty.html', '');
 
-$t->write_file('unescape.html?', 'SEE-THIS');
+$t->write_file('unescape.html?', 'SEE-THIS') unless $^O eq 'MSWin32';
 $t->write_file('unescape1.html',
 	'X<!--#include virtual="/tes%741.html?test=test" -->X');
 $t->write_file('unescape2.html',
@@ -146,17 +151,22 @@ unlike(http_get('/test1.html'), qr/Last-Modified|Accept-Ranges/im,
 unlike(http_get('/proxy/test1.html'), qr/Last-Modified|Accept-Ranges/im,
 	'cleared headers from proxy');
 
+# empty subrequests
+
 like(http_get('/test-empty1.html'), qr/HTTP/, 'empty with ssi');
 like(http_get('/test-empty2.html'), qr/HTTP/, 'empty without ssi');
 like(http_get('/test-empty3.html'), qr/HTTP/, 'empty with proxy');
 like(http_get('/test-empty3.html'), qr/HTTP/, 'empty with proxy cached');
 
+like(http_get('/test-empty-postpone.html'), qr/HTTP.*XX/ms,
+	'empty with postpone_output 0');
+
 # handling of escaped URIs
 
 like(http_get('/unescape1.html'), qr/^XXtestXX$/m, 'escaped in path');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.9');
+SKIP: {
+skip 'incorrect filename on win32', 2 if $^O eq 'MSWin32';
 
 like(http_get('/unescape2.html'), qr/^XSEE-THISX$/m,
 	'escaped question in path');
@@ -167,26 +177,17 @@ like(http_get('/unescape3.html'), qr/404 Not Found/,
 
 # handling of embedded date variables
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.10');
+my $re_date_gmt = qr/X-Var: x.+, \d\d-.+-\d{4} \d\d:\d\d:\d\d .+x/;
 
-like(http_get('/var_nossi.html'),
-	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'no ssi');
-like(http_get('/var_noformat.html'),
-	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'no format');
+like(http_get('/var_nossi.html'), $re_date_gmt, 'no ssi');
+like(http_get('/var_noformat.html'), $re_date_gmt, 'no format');
 
-like(http_get('/var_format.html?custom=1'),
-	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'custom header');
-like(http_get('/var_format.html'),
-	qr/X-Var: \w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+/, 'default header');
-
-}
+like(http_get('/var_format.html?custom=1'), $re_date_gmt, 'custom header');
+like(http_get('/var_format.html'), $re_date_gmt, 'default header');
 
 like(http_get('/var_format.html?custom=1'),
-	qr/x\w+, \d\d:\d\d:\d\dx/, 'custom ssi');
+	qr/x.+, \d\d:\d\d:\d\dx/, 'custom ssi');
 like(http_get('/var_format.html'),
-	qr/x\w+, \d\d-\w{3}-\d{4} \d\d:\d\d:\d\d \w+x/, 'default ssi');
-
-like(`grep -F '[alert]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no alerts');
+	qr/x.+, \d\d-.+-\d{4} \d\d:\d\d:\d\d .+x/, 'default ssi');
 
 ###############################################################################

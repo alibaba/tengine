@@ -11,9 +11,7 @@ use strict;
 
 use Test::More;
 
-use IO::Socket;
 use MIME::Base64;
-use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
