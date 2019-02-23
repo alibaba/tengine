@@ -23,9 +23,9 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 eval { require IO::Compress::Gzip; };
-Test::More::plan(skip_all => "IO::Compress::Gzip not found") if $@;
+plan(skip_all => "IO::Compress::Gzip not found") if $@;
 
-my $t = Test::Nginx->new()->has(qw/http gunzip proxy gzip_static rewrite/);
+my $t = Test::Nginx->new()->has(qw/http gunzip gzip_static rewrite/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -74,14 +74,7 @@ $t->write_file('t1.gz', $out);
 $t->write_file('t2.gz', $out . $out);
 $t->write_file('t3', 'not compressed');
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no gzip_static always') if $@;
-
-$t->plan(12);
+$t->run()->plan(12);
 
 ###############################################################################
 

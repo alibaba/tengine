@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -579,4 +578,3 @@ a [b c] [b] [c] [] [] d
 --- response_body
 a [b c] [b] [c] d
 1
-

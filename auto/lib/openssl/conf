@@ -15,8 +15,16 @@ if [ $OPENSSL != NONE ]; then
 
             CORE_INCS="$CORE_INCS $OPENSSL/openssl/include"
             CORE_DEPS="$CORE_DEPS $OPENSSL/openssl/include/openssl/ssl.h"
-            CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/ssleay32.lib"
-            CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/libeay32.lib"
+
+            if [ -f $OPENSSL/ms/do_ms.bat ]; then
+                # before OpenSSL 1.1.0
+                CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/ssleay32.lib"
+                CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/libeay32.lib"
+            else
+                # OpenSSL 1.1.0+
+                CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/libssl.lib"
+                CORE_LIBS="$CORE_LIBS $OPENSSL/openssl/lib/libcrypto.lib"
+            fi
 
             # libeay32.lib requires gdi32.lib
             CORE_LIBS="$CORE_LIBS gdi32.lib"
@@ -33,6 +41,7 @@ if [ $OPENSSL != NONE ]; then
             CORE_LIBS="$CORE_LIBS $OPENSSL/.openssl/lib/libssl.a"
             CORE_LIBS="$CORE_LIBS $OPENSSL/.openssl/lib/libcrypto.a"
             CORE_LIBS="$CORE_LIBS $NGX_LIBDL"
+            CORE_LIBS="$CORE_LIBS $NGX_LIBPTHREAD"
 
             if [ "$NGX_PLATFORM" = win32 ]; then
                 CORE_LIBS="$CORE_LIBS -lgdi32 -lcrypt32 -lws2_32"
@@ -51,13 +60,68 @@ else
         ngx_feature_run=no
         ngx_feature_incs="#include <openssl/ssl.h>"
         ngx_feature_path=
-        ngx_feature_libs="-lssl -lcrypto"
-        ngx_feature_test="SSL_library_init()"
+        ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
+        ngx_feature_test="SSL_CTX_set_options(NULL, 0)"
         . auto/feature
+
+        if [ $ngx_found = no ]; then
+
+            # FreeBSD port
+
+            ngx_feature="OpenSSL library in /usr/local/"
+            ngx_feature_path="/usr/local/include"
+
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -lssl -lcrypto"
+            else
+                ngx_feature_libs="-L/usr/local/lib -lssl -lcrypto"
+            fi
+
+            ngx_feature_libs="$ngx_feature_libs $NGX_LIBDL $NGX_LIBPTHREAD"
+
+            . auto/feature
+        fi
+
+        if [ $ngx_found = no ]; then
+
+            # NetBSD port
+
+            ngx_feature="OpenSSL library in /usr/pkg/"
+            ngx_feature_path="/usr/pkg/include"
+
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/usr/pkg/lib -L/usr/pkg/lib -lssl -lcrypto"
+            else
+                ngx_feature_libs="-L/usr/pkg/lib -lssl -lcrypto"
+            fi
+
+            ngx_feature_libs="$ngx_feature_libs $NGX_LIBDL $NGX_LIBPTHREAD"
+
+            . auto/feature
+        fi
+
+        if [ $ngx_found = no ]; then
+
+            # MacPorts
+
+            ngx_feature="OpenSSL library in /opt/local/"
+            ngx_feature_path="/opt/local/include"
+
+            if [ $NGX_RPATH = YES ]; then
+                ngx_feature_libs="-R/opt/local/lib -L/opt/local/lib -lssl -lcrypto"
+            else
+                ngx_feature_libs="-L/opt/local/lib -lssl -lcrypto"
+            fi
+
+            ngx_feature_libs="$ngx_feature_libs $NGX_LIBDL $NGX_LIBPTHREAD"
+
+            . auto/feature
+        fi
 
         if [ $ngx_found = yes ]; then
             have=NGX_SSL . auto/have
-            CORE_LIBS="$CORE_LIBS $ngx_feature_libs $NGX_LIBDL"
+            CORE_INCS="$CORE_INCS $ngx_feature_path"
+            CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
             OPENSSL=YES
         fi
     fi
@@ -74,5 +138,41 @@ with nginx by using --with-openssl=<path> option.
 END
         exit 1
     fi
-
 fi
+
+
+OPENSSL_ASYNC=
+if [ "$NGX_SSL_ASYNC" != NO ]; then
+    OPENSSL_ASYNC=NO
+
+    ngx_feature="OpenSSL Async Library"
+    ngx_feature_name=
+    ngx_feature_run=no
+    ngx_feature_incs="#include <openssl/ssl.h>"
+
+    if [ $OPENSSL = NONE ]; then
+         ngx_feature_path=
+    else
+         ngx_feature_path=$CORE_INCS
+    fi
+
+    ngx_feature_libs="-lssl -lcrypto"
+    ngx_feature_test="#ifndef SSL_MODE_ASYNC
+    error: not define async
+    #endif
+    "
+    . auto/feature
+    if [ $ngx_found = yes ]; then
+        have=NGX_SSL_ASYNC . auto/have
+        OPENSSL_ASYNC=YES
+    fi
+fi
+
+if [ -n "$OPENSSL_ASYNC"  -a  "$OPENSSL_ASYNC" != YES  ]; then
+cat << END
+$1: error: For using asynchronous mode, The OpenSSL must be version 1.1.0 or greater.
+
+END
+    exit 1
+fi
+

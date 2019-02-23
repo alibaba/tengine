@@ -59,7 +59,7 @@ http {
 EOF
 
 $t->run_daemon(\&scgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -70,12 +70,7 @@ like(http_get('/nolen'), qr/MISS/, 'no length');
 like(http_get('/nolen'), qr/HIT/, 'no length cached');
 
 like(http_get('/len/empty'), qr/MISS/, 'empty length');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.3');
-
 like(http_get('/len/empty'), qr/HIT/, 'empty length cached');
-}
 
 like(http_get('/nolen/empty'), qr/MISS/, 'empty no length');
 like(http_get('/nolen/empty'), qr/HIT/, 'empty no length cached');
@@ -88,7 +83,7 @@ like(http_get('/unfinished'), qr/MISS/, 'unfinished not cached');
 sub scgi_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8081',
+		LocalHost => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -98,7 +93,8 @@ sub scgi_daemon {
 	my %count;
 
 	while (my $request = $scgi->accept()) {
-		$request->read_env();
+		eval { $request->read_env(); };
+		next if $@;
 
 		my $uri = $request->env->{REQUEST_URI} || '';
 		my $c = $request->connection();

@@ -63,6 +63,7 @@ ngx_list_push(ngx_list_t *l)
 }
 
 
+#if (T_NGX_IMPROVED_LIST)
 static ngx_int_t
 ngx_list_delete_elt(ngx_list_t *list, ngx_list_part_t *cur, ngx_uint_t i)
 {
@@ -122,3 +123,4 @@ ngx_list_delete(ngx_list_t *list, void *elt)
 
     return NGX_ERROR;
 }
+#endif

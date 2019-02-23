@@ -24,8 +24,6 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy rewrite ipv6/);
 
-plan(skip_all => 'no ipv6 capable resolver') unless $t->has_version('1.5.8');
-
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -51,6 +49,7 @@ http {
             proxy_intercept_errors on;
             proxy_connect_timeout 50ms;
             error_page 504 502 /50x;
+            add_header X-Host $upstream_addr;
         }
         location /two {
             resolver    127.0.0.1:8081 127.0.0.1:8082;
@@ -68,20 +67,13 @@ http {
 
 EOF
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no inet6 support') if $@;
+$t->try_run('no inet6 support')->plan(72);
 
 $t->run_daemon(\&dns_daemon, 8081, $t);
 $t->run_daemon(\&dns_daemon, 8082, $t);
 
 $t->waitforfile($t->testdir . '/8081');
 $t->waitforfile($t->testdir . '/8082');
-
-$t->plan(72);
 
 ###############################################################################
 
@@ -95,7 +87,7 @@ like(http_host_header('cname.example.net', '/'), qr/\[fe80::1\]/,
 # CNAME + AAAA combined answer
 # demonstrates the name in answer section different from what is asked
 
-like(http_host_header('cname_a.example.net', '/'), qr/200 OK/, 'CNAME + AAAA');
+like(http_host_header('cname_a.example.net', '/'), qr/\[::1\]/, 'CNAME + AAAA');
 
 # many AAAA records in round robin
 # nonexisting IPs enumerated with proxy_next_upstream
@@ -574,7 +566,7 @@ sub reply_handler {
 	}
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 

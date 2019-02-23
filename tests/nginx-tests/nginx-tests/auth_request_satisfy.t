@@ -11,8 +11,6 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ CRLF /;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -133,12 +131,6 @@ like(http_get('/any/deny+forbidden'), qr/ 403 /, 'any deny+forbidden');
 
 like(http_get('/any/basic+open'), qr/ 404 /, 'any basic+open');
 like(http_get('/any/basic+unauthorized'), qr/ 401 /, 'any basic+unauthorized');
-
-TODO: {
-local $TODO = 'not yet, ticket 285' unless $t->has_version('1.5.7');
-
 like(http_get('/any/basic+forbidden'), qr/ 401 /, 'any basic+forbidden');
-
-}
 
 ###############################################################################

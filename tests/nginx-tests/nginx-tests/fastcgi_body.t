@@ -21,10 +21,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require FCGI; };
-plan(skip_all => 'FCGI not installed') if $@;
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
-
 my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(5)
 	->write_file_expand('nginx.conf', <<'EOF');
 
@@ -53,16 +49,17 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
-like(http_get('/'), qr/X-Body: /, 'fastcgi no body');
+like(http_get('/'), qr/X-Body: _eos\x0d?$/ms, 'fastcgi no body');
 
-like(http_get_length('/', ''), qr/X-Body: /, 'fastcgi empty body');
-like(http_get_length('/', 'foobar'), qr/X-Body: foobar/, 'fastcgi body');
+like(http_get_length('/', ''), qr/X-Body: _eos\x0d?$/ms, 'fastcgi empty body');
+like(http_get_length('/', 'foobar'), qr/X-Body: foobar_eos\x0d?$/ms,
+	'fastcgi body');
 
-like(http(<<EOF), qr/X-Body: foobar/, 'fastcgi chunked');
+like(http(<<EOF), qr/X-Body: foobar_eos\x0d?$/ms, 'fastcgi chunked');
 GET / HTTP/1.1
 Host: localhost
 Connection: close
@@ -74,7 +71,7 @@ foobar
 
 EOF
 
-like(http(<<EOF), qr/X-Body: /, 'fastcgi empty chunked');
+like(http(<<EOF), qr/X-Body: _eos\x0d?$/ms, 'fastcgi empty chunked');
 GET / HTTP/1.1
 Host: localhost
 Connection: close
@@ -87,9 +84,9 @@ EOF
 ###############################################################################
 
 sub http_get_length {
-        my ($url, $body) = @_;
+	my ($url, $body) = @_;
 	my $length = length $body;
-        return http(<<EOF);
+	return http(<<EOF);
 GET $url HTTP/1.1
 Host: localhost
 Connection: close
@@ -101,29 +98,86 @@ EOF
 
 ###############################################################################
 
+# Simple FastCGI responder implementation.
+
+# http://www.fastcgi.com/devkit/doc/fcgi-spec.html
+
+sub fastcgi_read_record($) {
+	my ($buf) = @_;
+	my $h;
+
+	return undef unless length $$buf;
+
+	@{$h}{qw/ version type id clen plen /} = unpack("CCnnC", $$buf);
+
+	$h->{content} = substr $$buf, 8, $h->{clen};
+	$h->{padding} = substr $$buf, 8 + $h->{clen}, $h->{plen};
+
+	$$buf = substr $$buf, 8 + $h->{clen} + $h->{plen};
+
+	return $h;
+}
+
+sub fastcgi_respond($$$$) {
+	my ($socket, $version, $id, $body) = @_;
+
+	# stdout
+	$socket->write(pack("CCnnCx", $version, 6, $id, length($body), 0));
+	$socket->write($body);
+
+	# close stdout
+	$socket->write(pack("CCnnCx", $version, 6, $id, 0, 0));
+
+	# end request
+	$socket->write(pack("CCnnCx", $version, 3, $id, 8, 0));
+	$socket->write(pack("NCxxx", 0, 0));
+}
+
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
-	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
-		$socket);
+	my $server = IO::Socket::INET->new(
+		Proto => 'tcp',
+		LocalAddr => '127.0.0.1:' . port(8081),
+		Listen => 5,
+		Reuse => 1
+	)
+		or die "Can't create listening socket: $!\n";
 
-	my $count;
-	my $body;
+	local $SIG{PIPE} = 'IGNORE';
 
-	while( $request->Accept() >= 0 ) {
-		$count++;
-		read(STDIN, $body, $ENV{'CONTENT_LENGTH'});
+	while (my $client = $server->accept()) {
+		$client->autoflush(1);
+		Test::Nginx::log_core('||', "fastcgi connection");
 
-		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+		$client->sysread(my $buf, 1024) or next;
+
+		my ($version, $id);
+		my $body = '';
+
+		while (my $h = fastcgi_read_record(\$buf)) {
+			$version = $h->{version};
+			$id = $h->{id};
+
+			Test::Nginx::log_core('||', "fastcgi record: "
+				. " $h->{version}, $h->{type}, $h->{id}, "
+				. "'$h->{content}'");
+
+			if ($h->{type} == 5) {
+				$body .= $h->{content} if $h->{clen} > 0;
+
+				# count stdin end-of-stream
+				$body .= '_eos' if $h->{clen} == 0;
+			}
+		}
+
+		# respond
+		fastcgi_respond($client, $version, $id, <<EOF);
+Location: http://localhost/redirect
 Content-Type: text/html
 X-Body: $body
 
 SEE-THIS
-$count
 EOF
 	}
-
-	FCGI::CloseSocket($socket);
 }
 
 ###############################################################################

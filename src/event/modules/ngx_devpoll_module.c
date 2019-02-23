@@ -14,7 +14,9 @@
 
 /* Solaris declarations */
 
+#ifndef POLLREMOVE
 #define POLLREMOVE   0x0800
+#endif
 #define DP_POLL      0xD001
 #define DP_ISPOLLED  0xD002
 
@@ -76,7 +78,7 @@ static ngx_command_t  ngx_devpoll_commands[] = {
 };
 
 
-ngx_event_module_t  ngx_devpoll_module_ctx = {
+static ngx_event_module_t  ngx_devpoll_module_ctx = {
     &devpoll_name,
     ngx_devpoll_create_conf,               /* create configuration */
     ngx_devpoll_init_conf,                 /* init configuration */
@@ -92,6 +94,10 @@ ngx_event_module_t  ngx_devpoll_module_ctx = {
         ngx_devpoll_process_events,        /* process the events */
         ngx_devpoll_init,                  /* init the events */
         ngx_devpoll_done,                  /* done the events */
+#if (NGX_SSL && NGX_SSL_ASYNC)
+        NULL,                              /* add an async conn */
+        NULL,                              /* del an async conn */
+#endif
     }
 
 };
@@ -334,7 +340,7 @@ ngx_devpoll_set_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 }
 
 
-ngx_int_t
+static ngx_int_t
 ngx_devpoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
@@ -436,7 +442,7 @@ ngx_devpoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
             default:
                 ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
-                    "unexpected event %04Xd for closed and removed socket %d, ",
+                    "unexpected event %04Xd for closed and removed socket %d, "
                     "ioctl(DP_ISPOLLED) returned rc:%d, fd:%d, event %04Xd",
                     revents, fd, rc, pfd.fd, pfd.revents);
 
@@ -479,13 +485,11 @@ ngx_devpoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
                           fd, event_list[i].events, revents);
         }
 
-        if ((revents & (POLLERR|POLLHUP|POLLNVAL))
-             && (revents & (POLLIN|POLLOUT)) == 0)
-        {
+        if (revents & (POLLERR|POLLHUP|POLLNVAL)) {
+
             /*
-             * if the error events were returned without POLLIN or POLLOUT,
-             * then add these flags to handle the events at least in one
-             * active handler
+             * if the error events were returned, add POLLIN and POLLOUT
+             * to handle the events at least in one active handler
              */
 
             revents |= POLLIN|POLLOUT;

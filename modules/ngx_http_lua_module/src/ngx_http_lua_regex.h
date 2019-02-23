@@ -14,6 +14,8 @@
 
 #if (NGX_PCRE)
 void ngx_http_lua_inject_regex_api(lua_State *L);
+ngx_int_t ngx_http_lua_ffi_set_jit_stack_size(int size, u_char *errstr,
+    size_t *errstr_size);
 #endif
 
 

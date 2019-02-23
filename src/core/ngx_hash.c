@@ -257,11 +257,19 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
     ngx_uint_t       i, n, key, size, start, bucket_size;
     ngx_hash_elt_t  *elt, **buckets;
 
+    if (hinit->max_size == 0) {
+        ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+                      "could not build %s, you should "
+                      "increase %s_max_size: %i",
+                      hinit->name, hinit->name, hinit->max_size);
+        return NGX_ERROR;
+    }
+
     for (n = 0; n < nelts; n++) {
         if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
         {
             ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
-                          "could not build the %s, you should "
+                          "could not build %s, you should "
                           "increase %s_bucket_size: %i",
                           hinit->name, hinit->name, hinit->bucket_size);
             return NGX_ERROR;
@@ -382,7 +390,6 @@ found:
 
         buckets[i] = (ngx_hash_elt_t *) elts;
         elts += test[i];
-
     }
 
     for (i = 0; i < size; i++) {
@@ -733,6 +740,10 @@ ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
             }
 
             if (key->data[i] == '.' && key->data[i + 1] == '.') {
+                return NGX_DECLINED;
+            }
+
+            if (key->data[i] == '\0') {
                 return NGX_DECLINED;
             }
         }

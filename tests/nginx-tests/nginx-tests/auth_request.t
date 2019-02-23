@@ -24,8 +24,8 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
-	->has(qw/http rewrite proxy fastcgi auth_basic auth_request/)
-	->plan(17);
+	->has(qw/http rewrite proxy cache fastcgi auth_basic auth_request/)
+	->plan(19);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,6 +38,9 @@ events {
 
 http {
     %%TEST_GLOBALS_HTTP%%
+
+    proxy_cache_path   %%TESTDIR%%/cache  levels=1:2
+                       keys_zone=NAME:1m;
 
     server {
         listen       127.0.0.1:8080;
@@ -115,6 +118,17 @@ http {
             proxy_set_header Content-Length "";
         }
 
+        location /proxy-cache {
+            auth_request /auth-proxy-cache;
+        }
+        location = /auth-proxy-cache {
+            proxy_pass http://127.0.0.1:8080/auth-basic;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_cache NAME;
+            proxy_cache_valid 1m;
+        }
+
         location /fastcgi {
             auth_request /auth-fastcgi;
         }
@@ -154,6 +168,9 @@ unlike(http_get_auth('/proxy'), qr/INVISIBLE/, 'proxy auth no content');
 
 like(http_post('/proxy'), qr/ 401 /, 'proxy auth post');
 
+like(http_get_auth('/proxy-cache'), qr/ 404 /, 'proxy auth with cache');
+like(http_get('/proxy-cache'), qr/ 404 /, 'proxy auth cached');
+
 # Consider the following scenario:
 #
 # 1. proxy_pass reads request body, then goes to fallback via error_page
@@ -176,7 +193,7 @@ SKIP: {
 	skip 'win32', 2 if $^O eq 'MSWin32';
 
 	$t->run_daemon(\&fastcgi_daemon);
-	$t->waitforsocket('127.0.0.1:8081');
+	$t->waitforsocket('127.0.0.1:' . port(8081));
 
 	like(http_get('/fastcgi'), qr/ 404 /, 'fastcgi auth open');
 	unlike(http_get('/fastcgi'), qr/INVISIBLE/, 'fastcgi auth no content');
@@ -221,7 +238,7 @@ sub http_post_big {
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

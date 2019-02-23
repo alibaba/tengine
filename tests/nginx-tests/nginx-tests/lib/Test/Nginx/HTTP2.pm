@@ -24,7 +24,7 @@ my %cframe = (
 #	2 => { name => 'PRIORITY', value => \&priority },
 	3 => { name => 'RST_STREAM', value => \&rst_stream },
 	4 => { name => 'SETTINGS', value => \&settings },
-#	5 => { name => 'PUSH_PROMISE', value => \&push_promise },
+	5 => { name => 'PUSH_PROMISE', value => \&push_promise },
 	6 => { name => 'PING', value => \&ping },
 	7 => { name => 'GOAWAY', value => \&goaway },
 	8 => { name => 'WINDOW_UPDATE', value => \&window_update },
@@ -36,8 +36,8 @@ sub new {
 	my ($port, %extra) = @_;
 
 	my $s = $extra{socket} || new_socket($port, %extra);
-	my $preface = $extra{preface}
-		|| 'PRI * HTTP/2.0' . CRLF . CRLF . 'SM' . CRLF . CRLF;
+	my $preface = defined $extra{preface} ? $extra{preface}
+		: 'PRI * HTTP/2.0' . CRLF . CRLF . 'SM' . CRLF . CRLF;
 
 	if ($extra{proxy}) {
 		raw_write($s, $extra{proxy});
@@ -116,11 +116,11 @@ sub h2_window {
 }
 
 sub h2_settings {
-	my ($self, $ack, %extra) = @_;
+	my ($self, $ack, @pairs) = @_;
 
-	my $len = 6 * keys %extra;
+	my $len = 6 * @pairs / 2;
 	my $buf = pack_length($len) . pack "CCx4", 0x4, $ack ? 0x1 : 0x0;
-	$buf .= join '', map { pack "nN", $_, $extra{$_} } keys %extra;
+	$buf .= pack "nN", splice @pairs, 0, 2 while @pairs;
 	raw_write($self->{socket}, $buf);
 }
 
@@ -196,7 +196,8 @@ sub new_stream {
 
 	my $type = defined $uri->{h2_continue} ? 0x9 : 0x1;
 	my $flags = defined $uri->{continuation} ? 0x0 : 0x4;
-	$flags |= 0x1 unless defined $body || defined $uri->{body_more};
+	$flags |= 0x1 unless defined $body || defined $uri->{body_more}
+		|| defined $uri->{h2_continue};
 	$flags |= 0x8 if $padlen;
 	$flags |= 0x20 if defined $dep || defined $prio;
 
@@ -204,8 +205,8 @@ sub new_stream {
 		$self->{last_stream} = $stream;
 	} else {
 		$self->{last_stream} += 2;
-		$self->{streams}{$self->{last_stream}} = $self->{iws};
 	}
+	$self->{streams}{$self->{last_stream}} = $self->{iws};
 
 	$buf = pack("xxx");				# Length stub
 	$buf .= pack("CC", $type, $flags);		# END_HEADERS
@@ -359,7 +360,8 @@ sub test_fin {
 	# wait for the fin flag
 
 	@test = grep { !(defined $_->{fin}
-		&& $_->{sid} == $frame->{sid} && $_->{fin} & $frame->{flags})
+		&& (!defined $_->{sid} || $_->{sid} == $frame->{sid})
+		&& $_->{fin} & $frame->{flags})
 	} @test if defined $frame->{flags};
 
 	# wait for the specified frame
@@ -400,6 +402,14 @@ sub settings {
 		$ctx->{iws} = $payload{$id} if $id == 4;
 	}
 	return \%payload;
+}
+
+sub push_promise {
+	my ($ctx, $buf, $len, $flags) = @_;
+	$len -= 4;
+
+	{ promised => unpack("N", $buf),
+	  headers => hunpack($ctx, substr($buf, 4, $len), $len) };
 }
 
 sub ping {
@@ -730,7 +740,7 @@ sub hunpack {
 	my $table = $ctx->{dynamic_decode};
 	my %headers;
 	my $skip = 0;
-	my ($index, $name, $value);
+	my ($index, $name, $value, $size);
 
 	my $field = sub {
 		my ($b) = @_;
@@ -782,6 +792,15 @@ sub hunpack {
 			$add->(\%headers, $name, $value);
 			next;
 		}
+
+		if (substr($ib, 0, 3) eq '001') {
+			($size, $skip) = iunpack(5, $data, $skip);
+
+			# TODO: handle dynamic table size update
+
+			next;
+		}
+
 		last;
 	}
 

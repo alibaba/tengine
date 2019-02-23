@@ -21,9 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
-
-my $t = Test::Nginx->new()->has(qw/http proxy cache rewrite/)->plan(7)
+my $t = Test::Nginx->new()->has(qw/http proxy cache rewrite shmem/)->plan(7)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -37,7 +35,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     proxy_cache_path   %%TESTDIR%%/cache  levels=1:2
-                       keys_zone=NAME:10m;
+                       keys_zone=NAME:1m;
 
     proxy_set_header X-Blah "blah";
     proxy_hide_header X-Hidden;
@@ -103,8 +101,8 @@ unlike(http_get('/nested/'), qr/X-Hidden/, 'proxy_hide_header nested');
 ###############################################################################
 
 sub http_get_ims {
-        my ($url) = @_;
-        return http(<<EOF);
+	my ($url) = @_;
+	return http(<<EOF);
 GET $url HTTP/1.0
 Host: localhost
 Connection: close

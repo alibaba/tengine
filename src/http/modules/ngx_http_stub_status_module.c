@@ -9,20 +9,22 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+
 static ngx_int_t ngx_http_stub_status_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_stub_status_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_stub_status_add_variables(ngx_conf_t *cf);
-
 static char *ngx_http_set_stub_status(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (T_NGX_HTTP_STUB_STATUS)
 static ngx_int_t ngx_http_stub_status_init(ngx_conf_t *cf);
+#endif
 
 
 static ngx_command_t  ngx_http_status_commands[] = {
 
     { ngx_string("stub_status"),
-      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS|NGX_CONF_TAKE1,
       ngx_http_set_stub_status,
       0,
       0,
@@ -32,10 +34,13 @@ static ngx_command_t  ngx_http_status_commands[] = {
 };
 
 
-
 static ngx_http_module_t  ngx_http_stub_status_module_ctx = {
     ngx_http_stub_status_add_variables,    /* preconfiguration */
+#if (T_NGX_HTTP_STUB_STATUS)
     ngx_http_stub_status_init,             /* postconfiguration */
+#else
+    NULL,                                  /* postconfiguration */
+#endif
 
     NULL,                                  /* create main configuration */
     NULL,                                  /* init main configuration */
@@ -78,7 +83,7 @@ static ngx_http_variable_t  ngx_http_stub_status_vars[] = {
     { ngx_string("connections_waiting"), NULL, ngx_http_stub_status_variable,
       3, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
-    { ngx_null_string, NULL, NULL, 0, 0, 0 }
+      ngx_http_null_variable
 };
 
 
@@ -89,9 +94,13 @@ ngx_http_stub_status_handler(ngx_http_request_t *r)
     ngx_int_t          rc;
     ngx_buf_t         *b;
     ngx_chain_t        out;
-    ngx_atomic_int_t   ap, hn, ac, rq, rd, wr, wa, rt;
+    ngx_atomic_int_t   ap, hn, ac, rq, rd, wr, wa;
 
-    if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
+#if (T_NGX_HTTP_STUB_STATUS)
+    ngx_atomic_int_t   rt;
+#endif
+
+    if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_HTTP_NOT_ALLOWED;
     }
 
@@ -116,8 +125,13 @@ ngx_http_stub_status_handler(ngx_http_request_t *r)
     }
 
     size = sizeof("Active connections:  \n") + NGX_ATOMIC_T_LEN
+#if (T_NGX_HTTP_STUB_STATUS)
            + sizeof("server accepts handled requests request_time\n") - 1
            + 6 + 4 * NGX_ATOMIC_T_LEN
+#else
+           + sizeof("server accepts handled requests\n") - 1
+           + 6 + 3 * NGX_ATOMIC_T_LEN
+#endif
            + sizeof("Reading:  Writing:  Waiting:  \n") + 3 * NGX_ATOMIC_T_LEN;
 
     b = ngx_create_temp_buf(r->pool, size);
@@ -135,15 +149,24 @@ ngx_http_stub_status_handler(ngx_http_request_t *r)
     rd = *ngx_stat_reading;
     wr = *ngx_stat_writing;
     wa = *ngx_stat_waiting;
+#if (T_NGX_HTTP_STUB_STATUS)
     rt = *ngx_stat_request_time;
+#endif
 
     b->last = ngx_sprintf(b->last, "Active connections: %uA \n", ac);
 
+#if (T_NGX_HTTP_STUB_STATUS)
     b->last = ngx_cpymem(b->last,
         "server accepts handled requests request_time\n",
         sizeof("server accepts handled requests request_time\n") - 1);
 
     b->last = ngx_sprintf(b->last, " %uA %uA %uA %uA\n", ap, hn, rq, rt);
+#else
+    b->last = ngx_cpymem(b->last, "server accepts handled requests\n",
+                         sizeof("server accepts handled requests\n") - 1);
+
+    b->last = ngx_sprintf(b->last, " %uA %uA %uA \n", ap, hn, rq);
+#endif
 
     b->last = ngx_sprintf(b->last, "Reading: %uA Writing: %uA Waiting: %uA \n",
                           rd, wr, wa);
@@ -240,18 +263,22 @@ ngx_http_set_stub_status(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+#if (T_NGX_HTTP_STUB_STATUS)
 static ngx_int_t
 ngx_http_status_log_handler(ngx_http_request_t *r)
 {
     ngx_time_t                *tp;
     ngx_msec_int_t             ms;
+#if (T_NGX_RET_CACHE)
     struct timeval             tv;
     ngx_http_core_loc_conf_t  *clcf;
+#endif
 
     if (r != r->main) {
         return NGX_OK;
     }
 
+#if (T_NGX_RET_CACHE)
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     if (clcf->request_time_cache) {
         tp = ngx_timeofday();
@@ -264,6 +291,12 @@ ngx_http_status_log_handler(ngx_http_request_t *r)
         ms = (ngx_msec_int_t) ((tv.tv_sec - r->start_sec) * 1000
                  + (tv.tv_usec / 1000 - r->start_msec));
     }
+
+#else 
+    tp = ngx_timeofday();
+    ms = (ngx_msec_int_t)
+             ((tp->sec - r->start_sec) * 1000 + (tp->msec - r->start_msec));    
+#endif
 
     ms = ngx_max(ms, 0);
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -292,4 +325,5 @@ ngx_http_stub_status_init(ngx_conf_t *cf)
 
     return NGX_OK;
 }
+#endif
 

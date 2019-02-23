@@ -54,12 +54,6 @@ EOF
 my $s = Test::Nginx::SMTP->new();
 $s->send('HELO example.com');
 $s->check(qr/^5.. /, "command before greeting - session must be rejected");
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.6');
-
 ok($s->eof(), "session have to be closed");
-
-}
 
 ###############################################################################

@@ -23,9 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy access ipv6/);
-
-plan(skip_all => 'new syntax "unix:"') unless $t->has_version('1.5.1');
+my $t = Test::Nginx->new()->has(qw/http proxy access unix/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -48,7 +46,7 @@ http {
         }
 
         location /inet6/ {
-            proxy_pass http://[::1]:8081/;
+            proxy_pass http://[::1]:%%PORT_8081%%/;
         }
 
         location /unix/ {
@@ -59,7 +57,7 @@ http {
 
     server {
         listen       127.0.0.1:8081;
-        listen       [::1]:8081;
+        listen       [::1]:%%PORT_8081%%;
         listen       unix:%%TESTDIR%%/unix.sock;
 
         location /allow_all {
@@ -82,14 +80,7 @@ http {
 
 EOF
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no inet6 and/or unix support') if $@;
-
-$t->plan(12);
+$t->try_run('no inet6 support')->plan(12);
 
 ###############################################################################
 

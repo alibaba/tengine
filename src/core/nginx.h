@@ -9,8 +9,8 @@
 #define _NGINX_H_INCLUDED_
 
 
-#define nginx_version      1008001
-#define NGINX_VERSION      "1.8.1"
+#define nginx_version      1015001
+#define NGINX_VERSION      "1.15.1"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 #ifdef NGX_BUILD
@@ -20,8 +20,8 @@
 #endif
 
 #define TENGINE            "Tengine"
-#define tengine_version    2002001
-#define TENGINE_VERSION    "2.2.1"
+#define tengine_version    2002002
+#define TENGINE_VERSION    "2.2.2"
 #define TENGINE_VER        TENGINE "/" TENGINE_VERSION
 
 #define NGINX_VAR          "NGINX"

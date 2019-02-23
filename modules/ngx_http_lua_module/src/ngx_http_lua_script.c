@@ -59,7 +59,7 @@ ngx_http_lua_compile_complex_value(ngx_http_lua_compile_complex_value_t *ccv)
     }
 
     n = nv * (2 * sizeof(ngx_http_lua_script_copy_code_t)
-                  + sizeof(ngx_http_lua_script_capture_code_t))
+              + sizeof(ngx_http_lua_script_capture_code_t))
         + sizeof(uintptr_t);
 
     if (ngx_array_init(&lengths, ccv->pool, n, 1) != NGX_OK) {
@@ -329,7 +329,7 @@ ngx_http_lua_script_add_copy_code(ngx_http_lua_script_compile_t *sc,
         return NGX_ERROR;
     }
 
-    code->code = (ngx_http_lua_script_code_pt)
+    code->code = (ngx_http_lua_script_code_pt) (void *)
                  ngx_http_lua_script_copy_len_code;
     code->len = len;
 
@@ -399,7 +399,7 @@ ngx_http_lua_script_add_capture_code(ngx_http_lua_script_compile_t *sc,
         return NGX_ERROR;
     }
 
-    code->code = (ngx_http_lua_script_code_pt)
+    code->code = (ngx_http_lua_script_code_pt) (void *)
                  ngx_http_lua_script_copy_capture_len_code;
     code->n = 2 * n;
 

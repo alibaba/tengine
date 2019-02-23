@@ -42,12 +42,10 @@ sub new {
 
 	$self->{_testdir} = tempdir(
 		'nginx-test-XXXXXXXXXX',
-		TMPDIR => 1,
-		CLEANUP => not $ENV{TEST_NGINX_LEAVE}
+		TMPDIR => 1
 	)
 		or die "Can't create temp directory: $!\n";
 	$self->{_testdir} =~ s!\\!/!g if $^O eq 'MSWin32';
-	$self->{_dso_module} = ();
 	mkdir "$self->{_testdir}/logs"
 		or die "Can't create logs directory: $!\n";
 
@@ -122,15 +120,17 @@ sub has_module($) {
 
 	my %regex = (
 		sni	=> 'TLS SNI support enabled',
-		mail	=> '--with-mail(?!\S)',
+		mail	=> '--with-mail((?!\S)|=dynamic)',
 		flv	=> '--with-http_flv_module',
 		perl	=> '--with-http_perl_module',
 		auth_request
 			=> '--with-http_auth_request_module',
 		realip	=> '--with-http_realip_module',
+		sub	=> '--with-http_sub_module',
 		charset	=> '(?s)^(?!.*--without-http_charset_module)',
 		gzip	=> '(?s)^(?!.*--without-http_gzip_module)',
 		ssi	=> '(?s)^(?!.*--without-http_ssi_module)',
+		mirror	=> '(?s)^(?!.*--without-http_mirror_module)',
 		userid	=> '(?s)^(?!.*--without-http_userid_module)',
 		access	=> '(?s)^(?!.*--without-http_access_module)',
 		auth_basic
@@ -145,6 +145,7 @@ sub has_module($) {
 		fastcgi	=> '(?s)^(?!.*--without-http_fastcgi_module)',
 		uwsgi	=> '(?s)^(?!.*--without-http_uwsgi_module)',
 		scgi	=> '(?s)^(?!.*--without-http_scgi_module)',
+		grpc	=> '(?s)^(?!.*--without-http_grpc_module)',
 		memcached
 			=> '(?s)^(?!.*--without-http_memcached_module)',
 		limit_conn
@@ -158,12 +159,14 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-http_upstream_hash_module)',
 		upstream_ip_hash
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
-		reqstat
-			=> '(?s)^(?!.*--without-http_reqstat_module)',
 		upstream_least_conn
 			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
+		upstream_random
+			=> '(?s)^(?!.*--without-http_upstream_random_module)',
 		upstream_keepalive
 			=> '(?s)^(?!.*--without-http_upstream_keepalive_modu)',
+		upstream_zone
+			=> '(?s)^(?!.*--without-http_upstream_zone_module)',
 		http	=> '(?s)^(?!.*--without-http(?!\S))',
 		cache	=> '(?s)^(?!.*--without-http-cache)',
 		pop3	=> '(?s)^(?!.*--without-mail_pop3_module)',
@@ -172,6 +175,29 @@ sub has_module($) {
 		pcre	=> '(?s)^(?!.*--without-pcre)',
 		split_clients
 			=> '(?s)^(?!.*--without-http_split_clients_module)',
+		stream	=> '--with-stream((?!\S)|=dynamic)',
+		stream_access
+			=> '(?s)^(?!.*--without-stream_access_module)',
+		stream_geo
+			=> '(?s)^(?!.*--without-stream_geo_module)',
+		stream_limit_conn
+			=> '(?s)^(?!.*--without-stream_limit_conn_module)',
+		stream_map
+			=> '(?s)^(?!.*--without-stream_map_module)',
+		stream_return
+			=> '(?s)^(?!.*--without-stream_return_module)',
+		stream_split_clients
+			=> '(?s)^(?!.*--without-stream_split_clients_module)',
+		stream_ssl
+			=> '--with-stream_ssl_module',
+		stream_upstream_hash
+			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
+		stream_upstream_least_conn
+			=> '(?s)^(?!.*--without-stream_upstream_least_conn_m)',
+		stream_upstream_random
+			=> '(?s)^(?!.*--without-stream_upstream_random_modul)',
+		stream_upstream_zone
+			=> '(?s)^(?!.*--without-stream_upstream_zone_module)',
 	);
 
 	my $re = $regex{$feature};
@@ -180,7 +206,28 @@ sub has_module($) {
 	$self->{_configure_args} = `$NGINX -V 2>&1`
 		if !defined $self->{_configure_args};
 
-	return ($self->{_configure_args} =~ $re or $self->{_configure_args} =~ '--enable-mods-static=all') ? 1 : 0;
+	return 1 if $self->{_configure_args} =~ $re;
+
+	my %modules = (
+		http_geoip
+			=> 'ngx_http_geoip_module',
+		image_filter
+			=> 'ngx_http_image_filter_module',
+		perl	=> 'ngx_http_perl_module',
+		xslt	=> 'ngx_http_xslt_filter_module',
+		mail	=> 'ngx_mail_module',
+		stream	=> 'ngx_stream_module',
+		stream_geoip
+			=> 'ngx_stream_geoip_module',
+	);
+
+	my $module = $modules{$feature};
+	if (defined $module && defined $ENV{TEST_NGINX_GLOBALS}) {
+		$re = qr/load_module\s+[^;]*\Q$module\E[-\w]*\.so\s*;/;
+		return 1 if $ENV{TEST_NGINX_GLOBALS} =~ $re;
+	}
+
+	return 0;
 }
 
 sub has_feature($) {
@@ -190,11 +237,11 @@ sub has_feature($) {
 		return $^O ne 'MSWin32';
 	}
 
-	if ($feature eq 'shmem') {
-		return $^O ne 'MSWin32' || $self->has_version('1.9.0');
+	if ($feature eq 'unix') {
+		return $^O ne 'MSWin32';
 	}
 
-	if ($feature eq 'unix') {
+	if ($feature eq 'udp') {
 		return $^O ne 'MSWin32';
 	}
 
@@ -225,7 +272,8 @@ sub has_daemon($) {
 	my ($self, $daemon) = @_;
 
 	if ($^O eq 'MSWin32') {
-		Test::More::plan(skip_all => "win32");
+		`for %i in ($daemon.exe) do \@echo | set /p x=%~\$PATH:i`
+			or Test::More::plan(skip_all => "$daemon not found");
 		return $self;
 	}
 
@@ -250,7 +298,19 @@ sub try_run($$) {
 		open STDERR, ">&", \*OLDERR;
 	};
 
-	Test::More::plan(skip_all => $message) if $@;
+	return $self unless $@;
+
+	if ($ENV{TEST_NGINX_VERBOSE}) {
+		my $path = $self->{_configure_args} =~ m!--error-log-path=(\S+)!
+			? $1 : 'logs/error.log';
+		$path = "$self->{_testdir}/$path" if index($path, '/');
+
+		open F, '<', $path or die "Can't open $path: $!";
+		log_core($_) while (<F>);
+		close F;
+	}
+
+	Test::More::plan(skip_all => $message);
 	return $self;
 }
 
@@ -296,39 +356,54 @@ sub run(;$) {
 	$self->waitforfile("$testdir/nginx.pid", $pid)
 		or die "Can't start nginx";
 
+	for (1 .. 50) {
+		last if $^O ne 'MSWin32';
+		last if $self->read_file('error.log') =~ /create thread/;
+		select undef, undef, undef, 0.1;
+	}
+
 	$self->{_started} = 1;
 	return $self;
 }
 
 sub port {
 	my ($num, %opts) = @_;
-	my ($s_tcp, $s_udp, $port);
+	my ($sock, $lock, $port);
 
 	goto done if defined $ports{$num};
+
+	my $socket = sub {
+		IO::Socket::INET->new(
+			Proto => 'tcp',
+			LocalAddr => '127.0.0.1:' . shift,
+			Listen => 1,
+			Reuse => ($^O ne 'MSWin32'),
+		);
+	};
+
+	my $socketl = sub {
+		IO::Socket::INET->new(
+			Proto => 'udp',
+			LocalAddr => '127.0.0.1:' . shift,
+		);
+	};
+
+	($socket, $socketl) = ($socketl, $socket) if $opts{udp};
 
 	$port = $num;
 
 	for (1 .. 10) {
-		$port = 8000 + int(rand(1000)) unless $_ == 1;
+		$port = int($port / 500) * 500 + int(rand(500)) unless $_ == 1;
 
-		$s_udp = IO::Socket::INET->new(
-			Proto => 'udp',
-			LocalAddr => '127.0.0.1:' . $port,
-		) or next;
-
-		$s_tcp = IO::Socket::INET->new(
-			Proto => 'tcp',
-			LocalAddr => '127.0.0.1:' . $port,
-			Listen => 1,
-			Reuse => ($^O ne 'MSWin32')
-		) and last;
+		$lock = $socketl->($port) or next;
+		$sock = $socket->($port) and last;
 	}
 
-	die "Port limit exceeded" unless defined $s_tcp and defined $s_udp;
+	die "Port limit exceeded" unless defined $lock and defined $sock;
 
 	$ports{$num} = {
 		port => $port,
-		socket => $opts{udp} ? $s_tcp : $s_udp
+		socket => $lock
 	};
 
 done:
@@ -387,30 +462,24 @@ sub waitforsocket($) {
 }
 
 sub reload() {
-	my ($self) = @_; 
+	my ($self) = @_;
 
 	return $self unless $self->{_started};
 
-	local $/;
-	open F, '<' . $self->{_testdir} . '/nginx.pid'
-		or die "Can't open nginx.pid: $!";
-	my $pid = <F>;
-	close F;
+	my $pid = $self->read_file('nginx.pid');
 
 	if ($^O eq 'MSWin32') {
 		my $testdir = $self->{_testdir};
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
-		system($NGINX, '-c', "$testdir/nginx.conf", '-s', 'reload',
-			@globals) == 0
+		system($NGINX, '-p', $testdir, '-c', "nginx.conf",
+			'-s', 'reload', @globals) == 0
 			or die "system() failed: $?\n";
 
 	} else {
 		kill 'HUP', $pid;
 	}
-
-	sleep(1);
 
 	return $self;
 }
@@ -420,11 +489,7 @@ sub stop() {
 
 	return $self unless $self->{_started};
 
-	local $/;
-	open F, '<' . $self->{_testdir} . '/nginx.pid'
-		or die "Can't open nginx.pid: $!";
-	my $pid = <F>;
-	close F;
+	my $pid = $self->read_file('nginx.pid');
 
 	if ($^O eq 'MSWin32') {
 		my $testdir = $self->{_testdir};

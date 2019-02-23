@@ -124,9 +124,9 @@ like(http_get_body('/single', '0123456789' x 128),
 # pipelined requests
 
 like(http_get_body('/', '0123456789', '0123456789' x 128, '0123456789' x 512,
-        'foobar'), qr/X-Body: foobar\x0d?$/ms, 'body pipelined');
+	'foobar'), qr/X-Body: foobar\x0d?$/ms, 'body pipelined');
 like(http_get_body('/', '0123456789' x 128, '0123456789' x 512, '0123456789',
-        'foobar'), qr/X-Body: foobar\x0d?$/ms, 'body pipelined 2');
+	'foobar'), qr/X-Body: foobar\x0d?$/ms, 'body pipelined 2');
 
 like(http_get_body('/discard', '0123456789', '0123456789' x 128,
 	'0123456789' x 512, 'foobar'), qr/(TEST.*){4}/ms,

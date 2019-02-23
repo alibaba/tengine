@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -199,4 +198,3 @@ GET /proxy-pass-uri
 --- response_body_like: It works!
 --- no_error_log
 [error]
-

@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http dav/)->plan(15);
+my $t = Test::Nginx->new()->has(qw/http dav/)->plan(20);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -40,6 +40,11 @@ http {
         server_name  localhost;
 
         location / {
+            dav_methods PUT DELETE MKCOL COPY MOVE;
+        }
+
+        location /i/ {
+            alias %%TESTDIR%%/;
             dav_methods PUT DELETE MKCOL COPY MOVE;
         }
     }
@@ -142,11 +147,37 @@ EOF
 
 like($r, qr/204 No Content/, 'copy file escaped');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.9');
-
 is(-s $t->testdir() . '/file-moved escape', 10, 'file copied unescaped');
 
+$t->write_file('file.exist', join '', (1 .. 42));
+
+$r = http(<<EOF);
+COPY /file HTTP/1.1
+Host: localhost
+Destination: /file.exist
+Connection: close
+
+EOF
+
+like($r, qr/204 No Content/, 'copy file overwrite');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.15.3');
+
+is(-s $t->testdir() . '/file.exist', 10, 'target file truncated');
+
 }
+
+$r = http(<<EOF . '0123456789');
+PUT /i/alias HTTP/1.1
+Host: localhost
+Connection: close
+Content-Length: 10
+
+EOF
+
+like($r, qr/201 Created.*(Content-Length|\x0d\0a0\x0d\x0a)/ms, 'put alias');
+like($r, qr!Location: http://localhost:\d+/i/alias\x0d?$!ms, 'location alias');
+is(-s $t->testdir() . '/alias', 10, 'put alias size');
 
 ###############################################################################

@@ -62,16 +62,9 @@ $t->write_file('inmemory.html',
 	'<!--#include virtual="/include$request_uri" set="x" -->' .
 	'set: <!--#echo var="x" -->');
 
-eval {
-	open OLDERR, ">&", \*STDERR; close STDERR;
-	$t->run();
-	open STDERR, ">&", \*OLDERR;
-};
-plan(skip_all => 'no fastcgi_buffering') if $@;
+$t->run()->plan(2);
 
-$t->run_daemon(\&fastcgi_daemon);
-
-$t->plan(2)->waitforsocket('127.0.0.1:8081');
+$t->run_daemon(\&fastcgi_daemon)->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -81,7 +74,7 @@ like(http_get('/inmemory.html'), qr/set: SEE-THIS/, 'fastcgi inmemory');
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

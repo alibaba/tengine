@@ -1,0 +1,9 @@
+ddon_name=ngx_http_upstream_consistent_hash_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_upstream_consistent_hash_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_upstream_consistent_hash_module.c"
+
+if ! echo "$CORE_DEPS" | grep "ngx_segment" > /dev/null
+then
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_segment_tree.c"
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_segment_tree.h"
+fi

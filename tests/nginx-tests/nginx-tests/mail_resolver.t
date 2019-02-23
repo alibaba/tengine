@@ -81,6 +81,13 @@ mail {
         protocol  smtp;
         resolver  127.0.0.1:8086;
     }
+
+    server {
+        listen    127.0.0.1:8032;
+        protocol  smtp;
+        resolver  127.0.0.1:8087;
+    }
+
 }
 
 http {
@@ -107,16 +114,16 @@ http {
 
 EOF
 
-for (8081 .. 8086) {
+for (8081 .. 8087) {
 	$t->run_daemon(\&dns_daemon, $_, $t);
 }
 $t->run();
 
-for (8081 .. 8086) {
+for (8081 .. 8087) {
 	$t->waitforfile($t->testdir . "/$_");
 }
 
-$t->plan(7);
+$t->plan(8);
 
 ###############################################################################
 
@@ -134,7 +141,6 @@ $s->ok('PTR');
 
 $s->send('QUIT');
 $s->read();
-close $s;
 
 # Cached PTR prevents from querying bad ns on port 8083
 
@@ -150,7 +156,6 @@ $s->ok('PTR cached');
 
 $s->send('QUIT');
 $s->read();
-close $s;
 
 # SERVFAIL
 
@@ -166,12 +171,8 @@ $s->check(qr/TEMPUNAVAIL/, 'PTR SERVFAIL');
 
 $s->send('QUIT');
 $s->read();
-close $s;
 
 # PTR with zero length RDATA
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.8');
 
 $s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8028");
 $s->read();
@@ -185,9 +186,6 @@ $s->check(qr/TEMPUNAVAIL/, 'PTR empty');
 
 $s->send('QUIT');
 $s->read();
-close $s;
-
-}
 
 # CNAME
 
@@ -202,11 +200,10 @@ $s->send('MAIL FROM:<test@example.com> SIZE=100');
 $s->read();
 
 $s->send('RCPT TO:<test@example.com>');
-$s->ok('PTR with CNAME');
+$s->ok('CNAME');
 
 $s->send('QUIT');
 $s->read();
-close $s;
 
 }
 
@@ -227,7 +224,6 @@ $s->ok('uncompressed PTR');
 
 $s->send('QUIT');
 $s->read();
-close $s;
 
 }
 
@@ -246,7 +242,26 @@ $s->check(qr/TEMPUNAVAIL/, 'PTR type');
 
 $s->send('QUIT');
 $s->read();
-close $s;
+
+}
+
+# CNAME and PTR in one answer section
+
+TODO: {
+local $TODO = 'not yet';
+
+$s = Test::Nginx::SMTP->new(PeerAddr => "127.0.0.1:8032");
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+$s->send('MAIL FROM:<test@example.com> SIZE=100');
+$s->read();
+
+$s->send('RCPT TO:<test@example.com>');
+$s->ok('CNAME with PTR');
+
+$s->send('QUIT');
+$s->read();
 
 }
 
@@ -264,6 +279,7 @@ sub reply_handler {
 	use constant A		=> 1;
 	use constant CNAME	=> 5;
 	use constant PTR	=> 12;
+	use constant DNAME      => 39;
 
 	use constant IN 	=> 1;
 
@@ -310,12 +326,20 @@ sub reply_handler {
 		} elsif ($port == 8085) {
 			# uncompressed answer
 
-			push @rdata, pack("(w/a*)6x n2N n(w/a*)3x",
+			push @rdata, pack("(C/a*)6x n2N n(C/a*)3x",
 				('1', '0', '0', '127', 'in-addr', 'arpa'),
 				PTR, IN, $ttl, 15, ('a', 'example', 'net'));
 
 		} elsif ($port == 8086) {
-			push @rdata, rd_name(CNAME, $ttl, 'a.example.net');
+			push @rdata, rd_name(DNAME, $ttl, 'a.example.net');
+
+		} elsif ($port == 8087) {
+			# PTR answered with CNAME+PTR
+
+			push @rdata, rd_name(CNAME, $ttl,
+				'1.1.0.0.127.in-addr.arpa');
+			push @rdata, pack("n3N n(C/a*)3 x", 0xc034,
+				PTR, IN, $ttl, 15, ('a', 'example', 'net'));
 		}
 
 	} elsif ($name eq '1.1.0.0.127.in-addr.arpa' && $type == PTR) {
@@ -323,7 +347,7 @@ sub reply_handler {
 	}
 
 	$len = @name;
-	pack("n6 (w/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
 		0, 0, @name, $type, $class) . join('', @rdata);
 }
 
@@ -333,7 +357,7 @@ sub rd_name {
 
 	@rdname = split /\./, $name;
 	$rdlen = length(join '', @rdname) + @rdname + 1;
-	pack("n3N n(w/a*)* x", 0xc00c, $type, IN, $ttl, $rdlen, @rdname);
+	pack("n3N n(C/a*)* x", 0xc00c, $type, IN, $ttl, $rdlen, @rdname);
 }
 
 sub rd_addr {

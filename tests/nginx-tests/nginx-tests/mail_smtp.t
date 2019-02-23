@@ -140,10 +140,6 @@ $s->authok('auth login with username');
 
 # Try auth plain with pipelining
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.6');
-local $SIG{__WARN__} = sub {};
-
 $s = Test::Nginx::SMTP->new();
 $s->read();
 $s->send('EHLO example.com');
@@ -165,8 +161,6 @@ $s->send('AUTH PLAIN '
 	. 'MAIL FROM:<test@example.com> SIZE=100');
 $s->read();
 $s->ok('mail from after pipelined auth');
-
-}
 
 # Try auth none
 
@@ -196,15 +190,8 @@ $s->send('MAIL FROM:<test@example.com> SIZE=100' . CRLF
 	. 'RSET');
 
 $s->ok('pipelined mail from');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.5.6');
-local $SIG{__WARN__} = sub {};
-
 $s->ok('pipelined rcpt to');
 $s->ok('pipelined rset');
-
-}
 
 # Connection must stay even if error returned to rcpt to command
 
@@ -227,7 +214,6 @@ $s->ok('good rcpt to');
 $s = Test::Nginx::SMTP->new();
 $s->read();
 
-log_out('HEL');
 $s->print('HEL');
 $s->send('O example.com');
 $s->ok('split command');

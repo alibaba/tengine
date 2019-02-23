@@ -21,9 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'win32') if $^O eq 'MSWin32';
-
-my $t = Test::Nginx->new()->has(qw/http limit_req/)->plan(5);
+my $t = Test::Nginx->new()->has(qw/http limit_req shmem/)->plan(5);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -37,9 +35,9 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    limit_req_zone  $binary_remote_addr  zone=one:10m   rate=2r/s;
-    limit_req_zone  $binary_remote_addr  zone=long:10m  rate=2r/s;
-    limit_req_zone  $binary_remote_addr  zone=fast:10m  rate=1000r/s;
+    limit_req_zone  $binary_remote_addr  zone=one:1m   rate=2r/s;
+    limit_req_zone  $binary_remote_addr  zone=long:1m  rate=2r/s;
+    limit_req_zone  $binary_remote_addr  zone=fast:1m  rate=1000r/s;
 
     server {
         listen       127.0.0.1:8080;
