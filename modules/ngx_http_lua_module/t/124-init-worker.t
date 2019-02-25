@@ -3,13 +3,13 @@
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
-#master_on();
+master_on();
 #workers(2);
 #log_level('warn');
 
 repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 4 + 1);
+plan tests => repeat_each() * (blocks() * 4 + 4);
 
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= 11211;
 $ENV{TEST_NGINX_RESOLVER} ||= '8.8.8.8';
@@ -447,7 +447,7 @@ warn(): Thu, 01 Jan 1970 01:34:38 GMT
 --- timeout: 10
 --- http_config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 3s;
     init_worker_by_lua '
         -- global
@@ -550,6 +550,7 @@ second line received: Server: openresty
             else
                 say("connect: ", ok, " ", err)
             end
+            done = true
         end
 
         local ok, err = ngx.timer.at(0, handler)
@@ -600,6 +601,7 @@ qr/connect\(\) failed \(\d+: Connection refused\), context: ngx\.timer$/
             else
                 say("connect: ", ok, " ", err)
             end
+            done = true
         end
 
         local ok, err = ngx.timer.at(0, handler)
@@ -650,6 +652,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
             else
                 say("connect: ", ok, " ", err)
             end
+            done = true
         end
 
         local ok, err = ngx.timer.at(0, handler)
@@ -740,3 +743,216 @@ ok
 Bad bad bad
 --- skip_nginx: 4: < 1.7.1
 
+
+
+=== TEST 19: fake module calls ngx_http_conf_get_module_srv_conf in its merge_srv_conf callback (GitHub issue #554)
+This also affects merge_loc_conf
+--- http_config
+    init_worker_by_lua return;
+--- config
+    location = /t {
+        return 200 ok;
+    }
+--- request
+GET /t
+--- response_body chomp
+ok
+--- no_error_log
+[error]
+
+
+
+=== TEST 20: destroy Lua VM in cache processes (without privileged agent or shdict)
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;../lua-resty-lrucache/lib/?.lua;;";
+
+    proxy_cache_path /tmp/cache levels=1:2 keys_zone=cache:1m;
+
+    #lua_shared_dict dummy 500k;
+
+    init_by_lua_block {
+        require "resty.core.regex"
+        assert(ngx.re.match("hello, world", [[hello, \w+]], "joi"))
+        assert(ngx.re.match("hi, world", [[hi, \w+]], "ji"))
+    }
+
+--- config
+    location = /t {
+        return 200;
+    }
+--- request
+    GET /t
+--- grep_error_log eval: qr/lua close the global Lua VM \S+ in the cache helper process \d+|lua close the global Lua VM \S+$/
+--- grep_error_log_out eval
+qr/\A(?:lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \1
+lua close the global Lua VM \1 in the cache helper process \d+
+lua close the global Lua VM \1
+|lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \2 in the cache helper process \d+
+lua close the global Lua VM \2
+lua close the global Lua VM \2
+)(?:lua close the global Lua VM [0-9A-F]+
+)*\z/
+--- no_error_log
+[error]
+start privileged agent process
+
+
+
+=== TEST 21: destroy Lua VM in cache processes (without privileged agent but with shdict)
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;../lua-resty-lrucache/lib/?.lua;;";
+
+    proxy_cache_path /tmp/cache levels=1:2 keys_zone=cache:1m;
+
+    lua_shared_dict dummy 500k;
+
+    init_by_lua_block {
+        require "resty.core.regex"
+        assert(ngx.re.match("hello, world", [[hello, \w+]], "joi"))
+        assert(ngx.re.match("hi, world", [[hi, \w+]], "ji"))
+    }
+
+--- config
+    location = /t {
+        return 200;
+    }
+--- request
+    GET /t
+--- grep_error_log eval: qr/lua close the global Lua VM \S+ in the cache helper process \d+|lua close the global Lua VM \S+$/
+--- grep_error_log_out eval
+qr/\A(?:lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \1
+lua close the global Lua VM \1 in the cache helper process \d+
+lua close the global Lua VM \1
+|lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \2 in the cache helper process \d+
+lua close the global Lua VM \2
+lua close the global Lua VM \2
+)(?:lua close the global Lua VM [0-9A-F]+
+)*\z/
+--- no_error_log
+[error]
+start privileged agent process
+
+
+
+=== TEST 22: destroy Lua VM in cache processes (with privileged agent)
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;../lua-resty-lrucache/lib/?.lua;;";
+
+    #lua_shared_dict dogs 1m;
+
+    proxy_cache_path /tmp/cache levels=1:2 keys_zone=cache:1m;
+
+    init_by_lua_block {
+        assert(require "ngx.process".enable_privileged_agent())
+        require "resty.core.regex"
+        assert(ngx.re.match("hello, world", [[hello, \w+]], "joi"))
+        assert(ngx.re.match("hi, world", [[hi, \w+]], "ji"))
+    }
+
+--- config
+    location = /t {
+        return 200;
+    }
+--- request
+    GET /t
+--- grep_error_log eval: qr/lua close the global Lua VM \S+ in the cache helper process \d+|lua close the global Lua VM \S+$/
+--- grep_error_log_out eval
+qr/\A(?:lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \1
+lua close the global Lua VM \1 in the cache helper process \d+
+lua close the global Lua VM \1
+|lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+
+lua close the global Lua VM \2 in the cache helper process \d+
+lua close the global Lua VM \2
+lua close the global Lua VM \2
+)(?:lua close the global Lua VM [0-9A-F]+
+)*\z/
+--- error_log eval
+qr/start privileged agent process \d+/
+--- no_error_log
+[error]
+
+
+
+=== TEST 23: destroy Lua VM in cache processes (with init worker and privileged agent)
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;../lua-resty-lrucache/lib/?.lua;;";
+
+    #lua_shared_dict dogs 1m;
+
+    proxy_cache_path /tmp/cache levels=1:2 keys_zone=cache:1m;
+
+    init_by_lua_block {
+        assert(require "ngx.process".enable_privileged_agent())
+        require "resty.core.regex"
+        assert(ngx.re.match("hello, world", [[hello, \w+]], "joi"))
+        assert(ngx.re.match("hi, world", [[hi, \w+]], "ji"))
+    }
+
+    init_worker_by_lua_block {
+        ngx.log(ngx.WARN, "hello from init worker by lua")
+    }
+
+--- config
+    location = /t {
+        return 200;
+    }
+--- request
+    GET /t
+--- grep_error_log eval: qr/hello from init worker by lua/
+--- grep_error_log_out
+hello from init worker by lua
+hello from init worker by lua
+
+--- error_log eval
+[
+qr/start privileged agent process \d+$/,
+qr/lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+$/,
+qr/lua close the global Lua VM ([0-9A-F]+)$/,
+]
+--- no_error_log
+[error]
+
+
+
+=== TEST 24: destroy Lua VM in cache processes (with init worker but without privileged agent)
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;../lua-resty-lrucache/lib/?.lua;;";
+
+    #lua_shared_dict dogs 1m;
+
+    proxy_cache_path /tmp/cache levels=1:2 keys_zone=cache:1m;
+
+    init_by_lua_block {
+        require "resty.core.regex"
+        assert(ngx.re.match("hello, world", [[hello, \w+]], "joi"))
+        assert(ngx.re.match("hi, world", [[hi, \w+]], "ji"))
+    }
+
+    init_worker_by_lua_block {
+        ngx.log(ngx.WARN, "hello from init worker by lua")
+    }
+
+--- config
+    location = /t {
+        return 200;
+    }
+--- request
+    GET /t
+
+--- grep_error_log eval: qr/hello from init worker by lua/
+--- grep_error_log_out
+hello from init worker by lua
+
+--- error_log eval
+[
+qr/lua close the global Lua VM ([0-9A-F]+) in the cache helper process \d+$/,
+qr/lua close the global Lua VM ([0-9A-F]+)$/,
+]
+--- no_error_log
+[error]
+start privileged agent process

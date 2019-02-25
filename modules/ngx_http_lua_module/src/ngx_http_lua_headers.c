@@ -26,6 +26,9 @@ static int ngx_http_lua_ngx_req_get_headers(lua_State *L);
 static int ngx_http_lua_ngx_req_header_clear(lua_State *L);
 static int ngx_http_lua_ngx_req_header_set(lua_State *L);
 static int ngx_http_lua_ngx_resp_get_headers(lua_State *L);
+#if nginx_version >= 1011011
+void ngx_http_lua_ngx_raw_header_cleanup(void *data);
+#endif
 
 
 static int
@@ -53,6 +56,12 @@ ngx_http_lua_ngx_req_http_version(lua_State *L)
         lua_pushnumber(L, 1.1);
         break;
 
+#ifdef NGX_HTTP_VERSION_20
+    case NGX_HTTP_VERSION_20:
+        lua_pushnumber(L, 2.0);
+        break;
+#endif
+
     default:
         lua_pushnil(L);
         break;
@@ -71,6 +80,11 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     size_t                       size;
     ngx_buf_t                   *b, *first = NULL;
     ngx_int_t                    i, j;
+#if nginx_version >= 1011011
+    ngx_buf_t                  **bb;
+    ngx_chain_t                 *cl;
+    ngx_http_lua_main_conf_t    *lmcf;
+#endif
     ngx_connection_t            *c;
     ngx_http_request_t          *r, *mr;
     ngx_http_connection_t       *hc;
@@ -87,18 +101,33 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
         return luaL_error(L, "no request object found");
     }
 
+#if nginx_version >= 1011011
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+#endif
+
     ngx_http_lua_check_fake_request(L, r);
 
     mr = r->main;
     hc = mr->http_connection;
     c = mr->connection;
 
+#if (NGX_HTTP_V2)
+    if (mr->stream) {
+        return luaL_error(L, "http2 requests not supported yet");
+    }
+#endif
+
 #if 1
     dd("hc->nbusy: %d", (int) hc->nbusy);
 
     if (hc->nbusy) {
+#if nginx_version >= 1011011
+        dd("hc->busy: %p %p %p %p", hc->busy->buf->start, hc->busy->buf->pos,
+           hc->busy->buf->last, hc->busy->buf->end);
+#else
         dd("hc->busy: %p %p %p %p", hc->busy[0]->start, hc->busy[0]->pos,
            hc->busy[0]->last, hc->busy[0]->end);
+#endif
     }
 
     dd("request line: %p %p", mr->request_line.data,
@@ -134,9 +163,37 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     dd("size: %d", (int) size);
 
     if (hc->nbusy) {
+#if nginx_version >= 1011011
+        if (hc->nbusy > lmcf->busy_buf_ptr_count) {
+            if (lmcf->busy_buf_ptrs) {
+                ngx_free(lmcf->busy_buf_ptrs);
+            }
+
+            lmcf->busy_buf_ptrs = ngx_alloc(hc->nbusy * sizeof(ngx_buf_t *),
+                                            r->connection->log);
+
+            if (lmcf->busy_buf_ptrs == NULL) {
+                return luaL_error(L, "no memory");
+            }
+
+            lmcf->busy_buf_ptr_count = hc->nbusy;
+        }
+
+        bb = lmcf->busy_buf_ptrs;
+        for (cl = hc->busy; cl; cl = cl->next) {
+            *bb++ = cl->buf;
+        }
+#endif
         b = NULL;
+
+#if nginx_version >= 1011011
+        bb = lmcf->busy_buf_ptrs;
+        for (i = hc->nbusy; i > 0; i--) {
+            b = bb[i - 1];
+#else
         for (i = 0; i < hc->nbusy; i++) {
             b = hc->busy[i];
+#endif
 
             dd("busy buf: %d: [%.*s]", (int) i, (int) (b->pos - b->start),
                b->start);
@@ -188,7 +245,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
 
         if (b != mr->header_in) {
             /* skip truncated header entries (if any) */
-            while (last > data && last[-1] != LF) {
+            while (last > data && last[-1] != LF && last[-1] != '\0') {
                 last--;
             }
         }
@@ -211,8 +268,15 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     }
 
     if (hc->nbusy) {
+
+#if nginx_version >= 1011011
+        bb = lmcf->busy_buf_ptrs;
+        for (i = hc->nbusy - 1; i >= 0; i--) {
+            b = bb[i];
+#else
         for (i = 0; i < hc->nbusy; i++) {
             b = hc->busy[i];
+#endif
 
             if (!found) {
                 if (b != first) {
@@ -251,7 +315,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
 
 #if 1
             /* skip truncated header entries (if any) */
-            while (last > p && last[-1] != LF) {
+            while (last > p && last[-1] != LF && last[-1] != '\0') {
                 last--;
             }
 #endif
@@ -261,8 +325,7 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
                 if (*p == '\0') {
                     j++;
                     if (p + 1 == last) {
-                        /* XXX this should not happen */
-                        dd("found string end!!");
+                        *p = LF;
 
                     } else if (*(p + 1) == LF) {
                         *p = CR;
@@ -334,6 +397,7 @@ ngx_http_lua_ngx_req_get_headers(lua_State *L)
     int                           max;
     int                           raw = 0;
     int                           count = 0;
+    int                           truncated = 0;
 
     n = lua_gettop(L);
 
@@ -362,21 +426,24 @@ ngx_http_lua_ngx_req_get_headers(lua_State *L)
 
     part = &r->headers_in.headers.part;
     count = part->nelts;
-    while (part->next) {
+    while (part->next != NULL) {
         part = part->next;
         count += part->nelts;
     }
 
     if (max > 0 && count > max) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "lua exceeding request header limit %d > %d", count,
+                       max);
         count = max;
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua exceeding request header limit %d", max);
+        truncated = 1;
     }
 
     lua_createtable(L, 0, count);
 
     if (!raw) {
-        lua_pushlightuserdata(L, &ngx_http_lua_headers_metatable_key);
+        lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                              headers_metatable_key));
         lua_rawget(L, LUA_REGISTRYINDEX);
         lua_setmetatable(L, -2);
     }
@@ -417,9 +484,14 @@ ngx_http_lua_ngx_req_get_headers(lua_State *L)
                        "lua request header: \"%V: %V\"",
                        &header[i].key, &header[i].value);
 
-        if (--count == 0) {
-            return 1;
+        if (--count <= 0) {
+            break;
         }
+    }  /* for */
+
+    if (truncated) {
+        lua_pushliteral(L, "truncated");
+        return 2;
     }
 
     return 1;
@@ -432,6 +504,7 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     ngx_list_part_t    *part;
     ngx_table_elt_t    *header;
     ngx_http_request_t *r;
+    ngx_http_lua_ctx_t *ctx;
     u_char             *lowcase_key = NULL;
     size_t              lowcase_key_sz = 0;
     ngx_uint_t          i;
@@ -439,6 +512,8 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     int                 max;
     int                 raw = 0;
     int                 count = 0;
+    int                 truncated = 0;
+    int                 extra = 0;
 
     n = lua_gettop(L);
 
@@ -463,31 +538,32 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
         return luaL_error(L, "no request object found");
     }
 
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return luaL_error(L, "no ctx found");
+    }
+
     ngx_http_lua_check_fake_request(L, r);
 
     part = &r->headers_out.headers.part;
     count = part->nelts;
-    while (part->next) {
+    while (part->next != NULL) {
         part = part->next;
         count += part->nelts;
     }
 
-    if (max > 0 && count > max) {
-        count = max;
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua exceeding request header limit %d", max);
-    }
-
-    lua_createtable(L, 0, count);
+    lua_createtable(L, 0, count + 2);
 
     if (!raw) {
-        lua_pushlightuserdata(L, &ngx_http_lua_headers_metatable_key);
+        lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                              headers_metatable_key));
         lua_rawget(L, LUA_REGISTRYINDEX);
         lua_setmetatable(L, -2);
     }
 
 #if 1
     if (r->headers_out.content_type.len) {
+        extra++;
         lua_pushliteral(L, "content-type");
         lua_pushlstring(L, (char *) r->headers_out.content_type.data,
                         r->headers_out.content_type.len);
@@ -497,11 +573,13 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     if (r->headers_out.content_length == NULL
         && r->headers_out.content_length_n >= 0)
     {
+        extra++;
         lua_pushliteral(L, "content-length");
         lua_pushfstring(L, "%d", (int) r->headers_out.content_length_n);
         lua_rawset(L, -3);
     }
 
+    extra++;
     lua_pushliteral(L, "connection");
     if (r->headers_out.status == NGX_HTTP_SWITCHING_PROTOCOLS) {
         lua_pushliteral(L, "upgrade");
@@ -515,11 +593,20 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
     lua_rawset(L, -3);
 
     if (r->chunked) {
+        extra++;
         lua_pushliteral(L, "transfer-encoding");
         lua_pushliteral(L, "chunked");
         lua_rawset(L, -3);
     }
 #endif
+
+    if (max > 0 && count + extra > max) {
+        truncated = 1;
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "lua exceeding response header limit %d > %d",
+                       count + extra, max);
+        count = max - extra;
+    }
 
     part = &r->headers_out.headers.part;
     header = part->elts;
@@ -573,9 +660,14 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
                        "lua response header: \"%V: %V\"",
                        &header[i].key, &header[i].value);
 
-        if (--count == 0) {
-            return 1;
+        if (--count <= 0) {
+            break;
         }
+    }  /* for */
+
+    if (truncated) {
+        lua_pushliteral(L, "truncated");
+        return 2;
     }
 
     return 1;
@@ -591,10 +683,16 @@ ngx_http_lua_ngx_header_get(lua_State *L)
     ngx_uint_t                   i;
     size_t                       len;
     ngx_http_lua_loc_conf_t     *llcf;
+    ngx_http_lua_ctx_t          *ctx;
 
     r = ngx_http_lua_get_req(L);
     if (r == NULL) {
         return luaL_error(L, "no request object found");
+    }
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return luaL_error(L, "no ctx found");
     }
 
     ngx_http_lua_check_fake_request(L, r);
@@ -608,7 +706,7 @@ ngx_http_lua_ngx_header_get(lua_State *L)
     if (llcf->transform_underscores_in_resp_headers
         && memchr(p, '_', len) != NULL)
     {
-        key.data = (u_char*) lua_newuserdata(L, len);
+        key.data = (u_char *) lua_newuserdata(L, len);
         if (key.data == NULL) {
             return luaL_error(L, "no memory");
         }
@@ -628,7 +726,7 @@ ngx_http_lua_ngx_header_get(lua_State *L)
 
     key.len = len;
 
-    return ngx_http_lua_get_output_header(L, r, &key);
+    return ngx_http_lua_get_output_header(L, r, ctx, &key);
 }
 
 
@@ -691,22 +789,13 @@ ngx_http_lua_ngx_header_set(lua_State *L)
         }
     }
 
-    if (!ctx->headers_set) {
-        rc = ngx_http_lua_set_content_type(r);
-        if (rc != NGX_OK) {
-            return luaL_error(L,
-                              "failed to set default content type: %d",
-                              (int) rc);
-        }
-
-        ctx->headers_set = 1;
-    }
+    ctx->headers_set = 1;
 
     if (lua_type(L, 3) == LUA_TNIL) {
         ngx_str_null(&value);
 
     } else if (lua_type(L, 3) == LUA_TTABLE) {
-        n = luaL_getn(L, 3);
+        n = lua_objlen(L, 3);
         if (n == 0) {
             ngx_str_null(&value);
 
@@ -725,7 +814,7 @@ ngx_http_lua_ngx_header_set(lua_State *L)
                 ngx_memcpy(value.data, p, len);
                 value.len = len;
 
-                rc = ngx_http_lua_set_output_header(r, key, value,
+                rc = ngx_http_lua_set_output_header(r, ctx, key, value,
                                                     i == 1 /* override */);
 
                 if (rc == NGX_ERROR) {
@@ -752,7 +841,7 @@ ngx_http_lua_ngx_header_set(lua_State *L)
     dd("key: %.*s, value: %.*s",
        (int) key.len, key.data, (int) value.len, value.data);
 
-    rc = ngx_http_lua_set_output_header(r, key, value, 1 /* override */);
+    rc = ngx_http_lua_set_output_header(r, ctx, key, value, 1 /* override */);
 
     if (rc == NGX_ERROR) {
         return luaL_error(L, "failed to set header %s (error: %d)",
@@ -840,7 +929,7 @@ ngx_http_lua_ngx_req_header_set_helper(lua_State *L)
         ngx_str_null(&value);
 
     } else if (lua_type(L, 2) == LUA_TTABLE) {
-        n = luaL_getn(L, 2);
+        n = lua_objlen(L, 2);
         if (n == 0) {
             ngx_str_null(&value);
 
@@ -961,7 +1050,8 @@ ngx_http_lua_create_headers_metatable(ngx_log_t *log, lua_State *L)
         "local new_key = string.gsub(string.lower(key), '_', '-')\n"
         "if new_key ~= key then return tb[new_key] else return nil end";
 
-    lua_pushlightuserdata(L, &ngx_http_lua_headers_metatable_key);
+    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                          headers_metatable_key));
 
     /* metatable for ngx.req.get_headers(_, true) and
      * ngx.resp.get_headers(_, true) */
@@ -984,14 +1074,17 @@ ngx_http_lua_create_headers_metatable(ngx_log_t *log, lua_State *L)
 
 #ifndef NGX_LUA_NO_FFI_API
 int
-ngx_http_lua_ffi_req_get_headers_count(ngx_http_request_t *r, int max)
+ngx_http_lua_ffi_req_get_headers_count(ngx_http_request_t *r, int max,
+    int *truncated)
 {
     int                           count;
     ngx_list_part_t              *part;
 
-    if (r->connection->fd == -1) {
+    if (r->connection->fd == (ngx_socket_t) -1) {
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
+
+    *truncated = 0;
 
     if (max < 0) {
         max = NGX_HTTP_LUA_MAX_HEADERS;
@@ -999,15 +1092,18 @@ ngx_http_lua_ffi_req_get_headers_count(ngx_http_request_t *r, int max)
 
     part = &r->headers_in.headers.part;
     count = part->nelts;
-    while (part->next) {
+    while (part->next != NULL) {
         part = part->next;
         count += part->nelts;
     }
 
     if (max > 0 && count > max) {
+        *truncated = 1;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "lua exceeding request header limit %d > %d", count,
+                       max);
         count = max;
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua exceeding request header limit %d", max);
     }
 
     return count;
@@ -1067,7 +1163,8 @@ ngx_http_lua_ffi_req_get_headers(ngx_http_request_t *r,
 int
 ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
     size_t key_len, int is_nil, const u_char *sval, size_t sval_len,
-    ngx_http_lua_ffi_str_t *mvals, size_t mvals_len, char **errmsg)
+    ngx_http_lua_ffi_str_t *mvals, size_t mvals_len, int override,
+    char **errmsg)
 {
     u_char                      *p;
     ngx_str_t                    value, key;
@@ -1082,7 +1179,7 @@ ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
         return NGX_HTTP_LUA_FFI_NO_REQ_CTX;
     }
 
-    if (r->connection->fd == -1) {
+    if (r->connection->fd == (ngx_socket_t) -1) {
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
 
@@ -1114,15 +1211,7 @@ ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
         }
     }
 
-    if (!ctx->headers_set) {
-        rc = ngx_http_lua_set_content_type(r);
-        if (rc != NGX_OK) {
-            *errmsg = "failed to set default content type";
-            return NGX_ERROR;
-        }
-
-        ctx->headers_set = 1;
-    }
+    ctx->headers_set = 1;
 
     if (is_nil) {
         value.data = NULL;
@@ -1149,8 +1238,8 @@ ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
                 ngx_memcpy(value.data, p, len);
                 value.len = len;
 
-                rc = ngx_http_lua_set_output_header(r, key, value,
-                                                    i == 0 /* override */);
+                rc = ngx_http_lua_set_output_header(r, ctx, key, value,
+                                                    override && i == 0);
 
                 if (rc == NGX_ERROR) {
                     *errmsg = "failed to set header";
@@ -1175,7 +1264,7 @@ ngx_http_lua_ffi_set_resp_header(ngx_http_request_t *r, const u_char *key_data,
     dd("key: %.*s, value: %.*s",
        (int) key.len, key.data, (int) value.len, value.data);
 
-    rc = ngx_http_lua_set_output_header(r, key, value, 1 /* override */);
+    rc = ngx_http_lua_set_output_header(r, ctx, key, value, override);
 
     if (rc == NGX_ERROR) {
         *errmsg = "failed to set header";
@@ -1198,7 +1287,7 @@ ngx_http_lua_ffi_req_header_set_single_value(ngx_http_request_t *r,
     ngx_str_t                    k;
     ngx_str_t                    v;
 
-    if (r->connection->fd == -1) {  /* fake request */
+    if (r->connection->fd == (ngx_socket_t) -1) {  /* fake request */
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
 
@@ -1243,18 +1332,26 @@ ngx_http_lua_ffi_req_header_set_single_value(ngx_http_request_t *r,
 int
 ngx_http_lua_ffi_get_resp_header(ngx_http_request_t *r,
     const u_char *key, size_t key_len,
-    u_char *key_buf, ngx_http_lua_ffi_str_t *values, int max_nvalues)
+    u_char *key_buf, ngx_http_lua_ffi_str_t *values, int max_nvalues,
+    char **errmsg)
 {
     int                  found;
     u_char               c, *p;
     ngx_uint_t           i;
     ngx_table_elt_t     *h;
     ngx_list_part_t     *part;
+    ngx_http_lua_ctx_t  *ctx;
 
     ngx_http_lua_loc_conf_t     *llcf;
 
-    if (r->connection->fd == -1) {
+    if (r->connection->fd == (ngx_socket_t) -1) {
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
+    }
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        *errmsg = "no ctx found";
+        return NGX_ERROR;
     }
 
     llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
@@ -1282,6 +1379,7 @@ ngx_http_lua_ffi_get_resp_header(ngx_http_request_t *r,
         {
             p = ngx_palloc(r->pool, NGX_OFF_T_LEN);
             if (p == NULL) {
+                *errmsg = "no memory";
                 return NGX_ERROR;
             }
 
@@ -1295,8 +1393,8 @@ ngx_http_lua_ffi_get_resp_header(ngx_http_request_t *r,
         break;
 
     case 12:
-        if (r->headers_out.content_type.len
-            && ngx_strncasecmp(key_buf, (u_char *) "Content-Type", 12) == 0)
+        if (ngx_strncasecmp(key_buf, (u_char *) "Content-Type", 12) == 0
+            && r->headers_out.content_type.len)
         {
             values[0].data = r->headers_out.content_type.data;
             values[0].len = r->headers_out.content_type.len;
@@ -1365,6 +1463,22 @@ ngx_http_lua_ffi_get_resp_header(ngx_http_request_t *r,
     return found;
 }
 #endif /* NGX_LUA_NO_FFI_API */
+
+
+#if nginx_version >= 1011011
+void
+ngx_http_lua_ngx_raw_header_cleanup(void *data)
+{
+    ngx_http_lua_main_conf_t  *lmcf;
+
+    lmcf = (ngx_http_lua_main_conf_t *) data;
+
+    if (lmcf->busy_buf_ptrs) {
+        ngx_free(lmcf->busy_buf_ptrs);
+        lmcf->busy_buf_ptrs = NULL;
+    }
+}
+#endif
 
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

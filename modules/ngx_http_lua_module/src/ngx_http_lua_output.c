@@ -3,6 +3,7 @@
 #endif
 #include "ddebug.h"
 
+
 #include "ngx_http_lua_output.h"
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_contentby.h"
@@ -146,10 +147,18 @@ ngx_http_lua_ngx_echo(lua_State *L, unsigned newline)
     }
 
     if (size == 0) {
-        /* do nothing for empty strings */
+        rc = ngx_http_lua_send_header_if_needed(r, ctx);
+        if (rc == NGX_ERROR || rc > NGX_OK) {
+            lua_pushnil(L);
+            lua_pushliteral(L, "nginx output filter error");
+            return 2;
+        }
+
         lua_pushinteger(L, 1);
         return 1;
     }
+
+    ctx->seen_body_data = 1;
 
     cl = ngx_http_lua_chain_get_free_buf(r->connection->log, r->pool,
                                          &ctx->free_bufs, size);
@@ -345,7 +354,7 @@ ngx_http_lua_calc_strlen_in_table(lua_State *L, int index, int arg_i,
 bad_type:
 
                 msg = lua_pushfstring(L, "bad data type %s found",
-                        lua_typename(L, type));
+                                      lua_typename(L, type));
                 return luaL_argerror(L, arg_i, msg);
         }
 
@@ -458,7 +467,7 @@ ngx_http_lua_ngx_flush(lua_State *L)
     n = lua_gettop(L);
     if (n > 1) {
         return luaL_error(L, "attempt to pass %d arguments, but accepted 0 "
-                "or 1", n);
+                          "or 1", n);
     }
 
     r = ngx_http_lua_get_req(L);
@@ -510,7 +519,9 @@ ngx_http_lua_ngx_flush(lua_State *L)
     }
 
 #if 1
-    if (!r->header_sent && !ctx->header_sent) {
+    if ((!r->header_sent && !ctx->header_sent)
+        || (!ctx->seen_body_data && !wait))
+    {
         lua_pushnil(L);
         lua_pushliteral(L, "nothing to flush");
         return 2;
@@ -713,6 +724,7 @@ ngx_http_lua_flush_resume_helper(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
     int                          n;
     lua_State                   *vm;
     ngx_int_t                    rc;
+    ngx_uint_t                   nreqs;
     ngx_connection_t            *c;
 
     c = r->connection;
@@ -737,18 +749,20 @@ ngx_http_lua_flush_resume_helper(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
     }
 
     vm = ngx_http_lua_get_lua_vm(r, ctx);
+    nreqs = c->requests;
+
     rc = ngx_http_lua_run_thread(vm, r, ctx, n);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "lua run thread returned %d", rc);
 
     if (rc == NGX_AGAIN) {
-        return ngx_http_lua_run_posted_threads(c, vm, r, ctx);
+        return ngx_http_lua_run_posted_threads(c, vm, r, ctx, nreqs);
     }
 
     if (rc == NGX_DONE) {
         ngx_http_lua_finalize_request(r, NGX_DONE);
-        return ngx_http_lua_run_posted_threads(c, vm, r, ctx);
+        return ngx_http_lua_run_posted_threads(c, vm, r, ctx, nreqs);
     }
 
     /* rc == NGX_ERROR || rc >= NGX_OK */

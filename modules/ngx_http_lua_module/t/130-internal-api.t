@@ -1,5 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -8,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 3;
+plan tests => repeat_each() * blocks() * 3;
 
 #no_diff();
 no_long_string();
@@ -19,12 +19,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: __ngx_req and __ngx_cycle
---- http_config
-    init_by_lua '
-        my_cycle = __ngx_cycle
-    ';
-
+=== TEST 1: req
 --- config
     location = /t {
         content_by_lua '
@@ -32,19 +27,14 @@ __DATA__
             local function tonum(ud)
                 return tonumber(ffi.cast("uintptr_t", ud))
             end
-            ngx.say(string.format("init: cycle=%#x", tonum(my_cycle)))
-            ngx.say(string.format("content cycle=%#x", tonum(__ngx_cycle)))
-            ngx.say(string.format("content req=%#x", tonum(__ngx_req)))
+            ngx.say(string.format("content req=%#x", tonum(exdata())))
         ';
     }
 --- request
 GET /t
 
 --- response_body_like chop
-^init: cycle=(0x[a-f0-9]{4,})
-content cycle=\1
-content req=0x[a-f0-9]{4,}
+^content req=0x[a-f0-9]{4,}
 $
 --- no_error_log
 [error]
-

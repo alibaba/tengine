@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -10,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 3 + 1);
+plan tests => repeat_each() * (blocks() * 3 + 2);
 
 #no_diff();
 #no_long_string();
@@ -84,6 +83,8 @@ GET /read
 !Location
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
+--- error_log
+only ngx.HTTP_MOVED_TEMPORARILY, ngx.HTTP_MOVED_PERMANENTLY, ngx.HTTP_PERMANENT_REDIRECT, ngx.HTTP_SEE_OTHER, and ngx.HTTP_TEMPORARY_REDIRECT are allowed
 
 
 
@@ -167,3 +168,155 @@ Location: http://agentzh.org/foo?bar=3
 --- response_body eval
 [qr/302 Found/, qr/302 Found/]
 
+
+
+=== TEST 9: explicit 307
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo", ngx.HTTP_TEMPORARY_REDIRECT);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo
+--- response_body_like: 307 Temporary Redirect
+--- error_code: 307
+
+
+
+=== TEST 10: explicit 307 with args
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", ngx.HTTP_TEMPORARY_REDIRECT);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- response_body_like: 307 Temporary Redirect
+--- error_code: 307
+
+
+
+=== TEST 11: explicit 307
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", 307);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- response_body_like: 307 Temporary Redirect
+--- error_code: 307
+
+
+
+=== TEST 12: explicit 303
+--- config
+    location /read {
+        content_by_lua_block {
+            ngx.redirect("http://agentzh.org/foo", ngx.HTTP_SEE_OTHER);
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo
+--- response_body_like: 303 See Other
+--- error_code: 303
+
+
+
+=== TEST 13: explicit 303 with args
+--- config
+    location /read {
+        content_by_lua_block {
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", ngx.HTTP_SEE_OTHER);
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- response_body_like: 303 See Other
+--- error_code: 303
+
+
+
+=== TEST 14: explicit 303
+--- config
+    location /read {
+        content_by_lua_block {
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", 303);
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /read
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- response_body_like: 303 See Other
+--- error_code: 303
+
+
+
+=== TEST 15: explicit 308 with args
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", ngx.HTTP_PERMANENT_REDIRECT);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_body_like: 308 Permanent Redirect
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- error_code: 308
+
+
+
+=== TEST 16: explicit 308
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", 308);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_body_like: 308 Permanent Redirect
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- error_code: 308
+
+
+
+=== TEST 17: explicit 308 with args
+--- config
+    location /read {
+        content_by_lua '
+            ngx.redirect("http://agentzh.org/foo?a=b&c=d", 308);
+            ngx.say("hi")
+        ';
+    }
+--- request
+GET /read
+--- response_body_like: 308 Permanent Redirect
+--- response_headers
+Location: http://agentzh.org/foo?a=b&c=d
+--- error_code: 308

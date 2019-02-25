@@ -22,12 +22,13 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http stream stream_limit_conn shmem/)
-	->write_file_expand('nginx.conf', <<'EOF');
+my $t = Test::Nginx->new()->has(qw/http stream stream_limit_conn/)
+	->plan(8)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -81,7 +82,7 @@ http {
 EOF
 
 $t->write_file('index.html', '');
-$t->try_run('no stream limit_conn')->plan(8);
+$t->run();
 
 ###############################################################################
 
@@ -96,8 +97,8 @@ EOF
 ok($s, 'long connection');
 
 is(get(), undef, 'rejected same zone');
-like(get('127.0.0.1:8081'), qr/200 OK/, 'passed different zone');
-like(get('127.0.0.1:8085'), qr/200 OK/, 'passed same zone unlimited');
+like(get('127.0.0.1:' . port(8081)), qr/200 OK/, 'passed different zone');
+like(get('127.0.0.1:' . port(8085)), qr/200 OK/, 'passed same zone unlimited');
 
 ok(http(<<EOF, socket => $s), 'long connection closed');
 Host: localhost
@@ -106,8 +107,8 @@ EOF
 
 # zones proxy chain
 
-like(get('127.0.0.1:8082'), qr/200 OK/, 'passed proxy');
-is(get('127.0.0.1:8083'), undef, 'rejected proxy');
+like(get('127.0.0.1:' . port(8082)), qr/200 OK/, 'passed proxy');
+is(get('127.0.0.1:' . port(8083)), undef, 'rejected proxy');
 
 ###############################################################################
 
@@ -126,7 +127,7 @@ sub getconn {
 	my $peer = shift;
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => $peer || '127.0.0.1:8080'
+		PeerAddr => $peer || '127.0.0.1:' . port(8080)
 	)
 		or die "Can't connect to nginx: $!\n";
 

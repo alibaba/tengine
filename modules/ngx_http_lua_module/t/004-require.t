@@ -1,5 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -35,6 +35,7 @@ __DATA__
     location /load {
         content_by_lua '
             package.loaded.foo = nil;
+            collectgarbage()
             local foo = require "foo";
             foo.hi()
         ';
@@ -84,7 +85,7 @@ hello, foo
 --- request
 GET /main
 --- user_files
---- response_body_like: ^[^;]+/servroot/html/\?.so$
+--- response_body_like: ^[^;]+/servroot(_\d+)?/html/\?\.so$
 
 
 
@@ -99,7 +100,7 @@ GET /main
     }
 --- request
 GET /main
---- response_body_like: ^[^;]+/servroot/html/\?.lua;.+\.lua;$
+--- response_body_like: ^[^;]+/servroot(_\d+)?/html/\?\.lua;(.+\.lua)?;*$
 
 
 
@@ -114,7 +115,7 @@ GET /main
     }
 --- request
 GET /main
---- response_body_like: ^[^;]+/servroot/html/\?.so;.+\.so;$
+--- response_body_like: ^[^;]+/servroot(_\d+)?/html/\?\.so;(.+\.so)?;*$
 
 
 
@@ -129,7 +130,7 @@ GET /main
     }
 --- request
 GET /main
---- response_body_like: ^.+\.lua;[^;]+/servroot/html/\?.lua$
+--- response_body_like: ^(.+\.lua)?;*?[^;]+/servroot(_\d+)?/html/\?\.lua$
 
 
 
@@ -144,7 +145,7 @@ GET /main
     }
 --- request
 GET /main
---- response_body_like: ^.+\.so;[^;]+/servroot/html/\?.so$
+--- response_body_like: ^(.+\.so)?;*?[^;]+/servroot(_\d+)?/html/\?\.so$
 
 
 
@@ -208,4 +209,3 @@ GET /ndk
 GET /ndk
 --- response_body
 %20
-

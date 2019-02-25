@@ -26,7 +26,7 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream/)
+my $t = Test::Nginx->new()->has(qw/stream/)->plan(2)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -54,24 +54,25 @@ stream {
 EOF
 
 $t->run_daemon(\&stream_daemon);
-$t->try_run('no stream proxy_protocol')->plan(2);
-$t->waitforsocket('127.0.0.1:8081');
+$t->run();
+$t->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
-my $s = stream();
+my $dp = port(8080);
+my $s = stream('127.0.0.1:' . $dp);
 my $data = $s->io('close');
 my $sp = $s->sockport();
-is($data, "PROXY TCP4 127.0.0.1 127.0.0.1 $sp 8080${CRLF}close", 'protocol on');
+is($data, "PROXY TCP4 127.0.0.1 127.0.0.1 $sp $dp${CRLF}close", 'protocol on');
 
-is(stream('127.0.0.1:8082')->io('close'), 'close', 'protocol off');
+is(stream('127.0.0.1:' . port(8082))->io('close'), 'close', 'protocol off');
 
 ###############################################################################
 
 sub stream_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -135,3 +134,70 @@ received: foo
 failed to receive a line: closed
 close: 1 nil
 
+
+
+=== TEST 4: ngx.socket.stream
+--- http_config
+    server {
+        listen unix:$TEST_NGINX_HTML_DIR/nginx.sock;
+        default_type 'text/plain';
+
+        server_tokens off;
+        location /foo {
+            content_by_lua_block { ngx.say("foo") }
+            more_clear_headers Date;
+        }
+    }
+--- config
+    location /test {
+        content_by_lua_block {
+            local sock = ngx.socket.stream()
+            local ok, err = sock:connect("unix:$TEST_NGINX_HTML_DIR/nginx.sock")
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+            -- req = "OK"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            while true do
+                print("calling receive")
+                local line, err = sock:receive()
+                if line then
+                    ngx.say("received: ", line)
+
+                else
+                    ngx.say("failed to receive a line: ", err)
+                    break
+                end
+            end
+
+            ok, err = sock:close()
+            ngx.say("close: ", ok, " ", err)
+        }
+    }
+--- request
+    GET /test
+--- response_body
+connected: 1
+request sent: 57
+received: HTTP/1.1 200 OK
+received: Server: nginx
+received: Content-Type: text/plain
+received: Content-Length: 4
+received: Connection: close
+received: 
+received: foo
+failed to receive a line: closed
+close: 1 nil

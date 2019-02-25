@@ -1402,6 +1402,7 @@ ngx_dyups_add_server(ngx_http_dyups_srv_conf_t *duscf, ngx_buf_t *buf)
     cf.cmd_type = NGX_HTTP_UPS_CONF;
     cf.log = ngx_cycle->log;
     cf.ctx = duscf->ctx;
+    cf.cycle = (ngx_cycle_t *) ngx_cycle;
     cf.args = ngx_array_create(duscf->pool, 10, sizeof(ngx_str_t));
     if (cf.args == NULL) {
         return NGX_ERROR;
@@ -1564,6 +1565,7 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
     cf.cmd_type = NGX_HTTP_MAIN_CONF;
     cf.pool = duscf->pool;
     cf.ctx = ngx_cycle->conf_ctx[ngx_http_module.index];
+    cf.cycle = (ngx_cycle_t *) ngx_cycle;
 
     ctx = ngx_pcalloc(duscf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
@@ -2497,6 +2499,7 @@ ngx_dyups_do_restore_upstream(ngx_buf_t *ups, ngx_buf_t *block)
     ngx_memzero(&cf, sizeof(ngx_conf_t));
     cf.pool = pool;
     cf.log = ngx_cycle->log;
+    cf.cycle = (ngx_cycle_t *) ngx_cycle;
     cf.args = ngx_array_create(pool, 2, sizeof(ngx_str_t));
     if (cf.args == NULL) {
         goto failed;

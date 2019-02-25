@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -35,7 +34,7 @@ __DATA__
 --- request
 GET /test
 --- response_body
-ngx: 99
+ngx: 117
 --- no_error_log
 [error]
 
@@ -56,7 +55,7 @@ ngx: 99
 --- request
 GET /test
 --- response_body
-99
+117
 --- no_error_log
 [error]
 
@@ -84,7 +83,7 @@ GET /test
 --- request
 GET /test
 --- response_body
-n = 99
+n = 117
 --- no_error_log
 [error]
 
@@ -124,7 +123,7 @@ n = 1
 --- request
 GET /test
 --- response_body
-n = 23
+n = 24
 --- no_error_log
 [error]
 
@@ -146,7 +145,7 @@ n = 23
 --- request
 GET /test
 --- response_body
-n = 23
+n = 24
 --- no_error_log
 [error]
 
@@ -173,7 +172,7 @@ n = 23
 --- request
 GET /test
 --- response_body
-n = 23
+n = 24
 --- no_error_log
 [error]
 
@@ -213,7 +212,7 @@ n = 2
 --- request
 GET /test
 --- response_body
-n = 3
+n = 4
 --- no_error_log
 [error]
 
@@ -240,22 +239,27 @@ n = 10
 
 
 
-=== TEST 11: entries under ngx._reqsock_meta
---- SKIP
+=== TEST 11: entries under the metatable of req sockets
 --- config
         location = /test {
             content_by_lua '
                 local n = 0
-                for k, v in pairs(ngx._reqsock_meta) do
+                local sock, err = ngx.req.socket()
+                if not sock then
+                    ngx.say("failed to get the request socket: ", err)
+                end
+
+                for k, v in pairs(getmetatable(sock)) do
                     n = n + 1
                 end
                 ngx.say("n = ", n)
             ';
         }
 --- request
-GET /test
+POST /test
+hello world
 --- response_body
-n = 4
+n = 5
 --- no_error_log
 [error]
 
@@ -279,7 +283,7 @@ n = 4
 --- request
 GET /test
 --- response_body
-n = 13
+n = 18
 --- no_error_log
 [error]
 
@@ -301,7 +305,7 @@ GET /t
 --- response_body_like: 404 Not Found
 --- error_code: 404
 --- error_log
-ngx. entry count: 99
+ngx. entry count: 117
 
 
 
@@ -319,7 +323,7 @@ ngx. entry count: 99
 --- request
 GET /test
 --- response_body
-n = 1
+n = 4
 --- no_error_log
 [error]
 
@@ -339,7 +343,7 @@ n = 1
 --- request
 GET /test
 --- response_body
-n = 5
+n = 6
 --- no_error_log
 [error]
 
@@ -434,7 +438,154 @@ thread: 3
 --- request
 GET /test
 --- response_body
-worker: 2
+worker: 4
 --- no_error_log
 [error]
 
+
+
+=== TEST 20: entries under the metatable of tcp sockets
+--- config
+        location = /test {
+            content_by_lua_block {
+                local n = 0
+                local sock = ngx.socket.tcp()
+                for k, v in pairs(getmetatable(sock)) do
+                    n = n + 1
+                end
+                ngx.say("n = ", n)
+            }
+        }
+--- request
+GET /test
+--- response_body
+n = 13
+--- no_error_log
+[error]
+
+
+
+=== TEST 21: entries under the metatable of udp sockets
+--- config
+        location = /test {
+            content_by_lua '
+                local n = 0
+                local sock = ngx.socket.udp()
+                for k, v in pairs(getmetatable(sock)) do
+                    n = n + 1
+                end
+                ngx.say("n = ", n)
+            ';
+        }
+--- request
+GET /test
+--- response_body
+n = 6
+--- no_error_log
+[error]
+
+
+
+=== TEST 22: entries under the metatable of req raw sockets
+--- config
+        location = /test {
+            content_by_lua '
+                local n = 0
+                ngx.req.read_body()
+                local sock, err = ngx.req.socket(true)
+                if not sock then
+                    ngx.log(ngx.ERR, "server: failed to get raw req socket: ", err)
+                    return
+                end
+
+                for k, v in pairs(getmetatable(sock)) do
+                    n = n + 1
+                end
+
+                local ok, err = sock:send("HTTP/1.1 200 OK\\r\\nContent-Length: 6\\r\\n\\r\\nn = "..n.."\\n")
+                if not ok then
+                    ngx.log(ngx.ERR, "failed to send: ", err)
+                    return
+                end
+            ';
+        }
+--- request
+GET /test
+--- response_body
+n = 6
+--- no_error_log
+[error]
+
+
+
+=== TEST 23: entries under the req raw sockets
+--- config
+        location = /test {
+            content_by_lua_block {
+                local narr = 0
+                local nrec = 0
+                ngx.req.read_body()
+                local sock, err = ngx.req.socket(true)
+                if not sock then
+                    ngx.log(ngx.ERR, "server: failed to get raw req socket: ", err)
+                    return
+                end
+                sock:settimeouts(1000, 2000, 3000)
+                for k, v in ipairs(sock) do
+                    narr = narr + 1
+                end
+                for k, v in pairs(sock) do
+                    nrec = nrec + 1
+                end
+                -- include '__index'
+                nrec = nrec - narr + 1
+
+                local ok, err = sock:send("HTTP/1.1 200 OK\r\n\r\nnarr = "..narr.."\nnrec = "..nrec.."\n")
+                if not ok then
+                    ngx.log(ngx.ERR, "failed to send: ", err)
+                    return
+                end
+            }
+        }
+--- request
+GET /test
+--- response_body
+narr = 2
+nrec = 3
+--- no_error_log
+[error]
+
+
+
+=== TEST 24: entries under the req sockets
+--- config
+        location = /test {
+            content_by_lua_block {
+                local narr = 0
+                local nrec = 0
+                local sock, err = ngx.req.socket()
+                if not sock then
+                    ngx.log(ngx.ERR, "server: failed to get req socket: ", err)
+                    return
+                end
+                sock:settimeouts(1000, 2000, 3000)
+                for k, v in ipairs(sock) do
+                    narr = narr + 1
+                end
+                for k, v in pairs(sock) do
+                    nrec = nrec + 1
+                end
+                -- include '__index'
+                nrec = nrec - narr + 1
+
+                ngx.say("narr = "..narr.."\nnrec = "..nrec)
+            }
+        }
+--- request
+POST /test
+hello world
+--- response_body
+narr = 2
+nrec = 3
+--- no_error_log
+[error]

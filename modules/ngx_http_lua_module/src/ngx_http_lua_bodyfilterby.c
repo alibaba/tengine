@@ -32,10 +32,6 @@ static void ngx_http_lua_body_filter_by_lua_env(lua_State *L,
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
 
-/* key for the ngx_chain_t *in pointer in the Lua thread */
-#define ngx_http_lua_chain_key  "__ngx_cl"
-
-
 /**
  * Set environment table for the given code closure.
  *
@@ -51,12 +47,14 @@ static void
 ngx_http_lua_body_filter_by_lua_env(lua_State *L, ngx_http_request_t *r,
     ngx_chain_t *in)
 {
-    /*  set nginx request pointer to current lua thread's globals table */
+    ngx_http_lua_main_conf_t    *lmcf;
+
     ngx_http_lua_set_req(L, r);
 
-    lua_pushlightuserdata(L, in);
-    lua_setglobal(L, ngx_http_lua_chain_key);
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+    lmcf->body_filter_chain = in;
 
+#ifndef OPENRESTY_LUAJIT
     /**
      * we want to create empty environment for current script
      *
@@ -79,6 +77,7 @@ ngx_http_lua_body_filter_by_lua_env(lua_State *L, ngx_http_request_t *r,
     /*  }}} */
 
     lua_setfenv(L, -2);    /*  set new running env for the code closure */
+#endif /* OPENRESTY_LUAJIT */
 }
 
 
@@ -116,7 +115,7 @@ ngx_http_lua_body_filter_by_chunk(lua_State *L, ngx_http_request_t *r,
 
     if (rc != 0) {
 
-        /*  error occured */
+        /*  error occurred */
         err_msg = (u_char *) lua_tolstring(L, -1, &len);
 
         if (err_msg == NULL) {
@@ -160,7 +159,8 @@ ngx_http_lua_body_filter_inline(ngx_http_request_t *r, ngx_chain_t *in)
     L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua inline script (w/ cache) sp = 1 */
-    rc = ngx_http_lua_cache_loadbuffer(r, L, llcf->body_filter_src.value.data,
+    rc = ngx_http_lua_cache_loadbuffer(r->connection->log, L,
+                                       llcf->body_filter_src.value.data,
                                        llcf->body_filter_src.value.len,
                                        llcf->body_filter_src_key,
                                        "=body_filter_by_lua");
@@ -208,7 +208,7 @@ ngx_http_lua_body_filter_file(ngx_http_request_t *r, ngx_chain_t *in)
     L = ngx_http_lua_get_lua_vm(r, NULL);
 
     /*  load Lua script file (w/ cache)        sp = 1 */
-    rc = ngx_http_lua_cache_loadfile(r, L, script_path,
+    rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
                                      llcf->body_filter_src_key);
     if (rc != NGX_OK) {
         return NGX_ERROR;
@@ -235,8 +235,8 @@ ngx_http_lua_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_int_t                    rc;
     uint16_t                     old_context;
     ngx_http_cleanup_t          *cln;
-    lua_State                   *L;
     ngx_chain_t                 *out;
+    ngx_http_lua_main_conf_t    *lmcf;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "lua body filter for user lua code, uri \"%V\"", &r->uri);
@@ -298,11 +298,8 @@ ngx_http_lua_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
-    L = ngx_http_lua_get_lua_vm(r, ctx);
-
-    lua_getglobal(L, ngx_http_lua_chain_key);
-    out = lua_touserdata(L, -1);
-    lua_pop(L, 1);
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+    out = lmcf->body_filter_chain;
 
     if (in == out) {
         return ngx_http_next_body_filter(r, in);
@@ -344,7 +341,7 @@ ngx_http_lua_body_filter_init(void)
 
 
 int
-ngx_http_lua_body_filter_param_get(lua_State *L)
+ngx_http_lua_body_filter_param_get(lua_State *L, ngx_http_request_t *r)
 {
     u_char              *data, *p;
     size_t               size;
@@ -352,6 +349,8 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
     ngx_buf_t           *b;
     int                  idx;
     ngx_chain_t         *in;
+
+    ngx_http_lua_main_conf_t    *lmcf;
 
     idx = luaL_checkint(L, 2);
 
@@ -362,8 +361,8 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
         return 1;
     }
 
-    lua_getglobal(L, ngx_http_lua_chain_key);
-    in = lua_touserdata(L, -1);
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+    in = lmcf->body_filter_chain;
 
     if (idx == 2) {
         /* asking for the eof argument */
@@ -441,6 +440,8 @@ ngx_http_lua_body_filter_param_set(lua_State *L, ngx_http_request_t *r,
     ngx_chain_t             *cl;
     ngx_chain_t             *in;
 
+    ngx_http_lua_main_conf_t    *lmcf;
+
     idx = luaL_checkint(L, 2);
 
     dd("index: %d", idx);
@@ -449,13 +450,13 @@ ngx_http_lua_body_filter_param_set(lua_State *L, ngx_http_request_t *r,
         return luaL_error(L, "bad index: %d", idx);
     }
 
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
     if (idx == 2) {
         /* overwriting the eof flag */
         last = lua_toboolean(L, 3);
 
-        lua_getglobal(L, ngx_http_lua_chain_key);
-        in = lua_touserdata(L, -1);
-        lua_pop(L, 1);
+        in = lmcf->body_filter_chain;
 
         if (last) {
             ctx->seen_last_in_filter = 1;
@@ -520,9 +521,7 @@ ngx_http_lua_body_filter_param_set(lua_State *L, ngx_http_request_t *r,
     case LUA_TNIL:
         /* discard the buffers */
 
-        lua_getglobal(L, ngx_http_lua_chain_key); /* key val */
-        in = lua_touserdata(L, -1);
-        lua_pop(L, 1);
+        in = lmcf->body_filter_chain;
 
         last = 0;
 
@@ -556,9 +555,7 @@ ngx_http_lua_body_filter_param_set(lua_State *L, ngx_http_request_t *r,
                           lua_typename(L, type));
     }
 
-    lua_getglobal(L, ngx_http_lua_chain_key);
-    in = lua_touserdata(L, -1);
-    lua_pop(L, 1);
+    in = lmcf->body_filter_chain;
 
     last = 0;
 
@@ -624,8 +621,8 @@ done:
         }
     }
 
-    lua_pushlightuserdata(L, cl);
-    lua_setglobal(L, ngx_http_lua_chain_key);
+    lmcf->body_filter_chain = cl;
+
     return 0;
 }
 

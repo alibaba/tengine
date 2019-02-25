@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -533,4 +532,3 @@ Expect: 100-Continue
 \breceived: hello\b.*?\breceived:  worl\b
 --- no_error_log
 [error]
-

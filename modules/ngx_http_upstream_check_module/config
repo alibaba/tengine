@@ -9,7 +9,7 @@ ngx_feature_test="int a;"
 . auto/feature
 
 if [ $ngx_found = yes ]; then
-    have=NGX_UPSTREAM_CHECK_MODULE . auto/have
+    have=NGX_HTTP_UPSTREAM_CHECK . auto/have
     CORE_INCS="$CORE_INCS $ngx_feature_path"
     ngx_addon_name=ngx_http_upstream_check_module
     HTTP_MODULES="$HTTP_MODULES ngx_http_upstream_check_module"

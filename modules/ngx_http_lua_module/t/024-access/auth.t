@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -108,4 +107,3 @@ Location: /terms_of_use\.html
 GET /lua
 --- response_body_like: 403 Forbidden
 --- error_code: 403
-
