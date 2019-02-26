@@ -26,7 +26,7 @@ plan(skip_all => 'win32') if $^O eq 'MSWin32';
 plan(skip_all => '127.0.0.2 local address required')
 	unless defined IO::Socket::INET->new( LocalAddr => '127.0.0.2' );
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(5)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -63,6 +63,12 @@ http {
             proxy_bind  $arg_b;
             proxy_pass  http://127.0.0.1:8081/;
         }
+
+        location /port {
+            proxy_bind  127.0.0.2:$remote_port;
+            proxy_pass  http://127.0.0.1:8081/;
+            add_header  X-Client-Port $remote_port;
+        }
     }
 
     server {
@@ -71,6 +77,7 @@ http {
 
         location / {
             add_header   X-IP $remote_addr;
+            add_header   X-Port $remote_port;
         }
     }
 }
@@ -86,5 +93,6 @@ like(http_get('/'), qr/X-IP: 127.0.0.1/, 'bind');
 like(http_get('/inherit'), qr/X-IP: 127.0.0.2/, 'bind inherit');
 like(http_get('/off'), qr/X-IP: 127.0.0.1/, 'bind off');
 like(http_get('/var?b=127.0.0.2'), qr/X-IP: 127.0.0.2/, 'bind var');
+like(http_get('/port'), qr/Port: (\d+)(?!\d).*Port: \1/s, 'bind port');
 
 ###############################################################################

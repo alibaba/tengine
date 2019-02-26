@@ -77,6 +77,8 @@ $t->run()->plan(8);
 
 ###############################################################################
 
+my $port = port(8080);
+
 is(http_get_set_cookie('/?domain=www.Example.org'),
 	'v=path=domain=; Domain=example.com', 'domain rewrite');
 is(http_get_set_cookie('/?domain=.LocalHost.com'),
@@ -103,7 +105,7 @@ is(http_get_set_cookie('/?domain=www.example.org&path=/path/test.html'),
 
 sub http_get_set_cookie {
 	my ($uri) = @_;
-	http_get("http://127.0.0.1:8080$uri") =~ /^Set-Cookie:\s(.+?)\x0d?$/mi;
+	http_get("http://127.0.0.1:$port$uri") =~ /^Set-Cookie:\s(.+?)\x0d?$/mi;
 	return $1;
 }
 

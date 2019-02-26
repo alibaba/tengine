@@ -3,8 +3,7 @@
 # (C) Sergey Kandaurov
 # (C) Nginx, Inc.
 
-# Tests for http proxy cache and range filter.
-# proxy_force_ranges enables partial response regardless Accept-Ranges.
+# Tests for http proxy cache, proxy_cache_max_range_offset directive.
 
 ###############################################################################
 
@@ -23,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(6)
+my $t = Test::Nginx->new()->has(qw/http proxy cache/)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -44,20 +43,25 @@ http {
         server_name  localhost;
 
         location / {
-            proxy_pass    http://127.0.0.1:8081;
-        }
-
-        location /proxy/ {
-            proxy_pass    http://127.0.0.1:8081/;
-            proxy_force_ranges on;
-        }
-
-        location /cache/ {
             proxy_pass    http://127.0.0.1:8081/;
             proxy_cache   NAME;
             proxy_cache_valid 200 1m;
+            proxy_cache_max_range_offset 2;
+        }
 
-            proxy_force_ranges on;
+        location /zero/ {
+            proxy_pass    http://127.0.0.1:8081/;
+            proxy_cache   NAME;
+            proxy_cache_valid 200 1m;
+            proxy_cache_max_range_offset 0;
+        }
+
+        location /min_uses/ {
+            proxy_pass    http://127.0.0.1:8081/;
+            proxy_cache   NAME;
+            proxy_cache_valid 200 1m;
+            proxy_cache_max_range_offset 2;
+            proxy_cache_min_uses 2;
         }
     }
 
@@ -66,9 +70,7 @@ http {
         server_name  localhost;
 
         location / {
-            max_ranges 0;
-            add_header Last-Modified "Mon, 28 Sep 1970 06:00:00 GMT";
-            add_header ETag '"59a5401c-8"';
+            add_header X-Range $http_range;
         }
     }
 }
@@ -76,43 +78,40 @@ http {
 EOF
 
 $t->write_file('t.html', 'SEE-THIS');
-$t->run();
+$t->run()->plan(8);
 
 ###############################################################################
 
-# serving range requests requires Accept-Ranges by default
+unlike(get('/t.html?1', 'bytes=1-'), qr/X-Range/, 'range - below');
+like(get('/t.html?2', 'bytes=3-'), qr/X-Range/, 'range - above');
+like(get('/t.html?3', 'bytes=-1'), qr/X-Range/, 'range - last');
 
-unlike(http_get_range('/t.html', 'Range: bytes=4-'), qr/^THIS/m,
-	'range without Accept-Ranges');
+TODO: {
+local $TODO = 'not yet';
 
-like(http_get_range('/cache/t.html', 'Range: bytes=4-'), qr/^THIS/m,
-	'uncached range');
-like(http_get_range('/cache/t.html', 'Range: bytes=4-'), qr/^THIS/m,
-	'cached range');
-like(http_get_range('/cache/t.html', 'Range: bytes=0-2,4-'), qr/^SEE.*^THIS/ms,
-	'cached multipart range');
+like(get('/t.html?4', 'bytes=1-1,3-'), qr/X-Range/, 'range - multipart above');
 
-# If-Range HTTP-date request
+}
 
-like(http_get_range('/proxy/t.html',
-	"Range: bytes=4-\nIf-Range: Mon, 28 Sep 1970 06:00:00 GMT"),
-	qr/^THIS/m, 'if-range last-modified proxy');
+like(get('/zero/t.html?5', 'bytes=0-0'), qr/X-Range/, 'always non-cacheable');
+like(get('/min_uses/t.html?6', 'bytes=1-'), qr/X-Range/, 'below min_uses');
 
-# If-Range entity-tag request
+# no range in client request
 
-like(http_get_range('/proxy/t.html',
-	"Range: bytes=4-\nIf-Range: \"59a5401c-8\""),
-	qr/^THIS/m, 'if-range etag proxy');
+like(http_get('/t.html'), qr/SEE-THIS/, 'no range');
+
+$t->write_file('t.html', 'NOOP');
+like(http_get('/t.html'), qr/SEE-THIS/, 'no range - cached');
 
 ###############################################################################
 
-sub http_get_range {
+sub get {
 	my ($url, $extra) = @_;
 	return http(<<EOF);
 GET $url HTTP/1.1
 Host: localhost
 Connection: close
-$extra
+Range: $extra
 
 EOF
 }

@@ -12,8 +12,6 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ CRLF /;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -26,7 +24,7 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http access realip/);
 
-$t->write_file_expand('nginx.conf', <<'EOF')->plan(18);
+$t->write_file_expand('nginx.conf', <<'EOF')->plan(21);
 
 %%TEST_GLOBALS%%
 
@@ -70,10 +68,13 @@ $t->run();
 
 ###############################################################################
 
-my $tcp4 = 'PROXY TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
-my $tcp6 = 'PROXY TCP6 2001:Db8::1 2001:Db8::2 1234 5678' . CRLF;
-my $unk1 = 'PROXY UNKNOWN' . CRLF;
-my $unk2 = 'PROXY UNKNOWN 1 2 3 4 5 6' . CRLF;
+my $p = pack("N3C", 0x0D0A0D0A, 0x000D0A51, 0x5549540A, 0x21);
+my $tcp4 = $p . pack("CnN2n2", 0x11, 12, 0xc0000201, 0xc0000202, 1234, 5678);
+my $tcp6 = $p . pack("CnNx8NNx8Nn2", 0x21, 36,
+	0x20010db8, 0x00000001, 0x20010db8, 0x00000002, 1234, 5678);
+my $tlv = $p . pack("CnN2n2x9", 0x11, 21, 0xc0000201, 0xc0000202, 1234, 5678);
+my $unk1 = $p . pack("Cxx", 0x01);
+my $unk2 = $p . pack("CnC4", 0x41, 4, 1, 2, 3, 4);
 my $r;
 
 # no realip, just PROXY header parsing
@@ -87,6 +88,11 @@ $r = pp_get('/t1', $tcp6);
 like($r, qr/SEE-THIS/, 'tcp6 request');
 like($r, qr/X-PP: 2001:DB8::1/i, 'tcp6 proxy');
 unlike($r, qr/X-IP: 2001:DB8::1/i, 'tcp6 client');
+
+$r = pp_get('/t1', $tlv);
+like($r, qr/SEE-THIS/, 'tlv request');
+like($r, qr/X-PP: 192.0.2.1/, 'tlv proxy');
+unlike($r, qr/X-IP: 192.0.2.1/, 'tlv client');
 
 like(pp_get('/t1', $unk1), qr/SEE-THIS/, 'unknown request 1');
 like(pp_get('/t1', $unk2), qr/SEE-THIS/, 'unknown request 2');

@@ -31,9 +31,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache sub shmem/)->plan(15);
-
-$t->todo_alerts() if $^O eq 'solaris';
+my $t = Test::Nginx->new()->has(qw/http proxy cache sub/)->plan(15);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -92,7 +90,7 @@ EOF
 $t->write_file('big.html', 'X' x (1024 * 1024) . 'finished');
 
 $t->run_daemon(\&http_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -142,8 +140,17 @@ like(http_get('/un/big/ok', sleep => 0.1), qr/finished/s, 'big finished un');
 # no final chunk
 
 chmod(0000, $t->testdir() . '/proxy_temp');
-like(http_get_11('/proxy/big.html', sleep => 0.5),
-	qr/X(?!.*\x0d\x0a?0\x0d\x0a?)|finished/s, 'no proxy temp');
+
+my $r = http_get_11('/proxy/big.html', sleep => 0.5);
+
+SKIP: {
+skip 'finished', 1 if length(Test::Nginx::http_content($r)) == 1024 * 1024 + 8;
+
+like($r, qr/X(?!.*\x0d\x0a?0\x0d\x0a?)/s, 'no proxy temp');
+
+}
+
+chmod(0700, $t->testdir() . '/proxy_temp');
 
 ###############################################################################
 
@@ -163,7 +170,7 @@ sub http_get_11 {
 sub http_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
