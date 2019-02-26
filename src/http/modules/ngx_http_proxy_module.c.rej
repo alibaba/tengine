@@ -1,0 +1,11 @@
+--- src/http/modules/ngx_http_proxy_module.c	2019-02-26 10:53:11.709970093 +0800
++++ ../nginx-1.15.2/src/http/modules/ngx_http_proxy_module.c	2018-07-24 21:11:00.000000000 +0800
+@@ -1883,7 +1864,7 @@
+         return NGX_CONF_ERROR;
+     }
+ 
+-    if (clcf->name.data[clcf->name.len - 1] == '/') {
++    if (clcf->name.len && clcf->name.data[clcf->name.len - 1] == '/') {
+         clcf->auto_redirect = 1;
+     }
+ 

@@ -149,7 +149,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
                 /*
                  * rev->available may be negative here because some additional
-                 * bytes may be received between kevent() and recv()
+                 * bytes may be received between kevent() and readv()
                  */
 
                 if (rev->available <= 0) {
