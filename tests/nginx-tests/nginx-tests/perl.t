@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http perl rewrite/)->plan(13)
+my $t = Test::Nginx->new()->has(qw/http perl rewrite/)->plan(17)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -60,6 +60,25 @@ http {
                 $r->print("xfoo: ", $r->header_in("X-Foo"), "\n");
                 $r->print("cookie: ", $r->header_in("Cookie"), "\n");
                 $r->print("xff: ", $r->header_in("X-Forwarded-For"), "\n");
+
+                return OK;
+            }';
+        }
+
+        location /range {
+            perl 'sub {
+                use warnings;
+                use strict;
+
+                my $r = shift;
+
+                $r->header_out("Content-Length", "42");
+                $r->allow_ranges();
+                $r->send_http_header("text/plain");
+
+                return OK if $r->header_only;
+
+                $r->print("x" x 42);
 
                 return OK;
             }';
@@ -135,6 +154,35 @@ like(http(
 	. 'X-Forwarded-For: foo2' . CRLF
 	. 'Host: localhost' . CRLF . CRLF
 ), qr/xff: foo1, foo2/, 'perl header_in xff2');
+
+# headers_out content-length tests with range filter
+
+like(http_get('/range'), qr/Content-Length: 42.*^x{42}$/ms,
+	'perl header_out content-length');
+
+like(http(
+	'GET /range HTTP/1.0' . CRLF
+	. 'Host: localhost' . CRLF
+	. 'Range: bytes=0-1' . CRLF . CRLF
+), qr/Content-Length: 2.*^xx$/ms, 'perl header_out content-length range');
+
+like(http(
+	'GET /range HTTP/1.0' . CRLF
+	. 'Host: localhost' . CRLF
+	. 'Range: bytes=0-1,3-5' . CRLF . CRLF
+), qr/Content-Length: (?!42).*^xx\x0d.*^xxx\x0d/ms,
+	'perl header_out content-length multipart');
+
+TODO: {
+local $TODO = 'not yet';
+
+like(http(
+	'GET /range HTTP/1.0' . CRLF
+	. 'Host: localhost' . CRLF
+	. 'Range: bytes=100000-' . CRLF . CRLF
+), qr|^\QHTTP/1.1 416\E.*(?!xxx)|ms, 'perl range not satisfiable');
+
+}
 
 # various request body tests
 

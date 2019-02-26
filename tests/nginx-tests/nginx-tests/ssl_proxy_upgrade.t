@@ -72,7 +72,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -82,8 +82,8 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -91,7 +91,7 @@ foreach my $name ('localhost') {
 $t->run_daemon(\&upgrade_fake_daemon);
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Can't start test backend";
 
 ###############################################################################
@@ -118,8 +118,8 @@ SKIP: {
 	# send multiple frames
 
 	for my $i (1 .. 10) {
-		upgrade_write($s, ('foo' x 16384) . $i);
-		upgrade_write($s, 'bazz' . $i);
+		upgrade_write($s, ('foo' x 16384) . $i, continue => 1);
+		upgrade_write($s, 'bazz' . $i, continue => $i != 10);
 	}
 
 	for my $i (1 .. 10) {
@@ -173,7 +173,7 @@ sub upgrade_connect {
 
 	my $s = IO::Socket::SSL->new(
 		Proto => 'tcp',
-		PeerAddr => '127.0.0.1:8080',
+		PeerAddr => '127.0.0.1:' . port(8080),
 		SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
 	)
 		or die "Can't connect to nginx: $!\n";
@@ -185,7 +185,7 @@ sub upgrade_connect {
 		. ($opts{noheader} ? '' : "Upgrade: foo" . CRLF)
 		. "Connection: Upgrade" . CRLF . CRLF;
 
-	$buf .= $opts{message} . CRLF if defined $opts{message};
+	$buf .= $opts{message} . CRLF . 'FIN' if defined $opts{message};
 
 	local $SIG{PIPE} = 'IGNORE';
 
@@ -219,7 +219,7 @@ sub upgrade_connect {
 
 sub upgrade_getline {
 	my ($s) = @_;
-	my ($h, $buf, $line);
+	my ($h, $buf);
 
 	${*$s}->{_upgrade_private} ||= { b => '', r => 0 };
 	$h = ${*$s}->{_upgrade_private};
@@ -230,10 +230,13 @@ sub upgrade_getline {
 	}
 
 	$s->blocking(0);
-	while (IO::Select->new($s)->can_read(1.5)) {
+	while (IO::Select->new($s)->can_read(3)) {
 		my $n = $s->sysread($buf, 16384);
-		unless ($n) {
+		if (!defined $n) {
 			next if $s->errstr() == IO::Socket::SSL->SSL_WANT_READ;
+			last;
+
+		} elsif (!$n) {
 			last;
 		}
 
@@ -248,9 +251,10 @@ sub upgrade_getline {
 }
 
 sub upgrade_write {
-	my ($s, $message) = @_;
+	my ($s, $message, %extra) = @_;
 
 	$message = $message . CRLF;
+	$message = $message . 'FIN' unless $extra{continue};
 
 	local $SIG{PIPE} = 'IGNORE';
 
@@ -283,7 +287,7 @@ sub upgrade_read {
 sub upgrade_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -314,7 +318,7 @@ sub upgrade_handle_client {
 		my $p = $poll->poll(0.5);
 		log2c("(poll $p)");
 
-		foreach my $reader ($poll->handles(POLLIN)) {
+		foreach ($poll->handles(POLLIN)) {
 			$n = $client->sysread(my $chunk, 65536);
 			return unless $n;
 
@@ -339,7 +343,8 @@ sub upgrade_handle_client {
 
 			$unfinished .= $chunk;
 
-			if ($unfinished =~ m/\x0d?\x0a\z/) {
+			if ($unfinished =~ m/\x0d?\x0aFIN\z/) {
+				$unfinished =~ s/FIN\z//;
 				$unfinished =~ s/foo/bar/g;
 				log2o($unfinished);
 				$buffer .= $unfinished;

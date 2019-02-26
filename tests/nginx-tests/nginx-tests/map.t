@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http map rewrite/)->plan(18);
+my $t = Test::Nginx->new()->has(qw/http map rewrite/)->plan(19);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -40,6 +40,7 @@ http {
     map $args $x {
         default                     0;
         foo                         bar;
+        foo2                        bar;
     }
 
     map $args $y {
@@ -86,6 +87,7 @@ $t->run();
 
 like(http_get('/?1'), qr/x:0 y:0/, 'map default');
 like(http_get('/?foo'), qr/x:bar y:0/, 'map foo bar');
+like(http_get('/?foo2'), qr/x:bar y:0/, 'map foo bar key');
 like(http_get('/?example.com'), qr/x:0 y:foo/, 'map example.com foo');
 like(http_get('/?EXAMPLE.COM'), qr/x:0 y:foo/, 'map EXAMPLE.COM foo');
 like(http_get('/?example.com.'), qr/x:0 y:foo/, 'map example.com. foo');

@@ -13,6 +13,8 @@ use strict;
 
 use Test::More;
 
+use Config;
+
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -51,16 +53,27 @@ EOF
 
 plan(skip_all => 'no lavfi')
 	unless grep /lavfi/, `ffmpeg -loglevel quiet -formats`;
-system('ffmpeg -loglevel quiet -y '
+system('ffmpeg -nostdin -loglevel quiet -y '
 	. '-f lavfi -i testsrc=duration=10:size=320x200:rate=15 '
 	. '-f lavfi -i testsrc=duration=20:size=320x200:rate=15 '
 	. '-map 0:0 -map 1:0 -pix_fmt yuv420p -g 15 -c:v libx264 '
 	. "${\($t->testdir())}/test.mp4") == 0
 	or die "Can't create mp4 file: $!";
+system('ffmpeg -nostdin -loglevel quiet -y '
+	. '-f lavfi -i testsrc=duration=10:size=320x200:rate=15 '
+	. '-f lavfi -i testsrc=duration=20:size=320x200:rate=15 '
+	. '-map 0:0 -map 1:0 -pix_fmt yuv420p -g 15 -c:v libx264 '
+	. '-movflags +faststart '
+	. "${\($t->testdir())}/no_mdat.mp4") == 0
+	or die "Can't create mp4 file: $!";
 
-$t->run()->plan(13);
+$t->run()->plan(26);
 
 ###############################################################################
+
+my $test_uri = '/test.mp4';
+
+again:
 
 is(durations($t, 0.0), '10.0 20.0', 'start zero');
 is(durations($t, 2), '8.0 18.0', 'start integer');
@@ -74,17 +87,19 @@ is(durations($t, undef, 5.6), '5.6 5.6', 'end float');
 
 # invalid range results in ignoring end argument
 
-like(http_head('/test.mp4?start=1&end=1'), qr/200 OK/, 'zero range');
-like(http_head('/test.mp4?start=1&end=0'), qr/200 OK/, 'negative range');
+like(http_head("$test_uri?start=1&end=1"), qr/200 OK/, 'zero range');
+like(http_head("$test_uri?start=1&end=0"), qr/200 OK/, 'negative range');
 
 # start/end values exceeding track/file duration
 
-unlike(http_head("/test.mp4?end=11"), qr!HTTP/1.1 500!,
+unlike(http_head("$test_uri?end=11"), qr!HTTP/1.1 500!,
 	'end beyond short track');
-unlike(http_head("/test.mp4?end=21"), qr!HTTP/1.1 500!, 'end beyond EOF');
-unlike(http_head("/test.mp4?start=11"), qr!HTTP/1.1 500!,
+unlike(http_head("$test_uri?end=21"), qr!HTTP/1.1 500!, 'end beyond EOF');
+unlike(http_head("$test_uri?start=11"), qr!HTTP/1.1 500!,
 	'start beyond short track');
-like(http_head("/test.mp4?start=21"), qr!HTTP/1.1 500!, 'start beyond EOF');
+like(http_head("$test_uri?start=21"), qr!HTTP/1.1 500!, 'start beyond EOF');
+
+$test_uri = '/no_mdat.mp4', goto again unless $test_uri eq '/no_mdat.mp4';
 
 ###############################################################################
 
@@ -92,7 +107,7 @@ sub durations {
 	my ($t, $start, $end) = @_;
 	my $path = $t->{_testdir} . '/frag.mp4';
 
-	my $uri = '/test.mp4';
+	my $uri = $test_uri;
 	if (defined $start) {
 		$uri .= "?start=$start";
 		if (defined $end) {

@@ -56,6 +56,7 @@ http {
         userid on;
 
         location / {
+            error_log %%TESTDIR%%/error.log debug;
             error_log %%TESTDIR%%/error_reset.log info;
         }
 

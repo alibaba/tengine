@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -248,4 +247,3 @@ Cookie: boo=123; foo=bar
 
 --- no_error_log
 [error]
-

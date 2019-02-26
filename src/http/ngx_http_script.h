@@ -121,16 +121,16 @@ typedef struct {
     uintptr_t                   status;
     uintptr_t                   next;
 
-    uintptr_t                   test:1;
-    uintptr_t                   negative_test:1;
-    uintptr_t                   uri:1;
-    uintptr_t                   args:1;
+    unsigned                    test:1;
+    unsigned                    negative_test:1;
+    unsigned                    uri:1;
+    unsigned                    args:1;
 
     /* add the r->args to the new arguments */
-    uintptr_t                   add_args:1;
+    unsigned                    add_args:1;
 
-    uintptr_t                   redirect:1;
-    uintptr_t                   break_cycle:1;
+    unsigned                    redirect:1;
+    unsigned                    break_cycle:1;
 
     ngx_str_t                   name;
 } ngx_http_script_regex_code_t;
@@ -139,13 +139,13 @@ typedef struct {
 typedef struct {
     ngx_http_script_code_pt     code;
 
-    uintptr_t                   uri:1;
-    uintptr_t                   args:1;
+    unsigned                    uri:1;
+    unsigned                    args:1;
 
     /* add the r->args to the new arguments */
-    uintptr_t                   add_args:1;
+    unsigned                    add_args:1;
 
-    uintptr_t                   redirect:1;
+    unsigned                    redirect:1;
 } ngx_http_script_regex_end_code_t;
 
 #endif
@@ -244,10 +244,12 @@ void ngx_http_script_return_code(ngx_http_script_engine_t *e);
 void ngx_http_script_break_code(ngx_http_script_engine_t *e);
 void ngx_http_script_if_code(ngx_http_script_engine_t *e);
 void ngx_http_script_equal_code(ngx_http_script_engine_t *e);
+#if (T_NGX_HTTP_IMPROVED_IF)
 void ngx_http_script_greater_code(ngx_http_script_engine_t *e);
 void ngx_http_script_less_code(ngx_http_script_engine_t *e);
 void ngx_http_script_greater_or_equal_code(ngx_http_script_engine_t *e);
 void ngx_http_script_less_or_equal_code(ngx_http_script_engine_t *e);
+#endif
 void ngx_http_script_not_equal_code(ngx_http_script_engine_t *e);
 void ngx_http_script_file_code(ngx_http_script_engine_t *e);
 void ngx_http_script_complex_value_code(ngx_http_script_engine_t *e);

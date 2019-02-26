@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -10,10 +9,10 @@ log_level('debug');
 
 repeat_each(2);
 
-plan tests => repeat_each() * 63;
+plan tests => repeat_each() * 71;
 
 #no_diff();
-#no_long_string();
+no_long_string();
 run_tests();
 
 __DATA__
@@ -406,3 +405,98 @@ ok
 [error]
 [alert]
 
+
+
+=== TEST 16: sleep 0
+--- config
+    location /t {
+        content_by_lua_block {
+            local function f (n)
+                print("f begin ", n)
+                ngx.sleep(0)
+                print("f middle ", n)
+                ngx.sleep(0)
+                print("f end ", n)
+                ngx.sleep(0)
+            end
+
+            for i = 1, 3 do
+                assert(ngx.thread.spawn(f, i))
+            end
+
+            ngx.say("ok")
+        }
+    }
+--- request
+GET /t
+--- response_body
+ok
+--- no_error_log
+[error]
+--- grep_error_log eval: qr/\bf (?:begin|middle|end)\b|\bworker cycle$|\be?poll timer: \d+$/
+--- grep_error_log_out eval
+qr/f begin
+f begin
+f begin
+worker cycle
+e?poll timer: 0
+f middle
+f middle
+f middle
+worker cycle
+e?poll timer: 0
+f end
+f end
+f end
+worker cycle
+e?poll timer: 0
+/
+
+
+
+=== TEST 17: sleep short times less than 1ms
+--- config
+    location /t {
+        content_by_lua_block {
+            local delay = 0.0005
+
+            local function f (n)
+                print("f begin ", n)
+                ngx.sleep(delay)
+                print("f middle ", n)
+                ngx.sleep(delay)
+                print("f end ", n)
+                ngx.sleep(delay)
+            end
+
+            for i = 1, 3 do
+                assert(ngx.thread.spawn(f, i))
+            end
+
+            ngx.say("ok")
+        }
+    }
+--- request
+GET /t
+--- response_body
+ok
+--- no_error_log
+[error]
+--- grep_error_log eval: qr/\bf (?:begin|middle|end)\b|\bworker cycle$|\be?poll timer: \d+$/
+--- grep_error_log_out eval
+qr/f begin
+f begin
+f begin
+worker cycle
+e?poll timer: 0
+f middle
+f middle
+f middle
+worker cycle
+e?poll timer: 0
+f end
+f end
+f end
+worker cycle
+e?poll timer: 0
+/

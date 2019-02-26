@@ -59,15 +59,19 @@ typedef struct {
     ngx_str_t                       stapling_file;
     ngx_str_t                       stapling_responder;
 
+#if (T_NGX_SSL_EARLY_DATA)
     ngx_flag_t                      early_data;
+#endif
 
     u_char                         *file;
     ngx_uint_t                      line;
 } ngx_http_ssl_srv_conf_t;
 
+#if (T_NGX_HTTP_SSL_VCE)
 typedef struct {
     ngx_flag_t                      verify_exception;
 } ngx_http_ssl_loc_conf_t;
+#endif
 
 
 extern ngx_module_t  ngx_http_ssl_module;

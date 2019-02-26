@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -25,7 +24,7 @@ __DATA__
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             if jit then
                 if not string.find(jit.version, "LuaJIT 2.0") then
@@ -36,7 +35,8 @@ __DATA__
             else
                 f:write(string.sub(b, 1, 147));
             end
-            f:close(); res = ngx.location.capture("/call");
+            f:close();
+            local res = ngx.location.capture("/call");
             ngx.print(res.body)
         ';
     }
@@ -61,14 +61,15 @@ __DATA__
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             if not package.loaded["jit"] then
                 f:write(string.sub(b, 149));
             else
                 f:write(string.sub(b, 1, 147));
             end
-            f:close(); res = ngx.location.capture("/call");
+            f:close();
+            local res = ngx.location.capture("/call");
             if res.status == 200 then
                 ngx.print(res.body)
             else
@@ -86,7 +87,7 @@ __DATA__
 --- response_body
 error
 --- error_log eval
-qr/failed to load external Lua file ".*?test\.lua": bad byte-code header/
+qr/failed to load external Lua file ".*?test\.lua": .* cannot load incompatible bytecode/
 
 
 
@@ -97,14 +98,15 @@ qr/failed to load external Lua file ".*?test\.lua": bad byte-code header/
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             if package.loaded["jit"] then
                 f:write(string.sub(b, 149));
             else
                 f:write(string.sub(b, 1, 147));
             end
-            f:close(); res = ngx.location.capture("/call");
+            f:close();
+            local res = ngx.location.capture("/call");
             if res.status == 200 then
                 ngx.print(res.body)
             else
@@ -122,7 +124,7 @@ qr/failed to load external Lua file ".*?test\.lua": bad byte-code header/
 --- response_body
 error
 --- error_log
-bytecode format version unsupported
+cannot load incompatible bytecode
 
 
 
@@ -133,7 +135,7 @@ bytecode format version unsupported
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             local do_jit
             if jit then
@@ -177,7 +179,7 @@ bytecode format version unsupported
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             local jit;
             if package.loaded["jit"] then
@@ -221,7 +223,7 @@ error
         content_by_lua '
             ngx.req.read_body();
             local b = ngx.req.get_body_data();
-            f = io.open(ngx.var.realpath_root.."/test.lua", "w");
+            local f = io.open(ngx.var.realpath_root.."/test.lua", "w");
             -- luajit bytecode: sub(149,-1), lua bytecode: sub(1,147)
             if jit then
                 if not string.find(jit.version, "LuaJIT 2.0") then
@@ -257,9 +259,9 @@ error
         content_by_lua '
             local bcsave = require "jit.bcsave"
             if jit then
-                local prefix = ngx.config.prefix()
-                local infile = prefix .. "html/a.lua"
-                local outfile = prefix .. "html/a.luac"
+                local prefix = "$TEST_NGINX_SERVER_ROOT"
+                local infile = prefix .. "/html/a.lua"
+                local outfile = prefix .. "/html/a.luac"
                 bcsave.start("-s", infile, outfile)
                 return ngx.exec("/call")
             end
@@ -290,9 +292,9 @@ ngx.status = 201 ngx.say("hello from Lua!")
         content_by_lua '
             local bcsave = require "jit.bcsave"
             if jit then
-                local prefix = ngx.config.prefix()
-                local infile = prefix .. "html/a.lua"
-                local outfile = prefix .. "html/a.luac"
+                local prefix = "$TEST_NGINX_SERVER_ROOT"
+                local infile = prefix .. "/html/a.lua"
+                local outfile = prefix .. "/html/a.luac"
                 bcsave.start("-g", infile, outfile)
                 return ngx.exec("/call")
             end
@@ -315,3 +317,60 @@ ngx.status = 201 ngx.say("hello from Lua!")
 [error]
 --- error_code: 201
 
+
+
+=== TEST 9: bytecode (not stripped)
+--- config
+    location = /t {
+        content_by_lua_block {
+            local f = assert(loadstring("local a = 1 ngx.say('a = ', a)", "=code"))
+            local bc = string.dump(f)
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/a.luac", "w"))
+            f:write(bc)
+            f:close()
+        }
+    }
+
+    location = /t2 {
+        content_by_lua_file html/a.luac;
+    }
+
+    location = /main {
+        echo_location /t;
+        echo_location /t2;
+    }
+--- request
+GET /main
+--- response_body
+a = 1
+--- no_error_log
+[error]
+
+
+
+=== TEST 10: bytecode (stripped)
+--- config
+    location = /t {
+        content_by_lua_block {
+            local f = assert(loadstring("local a = 1 ngx.say('a = ', a)", "=code"))
+            local bc = string.dump(f, true)
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/a.luac", "w"))
+            f:write(bc)
+            f:close()
+        }
+    }
+
+    location = /t2 {
+        content_by_lua_file html/a.luac;
+    }
+
+    location = /main {
+        echo_location /t;
+        echo_location /t2;
+    }
+--- request
+GET /main
+--- response_body
+a = 1
+--- no_error_log
+[error]

@@ -15,15 +15,15 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_end /;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice shmem/)
-	->plan(72);
+my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice rewrite/)
+	->plan(76);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,6 +38,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     proxy_cache_path   %%TESTDIR%%/cache  keys_zone=NAME:1m;
+    proxy_cache_path   %%TESTDIR%%/cach3  keys_zone=NAME3:1m;
     proxy_cache_key    $uri$is_args$args$slice_range;
 
     fastcgi_cache_path   %%TESTDIR%%/cache2  keys_zone=NAME2:1m;
@@ -48,6 +49,14 @@ http {
         server_name  localhost;
 
         location / { }
+
+        location /proxy/ {
+            slice 2;
+
+            proxy_pass    http://127.0.0.1:8081/;
+
+            proxy_set_header   Range  $slice_range;
+        }
 
         location /cache/ {
             slice 2;
@@ -78,19 +87,39 @@ http {
 
             add_header X-Cache-Status $upstream_cache_status;
         }
+
+        location /cache-redirect {
+            error_page 404 = @fallback;
+        }
+
+        location @fallback {
+            slice 2;
+
+            proxy_pass    http://127.0.0.1:8081/t$is_args$args;
+
+            proxy_cache   NAME3;
+
+            proxy_set_header   Range  $slice_range;
+
+            proxy_cache_valid   200 206  1h;
+        }
     }
 
     server {
         listen       127.0.0.1:8081;
         server_name  localhost;
 
-        location / { }
+        location / {
+            if ($http_range = "") {
+                set $limit_rate 100;
+	    }
+        }
     }
 }
 
 EOF
 
-$t->write_file('t', '012345678');
+$t->write_file('t', '0123456789abcdef');
 $t->run();
 
 ###############################################################################
@@ -98,7 +127,7 @@ $t->run();
 my $r;
 
 like(http_get('/cache/nx'), qr/ 404 /, 'not found');
-like(http_get('/cache/t'), qr/ 200 .*012345678$/ms, 'no range');
+like(http_get('/cache/t'), qr/ 200 .*0123456789abcdef$/ms, 'no range');
 
 $r = get('/cache/t?single', "Range: bytes=0-0");
 like($r, qr/ 206 /, 'single - 206 partial reply');
@@ -169,12 +198,12 @@ like($r, qr/Status: HIT/m, 'range next - cache status');
 
 $r = get('/cache/t?first', "Range: bytes=2-");
 like($r, qr/ 206 /, 'first bytes - 206 partial reply');
-like($r, qr/^2345678$/m, 'first bytes - correct content');
+like($r, qr/^23456789abcdef$/m, 'first bytes - correct content');
 like($r, qr/Status: MISS/m, 'first bytes - cache status');
 
 $r = get('/cache/t?first', "Range: bytes=4-");
 like($r, qr/ 206 /, 'first bytes cached - 206 partial reply');
-like($r, qr/^45678$/m, 'first bytes cached - correct content');
+like($r, qr/^456789abcdef$/m, 'first bytes cached - correct content');
 like($r, qr/Status: HIT/m, 'first bytes cached - cache status');
 
 # multiple ranges
@@ -182,11 +211,11 @@ like($r, qr/Status: HIT/m, 'first bytes cached - cache status');
 
 $r = get('/cache/t?many', "Range: bytes=3-3,4-4");
 like($r, qr/200 OK/, 'many - 206 partial reply');
-like($r, qr/^012345678$/m, 'many - correct content');
+like($r, qr/^0123456789abcdef$/m, 'many - correct content');
 
 $r = get('/cache/t?last', "Range: bytes=-10");
-like($r, qr/200 OK/, 'last bytes - 206 partial reply');
-like($r, qr/^012345678$/m, 'last bytes - correct content');
+like($r, qr/206 /, 'last bytes - 206 partial reply');
+like($r, qr/^6789abcdef$/m, 'last bytes - correct content');
 
 # respect not modified and range filters
 
@@ -202,9 +231,16 @@ $r = get('/cache/t?if', "Range: bytes=3-4\nIf-Range: $etag");
 like($r, qr/ 206 /, 'if-range - 206 partial reply');
 like($r, qr/^34$/m, 'if-range - correct content');
 
+# respect Last-Modified from non-cacheable response with If-Range
+
+my ($lm) = http_get('/t') =~ /Last-Modified: (.*)/;
+$r = get('/proxy/t', "Range: bytes=3-4\nIf-Range: $lm");
+like($r, qr/ 206 /, 'if-range last-modified proxy - 206 partial reply');
+like($r, qr/^34$/m, 'if-range last-modified proxy - correct content');
+
 $r = get('/cache/t?ifb', "Range: bytes=3-4\nIf-Range: bad");
 like($r, qr/ 200 /, 'if-range bad - 200 ok');
-like($r, qr/^012345678$/m, 'if-range bad - correct content');
+like($r, qr/^0123456789abcdef$/m, 'if-range bad - correct content');
 
 # first slice isn't known
 
@@ -228,7 +264,7 @@ SKIP: {
 	skip 'win32', 5 if $^O eq 'MSWin32';
 
 	$t->run_daemon(\&fastcgi_daemon);
-	$t->waitforsocket('127.0.0.1:8082');
+	$t->waitforsocket('127.0.0.1:' . port(8082));
 
 	like(http_get('/fastcgi'), qr/200 OK.*MISS.*^012345678$/ms, 'fastcgi');
 	like(http_get('/fastcgi'), qr/200 OK.*HIT.*^012345678$/ms,
@@ -241,6 +277,14 @@ SKIP: {
 	like(get("/fastcgi?1", "Range: bytes=2-2"), qr/ 206 .*MISS.*^2$/ms,
 		'fastcgi slice next');
 }
+
+# slicing in named location
+
+$r = http_get('/cache-redirect');
+
+like($r, qr/ 200 .*^0123456789abcdef$/ms, 'in named location');
+is(scalar @{[ glob $t->testdir() . '/cach3/*' ]}, 8,
+	'in named location - cache entries');
 
 ###############################################################################
 
@@ -258,7 +302,7 @@ EOF
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8082', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8082), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 

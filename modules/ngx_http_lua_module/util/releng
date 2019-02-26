@@ -1,0 +1,8 @@
+#!/bin/bash
+
+./update-readme
+ack '(?<=\#define)\s*DDEBUG\s*1' src
+echo ====================================================
+ack '(?<=_version_string) "\d+\.\d+\.\d+"' src
+ack '(?<=This document describes rds-json-nginx-module v)\d+\.\d+' README
+

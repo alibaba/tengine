@@ -111,7 +111,6 @@ static u_char  smtp_auth_ok[] = "235 2.0.0 OK" CRLF;
 void
 ngx_mail_proxy_init(ngx_mail_session_t *s, ngx_addr_t *peer)
 {
-    int                        keepalive;
     ngx_int_t                  rc;
     ngx_mail_proxy_ctx_t      *p;
     ngx_mail_proxy_conf_t     *pcf;
@@ -120,18 +119,6 @@ ngx_mail_proxy_init(ngx_mail_session_t *s, ngx_addr_t *peer)
     s->connection->log->action = "connecting to upstream";
 
     cscf = ngx_mail_get_module_srv_conf(s, ngx_mail_core_module);
-
-    if (cscf->so_keepalive) {
-        keepalive = 1;
-
-        if (setsockopt(s->connection->fd, SOL_SOCKET, SO_KEEPALIVE,
-                       (const void *) &keepalive, sizeof(int))
-                == -1)
-        {
-            ngx_log_error(NGX_LOG_ALERT, s->connection->log, ngx_socket_errno,
-                          "setsockopt(SO_KEEPALIVE) failed");
-        }
-    }
 
     p = ngx_pcalloc(s->connection->pool, sizeof(ngx_mail_proxy_ctx_t));
     if (p == NULL) {
@@ -895,10 +882,13 @@ ngx_mail_proxy_handler(ngx_event_t *ev)
     c = ev->data;
     s = c->data;
 
-    if (ev->timedout) {
+    if (ev->timedout || c->close) {
         c->log->action = "proxying";
 
-        if (c == s->connection) {
+        if (c->close) {
+            ngx_log_error(NGX_LOG_INFO, c->log, 0, "shutdown timeout");
+
+        } else if (c == s->connection) {
             ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
                           "client timed out");
             c->timedout = 1;
@@ -948,7 +938,7 @@ ngx_mail_proxy_handler(ngx_event_t *ev)
     do_write = ev->write ? 1 : 0;
 
     ngx_log_debug3(NGX_LOG_DEBUG_MAIL, ev->log, 0,
-                   "mail proxy handler: %d, #%d > #%d",
+                   "mail proxy handler: %ui, #%d > #%d",
                    do_write, src->fd, dst->fd);
 
     for ( ;; ) {

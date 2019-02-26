@@ -46,18 +46,18 @@ stream {
 EOF
 
 $t->run_daemon(\&stream_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
-my $s = stream();
+my $s = stream('127.0.0.1:' . port(8080));
 
 is($s->io('foo1', length => 4), 'bar1', 'proxy connection');
 is($s->io('foo3', length => 4), 'bar3', 'proxy connection again');
 is($s->io('close'), 'close', 'proxy connection close');
 is($s->io('test'), '', 'proxy connection closed');
 
-$s = stream();
+$s = stream('127.0.0.1:' . port(8080));
 
 sleep 3;
 
@@ -68,7 +68,7 @@ is($s->io('foo', length => 3), 'bar', 'proxy connect timeout');
 sub stream_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

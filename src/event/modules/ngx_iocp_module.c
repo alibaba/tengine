@@ -27,32 +27,32 @@ static ngx_str_t      iocp_name = ngx_string("iocp");
 
 static ngx_command_t  ngx_iocp_commands[] = {
 
-    {ngx_string("iocp_threads"),
-     NGX_EVENT_CONF|NGX_CONF_TAKE1,
-     ngx_conf_set_num_slot,
-     0,
-     offsetof(ngx_iocp_conf_t, threads),
-     NULL},
+    { ngx_string("iocp_threads"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      0,
+      offsetof(ngx_iocp_conf_t, threads),
+      NULL },
 
-    {ngx_string("post_acceptex"),
-     NGX_EVENT_CONF|NGX_CONF_TAKE1,
-     ngx_conf_set_num_slot,
-     0,
-     offsetof(ngx_iocp_conf_t, post_acceptex),
-     NULL},
+    { ngx_string("post_acceptex"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      0,
+      offsetof(ngx_iocp_conf_t, post_acceptex),
+      NULL },
 
-    {ngx_string("acceptex_read"),
-     NGX_EVENT_CONF|NGX_CONF_FLAG,
-     ngx_conf_set_flag_slot,
-     0,
-     offsetof(ngx_iocp_conf_t, acceptex_read),
-     NULL},
+    { ngx_string("acceptex_read"),
+      NGX_EVENT_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      0,
+      offsetof(ngx_iocp_conf_t, acceptex_read),
+      NULL },
 
-    ngx_null_command
+      ngx_null_command
 };
 
 
-ngx_event_module_t  ngx_iocp_module_ctx = {
+static ngx_event_module_t  ngx_iocp_module_ctx = {
     &iocp_name,
     ngx_iocp_create_conf,                  /* create configuration */
     ngx_iocp_init_conf,                    /* init configuration */
@@ -93,6 +93,8 @@ ngx_os_io_t ngx_iocp_io = {
     NULL,
     ngx_udp_overlapped_wsarecv,
     NULL,
+    NULL,
+    NULL,
     ngx_overlapped_wsasend_chain,
     0
 };
@@ -125,7 +127,7 @@ ngx_iocp_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 
     ngx_event_actions = ngx_iocp_module_ctx.actions;
 
-    ngx_event_flags = NGX_USE_AIO_EVENT|NGX_USE_IOCP_EVENT;
+    ngx_event_flags = NGX_USE_IOCP_EVENT;
 
     if (timer == 0) {
         return NGX_OK;

@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http/)->plan(25)
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(28)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -42,6 +42,8 @@ http {
 
         add_header   X-URI $uri;
         add_header   X-Always $uri always;
+        add_header   ETag foo always;
+        add_header   ETag '' always;
         expires      epoch;
 
         location /t1 {
@@ -80,6 +82,10 @@ http {
 
         location /modified {
             expires modified 2048;
+
+            location /modified/proxy {
+                proxy_pass http://127.0.0.1:8081/modified;
+            }
         }
 
         location /var {
@@ -93,6 +99,13 @@ http {
                 expires modified $arg_e;
             }
         }
+    }
+
+    server {
+        listen       127.0.0.1:8081;
+        server_name  localhost;
+
+        add_header   Last-Modified "Mon, 28 Sep 1970 06:00:00 GMT";
     }
 }
 
@@ -123,11 +136,13 @@ $r = http_get('/t1');
 like($r, qr/Cache-Control/, 'good expires');
 like($r, qr/X-URI/, 'good add_header');
 like($r, qr/X-Always/, 'good add_header always');
+unlike($r, qr/ETag/, 'good add_header always empty');
 
 $r = http_get('/nx');
 unlike($r, qr/Cache-Control/, 'bad expires');
 unlike($r, qr/X-URI/, 'bad add_header');
 like($r, qr/X-Always/, 'bad add_header always');
+unlike($r, qr/ETag/, 'bad add_header always empty');
 
 # various expires variants
 
@@ -139,6 +154,11 @@ like(http_get('/access_inner'), qr/max-age=2048/, 'expires inner');
 like(http_get('/negative'), qr/no-cache/, 'expires negative');
 like(http_get('/daily'), qr/Expires:.*:33 GMT/, 'expires daily');
 like(http_get('/modified'), qr/max-age=204./, 'expires modified');
+
+# "expires modified" with proxy
+
+like(http_get('/modified/proxy'), qr/Expires: Mon, 28 Sep 1970 06:34:08 GMT/,
+	'expires modified proxy');
 
 # expires with variables
 

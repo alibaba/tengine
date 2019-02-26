@@ -22,6 +22,7 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
 #endif
@@ -76,8 +77,10 @@ struct ngx_ssl_connection_s {
     ngx_int_t                   last;
     ngx_buf_t                  *buf;
     size_t                      buffer_size;
+#if (T_NGX_SSL_EARLY_DATA)
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     ngx_buf_t                  *early_buf;
+#endif
 #endif
 
     ngx_connection_handler_pt   handler;
@@ -96,9 +99,11 @@ struct ngx_ssl_connection_s {
     unsigned                    no_wait_shutdown:1;
     unsigned                    no_send_shutdown:1;
     unsigned                    handshake_buffer_set:1;
+#if (T_NGX_SSL_EARLY_DATA)
     unsigned                    enable_early_data:1;
 #if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
     int                         read_early_state;
+#endif
 #endif
 };
 
@@ -229,6 +234,8 @@ ngx_int_t ngx_ssl_get_server_name(ngx_connection_t *c, ngx_pool_t *pool,
 ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);

@@ -1,0 +1,127 @@
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs="#include <yajl/yajl_parse.h> \
+                  #include <yajl/yajl_gen.h>"
+ngx_feature_test="yajl_version();"
+
+if [ -n "$LIBYAJL_INC" -o -n "$LIBYAJL_LIB" ]; then
+    # explicit set libdyajl lib path
+    ngx_feature="libdyajl library in directories specified by LIBYAJL_INC ($LIBYAJL_INC) and LIBYAJL_LIB ($LIBYAJL_LIB)"
+    ngx_feature_path="$LIBYAJL_INC"
+    if [ $NGX_RPATH = YES ]; then
+        ngx_feature_libs="-R$LIBYAJL_LIB -L$LIBYAJL_LIB -lyajl"
+    else
+        ngx_feature_libs="-L$LIBYAJL_LIB -lyajl"
+    fi
+    . auto/feature
+else
+    # auto-discovery
+    ngx_feature="libyajl library"
+    ngx_feature_path=
+    ngx_feature_libs="-lyajl"
+    . auto/feature
+
+    if [ $ngx_found = no ]; then
+        # FreeBSD, OpenBSD, linux
+        ngx_feature="libyajl library in /usr/local/"
+        ngx_feature_path="/usr/local/include/yajl /usr/local/include"
+        if [ $NGX_RPATH = YES ]; then
+            ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -lyajl"
+        else
+            ngx_feature_libs="-L/usr/local/lib -lyajl"
+        fi
+        . auto/feature
+    fi
+
+    if [ $ngx_found = no ]; then
+        # NetBSD
+        ngx_feature="libyajl library in /usr/pkg/"
+        ngx_feature_path="/usr/pkg/include/yajl /usr/pkg/include"
+        if [ $NGX_RPATH = YES ]; then
+            ngx_feature_libs="-R/usr/pkg/lib -L/usr/pkg/lib -lyajl"
+        else
+            ngx_feature_libs="-L/usr/pkg/lib -lyajl"
+        fi
+        . auto/feature
+    fi
+
+    if [ $ngx_found = no ]; then
+        # MacPorts
+        ngx_feature="libyajl library in /opt/local/"
+        ngx_feature_path="/opt/local/include/yajl /opt/local/include"
+        if [ $NGX_RPATH = YES ]; then
+            ngx_feature_libs="-R/opt/local/lib -L/opt/local/lib -lyajl"
+        else
+            ngx_feature_libs="-L/opt/local/lib -lyajl"
+        fi
+        . auto/feature
+    fi
+fi
+
+if [ $ngx_found = yes ]; then
+    CORE_INCS="$CORE_INCS $ngx_feature_path"
+    CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+else
+ cat << END
+ $0: error: the ngx_tfs addon requires the libyajl library.
+END
+ exit 1
+fi
+
+
+ngx_addon_name="ngx_http_tfs_module"
+HTTP_MODULES="$HTTP_MODULES ngx_http_tfs_module"
+
+HTTP_TFS=YES
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS 
+                      $ngx_addon_dir/ngx_tfs_common.c \
+                      $ngx_addon_dir/ngx_http_tfs.c \
+                      $ngx_addon_dir/ngx_http_tfs_module.c \
+                      $ngx_addon_dir/ngx_http_tfs_restful.c \
+                      $ngx_addon_dir/ngx_http_tfs_serialization.c \
+                      $ngx_addon_dir/ngx_http_connection_pool.c \
+                      $ngx_addon_dir/ngx_http_tfs_json.c \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_info.c \
+                      $ngx_addon_dir/ngx_http_tfs_raw_fsname.c \
+                      $ngx_addon_dir/ngx_http_tfs_tair_helper.c \
+                      $ngx_addon_dir/ngx_http_tfs_duplicate.c \
+                      $ngx_addon_dir/ngx_http_tfs_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_local_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_remote_block_cache.c \
+                      $ngx_addon_dir/ngx_http_tfs_timers.c \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_name_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_data_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_root_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_meta_server_message.c \
+                      $ngx_addon_dir/ngx_http_tfs_peer_connection.c \
+                      $ngx_addon_dir/ngx_http_tfs_server_handler.c "
+
+
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir"
+
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_http_tfs.h \
+                      $ngx_addon_dir/ngx_http_tfs_errno.h \
+                      $ngx_addon_dir/ngx_tfs_common.h \
+                      $ngx_addon_dir/ngx_http_tfs_restful.h \
+                      $ngx_addon_dir/ngx_http_tfs_restful.h \
+                      $ngx_addon_dir/ngx_http_tfs_protocol.h \
+                      $ngx_addon_dir/ngx_http_tfs_serialization.h \
+                      $ngx_addon_dir/ngx_http_connection_pool.h \
+                      $ngx_addon_dir/ngx_http_tfs_json.h \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_info.h \
+                      $ngx_addon_dir/ngx_http_tfs_raw_fsname.h \
+                      $ngx_addon_dir/ngx_http_tfs_tair_helper.h \
+                      $ngx_addon_dir/ngx_http_tfs_duplicate.h \
+                      $ngx_addon_dir/ngx_http_tfs_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_local_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_remote_block_cache.h \
+                      $ngx_addon_dir/ngx_http_tfs_timers.h \
+                      $ngx_addon_dir/ngx_http_tfs_rc_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_name_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_data_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_root_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_meta_server_message.h \
+                      $ngx_addon_dir/ngx_http_tfs_peer_connection.h \
+                      $ngx_addon_dir/ngx_http_tfs_server_handler.h "

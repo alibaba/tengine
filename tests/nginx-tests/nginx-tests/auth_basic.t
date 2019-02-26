@@ -54,8 +54,6 @@ http {
 
 EOF
 
-my $d = $t->testdir();
-
 $t->write_file('index.html', 'SEETHIS');
 
 $t->write_file(
@@ -97,17 +95,8 @@ like(http_get_auth('/', 'crypt2', '1'), qr!401 Unauthorized!,
 
 like(http_get_auth('/', 'apr1', 'password'), qr!SEETHIS!, 'apr1 md5');
 like(http_get_auth('/', 'plain', 'password'), qr!SEETHIS!, 'plain password');
-
-SKIP: {
-	# SHA1 may not be available unless we have OpenSSL
-
-	skip 'no sha1', 2 unless $t->has_module('--with-http_ssl_module')
-		or $t->has_module('--with-sha1')
-		or $t->has_module('--with-openssl');
-
-	like(http_get_auth('/', 'ssha', 'password'), qr!SEETHIS!, 'ssha');
-	like(http_get_auth('/', 'sha', 'password'), qr!SEETHIS!, 'sha');
-}
+like(http_get_auth('/', 'ssha', 'password'), qr!SEETHIS!, 'ssha');
+like(http_get_auth('/', 'sha', 'password'), qr!SEETHIS!, 'sha');
 
 unlike(http_get_auth('/', 'apr1', '123'), qr!SEETHIS!, 'apr1 md5 wrong');
 unlike(http_get_auth('/', 'plain', '123'), qr!SEETHIS!, 'plain wrong');

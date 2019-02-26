@@ -105,7 +105,7 @@ sub fastcgi_daemon {
 		}
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 
 SEE-THIS

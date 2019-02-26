@@ -1,5 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -10,7 +10,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 2 + 19);
+plan tests => repeat_each() * (blocks() * 2 + 23);
 
 #no_diff();
 #no_long_string();
@@ -86,7 +86,7 @@ qr/content_by_lua\(nginx\.conf:\d+\):1: attempt to call field 'echo' \(a nil val
     location /lua {
         # NOTE: the newline escape sequence must be double-escaped, as nginx config
         # parser will unescape first!
-        content_by_lua 'v = ngx.var["request_uri"] ngx.print("request_uri: ", v, "\\n")';
+        content_by_lua 'local v = ngx.var["request_uri"] ngx.print("request_uri: ", v, "\\n")';
     }
 --- request
 GET /lua?a=1&b=2
@@ -102,7 +102,7 @@ request_uri: /lua?a=1&b=2
     }
 --- user_files
 >>> test.lua
-v = ngx.var["request_uri"]
+local v = ngx.var["request_uri"]
 ngx.print("request_uri: ", v, "\n")
 --- request
 GET /lua?a=1&b=2
@@ -154,7 +154,7 @@ result: -0.4090441561579
 === TEST 7: read $arg_xxx
 --- config
     location = /lua {
-        content_by_lua 'who = ngx.var.arg_who
+        content_by_lua 'local who = ngx.var.arg_who
             ngx.print("Hello, ", who, "!")';
     }
 --- request
@@ -171,7 +171,7 @@ Hello, agentzh!
     }
 
     location /lua {
-        content_by_lua 'res = ngx.location.capture("/other"); ngx.print("status=", res.status, " "); ngx.print("body=", res.body)';
+        content_by_lua 'local res = ngx.location.capture("/other"); ngx.print("status=", res.status, " "); ngx.print("body=", res.body)';
     }
 --- request
 GET /lua
@@ -183,7 +183,7 @@ status=200 body=hello, world
 ei= TEST 9: capture non-existed location
 --- config
     location /lua {
-        content_by_lua 'res = ngx.location.capture("/other"); ngx.print("status=", res.status)';
+        content_by_lua 'local res = ngx.location.capture("/other"); ngx.print("status=", res.status)';
     }
 --- request
 GET /lua
@@ -194,7 +194,7 @@ GET /lua
 === TEST 9: invalid capture location (not as expected...)
 --- config
     location /lua {
-        content_by_lua 'res = ngx.location.capture("*(#*"); ngx.say("res=", res.status)';
+        content_by_lua 'local res = ngx.location.capture("*(#*"); ngx.say("res=", res.status)';
     }
 --- request
 GET /lua
@@ -247,7 +247,7 @@ GET /lua
            ngx.print("num is: ", num, "\\n");
 
            if (num > 0) then
-               res = ngx.location.capture("/recur?num="..tostring(num - 1));
+               local res = ngx.location.capture("/recur?num="..tostring(num - 1));
                ngx.print("status=", res.status, " ");
                ngx.print("body=", res.body, "\\n");
            else
@@ -271,7 +271,7 @@ end
            ngx.print("num is: ", num, "\\n");
 
            if (num > 0) then
-               res = ngx.location.capture("/recur?num="..tostring(num - 1));
+               local res = ngx.location.capture("/recur?num="..tostring(num - 1));
                ngx.print("status=", res.status, " ");
                ngx.print("body=", res.body);
            else
@@ -353,7 +353,7 @@ location /sub {
 }
 location /parent {
     set $a 12;
-    content_by_lua 'res = ngx.location.capture("/sub"); ngx.print(res.body)';
+    content_by_lua 'local res = ngx.location.capture("/sub"); ngx.print(res.body)';
 }
 --- request
 GET /parent
@@ -369,7 +369,7 @@ location /sub {
 location /parent {
     set $a 12;
     content_by_lua '
-        res = ngx.location.capture(
+        local res = ngx.location.capture(
             "/sub",
             { share_all_vars = true }
         );
@@ -390,7 +390,7 @@ location /sub {
 }
 location /parent {
     content_by_lua '
-        res = ngx.location.capture("/sub", { share_all_vars = true });
+        local res = ngx.location.capture("/sub", { share_all_vars = true });
         ngx.say(ngx.var.a)
     ';
 }
@@ -408,7 +408,7 @@ location /sub {
 }
 location /parent {
     content_by_lua '
-        res = ngx.location.capture("/sub", { share_all_vars = false });
+        local res = ngx.location.capture("/sub", { share_all_vars = false });
         ngx.say(ngx.var.a)
     ';
 }
@@ -427,7 +427,7 @@ GET /parent
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other");
+            local res = ngx.location.capture("/other");
             ngx.say("type: ", res.header["Content-Type"]);
         ';
     }
@@ -454,7 +454,7 @@ type: foo/bar
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other");
+            local res = ngx.location.capture("/other");
             ngx.say("type: ", type(res.header["Set-Cookie"]));
             ngx.say("len: ", #res.header["Set-Cookie"]);
             ngx.say("value: ", table.concat(res.header["Set-Cookie"], "|"))
@@ -482,7 +482,7 @@ value: a|hello, world|foo
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other");
+            local res = ngx.location.capture("/other");
             ngx.say("type: ", res.header["Content-Type"]);
             ngx.say("Bar: ", res.header["Bar"]);
         ';
@@ -507,7 +507,7 @@ Bar: Bah
 
     location /lua {
         content_by_lua '
-            res = ngx.location.capture("/other");
+            local res = ngx.location.capture("/other");
             ngx.say("type: ", res.header["Content-Type"]);
             ngx.say("Bar: ", res.header["Bar"] or "nil");
         ';
@@ -524,7 +524,7 @@ Bar: nil
 --- config
     location /lua {
         content_by_lua '
-            data = "hello, world"
+            local data = "hello, world"
             -- ngx.header["Content-Length"] = #data
             -- ngx.header.content_length = #data
             ngx.print(data)
@@ -539,6 +539,9 @@ GET /main
 Content-Length: 12
 --- response_body chop
 hello, world
+--- no_error_log
+[error]
+[alert]
 
 
 
@@ -739,7 +742,7 @@ true
 --- config
     location /lua {
         content_by_lua '
-            data = "hello,\\nworld\\n"
+            local data = "hello,\\nworld\\n"
             ngx.header["Content-Length"] = #data
             ngx.say("hello,")
             ngx.flush()
@@ -761,6 +764,9 @@ Content-Length: 13
 hello,
 world
 --- timeout: 5
+--- no_error_log
+[error]
+[alert]
 
 
 
@@ -795,7 +801,7 @@ world
     }
 --- user_files
 >>> test.lua
-v = ngx.var["request_uri"]
+local v = ngx.var["request_uri"]
 ngx.print("request_uri: ", v, "\n")
 --- request
 GET /lua?a=1&b=2
@@ -836,4 +842,3 @@ GET /lua
 --- error_code: 500
 --- error_log eval
 qr/failed to load inlined Lua code: /
-

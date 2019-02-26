@@ -1,10 +1,10 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
+
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
 #master_process_enabled(1);
-log_level('debug'); # to ensure any log-level can be outputed
+log_level('debug'); # to ensure any log-level can be outputted
 
 repeat_each(2);
 
@@ -265,7 +265,96 @@ qr/\[error\] \S+: \S+ \[lua\] set_by_lua:2: truefalsenil,/
 
 
 
-=== TEST 14: print() in header filter
+=== TEST 14: test table with metamethod
+--- config
+    location /log {
+        content_by_lua_block {
+            ngx.say("before log")
+            local t = setmetatable({v = "value"}, {
+                __tostring = function(self)
+                    return "tostring "..self.v
+                end
+            })
+            ngx.log(ngx.ERR, t)
+            ngx.say("after log")
+        }
+    }
+--- request
+GET /log
+--- response_body
+before log
+after log
+--- error_log eval
+qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):8: tostring value,/
+
+
+
+=== TEST 15: test table without metamethod
+--- config
+    location /log {
+        content_by_lua_block {
+            ngx.log(ngx.ERR, {})
+            ngx.say("done")
+        }
+    }
+--- request
+GET /log
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+bad argument #1 to 'log' (expected table to have __tostring metamethod)
+
+
+
+=== TEST 16: test tables mixed with other types
+--- config
+    location /log {
+        content_by_lua_block {
+            ngx.say("before log")
+            local t = setmetatable({v = "value"}, {
+                __tostring = function(self)
+                    return "tostring: "..self.v
+                end
+            })
+            ngx.log(ngx.ERR, t, " hello ", t)
+            ngx.say("after log")
+        }
+    }
+--- request
+GET /log
+--- response_body
+before log
+after log
+--- error_log eval
+qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):8: tostring: value hello tostring: value,/
+
+
+
+=== TEST 17: test print with tables
+--- config
+    location /log {
+        content_by_lua_block {
+            ngx.say("before log")
+            local t = setmetatable({v = "value"}, {
+                __tostring = function(self)
+                    return "tostring: "..self.v
+                end
+            })
+            print(t, " hello ", t)
+            ngx.say("after log")
+        }
+    }
+--- request
+GET /log
+--- response_body
+before log
+after log
+--- error_log eval
+qr/\[notice\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):8: tostring: value hello tostring: value,/
+
+
+
+=== TEST 18: print() in header filter
 --- config
     location /log {
         header_filter_by_lua '
@@ -285,7 +374,7 @@ hi
 
 
 
-=== TEST 15: ngx.log() in header filter
+=== TEST 19: ngx.log in header filter
 --- config
     location /log {
         header_filter_by_lua '
@@ -305,7 +394,7 @@ qr/\[error\] .*? \[lua\] header_filter_by_lua:2: howdy, lua!/
 
 
 
-=== TEST 16: ngx.log() big data
+=== TEST 20: ngx.log big data
 --- config
     location /log {
         content_by_lua '
@@ -321,10 +410,12 @@ GET /log
 
 
 
-=== TEST 17: ngx.log in Lua function calls & inlined lua
+=== TEST 21: ngx.log in Lua function calls & inlined lua
 --- config
     location /log {
         content_by_lua '
+            local foo
+            local bar
             function foo()
                 bar()
             end
@@ -342,14 +433,16 @@ GET /log
 --- response_body
 done
 --- error_log eval
-qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):7: bar\(\): hello, log12343.14159/
+qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):9: bar\(\): hello, log12343.14159/
 
 
 
-=== TEST 18: ngx.log in Lua function tail-calls & inlined lua
+=== TEST 22: ngx.log in Lua function tail-calls & inlined lua
 --- config
     location /log {
         content_by_lua '
+            local foo
+            local bar
             function foo()
                 return bar(5)
             end
@@ -372,17 +465,19 @@ GET /log
 --- response_body
 done
 --- error_log eval
-qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):8:(?: foo\(\):)? hello, log12343.14159/
+qr/\[error\] \S+: \S+ \[lua\] content_by_lua\(nginx\.conf:\d+\):10:(?: foo\(\):)? hello, log12343.14159/
 
 
 
-=== TEST 19: ngx.log in Lua files
+=== TEST 23: ngx.log in Lua files
 --- config
     location /log {
         content_by_lua_file 'html/test.lua';
     }
 --- user_files
 >>> test.lua
+local foo
+local bar
 function foo()
     bar()
 end
@@ -399,11 +494,11 @@ GET /log
 --- response_body
 done
 --- error_log eval
-qr/\[error\] \S+: \S+ \[lua\] test.lua:6: bar\(\): hello, log12343.14159/
+qr/\[error\] \S+: \S+ \[lua\] test.lua:8: bar\(\): hello, log12343.14159/
 
 
 
-=== TEST 20: ngx.log with bad levels (ngx.ERROR, -1)
+=== TEST 24: ngx.log with bad levels (ngx.ERROR, -1)
 --- config
     location /log {
         content_by_lua '
@@ -420,7 +515,7 @@ bad log level: -1
 
 
 
-=== TEST 21: ngx.log with bad levels (9)
+=== TEST 25: ngx.log with bad levels (9)
 --- config
     location /log {
         content_by_lua '
@@ -437,7 +532,7 @@ bad log level: 9
 
 
 
-=== TEST 22: \0 in the log message
+=== TEST 26: \0 in the log message
 --- config
     location = /t {
         content_by_lua '
@@ -453,4 +548,3 @@ ok
 [error]
 --- error_log eval
 "2: hello\0world, client: "
-

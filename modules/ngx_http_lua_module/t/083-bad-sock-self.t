@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -137,4 +136,3 @@ bad argument #1 to 'close' (table expected, got number)
 --- error_code: 500
 --- error_log
 bad argument #1 to 'setkeepalive' (table expected, got number)
-

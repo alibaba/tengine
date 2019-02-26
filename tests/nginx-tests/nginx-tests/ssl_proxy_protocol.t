@@ -29,7 +29,7 @@ plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl access ipv6 realip/)
+my $t = Test::Nginx->new()->has(qw/http http_ssl access realip/)
 	->has_daemon('openssl');
 
 $t->write_file_expand('nginx.conf', <<'EOF')->plan(18);
@@ -76,7 +76,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -86,8 +86,8 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 	or die "Can't create certificate for $name: $!\n";
 }
@@ -142,16 +142,7 @@ like($r, qr/403 Forbidden/, 'tcp6 access');
 
 $t->stop();
 
-my $log;
-
-{
-	open LOG, $t->testdir() . '/pp.log'
-		or die("Can't open nginx access log file.\n");
-	local $/;
-	$log = <LOG>;
-	close LOG;
-}
-
+my $log = $t->read_file('pp.log');
 like($log, qr!^192\.0\.2\.1 GET /pp_4!m, 'tcp4 access log');
 like($log, qr!^2001:DB8::1 GET /pp_6!mi, 'tcp6 access log');
 
@@ -162,10 +153,22 @@ sub pp_get {
 
 	my $s = http($proxy, start => 1);
 
-	IO::Socket::SSL->start_SSL($s,
-		SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
-		SSL_error_trap => sub { die $_[1] }
-	);
+	eval {
+		local $SIG{ALRM} = sub { die "timeout\n" };
+		local $SIG{PIPE} = sub { die "sigpipe\n" };
+		alarm(8);
+		IO::Socket::SSL->start_SSL($s,
+			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+			SSL_error_trap => sub { die $_[1] }
+		);
+		alarm(0);
+	};
+	alarm(0);
+
+	if ($@) {
+		log_in("died: $@");
+		return undef;
+	}
 
 	return http(<<EOF, socket => $s);
 GET $url HTTP/1.0

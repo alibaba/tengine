@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -36,7 +35,7 @@ __DATA__
         rewrite_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             print("rewrite GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -50,7 +49,7 @@ __DATA__
         content_by_lua '
             ngx.location.capture("/flush");
 
-            res = ngx.location.capture("/memc");
+            local res = ngx.location.capture("/memc");
             ngx.say("content GET: " .. res.status);
 
             res = ngx.location.capture("/memc",
@@ -168,4 +167,3 @@ world\x03\x04\xff
 hello\x00\x01\x02
 world\x03\x04\xff
 "
-

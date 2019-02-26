@@ -21,11 +21,6 @@ typedef struct {
     void        **srv_conf;
     void        **loc_conf;
 
-    /* event ident must be after 3 words (i.e. 3 pointers' size) as in
-     * ngx_connection_t. and we use the Lua coroutine reference number as
-     * the event ident */
-    int           co_ref;
-    unsigned      premature;  /* :1 */
     lua_State    *co;
 
     ngx_pool_t   *pool;
@@ -36,10 +31,18 @@ typedef struct {
     ngx_http_lua_main_conf_t          *lmcf;
     ngx_http_lua_vm_state_t           *vm_state;
 
+    int           co_ref;
+    unsigned      delay:31;
+    unsigned      premature:1;
 } ngx_http_lua_timer_ctx_t;
 
 
 static int ngx_http_lua_ngx_timer_at(lua_State *L);
+static int ngx_http_lua_ngx_timer_every(lua_State *L);
+static int ngx_http_lua_ngx_timer_helper(lua_State *L, int every);
+static int ngx_http_lua_ngx_timer_running_count(lua_State *L);
+static int ngx_http_lua_ngx_timer_pending_count(lua_State *L);
+static ngx_int_t ngx_http_lua_timer_copy(ngx_http_lua_timer_ctx_t *old_tctx);
 static void ngx_http_lua_timer_handler(ngx_event_t *ev);
 static u_char *ngx_http_lua_log_timer_error(ngx_log_t *log, u_char *buf,
     size_t len);
@@ -49,17 +52,82 @@ static void ngx_http_lua_abort_pending_timers(ngx_event_t *ev);
 void
 ngx_http_lua_inject_timer_api(lua_State *L)
 {
-    lua_createtable(L, 0 /* narr */, 1 /* nrec */);    /* ngx.timer. */
+    lua_createtable(L, 0 /* narr */, 4 /* nrec */);    /* ngx.timer. */
 
     lua_pushcfunction(L, ngx_http_lua_ngx_timer_at);
     lua_setfield(L, -2, "at");
+
+    lua_pushcfunction(L, ngx_http_lua_ngx_timer_every);
+    lua_setfield(L, -2, "every");
+
+    lua_pushcfunction(L, ngx_http_lua_ngx_timer_running_count);
+    lua_setfield(L, -2, "running_count");
+
+    lua_pushcfunction(L, ngx_http_lua_ngx_timer_pending_count);
+    lua_setfield(L, -2, "pending_count");
 
     lua_setfield(L, -2, "timer");
 }
 
 
 static int
+ngx_http_lua_ngx_timer_running_count(lua_State *L)
+{
+    ngx_http_request_t          *r;
+    ngx_http_lua_main_conf_t    *lmcf;
+
+    r = ngx_http_lua_get_req(L);
+    if (r == NULL) {
+        return luaL_error(L, "no request");
+    }
+
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
+    lua_pushnumber(L, lmcf->running_timers);
+
+    return 1;
+}
+
+
+static int
+ngx_http_lua_ngx_timer_pending_count(lua_State *L)
+{
+    ngx_http_request_t          *r;
+    ngx_http_lua_main_conf_t    *lmcf;
+
+    r = ngx_http_lua_get_req(L);
+    if (r == NULL) {
+        return luaL_error(L, "no request");
+    }
+
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
+    lua_pushnumber(L, lmcf->pending_timers);
+
+    return 1;
+}
+
+
+static int
 ngx_http_lua_ngx_timer_at(lua_State *L)
+{
+    return ngx_http_lua_ngx_timer_helper(L, 0);
+}
+
+
+/*
+ * TODO: return a timer handler instead which can be passed to
+ * the ngx.timer.cancel method to cancel the timer.
+ */
+static int
+ngx_http_lua_ngx_timer_every(lua_State *L)
+{
+    return ngx_http_lua_ngx_timer_helper(L, 1);
+}
+
+
+static int
+ngx_http_lua_ngx_timer_helper(lua_State *L, int every)
 {
     int                      nargs, co_ref;
     u_char                  *p;
@@ -88,8 +156,12 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
 
     delay = (ngx_msec_t) (luaL_checknumber(L, 1) * 1000);
 
+    if (every && delay == 0) {
+        return luaL_error(L, "delay cannot be zero");
+    }
+
     luaL_argcheck(L, lua_isfunction(L, 2) && !lua_iscfunction(L, 2), 2,
-                 "Lua function expected");
+                  "Lua function expected");
 
     r = ngx_http_lua_get_req(L);
     if (r == NULL) {
@@ -144,10 +216,11 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
 
     co = lua_newthread(vm);
 
-    /* L stack: time func [args] thread */
+    /* L stack: time func [args] */
 
     ngx_http_lua_probe_user_coroutine_create(r, L, co);
 
+#ifndef OPENRESTY_LUAJIT
     lua_createtable(co, 0, 0);  /* the new globals table */
 
     /* co stack: global_tb */
@@ -160,6 +233,7 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     /* co stack: global_tb */
 
     ngx_http_lua_set_globals_table(co);
+#endif
 
     /* co stack: <empty> */
 
@@ -179,15 +253,18 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     /* L stack: time func [args] thread */
     /* co stack: func */
 
+#ifndef OPENRESTY_LUAJIT
     ngx_http_lua_get_globals_table(co);
     lua_setfenv(co, -2);
+#endif
 
     /* co stack: func */
 
-    lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                          coroutines_key));
     lua_rawget(L, LUA_REGISTRYINDEX);
 
-    /* L stack: time func [args] thread corountines */
+    /* L stack: time func [args] thread coroutines */
 
     lua_pushvalue(L, -2);
 
@@ -218,6 +295,8 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
     p += sizeof(ngx_event_t);
 
     tctx = (ngx_http_lua_timer_ctx_t *) p;
+
+    tctx->delay = every ? delay : 0;
 
     tctx->premature = 0;
     tctx->co_ref = co_ref;
@@ -271,6 +350,9 @@ ngx_http_lua_ngx_timer_at(lua_State *L)
 
     ngx_add_timer(ev, delay);
 
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "created timer (co: %p delay: %M ms)", tctx->co, delay);
+
     lua_pushinteger(L, 1);
     return 1;
 
@@ -284,11 +366,180 @@ nomem:
         ngx_free(ev);
     }
 
-    lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
+    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                          coroutines_key));
     lua_rawget(L, LUA_REGISTRYINDEX);
     luaL_unref(L, -1, co_ref);
 
     return luaL_error(L, "no memory");
+}
+
+
+static ngx_int_t
+ngx_http_lua_timer_copy(ngx_http_lua_timer_ctx_t *old_tctx)
+{
+    int                          nargs, co_ref, i;
+    u_char                      *p;
+    lua_State                   *vm;  /* the main thread */
+    lua_State                   *co;
+    lua_State                   *L;
+    ngx_event_t                 *ev = NULL;
+    ngx_http_lua_timer_ctx_t    *tctx = NULL;
+    ngx_http_lua_main_conf_t    *lmcf;
+
+    /* L stack: func [args] */
+    L = old_tctx->co;
+
+    lmcf = old_tctx->lmcf;
+
+    vm = old_tctx->vm_state ? old_tctx->vm_state->vm : lmcf->lua;
+
+    co = lua_newthread(vm);
+
+#ifndef OPENRESTY_LUAJIT
+    lua_createtable(co, 0, 0);  /* the new globals table */
+
+    /* co stack: global_tb */
+
+    lua_createtable(co, 0, 1);  /* the metatable */
+    ngx_http_lua_get_globals_table(co);
+    lua_setfield(co, -2, "__index");
+    lua_setmetatable(co, -2);
+
+    /* co stack: global_tb */
+
+    ngx_http_lua_set_globals_table(co);
+#endif
+
+    /* co stack: <empty> */
+
+    dd("stack top: %d", lua_gettop(L));
+
+    lua_xmove(vm, L, 1);    /* move coroutine from main thread to L */
+
+    /* L stack: func [args] thread */
+    /* vm stack: empty */
+
+    lua_pushvalue(L, 1);    /* copy entry function to top of L*/
+
+    /* L stack: func [args] thread func */
+
+    lua_xmove(L, co, 1);    /* move entry function from L to co */
+
+    /* L stack: func [args] thread */
+    /* co stack: func */
+
+#ifndef OPENRESTY_LUAJIT
+    ngx_http_lua_get_globals_table(co);
+    lua_setfenv(co, -2);
+#endif
+
+    /* co stack: func */
+
+    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                          coroutines_key));
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
+    /* L stack: func [args] thread coroutines */
+
+    lua_pushvalue(L, -2);
+
+    /* L stack: func [args] thread coroutines thread */
+
+    co_ref = luaL_ref(L, -2);
+    lua_pop(L, 2);
+
+    /* L stack: func [args] */
+
+    nargs = lua_gettop(L);
+    if (nargs > 1) {
+        for (i = 2; i <= nargs; i++) {
+            lua_pushvalue(L, i);
+        }
+
+        /* L stack: func [args] [args] */
+
+        lua_xmove(L, co, nargs - 1);
+
+        /* L stack: func [args] */
+        /* co stack: func [args] */
+    }
+
+    p = ngx_alloc(sizeof(ngx_event_t) + sizeof(ngx_http_lua_timer_ctx_t),
+                  ngx_cycle->log);
+    if (p == NULL) {
+        goto nomem;
+    }
+
+    ev = (ngx_event_t *) p;
+
+    ngx_memzero(ev, sizeof(ngx_event_t));
+
+    p += sizeof(ngx_event_t);
+
+    tctx = (ngx_http_lua_timer_ctx_t *) p;
+
+    ngx_memcpy(tctx, old_tctx, sizeof(ngx_http_lua_timer_ctx_t));
+
+    tctx->co_ref = co_ref;
+    tctx->co = co;
+
+    tctx->pool = ngx_create_pool(128, ngx_cycle->log);
+    if (tctx->pool == NULL) {
+        goto nomem;
+    }
+
+    if (tctx->client_addr_text.len) {
+        tctx->client_addr_text.data = ngx_palloc(tctx->pool,
+                                                 tctx->client_addr_text.len);
+        if (tctx->client_addr_text.data == NULL) {
+            goto nomem;
+        }
+
+        ngx_memcpy(tctx->client_addr_text.data, old_tctx->client_addr_text.data,
+                   tctx->client_addr_text.len);
+    }
+
+    if (tctx->vm_state) {
+        tctx->vm_state->count++;
+    }
+
+    ev->handler = ngx_http_lua_timer_handler;
+    ev->data = tctx;
+    ev->log = ngx_cycle->log;
+
+    lmcf->pending_timers++;
+
+    ngx_add_timer(ev, tctx->delay);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "created next timer (co: %p delay: %M ms)", tctx->co,
+                   tctx->delay);
+
+    return NGX_OK;
+
+nomem:
+
+    if (tctx && tctx->pool) {
+        ngx_destroy_pool(tctx->pool);
+    }
+
+    if (ev) {
+        ngx_free(ev);
+    }
+
+    /* L stack: func [args] */
+
+    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                          coroutines_key));
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    luaL_unref(L, -1, co_ref);
+
+    /* L stack: func [args] coroutines */
+
+    lua_pop(L, 1);
+
+    return NGX_ERROR;
 }
 
 
@@ -313,11 +564,19 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     ngx_memcpy(&tctx, ev->data, sizeof(ngx_http_lua_timer_ctx_t));
     ngx_free(ev);
-    ev = NULL;
 
     lmcf = tctx.lmcf;
 
     lmcf->pending_timers--;
+
+    if (!ngx_exiting && tctx.delay > 0) {
+        rc = ngx_http_lua_timer_copy(&tctx);
+        if (rc != NGX_OK) {
+            ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                          "failed to create the next timer of delay %ud ms",
+                          (unsigned) tctx.delay);
+        }
+    }
 
     if (lmcf->running_timers >= lmcf->max_running_timers) {
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
@@ -328,6 +587,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     c = ngx_http_lua_create_fake_connection(tctx.pool);
     if (c == NULL) {
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create fake connection to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -339,6 +601,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     r = ngx_http_lua_create_fake_request(c);
     if (r == NULL) {
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create fake request to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -374,6 +639,8 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     ctx = ngx_http_lua_create_ctx(r);
     if (ctx == NULL) {
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create ctx to run timer (co: %p)", tctx.co);
         goto failed;
     }
 
@@ -382,6 +649,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
         pcln = ngx_pool_cleanup_add(r->pool, 0);
         if (pcln == NULL) {
+            ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                          "failed to add vm cleanup to run timer (co: %p)",
+                          tctx.co);
             goto failed;
         }
 
@@ -395,6 +665,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     cln = ngx_http_cleanup_add(r, 0);
     if (cln == NULL) {
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to add request cleanup to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -452,7 +725,8 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 failed:
 
     if (tctx.co_ref && tctx.co) {
-        lua_pushlightuserdata(tctx.co, &ngx_http_lua_coroutines_key);
+        lua_pushlightuserdata(tctx.co, ngx_http_lua_lightudata_mask(
+                              coroutines_key));
         lua_rawget(tctx.co, LUA_REGISTRYINDEX);
         luaL_unref(tctx.co, -1, tctx.co_ref);
         lua_settop(tctx.co, 0);
@@ -558,7 +832,7 @@ ngx_http_lua_abort_pending_timers(ngx_event_t *ev)
 
     cur = ngx_event_timer_rbtree.root;
 
-    /* XXX nginx does not guarentee the parent of root is meaningful,
+    /* XXX nginx does not guarantee the parent of root is meaningful,
      * so we temporarily override it to simplify tree traversal. */
     temp = cur->parent;
     cur->parent = NULL;

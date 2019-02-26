@@ -27,7 +27,7 @@ my $t = Test::Nginx->new()->has(qw/http fastcgi upstream_keepalive/)->plan(6)
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
+worker_processes 1; # fixed for tengine
 
 events {
 }
@@ -54,7 +54,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_test_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -139,7 +139,7 @@ sub fastcgi_respond($$) {
 sub fastcgi_test_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -168,7 +168,7 @@ sub fastcgi_test_daemon {
 
 			# respond
 			fastcgi_respond($h, <<EOF);
-Location: http://localhost:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 
 SEE-THIS

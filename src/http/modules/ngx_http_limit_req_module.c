@@ -1069,7 +1069,7 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     name.len = 0;
 
 #if (T_LIMIT_REQ_RATE_VAR)
-    rate_var.var.len = 0;
+    memset(&rate_var, 0x0, sizeof(rate_var));
 #endif
 
     for (i = 2; i < cf->args->nelts; i++) {

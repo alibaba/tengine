@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #repeat_each(20000);
@@ -453,7 +452,7 @@ Hi
 --- config
     location /lua {
         content_by_lua '
-            function f ()
+            local function f ()
                 ngx.say("hello")
                 ngx.exit(200)
             end
@@ -724,4 +723,3 @@ GET /t
 --- response_body
 --- no_error_log
 [error]
-

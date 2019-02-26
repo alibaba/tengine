@@ -75,10 +75,10 @@ typedef struct {
 
 
 ngx_int_t ngx_http_lua_compile_complex_value(
-        ngx_http_lua_compile_complex_value_t *ccv);
+    ngx_http_lua_compile_complex_value_t *ccv);
 ngx_int_t ngx_http_lua_complex_value(ngx_http_request_t *r, ngx_str_t *subj,
-        size_t offset, ngx_int_t count, int *cap,
-        ngx_http_lua_complex_value_t *val, luaL_Buffer *luabuf);
+    size_t offset, ngx_int_t count, int *cap,
+    ngx_http_lua_complex_value_t *val, luaL_Buffer *luabuf);
 
 
 #endif /* _NGX_HTTP_LUA_SCRIPT_H_INCLUDED_ */
