@@ -1451,6 +1451,8 @@ have=T_NGX_HTTP_STUB_STATUS . auto/have
 have=T_UPSTREAM_TRIES  . auto/have
 have=T_GEO . auto/have
 have=T_NGX_RET_CACHE  . auto/have
+have=T_LIMIT_REQ  . auto/have
+have=T_LIMIT_REQ_RATE_VAR  . auto/have
 if [ $HTTP_V2 = YES ]; then
     have=T_NGX_HTTP2_SRV_ENABLE . auto/have
 fi
@@ -1467,4 +1469,5 @@ have=T_NGX_HTTP_UPSTREAM_ID . auto/have
 have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
 have=T_NGX_SSL_EARLY_DATA . auto/have
 have=T_NGX_SHOW_INFO . auto/have
+have=T_NGX_HTTP_IMAGE_FILTER . auto/have
 

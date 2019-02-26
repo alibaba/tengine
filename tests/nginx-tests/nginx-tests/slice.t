@@ -233,15 +233,10 @@ like($r, qr/^34$/m, 'if-range - correct content');
 
 # respect Last-Modified from non-cacheable response with If-Range
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.13.5');
-
 my ($lm) = http_get('/t') =~ /Last-Modified: (.*)/;
 $r = get('/proxy/t', "Range: bytes=3-4\nIf-Range: $lm");
 like($r, qr/ 206 /, 'if-range last-modified proxy - 206 partial reply');
 like($r, qr/^34$/m, 'if-range last-modified proxy - correct content');
-
-}
 
 $r = get('/cache/t?ifb', "Range: bytes=3-4\nIf-Range: bad");
 like($r, qr/ 200 /, 'if-range bad - 200 ok');

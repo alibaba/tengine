@@ -1,0 +1,100 @@
+ngx_debug_timer
+==============
+
+该模块可以提供NGINX/Tengine定时器的状态信息。
+
+示例
+=======
+
+获取NGINX/Tengine定时器的状态信息
+---------------------------------
+
+```
+ http {
+    server {
+        listen 80;
+
+        location = /debug_timer {
+            debug_timer;
+        }
+    }
+ }
+```
+
+请求URI /debug_timer，可以获取到该NGINX/Tengine定时器的使用情况统计。
+页面输出如下：
+
+```
+$ curl 'localhost:80/debug_timer'
+pid:80490
+timer:2
+--------- [0] --------
+timers[i]: 00007F837D02C4B8
+    timer: 148
+       ev: 00007F837D02C488
+     data: 00007F837D02C450
+  handler: 000000010778B450
+   action:
+--------- [1] --------
+timers[i]: 00007F837D02C698
+    timer: 1263
+       ev: 00007F837D02C668
+     data: 00007F837D02C630
+  handler: 000000010778B450
+   action:
+```
+
+定时器的使用情况统计
+-----------------------------------
+
+数据说明
+====
+
+每个数据段落如"[0]"包含当前标号对应定时器的状态信息，数据项意义如下：
+
+* __timers__: 当前定时器地址
+* __timer__: 当前定时器的超时时间
+* __ev__: 当前定时器的关联事件
+* __data__: 当前定时器的关联事件字段
+* __handler__: 当前定时器的关联事件handler，配合addr2line来查询对应函数
+* __action__: 当前定时器的log action
+
+NGINX兼容性
+===================
+
+* 1.13.4 (stable version of 1.13.x) 及其更高版本
+
+Tengine兼容性
+=====================
+
+* 2.1.1 (stable version of 2.1.x) 及其更高版本
+
+安装说明
+=======
+
+源码安装，执行如下命令：
+
+```
+$ wget http://nginx.org/download/nginx-1.13.4.tar.gz
+$ tar -xzvf nginx-1.13.4.tar.gz
+$ cd nginx-1.13.4/
+$ ./configure --add-module=/path/to/ngx_debug_timer
+$ make -j4 && make install
+```
+
+
+配置指令
+=========
+
+语法: **debug_timer**
+
+默认: `none`
+
+位置: `server, location`
+
+NGINX/Tenigne的定时器状态信息可以通过该location访问得到。
+
+注意信息
+=========
+
+
