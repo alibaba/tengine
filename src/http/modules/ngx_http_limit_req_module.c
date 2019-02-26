@@ -43,9 +43,6 @@ typedef struct {
     ngx_uint_t                   rate;
     ngx_http_complex_value_t     key;
     ngx_http_limit_req_node_t   *node;
-#if (T_LIMIT_REQ)
-    ngx_array_t                  *limit_vars;
-#endif
 #if (T_LIMIT_REQ_RATE_VAR)
     ngx_http_limit_req_variable_t rate_var;
 #endif
@@ -215,29 +212,23 @@ ngx_http_limit_req_ip_filter(ngx_http_request_t *r,
 
     return NGX_DECLINED;
 }
+#endif
 
 
+#if (T_LIMIT_REQ_RATE_VAR)
 static ngx_int_t
-ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
-    ngx_http_limit_req_ctx_t *ctx, ngx_http_limit_req_node_t *node)
+ngx_http_limit_req_rate_value(ngx_http_request_t *r,
+    ngx_http_limit_req_ctx_t *ctx)
 {
     u_char                        *p;
-    size_t                         len, total_len;
-    ngx_uint_t                     i;
-#if (T_LIMIT_REQ_RATE_VAR)
+    size_t                         len;
     ngx_uint_t                     rate, scale;
-#endif
     ngx_http_variable_value_t     *vv;
-    ngx_http_limit_req_variable_t *lrv;
 
-#if (T_LIMIT_REQ_RATE_VAR)
     rate = 1;
     scale = 1;
-#endif
-    total_len = 0;
     p = NULL;
 
-#if (T_LIMIT_REQ_RATE_VAR)
     if (ctx->rate_var.var.len != 0) {
         vv = ngx_http_get_indexed_variable(r, ctx->rate_var.index);
         if (vv == NULL || vv->not_found || vv->len <= 3) {
@@ -245,14 +236,14 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
                           "the value of the \"%V\" variable "
                           "for limit rate is wrong",
                           &ctx->rate_var.var);
-            return total_len;
+            return NGX_ERROR;
         }
         if (vv->len > 65535) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "the value of the \"%V\" variable "
                           "is more than 65535 bytes: \"%V\"",
                           &ctx->rate_var.var, vv);
-            return total_len;
+            return NGX_ERROR;
         }
         len = vv->len;
         p = vv->data + len - 3;
@@ -266,53 +257,13 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "the value of rate is wrong",
                           &ctx->rate_var.var);
-            return total_len;
+            return NGX_ERROR;
         }
          ctx->rate = rate * 1000 / scale;
     }
      p = NULL;
 
-#endif
-
-    if (node != NULL) {
-        p = node->data;
-    }
-
-    lrv = ctx->limit_vars->elts;
-    for (i = 0; i < ctx->limit_vars->nelts; i++) {
-        vv = ngx_http_get_indexed_variable(r, lrv[i].index);
-        if (vv == NULL || vv->not_found) {
-            total_len = 0;
-            break;
-        }
-
-        len = vv->len;
-
-        if (len == 0) {
-            total_len = 0;
-            break;
-        }
-
-        if (len > 65535) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "the value of the \"%V\" variable "
-                          "is more than 65535 bytes: \"%v\"",
-                          &lrv[i].var, vv);
-            total_len = 0;
-            break;
-        }
-
-        if (node == NULL) {
-            total_len += len;
-            ngx_crc32_update(hash, vv->data, len);
-
-        } else {
-
-            p = ngx_cpymem(p, vv->data, len);
-        }
-    }
-
-    return total_len;
+    return NGX_OK;
 }
 #endif
 
@@ -320,9 +271,6 @@ ngx_http_limit_req_copy_variables(ngx_http_request_t *r, uint32_t *hash,
 static ngx_int_t
 ngx_http_limit_req_handler(ngx_http_request_t *r)
 {
-#if (T_LIMIT_REQ)
-    size_t                       total_len;
-#endif
     uint32_t                     hash;
     ngx_str_t                    key;
     ngx_int_t                    rc;
@@ -364,18 +312,12 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
         ctx = limit->shm_zone->data;
 
-#if (T_LIMIT_REQ)
-        ngx_str_null(&key);
-
-        ngx_crc32_init(hash);
-
-        total_len = ngx_http_limit_req_copy_variables(r, &hash, ctx, NULL);
-        if (total_len == 0) {
-            continue;
+#if (T_LIMIT_REQ_RATE_VAR)
+        if (ngx_http_limit_req_rate_value(r, ctx) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
+#endif
 
-        ngx_crc32_final(hash);
-#else
         if (ngx_http_complex_value(r, &ctx->key, &key) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -393,7 +335,6 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         }
 
         hash = ngx_crc32_short(key.data, key.len);
-#endif
 
         ngx_shmtx_lock(&ctx->shpool->mutex);
 
@@ -850,10 +791,6 @@ ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     size_t                     len;
     ngx_http_limit_req_ctx_t  *ctx;
-#if (T_LIMIT_REQ)
-    ngx_uint_t                     i, j;
-    ngx_http_limit_req_variable_t *v1, *v2;
-#endif
 
     ctx = shm_zone->data;
 
@@ -870,32 +807,6 @@ ngx_http_limit_req_init_zone(ngx_shm_zone_t *shm_zone, void *data)
                           &octx->key.value);
             return NGX_ERROR;
         }
-
-#if (T_LIMIT_REQ)
-        v1 = ctx->limit_vars->elts;
-        v2 = octx->limit_vars->elts;
-
-        if (ctx->limit_vars->nelts != octx->limit_vars->nelts) {
-            ngx_log_error(NGX_LOG_EMERG, shm_zone->shm.log, 0,
-                          "limit_req \"%V\" uses the \"%V\" variable "
-                          "while previously it used the \"%V\" variable",
-                          &shm_zone->shm.name, &v1[0].var, &v2[0].var);
-            return NGX_ERROR;
-        }
-
-        for (i = 0, j = 0;
-             i < ctx->limit_vars->nelts && j < octx->limit_vars->nelts;
-             i++, j++)
-        {
-            if (ngx_strcmp(v1[i].var.data, v2[j].var.data) != 0) {
-                ngx_log_error(NGX_LOG_EMERG, shm_zone->shm.log, 0,
-                              "limit_req \"%V\" uses the \"%V\" variable "
-                              "while previously it used the \"%V\" variable",
-                              &shm_zone->shm.name, &v1[i].var, &v2[j].var);
-                return NGX_ERROR;
-            }
-        }
-#endif
 
         ctx->sh = octx->sh;
         ctx->shpool = octx->shpool;
@@ -1010,22 +921,9 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                         i;
     ngx_shm_zone_t                    *shm_zone;
     ngx_http_limit_req_ctx_t          *ctx;
-#if (T_LIMIT_REQ)
-    ngx_array_t                       *variables;
-    ngx_http_limit_req_variable_t     *v;
-#else
     ngx_http_compile_complex_value_t   ccv;
-#endif
 #if (T_LIMIT_REQ_RATE_VAR)
     ngx_http_limit_req_variable_t      rate_var;
-#endif
-
-#if (T_LIMIT_REQ)
-    variables = ngx_array_create(cf->pool, 5,
-                                 sizeof(ngx_http_limit_req_variable_t));
-    if (variables == NULL) {
-        return NGX_CONF_ERROR;
-    }
 #endif
 
     value = cf->args->elts;
@@ -1036,22 +934,47 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 #if (T_LIMIT_REQ)
-    v = ngx_array_push(variables);
-    if (v == NULL) {
+    {
+    u_char      *p;
+    size_t      len;
+    ngx_str_t   v1;
+
+    len = 0;
+    for (i = 1; i < cf->args->nelts; i++) {
+        if (i == 1 || value[i].data[0] == '$') {
+            len += value[i].len;
+        }
+        break;
+    }
+
+    p = ngx_palloc(cf->pool, len);
+    if (p == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    value[1].len--;
-    value[1].data++;
+    v1.len = len;
+    v1.data = p;
 
-    v->index = ngx_http_get_variable_index(cf, &value[1]);
-    if (v->index == NGX_ERROR) {
-        return NGX_CONF_ERROR;
+    for (i = 1; i < cf->args->nelts; i++) {
+        if (i == 1 || value[i].data[0] == '$') {
+            p = ngx_cpymem(p, value[i].data, value[i].len);
+        }
+        break;
+
     }
 
-    v->var = value[1];
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
+    ccv.cf = cf;
+    ccv.value = &v1;
+    ccv.complex_value = &ctx->key;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+    }
 #else
+
     ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
     ccv.cf = cf;
@@ -1150,22 +1073,6 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #if (T_LIMIT_REQ)
         if (value[i].data[0] == '$') {
-
-            value[i].len--;
-            value[i].data++;
-
-            v = ngx_array_push(variables);
-            if (v == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            v->index = ngx_http_get_variable_index(cf, &value[i]);
-            if (v->index == NGX_ERROR) {
-                return NGX_CONF_ERROR;
-            }
-
-            v->var = value[i];
-
             continue;
         }
 #endif
@@ -1183,10 +1090,6 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     ctx->rate = rate * 1000 / scale;
-
-#if (T_LIMIT_REQ)
-    ctx->limit_vars = variables;
-#endif
 
 #if (T_LIMIT_REQ_RATE_VAR)
     ctx->rate_var = rate_var;
