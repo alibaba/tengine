@@ -1,0 +1,4 @@
+ngx_addon_name=ngx_http_slice_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_slice_module"
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir/"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_slice_module.c"
