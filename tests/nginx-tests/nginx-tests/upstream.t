@@ -61,22 +61,24 @@ http {
 
 EOF
 
-$t->run_daemon(\&http_daemon, 8081);
-$t->run_daemon(\&http_daemon, 8082);
+$t->run_daemon(\&http_daemon, port(8081));
+$t->run_daemon(\&http_daemon, port(8082));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
-is(many('/', 30), '8081: 15, 8082: 15', 'balanced');
+my @ports = my ($p1, $p2) = (port(8081), port(8082));
 
-# from 9 first requests to 8081, only 6 will be successful,
+is(many('/', 30), "$p1: 15, $p2: 15", 'balanced');
+
+# from 9 first requests to the first port, only 6 will be successful,
 # 3rd, 6th, and 9th requests will fail; after this the backend
 # will be considered down and won't be used till fail_timeout passes
 
-is(many('/close', 30), '8081: 6, 8082: 24', 'failures');
+is(many('/close', 30), "$p1: 6, $p2: 24", 'failures');
 
 SKIP: {
 skip 'long test', 1 unless $ENV{TEST_NGINX_UNSAFE};
@@ -86,7 +88,7 @@ skip 'long test', 1 unless $ENV{TEST_NGINX_UNSAFE};
 # delay added to make sure first 9 requests will take more than 1s;
 # note that the test is racy and may unexpectedly succeed
 
-is(many('/close2', 30, delay => 0.2), '8081: 6, 8082: 24', 'failures delay');
+is(many('/close2', 30, delay => 0.2), "$p1: 6, $p2: 24", 'failures delay');
 
 }
 
@@ -105,7 +107,8 @@ sub many {
 		select undef, undef, undef, $opts{delay} if $opts{delay};
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################
@@ -138,7 +141,8 @@ sub http_daemon {
 
 		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
 
-		if ($uri =~ 'close' && $port == 8081 && $count++ % 3 == 0) {
+		if ($uri =~ 'close' && $port == port(8081) && $count++ % 3 == 0)
+		{
 			next;
 		}
 

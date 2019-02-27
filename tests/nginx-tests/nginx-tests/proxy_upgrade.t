@@ -137,14 +137,8 @@ ok(!$s, "handshake noupgrade");
 
 # connection upgrade in subrequests shouldn't cause a segfault
 
-SKIP: {
-skip 'leaves coredump', 1 unless $t->has_version('1.13.7')
-	or $ENV{TEST_NGINX_UNSAFE};
-
 $s = upgrade_connect(uri => '/ssi.html');
 ok(!$s, "handshake in subrequests");
-
-}
 
 # bytes sent on upgraded connection
 # verify with 1) data actually read by client, 2) expected data from backend

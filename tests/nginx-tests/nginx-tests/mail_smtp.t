@@ -27,10 +27,8 @@ select STDOUT; $| = 1;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()
-	->has(qw/mail smtp http rewrite/)->plan(25)
-	->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon)
-	->write_file_expand('nginx.conf', <<'EOF')->run();
+my $t = Test::Nginx->new()->has(qw/mail smtp http rewrite/)
+	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -47,7 +45,7 @@ mail {
     server {
         listen     127.0.0.1:8025;
         protocol   smtp;
-        smtp_auth  login plain none;
+        smtp_auth  login plain none cram-md5 external;
     }
 }
 
@@ -70,9 +68,19 @@ http {
                 set $reply OK;
             }
 
+            set $userpass "$http_auth_user:$http_auth_salt:$http_auth_pass";
+            if ($userpass ~ '^test@example.com:<.*@.*>:0{32}$') {
+                set $reply OK;
+            }
+
+            set $userpass "$http_auth_method:$http_auth_user:$http_auth_pass";
+            if ($userpass ~ '^external:test@example.com:$') {
+                set $reply OK;
+            }
+
             add_header Auth-Status $reply;
             add_header Auth-Server 127.0.0.1;
-            add_header Auth-Port 8026;
+            add_header Auth-Port %%PORT_8026%%;
             add_header Auth-Wait 1;
             return 204;
         }
@@ -80,6 +88,11 @@ http {
 }
 
 EOF
+
+$t->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon);
+$t->run()->plan(30);
+
+$t->waitforsocket('127.0.0.1:' . port(8026));
 
 ###############################################################################
 
@@ -137,6 +150,40 @@ $s->send('AUTH LOGIN ' . encode_base64('test@example.com', ''));
 $s->check(qr/^334 UGFzc3dvcmQ6/, 'auth login with username password challenge');
 $s->send(encode_base64('secret', ''));
 $s->authok('auth login with username');
+
+# Try auth cram-md5
+
+$s = Test::Nginx::SMTP->new();
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+
+$s->send('AUTH CRAM-MD5');
+$s->check(qr/^334 /, 'auth cram-md5 challenge');
+$s->send(encode_base64('test@example.com ' . ('0' x 32), ''));
+$s->authok('auth cram-md5');
+
+# Try auth external
+
+$s = Test::Nginx::SMTP->new();
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+
+$s->send('AUTH EXTERNAL');
+$s->check(qr/^334 VXNlcm5hbWU6/, 'auth external challenge');
+$s->send(encode_base64('test@example.com', ''));
+$s->ok('auth external');
+
+# Try auth external with username
+
+$s = Test::Nginx::SMTP->new();
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+
+$s->send('AUTH EXTERNAL ' . encode_base64('test@example.com', ''));
+$s->ok('auth external with username');
 
 # Try auth plain with pipelining
 

@@ -69,7 +69,7 @@ http {
 EOF
 
 $t->run_daemon(\&http_noclose_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -90,7 +90,7 @@ like(http_get('/nolen'), qr/SEE-THIS/, 'bad backend - no content length');
 sub http_noclose_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

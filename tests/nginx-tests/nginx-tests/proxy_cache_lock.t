@@ -21,7 +21,7 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache shmem/)->plan(17)
+my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(17)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -69,7 +69,7 @@ $t->run_daemon(\&http_fake_daemon);
 
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
+$t->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -113,12 +113,10 @@ for my $i (1 .. 3) {
 	$sockets[$i] = http_get('/nolock', start => 1);
 }
 
-like(http_end($sockets[1]), qr/request 1/, 'nolock - first');
+$rest = join '', map { http_end($sockets[$_]) } (1 .. 3);
 
-$rest = http_end($sockets[2]);
-$rest .= http_end($sockets[3]);
-
-like($rest, qr/request (2.*request 3|3.*request 2)/s, 'nolock - rest');
+like($rest, qr/request 1/, 'nolock - first');
+like($rest, qr/request 3/, 'nolock - last');
 like(http_get('/nolock'), qr/request 3/, 'nolock - last cached');
 
 ###############################################################################
@@ -126,7 +124,7 @@ like(http_get('/nolock'), qr/request 3/, 'nolock - last cached');
 sub http_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)

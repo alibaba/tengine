@@ -26,10 +26,8 @@ select STDOUT; $| = 1;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()
-	->has(qw/mail pop3 http rewrite/)->plan(8)
-	->run_daemon(\&Test::Nginx::POP3::pop3_test_daemon)
-	->write_file_expand('nginx.conf', <<'EOF')->run();
+my $t = Test::Nginx->new()->has(qw/mail pop3 http rewrite/)
+	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -45,6 +43,7 @@ mail {
     server {
         listen     127.0.0.1:8110;
         protocol   pop3;
+        pop3_auth  plain apop cram-md5 external;
     }
 }
 
@@ -57,6 +56,7 @@ http {
 
         location = /mail/auth {
             set $reply ERROR;
+            set $passw "";
 
             if ($http_auth_smtp_to ~ example.com) {
                 set $reply OK;
@@ -67,9 +67,22 @@ http {
                 set $reply OK;
             }
 
+            set $userpass "$http_auth_user:$http_auth_salt:$http_auth_pass";
+            if ($userpass ~ '^test@example.com:<.*@.*>:0{32}$') {
+                set $reply OK;
+                set $passw secret;
+            }
+
+            set $userpass "$http_auth_method:$http_auth_user:$http_auth_pass";
+            if ($userpass ~ '^external:test@example.com:$') {
+                set $reply OK;
+                set $passw secret;
+            }
+
             add_header Auth-Status $reply;
             add_header Auth-Server 127.0.0.1;
-            add_header Auth-Port 8111;
+            add_header Auth-Port %%PORT_8111%%;
+            add_header Auth-Pass $passw;
             add_header Auth-Wait 1;
             return 204;
         }
@@ -78,12 +91,49 @@ http {
 
 EOF
 
+$t->run_daemon(\&Test::Nginx::POP3::pop3_test_daemon);
+$t->run()->plan(20);
+
+$t->waitforsocket('127.0.0.1:' . port(8111));
+
 ###############################################################################
 
 my $s = Test::Nginx::POP3->new();
 $s->ok('greeting');
 
+# user / pass
+
+$s->send('USER test@example.com');
+$s->ok('user');
+
+$s->send('PASS secret');
+$s->ok('pass');
+
+# apop
+
+$s = Test::Nginx::POP3->new();
+$s->check(qr/<.*\@.*>/, 'apop salt');
+
+$s->send('APOP test@example.com ' . ('1' x 32));
+$s->check(qr/^-ERR/, 'apop error');
+
+$s->send('APOP test@example.com ' . ('0' x 32));
+$s->ok('apop');
+
+# auth capabilities
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('AUTH');
+$s->ok('auth');
+
+is(get_auth_caps($s), 'PLAIN:LOGIN:CRAM-MD5:EXTERNAL', 'auth capabilities');
+
 # auth plain
+
+$s = Test::Nginx::POP3->new();
+$s->read();
 
 $s->send('AUTH PLAIN ' . encode_base64("\0test\@example.com\0bad", ''));
 $s->check(qr/^-ERR/, 'auth plain with bad password');
@@ -115,5 +165,48 @@ $s->check(qr/\+ UGFzc3dvcmQ6/, 'auth login with username password challenge');
 
 $s->send(encode_base64('secret', ''));
 $s->ok('auth login with username');
+
+# auth cram-md5
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('AUTH CRAM-MD5');
+$s->check(qr/\+ /, 'auth cram-md5 challenge');
+
+$s->send(encode_base64('test@example.com ' . ('0' x 32), ''));
+$s->ok('auth cram-md5');
+
+# auth external
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('AUTH EXTERNAL');
+$s->check(qr/\+ VXNlcm5hbWU6/, 'auth external challenge');
+
+$s->send(encode_base64('test@example.com', ''));
+$s->ok('auth external');
+
+# auth external with username
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('AUTH EXTERNAL ' . encode_base64('test@example.com', ''));
+$s->ok('auth external with username');
+
+###############################################################################
+
+sub get_auth_caps {
+	my ($s) = @_;
+	my @meth;
+
+	while ($s->read()) {
+		last if /^\./;
+		push @meth, $1 if /(.*?)\x0d\x0a?/ms;
+	}
+	join ':', @meth;
+}
 
 ###############################################################################
