@@ -167,4 +167,5 @@ Context: events
 
 当打开reuse_port的时候，支持SO_REUSEPORT套接字参数，Linux从3.9开始支持。
 
+注意：Tengine-2.3.0 版本后废弃reuse_port指令，使用Nginx官方的reuseport。升级方法：将events配置块里面的reuse_port on|off 释掉，在对应的监听端口后面加reuseport参数、详细参考[文档](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/) 。
 

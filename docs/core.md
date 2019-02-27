@@ -160,4 +160,5 @@ Context: events
 
 turn on support for SO_REUSEPORT socket option. This option is supported since Linux 3.9.
 
-
+Note:
+Removed reuse_port directive after the Tengine-2.3.0 version and use the official reuseport of Nginx, detailed reference [document](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/).
