@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(15);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(16);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -42,7 +42,8 @@ http {
         # catch safe and unhandled unsafe URIs,
         # bypassed with redirect to named location
         if ($upstream_http_x_accel_redirect) {
-            return 200 "xar: $upstream_http_x_accel_redirect uri: $uri";
+            return 200 "xar: $upstream_http_x_accel_redirect uri: $uri
+                        method: $request_method";
         }
 
         location /proxy {
@@ -88,6 +89,9 @@ like($r, qr/^Expires: fake/m, 'Expires preserved');
 like($r, qr/^Accept-Ranges: parrots/m, 'Accept-Ranges preserved');
 unlike($r, qr/^Something/m, 'other headers stripped');
 
+like(http_post('/proxy?xar=/index.html'), qr/method: GET/,
+	'X-Accel-Redirect method name');
+
 # escaped characters
 
 like(http_get('/proxy?xar=/foo?bar'), qr/200 OK.*xar: \/foo\?bar/s,
@@ -105,5 +109,16 @@ like(http_get('/proxy?xar=/foo%20bar'), qr/uri: \/foo bar/,
 
 like(http_get('/proxy?xar=@named'),
 	qr!200 OK.*named xar: \@named uri: /proxy!s, 'in named location');
+
+###############################################################################
+
+sub http_post {
+	my ($url) = @_;
+	http(<<EOF);
+POST $url HTTP/1.0
+Host: localhost
+
+EOF
+}
 
 ###############################################################################

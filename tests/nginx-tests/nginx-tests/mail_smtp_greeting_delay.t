@@ -22,7 +22,7 @@ select STDOUT; $| = 1;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()->has(qw/mail smtp http/)->plan(2)
+my $t = Test::Nginx->new()->has(qw/mail smtp/)->plan(2)
 	->write_file_expand('nginx.conf', <<'EOF')->run();
 
 %%TEST_GLOBALS%%
@@ -40,7 +40,7 @@ mail {
     server {
         listen     127.0.0.1:8025;
         protocol   smtp;
-        smtp_greeting_delay  100ms;
+        smtp_greeting_delay  1s;
     }
 }
 
