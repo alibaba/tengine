@@ -36,6 +36,7 @@ error_log syslog:server=127.0.0.1:%%PORT_8981_UDP%% info;
 error_log %%TESTDIR%%/f_glob.log info;
 
 daemon off;
+worker_processes 1;
 
 events {
 }

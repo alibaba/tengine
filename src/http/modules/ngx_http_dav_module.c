@@ -841,11 +841,9 @@ overwrite_done:
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        dlcf = ngx_http_get_module_loc_conf(r, ngx_http_dav_module);
-
         cf.size = ngx_file_size(&fi);
         cf.buf_size = 0;
-        cf.access = dlcf->access;
+        cf.access = ngx_file_access(&fi);
         cf.time = ngx_file_mtime(&fi);
         cf.log = r->connection->log;
 

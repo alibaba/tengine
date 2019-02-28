@@ -64,24 +64,24 @@ ngx_int_t             ngx_accept_disabled;
 
 #if (NGX_STAT_STUB)
 
-ngx_atomic_t   ngx_stat_accepted0;
-ngx_atomic_t  *ngx_stat_accepted = &ngx_stat_accepted0;
-ngx_atomic_t   ngx_stat_handled0;
-ngx_atomic_t  *ngx_stat_handled = &ngx_stat_handled0;
-ngx_atomic_t   ngx_stat_requests0;
-ngx_atomic_t  *ngx_stat_requests = &ngx_stat_requests0;
-ngx_atomic_t   ngx_stat_active0;
-ngx_atomic_t  *ngx_stat_active = &ngx_stat_active0;
-ngx_atomic_t   ngx_stat_reading0;
-ngx_atomic_t  *ngx_stat_reading = &ngx_stat_reading0;
-ngx_atomic_t   ngx_stat_writing0;
-ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
-ngx_atomic_t   ngx_stat_waiting0;
-ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
+static ngx_atomic_t   ngx_stat_accepted0;
+ngx_atomic_t         *ngx_stat_accepted = &ngx_stat_accepted0;
+static ngx_atomic_t   ngx_stat_handled0;
+ngx_atomic_t         *ngx_stat_handled = &ngx_stat_handled0;
+static ngx_atomic_t   ngx_stat_requests0;
+ngx_atomic_t         *ngx_stat_requests = &ngx_stat_requests0;
+static ngx_atomic_t   ngx_stat_active0;
+ngx_atomic_t         *ngx_stat_active = &ngx_stat_active0;
+static ngx_atomic_t   ngx_stat_reading0;
+ngx_atomic_t         *ngx_stat_reading = &ngx_stat_reading0;
+static ngx_atomic_t   ngx_stat_writing0;
+ngx_atomic_t         *ngx_stat_writing = &ngx_stat_writing0;
+static ngx_atomic_t   ngx_stat_waiting0;
+ngx_atomic_t         *ngx_stat_waiting = &ngx_stat_waiting0;
 
 #if (T_NGX_HTTP_STUB_STATUS)
-ngx_atomic_t   ngx_stat_request_time0;
-ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
+static ngx_atomic_t   ngx_stat_request_time0;
+ngx_atomic_t         *ngx_stat_request_time = &ngx_stat_request_time0;
 #endif
 
 #endif

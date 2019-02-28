@@ -47,6 +47,9 @@ static void *ngx_http_ssl_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
+static ngx_int_t ngx_http_ssl_compile_certificates(ngx_conf_t *cf,
+    ngx_http_ssl_srv_conf_t *conf);
+
 static char *ngx_http_ssl_enable(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
@@ -267,14 +270,12 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, stapling_verify),
       NULL },
 
-#if (T_NGX_SSL_EARLY_DATA)
     { ngx_string("ssl_early_data"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, early_data),
       NULL },
-#endif
 
       ngx_null_command
 };
@@ -334,6 +335,10 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
 
     { ngx_string("ssl_session_reused"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_session_reused, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_early_data"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_early_data,
+      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_string("ssl_server_name"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_server_name, NGX_HTTP_VAR_CHANGEABLE, 0 },
@@ -617,6 +622,7 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
      * set by ngx_pcalloc():
      *
      *     sscf->protocols = 0;
+     *     sscf->certificate_values = NULL;
      *     sscf->dhparam = { 0, NULL };
      *     sscf->ecdh_curve = { 0, NULL };
      *     sscf->client_certificate = { 0, NULL };
@@ -633,6 +639,7 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->async_enable = NGX_CONF_UNSET;
 #endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
+    sscf->early_data = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
     sscf->verify = NGX_CONF_UNSET_UINT;
     sscf->verify_depth = NGX_CONF_UNSET_UINT;
@@ -645,9 +652,6 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->session_ticket_keys = NGX_CONF_UNSET_PTR;
     sscf->stapling = NGX_CONF_UNSET;
     sscf->stapling_verify = NGX_CONF_UNSET;
-#if (T_NGX_SSL_EARLY_DATA)
-    sscf->early_data = NGX_CONF_UNSET;
-#endif
 
     return sscf;
 }
@@ -708,6 +712,8 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->prefer_server_ciphers,
                          prev->prefer_server_ciphers, 0);
 
+    ngx_conf_merge_value(conf->early_data, prev->early_data, 0);
+
     ngx_conf_merge_bitmask_value(conf->protocols, prev->protocols,
                          (NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1
                           |NGX_SSL_TLSv1_1|NGX_SSL_TLSv1_2));
@@ -742,10 +748,6 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->stapling_file, prev->stapling_file, "");
     ngx_conf_merge_str_value(conf->stapling_responder,
                          prev->stapling_responder, "");
-
-#if (T_NGX_SSL_EARLY_DATA)
-    ngx_conf_merge_value(conf->early_data, prev->early_data, 1);
-#endif
 
     conf->ssl.log = cf->log;
 
@@ -834,11 +836,36 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
 
-    if (ngx_ssl_certificates(cf, &conf->ssl, conf->certificates,
-                             conf->certificate_keys, conf->passwords)
-        != NGX_OK)
-    {
+    if (ngx_http_ssl_compile_certificates(cf, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
+    }
+
+    if (conf->certificate_values) {
+
+#ifdef SSL_R_CERT_CB_ERROR
+
+        /* install callback to lookup certificates */
+
+        SSL_CTX_set_cert_cb(conf->ssl.ctx, ngx_http_ssl_certificate, conf);
+
+#else
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "variables in "
+                      "\"ssl_certificate\" and \"ssl_certificate_key\" "
+                      "directives are not supported on this platform");
+        return NGX_CONF_ERROR;
+#endif
+
+    } else {
+
+        /* configure certificates */
+
+        if (ngx_ssl_certificates(cf, &conf->ssl, conf->certificates,
+                                 conf->certificate_keys, conf->passwords)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
     }
 
     if (ngx_ssl_ciphers(cf, &conf->ssl, &conf->ciphers,
@@ -895,7 +922,7 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     if (ngx_ssl_session_cache(&conf->ssl, &ngx_http_ssl_sess_id_ctx,
-                              conf->builtin_session_cache,
+                              conf->certificates, conf->builtin_session_cache,
                               conf->shm_zone, conf->session_timeout)
         != NGX_OK)
     {
@@ -930,7 +957,95 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     }
 
+    if (ngx_ssl_early_data(cf, &conf->ssl, conf->early_data) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     return NGX_CONF_OK;
+}
+
+
+static ngx_int_t
+ngx_http_ssl_compile_certificates(ngx_conf_t *cf,
+    ngx_http_ssl_srv_conf_t *conf)
+{
+    ngx_str_t                         *cert, *key;
+    ngx_uint_t                         i, nelts;
+    ngx_http_complex_value_t          *cv;
+    ngx_http_compile_complex_value_t   ccv;
+
+    cert = conf->certificates->elts;
+    key = conf->certificate_keys->elts;
+    nelts = conf->certificates->nelts;
+
+    for (i = 0; i < nelts; i++) {
+
+        if (ngx_http_script_variables_count(&cert[i])) {
+            goto found;
+        }
+
+        if (ngx_http_script_variables_count(&key[i])) {
+            goto found;
+        }
+    }
+
+    return NGX_OK;
+
+found:
+
+    conf->certificate_values = ngx_array_create(cf->pool, nelts,
+                                             sizeof(ngx_http_complex_value_t));
+    if (conf->certificate_values == NULL) {
+        return NGX_ERROR;
+    }
+
+    conf->certificate_key_values = ngx_array_create(cf->pool, nelts,
+                                             sizeof(ngx_http_complex_value_t));
+    if (conf->certificate_key_values == NULL) {
+        return NGX_ERROR;
+    }
+
+    for (i = 0; i < nelts; i++) {
+
+        cv = ngx_array_push(conf->certificate_values);
+        if (cv == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &cert[i];
+        ccv.complex_value = cv;
+        ccv.zero = 1;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        cv = ngx_array_push(conf->certificate_key_values);
+        if (cv == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &key[i];
+        ccv.complex_value = cv;
+        ccv.zero = 1;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_ERROR;
+        }
+    }
+
+    conf->passwords = ngx_ssl_preserve_passwords(cf, conf->passwords);
+    if (conf->passwords == NULL) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
 }
 
 
