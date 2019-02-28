@@ -308,6 +308,7 @@ ngx_pcalloc(ngx_pool_t *pool, size_t size)
 }
 
 
+#if (T_DEPRECATED)
 void *
 ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 {
@@ -353,6 +354,7 @@ ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size)
 
     return new;
 }
+#endif
 
 
 ngx_pool_cleanup_t *
