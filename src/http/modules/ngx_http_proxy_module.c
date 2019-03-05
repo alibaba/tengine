@@ -606,7 +606,7 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_proxy_loc_conf_t, upstream.upstream_tries),
+      offsetof(ngx_http_proxy_loc_conf_t, upstream.next_upstream_tries),
       NULL },
 #endif
 
@@ -2864,10 +2864,6 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.max_temp_file_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.temp_file_write_size_conf = NGX_CONF_UNSET_SIZE;
 
-#if (T_UPSTREAM_TRIES)
-    conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
-#endif
-
     conf->upstream.pass_request_headers = NGX_CONF_UNSET;
     conf->upstream.pass_request_body = NGX_CONF_UNSET;
 
@@ -3105,12 +3101,6 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->upstream.next_upstream = NGX_CONF_BITMASK_SET
                                        |NGX_HTTP_UPSTREAM_FT_OFF;
     }
-
-#if (T_UPSTREAM_TRIES)
-    ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
-                              prev->upstream.upstream_tries,
-                              NGX_CONF_UNSET_UINT);
-#endif
 
     if (ngx_conf_merge_path_value(cf, &conf->upstream.temp_path,
                               prev->upstream.temp_path,

@@ -648,10 +648,6 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->main = r;
     r->count = 1;
 
-#if (T_UPSTREAM_TRIES)
-    r->us_tries = 1;
-#endif
-
 #if (T_NGX_RET_CACHE)
     {
     struct timeval              tv;
