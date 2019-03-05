@@ -65,6 +65,9 @@ struct ngx_peer_connection_s {
 
     unsigned                         cached:1;
     unsigned                         transparent:1;
+    unsigned                         so_keepalive:1;
+    unsigned                         down:1;
+
 #if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
     unsigned                         resolved:2;
 #endif

@@ -24,6 +24,7 @@ typedef struct {
     ngx_ssl_t                       ssl;
 
     ngx_flag_t                      prefer_server_ciphers;
+    ngx_flag_t                      early_data;
 
     ngx_uint_t                      protocols;
 
@@ -38,6 +39,9 @@ typedef struct {
 
     ngx_array_t                    *certificates;
     ngx_array_t                    *certificate_keys;
+
+    ngx_array_t                    *certificate_values;
+    ngx_array_t                    *certificate_key_values;
 
     ngx_str_t                       dhparam;
     ngx_str_t                       ecdh_curve;
@@ -58,10 +62,6 @@ typedef struct {
     ngx_flag_t                      stapling_verify;
     ngx_str_t                       stapling_file;
     ngx_str_t                       stapling_responder;
-
-#if (T_NGX_SSL_EARLY_DATA)
-    ngx_flag_t                      early_data;
-#endif
 
     u_char                         *file;
     ngx_uint_t                      line;

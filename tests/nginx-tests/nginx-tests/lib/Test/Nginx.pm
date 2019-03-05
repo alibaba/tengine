@@ -109,12 +109,6 @@ sub has($;) {
 	return $self;
 }
 
-sub set_dso($;) {
-	my ($self, $module_name, $module_path) = @_;
-
-	$self->{_dso_module}{$module_name} = $module_path;
-}
-
 sub has_module($) {
 	my ($self, $feature) = @_;
 
@@ -551,7 +545,6 @@ sub write_file_expand($$) {
 	my ($self, $name, $content) = @_;
 
 	$content =~ s/%%TEST_GLOBALS%%/$self->test_globals()/gmse;
-	$content =~ s/%%TEST_GLOBALS_DSO%%/$self->test_globals_dso()/gmse;
 	$content =~ s/%%TEST_GLOBALS_HTTP%%/$self->test_globals_http()/gmse;
 	$content =~ s/%%TESTDIR%%/$self->{_testdir}/gms;
 
@@ -692,28 +685,6 @@ sub test_globals_http() {
 		if $ENV{TEST_NGINX_GLOBALS_HTTP};
 
 	$self->{_test_globals_http} = $s;
-}
-
-sub test_globals_dso() {
-	my ($self) = @_;
-
-	return "" unless defined $ENV{TEST_NGINX_DSO};
-
-	return $self->{_test_globals_dso} if defined $self->{_test_globals_dso};
-
-	my $s = '';
-
-	$s .= "dso {\n";
-	if (defined $ENV{NGINX_DSO_PATH}) {
-		$s .= "path $ENV{NGINX_DSO_PATH};\n";
-	}
-
-	while ( my ($key, $value) = each(%{$self->{_dso_module}}) ) {
-		$s .= "load $key $value;\n";
-	}
-	$s .= "}\n";
-
-	$self->{_test_globals_dso} = $s;
 }
 
 ###############################################################################

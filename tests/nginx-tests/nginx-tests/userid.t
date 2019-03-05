@@ -26,7 +26,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http userid map/)->plan(33);
+my $t = Test::Nginx->new()->has(qw/http userid map unix/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -48,6 +48,8 @@ http {
 
     server {
         listen       127.0.0.1:8080;
+        listen       [::1]:%%PORT_8080%%;
+        listen       unix:%%TESTDIR%%/unix.sock;
         server_name  localhost;
 
         add_header X-Got $uid_got;
@@ -117,6 +119,16 @@ http {
             userid_mark t;
         }
 
+        location /ip6 {
+            userid off;
+            proxy_pass http://[::1]:%%PORT_8080%%/;
+        }
+
+        location /unix {
+            userid off;
+            proxy_pass http://unix:%%TESTDIR%%/unix.sock:/;
+        }
+
         location /clog {
             userid log;
         }
@@ -135,7 +147,7 @@ $t->write_file('service', '');
 $t->write_file('cv1', '');
 $t->write_file('clog', '');
 $t->write_file('coff', '');
-$t->run();
+$t->try_run('no inet6 support')->plan(35);
 
 ###############################################################################
 
@@ -214,6 +226,16 @@ is(substr(uid_set(http_get('/')), 0, 8), $addr, 'service default v2');
 
 $addr = $bigendian ? "0000FFFE" : "FEFF0000";
 is(substr(uid_set(http_get('/service')), 0, 8), $addr, 'service custom');
+
+$addr = $bigendian ? "00000001" : "01000000";
+is(substr(uid_set(http_get('/ip6')), 0, 8), $addr, 'service ipv6');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.15.8');
+
+is(substr(uid_set(http_get('/unix')), 0, 8), "00000000", 'service unix');
+
+}
 
 # reset log
 

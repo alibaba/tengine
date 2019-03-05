@@ -310,7 +310,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
                 goto failed;
             }
 
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, rv);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s", rv);
 
             goto failed;
         }
@@ -656,12 +656,13 @@ ngx_conf_read_token(ngx_conf_t *cf)
         }
 
         if (last_space) {
-            if (ch == ' ' || ch == '\t' || ch == CR || ch == LF) {
-                continue;
-            }
 
             start = b->pos - 1;
             start_line = cf->conf_file->line;
+
+            if (ch == ' ' || ch == '\t' || ch == CR || ch == LF) {
+                continue;
+            }
 
             switch (ch) {
 

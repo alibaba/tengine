@@ -1,9 +1,7 @@
 ngx_addon_name=ngx_backtrace_module
 HTTP_MODULES="$HTTP_MODULES ngx_backtrace_module"
 NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_backtrace_module.c"
-if ! [ $NGX_DSO = YES ] ; then
-    LINK="$LINK -rdynamic"
-fi
+LINK="$LINK -rdynamic"
 
 ngx_feature="BACKTRACE"
 ngx_feature_name=
@@ -20,6 +18,7 @@ if [ $ngx_found = no ]; then
     $0: error: the backtrace module requires backtrace function.
     You can either do not enable the module or update your libc library.
     
-    END
+END
+
     exit 1
 fi
