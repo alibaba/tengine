@@ -5530,6 +5530,12 @@ ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "is duplicate";
     }
 
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (cf->no_ssl_init) {
+        return NGX_CONF_OK;
+    }
+#endif
+
     oscf->engine = 1;
 
     value = cf->args->elts;
