@@ -65,6 +65,9 @@ typedef struct {
     int                            rcvbuf;
     int                            sndbuf;
     int                            type;
+#if (NGX_STREAM_SNI)
+    unsigned                       default_server;
+#endif
 } ngx_stream_listen_t;
 
 
@@ -73,6 +76,10 @@ typedef struct {
     ngx_str_t                      addr_text;
     unsigned                       ssl:1;
     unsigned                       proxy_protocol:1;
+#if (NGX_STREAM_SNI)
+    void                          *default_server;
+    void                          *virtual_names;
+#endif
 } ngx_stream_addr_conf_t;
 
 typedef struct {
@@ -108,6 +115,13 @@ typedef struct {
 
 typedef struct {
     ngx_stream_listen_t            opt;
+#if (NGX_STREAM_SNI)
+    void                          *default_server;
+    ngx_array_t                    servers;  /* array of ngx_stream_core_srv_conf_t */
+    ngx_hash_t                     hash;
+    ngx_hash_wildcard_t           *wc_head;
+    ngx_hash_wildcard_t           *wc_tail;
+#endif
 } ngx_stream_conf_addr_t;
 
 
@@ -165,6 +179,11 @@ typedef struct {
     ngx_hash_keys_arrays_t        *variables_keys;
 
     ngx_stream_phase_t             phases[NGX_STREAM_LOG_PHASE + 1];
+
+#if (NGX_STREAM_SNI)
+    ngx_uint_t                     server_names_hash_max_size;
+    ngx_uint_t                     server_names_hash_bucket_size;
+#endif
 } ngx_stream_core_main_conf_t;
 
 
@@ -188,8 +207,25 @@ typedef struct {
     ngx_msec_t                     proxy_protocol_timeout;
 
     ngx_uint_t                     listen;  /* unsigned  listen:1; */
+
+#if (NGX_STREAM_SNI)
+    /* array of the ngx_stream_server_name_t, "server_name" directive */
+    ngx_array_t                    server_names;
+    ngx_str_t                      server_name;
+#endif
 } ngx_stream_core_srv_conf_t;
 
+#if (NGX_STREAM_SNI)
+/* list of structures to find core_srv_conf quickly at run time */
+typedef struct {
+    ngx_stream_core_srv_conf_t  *server;   /* virtual name server conf */
+    ngx_str_t                    name;
+} ngx_stream_server_name_t;
+
+typedef struct {
+    ngx_hash_combined_t        names;
+} ngx_stream_virtual_names_t;
+#endif
 
 struct ngx_stream_session_s {
     uint32_t                       signature;         /* "STRM" */
@@ -225,6 +261,9 @@ struct ngx_stream_session_s {
     unsigned                       stat_processing:1;
 
     unsigned                       health_check:1;
+#if (NGX_STREAM_SNI)
+    ngx_stream_addr_conf_t        *addr_conf;
+#endif
 };
 
 
