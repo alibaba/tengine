@@ -45,8 +45,8 @@ static char *ngx_stream_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
 static ngx_int_t ngx_stream_ssl_init(ngx_conf_t *cf);
 
 #if (NGX_STREAM_SNI)
-int
-ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
+int ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad,
+    void *arg);
 #endif
 
 
@@ -655,6 +655,7 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (NGX_STREAM_SNI)
     ngx_conf_merge_value(conf->sni_force, prev->sni_force, 0);
+    if (!conf->listen)
 #endif
 
     conf->ssl.log = cf->log;
@@ -812,15 +813,19 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
 #if (NGX_STREAM_SNI)
+#if (SSL_CTRL_SET_TLSEXT_HOSTNAME)
     if (SSL_CTX_set_tlsext_servername_callback(conf->ssl.ctx,
                                                ngx_stream_ssl_servername)
         == 0)
     {
+#endif
         ngx_log_error(NGX_LOG_WARN, cf->log, 0,
             "nginx was built with SNI support, however, now it is linked "
             "dynamically to an OpenSSL library which has no tlsext support, "
             "therefore SNI is not available");
+#if (SSL_CTRL_SET_TLSEXT_HOSTNAME)
     }
+#endif
 #endif
 
     return NGX_CONF_OK;

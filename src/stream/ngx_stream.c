@@ -661,7 +661,9 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
     ngx_stream_conf_port_t      *port;
     ngx_stream_conf_addr_t      *addr;
     ngx_stream_core_srv_conf_t  *cscf;
-
+#if (NGX_STREAM_SNI)
+    ngx_stream_core_main_conf_t *cmcf;
+#endif
     port = ports->elts;
     for (p = 0; p < ports->nelts; p++) {
 
@@ -741,9 +743,10 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
             stport->naddrs = i + 1;
 
 #if (NGX_STREAM_SNI)
-            /*Because of ssl_sni_force we have to add hash key even one server*/
+            cmcf = addr->opt.ctx->main_conf[ngx_stream_core_module.ctx_index];
+            /*Because of ssl_sni_force we have to do this even one server*/
             if (addr[i].servers.nelts >= 1) {
-                if (ngx_stream_server_names(cf, addr->opt.ctx->main_conf[ngx_stream_core_module.ctx_index], &addr[i]) != NGX_OK) {
+                if (ngx_stream_server_names(cf, cmcf, &addr[i]) != NGX_OK) {
                     return NGX_CONF_ERROR;
                 }
             }
