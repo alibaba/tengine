@@ -661,6 +661,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
     ngx_stream_conf_port_t      *port;
     ngx_stream_conf_addr_t      *addr;
     ngx_stream_core_srv_conf_t  *cscf;
+
 #if (NGX_STREAM_SNI)
     ngx_stream_core_main_conf_t *cmcf;
 #endif

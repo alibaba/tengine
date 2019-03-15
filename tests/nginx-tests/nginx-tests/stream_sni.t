@@ -1,9 +1,8 @@
 #!/usr/bin/perl
 
-# (C) Sergey Kandaurov
-# (C) Nginx, Inc.
+# Copyright (C) 2019 Alibaba Group Holding Limited
 
-# Stream tests for proxy to ssl backend.
+# Stream tests for SNI.
 
 ###############################################################################
 # "For using stream_sni.t, you should configure Tengine by using --with-stream_ssl_module --with-stream_sni";

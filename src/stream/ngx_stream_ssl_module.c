@@ -200,11 +200,11 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
 
 #if (NGX_STREAM_SNI)
     { ngx_string("ssl_sni_force"),
-        NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
-        ngx_conf_set_flag_slot,
-        NGX_STREAM_SRV_CONF_OFFSET,
-        offsetof(ngx_stream_ssl_conf_t, sni_force),
-        NULL },
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_ssl_conf_t, sni_force),
+      NULL },
 #endif
 
       ngx_null_command
