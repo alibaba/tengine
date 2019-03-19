@@ -1159,6 +1159,53 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 break;
             }
 
+#if (NGX_HTTP_PROXY_CONNECT)
+
+            if (r->connect_host_start && r->connect_host_end) {
+
+                host.len = r->connect_host_end - r->connect_host_start;
+                host.data = r->connect_host_start;
+                rc = ngx_http_validate_host(&host, r->pool, 0);
+
+                if (rc == NGX_DECLINED) {
+                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent invalid host in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                if (rc == NGX_ERROR) {
+                    ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                    return;
+                }
+
+                r->connect_host = host;
+
+                if (!r->connect_port_end) {
+                   ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent no port in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                r->connect_port.data = r->connect_host_end + 1;
+                r->connect_port.len = r->connect_port_end
+                                      - r->connect_host_end - 1;
+
+                ngx_int_t port;
+
+                port = ngx_atoi(r->connect_port.data, r->connect_port.len);
+                if (port == NGX_ERROR || port < 1 || port > 65535) {
+                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                                  "client sent invalid port in request line");
+                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+                    return;
+                }
+
+                r->connect_port_n = port;
+            }
+#endif
+
             if (r->schema_end) {
                 r->schema.len = r->schema_end - r->schema_start;
                 r->schema.data = r->schema_start;
@@ -1759,6 +1806,19 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
             r->schema_start = new + (r->schema_start - old);
             r->schema_end = new + (r->schema_end - old);
         }
+
+#if (NGX_HTTP_PROXY_CONNECT)
+        if (r->connect_host_start) {
+            r->connect_host_start = new + (r->connect_host_start - old);
+            if (r->connect_host_end) {
+                r->connect_host_end = new + (r->connect_host_end - old);
+            }
+
+            if (r->connect_port_end) {
+                r->connect_port_end = new + (r->connect_port_end - old);
+            }
+        }
+#endif
 
         if (r->host_start) {
             r->host_start = new + (r->host_start - old);

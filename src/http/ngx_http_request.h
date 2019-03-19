@@ -42,6 +42,10 @@
 #define NGX_HTTP_PATCH                     0x4000
 #define NGX_HTTP_TRACE                     0x8000
 
+#if (NGX_HTTP_PROXY_CONNECT)
+#define NGX_HTTP_CONNECT                   0x10000
+#endif
+
 #define NGX_HTTP_CONNECTION_CLOSE          1
 #define NGX_HTTP_CONNECTION_KEEP_ALIVE     2
 
@@ -415,6 +419,15 @@ struct ngx_http_request_s {
     ngx_str_t                         args;
     ngx_str_t                         exten;
     ngx_str_t                         unparsed_uri;
+
+#if (NGX_HTTP_PROXY_CONNECT)
+    ngx_str_t                         connect_host;
+    ngx_str_t                         connect_port;
+    in_port_t                         connect_port_n;
+    u_char                           *connect_host_start;
+    u_char                           *connect_host_end;
+    u_char                           *connect_port_end;
+#endif
 
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
