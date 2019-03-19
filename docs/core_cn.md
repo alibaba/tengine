@@ -169,3 +169,33 @@ Context: events
 
 注意：Tengine-2.3.0 版本后废弃reuse_port指令，使用Nginx官方的reuseport。升级方法：将events配置块里面的reuse_port on|off 释掉，在对应的监听端口后面加reuseport参数、详细参考[文档](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/) 。
 
+### server_name
+
+Syntax: **server_name** name;
+
+Default: —
+
+Context: server
+
+在Stream模块中，`server_name` 可以用来允许多个server块监听同一个ip:port。Tengine会根据TLS的SNI来决定请求连接匹配到哪个server块。这意味着，Stream模块的`server_name`必须用在SSL卸载的情况下（即`listen`指令后面有`ssl`这个参数）。
+
+Stream模块中的`server_name` 默认是不开启的. 你需要这么显示的编译:
+
+```
+ ./configure --with-stream_sni
+```
+注意:
+这个特性是实验性的。如果Nginx官方有类似的功能和该功能有冲突，那么改功能将被废弃。
+
+### ssl_sni_force
+
+Syntax: **ssl_sni_force** on | off
+
+Default: ssl_sni_force off
+
+Context: stream, server
+
+在Stream模块中，`ssl_sni_force`决定了如果TLS的SNI和配置的`server_name`不匹配，TLS握手是否被拒绝。
+
+注意:
+详见`server_name`的注意点.
