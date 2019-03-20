@@ -19,6 +19,8 @@ The force_exit support is not enabled by default. You should compile it explicit
  ./configure --with-force-exit
 ```
 
+Note: Removed force_exit directive after the Tengine-2.3.0 version and use Nginx official `worker_shutdown_timeout` , detailed reference [worker_shutdown_timeout](http://nginx.org/en/docs/ngx_core_module.html#worker_shutdown_timeout)
+
 
 ### worker_processes
 
