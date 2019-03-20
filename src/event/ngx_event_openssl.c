@@ -2982,13 +2982,6 @@ ngx_ssl_free_buffer(ngx_connection_t *c)
             c->ssl->buf->start = NULL;
         }
     }
-#if !defined(OPENSSL_IS_BORINGSSL) && (OPENSSL_VERSION_NUMBER >= 0x10101000L)
-    if (c->ssl->early_buf && c->ssl->early_buf->start) {
-        if (ngx_pfree(c->pool, c->ssl->early_buf->start) == NGX_OK) {
-            c->ssl->early_buf->start = NULL;
-        }
-    }
-#endif
 }
 
 
@@ -5529,6 +5522,12 @@ ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (oscf->engine) {
         return "is duplicate";
     }
+
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (cf->no_ssl_init) {
+        return NGX_CONF_OK;
+    }
+#endif
 
     oscf->engine = 1;
 

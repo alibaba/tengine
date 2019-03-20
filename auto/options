@@ -136,6 +136,7 @@ STREAM_UPSTREAM_LEAST_CONN=YES
 STREAM_UPSTREAM_RANDOM=YES
 STREAM_UPSTREAM_ZONE=YES
 STREAM_SSL_PREREAD=NO
+STREAM_SNI=NO
 
 DYNAMIC_MODULES=
 
@@ -341,6 +342,7 @@ use the \"--with-mail_ssl_module\" option instead"
                                          STREAM_GEOIP=DYNAMIC       ;;
         --with-stream_ssl_preread_module)
                                          STREAM_SSL_PREREAD=YES     ;;
+        --with-stream_sni)               STREAM_SNI=YES             ;;
         --without-stream_limit_conn_module)
                                          STREAM_LIMIT_CONN=NO       ;;
         --without-stream_access_module)  STREAM_ACCESS=NO           ;;
@@ -573,6 +575,7 @@ cat << END
   --with-stream_geoip_module         enable ngx_stream_geoip_module
   --with-stream_geoip_module=dynamic enable dynamic ngx_stream_geoip_module
   --with-stream_ssl_preread_module   enable ngx_stream_ssl_preread_module
+  --with-stream_sni                  enable dynamic server block
   --without-stream_limit_conn_module disable ngx_stream_limit_conn_module
   --without-stream_access_module     disable ngx_stream_access_module
   --without-stream_geo_module        disable ngx_stream_geo_module

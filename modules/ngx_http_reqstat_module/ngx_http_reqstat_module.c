@@ -139,6 +139,13 @@ static ngx_command_t   ngx_http_reqstat_commands[] = {
       0,
       NULL },
 
+    { ngx_string("req_status_lazy"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_reqstat_conf_t, lazy),
+      NULL },
+
     { ngx_string("req_status_bypass"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
       ngx_http_set_predicate_slot,
@@ -233,6 +240,7 @@ ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    conf->lazy = NGX_CONF_UNSET;
     conf->bypass = NGX_CONF_UNSET_PTR;
     conf->monitor = NGX_CONF_UNSET_PTR;
     conf->display = NGX_CONF_UNSET_PTR;
@@ -250,6 +258,7 @@ ngx_http_reqstat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_reqstat_conf_t      *conf = child;
     ngx_http_reqstat_conf_t      *prev = parent;
 
+    ngx_conf_merge_value(conf->lazy, prev->lazy, 0);
     ngx_conf_merge_ptr_value(conf->bypass, prev->bypass, NULL);
     ngx_conf_merge_ptr_value(conf->monitor, prev->monitor, NULL);
     ngx_conf_merge_ptr_value(conf->display, prev->display, NULL);
@@ -803,6 +812,7 @@ static ngx_int_t
 ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 {
     u_char                       *p;
+    ngx_str_t                     val, *value;
     ngx_int_t                    *indicator, iv;
     ngx_uint_t                    i, j, k, status, utries;
     ngx_time_t                   *tp;
@@ -829,8 +839,53 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
 
     shm_zone = rcf->monitor->elts;
     fnode_store = store->monitor_index.elts;
+    value = store->value_index.elts;
     for (i = 0; i < store->monitor_index.nelts; i++) {
-        fnode = fnode_store[i];
+        if (fnode_store[i] == NULL) {
+            continue;
+        }
+
+        z = shm_zone[i];
+        ctx = z->data;
+
+        if (rcf->lazy) {
+            if (ngx_http_complex_value(r, &ctx->value, &val) != NGX_OK) {
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                              "failed to reap the key \"%V\"", ctx->val);
+                continue;
+            }
+
+            if (value[i].len == val.len
+                && ngx_strncmp(value[i].data, val.data, val.len) == 0)
+            {
+                fnode = fnode_store[i];
+
+            } else {
+                fnode = ngx_http_reqstat_rbtree_lookup(shm_zone[i], &val);
+
+                if (fnode == NULL) {
+                    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                                  "failed to alloc node in zone \"%V\", "
+                                  "enlarge it please",
+                                  &z->shm.name);
+
+                    fnode = fnode_store[i];
+
+                } else {
+                    ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT,
+                                           r->connection->sent);
+                    ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN,
+                                           r->connection->received);
+                    if (store) {
+                        store->recv = r->connection->received;
+                    }
+                }
+            }
+
+        } else {
+            fnode = fnode_store[i];
+        }
+
         if (r->connection->requests == 1) {
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_CONN_TOTAL, 1);
         }
@@ -1010,9 +1065,6 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
             ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_UPS_TRIES,
                                    utries);
         }
-
-        z = shm_zone[i];
-        ctx = z->data;
 
         if (ctx->user_defined) {
             indicator = ctx->user_defined->elts;
@@ -1468,6 +1520,10 @@ ngx_http_reqstat_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
     fnode_store = store->monitor_index.elts;
     for (i = 0; i < store->monitor_index.nelts; i++) {
         fnode = fnode_store[i];
+        if (fnode == NULL) {
+            continue;
+        }
+
         ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN, diff);
     }
 
@@ -1501,6 +1557,10 @@ ngx_http_reqstat_log_flow(ngx_http_request_t *r)
     fnode_store = store->monitor_index.elts;
     for (i = 0; i < store->monitor_index.nelts; i++) {
         fnode = fnode_store[i];
+        if (fnode == NULL) {
+            continue;
+        }
+
         ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT, diff);
     }
 
@@ -1512,7 +1572,7 @@ static ngx_http_reqstat_store_t *
 ngx_http_reqstat_create_store(ngx_http_request_t *r,
     ngx_http_reqstat_conf_t *rlcf)
 {
-    ngx_str_t                     val;
+    ngx_str_t                     val, *value;
     ngx_uint_t                    i;
     ngx_shm_zone_t              **shm_zone, *z;
     ngx_http_reqstat_ctx_t       *ctx;
@@ -1550,6 +1610,12 @@ ngx_http_reqstat_create_store(ngx_http_request_t *r,
         return NULL;
     }
 
+    if (ngx_array_init(&store->value_index, r->pool, rlcf->monitor->nelts,
+                       sizeof(ngx_str_t)) == NGX_ERROR)
+    {
+        return NULL;
+    }
+
     shm_zone = rlcf->monitor->elts;
     for (i = 0; i < rlcf->monitor->nelts; i++) {
         z = shm_zone[i];
@@ -1561,18 +1627,19 @@ ngx_http_reqstat_create_store(ngx_http_request_t *r,
             continue;
         }
 
-        fnode = ngx_http_reqstat_rbtree_lookup(shm_zone[i], &val);
+        value = ngx_array_push(&store->value_index);
+        *value = val;
 
+        fnode = ngx_http_reqstat_rbtree_lookup(shm_zone[i], &val);
         if (fnode == NULL) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "failed to alloc node in zone \"%V\", "
                           "enlarge it please",
                           &z->shm.name);
-
-        } else {
-            fnode_store = ngx_array_push(&store->monitor_index);
-            *fnode_store = fnode;
         }
+
+        fnode_store = ngx_array_push(&store->monitor_index);
+        *fnode_store = fnode;
     }
 
     return store;
