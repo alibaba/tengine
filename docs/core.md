@@ -162,3 +162,33 @@ turn on support for SO_REUSEPORT socket option. This option is supported since L
 
 Note:
 Removed reuse_port directive after the Tengine-2.3.0 version and use the official reuseport of Nginx, detailed reference [document](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/).
+
+### server_name
+
+Syntax: **server_name** name;
+
+Default: —
+
+Context: server
+
+`server_name` used in Stream module makes Tengine have the ability to listen same ip:port in multiply server blocks and. The connection will be attached to a certain server block by SNI extension in TLS. That means `server_name` should be used with SSL offloading(using `ssl` after `listen`).
+The `server_name` support in Stream module is not enabled by default. You should compile it explicitly:
+
+```
+ ./configure --with-stream_sni
+```
+Note:
+This feature is experimental. We will deprecate this feature if there is any conflict with similar feature of nginx official.
+
+### ssl_sni_force
+
+Syntax: **ssl_sni_force** on | off
+
+Default: ssl_sni_force off
+
+Context: stream, server
+
+`ssl_sni_force` will determine whether the TLS handsheke is rejected or not if SNI is not matched with server name which we configure by `server_name` in Stream module.
+
+Note:
+Same note in `server_name` above.

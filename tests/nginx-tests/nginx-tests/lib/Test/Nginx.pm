@@ -184,6 +184,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-stream_split_clients_module)',
 		stream_ssl
 			=> '--with-stream_ssl_module',
+		stream_sni
+			=> '--with-stream_sni',
 		stream_upstream_hash
 			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
 		stream_upstream_least_conn
