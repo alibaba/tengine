@@ -17,6 +17,7 @@ force_exit功能默认没有编译开启。需要编译时开启:
 ```
  ./configure --with-force-exit
 ```
+注意：Tengine-2.3.0 版本后废弃force_exit指令,使用Nginx官方`worker_shutdown_timeout`指令替代，详细[文档](http://nginx.org/en/docs/ngx_core_module.html#worker_shutdown_timeout)
 
 
 ### worker_processes
