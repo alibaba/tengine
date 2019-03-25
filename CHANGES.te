@@ -1,4 +1,4 @@
-Changes with Tengine 2.3.0                                         20 MAR 2019
+Changes with Tengine 2.3.0                                         25 MAR 2019
 
     *) Feature: added proxy_connect module support for the CONNECT
        HTTP method. (chobits)
@@ -11,22 +11,22 @@ Changes with Tengine 2.3.0                                         20 MAR 2019
     *) Feature: added support of variable of limit_req_zone
        parameter rate. (Alaaask)
     *) Change: updated debug_pool module for Nginx 1.15.9. (chobits)
-    *) Change: updated documents for reuse_port、dso、limit_req
-       directive changes. (chobits、wangfakang)
+    *) Change: updated documents for reuse_port, dso, limit_req
+       directive changes. (chobits, wangfakang)
     *) Change: merged the official limit_req logic. Now will ignore statistics
        when all variable values are empty. (chobits)
-    *) Change: the reuse_port、dso、slice directive has been removed and
+    *) Change: the reuse_port, dso, slice directive has been removed and
        use the official features of Nginx. (wangfakang)
     *) Change: updated and modify the official 1.15.9 test cases.
-       (chobits、wangfakang)
+       (chobits, wangfakang)
     *) Change: put all Tengine's modules into the modules directory
-       which reduces the intrusion of Nginx's core module. (chobits、wangfakang)
+       which reduces the intrusion of Nginx's core module. (chobits, wangfakang)
     *) Change: updated the code from Nginx-1.15.9 version,
-       Stream、gRPC etc. (chobits、wangfakang)
+       Stream, gRPC etc. (chobits, wangfakang)
     *) Change: updated the Lua module to v0.10.14rc4. (wangfakang)
     *) Change: updated the dyups document. (lf1029698952)
     *) Change: changes of the core code are all guarded by macros.
-       (chobits、wangfakang、fankeke、hongxiaolong、imkeeper)
+       (chobits, wangfakang, fankeke, hongxiaolong, imkeeper)
     *) Change: rollback  accpte_filter feature. (wangfakang)
     *) Bugfix: fixed compilation error of dyups module compiled
        with a higher version of OpenSSL. (wangfakang)
@@ -37,7 +37,7 @@ Changes with Tengine 2.3.0                                         20 MAR 2019
        for ssl_verify_client_exception. (chobits)
     *) Bugfix: fixed coredump caused by upgrading core code
        in dyups and session_sticky modules. (wangfakang)
-    *) Bugfix: fixed compilation error of limit_req、http2 module. (hongxiaolong)
+    *) Bugfix: fixed compilation error of limit_req, http2 module. (hongxiaolong)
     *) Bugfix: fixed removes the Unix domain socket file
        when pipe proc close listen socket. (wangfakang)
     *) Bugfix: fixed compatibility for --with-openssl
@@ -326,7 +326,7 @@ Changes with Tengine 2.0.0                                       08 Jan 2014
        compiler options when compiling a new module. (monadbobo)
 
     *) Feature: added support for SPDY v3, and SPDY/HTTP servers can listen on
-       the same port. (lilbedwin、chobits)
+       the same port. (lilbedwin, chobits)
 
     *) Feature: added support for setting retries for upstream servers (proxy,
        memcached, fastcgi, scgi, uwsgi). (supertcy)
