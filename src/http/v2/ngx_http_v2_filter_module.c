@@ -154,8 +154,13 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
         "\x8b\x84\x84\x2d\x69\x5b\x05\x44\x3c\x86\xaa\x6f";
 #endif
 
+#if (T_NGX_SERVER_INFO)
+    static size_t nginx_ver_len = ngx_http_v2_literal_size(TENGINE_VER);
+    static u_char nginx_ver[ngx_http_v2_literal_size(TENGINE_VER)];
+#else
     static size_t nginx_ver_len = ngx_http_v2_literal_size(NGINX_VER);
     static u_char nginx_ver[ngx_http_v2_literal_size(NGINX_VER)];
+#endif
 
     static size_t nginx_ver_build_len =
                                   ngx_http_v2_literal_size(NGINX_VER_BUILD);
@@ -465,10 +470,17 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     if (r->headers_out.server == NULL) {
 
+#if (T_NGX_SERVER_INFO)
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                           "http2 output header: \"server: %s\"",
+                           TENGINE_VER);
+#else
         if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
                            "http2 output header: \"server: %s\"",
                            NGINX_VER);
+#endif
 
         } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
@@ -484,8 +496,13 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
         if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
             if (nginx_ver[0] == '\0') {
+#if (T_NGX_SERVER_INFO)
+                p = ngx_http_v2_write_value(nginx_ver, (u_char *) TENGINE_VER,
+                                            sizeof(TENGINE_VER) - 1, tmp);
+#else
                 p = ngx_http_v2_write_value(nginx_ver, (u_char *) NGINX_VER,
                                             sizeof(NGINX_VER) - 1, tmp);
+#endif
                 nginx_ver_len = p - nginx_ver;
             }
 
