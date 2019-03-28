@@ -426,7 +426,7 @@ static void
 ngx_show_version_info(void)
 {
 #if (T_NGX_SERVER_INFO) 
-    ngx_write_stderr("Tengine version: " TENGINE_VER " (" NGINX_VER ")"
+    ngx_write_stderr("Tengine version: " TENGINE_VER_BUILD " (" NGINX_VER ")"
                      NGX_LINEFEED);
 #else
     ngx_write_stderr("nginx version: " NGINX_VER_BUILD NGX_LINEFEED);
