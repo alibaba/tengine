@@ -86,7 +86,7 @@ static u_char ngx_http_error_banner[] =
 
 
 static u_char ngx_http_error_full_banner[] =
-"<hr/>Powered by " TENGINE_VER;
+"<hr/>Powered by " TENGINE_VER_BUILD;
 
 
 static u_char ngx_http_error_powered_by[] =
