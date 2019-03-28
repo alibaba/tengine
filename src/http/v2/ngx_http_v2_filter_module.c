@@ -149,7 +149,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
     u_char                     addr[NGX_SOCKADDR_STRLEN];
 
 #if (T_NGX_SERVER_INFO)
-    static const u_char nginx[5] = "\x85\xde\x5a\xa6\x35\x45";
+    static const u_char nginx[6] = "\x85\xde\x5a\xa6\x35\x45";
 #else
     static const u_char nginx[5] = "\x84\xaa\x63\x55\xe7";
 #endif
