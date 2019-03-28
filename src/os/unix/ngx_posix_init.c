@@ -98,10 +98,9 @@ ngx_os_init(ngx_log_t *log)
 void
 ngx_os_status(ngx_log_t *log)
 {
+    ngx_log_error(NGX_LOG_NOTICE, log, 0, NGINX_VER_BUILD);
 #if (T_NGX_SERVER_INFO)
     ngx_log_error(NGX_LOG_NOTICE, log, 0, TENGINE_VER_BUILD);
-#else
-    ngx_log_error(NGX_LOG_NOTICE, log, 0, NGINX_VER_BUILD);
 #endif
 
 #ifdef NGX_COMPILER
