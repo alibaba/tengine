@@ -49,6 +49,7 @@ ngx_module_t  ngx_http_header_filter_module = {
 #if (T_NGX_SERVER_INFO)
 static u_char ngx_http_server_string[] = "Server: " TENGINE CRLF;
 static u_char ngx_http_server_full_string[] = "Server: " TENGINE_VER CRLF;
+static u_char ngx_http_server_build_string[] = "Server: " TENGINE_VER_BUILD CRLF;
 #else
 static u_char ngx_http_server_string[] = "Server: nginx" CRLF;
 static u_char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
