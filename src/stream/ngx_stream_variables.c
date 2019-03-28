@@ -753,19 +753,11 @@ static ngx_int_t
 ngx_stream_variable_nginx_version(ngx_stream_session_t *s,
     ngx_stream_variable_value_t *v, uintptr_t data)
 {
-#if (T_NGX_SERVER_INFO)
-    v->len = sizeof(TENGINE_VERSION) - 1;
-#else
     v->len = sizeof(NGINX_VERSION) - 1;
-#endif
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-#if (T_NGX_SERVER_INFO)
-    v->data = (u_char *) TENGINE_VERSION;
-#else
     v->data = (u_char *) NGINX_VERSION;
-#endif
 
     return NGX_OK;
 }
