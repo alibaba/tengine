@@ -317,7 +317,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         ngx_log_stderr(0, "loaded modules:");
 
         for (i = 0; i < cycle->modules_n; i++) {
-            if (i < ngx_modules_n) {
+            if (cycle->modules[i]->index < ngx_modules_n) {
                 ngx_log_stderr(0, "    %s (static)", cycle->modules[i]->name);
 
             } else {
