@@ -46,6 +46,7 @@ typedef struct {
 
 typedef struct {
     ngx_uint_t                           ref;
+    ngx_http_dyups_srv_conf_t           *duscf;
     ngx_http_upstream_init_peer_pt       init;
 } ngx_http_dyups_upstream_srv_conf_t;
 
@@ -1362,8 +1363,15 @@ ngx_dyups_parse_upstream_name(ngx_conf_t *cf, ngx_buf_t *buf, ngx_str_t *name)
 static char *
 ngx_dyups_parse_upstream(ngx_conf_t *cf, ngx_buf_t *buf)
 {
-    ngx_conf_file_t     conf_file;
-    ngx_buf_t           b;
+    char                       *rc;
+    ngx_buf_t                   b;
+    ngx_str_t                   s;
+    ngx_hash_t                  vh, vh_prev;
+    ngx_array_t                 va, va_prev;
+    ngx_conf_file_t             conf_file;
+    ngx_http_variable_t        *v, *v_head, *v_tail;
+    ngx_hash_keys_arrays_t      vk;
+    ngx_http_core_main_conf_t  *cmcf;
 
     b = *buf;   /* avoid modifying @buf */
 
@@ -1373,7 +1381,59 @@ ngx_dyups_parse_upstream(ngx_conf_t *cf, ngx_buf_t *buf)
 
     cf->conf_file = &conf_file;
 
-    return ngx_conf_parse(cf, NULL);
+    rc = ngx_conf_parse(cf, NULL);
+    if (rc != NGX_CONF_OK) {
+        return rc;
+    }
+
+    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+
+    va_prev = cmcf->variables;
+    vh_prev = cmcf->variables_hash;
+
+    ngx_memzero(&va, sizeof(va));
+    ngx_memzero(&vh, sizeof(vh));
+    ngx_memzero(&vk, sizeof(vk));
+
+    cmcf->variables      = va;
+    cmcf->variables_hash = vh;
+
+    v_head = va_prev.elts;
+    v_tail = v_head + va_prev.nelts;
+
+    for (v = v_tail - 1; v >= v_head; v--) {
+
+        if (v->get_handler) {
+            break;
+        }
+
+        s.len = v->name.len;
+        s.data = ngx_pstrdup(ngx_cycle->pool, &v->name);
+        if (!s.data) {
+            rc = NGX_CONF_ERROR;
+            break;
+        }
+
+        /*
+         * variable name will be assign to cmcf->variables[idx].name directly
+         * so the lifetime of v->name should be the same as cmcf
+         */
+        v->name = s;
+
+        cmcf->variables.elts = v;
+        cmcf->variables.nelts = 1;
+        cmcf->variables_keys = &vk;
+        if (ngx_http_variables_init_vars(cf) != NGX_OK) {
+            rc = NGX_CONF_ERROR;
+            break;
+        }
+    }
+
+    cmcf->variables      = va_prev;
+    cmcf->variables_hash = vh_prev;
+    cmcf->variables_keys = NULL;
+
+    return rc;
 }
 
 
@@ -1525,8 +1585,10 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
     void                                *mconf;
     ngx_uint_t                           m;
     ngx_conf_t                           cf;
+    ngx_array_t                         *arr;
     ngx_http_module_t                   *module;
     ngx_http_conf_ctx_t                 *ctx;
+    ngx_http_core_main_conf_t           *cmcf, *cmcf_dyups;
     ngx_http_upstream_srv_conf_t        *uscf, **uscfp;
     ngx_http_upstream_main_conf_t       *umcf;
     ngx_http_dyups_upstream_srv_conf_t  *dscf;
@@ -1568,7 +1630,7 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
 
     duscf->dynamic = 1;
     duscf->upstream = uscf;
-    
+
     ngx_memzero(&cf, sizeof(ngx_conf_t));
     cf.module_type = NGX_HTTP_MODULE;
     cf.cmd_type = NGX_HTTP_MAIN_CONF;
@@ -1580,10 +1642,30 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
     if (ctx == NULL) {
         return NGX_ERROR;
     }
-
-    ctx->main_conf = ((ngx_http_conf_ctx_t *)
-                      ngx_cycle->conf_ctx[ngx_http_module.index])->main_conf;
-
+  
+    ctx->main_conf = ngx_pcalloc(cf.pool, sizeof(void *) * ngx_http_max_module);
+    if (ctx->main_conf == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_memcpy(ctx->main_conf, ((ngx_http_conf_ctx_t *)cf.ctx)->main_conf,
+               sizeof(void *) * ngx_http_max_module);
+  
+    if ((cmcf_dyups = ngx_pcalloc(cf.pool, sizeof(*cmcf_dyups))) == NULL) {
+        return NGX_ERROR;
+    }
+    
+    cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    ngx_memcpy(cmcf_dyups, cmcf, sizeof(*cmcf_dyups));
+    
+    arr = &cmcf_dyups->variables;
+    arr->pool = cf.pool;
+    arr->nalloc = arr->nelts;
+    if ((arr->elts = ngx_pcalloc(cf.pool, arr->nelts * arr->size)) == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_memcpy(arr->elts, cmcf->variables.elts, arr->nelts * arr->size);
+    
+    ctx->main_conf[ngx_http_core_module.ctx_index] = cmcf_dyups;
     ctx->srv_conf = ngx_pcalloc(cf.pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->srv_conf == NULL) {
         return NGX_ERROR;
@@ -1614,6 +1696,7 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
     }
 
     dscf = uscf->srv_conf[ngx_http_dyups_module.ctx_index];
+    dscf->duscf = duscf;
     duscf->ref = &dscf->ref;
     duscf->ctx = ctx;
     duscf->deleted = 0;
@@ -1863,9 +1946,27 @@ ngx_http_dyups_init_peer(ngx_http_request_t *r,
     ngx_int_t                            rc;
     ngx_pool_cleanup_t                  *cln;
     ngx_http_dyups_ctx_t                *ctx;
+    ngx_http_variable_value_t           *vars;
+    ngx_http_core_main_conf_t           *cmcf, *cmcf_dyups;
     ngx_http_dyups_upstream_srv_conf_t  *dscf;
 
     dscf = us->srv_conf[ngx_http_dyups_module.ctx_index];
+    
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+    cmcf_dyups = dscf->duscf->ctx->main_conf[ngx_http_core_module.ctx_index];
+    
+    if (cmcf->variables.nelts < cmcf_dyups->variables.nelts) {
+        vars = ngx_pcalloc(r->pool, cmcf_dyups->variables.nelts
+                                    * sizeof(ngx_http_variable_value_t));
+        if (vars == NULL) {
+            return NGX_ERROR;
+        }
+        ngx_memcpy(vars, r->variables, cmcf->variables.nelts
+                                       * sizeof(ngx_http_variable_value_t));
+        r->variables = vars;
+    }
+    
+    r->main_conf = dscf->duscf->ctx->main_conf;
 
     rc = dscf->init(r, us);
 
