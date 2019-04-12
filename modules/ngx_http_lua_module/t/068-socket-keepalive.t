@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 #repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 4 + 33);
+plan tests => repeat_each() * (blocks() * 4 + 31);
 
 our $HtmlDir = html_dir;
 
@@ -2005,7 +2005,7 @@ continue to handle cosocket
 
             local sock = ngx.socket.tcp()
             sock:settimeouts(100, 3000, 3000)
-            local ok, err = sock:connect("agentzh.org", 12345, opts)
+            local ok, err = sock:connect("127.0.0.2", 12345, opts)
             if not ok then
                 ngx.say(err)
             end
@@ -2610,7 +2610,7 @@ ok
                 local ok, err
                 if should_timeout then
                     sock:settimeouts(100, 3000, 3000)
-                    ok, err = sock:connect("agentzh.org", 12345, opts)
+                    ok, err = sock:connect("127.0.0.2", 12345, opts)
                 else
                     ok, err = sock:connect("127.0.0.1", port, opts)
                 end
@@ -2644,8 +2644,8 @@ lua tcp socket connect timed out, when connecting to
 
 === TEST 46: conn queuing: resume connect operation if resumed connect failed (could not be resolved)
 --- config
-    resolver 127.0.0.1 ipv6=off;
-    resolver_timeout 100ms;
+    resolver 127.0.0.2:12345 ipv6=off;
+    resolver_timeout 1s;
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
 
@@ -2657,8 +2657,8 @@ lua tcp socket connect timed out, when connecting to
                 local sock = ngx.socket.tcp()
                 local ok, err
                 if should_timeout then
-                    sock:settimeouts(100, 3000, 3000)
-                    ok, err = sock:connect("agentzh.org", 12345, opts)
+                    sock:settimeouts(1, 3000, 3000)
+                    ok, err = sock:connect("agentzh.org", 80, opts)
                 else
                     ok, err = sock:connect("127.0.0.1", port, opts)
                 end
@@ -2835,3 +2835,124 @@ GET /t
 [alert]
 --- error_log
 resume success
+
+
+
+=== TEST 50: conn queuing: increase the counter for connections created before creating the pool with setkeepalive()
+--- config
+    set $port $TEST_NGINX_MEMCACHED_PORT;
+
+    location /t {
+        content_by_lua_block {
+            local function connect()
+                local sock, err = ngx.socket.connect("127.0.0.1", ngx.var.port)
+                if not sock then
+                    error("connect failed: " .. err)
+                end
+
+                return sock
+            end
+
+            local sock1 = connect()
+            local sock2 = connect()
+            assert(sock1:setkeepalive())
+            assert(sock2:setkeepalive())
+
+            local sock1 = connect()
+            local sock2 = connect()
+            assert(sock1:close())
+            assert(sock2:close())
+
+            ngx.say("ok")
+        }
+    }
+--- request
+GET /t
+--- no_error_log
+[error]
+--- response_body
+ok
+
+
+
+=== TEST 51: conn queuing: only decrease the counter for connections which were counted by the pool
+--- config
+    set $port $TEST_NGINX_MEMCACHED_PORT;
+
+    location /t {
+        content_by_lua_block {
+            local function connect()
+                local sock, err = ngx.socket.connect("127.0.0.1", ngx.var.port)
+                if not sock then
+                    error("connect failed: " .. err)
+                end
+
+                return sock
+            end
+
+            local sock1 = connect()
+            local sock2 = connect()
+            assert(sock1:setkeepalive(1000, 1))
+            assert(sock2:setkeepalive(1000, 1))
+
+            local sock1 = connect()
+            local sock2 = connect()
+            assert(sock1:close())
+            assert(sock2:close())
+
+            ngx.say("ok")
+        }
+    }
+--- request
+GET /t
+--- no_error_log
+[error]
+--- response_body
+ok
+
+
+
+=== TEST 52: conn queuing: clean up pending connect operations which are in queue
+--- config
+    set $port $TEST_NGINX_MEMCACHED_PORT;
+
+    location /sub {
+        content_by_lua_block {
+            local opts = {pool = "test", pool_size = 1, backlog = 1}
+            local sock, err = ngx.socket.connect("127.0.0.1", ngx.var.port, opts)
+            if not sock then
+                ngx.say("connect failed: " .. err)
+                return
+            end
+
+            local function f()
+                assert(ngx.socket.connect("127.0.0.1", ngx.var.port, opts))
+            end
+
+            local th = ngx.thread.spawn(f)
+            local ok, err = ngx.thread.kill(th)
+            if not ok then
+                ngx.log(ngx.ERR, "kill thread failed: ", err)
+                return
+            end
+
+            sock:close()
+        }
+    }
+
+    location /t {
+        content_by_lua_block {
+            ngx.location.capture("/sub")
+            -- let pending connect operation resumes first
+            ngx.sleep(0)
+            ngx.say("ok")
+        }
+    }
+--- request
+GET /t
+--- no_error_log
+[error]
+--- error_log
+lua tcp socket abort queueing
+--- response_body
+ok

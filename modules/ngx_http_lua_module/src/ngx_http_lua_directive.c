@@ -1304,11 +1304,12 @@ ngx_http_lua_gen_chunk_name(ngx_conf_t *cf, const char *tag, size_t tag_len,
 
 found:
 
-    ngx_snprintf(out, len, "=%*s(%*s:%d)%Z",
-                 tag_len, tag, cf->conf_file->file.name.data
-                               + cf->conf_file->file.name.len - p,
-                 p, cf->conf_file->line);
-    *chunkname_len = len;
+    p = ngx_snprintf(out, len, "=%*s(%*s:%d)%Z",
+                     tag_len, tag, cf->conf_file->file.name.data
+                     + cf->conf_file->file.name.len - p,
+                     p, cf->conf_file->line);
+
+    *chunkname_len = p - out - 1;  /* exclude the trailing '\0' byte */
 
     return out;
 }

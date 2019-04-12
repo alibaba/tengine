@@ -11,7 +11,7 @@ add_block_preprocessor(sub {
     init_by_lua_block {
         function test_sa_restart()
             local signals = {
-                "HUP",
+                --"HUP",
                 --"INFO",
                 --"XCPU",
                 --"USR1",
@@ -20,7 +20,7 @@ add_block_preprocessor(sub {
                 --"INT",
                 "IO",
                 "CHLD",
-                "WINCH",
+                --"WINCH",
             }
 
             for _, signame in ipairs(signals) do
