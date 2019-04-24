@@ -384,7 +384,7 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
     { ngx_string("ssl_client_v_remain"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
-#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+#if (T_NGX_SSL_HANDSHAKE_TIME)
     { ngx_string("ssl_handshakd_time"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_handshake_time, NGX_HTTP_VAR_CHANGEABLE, 0 },
 #endif
