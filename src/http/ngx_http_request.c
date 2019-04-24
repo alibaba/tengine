@@ -806,7 +806,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
-#if (T_NGX_HTTP_SSL_HANDSHAKE_TIME)
+#if (T_NGX_SSL_HANDSHAKE_TIME)
             {
             /* ssl handshake start time */
             ngx_time_t *tp = ngx_timeofday();

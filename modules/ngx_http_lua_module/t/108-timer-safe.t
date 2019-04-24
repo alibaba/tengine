@@ -489,7 +489,7 @@ delete thread 2
 --- response_body
 hello world
 
---- wait: 0.1
+--- wait: 0.15
 --- no_error_log
 [error]
 [alert]
@@ -499,7 +499,7 @@ hello world
 [
 "registered timer",
 qr/\[lua\] .*? my lua timer handler/,
-qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
+qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-9]|8[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]

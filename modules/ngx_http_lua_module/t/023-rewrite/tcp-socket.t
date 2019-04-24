@@ -304,7 +304,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
     location /test {
         rewrite_by_lua '
             local sock = ngx.socket.tcp()
-            local ok, err = sock:connect("agentzh.org", 12345)
+            local ok, err = sock:connect("127.0.0.2", 12345)
             ngx.say("connect: ", ok, " ", err)
 
             local bytes
@@ -329,7 +329,7 @@ send: nil closed
 receive: nil closed
 close: nil closed
 --- error_log
-lua tcp socket connect timed out, when connecting to 172.105.207.225:12345
+lua tcp socket connect timed out, when connecting to 127.0.0.2:12345
 --- timeout: 10
 
 

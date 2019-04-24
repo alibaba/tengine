@@ -2162,7 +2162,7 @@ ngx_http_lua_pipe_wait_retval(ngx_http_lua_ffi_pipe_proc_t *proc, lua_State *L)
 
     if (pipe->timeout) {
         pipe->timeout = 0;
-        lua_pushboolean(L, 0);
+        lua_pushnil(L);
         lua_pushliteral(L, "timeout");
         return 2;
     }

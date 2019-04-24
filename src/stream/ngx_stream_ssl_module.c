@@ -297,6 +297,11 @@ static ngx_stream_variable_t  ngx_stream_ssl_vars[] = {
     { ngx_string("ssl_client_v_remain"), NULL, ngx_stream_ssl_variable,
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_STREAM_VAR_CHANGEABLE, 0 },
 
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    { ngx_string("ssl_handshakd_time"), NULL, ngx_stream_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time, NGX_STREAM_VAR_CHANGEABLE, 0 },
+#endif
+
       ngx_stream_null_variable
 };
 
@@ -385,6 +390,14 @@ ngx_stream_ssl_init_connection(ngx_ssl_t *ssl, ngx_connection_t *c)
     if (ngx_ssl_create_connection(ssl, c, 0) != NGX_OK) {
         return NGX_ERROR;
     }
+
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    {
+    /* ssl handshake start time */
+    ngx_time_t *tp = ngx_timeofday();
+    c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
+    }
+#endif
 
     rc = ngx_ssl_handshake(c);
 
