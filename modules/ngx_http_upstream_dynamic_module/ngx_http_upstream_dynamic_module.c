@@ -220,6 +220,7 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
     in_port_t               port;
     ngx_str_t              *addr;
     u_char                 *p;
+    ngx_uint_t             sin_size;
 
     size_t                                 len;
     ngx_http_upstream_dynamic_srv_conf_t  *dscf;
@@ -246,7 +247,11 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
         /* dns query ok */
         dscf->fail_check = 0;
 
-        sin = ngx_pcalloc(r->pool, sizeof(struct sockaddr_in));
+        sin_size = sizeof(struct sockaddr_in);
+        if (sin_size < pc->socklen)
+            sin_size = pc->socklen;
+
+        sin = ngx_pcalloc(r->pool, sin_size);
         if (sin == NULL) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
