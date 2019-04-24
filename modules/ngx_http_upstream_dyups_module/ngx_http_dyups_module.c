@@ -1384,7 +1384,6 @@ ngx_dyups_add_server(ngx_http_dyups_srv_conf_t *duscf, ngx_buf_t *buf)
     ngx_http_upstream_init_pt            init;
     ngx_http_upstream_srv_conf_t        *uscf;
     ngx_http_dyups_upstream_srv_conf_t  *dscf;
-    ngx_http_upstream_rr_peers_t        *peers, *backup;
 
     uscf = duscf->upstream;
 
@@ -1427,14 +1426,24 @@ ngx_dyups_add_server(ngx_http_dyups_srv_conf_t *duscf, ngx_buf_t *buf)
     if (init(&cf, uscf) != NGX_OK) {
         return NGX_ERROR;
     }
-   
-    /*add init_number initialization*/
+
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
+    {
+
+    ngx_http_upstream_rr_peers_t        *peers, *backup;
+
+    /* add init_number initialization */
+
     peers = uscf->peer.data;
     peers->init_number = ngx_random() % peers->number;
     backup = peers->next;
+
     if (backup) {
         backup->init_number = ngx_random() % backup->number;
     }
+
+    }
+#endif
 
     dscf = uscf->srv_conf[ngx_http_dyups_module.ctx_index];
     dscf->init = uscf->peer.init;
@@ -1568,7 +1577,7 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
 
     duscf->dynamic = 1;
     duscf->upstream = uscf;
-    
+
     ngx_memzero(&cf, sizeof(ngx_conf_t));
     cf.module_type = NGX_HTTP_MODULE;
     cf.cmd_type = NGX_HTTP_MAIN_CONF;
@@ -2599,7 +2608,7 @@ ngx_http_dyups_save_peer_session(ngx_peer_connection_t *pc, void *data)
     if (old_ssl_session) {
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                        "old session: %p:%d",
-                       old_ssl_session, 
+                       old_ssl_session,
 #if OPENSSL_VERSION_NUMBER >= 0x10100003L
                        SSL_get_ref(old_ssl_session)
 #else
