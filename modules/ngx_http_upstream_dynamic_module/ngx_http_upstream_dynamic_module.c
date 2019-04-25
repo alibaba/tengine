@@ -251,6 +251,7 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
         if (sin_size < pc->socklen) {
             sin_size = pc->socklen;
         }
+
         sin = ngx_pcalloc(r->pool, sin_size);
         if (sin == NULL) {
             ngx_http_upstream_finalize_request(r, u,
