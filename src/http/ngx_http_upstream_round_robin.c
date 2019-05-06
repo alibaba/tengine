@@ -79,6 +79,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peers->weighted = (w != n);
         peers->total_weight = w;
         peers->name = &us->host;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
+        peers->init_number = NGX_CONF_UNSET_UINT;
+#endif
 
         n = 0;
         peerp = &peers->peer;
@@ -159,6 +162,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         backup->weighted = (w != n);
         backup->total_weight = w;
         backup->name = &us->host;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
+        backup->init_number = NGX_CONF_UNSET_UINT;
+#endif
 
         n = 0;
         peerp = &backup->peer;
@@ -250,6 +256,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     peers->weighted = 0;
     peers->total_weight = n;
     peers->name = &us->host;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
+    peers->init_number = NGX_CONF_UNSET_UINT;
+#endif
 
     peerp = &peers->peer;
 
@@ -379,7 +388,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
     peers->single = (ur->naddrs == 1);
     peers->number = ur->naddrs;
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
-    peers->init_number = ngx_random() % peers->number;
+    peers->init_number = NGX_CONF_UNSET_UINT;
 #endif
     peers->name = &ur->host;
 
@@ -598,6 +607,10 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
 #endif
 
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
+    if (rrp->peers->init_number == NGX_CONF_UNSET_UINT) {
+         rrp->peers->init_number = ngx_random() % rrp->peers->number;
+    }
+
     for (peer = rrp->peers->peer, i = 0; i < rrp->peers->init_number; i++) {
         peer = peer->next;
     }
