@@ -13,7 +13,7 @@ use Test::Nginx;
 
 my $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
         : '../nginx/objs/nginx';
-my $t = Test::Nginx->new()->plan(76);
+my $t = Test::Nginx->new()->plan(82);
 
 sub mhttp_get($;$;$;%) {
     my ($url, $host, $port, %extra) = @_;
@@ -293,7 +293,24 @@ like(mhttp_get('/', 'host1', 8080), qr/8089/m, '2014-06-15 07:45:33');
 like(mhttp_post('/upstream/host1', 'server 127.0.0.1:8088;', 8081), qr/success/m, '2014-06-15 07:45:40');
 like(mhttp_get('/', 'host1', 8080), qr/8088/m, '2014-06-15 07:45:43');
 
+# test upstream with consistence hash
+like(mhttp_post('/upstream/consistent_hash', <<'EOF', 8081), qr/success/m, '2018-12-30 11:11:37');
+consistent_hash $arg_ds$arg_foo$arg_bar;
+server 127.0.0.1:8088;
+server 127.0.0.1:8089;
+EOF
 
+$rep = qr/
+consistent_hash
+server 127.0.0.1:8088
+server 127.0.0.1:8089
+/m;
+
+like(mhttp_get('/detail', 'locahost', 8081), $rep, '2013-03-25 10:49:47');
+like(mhttp_get('/?ds=1', 'consistent_hash', 8080), qr/8089/m, '2018-12-30 11:11:40');
+like(mhttp_get('/?ds=2', 'consistent_hash', 8080), qr/8088/m, '2018-12-30 11:11:41');
+like(mhttp_get('/?ds=3', 'consistent_hash', 8080), qr/8088/m, '2018-12-30 11:11:42');
+like(mhttp_get('/?ds=4', 'consistent_hash', 8080), qr/8088/m, '2018-12-30 11:11:43');
 
 $t->stop();
 unlink("/tmp/dyupssocket");
@@ -362,7 +379,6 @@ EOF
 
 mrun($t);
 
-
 $rep = qr/
 host1
 host2
@@ -381,6 +397,7 @@ like(mhttp_get('/upstream/host1', 'localhost', 8081), qr/server 127.0.0.1:8088/m
 ###############################################################################
 
 like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;', 8081), qr/success/m, '2013-02-26 16:51:51');
+sleep(1);
 
 $rep = qr/
 host1
@@ -403,6 +420,7 @@ like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:36:59');
 
 
 like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;server 127.0.0.1:8089;', 8081), qr/success/m, '2013-02-26 17:40:24');
+sleep(1);
 
 $rep = qr/
 host1
@@ -440,6 +458,7 @@ server 127.0.0.1:8089
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:45:03');
 
 like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;', 8081), qr/success/m, '2013-02-26 17:05:20');
+sleep(1);
 
 $rep = qr/
 host2
