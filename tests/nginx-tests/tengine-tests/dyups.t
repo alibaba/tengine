@@ -97,7 +97,7 @@ events {
 }
 
 http {
-    error_log %%TESTDIR%%/error_dyups.log debug;
+
     upstream host1 {
         server 127.0.0.1:8088;
     }
@@ -157,10 +157,10 @@ host2
 like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 16:51:46');
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:30:07');
 like(mhttp_get('/upstream/host1', 'localhost', 8081), qr/server 127.0.0.1:8088/m, '2013-02-26 17:35:19');
@@ -181,13 +181,13 @@ like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 17:02:13');
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:36:59');
 
@@ -200,14 +200,14 @@ like(mhttp_get('/', 'host2', 8080), qr/8089|8088/m, '2013-02-26 17:40:39');
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
-server 127.0.0.1:8089
+server 127.0.0.1:8088 weight=1 .*
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:41:09');
 
@@ -223,10 +223,10 @@ like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 17:00:54');
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:42:27');
 
@@ -237,7 +237,7 @@ like(mhttp_get('/', 'host1', 8080), qr/502/m, '2013-02-26 17:08:04');
 
 $rep = qr/
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:45:03');
 
@@ -246,10 +246,10 @@ like(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '2013-02-26 17:05:30');
 
 $rep = qr/
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-06-20 17:46:03');
 
@@ -370,10 +370,10 @@ host2
 like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 16:51:46');
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:30:07');
 like(mhttp_get('/upstream/host1', 'localhost', 8081), qr/server 127.0.0.1:8088/m, '2013-02-26 17:35:19');
@@ -391,13 +391,13 @@ like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 17:02:13');
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:36:59');
 
@@ -406,14 +406,14 @@ like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;server 127.0.0.1:8089
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
-server 127.0.0.1:8089
+server 127.0.0.1:8088 weight=1 .*
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:41:09');
 
@@ -426,16 +426,16 @@ like(mhttp_get('/list', 'localhost', 8081), $rep, '2013-02-26 17:00:54');
 
 $rep = qr/
 host1
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:42:27');
 
 $rep = qr/
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:45:03');
 
@@ -443,10 +443,10 @@ like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;', 8081), qr/success/
 
 $rep = qr/
 host2
-server 127.0.0.1:8089
+server 127.0.0.1:8089 weight=1 .*
 
 dyhost
-server 127.0.0.1:8088
+server 127.0.0.1:8088 weight=1 .*
 /m;
 like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:46:03');
 
