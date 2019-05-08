@@ -754,6 +754,7 @@ ngx_dyups_delete_upstream(ngx_str_t *name, ngx_str_t *rv)
         ngx_str_set(rv, "alert: delte success but not sync to other process");
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "[dyups] %V", &rv);
         status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+        goto finish;
     }
 
     rc = ngx_http_dyups_record_msg(name, NULL, NGX_DYUPS_DELETE);
