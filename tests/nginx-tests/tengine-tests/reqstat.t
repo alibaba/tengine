@@ -33,8 +33,6 @@ http {
 
     root %%TESTDIR%%;
 
-    error_page default;
-
     req_status_zone server "$host,$server_addr:$server_port" 40M;
     req_status_zone test   "$uri"   40M;
     req_status_zone test1  "$uri"   40M;
@@ -110,7 +108,6 @@ http {
 }
 
 events {
-    use     epoll;
 }
 
 EOF
@@ -149,7 +146,6 @@ http {
 }
 
 events {
-    use     epoll;
 }
 
 EOF
@@ -288,8 +284,6 @@ http {
 
     root %%TESTDIR%%;
 
-    error_page default;
-
     req_status_zone         test3   "$uri"   1M;
     req_status_zone_recycle test3   1  1;
 
@@ -307,8 +301,9 @@ http {
     }
 }
 
+worker_processes 1;
+
 events {
-    use     epoll;
 }
 
 EOF
@@ -322,6 +317,8 @@ $t->run();
 for $i (0..1009) {
   my_http_get('/test' . $i, 'www.test_cp.com', 3128);
 }
+
+sleep 1;
 
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
 unlike($r, qr/test1008/, 'test1008 is dropped because any is not spare');
@@ -352,8 +349,6 @@ http {
 
     root %%TESTDIR%%;
 
-    error_page default;
-
     req_status_zone                    test3   "$uri"   1M;
     req_status_zone_recycle            test3   1  1;
     req_status_zone_key_length  test3  4;
@@ -370,7 +365,6 @@ http {
 }
 
 events {
-    use     epoll;
 }
 
 EOF
@@ -477,7 +471,6 @@ http {
 }
 
 events {
-    use     epoll;
 }
 
 EOF
