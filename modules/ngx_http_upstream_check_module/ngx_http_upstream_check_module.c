@@ -1592,6 +1592,7 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
 
     if (rc == NGX_ERROR || rc == NGX_DECLINED) {
         ngx_http_upstream_check_status_update(peer, 0);
+        ngx_http_upstream_check_clean_event(peer);
         return;
     }
 
