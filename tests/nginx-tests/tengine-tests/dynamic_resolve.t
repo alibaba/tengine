@@ -28,7 +28,7 @@ my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(6);
 my @server_addrs = ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4");
 my @domain_addrs = ("127.0.0.2");
 
-my $ipv6 = $t->has_module("ipv6") ? "ipv6=off" : "";
+my $ipv6 = $t->has_version('1.11.5') ? "ipv6=off" : "";
 
 my $nginx_conf = <<'EOF';
 
