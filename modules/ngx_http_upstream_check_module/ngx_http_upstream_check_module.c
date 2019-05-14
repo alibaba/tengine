@@ -807,6 +807,13 @@ static ngx_check_status_command_t ngx_check_status_commands[] =  {
 static ngx_uint_t ngx_http_upstream_check_shm_generation = 0;
 static ngx_http_upstream_check_peers_t *check_peers_ctx = NULL;
 
+static void
+ngx_http_upstream_check_clean_dynamic_peer(void *ptr)
+{
+    ngx_http_upstream_check_peer_t *peer = ptr;
+    ngx_http_upstream_check_delete_dynamic_peer(peer->upstream_name,
+                                                peer->peer_addr);
+}
 
 ngx_uint_t
 ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
@@ -814,6 +821,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 {
     void                                 *elts;
     ngx_uint_t                            i, index;
+    ngx_pool_cleanup_t                   *cln;
     ngx_http_upstream_check_peer_t       *peer, *p, *np;
     ngx_http_upstream_check_peers_t      *peers;
     ngx_http_upstream_check_srv_conf_t   *ucscf;
@@ -944,7 +952,20 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, pool->log, 0,
                    "http upstream check add peer: %p, index: %ui, shm->ref: %i",
                    peer, peer->index, peer->shm->ref);
-
+  
+    //
+    // `ngx_http_upstream_dyups_module` will create it's own srv_conf
+    // and it will be freed while upstream is deleted
+    // as a result, the dynamic added ucscf will be freed too
+    // but the upstream check timer will continue use ucscf via peer->conf
+    // so we should delete dynamic peer as well while its upstream is deleting
+    //
+    if (ngx_process == NGX_PROCESS_WORKER) {
+      cln = ngx_pool_cleanup_add(pool, 0);
+      cln->data = peer;
+      cln->handler = ngx_http_upstream_check_clean_dynamic_peer;
+    }
+    
     peers->checksum +=
         ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
 
