@@ -206,3 +206,14 @@ Define the recycle threshold for a zone. Recycle will be switched on when the sh
 and will only take effect on imformation whose visit frequency is lower than the setting.
 The setting frequency is defined by 'times' and 'seconds', and it is 10r/min by default.
      req_status_zone_recycle demo_zone 10 60;
+
+req_status_lazy
+-------------------------------
+
+**Syntax**: *req_status_lazy on|off*
+
+**Default**: *off*
+
+**Context**: *http、srv、loc*
+
+req_status_lazy directive is used to control whether the variable in the req_status_zone directive is recalculate during the log phasei. In order to solve some variables (such as the upstream_xxx related variable) as a key scene to get empty value.

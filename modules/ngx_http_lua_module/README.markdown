@@ -8,6 +8,8 @@ Name
 
 ngx_http_lua_module - Embed the power of Lua into Nginx HTTP Servers.
 
+This module is a core component of OpenResty. If you are using this module, then you are essentially using OpenResty :)
+
 *This module is not distributed with the Nginx source.* See [the installation instructions](#installation).
 
 Table of Contents
@@ -61,7 +63,7 @@ Production ready.
 Version
 =======
 
-This document describes ngx_lua [v0.10.13](https://github.com/openresty/lua-nginx-module/tags) released on 22 April 2018.
+This document describes ngx_lua [v0.10.14](https://github.com/openresty/lua-nginx-module/tags) released on February 23rd, 2019.
 
 Synopsis
 ========
@@ -185,6 +187,8 @@ Synopsis
 
 Description
 ===========
+
+This module is a core component of OpenResty. If you are using this module, then you are essentially using OpenResty :)
 
 This module embeds Lua, via [LuaJIT 2.0/2.1](http://luajit.org/luajit.html), into Nginx and by leveraging Nginx's subrequests, allows the integration of the powerful Lua threads (Lua coroutines) into the Nginx event model.
 

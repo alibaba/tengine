@@ -1204,6 +1204,14 @@ if [ $STREAM != NO ]; then
 
         . auto/module
     fi
+
+    if [ $STREAM_SNI = YES ]; then
+        if [ $STREAM_SSL != YES ]; then
+            echo "--with-stream_ssl_module is needed by --with-stream_sni"
+            exit 1;
+        fi
+        have=NGX_STREAM_SNI . auto/have
+    fi
 fi
 
 
@@ -1451,10 +1459,12 @@ have=T_NGX_HTTP_STUB_STATUS . auto/have
 have=T_UPSTREAM_TRIES  . auto/have
 have=T_GEO . auto/have
 have=T_NGX_RET_CACHE  . auto/have
+have=T_LIMIT_REQ  . auto/have
+have=T_LIMIT_REQ_RATE_VAR  . auto/have
 if [ $HTTP_V2 = YES ]; then
     have=T_NGX_HTTP2_SRV_ENABLE . auto/have
 fi
-have=T_NGX_HTTP_SSL_HANDSHAKE_TIME . auto/have
+have=T_NGX_SSL_HANDSHAKE_TIME . auto/have
 have=T_NGX_HTTP_IMPROVED_IF . auto/have
 have=T_NGX_HTTP_UPSTREAM_RETRY_CC . auto/have
 have=T_NGX_HTTP_SSL_VCE . auto/have
@@ -1465,6 +1475,6 @@ have=T_NGX_ACCEPT_FILTER . auto/have
 have=T_NGX_MODIFY_DEFAULT_VALUE . auto/have
 have=T_NGX_HTTP_UPSTREAM_ID . auto/have
 have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
-have=T_NGX_SSL_EARLY_DATA . auto/have
 have=T_NGX_SHOW_INFO . auto/have
+have=T_NGX_HTTP_IMAGE_FILTER . auto/have
 

@@ -129,6 +129,9 @@ struct ngx_conf_s {
 
     ngx_conf_handler_pt   handler;
     void                 *handler_conf;
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    ngx_flag_t            no_ssl_init;
+#endif
 };
 
 

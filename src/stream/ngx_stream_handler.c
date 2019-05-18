@@ -125,6 +125,12 @@ ngx_stream_init_connection(ngx_connection_t *c)
     s->main_conf = addr_conf->ctx->main_conf;
     s->srv_conf = addr_conf->ctx->srv_conf;
 
+#if (NGX_STREAM_SNI)
+    s->addr_conf = addr_conf;
+    s->main_conf = ((ngx_stream_core_srv_conf_t*)addr_conf->default_server)->ctx->main_conf;
+    s->srv_conf = ((ngx_stream_core_srv_conf_t*)addr_conf->default_server)->ctx->srv_conf;
+#endif
+
 #if (NGX_STREAM_SSL)
     s->ssl = addr_conf->ssl;
 #endif

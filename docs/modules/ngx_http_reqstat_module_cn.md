@@ -192,3 +192,15 @@ req_status_zone_recycle
 定义某个共享内存块过期数据的回收。回收在共享内存耗尽时自动开启。只会回收访问频率低于设置值的监控数据。
 频率定义为 times / seconds，默认值为10r/min，即
      req_status_zone_recycle demo_zone 10 60;
+
+
+req_status_lazy
+-------------------------------
+
+**Syntax**: *req_status_lazy on|off*
+
+**Default**: *off*
+
+**Context**: *http、srv、loc*
+
+req_status_lazy指令用于控制req_status_zone指令中配置的变量是否在log阶段重新取值，用来解决部分变量（如upstream_xxx相关变量）作为key场景下获取是空的问题。

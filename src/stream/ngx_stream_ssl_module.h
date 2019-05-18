@@ -34,6 +34,9 @@ typedef struct {
     ngx_array_t     *certificates;
     ngx_array_t     *certificate_keys;
 
+    ngx_array_t     *certificate_values;
+    ngx_array_t     *certificate_key_values;
+
     ngx_str_t        dhparam;
     ngx_str_t        ecdh_curve;
     ngx_str_t        client_certificate;
@@ -51,6 +54,10 @@ typedef struct {
 
     u_char          *file;
     ngx_uint_t       line;
+
+#if (NGX_STREAM_SNI)
+    ngx_flag_t       sni_force;
+#endif
 } ngx_stream_ssl_conf_t;
 
 

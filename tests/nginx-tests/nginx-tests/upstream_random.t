@@ -49,7 +49,6 @@ http {
         random two;
         server 127.0.0.1:8081;
         server 127.0.0.1:8082;
-        server 127.0.0.1:8083 down;
     }
 
     upstream w {
@@ -153,7 +152,7 @@ my @ports = my ($port1, $port2) = (port(8081), port(8082));
 like(http_get('/'), qr/X-Port: ($port1|$port2)/, 'random');
 like(http_get('/lc/'), qr/X-Port: ($port1|$port2)/, 'random two');
 
-my $s = http_get('/lc/w', start => 1, sleep => 0.2);
+my $s = http_get('/lc/w', start => 1, sleep => 0.5);
 my $r = http_get('/lc/');
 my ($p) = http_end($s) =~ /X-Port: (\d+)/;
 like($r, qr/X-Port: (?!$p)/, 'random wait');

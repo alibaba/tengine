@@ -555,7 +555,7 @@ lua udp socket read timed out
 
             local udp = socket.udp()
 
-            udp:settimeout(2000) -- 2 sec
+            udp:settimeout(5000) -- 5 sec
 
             local ok, err = udp:setpeername("$TEST_NGINX_RESOLVER", 53)
             if not ok then

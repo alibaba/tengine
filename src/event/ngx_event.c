@@ -64,24 +64,24 @@ ngx_int_t             ngx_accept_disabled;
 
 #if (NGX_STAT_STUB)
 
-ngx_atomic_t   ngx_stat_accepted0;
-ngx_atomic_t  *ngx_stat_accepted = &ngx_stat_accepted0;
-ngx_atomic_t   ngx_stat_handled0;
-ngx_atomic_t  *ngx_stat_handled = &ngx_stat_handled0;
-ngx_atomic_t   ngx_stat_requests0;
-ngx_atomic_t  *ngx_stat_requests = &ngx_stat_requests0;
-ngx_atomic_t   ngx_stat_active0;
-ngx_atomic_t  *ngx_stat_active = &ngx_stat_active0;
-ngx_atomic_t   ngx_stat_reading0;
-ngx_atomic_t  *ngx_stat_reading = &ngx_stat_reading0;
-ngx_atomic_t   ngx_stat_writing0;
-ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
-ngx_atomic_t   ngx_stat_waiting0;
-ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
+static ngx_atomic_t   ngx_stat_accepted0;
+ngx_atomic_t         *ngx_stat_accepted = &ngx_stat_accepted0;
+static ngx_atomic_t   ngx_stat_handled0;
+ngx_atomic_t         *ngx_stat_handled = &ngx_stat_handled0;
+static ngx_atomic_t   ngx_stat_requests0;
+ngx_atomic_t         *ngx_stat_requests = &ngx_stat_requests0;
+static ngx_atomic_t   ngx_stat_active0;
+ngx_atomic_t         *ngx_stat_active = &ngx_stat_active0;
+static ngx_atomic_t   ngx_stat_reading0;
+ngx_atomic_t         *ngx_stat_reading = &ngx_stat_reading0;
+static ngx_atomic_t   ngx_stat_writing0;
+ngx_atomic_t         *ngx_stat_writing = &ngx_stat_writing0;
+static ngx_atomic_t   ngx_stat_waiting0;
+ngx_atomic_t         *ngx_stat_waiting = &ngx_stat_waiting0;
 
 #if (T_NGX_HTTP_STUB_STATUS)
-ngx_atomic_t   ngx_stat_request_time0;
-ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
+static ngx_atomic_t   ngx_stat_request_time0;
+ngx_atomic_t         *ngx_stat_request_time = &ngx_stat_request_time0;
 #endif
 
 #endif
@@ -423,11 +423,51 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 static char *
 ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 {
+#if (NGX_HAVE_REUSEPORT)
+    ngx_uint_t        i;
+    ngx_listening_t  *ls;
+#endif
+
     if (ngx_get_conf(cycle->conf_ctx, ngx_events_module) == NULL) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                       "no \"events\" section in configuration");
         return NGX_CONF_ERROR;
     }
+
+    if (cycle->connection_n < cycle->listening.nelts + 1) {
+
+        /*
+         * there should be at least one connection for each listening
+         * socket, plus an additional connection for channel
+         */
+
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "%ui worker_connections are not enough "
+                      "for %ui listening sockets",
+                      cycle->connection_n, cycle->listening.nelts);
+
+        return NGX_CONF_ERROR;
+    }
+
+#if (NGX_HAVE_REUSEPORT)
+
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+
+        if (!ls[i].reuseport || ls[i].worker != 0) {
+            continue;
+        }
+
+        if (ngx_clone_listening(cycle, &ls[i]) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        /* cloning may change cycle->listening.elts */
+
+        ls = cycle->listening.elts;
+    }
+
+#endif
 
     return NGX_CONF_OK;
 }

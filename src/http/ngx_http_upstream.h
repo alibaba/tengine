@@ -64,6 +64,7 @@ typedef struct {
     ngx_msec_t                       queue_time;
     off_t                            response_length;
     off_t                            bytes_received;
+    off_t                            bytes_sent;
 
     ngx_str_t                       *peer;
 } ngx_http_upstream_state_t;
@@ -196,9 +197,6 @@ typedef struct {
 
     ngx_uint_t                       ignore_headers;
     ngx_uint_t                       next_upstream;
-#if (T_UPSTREAM_TRIES)
-    ngx_uint_t                       upstream_tries;
-#endif
     ngx_uint_t                       store_access;
     ngx_uint_t                       next_upstream_tries;
     ngx_flag_t                       buffering;
@@ -218,6 +216,7 @@ typedef struct {
     ngx_array_t                     *pass_headers;
 
     ngx_http_upstream_local_t       *local;
+    ngx_flag_t                       socket_keepalive;
 
 #if (NGX_HTTP_CACHE)
     ngx_shm_zone_t                  *cache_zone;
@@ -397,7 +396,7 @@ struct ngx_http_upstream_s {
     ngx_int_t                      (*rewrite_cookie)(ngx_http_request_t *r,
                                          ngx_table_elt_t *h);
 
-    ngx_msec_t                       timeout;
+    ngx_msec_t                       start_time;
 
     ngx_http_upstream_state_t       *state;
 

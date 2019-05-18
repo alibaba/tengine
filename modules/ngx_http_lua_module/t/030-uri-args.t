@@ -421,7 +421,7 @@ done
             ngx.req.set_uri_args("hello")
             ngx.req.set_uri("/bar", true);
         ';
-        proxy_pass http://agentzh.org:12345;
+        proxy_pass http://127.0.0.2:12345;
     }
 --- request
     GET /foo?world
@@ -568,7 +568,7 @@ HTTP/1.0 ca%20t=%25
             ngx.req.set_uri("/bar", true);
             ngx.exit(503)
         ';
-        proxy_pass http://agentzh.org:12345;
+        proxy_pass http://127.0.0.2:12345;
     }
 --- request
     GET /foo?world

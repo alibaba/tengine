@@ -24,15 +24,12 @@
 #define EPOLLWRNORM    0x100
 #define EPOLLWRBAND    0x200
 #define EPOLLMSG       0x400
-#define EPOLLERR       0x008
-#define EPOLLHUP       0x010
 
 #define EPOLLRDHUP     0x2000
 
 #define EPOLLEXCLUSIVE 0x10000000
 #define EPOLLONESHOT   0x40000000
 #define EPOLLET        0x80000000
-#define EPOLLONESHOT   0x40000000
 
 #define EPOLL_CTL_ADD  1
 #define EPOLL_CTL_DEL  2

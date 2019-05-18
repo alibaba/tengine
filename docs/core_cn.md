@@ -17,6 +17,7 @@ force_exit功能默认没有编译开启。需要编译时开启:
 ```
  ./configure --with-force-exit
 ```
+注意：Tengine-2.3.0 版本后废弃force_exit指令,使用Nginx官方`worker_shutdown_timeout`指令替代，详细[文档](http://nginx.org/en/docs/ngx_core_module.html#worker_shutdown_timeout)
 
 
 ### worker_processes
@@ -167,37 +168,35 @@ Context: events
 
 当打开reuse_port的时候，支持SO_REUSEPORT套接字参数，Linux从3.9开始支持。
 
+注意：Tengine-2.3.0 版本后废弃reuse_port指令，使用Nginx官方的reuseport。升级方法：将events配置块里面的reuse_port on|off 释掉，在对应的监听端口后面加reuseport参数、详细参考[文档](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/) 。
 
-### log pipe
-Syntax: **pipe:rollback** [logpath] **interval=**[interval] **baknum=**[baknum] **maxsize=**[maxsize]
-Default: none
-Context: http, server, location
+### server_name
 
-日志pipe功能使用独立进程打印日志，不会阻塞worker进程，worker进程与独立日志进程间通过pipe进行通讯，rollback功能依赖日志pipe功能，提供基于tengine自身的日志回滚功能，支持，按照时间间隔、文件大小进行回滚，并支持配置，backup文件的个数。日志回滚模块会按照配置的条件将log文件rename成backup文件，然后重新写新日志文件
+Syntax: **server_name** name;
 
-该功能配置集成在access_log和error_log指令中：类似如下配置
+Default: —
+
+Context: server
+
+在Stream模块中，`server_name` 可以用来允许多个server块监听同一个ip:port。Tengine会根据TLS的SNI来决定请求连接匹配到哪个server块。这意味着，Stream模块的`server_name`必须用在SSL卸载的情况下（即`listen`指令后面有`ssl`这个参数）。
+
+Stream模块中的`server_name` 默认是不开启的. 你需要这么显示的编译:
+
 ```
-access_log "pipe:rollback [logpath] interval=[interval] baknum=[baknum] maxsize=[maxsize]" proxyformat;
-
-error_log  "pipe:rollback [logpath] interval=[interval] baknum=[baknum] maxsize=[maxsize]" info;
+ ./configure --with-stream_sni
 ```
+注意:
+这个特性是实验性的。如果Nginx官方有类似的功能和该功能有冲突，那么改功能将被废弃。
 
-logpath: 日志输出路径
+### ssl_sni_force
 
-interval：日志回滚间隔，默认0（永不回滚）
+Syntax: **ssl_sni_force** on | off
 
-baknum：backup文件保留个数，默认1（保留1个）
+Default: ssl_sni_force off
 
-maxsize：log文件最大size，默认0（永不回滚）
+Context: stream, server
 
-使用示例：
-```
-error_log  "pipe:rollback logs/error_log interval=60m baknum=5 maxsize=2048M" info;
+在Stream模块中，`ssl_sni_force`决定了如果TLS的SNI和配置的`server_name`不匹配，TLS握手是否被拒绝。
 
-http {
-	log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                      '$status $body_bytes_sent "$http_referer" '
-                      '"$http_user_agent" "$http_x_forwarded_for"';
-	access_log  "pipe:rollback logs/access_log interval=1h baknum=5 maxsize=2G"  main;
-}
-```
+注意:
+详见`server_name`的注意点.

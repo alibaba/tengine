@@ -19,6 +19,8 @@ The force_exit support is not enabled by default. You should compile it explicit
  ./configure --with-force-exit
 ```
 
+Note: Removed force_exit directive after the Tengine-2.3.0 version and use Nginx official `worker_shutdown_timeout` , detailed reference [worker_shutdown_timeout](http://nginx.org/en/docs/ngx_core_module.html#worker_shutdown_timeout)
+
 
 ### worker_processes
 
@@ -160,38 +162,35 @@ Context: events
 
 turn on support for SO_REUSEPORT socket option. This option is supported since Linux 3.9.
 
+Note:
+Removed reuse_port directive after the Tengine-2.3.0 version and use the official reuseport of Nginx, detailed reference [document](https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/).
 
+### server_name
 
-### log pipe
-Syntax: **pipe:rollback** [logpath] **interval=**[interval] **baknum=**[baknum] **maxsize=**[maxsize]
-Default: none
-Context: http, server, location
+Syntax: **server_name** name;
 
-log pipe module write log use special log proccess, it may not block worker, worker communicate with log proccess use pipe, rollback depend on log pipe module, it support log file auto rollback by tengine self. it support rollback by time and file size, also can configure backup file number. log rollback module will rename log file to backup filename, then reopen the log file and write again
+Default: —
 
-rollback configurge is built-in access_log and error_log：
+Context: server
+
+`server_name` used in Stream module makes Tengine have the ability to listen same ip:port in multiply server blocks and. The connection will be attached to a certain server block by SNI extension in TLS. That means `server_name` should be used with SSL offloading(using `ssl` after `listen`).
+The `server_name` support in Stream module is not enabled by default. You should compile it explicitly:
+
 ```
-access_log "pipe:rollback [logpath] interval=[interval] baknum=[baknum] maxsize=[maxsize]" proxyformat;
-
-error_log  "pipe:rollback [logpath] interval=[interval] baknum=[baknum] maxsize=[maxsize]" info;
+ ./configure --with-stream_sni
 ```
+Note:
+This feature is experimental. We will deprecate this feature if there is any conflict with similar feature of nginx official.
 
-logpath: log output file path and name
+### ssl_sni_force
 
-interval：log rollback interval, default 0 (never)
+Syntax: **ssl_sni_force** on | off
 
-baknum：backup file number, default 1 (keep 1 backup file)
+Default: ssl_sni_force off
 
-maxsize：log file max size, default 0 (never)
+Context: stream, server
 
-example：
-```
-error_log  "pipe:rollback logs/error_log interval=60m baknum=5 maxsize=2048M" info;
+`ssl_sni_force` will determine whether the TLS handsheke is rejected or not if SNI is not matched with server name which we configure by `server_name` in Stream module.
 
-http {
-	log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                      '$status $body_bytes_sent "$http_referer" '
-                      '"$http_user_agent" "$http_x_forwarded_for"';
-	access_log  "pipe:rollback logs/access_log interval=1h baknum=5 maxsize=2G"  main;
-}
-```
+Note:
+Same note in `server_name` above.

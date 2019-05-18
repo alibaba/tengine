@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite shmem/)
+my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)
 	->plan(27);
 
 $t->write_file_expand('nginx.conf', <<'EOF');

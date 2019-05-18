@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache shmem/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(6)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -47,6 +47,11 @@ http {
             proxy_pass    http://127.0.0.1:8081;
         }
 
+        location /proxy/ {
+            proxy_pass    http://127.0.0.1:8081/;
+            proxy_force_ranges on;
+        }
+
         location /cache/ {
             proxy_pass    http://127.0.0.1:8081/;
             proxy_cache   NAME;
@@ -62,6 +67,8 @@ http {
 
         location / {
             max_ranges 0;
+            add_header Last-Modified "Mon, 28 Sep 1970 06:00:00 GMT";
+            add_header ETag '"59a5401c-8"';
         }
     }
 }
@@ -84,6 +91,18 @@ like(http_get_range('/cache/t.html', 'Range: bytes=4-'), qr/^THIS/m,
 	'cached range');
 like(http_get_range('/cache/t.html', 'Range: bytes=0-2,4-'), qr/^SEE.*^THIS/ms,
 	'cached multipart range');
+
+# If-Range HTTP-date request
+
+like(http_get_range('/proxy/t.html',
+	"Range: bytes=4-\nIf-Range: Mon, 28 Sep 1970 06:00:00 GMT"),
+	qr/^THIS/m, 'if-range last-modified proxy');
+
+# If-Range entity-tag request
+
+like(http_get_range('/proxy/t.html',
+	"Range: bytes=4-\nIf-Range: \"59a5401c-8\""),
+	qr/^THIS/m, 'if-range etag proxy');
 
 ###############################################################################
 

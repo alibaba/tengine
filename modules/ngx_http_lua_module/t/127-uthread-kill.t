@@ -138,12 +138,12 @@ lua clean up the timer for pending ngx.sleep
 
 === TEST 3: kill pending resolver
 --- config
-    resolver agentzh.org:12345;
+    resolver 127.0.0.2:12345;
     location /lua {
         content_by_lua '
             local function f()
                 local sock = ngx.socket.tcp()
-                sock:connect("some.agentzh.org", 12345)
+                sock:connect("some.127.0.0.2", 12345)
             end
 
             local t, err = ngx.thread.spawn(f)
@@ -200,7 +200,7 @@ resolve name done: -2
                 sock:close()
                 ready = true
                 sock:settimeout(10000)
-                sock:connect("agentzh.org", 12345)
+                sock:connect("127.0.0.2", 12345)
             end
 
             local t, err = ngx.thread.spawn(f)

@@ -32,6 +32,15 @@ Support variable for rate. For example:
 
     limit_req_zone $binary_remote_addr zone=three:3m rate=$limit_count;
 
+
+Prior to tengine version 2.3.0, requests with any empty variable are not accounted.
+
+From tengine version 2.3.0, requests with all empty variables are not accounted.
+The variable can contain text, variables, and their combination. For example:
+
+    limit_req_zone $binary_remote_addr$request_uri zone=two:3m rate=1r/s;
+
+
 limit_req
 ------------------------
 

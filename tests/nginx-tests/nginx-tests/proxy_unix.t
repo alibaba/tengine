@@ -26,7 +26,7 @@ select STDOUT; $| = 1;
 eval { require IO::Socket::UNIX; };
 plan(skip_all => 'IO::Socket::UNIX not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http proxy unix/)->plan(4);
+my $t = Test::Nginx->new()->has(qw/http proxy unix/)->plan(5);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -40,6 +40,10 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    upstream u {
+        server unix:%%TESTDIR%%/unix.sock;
+    }
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
@@ -52,6 +56,11 @@ http {
 
         location /var {
             proxy_pass http://$arg_b;
+            proxy_read_timeout 1s;
+        }
+
+        location /u {
+            proxy_pass http://u;
             proxy_read_timeout 1s;
         }
     }
@@ -80,6 +89,8 @@ unlike(http_head('/'), qr/SEE-THIS/, 'proxy head request');
 
 like(http_get("/var?b=unix:$path:/"), qr/SEE-THIS/, 'proxy with variables');
 
+like(http_get('/u'), qr/SEE-THIS/, 'proxy implicit upstream');
+
 ###############################################################################
 
 sub http_daemon {
@@ -106,7 +117,7 @@ sub http_daemon {
 
 		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
 
-		if ($uri eq '/') {
+		if (grep { $uri eq $_ } ('/', '/u')) {
 			print $client <<'EOF';
 HTTP/1.1 200 OK
 Connection: close

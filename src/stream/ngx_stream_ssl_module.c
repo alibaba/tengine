@@ -22,6 +22,9 @@ static ngx_int_t ngx_stream_ssl_handler(ngx_stream_session_t *s);
 static ngx_int_t ngx_stream_ssl_init_connection(ngx_ssl_t *ssl,
     ngx_connection_t *c);
 static void ngx_stream_ssl_handshake_handler(ngx_connection_t *c);
+#ifdef SSL_R_CERT_CB_ERROR
+static int ngx_stream_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg);
+#endif
 static ngx_int_t ngx_stream_ssl_static_variable(ngx_stream_session_t *s,
     ngx_stream_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_stream_ssl_variable(ngx_stream_session_t *s,
@@ -32,11 +35,19 @@ static void *ngx_stream_ssl_create_conf(ngx_conf_t *cf);
 static char *ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
 
+static ngx_int_t ngx_stream_ssl_compile_certificates(ngx_conf_t *cf,
+    ngx_stream_ssl_conf_t *conf);
+
 static char *ngx_stream_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_stream_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_stream_ssl_init(ngx_conf_t *cf);
+
+#if (NGX_STREAM_SNI)
+int ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad,
+    void *arg);
+#endif
 
 
 static ngx_conf_bitmask_t  ngx_stream_ssl_protocols[] = {
@@ -187,6 +198,15 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
       offsetof(ngx_stream_ssl_conf_t, crl),
       NULL },
 
+#if (NGX_STREAM_SNI)
+    { ngx_string("ssl_sni_force"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_ssl_conf_t, sni_force),
+      NULL },
+#endif
+
       ngx_null_command
 };
 
@@ -277,6 +297,11 @@ static ngx_stream_variable_t  ngx_stream_ssl_vars[] = {
     { ngx_string("ssl_client_v_remain"), NULL, ngx_stream_ssl_variable,
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_STREAM_VAR_CHANGEABLE, 0 },
 
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    { ngx_string("ssl_handshakd_time"), NULL, ngx_stream_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time, NGX_STREAM_VAR_CHANGEABLE, 0 },
+#endif
+
       ngx_stream_null_variable
 };
 
@@ -366,6 +391,14 @@ ngx_stream_ssl_init_connection(ngx_ssl_t *ssl, ngx_connection_t *c)
         return NGX_ERROR;
     }
 
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    {
+    /* ssl handshake start time */
+    ngx_time_t *tp = ngx_timeofday();
+    c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
+    }
+#endif
+
     rc = ngx_ssl_handshake(c);
 
     if (rc == NGX_ERROR) {
@@ -406,6 +439,62 @@ ngx_stream_ssl_handshake_handler(ngx_connection_t *c)
 
     ngx_stream_core_run_phases(s);
 }
+
+
+#ifdef SSL_R_CERT_CB_ERROR
+
+int
+ngx_stream_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg)
+{
+    ngx_str_t                    cert, key;
+    ngx_uint_t                   i, nelts;
+    ngx_connection_t            *c;
+    ngx_stream_session_t        *s;
+    ngx_stream_ssl_conf_t       *sslcf;
+    ngx_stream_complex_value_t  *certs, *keys;
+
+    c = ngx_ssl_get_connection(ssl_conn);
+
+    if (c->ssl->handshaked) {
+        return 0;
+    }
+
+    s = c->data;
+
+    sslcf = arg;
+
+    nelts = sslcf->certificate_values->nelts;
+    certs = sslcf->certificate_values->elts;
+    keys = sslcf->certificate_key_values->elts;
+
+    for (i = 0; i < nelts; i++) {
+
+        if (ngx_stream_complex_value(s, &certs[i], &cert) != NGX_OK) {
+            return 0;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                       "ssl cert: \"%s\"", cert.data);
+
+        if (ngx_stream_complex_value(s, &keys[i], &key) != NGX_OK) {
+            return 0;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                       "ssl key: \"%s\"", key.data);
+
+        if (ngx_ssl_connection_certificate(c, c->pool, &cert, &key,
+                                           sslcf->passwords)
+            != NGX_OK)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+#endif
 
 
 static ngx_int_t
@@ -505,6 +594,7 @@ ngx_stream_ssl_create_conf(ngx_conf_t *cf)
      *
      *     scf->listen = 0;
      *     scf->protocols = 0;
+     *     scf->certificate_values = NULL;
      *     scf->dhparam = { 0, NULL };
      *     scf->ecdh_curve = { 0, NULL };
      *     scf->client_certificate = { 0, NULL };
@@ -526,6 +616,9 @@ ngx_stream_ssl_create_conf(ngx_conf_t *cf)
     scf->session_tickets = NGX_CONF_UNSET;
     scf->session_ticket_keys = NGX_CONF_UNSET_PTR;
 
+#if (NGX_STREAM_SNI)
+    scf->sni_force = NGX_CONF_UNSET;
+#endif
     return scf;
 }
 
@@ -573,6 +666,10 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
+#if (NGX_STREAM_SNI)
+    ngx_conf_merge_value(conf->sni_force, prev->sni_force, 0);
+    if (!conf->listen)
+#endif
 
     conf->ssl.log = cf->log;
 
@@ -619,11 +716,36 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
 
-    if (ngx_ssl_certificates(cf, &conf->ssl, conf->certificates,
-                             conf->certificate_keys, conf->passwords)
-        != NGX_OK)
-    {
+    if (ngx_stream_ssl_compile_certificates(cf, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
+    }
+
+    if (conf->certificate_values) {
+
+#ifdef SSL_R_CERT_CB_ERROR
+
+        /* install callback to lookup certificates */
+
+        SSL_CTX_set_cert_cb(conf->ssl.ctx, ngx_stream_ssl_certificate, conf);
+
+#else
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "variables in "
+                      "\"ssl_certificate\" and \"ssl_certificate_key\" "
+                      "directives are not supported on this platform");
+        return NGX_CONF_ERROR;
+#endif
+
+    } else {
+
+        /* configure certificates */
+
+        if (ngx_ssl_certificates(cf, &conf->ssl, conf->certificates,
+                                 conf->certificate_keys, conf->passwords)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
     }
 
     if (ngx_ssl_ciphers(cf, &conf->ssl, &conf->ciphers,
@@ -678,7 +800,7 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     if (ngx_ssl_session_cache(&conf->ssl, &ngx_stream_ssl_sess_id_ctx,
-                              conf->builtin_session_cache,
+                              conf->certificates, conf->builtin_session_cache,
                               conf->shm_zone, conf->session_timeout)
         != NGX_OK)
     {
@@ -703,7 +825,107 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
+#if (NGX_STREAM_SNI)
+#if (SSL_CTRL_SET_TLSEXT_HOSTNAME)
+    if (SSL_CTX_set_tlsext_servername_callback(conf->ssl.ctx,
+                                               ngx_stream_ssl_servername)
+        == 0)
+    {
+#endif
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "nginx was built with SNI support, however, now it is linked "
+            "dynamically to an OpenSSL library which has no tlsext support, "
+            "therefore SNI is not available");
+#if (SSL_CTRL_SET_TLSEXT_HOSTNAME)
+    }
+#endif
+#endif
+
     return NGX_CONF_OK;
+}
+
+
+static ngx_int_t
+ngx_stream_ssl_compile_certificates(ngx_conf_t *cf,
+    ngx_stream_ssl_conf_t *conf)
+{
+    ngx_str_t                           *cert, *key;
+    ngx_uint_t                           i, nelts;
+    ngx_stream_complex_value_t          *cv;
+    ngx_stream_compile_complex_value_t   ccv;
+
+    cert = conf->certificates->elts;
+    key = conf->certificate_keys->elts;
+    nelts = conf->certificates->nelts;
+
+    for (i = 0; i < nelts; i++) {
+
+        if (ngx_stream_script_variables_count(&cert[i])) {
+            goto found;
+        }
+
+        if (ngx_stream_script_variables_count(&key[i])) {
+            goto found;
+        }
+    }
+
+    return NGX_OK;
+
+found:
+
+    conf->certificate_values = ngx_array_create(cf->pool, nelts,
+                                           sizeof(ngx_stream_complex_value_t));
+    if (conf->certificate_values == NULL) {
+        return NGX_ERROR;
+    }
+
+    conf->certificate_key_values = ngx_array_create(cf->pool, nelts,
+                                           sizeof(ngx_stream_complex_value_t));
+    if (conf->certificate_key_values == NULL) {
+        return NGX_ERROR;
+    }
+
+    for (i = 0; i < nelts; i++) {
+
+        cv = ngx_array_push(conf->certificate_values);
+        if (cv == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memzero(&ccv, sizeof(ngx_stream_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &cert[i];
+        ccv.complex_value = cv;
+        ccv.zero = 1;
+
+        if (ngx_stream_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        cv = ngx_array_push(conf->certificate_key_values);
+        if (cv == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memzero(&ccv, sizeof(ngx_stream_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &key[i];
+        ccv.complex_value = cv;
+        ccv.zero = 1;
+
+        if (ngx_stream_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_ERROR;
+        }
+    }
+
+    conf->passwords = ngx_ssl_preserve_passwords(cf, conf->passwords);
+    if (conf->passwords == NULL) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
 }
 
 
@@ -859,3 +1081,112 @@ ngx_stream_ssl_init(ngx_conf_t *cf)
 
     return NGX_OK;
 }
+
+#ifdef NGX_STREAM_SNI
+static ngx_int_t
+ngx_stream_find_virtual_server(ngx_connection_t *c,
+    ngx_stream_virtual_names_t *virtual_names, ngx_str_t *host,
+    ngx_stream_core_srv_conf_t **cscfp)
+{
+    ngx_stream_core_srv_conf_t  *cscf;
+
+    if (virtual_names == NULL) {
+        return NGX_DECLINED;
+    }
+
+    cscf = ngx_hash_find_combined(&virtual_names->names,
+                                  ngx_hash_key(host->data, host->len),
+                                  host->data, host->len);
+
+    if (cscf) {
+        *cscfp = cscf;
+        return NGX_OK;
+    }
+
+    return NGX_DECLINED;
+}
+
+int
+ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
+{
+    ngx_str_t                   host;
+    const char                 *servername;
+    ngx_connection_t           *c;
+    ngx_stream_session_t       *s;
+    ngx_stream_ssl_conf_t      *sscf;
+    ngx_stream_core_srv_conf_t *cscf;
+
+    c = ngx_ssl_get_connection(ssl_conn);
+    s = c->data;
+
+    servername = SSL_get_servername(ssl_conn, TLSEXT_NAMETYPE_host_name);
+
+    if (servername == NULL) {
+        goto not_match;
+    }
+
+    if (c->ssl->renegotiation) {
+        return SSL_TLSEXT_ERR_NOACK;
+    }
+
+    host.len = ngx_strlen(servername);
+    if (host.len == 0) {
+        goto not_match;
+    }
+
+    host.data = (u_char *) servername;
+
+
+    if (ngx_stream_find_virtual_server(c, s->addr_conf->virtual_names, &host,
+                                       &cscf)
+        != NGX_OK)
+    {
+        goto not_match;
+    }
+
+    ngx_set_connection_log(c, cscf->error_log);
+
+    s->main_conf = cscf->ctx->main_conf;
+    s->srv_conf  = cscf->ctx->srv_conf;
+
+    sscf = ngx_stream_get_module_srv_conf(cscf->ctx, ngx_stream_ssl_module);
+
+    if (sscf->ssl.ctx) {
+        SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);
+
+        /*
+         * SSL_set_SSL_CTX() only changes certs as of 1.0.0d
+         * adjust other things we care about
+         */
+
+        SSL_set_verify(ssl_conn, SSL_CTX_get_verify_mode(sscf->ssl.ctx),
+                       SSL_CTX_get_verify_callback(sscf->ssl.ctx));
+
+        SSL_set_verify_depth(ssl_conn, SSL_CTX_get_verify_depth(sscf->ssl.ctx));
+
+#ifdef SSL_CTRL_CLEAR_OPTIONS
+        /* only in 0.9.8m+ */
+        SSL_clear_options(ssl_conn, SSL_get_options(ssl_conn) &
+                                    ~SSL_CTX_get_options(sscf->ssl.ctx));
+#endif
+
+        SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
+    }
+
+    return SSL_TLSEXT_ERR_OK;
+
+not_match:
+    sscf = ngx_stream_get_module_srv_conf(s, ngx_stream_ssl_module);
+
+    if (sscf->sni_force) {
+        ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                      "SSL sni not match, sni:%s, reject", servername?servername:"NULL");
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+
+    } else {
+        return SSL_TLSEXT_ERR_NOACK;
+    }
+}
+
+#endif
+

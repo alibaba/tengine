@@ -1019,6 +1019,14 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
     r->content_handler = NULL;
     r->uri_changed = 0;
 
+#if (NGX_HTTP_PROXY_CONNECT)
+    if (r->method == NGX_HTTP_CONNECT) {
+        ngx_http_update_location_config(r);
+        r->phase_handler++;
+        return NGX_AGAIN;
+    }
+#endif
+
     rc = ngx_http_core_find_location(r);
 
     if (rc == NGX_ERROR) {
@@ -2435,10 +2443,6 @@ ngx_http_subrequest(ngx_http_request_t *r,
     c = r->connection;
     sr->connection = c;
 
-#if (T_UPSTREAM_TRIES)
-    sr->us_tries = 1;
-#endif
-
     sr->ctx = ngx_pcalloc(r->pool, sizeof(void *) * ngx_http_max_module);
     if (sr->ctx == NULL) {
         return NGX_ERROR;
@@ -2593,6 +2597,14 @@ ngx_http_subrequest(ngx_http_request_t *r,
         sr->content_handler = r->content_handler;
         sr->phase_handler = r->phase_handler;
         sr->write_event_handler = ngx_http_core_run_phases;
+
+#if (NGX_PCRE)
+        sr->ncaptures = r->ncaptures;
+        sr->captures = r->captures;
+        sr->captures_data = r->captures_data;
+        sr->realloc_captures = 1;
+        r->realloc_captures = 1;
+#endif
 
         ngx_http_update_location_config(sr);
     }

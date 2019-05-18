@@ -214,6 +214,14 @@ static ngx_int_t ngx_http_variables_time_fmt(ngx_http_request_t *r,
 
 static ngx_http_variable_t  ngx_http_core_variables[] = {
 
+#if (NGX_HTTP_PROXY_CONNECT)
+    { ngx_string("connect_host"), NULL, ngx_http_variable_request,
+      offsetof(ngx_http_request_t, connect_host), 0, 0 },
+
+    { ngx_string("connect_port"), NULL, ngx_http_variable_request,
+      offsetof(ngx_http_request_t, connect_port), 0, 0 },
+#endif
+
     { ngx_string("http_host"), NULL, ngx_http_variable_header,
       offsetof(ngx_http_request_t, headers_in.host), 0, 0 },
 
@@ -3373,7 +3381,9 @@ ngx_http_regex_exec(ngx_http_request_t *r, ngx_http_regex_t *re, ngx_str_t *s)
     if (re->ncaptures) {
         len = cmcf->ncaptures;
 
-        if (r->captures == NULL) {
+        if (r->captures == NULL || r->realloc_captures) {
+            r->realloc_captures = 0;
+
             r->captures = ngx_palloc(r->pool, len * sizeof(int));
             if (r->captures == NULL) {
                 return NGX_ERROR;

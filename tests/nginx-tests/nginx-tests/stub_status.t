@@ -50,7 +50,7 @@ http {
             limit_rate 15;
         }
         location /stub {
-            stub_status on;
+            stub_status;
         }
     }
 }

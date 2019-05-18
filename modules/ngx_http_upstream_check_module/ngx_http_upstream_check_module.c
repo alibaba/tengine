@@ -176,10 +176,12 @@ typedef struct {
 #define NGX_HTTP_CHECK_MYSQL                 0x0008
 #define NGX_HTTP_CHECK_AJP                   0x0010
 
-#define NGX_CHECK_HTTP_2XX                   0x0002
-#define NGX_CHECK_HTTP_3XX                   0x0004
-#define NGX_CHECK_HTTP_4XX                   0x0008
-#define NGX_CHECK_HTTP_5XX                   0x0010
+#define NGX_CHECK_HTTP_1XX                   0x0002
+#define NGX_CHECK_HTTP_2XX                   0x0004
+#define NGX_CHECK_HTTP_3XX                   0x0008
+#define NGX_CHECK_HTTP_4XX                   0x0010
+#define NGX_CHECK_HTTP_5XX                   0x0020
+
 #define NGX_CHECK_HTTP_ERR                   0x8000
 
 typedef struct {
@@ -530,6 +532,7 @@ static ngx_int_t ngx_http_upstream_check_init_process(ngx_cycle_t *cycle);
 
 
 static ngx_conf_bitmask_t  ngx_check_http_expect_alive_masks[] = {
+    { ngx_string("http_1xx"), NGX_CHECK_HTTP_1XX },
     { ngx_string("http_2xx"), NGX_CHECK_HTTP_2XX },
     { ngx_string("http_3xx"), NGX_CHECK_HTTP_3XX },
     { ngx_string("http_4xx"), NGX_CHECK_HTTP_4XX },
@@ -1589,6 +1592,7 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
 
     if (rc == NGX_ERROR || rc == NGX_DECLINED) {
         ngx_http_upstream_check_status_update(peer, 0);
+        ngx_http_upstream_check_clean_event(peer);
         return;
     }
 
@@ -1996,7 +2000,9 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 
         code = ctx->status.code;
 
-        if (code >= 200 && code < 300) {
+        if (code > 0 && code < 200) {
+            code_n = NGX_CHECK_HTTP_1XX;
+        } else if (code >= 200 && code < 300) {
             code_n = NGX_CHECK_HTTP_2XX;
         } else if (code >= 300 && code < 400) {
             code_n = NGX_CHECK_HTTP_3XX;
@@ -2264,7 +2270,9 @@ ngx_http_upstream_check_fastcgi_parse(ngx_http_upstream_check_peer_t *peer)
 
         code = ctx->status.code;
 
-        if (code >= 200 && code < 300) {
+        if (code > 0 && code < 200) {
+            code_n = NGX_CHECK_HTTP_1XX;
+        } else if (code >= 200 && code < 300) {
             code_n = NGX_CHECK_HTTP_2XX;
         } else if (code >= 300 && code < 400) {
             code_n = NGX_CHECK_HTTP_3XX;

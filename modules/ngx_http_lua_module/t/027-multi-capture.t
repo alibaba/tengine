@@ -743,7 +743,7 @@ proxy_cache_path conf/cache levels=1:2 keys_zone=STATIC:10m inactive=10m max_siz
 
     location = /proxy {
             proxy_cache STATIC;
-            proxy_pass http://agentzh.org:12345;
+            proxy_pass http://127.0.0.2:12345;
             proxy_cache_key $proxy_host$uri$args;
             proxy_cache_valid any 1s;
             #proxy_http_version 1.1;
