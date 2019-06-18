@@ -1,3 +1,35 @@
+Changes with nginx 1.16.0                                        23 Apr 2019
+
+    *) 1.16.x stable branch.
+
+
+Changes with nginx 1.15.12                                       16 Apr 2019
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+variables were used in the "ssl_certificate" or "ssl_certificate_key"
+directives and OCSP stapling was enabled.
+
+
+Changes with nginx 1.15.11                                       09 Apr 2019
+
+    *) Bugfix: in the "ssl_stapling_file" directive on Windows.
+
+
+Changes with nginx 1.15.10                                       26 Mar 2019
+
+    *) Change: when using a hostname in the "listen" directive nginx now
+creates listening sockets for all addresses the hostname resolves to
+(previously, only the first address was used).
+
+    *) Feature: port ranges in the "listen" directive.
+
+    *) Feature: loading of SSL certificates and secret keys from variables.
+
+    *) Workaround: the $ssl_server_name variable might be empty when using
+OpenSSL 1.1.1.
+
+    *) Bugfix: nginx/Windows could not be built with Visual Studio 2015 or
+newer; the bug had appeared in 1.15.9.
 
 Changes with nginx 1.15.9                                        26 Feb 2019
 

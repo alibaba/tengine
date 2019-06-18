@@ -1,3 +1,22 @@
+Tengine 2.3.1 [2019-03-25]
+
+* Feature: stream ssl模块新增$ssl_handshakd_time变量 [mrpre]
+* Feature: upstream check模块支持websocket健康检查 (mrpre)
+* Change: round robin负载均衡算法采用随机起点 (wangfakang)
+* Change: 升级http lua模块到v0.10.14 (mrpre)
+* Change: 升级dyups模块到yzprofile/dyups的最新主干版本 (chobits)
+* Change: 升级Nginx版本到Nginx-1.16.0(MenqqiWu)
+* Change: 支持reqstatus模块的dso编译 (chobits)
+* Change: 支持upstream dynamic模块的dso编译 (wangfakang)
+* Change: 支持trim模块的dso编译 (wangfakang)
+* Change: 支持footer模块的dso编译 (wangfakang)
+* Change: 支持user_agent模块的dso编译 (wangfakang)
+* Change: 支持concat模块的dso编译 (mathieu-aubin)
+* Fix: 修复部分服务端返回的HTTP头部服务端版本信息  (AstroProfundis)
+* Fix: 修复"-m"参数显示dynamic module的问题 (wangfakang)
+* Fix：修复limit_req指令的参数检查 (wangfakang)
+* Fix: 修复reqstatus在macOS下的兼容性问题 (chobits)
+
 Tengine 2.3.0 [2019-03-25]
 
 * Feature: 新增proxy_connect模块，可以支持HTTP的CONNECT方法 [chobits]

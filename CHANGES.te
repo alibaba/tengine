@@ -1,4 +1,23 @@
-Changes with Tengine 2.3.0                                         25 MAR 2019
+Changes with Tengine 2.3.1                                         18 Jun 2019
+
+    *) Feature: add $ssl_handshakd_time variable for stream ssl module (mrpre)
+    *) Feature: support websocket check of upstream check module (mrpre)
+    *) Change: random index logical for round robin (wangfakang)
+    *) Change: update http lua module to v0.10.14 (mrpre)
+    *) Change: update dyups to master branch of yzprofile/dyups (chobits)
+    *) Change: update core to Nginx-1.16.0 (MenqqiWu)
+    *) Change: support dynamic module for reqstatus (chobits)
+    *) Change: support dynamic build for upstream dynamic module (wangfakang)
+    *) Change: support dynamic build for trim module (wangfakang)
+    *) Change: support dynamic build for footer module (wangfakang)
+    *) Change: support dynamic build for user_agent module (wangfakang)
+    *) Change: support dynamic build for concat module (mathieu-aubin)
+    *) Fix: server version strings in http2 and stream response headers (AstroProfundis)
+    *) Fix: "-m" option to show dynamic module (wangfakang)
+    *) Fix：parameter number check for limit_req directive (wangfakang)
+    *) Fix: fixed compilation error on macOS for reqstatus (chobits)
+
+Changes with Tengine 2.3.0                                         25 Mar 2019
 
     *) Feature: added proxy_connect module support for the CONNECT
        HTTP method. (chobits)
