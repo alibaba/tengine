@@ -601,8 +601,8 @@ found:
     addr = port->addrs.elts;
 
     for (i = 0; i < port->addrs.nelts; i++) {
-        if (ngx_cmp_sockaddr(&listen->sockaddr.sockaddr, listen->socklen,
-            &addr[i].opt.sockaddr.sockaddr,
+        if (ngx_cmp_sockaddr(listen->sockaddr, listen->socklen,
+            addr[i].opt.sockaddr,
             addr[i].opt.socklen, 0)
             != NGX_OK)
         {

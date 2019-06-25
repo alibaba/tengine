@@ -944,9 +944,6 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
         }
     }
-#if (NGX_STREAM_SNI)
-    return NGX_CONF_OK;
-#endif
 
     als = cmcf->listen.elts;
 
@@ -957,6 +954,10 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ls[n].socklen = u.addrs[n].socklen;
         ls[n].addr_text = u.addrs[n].name;
         ls[n].wildcard = ngx_inet_wildcard(ls[n].sockaddr);
+
+#if (NGX_STREAM_SNI)
+        continue;
+#endif
 
         for (i = 0; i < cmcf->listen.nelts - u.naddrs + n; i++) {
             if (ls[n].type != als[i].type) {
