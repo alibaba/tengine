@@ -5448,7 +5448,7 @@ ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     tp = ngx_timeofday();
 
     if (c->ssl->handshake_end_msec == 0) {
-        ms = tp->sec * 1000 + tp->sec - c->ssl->handshake_start_msec;
+        ms = tp->sec * 1000 + tp->msec - c->ssl->handshake_start_msec;
 
     } else {
         ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
@@ -5484,7 +5484,7 @@ ngx_ssl_get_handshake_time_msec(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t
     tp = ngx_timeofday();
 
     if (c->ssl->handshake_end_msec == 0) {
-        ms = tp->sec * 1000 + tp->sec - c->ssl->handshake_start_msec;
+        ms = tp->sec * 1000 + tp->msec - c->ssl->handshake_start_msec;
 
     } else {
         ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
