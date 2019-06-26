@@ -301,8 +301,15 @@ static ngx_stream_variable_t  ngx_stream_ssl_vars[] = {
       (uintptr_t) ngx_ssl_get_client_v_remain, NGX_STREAM_VAR_CHANGEABLE, 0 },
 
 #if (T_NGX_SSL_HANDSHAKE_TIME)
+    /* $ssl_shandshakd_time deprecated and will be removed in the next release */
     { ngx_string("ssl_handshakd_time"), NULL, ngx_stream_ssl_variable,
       (uintptr_t) ngx_ssl_get_handshake_time, NGX_STREAM_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_handshake_time"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_handshake_time_msec"), NULL, ngx_stream_ssl_variable,
+      (uintptr_t) ngx_ssl_get_handshake_time_msec, NGX_STREAM_VAR_CHANGEABLE, 0 },
 #endif
 
       ngx_stream_null_variable
