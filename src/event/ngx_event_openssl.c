@@ -5448,7 +5448,7 @@ ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     tp = ngx_timeofday();
 
     if (c->ssl->handshake_end_msec == 0) {
-        ms = tp->sec * 1000 + tp->sec - c->ssl->handshake_start_msec;
+        ms = tp->sec * 1000 + tp->msec - c->ssl->handshake_start_msec;
 
     } else {
         ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
@@ -5457,6 +5457,42 @@ ngx_ssl_get_handshake_time(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     ms = ngx_max(ms, 0);
 
     p = ngx_pnalloc(pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    s->len = ngx_sprintf(p, "%T.%03M", (time_t) ms / 1000, ms % 1000) - p;
+    s->data = p;
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_handshake_time_msec(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
+    ngx_msec_int_t   ms;
+    u_char          *p;
+    ngx_time_t      *tp;
+
+    if (c->ssl == NULL) {
+        ngx_str_null(s);
+
+        return NGX_OK;
+    }
+
+    tp = ngx_timeofday();
+
+    if (c->ssl->handshake_end_msec == 0) {
+        ms = tp->sec * 1000 + tp->msec - c->ssl->handshake_start_msec;
+
+    } else {
+        ms = c->ssl->handshake_end_msec - c->ssl->handshake_start_msec;
+    }
+
+    ms = ngx_max(ms, 0);
+
+    p = ngx_pnalloc(pool, NGX_TIME_T_LEN);
     if (p == NULL) {
         return NGX_ERROR;
     }
