@@ -213,13 +213,18 @@ ngx_http_upstream_init_dynamic_peer(ngx_http_request_t *r,
 static void
 ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
 {
-    ngx_http_request_t     *r;
-    ngx_http_upstream_t    *u;
-    ngx_peer_connection_t  *pc;
-    struct sockaddr_in     *sin, *csin;
-    in_port_t               port;
-    ngx_str_t              *addr;
-    u_char                 *p;
+    ngx_http_request_t                    *r;
+    ngx_http_upstream_t                   *u;
+    ngx_peer_connection_t                 *pc;
+#if defined(nginx_version) && nginx_version >= 1005008
+    socklen_t                              socklen;
+    struct sockaddr                       *sockaddr, *csockaddr;
+#else
+    struct sockaddr_in                    *sin, *csin;
+#endif
+    in_port_t                              port;
+    ngx_str_t                             *addr;
+    u_char                                *p;
 
     size_t                                 len;
     ngx_http_upstream_dynamic_srv_conf_t  *dscf;
@@ -244,7 +249,79 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
 
     } else {
         /* dns query ok */
+#if (NGX_DEBUG)
+        {
+        u_char      text[NGX_SOCKADDR_STRLEN];
+        ngx_str_t   addr;
+        ngx_uint_t  i;
+
+        addr.data = text;
+
+        for (i = 0; i < ctx->naddrs; i++) {
+            addr.len = ngx_sock_ntop(ctx->addrs[i].sockaddr, ctx->addrs[i].socklen,
+                                     text, NGX_SOCKADDR_STRLEN, 0);
+
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "name was resolved to %V", &addr);
+        }
+        }
+#endif
         dscf->fail_check = 0;
+#if defined(nginx_version) && nginx_version >= 1005008
+        csockaddr = ctx->addrs[0].sockaddr;
+        socklen = ctx->addrs[0].socklen;
+
+        if (ngx_cmp_sockaddr(pc->sockaddr, pc->socklen, csockaddr, socklen, 0)
+            == NGX_OK)
+        {
+            pc->resolved = NGX_HTTP_UPSTREAM_DR_OK;
+            goto out;
+        }
+
+        sockaddr = ngx_pcalloc(r->pool, socklen);
+        if (sockaddr == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        ngx_memcpy(sockaddr, csockaddr, socklen);
+        port = ngx_inet_get_port(pc->sockaddr);
+        
+        switch (sockaddr->sa_family) {
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            ((struct sockaddr_in6 *) sockaddr)->sin6_port = htons(port);
+            break;
+#endif
+        default: /* AF_INET */
+            ((struct sockaddr_in *) sockaddr)->sin_port = htons(port);
+        }
+
+        p = ngx_pnalloc(r->pool, NGX_SOCKADDR_STRLEN);
+        if (p == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        len = ngx_sock_ntop(sockaddr, socklen, p, NGX_SOCKADDR_STRLEN, 1);
+
+        addr = ngx_palloc(r->pool, sizeof(ngx_str_t));
+        if (addr == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        addr->data = p;
+        addr->len = len;
+        pc->sockaddr = sockaddr;
+        pc->socklen = socklen;
+        pc->name = addr;
+
+#else
+        /* for nginx older than 1.5.8 */
 
         sin = ngx_pcalloc(r->pool, sizeof(struct sockaddr_in));
         if (sin == NULL) {
@@ -294,6 +371,7 @@ ngx_http_upstream_dynamic_handler(ngx_resolver_ctx_t *ctx)
         pc->sockaddr = (struct sockaddr *) sin;
         pc->socklen = sizeof(struct sockaddr_in);
         pc->name = addr;
+#endif
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                 "name was resolved to %V", pc->name);
