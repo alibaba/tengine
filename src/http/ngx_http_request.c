@@ -465,13 +465,12 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
          * We are trying to not hold c->buffer's memory for an idle connection.
          */
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         /* For the Async implementation we need the same buffer to be used
          * again on any async calls that have not completed.
          * As such we need to turn off this optimisation if an async request
          * is still in progress.
          */
-
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable) {
 #endif
             if (ngx_pfree(c->pool, b->start) == NGX_OK) {
@@ -937,6 +936,7 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 int
 ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 {
+    ngx_int_t                  rc;
     ngx_str_t                  host;
     const char                *servername;
     ngx_connection_t          *c;
@@ -945,16 +945,17 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     ngx_http_core_loc_conf_t  *clcf;
     ngx_http_core_srv_conf_t  *cscf;
 
-    servername = SSL_get_servername(ssl_conn, TLSEXT_NAMETYPE_host_name);
-
-    if (servername == NULL) {
-        return SSL_TLSEXT_ERR_NOACK;
-    }
-
     c = ngx_ssl_get_connection(ssl_conn);
 
     if (c->ssl->handshaked) {
-        return SSL_TLSEXT_ERR_NOACK;
+        *ad = SSL_AD_NO_RENEGOTIATION;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    servername = SSL_get_servername(ssl_conn, TLSEXT_NAMETYPE_host_name);
+
+    if (servername == NULL) {
+        return SSL_TLSEXT_ERR_OK;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -963,27 +964,40 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     host.len = ngx_strlen(servername);
 
     if (host.len == 0) {
-        return SSL_TLSEXT_ERR_NOACK;
+        return SSL_TLSEXT_ERR_OK;
     }
 
     host.data = (u_char *) servername;
 
-    if (ngx_http_validate_host(&host, c->pool, 1) != NGX_OK) {
-        return SSL_TLSEXT_ERR_NOACK;
+    rc = ngx_http_validate_host(&host, c->pool, 1);
+
+    if (rc == NGX_ERROR) {
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    if (rc == NGX_DECLINED) {
+        return SSL_TLSEXT_ERR_OK;
     }
 
     hc = c->data;
 
-    if (ngx_http_find_virtual_server(c, hc->addr_conf->virtual_names, &host,
-                                     NULL, &cscf)
-        != NGX_OK)
-    {
-        return SSL_TLSEXT_ERR_NOACK;
+    rc = ngx_http_find_virtual_server(c, hc->addr_conf->virtual_names, &host,
+                                      NULL, &cscf);
+
+    if (rc == NGX_ERROR) {
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    if (rc == NGX_DECLINED) {
+        return SSL_TLSEXT_ERR_OK;
     }
 
     hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
     if (hc->ssl_servername == NULL) {
-        return SSL_TLSEXT_ERR_NOACK;
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
     }
 
     *hc->ssl_servername = host;
@@ -3267,58 +3281,59 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
      * c->pool and are freed too.
      */
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     /* For the Async implementation we need the same buffer to be used
      * again on any async calls that have not completed.
      * As such we need to turn off this optimisation if an async request
      * is still in progress.
      */
-
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
     {
 #endif
-        b = c->buffer;
+    b = c->buffer;
 
-        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
-            /*
-             * the special note for ngx_http_keepalive_handler() that
-             * c->buffer's memory was freed
-             */
+    if (ngx_pfree(c->pool, b->start) == NGX_OK) {
 
-            b->pos = NULL;
+        /*
+         * the special note for ngx_http_keepalive_handler() that
+         * c->buffer's memory was freed
+         */
 
-        } else {
-            b->pos = b->start;
-            b->last = b->start;
+        b->pos = NULL;
+
+    } else {
+        b->pos = b->start;
+        b->last = b->start;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc free: %p",
+                   hc->free);
+
+    if (hc->free) {
+        for (cl = hc->free; cl; /* void */) {
+            ln = cl;
+            cl = cl->next;
+            ngx_pfree(c->pool, ln->buf->start);
+            ngx_free_chain(c->pool, ln);
         }
 
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc free: %p",
-                       hc->free);
+        hc->free = NULL;
+    }
 
-        if (hc->free) {
-            for (cl = hc->free; cl; /* void */) {
-                ln = cl;
-                cl = cl->next;
-                ngx_pfree(c->pool, ln->buf->start);
-                ngx_free_chain(c->pool, ln);
-            }
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc busy: %p %i",
+                   hc->busy, hc->nbusy);
 
-            hc->free = NULL;
+    if (hc->busy) {
+        for (cl = hc->busy; cl; /* void */) {
+            ln = cl;
+            cl = cl->next;
+            ngx_pfree(c->pool, ln->buf->start);
+            ngx_free_chain(c->pool, ln);
         }
 
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0, "hc busy: %p %i",
-                       hc->busy, hc->nbusy);
-        if (hc->busy) {
-            for (cl = hc->busy; cl; /* void */) {
-                ln = cl;
-                cl = cl->next;
-                ngx_pfree(c->pool, ln->buf->start);
-                ngx_free_chain(c->pool, ln);
-            }
-
-                hc->busy = NULL;
-                hc->nbusy = 0;
-        }
+        hc->busy = NULL;
+        hc->nbusy = 0;
+    }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     }
 #endif
@@ -3464,23 +3479,22 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
          * c->buffer's memory for a keepalive connection.
          */
 
+#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         /* For the Asynch implementation we need the same buffer to be used
          * on subsequent read requests. As such we need to turn off this optimisation that
          * frees the buffer between invocations as may end up with a buffer that is at a
          * different address */
-
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
         {
 #endif
-            if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
 
-                /*
-                 * the special note that c->buffer's memory was freed
-                 */
+            /*
+             * the special note that c->buffer's memory was freed
+             */
 
-                b->pos = NULL;
-            }
+            b->pos = NULL;
+        }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
 #endif

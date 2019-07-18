@@ -9,13 +9,13 @@
 #define _NGINX_H_INCLUDED_
 
 
-#define nginx_version      1015009
-#define NGINX_VERSION      "1.15.9"
+#define nginx_version      1016000
+#define NGINX_VERSION      "1.16.0"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 #define TENGINE            "Tengine"
-#define tengine_version    2003000
-#define TENGINE_VERSION    "2.3.0"
+#define tengine_version    2003001
+#define TENGINE_VERSION    "2.3.1"
 #define TENGINE_VER        TENGINE "/" TENGINE_VERSION
 
 #ifdef NGX_BUILD

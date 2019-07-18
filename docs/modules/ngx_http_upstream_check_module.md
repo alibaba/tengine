@@ -4,7 +4,7 @@
 
 Add proactive health check for the upstream servers.
 
-This module is not built by default, it should be enabled with the `--with-http_upstream_check_module` configuration parameter.
+This module is not built by default, it should be enabled with the `--add-module=modules/ngx_http_upstream_check_module` configuration parameter.
 
 # Examples #
 

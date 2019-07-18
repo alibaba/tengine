@@ -90,6 +90,7 @@ http {
         server_name  localhost;
 
         location /static {
+            add_header UPS $upstream_addr always;
             proxy_pass http://backend;
         }
 
@@ -133,7 +134,7 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/static'), qr/501/,
+unlike(http_get('/static'), qr/127.0.0.4/,
     'static resolved should be taobao\' IP addr');
 like(http_get('/'), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2');
