@@ -1,0 +1,7 @@
+HTTP_MODULES="$HTTP_MODULES ngx_http_dubbo_module"
+CORE_DEPS="$CORE_DEPS $ngx_addon_dir/ngx_http_dubbo_module.h $ngx_addon_dir/ngx_dubbo.h"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_dubbo_util.cpp $ngx_addon_dir/utils/debug_text.cc $ngx_addon_dir/utils/json_text.cc $ngx_addon_dir/utils/objects.cc $ngx_addon_dir/utils/utils.cc $ngx_addon_dir/hessian2/hessian2_ext.cc $ngx_addon_dir/hessian2/hessian2_input.cc $ngx_addon_dir/hessian2/hessian2_output.cc $ngx_addon_dir/ngx_dubbo.c $ngx_addon_dir/ngx_http_dubbo_module.c"
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir $ngx_addon_dir/utils $ngx_addon_dir/hessian $ngx_addon_dir/hessian2"
+have=T_NGX_DUBBO . auto/have
+
+CORE_LIBS="$CORE_LIBS -lstdc++"
