@@ -23,6 +23,7 @@ force=$2
             #--with-http_spdy_module \
 
 add_fake_shm_module="--add-module=$root/t/data/fake-shm-module"
+add_fake_merge_module="--add-module=$root/t/data/fake-merge-module"
 
 time ngx-build $force $version \
             --with-pcre-jit \
@@ -58,6 +59,7 @@ time ngx-build $force $version \
                 --add-module=$root/../stream-lua-nginx-module \
                 --add-module=$root/t/data/fake-module \
                 $add_fake_shm_module \
+                $add_fake_merge_module \
                 --add-module=$root/t/data/fake-delayed-load-module \
                 --with-http_gunzip_module \
                 --with-http_dav_module \
