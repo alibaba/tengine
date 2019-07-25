@@ -123,6 +123,9 @@ typedef enum {
 
 struct ngx_connection_s {
     void               *data;
+#if (T_NGX_MULTI_UPSTREAM)
+    void               *multi_c;
+#endif
     ngx_event_t        *read;
     ngx_event_t        *write;
 #if (NGX_SSL && NGX_SSL_ASYNC)
