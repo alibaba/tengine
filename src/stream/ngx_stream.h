@@ -265,6 +265,13 @@ struct ngx_stream_session_s {
 #if (NGX_STREAM_SNI)
     ngx_stream_addr_conf_t        *addr_conf;
 #endif
+
+#if (T_NGX_MULTI_UPSTREAM)
+    ngx_queue_t                   *multi_item;
+    ngx_queue_t                   *backend_r;
+    ngx_queue_t                    waiting_queue;
+    ngx_flag_t                     waiting;
+#endif
 };
 
 
