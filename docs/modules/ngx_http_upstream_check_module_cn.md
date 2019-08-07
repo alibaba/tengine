@@ -4,7 +4,7 @@
 
 该模块可以为Tengine提供主动式后端服务器健康检查的功能。
 
-该模块没有默认开启，它可以在配置编译选项的时候开启：`./configure --with-http_upstream_check_module`
+该模块没有默认开启，它可以在配置编译选项的时候开启：`./configure --add-module=modules/ngx_http_upstream_check_module`
 
 # Examples #
 

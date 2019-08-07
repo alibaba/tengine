@@ -3505,7 +3505,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
             count,
             ngx_http_upstream_check_shm_generation);
 
-    last = peers->peers.nelts - 1;
+    last = 0;
     for (i = 0; i < peers->peers.nelts; i++) {
 
         if (peer[i].delete) {
@@ -3525,6 +3525,8 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
             }
         }
 
+        last++;
+
         b->last = ngx_snprintf(b->last, b->end - b->last,
                 "    {\"index\": %ui, "
                 "\"upstream\": \"%V\", "
@@ -3543,7 +3545,7 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
                 peer[i].shm->fall_count,
                 &peer[i].conf->check_type_conf->name,
                 peer[i].conf->port,
-                (i == last) ? "" : ",");
+                (last == count) ? "" : ",");
     }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
