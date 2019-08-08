@@ -13,7 +13,7 @@ Features
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
-* Support server_name in Stream modlue.
+* Support server_name in Stream module.
 * More load balancing methods, e.g., consistent hashing, and session persistence.
 * Input body filter support. It's quite handy to write Web Application Firewalls using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and makes it easy to extend core functionalities.
