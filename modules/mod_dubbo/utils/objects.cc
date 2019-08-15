@@ -124,7 +124,7 @@ uint32_t Object::generate_type_id(ObjectType ext_type) {
 /*
  * Object implementations
  */
-bool Object::to_bool() const throw(class_cast_exception) {
+bool Object::to_bool() const {
     switch (type_id()) {
         case BOOLEAN: return ((Boolean*) this)->to_bool();
         case INTEGER: return ((Integer*) this)->to_int() == 0;
@@ -136,7 +136,7 @@ bool Object::to_bool() const throw(class_cast_exception) {
     }
 }
 
-int32_t Object::to_int() const throw(class_cast_exception) {
+int32_t Object::to_int() const {
     switch (type_id()) {
         case INTEGER: return ((Integer*) this)->to_int();
         case LONG:    return (int32_t) ((Long*) this)->to_long();
@@ -148,7 +148,7 @@ int32_t Object::to_int() const throw(class_cast_exception) {
     }
 }
 
-int64_t Object::to_long() const throw(class_cast_exception) {
+int64_t Object::to_long() const {
     switch (type_id()) {
         case LONG:    return ((Long*) this)->to_long();
         case INTEGER: return (int64_t) ((Integer*) this)->to_int();
@@ -161,7 +161,7 @@ int64_t Object::to_long() const throw(class_cast_exception) {
     }
 }
 
-double Object::to_double() const throw(class_cast_exception) {
+double Object::to_double() const {
     switch (type_id()) {
         case DOUBLE:  return ((Double*) this)->to_double();
         case LONG:    return (double) ((Long*) this)->to_long();
@@ -173,7 +173,7 @@ double Object::to_double() const throw(class_cast_exception) {
     }
 }
 
-string Object::to_string() const throw(class_cast_exception) {
+string Object::to_string() const {
     switch (type_id()) {
         case STRING:     return ((String*) this)->data();
         case LONG:       return int64_to_string(((Long*) this)->to_long());
@@ -187,14 +187,14 @@ string Object::to_string() const throw(class_cast_exception) {
     }
 }
 
-List* Object::to_list() throw(class_cast_exception) {
+List* Object::to_list() {
     if (!instance_of<List>(this)) {
         throw class_cast_exception("can not cast to list from class: " + _classname);
     }
     return static_cast<List*>(this);
 }
 
-Map* Object::to_map() throw(class_cast_exception) {
+Map* Object::to_map() {
     if (!instance_of<Map>(this)) {
         throw class_cast_exception("can not cast to map from class: " + _classname);
     }

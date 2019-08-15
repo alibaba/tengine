@@ -162,7 +162,7 @@ static void exception_serialize_hessian2(const Object* obj, hessian2_output& hou
 
 static Object* exception_deserialize(const string& type, hessian2_input& hin) {
     Exception* ex = new Exception("", type);
-    auto_ptr<Exception> safeguard(ex);
+    Safeguard<Exception> safeguard(ex);
     hin.add_ref(ex);
 
     int tag;

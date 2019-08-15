@@ -13,7 +13,7 @@
 #include <ngx_event_connect.h>
 #include "ngx_multi_upstream_module.h"
 
-inline int ngx_dubbo_is_big_endian();
+int ngx_dubbo_is_big_endian();
 
 #define ngx_dubbo_swap64(val) (((val) >> 56)   |\
         (((val) & 0x00ff000000000000ll) >> 40) |\
@@ -80,7 +80,6 @@ typedef enum {
 } ngx_dubbo_parse_state_t;
 
 typedef struct {
-    ngx_pool_t                     *pool;
     ngx_pool_t                     *temp_pool;
 
 

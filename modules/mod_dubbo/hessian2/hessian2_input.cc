@@ -960,7 +960,7 @@ int64_t hessian2_input::read_utc_date() {
 
 std::string* hessian2_input::read_utf8_string(std::string *dest)
 {
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
     if (dest == NULL) {
         dest = new string();
         safeguard.reset(dest);
@@ -1280,7 +1280,7 @@ string* hessian2_input::read_chunked_utf8_string(string* dest) {
         dest = new string();
     }
 
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     while (tag == 'R') {
         uint16_t char_size = parse_16bit();
@@ -1398,7 +1398,7 @@ string* hessian2_input::read_chunked_utf8_string(string* dest) {
 string* hessian2_input::read_bytes() {
     string *dest = new string();
 
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     uint8_t tag = parse_8bit();
     int len;
@@ -1459,6 +1459,7 @@ string* hessian2_input::read_bytes() {
             return dest;
         case 65:
             --_curr;
+            safeguard.release();
             return read_chunked_bytes(dest);
         case 66:
             {
@@ -1483,7 +1484,7 @@ string* hessian2_input::read_chunked_bytes(string* dest) {
     if (dest == NULL) {
         dest = new string();
     }
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     while (tag == 'A') {
         uint16_t byte_size = parse_16bit();
@@ -1593,7 +1594,7 @@ Object* hessian2_input::read_map(const string& classname) {
         return ext(type, *this);
     } else {
         Map* map = new Map(type);
-        auto_ptr<Map> safeguard(map);
+        Safeguard<Map> safeguard(map);
         add_ref(map);
 
         while ((tag = peek()) != 'Z') {

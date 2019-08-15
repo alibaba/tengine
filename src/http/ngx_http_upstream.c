@@ -2203,7 +2203,7 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
         }
 
 #if (T_NGX_MULTI_UPSTREAM)
-        if (u->multi && r->connection != u->peer.connection) {
+        if (u->multi && r->connection != u->peer.connection && !r->waiting) {
             ngx_multi_connection_t *multi_c = ngx_get_multi_connection(c);
             ngx_queue_insert_tail(&multi_c->waiting_list, &r->waiting_queue);
             r->waiting = 1;

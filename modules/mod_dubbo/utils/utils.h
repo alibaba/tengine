@@ -88,6 +88,19 @@ std::string utf8_to_gbk(const std::string& input);
 std::string gbk_to_utf8(const std::string& input);
 std::string utf8_to_native(const std::string& input);
 
+template <class T>
+class Safeguard {
+    public:
+        Safeguard(): m_pt(NULL) { }
+        Safeguard(T* pt): m_pt(pt) { }
+        ~Safeguard() { if (m_pt != NULL) delete m_pt; }
+
+        void reset(T* pt) { m_pt = pt; }
+        void release() { m_pt = NULL; }
+    private:
+        T* m_pt;
+};
+
 }
 
 #endif

@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <objects.h>
+#include <utils.h>
 #include <hessian2_output.h>
 #include <hessian2_input.h>
 
@@ -39,6 +40,9 @@ ngx_int_t ngx_dubbo_hessian2_encode_str(ngx_pool_t *pool, ngx_str_t *in, ngx_str
         out->len = str.length();
 
         return NGX_OK;
+    } catch (io_exception e) {
+        ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
+        return NGX_ERROR;
     } catch (...) {
         return NGX_ERROR;
     }
@@ -70,6 +74,9 @@ ngx_int_t ngx_dubbo_hessian2_encode_map(ngx_pool_t *pool, ngx_array_t *in, ngx_s
         out->len = str.length();
 
         return NGX_OK;
+    } catch (io_exception e) {
+        ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
+        return NGX_ERROR;
     } catch (...) {
         return NGX_ERROR;
     }
@@ -82,7 +89,6 @@ ngx_int_t ngx_dubbo_hessian2_encode_payload_map(ngx_pool_t *pool, ngx_array_t *i
         hessian2_output hout(&str);
 
         Map strMap;
-        auto_ptr<string> safeguard;
         ngx_keyval_t *kv = (ngx_keyval_t*)in->elts;
         for (size_t i=0; i<in->nelts; i++) {
             string key((const char*)kv[i].key.data, kv[i].key.len);
@@ -110,6 +116,9 @@ ngx_int_t ngx_dubbo_hessian2_encode_payload_map(ngx_pool_t *pool, ngx_array_t *i
         out->len = str.length();
 
         return NGX_OK;
+    } catch (io_exception e) {
+        ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
+        return NGX_ERROR;
     } catch (...) {
         return NGX_ERROR;
     }
@@ -137,7 +146,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
             return NGX_ERROR;
         }
 
-        auto_ptr<Map> safeguard(pmap);
+        Safeguard<Map> safeguard(pmap);
 
         pres = ngx_array_create(pool, pmap->size(), sizeof(ngx_keyval_t));
         if (pres == NULL) {
@@ -153,6 +162,9 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
             ByteArray *bValue = NULL;
 
             kv = (ngx_keyval_t*)ngx_array_push(pres);
+            if (kv == NULL) {
+                return NGX_ERROR;
+            }
             if (sKey) {
                 string p = sKey->to_string();
                 kv->key.data = (u_char*)ngx_palloc(pool, sKey->size());
@@ -191,6 +203,9 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
         }
 
         return NGX_OK;
+    } catch (io_exception e) {
+        ngx_log_error(NGX_LOG_ERR, log, 0, "dubbo: parse exception failed %s", e.what());
+        return NGX_ERROR;
     } catch (...) {
         ngx_log_error(NGX_LOG_ERR, log, 0, "dubbo: parse result failed %V", in);
         return NGX_ERROR;
