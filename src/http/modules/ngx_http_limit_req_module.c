@@ -72,6 +72,7 @@ typedef struct {
     ngx_uint_t                   limit_log_level;
     ngx_uint_t                   delay_log_level;
     ngx_uint_t                   status_code;
+    ngx_flag_t                   dry_run;
 } ngx_http_limit_req_conf_t;
 
 
@@ -148,6 +149,13 @@ static ngx_command_t  ngx_http_limit_req_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_limit_req_conf_t, status_code),
       &ngx_http_limit_req_status_bounds },
+
+    { ngx_string("limit_req_dry_run"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_limit_req_conf_t, dry_run),
+      NULL },
 
 #if (T_LIMIT_REQ)
     { ngx_string("limit_req_whitelist"),
@@ -366,9 +374,10 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
         if (rc == NGX_BUSY) {
             ngx_log_error(lrcf->limit_log_level, r->connection->log, 0,
-                          "limiting requests, excess: %ui.%03ui by zone \"%V\"",
-                          excess / 1000, excess % 1000,
-                          &limit->shm_zone->shm.name);
+                        "limiting requests%s, excess: %ui.%03ui by zone \"%V\"",
+                        lrcf->dry_run ? ", dry run" : "",
+                        excess / 1000, excess % 1000,
+                        &limit->shm_zone->shm.name);
         }
 
         while (n--) {
@@ -385,6 +394,10 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
             ngx_shmtx_unlock(&ctx->shpool->mutex);
 
             ctx->node = NULL;
+        }
+
+        if (lrcf->dry_run) {
+            return NGX_DECLINED;
         }
 
 #if (T_LIMIT_REQ)
@@ -428,8 +441,13 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
     }
 
     ngx_log_error(lrcf->delay_log_level, r->connection->log, 0,
-                  "delaying request, excess: %ui.%03ui, by zone \"%V\"",
+                  "delaying request%s, excess: %ui.%03ui, by zone \"%V\"",
+                  lrcf->dry_run ? ", dry run" : "",
                   excess / 1000, excess % 1000, &limit->shm_zone->shm.name);
+
+    if (lrcf->dry_run) {
+        return NGX_DECLINED;
+    }
 
     if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -872,6 +890,7 @@ ngx_http_limit_req_create_conf(ngx_conf_t *cf)
 
     conf->limit_log_level = NGX_CONF_UNSET_UINT;
     conf->status_code = NGX_CONF_UNSET_UINT;
+    conf->dry_run = NGX_CONF_UNSET;
 
 #if (T_LIMIT_REQ)
     conf->enable = NGX_CONF_UNSET;
@@ -901,6 +920,7 @@ ngx_http_limit_req_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->status_code, prev->status_code,
                               NGX_HTTP_SERVICE_UNAVAILABLE);
 
+    ngx_conf_merge_value(conf->dry_run, prev->dry_run, 0);
 #if (T_LIMIT_REQ)
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
 
