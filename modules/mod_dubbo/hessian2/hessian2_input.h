@@ -68,11 +68,11 @@ class hessian2_input {
         const char* current_ptr() const { return _curr; }
         void seek(uint32_t offset) { _curr += offset; }
 
-        int8_t peek();
-        int8_t parse_8bit();
-        int16_t parse_16bit();
-        int32_t parse_32bit();
-        int64_t parse_64bit();
+        uint8_t peek();
+        uint8_t parse_8bit();
+        uint16_t parse_16bit();
+        uint32_t parse_32bit();
+        uint64_t parse_64bit();
 
         double parse_double();
 
@@ -94,43 +94,43 @@ class hessian2_input {
         std::vector<Object*> _refs_list;
 };
 
-inline int8_t hessian2_input::peek() {
+inline uint8_t hessian2_input::peek() {
     if (_curr >= _end) {
         throw io_exception("hessian2_input::peek(): will reach EOF");
     }
     return *_curr;
 }
 
-inline int8_t hessian2_input::parse_8bit() {
+inline uint8_t hessian2_input::parse_8bit() {
     if (_curr >= _end) {
         throw io_exception("hessian2_input::read_8bit(): will reach EOF");
     }
     return *_curr++;
 }
 
-inline int16_t hessian2_input::parse_16bit() {
+inline uint16_t hessian2_input::parse_16bit() {
     if (_curr + 1 >= _end) {
         throw io_exception("hessian2_input::read_16bit(): will reach EOF");
     }
-    int16_t ret = bswap_16(*((uint16_t *)(_curr)));
+    uint16_t ret = bswap_16(*((uint16_t *)(_curr)));
     _curr += 2;
     return ret;
 }
 
-inline int32_t hessian2_input::parse_32bit() {
+inline uint32_t hessian2_input::parse_32bit() {
     if (_curr + 3 >= _end) {
         throw io_exception("hessian2_input::read_32bit(): will reach EOF");
     }
-    int32_t ret = bswap_32(*((uint32_t *)(_curr)));
+    uint32_t ret = bswap_32(*((uint32_t *)(_curr)));
     _curr += 4;
     return ret;
 }
 
-inline int64_t hessian2_input::parse_64bit() {
+inline uint64_t hessian2_input::parse_64bit() {
     if (_curr + 7 >= _end) {
         throw io_exception("hessian2_input::read_64bit(): will reach EOF");
     }
-    int64_t ret = bswap_64(*((uint64_t *)(_curr)));
+    uint64_t ret = bswap_64(*((uint64_t *)(_curr)));
     _curr += 8;
     return ret;
 }
