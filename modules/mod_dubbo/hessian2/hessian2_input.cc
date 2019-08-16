@@ -93,19 +93,19 @@ bool hessian2_input::read_bool() {
         default:
             throw expect("boolean", tag);
         case 68:
-            return parse_double() != 0.0D;
+            return parse_double() != 0.0;
         case 70:
             return false;
         case 73:
             return parse_32bit() != 0;
         case 76:
-            return parse_64bit() != 0L;
+            return parse_64bit() != 0;
         case 78:
             return false;
         case 84:
             return true;
         case 89:
-            return 16777216L * (long)parse_8bit() + 65536L * (long)parse_8bit() + (long)(256 * parse_8bit()) + (long)parse_8bit() != 0L;
+            return 16777216 * (long)parse_8bit() + 65536 * (long)parse_8bit() + (long)(256 * parse_8bit()) + (long)parse_8bit() != 0;
         case 91:
             return false;
         case 92:
@@ -559,20 +559,20 @@ int64_t hessian2_input::read_int64() {
         case 68:
             return (int64_t)parse_double();
         case 70:
-            return 0L;
+            return 0;
         case 73:
         case 89:
             return (int64_t)parse_32bit();
         case 76:
             return parse_64bit();
         case 78:
-            return 0L;
+            return 0;
         case 84:
-            return 1L;
+            return 1;
         case 91:
-            return 0L;
+            return 0;
         case 92:
-            return 1L;
+            return 1;
         case 93:
             return (int64_t)parse_8bit();
         case 94:
@@ -580,7 +580,7 @@ int64_t hessian2_input::read_int64() {
         case 95:
             {
                 int mills = parse_32bit();
-                return (int64_t)(0.001D * (double)mills);
+                return (int64_t)(0.001 * (double)mills);
             }
         case 128:
         case 129:
@@ -787,20 +787,20 @@ double hessian2_input::read_double() {
         case 68:
             return parse_double();
         case 70:
-            return 0.0D;
+            return 0.0;
         case 73:
         case 89:
             return (double)parse_double();
         case 76:
             return (double)parse_64bit();
         case 78:
-            return 0.0D;
+            return 0.0;
         case 84:
-            return 1.0D;
+            return 1.0;
         case 91:
-            return 0.0D;
+            return 0.0;
         case 92:
-            return 1.0D;
+            return 1.0;
         case 93:
             return (double)parse_8bit();
         case 94:
@@ -808,7 +808,7 @@ double hessian2_input::read_double() {
         case 95:
             {
                 int mills = parse_32bit();
-                return 0.001D * (double)mills;
+                return 0.001 * (double)mills;
             }
         case 128:
         case 129:
@@ -952,7 +952,7 @@ int64_t hessian2_input::read_utc_date() {
     if(tag == 'J') {
         return parse_64bit();
     } else if(tag == 'K') {
-        return (int64_t)parse_32bit() * 60000L;
+        return (int64_t)parse_32bit() * 60000;
     } else {
         throw expect("date", tag);
     }
@@ -1131,7 +1131,7 @@ std::string* hessian2_input::read_utf8_string(std::string *dest)
         case 95:
             {
                 int ch = parse_32bit();
-                return new string(double_to_string(0.001D * (double)ch));
+                return new string(double_to_string(0.001 * (double)ch));
             }
         case 128:
         case 129:
