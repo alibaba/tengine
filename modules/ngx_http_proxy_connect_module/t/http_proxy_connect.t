@@ -27,10 +27,10 @@ my $t = Test::Nginx->new()->has(qw/http proxy/); #->plan(12);
 
 ###############################################################################
 
-my $test_enable_rewrite_phase = 0;
+my $test_enable_rewrite_phase = 1;
 
-if (defined $ENV{TEST_ENABLE_REWRITE_PHASE}) {
-    $test_enable_rewrite_phase = 1;
+if (defined $ENV{TEST_DISABLE_REWRITE_PHASE}) {
+    $test_enable_rewrite_phase = 0;
 }
 
 print("+ test_enable_rewrite_phase: $test_enable_rewrite_phase\n");
@@ -119,6 +119,10 @@ http {
             set $proxy_local_address "127.0.0.1";   # NOTE that we cannot bind 127.0.0.3 in mac os x.
         }
 
+        if ($host = "proxy-remote-address-resolve-domain.com") {
+            set $proxy_remote_address "www.test-a.com:8081";
+        }
+
         location / {
             proxy_pass http://127.0.0.1:8081;
         }
@@ -168,6 +172,11 @@ like(http_connect_request('127.0.0.1', '9999', '/'), qr/403/, '200 Connection Es
 like(http_get('/'), qr/backend server/, 'Get method: proxy_pass');
 like(http_get('/hello'), qr/world/, 'Get method: return 200');
 like(http_connect_request('forbidden.example.com', '8080', '/'), qr/400 Bad Request/, 'forbid CONNECT request without proxy_connect command enabled');
+
+# proxy_remote_address directive supports dynamic domain resolving.
+like(http_connect_request('proxy-remote-address-resolve-domain.com', '8081', '/'),
+     qr/host:proxy-remote-address-resolve-domain\.com/,
+     'proxy_remote_address supports dynamic domain resovling');
 
 if ($test_enable_rewrite_phase) {
     like(http_connect_request('address.com', '8081', '/'), qr/backend server: addr:127.0.0.1 port:8082/, 'set remote address');
