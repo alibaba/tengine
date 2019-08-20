@@ -1,3 +1,76 @@
+Changes with nginx 1.17.3                                        13 Aug 2019
+
+    *) Security: when using HTTP/2 a client might cause excessive memory
+       consumption and CPU usage (CVE-2019-9511, CVE-2019-9513,
+       CVE-2019-9516).
+
+    *) Bugfix: "zero size buf" alerts might appear in logs when using
+       gzipping; the bug had appeared in 1.17.2.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "resolver" directive was used in SMTP proxy.
+
+
+Changes with nginx 1.17.2                                        23 Jul 2019
+
+    *) Change: minimum supported zlib version is 1.2.0.4.
+       Thanks to Ilya Leoshkevich.
+
+    *) Change: the $r->internal_redirect() embedded perl method now expects
+       escaped URIs.
+
+    *) Feature: it is now possible to switch to a named location using the
+       $r->internal_redirect() embedded perl method.
+
+    *) Bugfix: in error handling in embedded perl.
+
+    *) Bugfix: a segmentation fault might occur on start or during
+       reconfiguration if hash bucket size larger than 64 kilobytes was used
+       in the configuration.
+
+    *) Bugfix: nginx might hog CPU during unbuffered proxying and when
+       proxying WebSocket connections if the select, poll, or /dev/poll
+       methods were used.
+
+    *) Bugfix: in the ngx_http_xslt_filter_module.
+
+    *) Bugfix: in the ngx_http_ssi_filter_module.
+
+
+Changes with nginx 1.17.1                                        25 Jun 2019
+
+    *) Feature: the "limit_req_dry_run" directive.
+
+    *) Feature: when using the "hash" directive inside the "upstream" block
+       an empty hash key now triggers round-robin balancing.
+       Thanks to Niklas Keller.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       caching was used along with the "image_filter" directive, and errors
+       with code 415 were redirected with the "error_page" directive; the
+       bug had appeared in 1.11.10.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       embedded perl was used; the bug had appeared in 1.7.3.
+
+
+Changes with nginx 1.17.0                                        21 May 2019
+
+    *) Feature: variables support in the "limit_rate" and "limit_rate_after"
+       directives.
+
+    *) Feature: variables support in the "proxy_upload_rate" and
+       "proxy_download_rate" directives in the stream module.
+
+    *) Change: minimum supported OpenSSL version is 0.9.8.
+
+    *) Change: now the postpone filter is always built.
+
+    *) Bugfix: the "include" directive did not work inside the "if" and
+       "limit_except" blocks.
+
+    *) Bugfix: in byte ranges processing.
+
 Changes with nginx 1.16.0                                        23 Apr 2019
 
     *) 1.16.x stable branch.
