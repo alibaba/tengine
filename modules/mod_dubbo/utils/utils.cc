@@ -3,24 +3,22 @@
 #endif
 
 #include "utils.h"
-#include <cstdlib>
-#include <cstdio>
 #include <string>
-#include <cstring>
-#include <cstdlib>
-#include <inttypes.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <langinfo.h>
-#include <iconv.h>
 #include <sstream>
 #include <ostream>
-#include <unistd.h>
+#include <inttypes.h>
 
 namespace hessian {
 
 using namespace std;
+
+int ngx_hessian_is_big_endian() {
+    const int n = 1;
+    if(*(char *)&n) {
+        return 0;
+    }
+    return 1;
+}
 
 union double_int64 {
     double  dval;
@@ -74,33 +72,6 @@ int64_t cstr_to_int64(const char* cstr) {
 
 double cstr_to_double(const char* cstr) {
     return strtod(cstr, NULL);
-}
-
-vector<string> parse_lines(const string& data) {
-    vector<string> r;
-    string data0(data);
-    trim(data0);
-    if (data0.empty()) {
-        return r;
-    }
-
-    size_t bol = 0, eol, len = data0.length();
-    do {
-        eol = data0.find('\n', bol);
-        if (eol == string::npos) {
-            r.push_back(data0.substr(bol));
-        } else {
-            size_t eol2 = eol;
-            if (eol2 > bol && data0[eol2 - 1] == '\r') {
-                --eol2;
-            }
-            if (eol2 > bol) {
-                r.push_back(data0.substr(bol, eol2 - bol));
-            }
-        }
-        bol = eol + 1;
-    } while (eol != string::npos && bol < len);
-    return r;
 }
 
 string to_hex_string(const void* ch, size_t size) {
@@ -158,127 +129,5 @@ void hexdump(const char* caption, const void* ptr, unsigned int len) {
     }
     printf("%08x\n", len);
 }
-
-string system_charset() {
-    // locale charmap
-    setlocale(LC_CTYPE, "");
-    return string(nl_langinfo(CODESET));
-}
-
-/*
- * Thread local
- */
-template <class T>
-class ThreadLocal {
-    public:
-        ThreadLocal(void (*destructor)(void*))
-            : _destructor(destructor) {
-                pthread_key_create(&_key, destructor);
-            }
-        ~ThreadLocal() {
-            clear();
-            pthread_key_delete(_key);
-        }
-        T* get() {
-            return (T*) pthread_getspecific(_key);
-        }
-        void clear() {
-            T* data = (T*) pthread_getspecific(_key);
-            if (data && _destructor) {
-                _destructor(data);
-            }
-        }
-        int set(T* data) {
-            return pthread_setspecific(_key, data);
-        }
-
-    private:
-        ThreadLocal(const ThreadLocal& other);
-        ThreadLocal& operator=(const ThreadLocal& other);
-
-    private:
-        pthread_key_t  _key;
-        void (*_destructor)(void*);
-};
-
-/* ============================================================================
- * convert charset
- * ========================================================================= */
-string iconv_string(const string& input, void* iconv_t_ptr) {
-    if (input.empty() || !iconv_t_ptr) {
-        return input;
-    }
-
-    char*  inbuf = const_cast<char*>(input.data());
-    size_t insize = input.size();
-    size_t outsize = insize << 1;
-    char*  outbuf = new char[outsize];
-
-    char*  inptr = inbuf;
-    size_t inremain = insize;
-    char*  outptr = outbuf;
-    size_t outremain = outsize;
-
-    iconv(*(iconv_t*) iconv_t_ptr, &inptr, &inremain, &outptr, &outremain);
-
-    string ret(outbuf, outsize - outremain);
-    delete[] outbuf;
-    return ret;
-}
-
-static void iconv_t_destructor(void* iconv_t_ptr) {
-    iconv_close(*(iconv_t*)iconv_t_ptr);
-    delete (iconv_t*)iconv_t_ptr;
-}
-
-static ThreadLocal<iconv_t> utf8_to_gbk_iconv(iconv_t_destructor);
-static ThreadLocal<iconv_t> gbk_to_utf8_iconv(iconv_t_destructor);
-static ThreadLocal<iconv_t> utf8_to_native_iconv(iconv_t_destructor);
-
-string utf8_to_gbk(const string& input) {
-    iconv_t* iconv_t_ptr = utf8_to_gbk_iconv.get();
-    if (!iconv_t_ptr) {
-        iconv_t cd;
-        if ((iconv_t)(-1) == (cd = iconv_open("GB18030//TRANSLIT", "UTF-8"))) {
-            return input;
-        }
-        iconv_t_ptr = new iconv_t(cd);
-        utf8_to_gbk_iconv.set(iconv_t_ptr);
-    }
-    return iconv_string(input, iconv_t_ptr);
-}
-
-string gbk_to_utf8(const string& input) {
-    iconv_t* iconv_t_ptr = gbk_to_utf8_iconv.get();
-    if (!iconv_t_ptr) {
-        iconv_t cd;
-        if ((iconv_t)(-1) == (cd = iconv_open("UTF-8//TRANSLIT", "GB18030"))) {
-            return input;
-        }
-        iconv_t_ptr = new iconv_t(cd);
-        gbk_to_utf8_iconv.set(iconv_t_ptr);
-    }
-    return iconv_string(input, iconv_t_ptr);
-}
-
-string utf8_to_native(const string& input) {
-    static bool bconv = (system_charset() != "UTF-8");
-    static string sys_conv = (system_charset() + "//TRANSLIT");
-    if (bconv) {
-        iconv_t* iconv_t_ptr = utf8_to_native_iconv.get();
-        if (!iconv_t_ptr) {
-            iconv_t cd;
-            if ((iconv_t)(-1) == (cd = iconv_open(sys_conv.c_str(), "UTF-8"))) {
-                return input;
-            }
-            iconv_t_ptr = new iconv_t(cd);
-            utf8_to_native_iconv.set(iconv_t_ptr);
-        }
-        return iconv_string(input, iconv_t_ptr);
-    } else {
-        return input;
-    }
-}
-
 }
 

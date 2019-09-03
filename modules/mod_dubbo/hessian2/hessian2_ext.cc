@@ -99,7 +99,7 @@ void hessian2_regist_deserializer(Object::ObjectType ext_type,
         const string& classname,
         hessian2_deserialize_pt deserializer) {
     if (ext_type != Object::EXT_MAP) {
-        throw runtime_error("illegal ext_type when registering hessian deserializer of " + classname);
+        throw io_exception("illegal ext_type when registering hessian deserializer of " + classname);
     }
 
     size_t asterisk = classname.find_first_of('*');
@@ -110,7 +110,7 @@ void hessian2_regist_deserializer(Object::ObjectType ext_type,
         deserializer_registry_hessian2_suffix.push_back(
                 deserializer_registry_hessian2_t::value_type(classname.substr(1), deserializer));
     } else {
-        throw runtime_error("illegal classname when registering hessian deserializer of " + classname);
+        throw io_exception("illegal classname when registering hessian deserializer of " + classname);
     }
 }
 

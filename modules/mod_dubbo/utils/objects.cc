@@ -1,7 +1,6 @@
 #include "objects.h"
 #include "utils.h"
 #include "hessian2_output.h"
-#include "debug_text.h"
 #include <sstream>
 
 /*
@@ -199,19 +198,6 @@ Map* Object::to_map() {
         throw class_cast_exception("can not cast to map from class: " + _classname);
     }
     return static_cast<Map*>(this);
-}
-
-/** output debug info to stream **/
-std::ostream& operator << (std::ostream& os, const Object& obj) {
-    set<const Object*> dejaVu;
-    debug_text_handle_object(&obj, os, 0, &dejaVu);
-    return os;
-}
-
-string Object::debug_text() const {
-    stringstream ss;
-    ss << *this;
-    return ss.str();
 }
 
 /*

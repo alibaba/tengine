@@ -1,5 +1,5 @@
-#ifndef HSF_UTILS_H
-#define HSF_UTILS_H
+#ifndef DUBBO_UTILS_H
+#define DUBBO_UTILS_H
 
 #ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
@@ -8,12 +8,23 @@
 #include <stdint.h>
 #include <vector>
 #include <string>
-#include <algorithm>
-#include <iosfwd>
-#include <stdexcept>
-#include <pthread.h>
+#include "ngx_config.h"
 
 namespace hessian {
+
+int ngx_hessian_is_big_endian();
+
+#define ngx_hessian_swap64(val) (((val) >> 56)   |\
+        (((val) & 0x00ff000000000000ll) >> 40) |\
+        (((val) & 0x0000ff0000000000ll) >> 24) |\
+        (((val) & 0x000000ff00000000ll) >> 8)  |\
+        (((val) & 0x00000000ff000000ll) << 8)  |\
+        (((val) & 0x0000000000ff0000ll) << 24) |\
+        (((val) & 0x000000000000ff00ll) << 40) |\
+        (((val) << 56)))
+
+#define ngx_hessian_hton64(val) ngx_hessian_is_big_endian() ? val : ngx_hessian_swap64(val)
+#define ngx_hessian_ntoh64(val) ngx_hessian_hton64(val)
 
 #define CONST_C_STRING(const_c_str) const_c_str, sizeof(const_c_str) - 1
 
@@ -43,8 +54,6 @@ inline double string_to_double(const std::string& str) { return cstr_to_double(s
 std::string to_hex_string(const void* ch, size_t size);
 void write_hex_to_stream(std::ostream& os, const void* ch, size_t size);
 
-std::vector<std::string> parse_lines(const std::string& data);
-
 /**
  * debug function, output hex
  * @param caption title, not output when NULL
@@ -52,29 +61,6 @@ std::vector<std::string> parse_lines(const std::string& data);
  * @param len len when output
  */
 void hexdump(const char* caption, const void* ptr, unsigned int len);
-
-inline std::string &rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-    return s;
-}
-
-inline std::string &ltrim(std::string &s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    return s;
-}
-
-inline std::string &trim(std::string &s) {
-    return ltrim(rtrim(s));
-}
-
-/*
- * charset
- */
-std::string system_charset();
-
-std::string utf8_to_gbk(const std::string& input);
-std::string gbk_to_utf8(const std::string& input);
-std::string utf8_to_native(const std::string& input);
 
 template <class T>
 class Safeguard {

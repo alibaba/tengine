@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <iosfwd>
 
 namespace hessian {
 
@@ -59,9 +58,6 @@ class Object {
         List* to_list();
         Map* to_map();
 
-        /** output object debug info */
-        std::string debug_text() const;
-
         /** generate extend object type_id */
         static uint32_t generate_type_id(ObjectType ext_type);
 
@@ -75,9 +71,6 @@ class Object {
         Object(const Object& other);
         Object& operator=(const Object& other);
 };
-
-/** output debug info to stream */
-std::ostream& operator << (std::ostream& os, const Object& obj);
 
 template <class T>
 inline bool instance_of(const Object* obj) {
