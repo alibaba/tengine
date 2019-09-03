@@ -68,6 +68,10 @@ statue: HTTP响应的状态码，value的类型为String
 支持在Tengine侧配置参数映射，动态生成对后端任意Dubbo Provider方法的调用（持续更新中，敬请期待）。
 
 
+QuickStart
+=======
+这里有一个[Tengine Dubbo功能的QuickStart](https://github.com/apache/dubbo-samples/tree/master/dubbo-samples-tengine)
+
 
 Install
 =======

@@ -27,7 +27,7 @@ make
 sudo make install
 ```
 
-CentOS maybee need
+CentOS maybe need
 ```
 sudo yum install gcc
 sudo yum install gcc-c++
@@ -102,20 +102,37 @@ git clone https://github.com/apache/dubbo-samples.git
 ```
 
 ### Build Dubbo Tengine Sample
+depend on ```maven``` and ```jdk8```
+
 ```
 cd ./dubbo-samples/dubbo-samples-tengine
 mvn package
 ```
 
-CentOS maybee need
+CentOS maybe need
 ```
 sudo yum install maven
+
+#or
+
+wget http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+sudo yum -y install apache-maven
+
+
+sudo yum install java-1.8.0-openjdk-devel
 ```
 
-Ubuntu maybee need
+Ubuntu maybe need
 ```
 sudo apt install maven
-sudo apt install openjdk-8-jdk-headless
+sudo apt install openjdk-8-jdk-devel
+
+#some times
+sudo apt-get install software-properties-common
+sudo add-apt-repository ppa:openjdk-r/ppa
+sudo apt-get update
+sudo apt-get install openjdk-8-jdk
+sudo update-alternatives --config java
 ```
 
 ### Run Dubbo Demo
@@ -147,3 +164,12 @@ test: 123
 dubbo success
 ```
 
+This doc Verified on
+```
+Ubuntu 14.04
+Ubuntu 16.04
+Ubuntu 18.04
+
+Centos 7
+Centos 6
+```
