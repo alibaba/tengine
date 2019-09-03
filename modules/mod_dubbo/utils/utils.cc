@@ -9,12 +9,9 @@
 #include <cstring>
 #include <cstdlib>
 #include <inttypes.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <linux/if.h>
 #include <langinfo.h>
 #include <iconv.h>
 #include <sstream>
@@ -160,47 +157,6 @@ void hexdump(const char* caption, const void* ptr, unsigned int len) {
         printf("|\n");
     }
     printf("%08x\n", len);
-}
-
-uint64_t milli_time() {
-    struct timeval tv;
-    gettimeofday(&tv , NULL);
-    return (tv.tv_sec * __UINT64_C(1000)) + tv.tv_usec / __UINT64_C(1000);
-}
-
-uint64_t micro_time() {
-    struct timeval tv;
-    gettimeofday(&tv , NULL);
-    return (tv.tv_sec * __UINT64_C(1000000)) + tv.tv_usec;
-}
-
-void asleep(double sec) {
-    struct timespec ts;
-    ts.tv_sec = (long)sec; ts.tv_nsec = (long)((sec - ts.tv_sec) * 1e9);
-    nanosleep(&ts, 0);
-}
-
-uint64_t get_ifaddr_ipv4() {
-    int MAX_INTERFACES = 16;
-    uint64_t ip = 0;
-    int fd, intrface = 0;
-    struct ifreq buf[MAX_INTERFACES];
-    struct ifconf ifc;
-    if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
-        ifc.ifc_len = sizeof(buf);
-        ifc.ifc_buf = (caddr_t) buf;
-        if (!ioctl(fd, SIOCGIFCONF, (char*)&ifc)) {
-            intrface = ifc.ifc_len / sizeof(struct ifreq);
-            while (intrface-- > 0) {
-                if (!(ioctl(fd, SIOCGIFADDR, (char*)&buf[intrface]))) {
-                    ip = *((uint64_t*)&(buf[intrface].ifr_addr));
-                    break;
-                }
-            }
-        }
-        close(fd);
-    }
-    return ip;
 }
 
 string system_charset() {

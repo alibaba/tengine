@@ -35,19 +35,19 @@ pair<Object*, bool> ObjectValue::get_object() const {
      * maybe need delete, need check pair.second
      */
     switch (_type) {
-        case OBJ:        return pair<Object*, bool>(_value.obj, false); // 不需要链式释放
-        case C_OBJ:      return pair<Object*, bool>(_value.obj, false); // 不需要链式释放
+        case OBJ:        return pair<Object*, bool>(_value.obj, false);
+        case C_OBJ:      return pair<Object*, bool>(_value.obj, false);
         case IVAL:       return pair<Object*, bool>(new Integer(_value.ival), true);
         case LVAL:       return pair<Object*, bool>(new Long(_value.lval), true);
         case BVAL:       return pair<Object*, bool>(new Boolean(_value.bval), true);
-        case C_CHAR_PTR: return pair<Object*, bool>(new String(_value.c_char_ptr), true); // 拷贝
+        case C_CHAR_PTR: return pair<Object*, bool>(new String(_value.c_char_ptr), true);
         case C_STR_REF:  return pair<Object*, bool>(new String(_value.c_str_ptr->c_str(), _value.c_str_ptr->size()), true); // 拷贝
-        case C_STR_PTR:  return pair<Object*, bool>(new String(_value.c_str_ptr), true); // 不拷贝，也不负责删除
-        case STR_PTR:    return pair<Object*, bool>(new String(_value.str_ptr, false), true); // 不拷贝，也不负责删除
+        case C_STR_PTR:  return pair<Object*, bool>(new String(_value.c_str_ptr), true);
+        case STR_PTR:    return pair<Object*, bool>(new String(_value.str_ptr, false), true);
         case CVAL:       return pair<Object*, bool>(new String(new string(1, _value.cval), true, "char"), true);
         case SVAL:       return pair<Object*, bool>(new Integer(_value.sval), true);
         case DVAL:       return pair<Object*, bool>(new Double(_value.dval), true);
-        default:         return pair<Object*, bool>(NULL, false); // 不需要链式释放
+        default:         return pair<Object*, bool>(NULL, false);
     }
 }
 

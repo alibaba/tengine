@@ -68,18 +68,6 @@ inline std::string &trim(std::string &s) {
 }
 
 /*
- * time
- */
-uint64_t micro_time();
-uint64_t milli_time();
-void asleep(double sec);
-
-/*
- * local ip
- */
-uint64_t get_ifaddr_ipv4();
-
-/*
  * charset
  */
 std::string system_charset();
