@@ -76,12 +76,18 @@ QuickStart
 Install
 =======
 
-* 源码安装此模块：
+源码安装此模块：
 
 ```
 $ ./configure --add-module=./modules/mod_dubbo --add-module=./modules/ngx_multi_upstream_module --add-module=./modules/mod_config
 $ make && make install
 ```
+
+Dynamic module 支持
+* mod_dubbo: ```支持```编译成 dynamic module
+* ngx_multi_upstream_module: ```不支持```编译成 dynamic module
+* mod_config: ```支持但无需```编译成 dynamic module
+
 
 Directive
 =========

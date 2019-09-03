@@ -79,12 +79,19 @@ This is a [QuickStart for Tengine Dubbo](https://github.com/apache/dubbo-samples
 Install
 =======
 
-* Build Tengine with this module from source:
+Build Tengine with this module from source:
 
 ```
 $ ./configure --add-module=./modules/mod_dubbo --add-module=./modules/ngx_multi_upstream_module --add-module=./modules/mod_config
 $ make && make install
 ```
+
+Dynamic module support
+
+* mod_dubbo: ```support``` build as a dynamic module
+* ngx_multi_upstream_module: ```no support``` build as a dynamic module
+* mod_config: ```support but no need``` build as a dynamic module
+
 
 Directive
 =========
