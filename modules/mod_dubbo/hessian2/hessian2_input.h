@@ -2,11 +2,10 @@
 #define _HESSIAN2_INPUT_H_
 
 #include "exceptions.h"
+#include "utils.h"
 #include <stdint.h>
 #include <string>
 #include <vector>
-#include <utility>
-#include <byteswap.h>
 
 namespace hessian {
 
@@ -112,7 +111,7 @@ inline uint16_t hessian2_input::parse_16bit() {
     if (_curr + 1 >= _end) {
         throw io_exception("hessian2_input::read_16bit(): will reach EOF");
     }
-    uint16_t ret = bswap_16(*((uint16_t *)(_curr)));
+    uint16_t ret = ntohs(*((uint16_t *)(_curr)));
     _curr += 2;
     return ret;
 }
@@ -121,7 +120,7 @@ inline uint32_t hessian2_input::parse_32bit() {
     if (_curr + 3 >= _end) {
         throw io_exception("hessian2_input::read_32bit(): will reach EOF");
     }
-    uint32_t ret = bswap_32(*((uint32_t *)(_curr)));
+    uint32_t ret = ntohl(*((uint32_t *)(_curr)));
     _curr += 4;
     return ret;
 }
@@ -130,7 +129,7 @@ inline uint64_t hessian2_input::parse_64bit() {
     if (_curr + 7 >= _end) {
         throw io_exception("hessian2_input::read_64bit(): will reach EOF");
     }
-    uint64_t ret = bswap_64(*((uint64_t *)(_curr)));
+    uint64_t ret = ngx_hessian_ntoh64(*((uint64_t *)(_curr)));
     _curr += 8;
     return ret;
 }
