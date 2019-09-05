@@ -57,6 +57,10 @@ static ngx_int_t ngx_http_upstream_get_rr_peer(ngx_http_upstream_rr_peers_t *pee
     ngx_http_upstream_rr_peer_t **rpeer);
 static ngx_http_upstream_rr_peer_t *ngx_http_upstream_get_vnswrr(
     ngx_http_upstream_vnswrr_peer_data_t *vnsp);
+static void ngx_http_upstream_init_virtual_peers(
+    ngx_http_upstream_rr_peers_t *peers,
+    ngx_http_upstream_vnswrr_srv_conf_t *uvnscf,
+    ngx_uint_t s, ngx_uint_t e);
 
 
 static ngx_command_t  ngx_http_upstream_vnswrr_commands[] = {
@@ -148,7 +152,9 @@ ngx_http_upstream_vnswrr(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                   |NGX_HTTP_UPSTREAM_BACKUP
                   |NGX_HTTP_UPSTREAM_MAX_FAILS
                   |NGX_HTTP_UPSTREAM_FAIL_TIMEOUT
+#if defined(nginx_version) && nginx_version >= 1011005
                   |NGX_HTTP_UPSTREAM_MAX_CONNS
+#endif
                   |NGX_HTTP_UPSTREAM_DOWN;
 
     return NGX_CONF_OK;
@@ -159,9 +165,6 @@ static ngx_int_t
 ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
 {
-    ngx_uint_t                              i;
-    ngx_int_t                               rindex;
-    ngx_http_upstream_rr_peer_t            *peer;
     ngx_http_upstream_rr_peers_t           *peers, *backup;
     ngx_http_upstream_vnswrr_srv_conf_t    *uvnscf, *ubvnscf;
 
@@ -194,22 +197,8 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
             return NGX_ERROR;
         }
 
-        uvnscf->vnumber = peers->number;
+        ngx_http_upstream_init_virtual_peers(peers, uvnscf, 0, peers->number);
 
-        for (i = 0; i < peers->number; i++) {
-            rindex = ngx_http_upstream_get_rr_peer(peers, &peer);
-            if (rindex == NGX_ERROR) {
-                ngx_log_error(NGX_LOG_WARN, cf->log, 0,
-                              "peers peer is null in upstream \"%V\" "
-                              "in %s:%ui",&us->host, us->file_name, us->line);
-                if (i != 0) {
-                    i--;
-                }
-                continue;
-            }
-            uvnscf->vpeers[i].vpeer = peer;
-            uvnscf->vpeers[i].rindex = rindex;
-        }
     }
 
     /* backup peers */
@@ -238,23 +227,7 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
             return NGX_ERROR;
         }
 
-        ubvnscf->vnumber = backup->number;
-
-        for (i = 0; i < backup->number; i++) {
-            rindex = ngx_http_upstream_get_rr_peer(backup, &peer);
-            if (rindex == NGX_ERROR) {
-                ngx_log_error(NGX_LOG_WARN, cf->log, 0,
-                              "backup peer is null in upstream \"%V\" "
-                              "in %s:%ui", &us->host, us->file_name, us->line);
-                if (i != 0) {
-                    i--;
-                }
-                continue;
-            }
-
-            ubvnscf->vpeers[i].vpeer = peer;
-            ubvnscf->vpeers[i].rindex = rindex;
-        }
+        ngx_http_upstream_init_virtual_peers(backup, ubvnscf, 0, backup->number);
     }
 
     return NGX_OK;
@@ -318,9 +291,11 @@ ngx_http_upstream_get_vnswrr_peer(ngx_peer_connection_t *pc, void *data)
             goto failed;
         }
 
+#if defined(nginx_version) && nginx_version >= 1011005
         if (peer->max_conns && peer->conns >= peer->max_conns) {
             goto failed;
         }
+#endif
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
@@ -427,7 +402,6 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
 {
     time_t                                  now;
     uintptr_t                               m;
-    ngx_int_t                               rindex;
     ngx_uint_t                              i, n, p, flag, begin_number;
     ngx_http_upstream_rr_peer_t            *peer, *best;
     ngx_http_upstream_rr_peers_t           *peers;
@@ -474,24 +448,9 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
                 n = peers->number;
             }
 
-            for (i = uvnscf->vnumber; i < n + uvnscf->vnumber; i++) {
-                rindex = ngx_http_upstream_get_rr_peer(peers, &peer);
-                if (rindex == NGX_ERROR) {
-                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                                  "get rr peer is null in upstream \"%V\" ",
-                                  peers->name);
-                    if (i != 0) {
-                        i--;
-                    }
+            ngx_http_upstream_init_virtual_peers(peers, uvnscf, uvnscf->vnumber,
+			                         n + uvnscf->vnumber);
 
-                    continue;
-                }
-
-                vpeers[i].vpeer = peer;
-                vpeers[i].rindex = rindex;
-            }
-
-            uvnscf->vnumber = i;
         }
 
         begin_number = (uvnscf->last_number + 1) % uvnscf->vnumber;
@@ -517,6 +476,15 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
 
         flag = 0;
         if (peers->weighted) {
+
+            n = peers->total_weight - uvnscf->vnumber;
+            if (n > peers->number) {
+                n = peers->number;
+            }
+
+            ngx_http_upstream_init_virtual_peers(peers, uvnscf, uvnscf->vnumber,
+			                         n + uvnscf->vnumber);
+
             n = vpeers[i].rindex / (8 * sizeof(uintptr_t));
             m = (uintptr_t) 1 << vpeers[i].rindex % (8 * sizeof(uintptr_t));
 
@@ -540,9 +508,11 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
             continue;
         }
 
+#if defined(nginx_version) && nginx_version >= 1011005
         if (peer->max_conns && peer->conns >= peer->max_conns) {
             continue;
         }
+#endif
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
@@ -579,4 +549,43 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
     }
 
     return best;
+}
+
+
+static void 
+ngx_http_upstream_init_virtual_peers(ngx_http_upstream_rr_peers_t *peers,
+                                     ngx_http_upstream_vnswrr_srv_conf_t *uvnscf,
+                                     ngx_uint_t s, ngx_uint_t e)
+{
+    ngx_uint_t                              i;
+    ngx_int_t                               rindex;
+    ngx_http_upstream_rr_peer_t            *peer;
+    ngx_http_upstream_rr_vpeers_t          *vpeers;
+
+    if (uvnscf == NULL || peers == NULL) {
+        return;
+    }
+
+    vpeers = uvnscf->vpeers;
+    
+    for (i = s; i < e; i++) {
+        rindex = ngx_http_upstream_get_rr_peer(peers, &peer);
+        if (rindex == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                          "get rr peer is null in upstream \"%V\" ",
+                          peers->name);
+            if (i != 0) {
+                i--;
+            }
+    
+            continue;
+        }
+    
+        vpeers[i].vpeer = peer;
+        vpeers[i].rindex = rindex;
+    }
+    
+    uvnscf->vnumber = i;
+
+    return;
 }

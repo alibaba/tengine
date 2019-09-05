@@ -58,6 +58,14 @@ http {
         server 127.0.0.1:8082 backup;
     }
 
+    upstream d {
+        vnswrr;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083 weight=2;
+        server 127.0.0.1:8084 down;
+    }
+
     server {
         listen       127.0.0.1:8081;
         listen       127.0.0.1:8082;
@@ -88,12 +96,16 @@ http {
         location /b {
             proxy_pass http://b;
         }
+
+        location /d {
+            proxy_pass http://d;
+        }
     }
 }
 
 EOF
 
-$t->try_run('no upstream vnswrr')->plan(7);
+$t->try_run('no upstream vnswrr')->plan(10);
 
 ###############################################################################
 my $r;
@@ -126,6 +138,15 @@ $list{http_get_body('/b')} += 1;
 
 is($list{'8082'}, 1, 'vnswrr backup');
 
+%list = ();
+$list{http_get_body('/d')} += 1;
+$list{http_get_body('/d')} += 1;
+$list{http_get_body('/d')} += 1;
+$list{http_get_body('/d')} += 1;
+
+is($list{'8081'}, 1, 'weight 1');
+is($list{'8082'}, 1, 'weight 1');
+is($list{'8083'}, 2, 'weight 2');
 ###############################################################################
 
 sub http_get_body {
