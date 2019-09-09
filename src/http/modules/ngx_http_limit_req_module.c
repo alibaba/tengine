@@ -967,8 +967,10 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     for (i = 1; i < cf->args->nelts; i++) {
         if (i == 1 || value[i].data[0] == '$') {
             len += value[i].len;
-        }
-        break;
+
+        } else {
+            break;
+	}
     }
 
     p = ngx_palloc(cf->pool, len);
@@ -982,8 +984,10 @@ ngx_http_limit_req_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     for (i = 1; i < cf->args->nelts; i++) {
         if (i == 1 || value[i].data[0] == '$') {
             p = ngx_cpymem(p, value[i].data, value[i].len);
-        }
-        break;
+
+        } else {
+            break;
+	}
 
     }
 
