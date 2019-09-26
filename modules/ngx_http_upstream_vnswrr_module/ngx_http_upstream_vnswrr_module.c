@@ -322,6 +322,9 @@ ngx_http_upstream_get_vnswrr_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
+    pc->host = &peer->host;
+#endif    
 
     peer->conns++;
 
