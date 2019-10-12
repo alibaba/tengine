@@ -6958,6 +6958,10 @@ ngx_http_upstream_init_process(ngx_cycle_t *cycle)
     uscfp = umcf->upstreams.elts;
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+	if (!(uscfp[i]->flags & T_NGX_HTTP_UPSTREAM_RANDOM_FLAG)) {
+	    continue;
+	}
+
         peers = uscfp[i]->peer.data;
 
         if (peers == NULL) {
