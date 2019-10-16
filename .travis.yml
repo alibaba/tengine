@@ -27,6 +27,6 @@ addons:
 #       so we can run `make`, `make test`, `make install`.
 
 script:
-  - ./configure --enable-mods-static=all --with-ipv6 --with-http_v2_module
+  - ./configure --with-ipv6 --with-http_v2_module
   - make -j2
   - sudo make install
