@@ -14,7 +14,7 @@ addons:
       - libgd2-xpm-dev
       - libgeoip-dev
       - libxslt1-dev
-      - libpcre++0
+      - libpcre++0v5
       - libpcre++-dev
       - liblua5.1-0-dev
       - libssl-dev
