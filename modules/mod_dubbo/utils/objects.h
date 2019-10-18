@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <iosfwd>
 
 namespace hessian {
 
@@ -51,16 +50,13 @@ class Object {
          * convert object to basic type (support weak convert, like long->int)
          * throw exception when failed
          */
-        bool to_bool() const throw(class_cast_exception);
-        int32_t to_int() const throw(class_cast_exception);
-        int64_t to_long() const throw(class_cast_exception);
-        double to_double() const throw(class_cast_exception);
-        std::string to_string() const throw(class_cast_exception);
-        List* to_list() throw(class_cast_exception);
-        Map* to_map() throw(class_cast_exception);
-
-        /** output object debug info */
-        std::string debug_text() const;
+        bool to_bool() const;
+        int32_t to_int() const;
+        int64_t to_long() const;
+        double to_double() const;
+        std::string to_string() const;
+        List* to_list();
+        Map* to_map();
 
         /** generate extend object type_id */
         static uint32_t generate_type_id(ObjectType ext_type);
@@ -75,9 +71,6 @@ class Object {
         Object(const Object& other);
         Object& operator=(const Object& other);
 };
-
-/** output debug info to stream */
-std::ostream& operator << (std::ostream& os, const Object& obj);
 
 template <class T>
 inline bool instance_of(const Object* obj) {
@@ -477,7 +470,7 @@ class Exception : public Map {
             _stack_trace(NULL), _cause(NULL) {}
         virtual ~Exception() {}
 
-        const char* what() const throw() { return _detail_message.c_str(); }
+        const char* what() const { return _detail_message.c_str(); }
 
         void set_cause(Exception* cause, bool chain_delete = false) {
             _cause = cause; if (cause && chain_delete) _delete_chain.push_back(cause); }

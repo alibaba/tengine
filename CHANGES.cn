@@ -1,4 +1,18 @@
-Tengine 2.3.1 [2019-03-25]
+Tengine 2.3.2 [2019-08-20]
+
+* Security: 修复HTTP2安全漏洞CVE-2019-9511, CVE-2019-9513和CVE-2019-9516 (wangfakang)
+* Feature: 支持后端Dubbo协议 (MenqqiWu)
+* Feature: upstream支持VNSWRR高效负载均衡算法 (wangfakang)
+* Feature: dynamic_resolve模块支持IPv6 (wangfakang)
+* Change: proxy_connect模块支持动态编译并增加调试日志 (chobits)
+* Change: 升级core代码版本到Nginx-1.17.3 (wangfakang)
+* Change: 更新健康检查模块使用文档 (zhangqx2010)
+* Change: 更新README文档(Lin-Buo-Ren)
+* Bugfix: 修复健康检查模块的JSON输出格式问题 (IYism)
+* Bugfix: 修复ngx-lua模块在init_worker_by_lua*指令下的问题 (wangfakang)
+* Bugfix: 修复dyups模块与OpenSSL兼容性问题 (wangfakang)
+
+Tengine 2.3.1 [2019-06-18]
 
 * Feature: stream ssl模块新增$ssl_handshakd_time变量 [mrpre]
 * Feature: upstream check模块支持websocket健康检查 (mrpre)

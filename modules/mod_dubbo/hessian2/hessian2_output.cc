@@ -2,7 +2,6 @@
 #include "hessian2_ext.h"
 #include "objects.h"
 #include "utils.h"
-#include <cstring>
 
 namespace hessian {
 

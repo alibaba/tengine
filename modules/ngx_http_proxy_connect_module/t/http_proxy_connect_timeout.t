@@ -27,10 +27,10 @@ my $t = Test::Nginx->new()->has(qw/http proxy/); #->plan(12);
 
 ###############################################################################
 
-my $test_enable_rewrite_phase = 0;
+my $test_enable_rewrite_phase = 1;
 
-if (defined $ENV{TEST_ENABLE_REWRITE_PHASE}) {
-    $test_enable_rewrite_phase = 1;
+if (defined $ENV{TEST_DISABLE_REWRITE_PHASE}) {
+    $test_enable_rewrite_phase = 0;
 }
 
 print("+ test_enable_rewrite_phase: $test_enable_rewrite_phase\n");
@@ -83,6 +83,7 @@ http {
                        ' c:$proxy_connect_connect_timeout,s:$proxy_connect_send_timeout,r:$proxy_connect_read_timeout';
 
     access_log %%TESTDIR%%/connect.log connect;
+    error_log %%TESTDIR%%/connect_error.log error;
 
     resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
@@ -120,6 +121,13 @@ http {
             access_log off;
             root %%TESTDIR%%/;
         }
+
+        # used to output error.log
+        location = /connect_error.log {
+            access_log off;
+            root %%TESTDIR%%/;
+        }
+
     }
 }
 
@@ -144,12 +152,17 @@ if ($@) {
 #}
 
 my $log;
+my $errlog;
 
 TODO: {
     local $TODO = '# This case will pass, if connecting 8.8.8.8 timed out.';
     like(http_connect_request('test-connect-timeout.com', '8888', '/'), qr/504/, 'connect timed out: set $var');
     $log = http_get('/connect.log');
-    like($log, qr/"CONNECT test-connect-timeout.com:8888 HTTP\/1.1" 504 .+ c:1,s:102,r:103/, 'connect timed out log: get $var & status=504');
+    like($log, qr/"CONNECT test-connect-timeout.com:8888 HTTP\/1.1" 504 .+ c:1,s:102,r:103/,
+        'connect timed out log: get $var & status=504');
+    $errlog = http_get('/connect_error.log');
+    like($errlog, qr/proxy_connect: upstream connect timed out \(peer:8\.8\.8\.8:8888\) while connecting to upstream/,
+        'connect timed out error log');
 }
 
 http_connect_request('test-read-timeout.com', '8888', '/');

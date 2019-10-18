@@ -361,34 +361,33 @@ ngx_http_multi_upstream_read_handler(ngx_connection_t *pc)
             ngx_log_debug4(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                            "multi: read buffer full %p, %p, %p, %p"
                            , b->start, b->end, b->pos, b->last);
-            break;
-        }
+        } else {
+            n = c->recv(c, b->last, b->end - b->last);
 
-        n = c->recv(c, b->last, b->end - b->last);
+            if (n == NGX_AGAIN) {
+                ngx_add_timer(pc->read, u->conf->read_timeout);
 
-        if (n == NGX_AGAIN) {
-            ngx_add_timer(pc->read, u->conf->read_timeout);
+                if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                    ngx_http_multi_upstream_finalize_request(pc,
+                            NGX_HTTP_INTERNAL_SERVER_ERROR);
+                    return;
+                }
 
-            if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-                ngx_http_multi_upstream_finalize_request(pc,
-                                                         NGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
             }
 
-            return;
-        }
+            if (n == 0) {
+                ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                        "upstream prematurely closed connection");
+            }
 
-        if (n == 0) {
-            ngx_log_error(NGX_LOG_ERR, c->log, 0,
-                          "upstream prematurely closed connection");
-        }
+            if (n == NGX_ERROR || n == 0) {
+                ngx_http_multi_upstream_next(pc, NGX_HTTP_UPSTREAM_FT_ERROR);
+                return;
+            }
 
-        if (n == NGX_ERROR || n == 0) {
-            ngx_http_multi_upstream_next(pc, NGX_HTTP_UPSTREAM_FT_ERROR);
-            return;
+            b->last += n;
         }
-
-        b->last += n;
 
 #if 0
         u->valid_header_in = 0;
@@ -420,12 +419,17 @@ ngx_http_multi_upstream_read_handler(ngx_connection_t *pc)
                 return;
             }
 
+            if (rc == NGX_ERROR) {
+                ngx_http_multi_upstream_finalize_request(pc, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                return;
+            }
+
             /* rc == NGX_OK || rc == NGX_ERROR */
 
             if (!multi_c->cur) {
                 ngx_log_error(NGX_LOG_ERR, c->log, 0,
                               "multi: upstream next because parse cur is empty");
-                ngx_http_multi_upstream_next(pc, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                ngx_http_multi_upstream_finalize_request(pc, NGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
             }
 
@@ -452,8 +456,6 @@ ngx_http_multi_upstream_read_handler(ngx_connection_t *pc)
                 }
 
                 ngx_http_multi_upstream_send_response(real_r, real_u);
-                ngx_http_run_posted_requests(real_c);
-                continue;
             } else if (rc == NGX_HTTP_UPSTREAM_GET_BODY_DATA) {
                 if (!real_u->header_sent) {
                     ngx_log_error(NGX_LOG_INFO, c->log, 0,
@@ -478,37 +480,25 @@ ngx_http_multi_upstream_read_handler(ngx_connection_t *pc)
                 }
 
                 ngx_http_multi_upstream_process_non_buffered_request(real_r);
-                ngx_http_run_posted_requests(real_c);
-            } else if (rc == NGX_ERROR) {
+            } else if (rc == NGX_HTTP_UPSTREAM_PARSE_ERROR) {
+                ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                              "multi: parse get error %p", fake_r);
                 if (!real_u->header_sent) {
-                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                                  "multi: parse get error %p", fake_r);
-                    //handle header first
-                    real_u->state->header_time = ngx_current_msec - real_u->state->response_time;
-                    if (real_u->headers_in.status_n >= NGX_HTTP_SPECIAL_RESPONSE) {
-                        if (ngx_http_upstream_test_next(real_r, real_u) == NGX_OK) {
-                            continue;
-                        }
-
-                        if (ngx_http_upstream_intercept_errors(real_r, real_u) == NGX_OK) {
-                            continue;
-                        }
-                    }
-
-                    if (ngx_http_upstream_process_headers(real_r, real_u) != NGX_OK) {
-                        continue;
-                    }
-
-                    ngx_http_multi_upstream_send_response(real_r, real_u);
+                    ngx_http_upstream_finalize_request(real_r, real_u, NGX_HTTP_BAD_GATEWAY);
+                } else {
+                    ngx_http_upstream_finalize_request(real_r, real_u, NGX_ERROR);
                 }
-
-                ngx_http_multi_upstream_process_non_buffered_request(real_r);
-                ngx_http_run_posted_requests(real_c);
-            }
-            else {
+            } else {
                 ngx_log_error(NGX_LOG_ERR, c->log, 0,
                               "multi: parse code unknown: %d", rc);
+                if (!real_u->header_sent) {
+                    ngx_http_upstream_finalize_request(real_r, real_u, NGX_HTTP_INTERNAL_SERVER_ERROR);
+                } else {
+                    ngx_http_upstream_finalize_request(real_r, real_u, NGX_ERROR);
+                }
             }
+
+            ngx_http_run_posted_requests(real_c);
         }
     }
 }

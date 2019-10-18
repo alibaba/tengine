@@ -1,7 +1,6 @@
 #include "objects.h"
 #include "utils.h"
 #include "hessian2_output.h"
-#include "debug_text.h"
 #include <sstream>
 
 /*
@@ -35,19 +34,19 @@ pair<Object*, bool> ObjectValue::get_object() const {
      * maybe need delete, need check pair.second
      */
     switch (_type) {
-        case OBJ:        return pair<Object*, bool>(_value.obj, false); // 不需要链式释放
-        case C_OBJ:      return pair<Object*, bool>(_value.obj, false); // 不需要链式释放
+        case OBJ:        return pair<Object*, bool>(_value.obj, false);
+        case C_OBJ:      return pair<Object*, bool>(_value.obj, false);
         case IVAL:       return pair<Object*, bool>(new Integer(_value.ival), true);
         case LVAL:       return pair<Object*, bool>(new Long(_value.lval), true);
         case BVAL:       return pair<Object*, bool>(new Boolean(_value.bval), true);
-        case C_CHAR_PTR: return pair<Object*, bool>(new String(_value.c_char_ptr), true); // 拷贝
+        case C_CHAR_PTR: return pair<Object*, bool>(new String(_value.c_char_ptr), true);
         case C_STR_REF:  return pair<Object*, bool>(new String(_value.c_str_ptr->c_str(), _value.c_str_ptr->size()), true); // 拷贝
-        case C_STR_PTR:  return pair<Object*, bool>(new String(_value.c_str_ptr), true); // 不拷贝，也不负责删除
-        case STR_PTR:    return pair<Object*, bool>(new String(_value.str_ptr, false), true); // 不拷贝，也不负责删除
+        case C_STR_PTR:  return pair<Object*, bool>(new String(_value.c_str_ptr), true);
+        case STR_PTR:    return pair<Object*, bool>(new String(_value.str_ptr, false), true);
         case CVAL:       return pair<Object*, bool>(new String(new string(1, _value.cval), true, "char"), true);
         case SVAL:       return pair<Object*, bool>(new Integer(_value.sval), true);
         case DVAL:       return pair<Object*, bool>(new Double(_value.dval), true);
-        default:         return pair<Object*, bool>(NULL, false); // 不需要链式释放
+        default:         return pair<Object*, bool>(NULL, false);
     }
 }
 
@@ -124,7 +123,7 @@ uint32_t Object::generate_type_id(ObjectType ext_type) {
 /*
  * Object implementations
  */
-bool Object::to_bool() const throw(class_cast_exception) {
+bool Object::to_bool() const {
     switch (type_id()) {
         case BOOLEAN: return ((Boolean*) this)->to_bool();
         case INTEGER: return ((Integer*) this)->to_int() == 0;
@@ -136,7 +135,7 @@ bool Object::to_bool() const throw(class_cast_exception) {
     }
 }
 
-int32_t Object::to_int() const throw(class_cast_exception) {
+int32_t Object::to_int() const {
     switch (type_id()) {
         case INTEGER: return ((Integer*) this)->to_int();
         case LONG:    return (int32_t) ((Long*) this)->to_long();
@@ -148,7 +147,7 @@ int32_t Object::to_int() const throw(class_cast_exception) {
     }
 }
 
-int64_t Object::to_long() const throw(class_cast_exception) {
+int64_t Object::to_long() const {
     switch (type_id()) {
         case LONG:    return ((Long*) this)->to_long();
         case INTEGER: return (int64_t) ((Integer*) this)->to_int();
@@ -161,7 +160,7 @@ int64_t Object::to_long() const throw(class_cast_exception) {
     }
 }
 
-double Object::to_double() const throw(class_cast_exception) {
+double Object::to_double() const {
     switch (type_id()) {
         case DOUBLE:  return ((Double*) this)->to_double();
         case LONG:    return (double) ((Long*) this)->to_long();
@@ -173,7 +172,7 @@ double Object::to_double() const throw(class_cast_exception) {
     }
 }
 
-string Object::to_string() const throw(class_cast_exception) {
+string Object::to_string() const {
     switch (type_id()) {
         case STRING:     return ((String*) this)->data();
         case LONG:       return int64_to_string(((Long*) this)->to_long());
@@ -187,31 +186,18 @@ string Object::to_string() const throw(class_cast_exception) {
     }
 }
 
-List* Object::to_list() throw(class_cast_exception) {
+List* Object::to_list() {
     if (!instance_of<List>(this)) {
         throw class_cast_exception("can not cast to list from class: " + _classname);
     }
     return static_cast<List*>(this);
 }
 
-Map* Object::to_map() throw(class_cast_exception) {
+Map* Object::to_map() {
     if (!instance_of<Map>(this)) {
         throw class_cast_exception("can not cast to map from class: " + _classname);
     }
     return static_cast<Map*>(this);
-}
-
-/** output debug info to stream **/
-std::ostream& operator << (std::ostream& os, const Object& obj) {
-    set<const Object*> dejaVu;
-    debug_text_handle_object(&obj, os, 0, &dejaVu);
-    return os;
-}
-
-string Object::debug_text() const {
-    stringstream ss;
-    ss << *this;
-    return ss.str();
 }
 
 /*

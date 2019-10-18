@@ -12,6 +12,7 @@ Table of Contents
       * [configuration example](#configuration-example)
       * [example for curl](#example-for-curl)
    * [Install](#install)
+   * [Error Log](#error-log)
    * [Directive](#directive)
       * [proxy_connect](#proxy_connect)
       * [proxy_connect_allow](#proxy_connect_allow)
@@ -139,6 +140,18 @@ Install
 ```
 $ ./configure --add-module=./modules/ngx_http_proxy_connect_module
 $ make && make install
+```
+
+Error Log
+=========
+
+This module logs its own error message beginning with `"proxy_connect:"` string.  
+Some typical error logs are shown as following:
+
+* The proxy_connect module tries to establish tunnel connection with backend server, but the TCP connection timeout occurs.
+
+```
+2019/08/07 17:27:20 [error] 19257#0: *1 proxy_connect: upstream connect timed out (peer:216.58.200.4:443) while connecting to upstream, client: 127.0.0.1, server: , request: "CONNECT www.google.com:443 HTTP/1.1", host: "www.google.com:443"
 ```
 
 Directive
@@ -292,4 +305,11 @@ Known Issues
 ============
 
 * In HTTP/2, the CONNECT method is not supported. It only supports the CONNECT method request in HTTP/1.x and HTTPS.
+
+See Also
+========
+
+* [HTTP tunnel - Wikipedia](https://en.wikipedia.org/wiki/HTTP_tunnel)
+* [CONNECT method in HTTP/1.1](https://tools.ietf.org/html/rfc7231#section-4.3.6)
+* [CONNECT method in HTTP/2](https://httpwg.org/specs/rfc7540.html#CONNECT)
 

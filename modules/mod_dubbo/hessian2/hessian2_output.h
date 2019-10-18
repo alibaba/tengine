@@ -1,10 +1,10 @@
 #ifndef _HESSIAN2_OUTPUT_H_
 #define _HESSIAN2_OUTPUT_H_
 
+#include "utils.h"
 #include <stdint.h>
 #include <string>
 #include <map>
-#include <byteswap.h>
 
 namespace hessian {
 
@@ -54,13 +54,13 @@ class hessian2_output {
             _data->push_back((char) value);
         }
         void print_16bit(int16_t value) {
-            _data->append((const char*)&(value = bswap_16(value)), 2);
+            _data->append((const char*)&(value = htons((uint16_t)value)), 2);
         }
         void print_32bit(int32_t value) {
-            _data->append((const char*)&(value = bswap_32(value)), 4);
+            _data->append((const char*)&(value = htonl((uint32_t)value)), 4);
         }
         void print_64bit(int64_t value) {
-            _data->append((const char*)&(value = bswap_64(value)), 8);
+            _data->append((const char*)&(value = ngx_hessian_hton64((uint64_t)value)), 8);
         }
 
         void fill_chars(uint32_t size, char c) {
