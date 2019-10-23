@@ -1839,8 +1839,10 @@ ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     ngx_buf_t    *b;
     ngx_chain_t   out;
 
-    if (ngx_http_discard_request_body(r) != NGX_OK) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    rc = ngx_http_discard_request_body(r);
+
+    if (rc != NGX_OK) {
+        return rc;
     }
 
     r->headers_out.status = status;
@@ -4005,7 +4007,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->msie_padding, prev->msie_padding,
 #if (T_NGX_MODIFY_DEFAULT_VALUE)
                          0);
-#else 
+#else
                          1);
 #endif
     ngx_conf_merge_value(conf->msie_refresh, prev->msie_refresh, 0);
