@@ -1,0 +1,36 @@
+ngx_addon_name=ngx_http_dyups_module
+
+HTTP_DYUPS_SRCS="$ngx_addon_dir/ngx_http_dyups_module.c"
+HTTP_DYUPS_DEPS="$ngx_addon_dir/ngx_http_dyups.h"
+
+dyups_lua() {
+    echo " + dyups module support lua"
+    have=NGX_DYUPS_LUA . auto/have
+    HTTP_DYUPS_SRCS="$HTTP_DYUPS_SRCS $ngx_addon_dir/ngx_http_dyups_lua.c"
+    HTTP_DYUPS_DEPS="$HTTP_DYUPS_DEPS $ngx_addon_dir/ngx_http_dyups_lua.h"
+}
+
+if test -n "$ngx_module_link"; then
+    if test -n "$HTTP_LUA_SRCS"; then
+        dyups_lua
+        if test -n "$ngx_http_lua_module_LIBS"; then
+            ngx_module_libs="$ngx_module_libs $ngx_http_lua_module_LIBS"
+        fi
+    fi
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_srcs="$HTTP_DYUPS_SRCS"
+    ngx_module_incs="$ngx_addon_dir"
+    ngx_module_deps="$HTTP_DYUPS_DEPS"
+    . auto/module
+else
+    if $HTTP_AUX_FILTER_MODULES | grep "ngx_http_lua_module" > /dev/null; then
+        dyups_lua
+    fi
+    HTTP_MODULES="$HTTP_MODULES ngx_http_dyups_module"
+    HTTP_INCS="$HTTP_INCS $ngx_addon_dir/"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_DYUPS_SRCS"
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $HTTP_DYUPS_DEPS"
+fi
+
+have=NGX_DYUPS . auto/have

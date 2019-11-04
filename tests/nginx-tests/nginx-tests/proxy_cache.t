@@ -21,7 +21,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache gzip shmem/)->plan(13)
+my $t = Test::Nginx->new()->has(qw/http proxy cache gzip/)->plan(15)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -58,6 +58,8 @@ http {
             proxy_cache_use_stale  error timeout invalid_header http_500
                                    http_404;
 
+            proxy_no_cache  $arg_e;
+
             add_header X-Cache-Status $upstream_cache_status;
         }
     }
@@ -66,6 +68,7 @@ http {
         server_name  localhost;
 
         location / {
+            limit_rate 512;
         }
     }
 }
@@ -75,6 +78,7 @@ EOF
 $t->write_file('t.html', 'SEE-THIS');
 $t->write_file('t2.html', 'SEE-THIS');
 $t->write_file('empty.html', '');
+$t->write_file('big.html', 'x' x 1024);
 
 $t->run();
 
@@ -109,6 +113,20 @@ unlink $t->testdir() . '/empty.html';
 like(http_gzip_request('/empty.html'),
 	qr/HTTP.*STALE.*14\x0d\x0a.{20}\x0d\x0a0\x0d\x0a\x0d\x0a\z/s,
 	'empty get stale');
+
+# no client connection close with response on non-cacheable HEAD requests
+# see 545b5e4d83b2 in nginx for detailed explanation
+
+my $s = http(<<EOF, start => 1);
+HEAD /big.html?e=1 HTTP/1.1
+Host: localhost
+
+EOF
+
+my $r = http_get('/t.html', socket => $s);
+
+like($r, qr/Connection: keep-alive/, 'non-cacheable head - keepalive');
+like($r, qr/SEE-THIS/, 'non-cacheable head - second');
 
 ###############################################################################
 

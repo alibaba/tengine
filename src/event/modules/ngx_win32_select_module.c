@@ -26,6 +26,7 @@ static fd_set         master_read_fd_set;
 static fd_set         master_write_fd_set;
 static fd_set         work_read_fd_set;
 static fd_set         work_write_fd_set;
+static fd_set         work_except_fd_set;
 
 static ngx_uint_t     max_read;
 static ngx_uint_t     max_write;
@@ -34,9 +35,9 @@ static ngx_uint_t     nevents;
 static ngx_event_t  **event_index;
 
 
-static ngx_str_t    select_name = ngx_string("select");
+static ngx_str_t           select_name = ngx_string("select");
 
-ngx_event_module_t  ngx_select_module_ctx = {
+static ngx_event_module_t  ngx_select_module_ctx = {
     &select_name,
     NULL,                                  /* create configuration */
     ngx_select_init_conf,                  /* init configuration */
@@ -255,9 +256,11 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
     work_read_fd_set = master_read_fd_set;
     work_write_fd_set = master_write_fd_set;
+    work_except_fd_set = master_write_fd_set;
 
     if (max_read || max_write) {
-        ready = select(0, &work_read_fd_set, &work_write_fd_set, NULL, tp);
+        ready = select(0, &work_read_fd_set, &work_write_fd_set,
+                       &work_except_fd_set, tp);
 
     } else {
 
@@ -310,14 +313,20 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
         if (ev->write) {
             if (FD_ISSET(c->fd, &work_write_fd_set)) {
-                found = 1;
+                found++;
                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                                "select write %d", c->fd);
             }
 
+            if (FD_ISSET(c->fd, &work_except_fd_set)) {
+                found++;
+                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                               "select except %d", c->fd);
+            }
+
         } else {
             if (FD_ISSET(c->fd, &work_read_fd_set)) {
-                found = 1;
+                found++;
                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                                "select read %d", c->fd);
             }
@@ -331,7 +340,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
             ngx_post_event(ev, queue);
 
-            nready++;
+            nready += found;
         }
     }
 

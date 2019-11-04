@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite sub proxy/);
+my $t = Test::Nginx->new()->has(qw/http rewrite sub proxy/)->plan(42);
 
 my $long_pattern = '0123456789abcdef' x 17;
 
@@ -281,7 +281,7 @@ $t->write_file('huge10-01.html', scalar ($long_pattern . 'ABC01ef') x 1000);
 $t->write_file('huge10-02.html', scalar ('01efABC' . $long_pattern) x 1000);
 $t->write_file('huge11.html', scalar ('01efA_Z' . $long_pattern) x 1000);
 
-$t->try_run('no multiple sub_filter')->plan(42);
+$t->run();
 
 ###############################################################################
 

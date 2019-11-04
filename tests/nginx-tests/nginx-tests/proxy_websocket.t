@@ -66,7 +66,7 @@ EOF
 $t->run_daemon(\&websocket_fake_daemon);
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Can't start test backend";
 
 ###############################################################################
@@ -125,7 +125,7 @@ sub websocket_connect {
 
 	my $s = IO::Socket::INET->new(
 		Proto => 'tcp',
-		PeerAddr => '127.0.0.1:8080'
+		PeerAddr => '127.0.0.1:' . port(8080)
 	)
 		or die "Can't connect to nginx: $!\n";
 
@@ -210,7 +210,7 @@ sub websocket_read {
 sub websocket_fake_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8081',
+		LocalAddr => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -242,7 +242,7 @@ sub websocket_handle_client {
 		my $p = $poll->poll(0.5);
 		log2c("(poll $p)");
 
-		foreach my $reader ($poll->handles(POLLIN)) {
+		foreach ($poll->handles(POLLIN)) {
 			$n = $client->sysread(my $chunk, 65536);
 			return unless $n;
 

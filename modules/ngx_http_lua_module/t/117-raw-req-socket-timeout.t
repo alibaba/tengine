@@ -21,7 +21,6 @@ BEGIN {
     $ENV{TEST_NGINX_POSTPONE_OUTPUT} = 1;
 }
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 use t::StapThread;
 
@@ -115,4 +114,3 @@ lua tcp socket write timed out
 server: failed to send: timeout
 --- no_error_log
 [alert]
-

@@ -31,6 +31,7 @@ my $t = Test::Nginx->new()->has(qw/http memcached upstream_keepalive rewrite/)
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 events {
 }
@@ -92,8 +93,8 @@ if ($memhelp =~ /repcached/) {
 	# repcached patches adds additional listen socket memcached
 	# that should be different too
 
-	push @memopts1, '-X', '8091';
-	push @memopts2, '-X', '8092';
+	push @memopts1, '-X', port(8083);
+	push @memopts2, '-X', port(8084);
 }
 if ($memhelp =~ /-U/) {
 	# UDP ports no longer off by default in memcached 1.2.7+
@@ -108,21 +109,21 @@ if ($memhelp =~ /-t/) {
 	push @memopts2, '-t', '1';
 }
 
-$t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8081', @memopts1);
-$t->run_daemon('memcached', '-l', '127.0.0.1', '-p', '8082', @memopts2);
+$t->run_daemon('memcached', '-l', '127.0.0.1', '-p', port(8081), @memopts1);
+$t->run_daemon('memcached', '-l', '127.0.0.1', '-p', port(8082), @memopts2);
 
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081')
+$t->waitforsocket('127.0.0.1:' . port(8081))
 	or die "Unable to start memcached";
-$t->waitforsocket('127.0.0.1:8082')
+$t->waitforsocket('127.0.0.1:' . port(8082))
 	or die "Unable to start second memcached";
 
 ###############################################################################
 
-my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:8081' ],
+my $memd1 = Cache::Memcached->new(servers => [ '127.0.0.1:' . port(8081) ],
 	connect_timeout => 1.0);
-my $memd2 = Cache::Memcached->new(servers => [ '127.0.0.1:8082' ],
+my $memd2 = Cache::Memcached->new(servers => [ '127.0.0.1:' . port(8082) ],
 	connect_timeout => 1.0);
 
 $memd1->set('/', 'SEE-THIS');

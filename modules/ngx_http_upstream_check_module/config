@@ -1,0 +1,41 @@
+ngx_feature="ngx_http_upstream_check_module"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path="$ngx_addon_dir"
+ngx_feature_deps="$ngx_addon_dir/ngx_http_upstream_check_module.h"
+ngx_check_src="$ngx_addon_dir/ngx_http_upstream_check_module.c"
+ngx_feature_test="int a;"
+. auto/feature
+
+if [ $ngx_found = yes ]; then
+    have=NGX_HTTP_UPSTREAM_CHECK . auto/have
+    CORE_INCS="$CORE_INCS $ngx_feature_path"
+    ngx_addon_name=ngx_http_upstream_check_module
+    HTTP_MODULES="$HTTP_MODULES ngx_http_upstream_check_module"
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_feature_deps"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_check_src"
+else
+    cat << END
+    $0: error: the ngx_http_upstream_check_module addon error.
+END
+    exit 1
+fi
+
+ngx_feature="compiler structure-packing pragma"
+ngx_feature_name="NGX_HAVE_PACK_PRAGMA"
+ngx_feature_run=yes
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="#pragma pack(push, 1)
+                  struct test_s {
+                      char foo;
+                      int  bar;
+                  };
+                  #pragma pack(pop)
+
+                  if (sizeof(struct test_s) != (sizeof(char) + sizeof(int)))
+                      return 1;"
+. auto/feature
+

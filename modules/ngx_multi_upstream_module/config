@@ -1,0 +1,31 @@
+if [ "$ngx_module_link" = DYNAMIC ]; then
+    cat << END
+    $0: error: ngx_multi_upstream not support build as a dynamic module.
+END
+    exit 1
+fi
+
+ngx_addon_name=ngx_http_multi_upstream_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_multi_upstream_module"
+CORE_DEPS="$CORE_DEPS $ngx_addon_dir/ngx_multi_upstream_module.h $ngx_addon_dir/ngx_http_multi_upstream_module.h $ngx_addon_dir/ngx_http_multi_upstream.c"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_multi_upstream_module.c $ngx_addon_dir/ngx_multi_upstream_module.c"
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir"
+
+if [ $STREAM != NO ]; then
+    ngx_module_name=ngx_stream_multi_upstream_module
+    ngx_module_type=STREAM
+    ngx_module_link=ADDON
+    ngx_module_incs=$ngx_addon_dir 
+    ngx_module_deps=$ngx_addon_dir/ngx_stream_multi_upstream_module.h
+    ngx_module_srcs=$ngx_addon_dir/ngx_stream_multi_upstream_module.c
+
+    if [ $STREAM = DYNAMIC ]; then
+        ngx_module_link=DYNAMIC
+    else
+        ngx_module_link=ADDON
+    fi
+
+    . auto/module
+fi
+
+have=T_NGX_MULTI_UPSTREAM . auto/have

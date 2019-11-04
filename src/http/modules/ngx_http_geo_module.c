@@ -215,6 +215,13 @@ ngx_http_geo_cidr_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
         break;
 #endif
 
+#if (NGX_HAVE_UNIX_DOMAIN)
+    case AF_UNIX:
+        vv = (ngx_http_variable_value_t *)
+                  ngx_radix32tree_find(ctx->u.trees.tree, INADDR_NONE);
+        break;
+#endif
+
     default: /* AF_INET */
         sin = (struct sockaddr_in *) addr.sockaddr;
         inaddr = ntohl(sin->sin_addr.s_addr);
@@ -274,6 +281,12 @@ ngx_http_geo_range_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
                 inaddr = INADDR_NONE;
             }
 
+            break;
+#endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+        case AF_UNIX:
+            inaddr = INADDR_NONE;
             break;
 #endif
 
@@ -439,6 +452,7 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ctx.temp_pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE, cf->log);
     if (ctx.temp_pool == NULL) {
+        ngx_destroy_pool(pool);
         return NGX_CONF_ERROR;
     }
 
@@ -460,6 +474,10 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     *cf = save;
 
+    if (rv != NGX_CONF_OK) {
+        goto failed;
+    }
+
     geo->proxies = ctx.proxies;
     geo->proxy_recursive = ctx.proxy_recursive;
 
@@ -469,7 +487,12 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             for (i = 0; i < 0x10000; i++) {
                 a = (ngx_array_t *) ctx.high.low[i];
 
-                if (a == NULL || a->nelts == 0) {
+                if (a == NULL) {
+                    continue;
+                }
+
+                if (a->nelts == 0) {
+                    ctx.high.low[i] = NULL;
                     continue;
                 }
 
@@ -477,7 +500,7 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
                 ctx.high.low[i] = ngx_palloc(cf->pool, len + sizeof(void *));
                 if (ctx.high.low[i] == NULL) {
-                    return NGX_CONF_ERROR;
+                    goto failed;
                 }
 
                 ngx_memcpy(ctx.high.low[i], a->elts, len);
@@ -503,14 +526,11 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         var->get_handler = ngx_http_geo_range_variable;
         var->data = (uintptr_t) geo;
 
-        ngx_destroy_pool(ctx.temp_pool);
-        ngx_destroy_pool(pool);
-
     } else {
         if (ctx.tree == NULL) {
             ctx.tree = ngx_radix_tree_create(cf->pool, -1);
             if (ctx.tree == NULL) {
-                return NGX_CONF_ERROR;
+                goto failed;
             }
         }
 
@@ -520,7 +540,7 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ctx.tree6 == NULL) {
             ctx.tree6 = ngx_radix_tree_create(cf->pool, -1);
             if (ctx.tree6 == NULL) {
-                return NGX_CONF_ERROR;
+                goto failed;
             }
         }
 
@@ -530,14 +550,11 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         var->get_handler = ngx_http_geo_cidr_variable;
         var->data = (uintptr_t) geo;
 
-        ngx_destroy_pool(ctx.temp_pool);
-        ngx_destroy_pool(pool);
-
         if (ngx_radix32tree_insert(ctx.tree, 0, 0,
                                    (uintptr_t) &ngx_http_variable_null_value)
             == NGX_ERROR)
         {
-            return NGX_CONF_ERROR;
+            goto failed;
         }
 
         /* NGX_BUSY is okay (default was set explicitly) */
@@ -547,12 +564,22 @@ ngx_http_geo_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                     (uintptr_t) &ngx_http_variable_null_value)
             == NGX_ERROR)
         {
-            return NGX_CONF_ERROR;
+            goto failed;
         }
 #endif
     }
 
-    return rv;
+    ngx_destroy_pool(ctx.temp_pool);
+    ngx_destroy_pool(pool);
+
+    return NGX_CONF_OK;
+
+failed:
+
+    ngx_destroy_pool(ctx.temp_pool);
+    ngx_destroy_pool(pool);
+
+    return NGX_CONF_ERROR;
 }
 
 
@@ -814,7 +841,7 @@ ngx_http_geo_add_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
                 range = a->elts;
 
                 ngx_memmove(&range[i + 2], &range[i + 1],
-                           (a->nelts - 2 - i) * sizeof(ngx_http_geo_range_t));
+                            (a->nelts - 2 - i) * sizeof(ngx_http_geo_range_t));
 
                 range[i + 1].start = (u_short) s;
                 range[i + 1].end = (u_short) e;
@@ -853,7 +880,7 @@ ngx_http_geo_add_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
                 range = a->elts;
 
                 ngx_memmove(&range[i + 3], &range[i + 1],
-                           (a->nelts - 3 - i) * sizeof(ngx_http_geo_range_t));
+                            (a->nelts - 3 - i) * sizeof(ngx_http_geo_range_t));
 
                 range[i + 2].start = (u_short) (e + 1);
                 range[i + 2].end = range[i].end;
@@ -881,7 +908,7 @@ ngx_http_geo_add_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
                 range = a->elts;
 
                 ngx_memmove(&range[i + 1], &range[i],
-                           (a->nelts - 1 - i) * sizeof(ngx_http_geo_range_t));
+                            (a->nelts - 1 - i) * sizeof(ngx_http_geo_range_t));
 
                 range[i + 1].start = (u_short) (e + 1);
 
@@ -905,7 +932,7 @@ ngx_http_geo_add_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
                 range = a->elts;
 
                 ngx_memmove(&range[i + 2], &range[i + 1],
-                           (a->nelts - 2 - i) * sizeof(ngx_http_geo_range_t));
+                            (a->nelts - 2 - i) * sizeof(ngx_http_geo_range_t));
 
                 range[i + 1].start = (u_short) s;
                 range[i + 1].end = (u_short) e;
@@ -935,13 +962,20 @@ ngx_http_geo_add_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
             return NGX_CONF_ERROR;
         }
 
-        range->start = (u_short) s;
-        range->end = (u_short) e;
-        range->value = ctx->value;
+        range = a->elts;
+
+        ngx_memmove(&range[1], &range[0],
+                    (a->nelts - 1) * sizeof(ngx_http_geo_range_t));
+
+        range[0].start = (u_short) s;
+        range[0].end = (u_short) e;
+        range[0].value = ctx->value;
 
     next:
 
-        continue;
+        if (h == 0xffff) {
+            break;
+        }
     }
 
     return NGX_CONF_OK;
@@ -959,7 +993,7 @@ ngx_http_geo_delete_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
 
     warn = 0;
 
-    for (n = start; n <= end; n += 0x10000) {
+    for (n = start; n <= end; n = (n + 0x10000) & 0xffff0000) {
 
         h = n >> 16;
 
@@ -978,9 +1012,9 @@ ngx_http_geo_delete_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
 
         a = (ngx_array_t *) ctx->high.low[h];
 
-        if (a == NULL) {
+        if (a == NULL || a->nelts == 0) {
             warn = 1;
-            continue;
+            goto next;
         }
 
         range = a->elts;
@@ -990,20 +1024,22 @@ ngx_http_geo_delete_range(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
                 && e == (ngx_uint_t) range[i].end)
             {
                 ngx_memmove(&range[i], &range[i + 1],
-                           (a->nelts - 1 - i) * sizeof(ngx_http_geo_range_t));
+                            (a->nelts - 1 - i) * sizeof(ngx_http_geo_range_t));
 
                 a->nelts--;
 
                 break;
             }
 
-            if (s != (ngx_uint_t) range[i].start
-                && e != (ngx_uint_t) range[i].end)
-            {
-                continue;
+            if (i == a->nelts - 1) {
+                warn = 1;
             }
+        }
 
-            warn = 1;
+    next:
+
+        if (h == 0xffff) {
+            break;
         }
     }
 
@@ -1386,7 +1422,8 @@ ngx_http_geo_include_binary_base(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
     file.name = *name;
     file.log = cf->log;
 
-    file.fd = ngx_open_file(name->data, NGX_FILE_RDONLY, 0, 0);
+    file.fd = ngx_open_file(name->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+
     if (file.fd == NGX_INVALID_FILE) {
         err = ngx_errno;
         if (err != NGX_ENOENT) {

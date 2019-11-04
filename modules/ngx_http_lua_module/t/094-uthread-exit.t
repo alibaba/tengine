@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 use t::StapThread;
 
@@ -25,7 +24,7 @@ __DATA__
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.exit(0)
             end
@@ -88,7 +87,7 @@ hello in thread
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -172,13 +171,13 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.say("f")
                 ngx.exit(0)
             end
 
-            function g()
+            local function g()
                 ngx.sleep(1)
                 ngx.say("g")
             end
@@ -262,7 +261,7 @@ f
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.say("exiting the user thread")
                 ngx.exit(0)
@@ -301,7 +300,7 @@ exiting the user thread
         resolver agentzh.org;
         resolver_timeout 12s;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.001)
                 ngx.exit(0)
@@ -397,7 +396,7 @@ after
         resolver agentzh.org;
         resolver_timeout 12s;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.001)
                 ngx.exit(0)
@@ -491,7 +490,7 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -502,7 +501,7 @@ after
             ngx.say("after")
             local sock = ngx.socket.tcp()
             sock:settimeout(12000)
-            local ok, err = sock:connect("106.187.41.147", 12345)
+            local ok, err = sock:connect("127.0.0.2", 12345)
             if not ok then
                 ngx.say("failed to connect: ", err)
                 return
@@ -581,7 +580,7 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -681,7 +680,7 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -787,7 +786,7 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -882,7 +881,7 @@ after
 --- config
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -975,7 +974,7 @@ after
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -1060,7 +1059,7 @@ after
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -1143,7 +1142,7 @@ attempt to abort with pending subrequests
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.exit(0)
             end
@@ -1226,7 +1225,7 @@ attempt to abort with pending subrequests
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.sleep(0.1)
                 ngx.exit(0)
             end
@@ -1316,7 +1315,7 @@ attempt to abort with pending subrequests
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.location.capture_multi{
                     {"/echo"},
                     {"/sleep"}
@@ -1408,7 +1407,7 @@ attempt to abort with pending subrequests
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(444)
@@ -1491,7 +1490,7 @@ free request
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(408)
@@ -1574,7 +1573,7 @@ free request
     location /lua {
         client_body_timeout 12000ms;
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(499)
@@ -1649,4 +1648,3 @@ free request
 [alert]
 [error]
 [warn]
-

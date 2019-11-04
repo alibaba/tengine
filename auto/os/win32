@@ -11,11 +11,18 @@ CORE_SRCS="$WIN32_SRCS $IOCP_SRCS"
 OS_CONFIG="$WIN32_CONFIG"
 NGX_ICONS="$NGX_WIN32_ICONS"
 SELECT_SRCS=$WIN32_SELECT_SRCS
+POLL_SRCS=$WIN32_POLL_SRCS
+
+ngx_pic_opt=
+ngx_binext=".exe"
 
 case "$NGX_CC_NAME" in
 
     gcc)
         CORE_LIBS="$CORE_LIBS -ladvapi32 -lws2_32"
+        MAIN_LINK="$MAIN_LINK -Wl,--export-all-symbols"
+        MAIN_LINK="$MAIN_LINK -Wl,--out-implib=$NGX_OBJS/libnginx.a"
+        MODULE_LINK="-shared -L $NGX_OBJS -lnginx"
     ;;
 
     *)
@@ -25,16 +32,8 @@ case "$NGX_CC_NAME" in
 esac
 
 EVENT_MODULES="$EVENT_MODULES $IOCP_MODULE"
-EVENT_FOUND=YES
+#EVENT_FOUND=YES
 
-if [ $EVENT_SELECT = NO ]; then
-    CORE_SRCS="$CORE_SRCS $SELECT_SRCS"
-    EVENT_MODULES="$EVENT_MODULES $SELECT_MODULE"
-fi
+have=NGX_HAVE_INET6 . auto/have
 
-if [ $NGX_IPV6 = YES ]; then
-    have=NGX_HAVE_INET6 . auto/have
-fi
-
-have=NGX_HAVE_AIO . auto/have
 have=NGX_HAVE_IOCP . auto/have

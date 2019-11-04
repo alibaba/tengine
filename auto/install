@@ -3,7 +3,7 @@
 # Copyright (C) Nginx, Inc.
 
 
-if [ $USE_PERL = YES ]; then
+if [ $USE_PERL != NO ]; then
 
     cat << END                                                >> $NGX_MAKEFILE
 
@@ -20,14 +20,22 @@ case ".$NGX_SBIN_PATH" in
     ./*)
     ;;
 
-    .)
-        NGX_SBIN_PATH=$NGX_PREFIX/sbin/nginx
-    ;;
-
     *)
         NGX_SBIN_PATH=$NGX_PREFIX/$NGX_SBIN_PATH
     ;;
 esac
+
+
+case ".$NGX_MODULES_PATH" in
+    ./*)
+    ;;
+
+    *)
+        NGX_MODULES_PATH=$NGX_PREFIX/$NGX_MODULES_PATH
+    ;;
+esac
+
+NGX_MODULES_PATH=`dirname $NGX_MODULES_PATH/.`
 
 
 case ".$NGX_CONF_PATH" in
@@ -73,26 +81,6 @@ case ".$NGX_HTTP_LOG_PATH" in
 esac
 
 
-case ".$NGX_DSO_PATH" in
-    ./*)
-    ;;
-
-    *)
-        NGX_DSO_PATH=$NGX_PREFIX/$NGX_DSO_PATH
-    ;;
-esac
-
-
-case ".$NGX_DSO_TOOL_PATH" in
-    ./*)
-    ;;
-
-    *)
-        NGX_DSO_TOOL_PATH=$NGX_PREFIX/$NGX_DSO_TOOL_PATH
-    ;;
-esac
-
-
 if test -f man/nginx.8 ; then
     NGX_MAN=man/nginx.8
 else
@@ -116,222 +104,94 @@ $NGX_OBJS/nginx.8:	$NGX_MAN $NGX_AUTO_CONFIG_H
 		-e "s|%%ERROR_LOG_PATH%%|${NGX_ERROR_LOG_PATH:-stderr}|" \\
 		< $NGX_MAN > \$@
 
-END
-
-case ".$NGX_OBJS" in
-    ./*)
-        NGX_TEST_BINARY=$NGX_OBJS/nginx
-    ;;
-
-    *)
-        NGX_TEST_BINARY=`pwd`/$NGX_OBJS/nginx
-    ;;
-esac
-
-cat << END                                                    >> $NGX_MAKEFILE
-
-test:	$NGX_OBJS/nginx
-	TEST_NGINX_BINARY=$NGX_TEST_BINARY prove -v -I `pwd`/tests/nginx-tests/nginx-tests/lib tests/nginx-tests/nginx-tests tests/nginx-tests/cases
-
-END
-
-if test -n "$NGX_SHARED_MODULES"; then
-
-    cat << END                                                >> $NGX_MAKEFILE
-
-dso_install:	all
-END
-
-    cat << END                                                >> $NGX_MAKEFILE
-
-	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
-		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
-END
-
-    for ngx_shared_modules in $NGX_SHARED_MODULES
-    do
-        cat << END                                                >> $NGX_MAKEFILE
-
-	test ! -f '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}' \
-		|| unlink '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}'
-END
-    done
-
-    for ngx_dso_module in $NGX_DSO_ALL_TARGETS
-    do
-        cat << END                                                >> $NGX_MAKEFILE
-
-	cp $ngx_dso_module \$(DESTDIR)$NGX_DSO_PATH
-
-END
-    done
-
-cat << END                                                    >> $NGX_MAKEFILE
-
-install:	all \
-		$NGX_INSTALL_PERL_MODULES
-END
-
-else
-cat << END                                                    >> $NGX_MAKEFILE
-
-install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
-		$NGX_INSTALL_PERL_MODULES
-END
-
-fi
-
-cat << END                                                    >> $NGX_MAKEFILE
+install:	build $NGX_INSTALL_PERL_MODULES
 	test -d '\$(DESTDIR)$NGX_PREFIX' || mkdir -p '\$(DESTDIR)$NGX_PREFIX'
 
-	test -d '\$(DESTDIR)`dirname "$NGX_SBIN_PATH"`' \
+	test -d '\$(DESTDIR)`dirname "$NGX_SBIN_PATH"`' \\
 		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_SBIN_PATH"`'
-	test ! -f '\$(DESTDIR)$NGX_SBIN_PATH' \
-		|| mv '\$(DESTDIR)$NGX_SBIN_PATH' \
+	test ! -f '\$(DESTDIR)$NGX_SBIN_PATH' \\
+		|| mv '\$(DESTDIR)$NGX_SBIN_PATH' \\
 			'\$(DESTDIR)$NGX_SBIN_PATH.old'
 	cp $NGX_OBJS/nginx '\$(DESTDIR)$NGX_SBIN_PATH'
 
-	test -d '\$(DESTDIR)$NGX_CONF_PREFIX' \
+	test -d '\$(DESTDIR)$NGX_CONF_PREFIX' \\
 		|| mkdir -p '\$(DESTDIR)$NGX_CONF_PREFIX'
 
 	cp conf/koi-win '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp conf/koi-utf '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp conf/win-utf '\$(DESTDIR)$NGX_CONF_PREFIX'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/mime.types' \
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/mime.types' \\
 		|| cp conf/mime.types '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp conf/mime.types '\$(DESTDIR)$NGX_CONF_PREFIX/mime.types.default'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi_params' \
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi_params' \\
 		|| cp conf/fastcgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp conf/fastcgi_params \
+	cp conf/fastcgi_params \\
 		'\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi_params.default'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi.conf' \
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi.conf' \\
 		|| cp conf/fastcgi.conf '\$(DESTDIR)$NGX_CONF_PREFIX'
 	cp conf/fastcgi.conf '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi.conf.default'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/uwsgi_params' \
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/uwsgi_params' \\
 		|| cp conf/uwsgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp conf/uwsgi_params \
+	cp conf/uwsgi_params \\
 		'\$(DESTDIR)$NGX_CONF_PREFIX/uwsgi_params.default'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/scgi_params' \
+	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/scgi_params' \\
 		|| cp conf/scgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp conf/scgi_params \
+	cp conf/scgi_params \\
 		'\$(DESTDIR)$NGX_CONF_PREFIX/scgi_params.default'
 
-	test -f '\$(DESTDIR)$NGX_CONF_PATH' \
+	test -f '\$(DESTDIR)$NGX_CONF_PATH' \\
 		|| cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PATH'
 	cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PREFIX/nginx.conf.default'
 
-	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \
+	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \\
 		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_PID_PATH"`'
 
-	test -d '\$(DESTDIR)`dirname "$NGX_HTTP_LOG_PATH"`' || \
-		mkdir -p '\$(DESTDIR)`dirname "$NGX_HTTP_LOG_PATH"`'
+	test -d '\$(DESTDIR)`dirname "$NGX_HTTP_LOG_PATH"`' \\
+		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_HTTP_LOG_PATH"`'
 
-	test -d '\$(DESTDIR)$NGX_PREFIX/html' \
+	test -d '\$(DESTDIR)$NGX_PREFIX/html' \\
 		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
 END
-
-
-if [ $HTTP_USER_AGENT = YES ] || [ $HTTP_USER_AGENT_SHARED = YES ]; then
-    cat << END                                                >> $NGX_MAKEFILE
-
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/browsers' \
-		|| cp conf/browsers '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp conf/browsers '\$(DESTDIR)$NGX_CONF_PREFIX/browsers'
-END
-
-fi
 
 
 if test -n "$NGX_ERROR_LOG_PATH"; then
     cat << END                                                >> $NGX_MAKEFILE
 
-	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' || \
-		mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
+	test -d '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`' \\
+		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_ERROR_LOG_PATH"`'
 END
 
 fi
 
 
-if [ $NGX_DSO = YES ] ; then
-
+if test -n "$DYNAMIC_MODULES"; then
     cat << END                                                >> $NGX_MAKEFILE
 
-	test -d '\$(DESTDIR)$NGX_DSO_PATH' \
-		|| mkdir -p '\$(DESTDIR)$NGX_DSO_PATH'
-END
-
-    for ngx_shared_modules in $NGX_SHARED_MODULES
-    do
-        cat << END                                                >> $NGX_MAKEFILE
-
-	test ! -f '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}' \
-		|| unlink '\$(DESTDIR)$NGX_DSO_PATH$ngx_shared_modules${NGX_SOEXT}'
-END
-    done
-
-    for ngx_dso_module in $NGX_DSO_ALL_TARGETS
-    do
-        cat << END                                                >> $NGX_MAKEFILE
-
-	cp $ngx_dso_module \$(DESTDIR)$NGX_DSO_PATH
-
-END
-    done
-
-    cat << END                                                >> $NGX_MAKEFILE
-
-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs' \
-		|| cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX'
-	cp $NGX_MODULE_STUBS '\$(DESTDIR)$NGX_CONF_PREFIX/module_stubs'
-	test -d '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`' || \
-		mkdir -p '\$(DESTDIR)`dirname "$NGX_DSO_TOOL_PATH"`'
-	cp $NGX_DSO_COMPILE '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
-	chmod 0755 '\$(DESTDIR)$NGX_DSO_TOOL_PATH'
-END
-
-
-# nginx c header
-
-    cat << END                                                >> $NGX_MAKEFILE
-
-	test -d '\$(DESTDIR)$NGX_INCLUDE_PATH' \
-		|| mkdir -p '\$(DESTDIR)$NGX_INCLUDE_PATH'
-END
-
-    for dep in $CORE_DEPS
-    do
-        if test -n "$dep"; then
-            cat << END                                                >> $NGX_MAKEFILE
-		test -f '$dep' && cp '$dep' '\$(DESTDIR)$NGX_INCLUDE_PATH'
-END
-        fi
-    done
-
-    for hdep in $HTTP_DEPS
-    do
-        if test -n "$hdep"; then
-
-            cat << END                                                       >> $NGX_MAKEFILE
-
-		test -f '$hdep' && cp '$hdep' '\$(DESTDIR)$NGX_INCLUDE_PATH'
-END
-        fi
-    done
-
-
-    cat << END                                                       >> $NGX_MAKEFILE
-
-	test -f '$NGX_OBJS/ngx_auto_headers.h'  && cp '$NGX_OBJS/ngx_auto_headers.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
-	test -f '$NGX_OBJS/ngx_auto_config.h' && cp '$NGX_OBJS/ngx_auto_config.h' '\$(DESTDIR)$NGX_INCLUDE_PATH'
-
+	test -d '\$(DESTDIR)$NGX_MODULES_PATH' \\
+		|| mkdir -p '\$(DESTDIR)$NGX_MODULES_PATH'
 END
 
 fi
+
+
+for ngx_module in $DYNAMIC_MODULES
+do
+    ngx_module=$ngx_module$ngx_modext
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+	test ! -f '\$(DESTDIR)$NGX_MODULES_PATH/$ngx_module' \\
+		|| mv '\$(DESTDIR)$NGX_MODULES_PATH/$ngx_module' \\
+			'\$(DESTDIR)$NGX_MODULES_PATH/$ngx_module.old'
+	cp $NGX_OBJS/$ngx_module '\$(DESTDIR)$NGX_MODULES_PATH/$ngx_module'
+END
+
+done
 
 
 # create Makefile
@@ -340,16 +200,13 @@ cat << END >> Makefile
 
 build:
 	\$(MAKE) -f $NGX_MAKEFILE
-	\$(MAKE) -f $NGX_MAKEFILE manpage
-
-test:
-	\$(MAKE) -f $NGX_MAKEFILE test
 
 install:
 	\$(MAKE) -f $NGX_MAKEFILE install
 
-dso_install:
-	\$(MAKE) -f $NGX_MAKEFILE dso_install
+.PHONY: modules
+modules:
+	\$(MAKE) -f $NGX_MAKEFILE modules
 
 upgrade:
 	$NGX_SBIN_PATH -t

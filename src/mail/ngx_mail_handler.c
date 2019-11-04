@@ -24,19 +24,20 @@ static ngx_int_t ngx_mail_verify_cert(ngx_mail_session_t *s,
 void
 ngx_mail_init_connection(ngx_connection_t *c)
 {
-    size_t                 len;
-    ngx_uint_t             i;
-    ngx_mail_port_t       *port;
-    struct sockaddr       *sa;
-    struct sockaddr_in    *sin;
-    ngx_mail_log_ctx_t    *ctx;
-    ngx_mail_in_addr_t    *addr;
-    ngx_mail_session_t    *s;
-    ngx_mail_addr_conf_t  *addr_conf;
-    u_char                 text[NGX_SOCKADDR_STRLEN];
+    size_t                     len;
+    ngx_uint_t                 i;
+    ngx_mail_port_t           *port;
+    struct sockaddr           *sa;
+    struct sockaddr_in        *sin;
+    ngx_mail_log_ctx_t        *ctx;
+    ngx_mail_in_addr_t        *addr;
+    ngx_mail_session_t        *s;
+    ngx_mail_addr_conf_t      *addr_conf;
+    ngx_mail_core_srv_conf_t  *cscf;
+    u_char                     text[NGX_SOCKADDR_STRLEN];
 #if (NGX_HAVE_INET6)
-    struct sockaddr_in6   *sin6;
-    ngx_mail_in6_addr_t   *addr6;
+    struct sockaddr_in6       *sin6;
+    ngx_mail_in6_addr_t       *addr6;
 #endif
 
 
@@ -133,6 +134,10 @@ ngx_mail_init_connection(ngx_connection_t *c)
     c->data = s;
     s->connection = c;
 
+    cscf = ngx_mail_get_module_srv_conf(s, ngx_mail_core_module);
+
+    ngx_set_connection_log(c, cscf->error_log);
+
     len = ngx_sock_ntop(c->sockaddr, c->socklen, text, NGX_SOCKADDR_STRLEN, 1);
 
     ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%uA client %*s connected to %V",
@@ -160,24 +165,8 @@ ngx_mail_init_connection(ngx_connection_t *c)
 
     sslcf = ngx_mail_get_module_srv_conf(s, ngx_mail_ssl_module);
 
-    if (sslcf->enable) {
+    if (sslcf->enable || addr_conf->ssl) {
         c->log->action = "SSL handshaking";
-
-        ngx_mail_ssl_init_connection(&sslcf->ssl, c);
-        return;
-    }
-
-    if (addr_conf->ssl) {
-
-        c->log->action = "SSL handshaking";
-
-        if (sslcf->ssl.ctx == NULL) {
-            ngx_log_error(NGX_LOG_ERR, c->log, 0,
-                          "no \"ssl_certificate\" is defined "
-                          "in server listening on SSL port");
-            ngx_mail_close_connection(c);
-            return;
-        }
 
         ngx_mail_ssl_init_connection(&sslcf->ssl, c);
         return;
@@ -217,7 +206,7 @@ ngx_mail_ssl_init_connection(ngx_ssl_t *ssl, ngx_connection_t *c)
     ngx_mail_session_t        *s;
     ngx_mail_core_srv_conf_t  *cscf;
 
-    if (ngx_ssl_create_connection(ssl, c, 0) == NGX_ERROR) {
+    if (ngx_ssl_create_connection(ssl, c, 0) != NGX_OK) {
         ngx_mail_close_connection(c);
         return;
     }
@@ -297,7 +286,7 @@ ngx_mail_verify_cert(ngx_mail_session_t *s, ngx_connection_t *c)
                       "client SSL certificate verify error: (%l:%s)",
                       rc, X509_verify_cert_error_string(rc));
 
-        ngx_ssl_remove_cached_session(sslcf->ssl.ctx,
+        ngx_ssl_remove_cached_session(c->ssl->session_ctx,
                                       (SSL_get0_session(c->ssl->connection)));
 
         cscf = ngx_mail_get_module_srv_conf(s, ngx_mail_core_module);
@@ -318,7 +307,7 @@ ngx_mail_verify_cert(ngx_mail_session_t *s, ngx_connection_t *c)
             ngx_log_error(NGX_LOG_INFO, c->log, 0,
                           "client sent no required SSL certificate");
 
-            ngx_ssl_remove_cached_session(sslcf->ssl.ctx,
+            ngx_ssl_remove_cached_session(c->ssl->session_ctx,
                                        (SSL_get0_session(c->ssl->connection)));
 
             cscf = ngx_mail_get_module_srv_conf(s, ngx_mail_core_module);
@@ -602,6 +591,40 @@ ngx_mail_auth_cram_md5(ngx_mail_session_t *s, ngx_connection_t *c)
                    "mail auth cram-md5: \"%V\" \"%V\"", &s->login, &s->passwd);
 
     s->auth_method = NGX_MAIL_AUTH_CRAM_MD5;
+
+    return NGX_DONE;
+}
+
+
+ngx_int_t
+ngx_mail_auth_external(ngx_mail_session_t *s, ngx_connection_t *c,
+    ngx_uint_t n)
+{
+    ngx_str_t  *arg, external;
+
+    arg = s->args.elts;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_MAIL, c->log, 0,
+                   "mail auth external: \"%V\"", &arg[n]);
+
+    external.data = ngx_pnalloc(c->pool, ngx_base64_decoded_length(arg[n].len));
+    if (external.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_decode_base64(&external, &arg[n]) != NGX_OK) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+            "client sent invalid base64 encoding in AUTH EXTERNAL command");
+        return NGX_MAIL_PARSE_INVALID_COMMAND;
+    }
+
+    s->login.len = external.len;
+    s->login.data = external.data;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_MAIL, c->log, 0,
+                   "mail auth external: \"%V\"", &s->login);
+
+    s->auth_method = NGX_MAIL_AUTH_EXTERNAL;
 
     return NGX_DONE;
 }

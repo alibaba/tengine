@@ -29,6 +29,22 @@ ngx_strlow(u_char *dst, u_char *src, size_t n)
 }
 
 
+size_t
+ngx_strnlen(u_char *p, size_t n)
+{
+    size_t  i;
+
+    for (i = 0; i < n; i++) {
+
+        if (p[i] == '\0') {
+            return i;
+        }
+    }
+
+    return n;
+}
+
+
 u_char *
 ngx_cpystrn(u_char *dst, u_char *src, size_t n)
 {
@@ -178,7 +194,7 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
             slen = (size_t) -1;
 
             while (*fmt >= '0' && *fmt <= '9') {
-                width = width * 10 + *fmt++ - '0';
+                width = width * 10 + (*fmt++ - '0');
             }
 
 
@@ -211,7 +227,7 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
                     fmt++;
 
                     while (*fmt >= '0' && *fmt <= '9') {
-                        frac_width = frac_width * 10 + *fmt++ - '0';
+                        frac_width = frac_width * 10 + (*fmt++ - '0');
                     }
 
                     break;
@@ -410,7 +426,7 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
                 hex = 2;
                 sign = 0;
                 zero = '0';
-                width = NGX_PTR_SIZE * 2;
+                width = 2 * sizeof(void *);
                 break;
 
             case 'c':
@@ -926,6 +942,7 @@ ngx_atoi(u_char *line, size_t n)
 }
 
 
+#if (T_NGX_HTTP_IMPROVED_IF)
 long long
 ngx_atoll(u_char *line, size_t n)
 {
@@ -950,6 +967,7 @@ ngx_atoll(u_char *line, size_t n)
         return value;
     }
 }
+#endif
 
 
 /* parse a fixed point number, e.g., ngx_atofp("10.5", 4, 2) returns 1050 */
@@ -1391,7 +1409,7 @@ ngx_utf8_length(u_char *p, size_t n)
             continue;
         }
 
-        if (ngx_utf8_decode(&p, n) > 0x10ffff) {
+        if (ngx_utf8_decode(&p, last - p) > 0x10ffff) {
             /* invalid UTF-8 */
             return n;
         }
@@ -1589,7 +1607,7 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
         n = 0;
 
         while (size) {
-            if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
+            if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
                 n++;
             }
             src++;
@@ -1600,7 +1618,7 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
     }
 
     while (size) {
-        if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
+        if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
             *dst++ = '%';
             *dst++ = hex[*src >> 4];
             *dst++ = hex[*src & 0xf];
@@ -1672,7 +1690,7 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
 
             state = sw_usual;
 
-            *d++ = '%'; *d++ = ch;
+            *d++ = ch;
 
             break;
 
@@ -1681,7 +1699,7 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
             state = sw_usual;
 
             if (ch >= '0' && ch <= '9') {
-                ch = (u_char) ((decoded << 4) + ch - '0');
+                ch = (u_char) ((decoded << 4) + (ch - '0'));
 
                 if (type & NGX_UNESCAPE_REDIRECT) {
                     if (ch > '%' && ch < 0x7f) {
@@ -1701,7 +1719,7 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
 
             c = (u_char) (ch | 0x20);
             if (c >= 'a' && c <= 'f') {
-                ch = (u_char) ((decoded << 4) + c - 'a' + 10);
+                ch = (u_char) ((decoded << 4) + (c - 'a') + 10);
 
                 if (type & NGX_UNESCAPE_URI) {
                     if (ch == '?') {
@@ -1834,7 +1852,19 @@ ngx_escape_json(u_char *dst, u_char *src, size_t size)
                 len++;
 
             } else if (ch <= 0x1f) {
-                len += sizeof("\\u001F") - 2;
+
+                switch (ch) {
+                case '\n':
+                case '\r':
+                case '\t':
+                case '\b':
+                case '\f':
+                    len++;
+                    break;
+
+                default:
+                    len += sizeof("\\u001F") - 2;
+                }
             }
 
             size--;
@@ -1855,12 +1885,37 @@ ngx_escape_json(u_char *dst, u_char *src, size_t size)
             *dst++ = ch;
 
         } else {
-            *dst++ = '\\'; *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
-            *dst++ = '0' + (ch >> 4);
+            *dst++ = '\\';
 
-            ch &= 0xf;
+            switch (ch) {
+            case '\n':
+                *dst++ = 'n';
+                break;
 
-            *dst++ = (ch < 10) ? ('0' + ch) : ('A' + ch - 10);
+            case '\r':
+                *dst++ = 'r';
+                break;
+
+            case '\t':
+                *dst++ = 't';
+                break;
+
+            case '\b':
+                *dst++ = 'b';
+                break;
+
+            case '\f':
+                *dst++ = 'f';
+                break;
+
+            default:
+                *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
+                *dst++ = '0' + (ch >> 4);
+
+                ch &= 0xf;
+
+                *dst++ = (ch < 10) ? ('0' + ch) : ('A' + ch - 10);
+            }
         }
 
         size--;
@@ -1983,6 +2038,14 @@ ngx_sort(void *base, size_t n, size_t size,
     }
 
     ngx_free(p);
+}
+
+
+void
+ngx_explicit_memzero(void *buf, size_t n)
+{
+    ngx_memzero(buf, n);
+    ngx_memory_barrier();
 }
 
 

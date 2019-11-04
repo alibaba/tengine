@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -205,7 +204,7 @@ attempt to send data on a closed socket:
 --- timeout: 10
 --- config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 3s;
     location /t {
         rewrite_by_lua '
@@ -297,7 +296,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
 
 === TEST 6: connection timeout (tcp)
 --- config
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     lua_socket_connect_timeout 100ms;
     lua_socket_send_timeout 100ms;
     lua_socket_read_timeout 100ms;
@@ -305,7 +304,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
     location /test {
         rewrite_by_lua '
             local sock = ngx.socket.tcp()
-            local ok, err = sock:connect("agentzh.org", 12345)
+            local ok, err = sock:connect("127.0.0.2", 12345)
             ngx.say("connect: ", ok, " ", err)
 
             local bytes
@@ -330,7 +329,7 @@ send: nil closed
 receive: nil closed
 close: nil closed
 --- error_log
-lua tcp socket connect timed out
+lua tcp socket connect timed out, when connecting to 127.0.0.2:12345
 --- timeout: 10
 
 
@@ -373,7 +372,7 @@ connected: 1
 === TEST 8: resolver error (host not found)
 --- config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 3s;
     location /t {
         rewrite_by_lua '
@@ -416,7 +415,7 @@ attempt to send data on a closed socket
 === TEST 9: resolver error (timeout)
 --- config
     server_tokens off;
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 1ms;
     location /t {
         rewrite_by_lua '
@@ -447,7 +446,7 @@ attempt to send data on a closed socket
 --- request
 GET /t
 --- response_body_like
-^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(\d+: Operation timed out\))?
+^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(\d+: (?:Operation timed out|Host not found)\))?
 connected: nil
 failed to send request: closed$
 --- error_log
@@ -941,7 +940,7 @@ close: 1 nil
                 end
             end
 
-            ok, err = sock:close()
+            local ok, err = sock:close()
             ngx.say("close: ", ok, " ", err)
         ';
 
@@ -2391,4 +2390,3 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):16: bad request/
 
 --- no_error_log
 [alert]
-

@@ -25,7 +25,7 @@ $NGX_INCLUDE_UNISTD_H
 $NGX_INCLUDE_INTTYPES_H
 $NGX_INCLUDE_AUTO_CONFIG_H
 
-int main() {
+int main(void) {
     printf("%d", (int) sizeof($ngx_type));
     return 0;
 }
@@ -45,27 +45,14 @@ if [ -x $NGX_AUTOTEST ]; then
 fi
 
 
-rm -rf $NGX_AUTOTEST*
-
-
 case $ngx_size in
     4)
-        if [ "$ngx_type"="long" ]; then
-            ngx_max_value=2147483647L
-        else
-            ngx_max_value=2147483647
-        fi
-
+        ngx_max_value=2147483647
         ngx_max_len='(sizeof("-2147483648") - 1)'
     ;;
 
     8)
-        if [ "$ngx_type"="long long" ]; then
-            ngx_max_value=9223372036854775807LL
-        else
-            ngx_max_value=9223372036854775807L
-        fi
-
+        ngx_max_value=9223372036854775807LL
         ngx_max_len='(sizeof("-9223372036854775808") - 1)'
     ;;
 
@@ -79,6 +66,11 @@ case $ngx_size in
         echo $ngx_test       >> $NGX_AUTOCONF_ERR
         echo "----------"    >> $NGX_AUTOCONF_ERR
 
+        rm -rf $NGX_AUTOTEST*
+
         exit 1
 esac
+
+
+rm -rf $NGX_AUTOTEST*
 

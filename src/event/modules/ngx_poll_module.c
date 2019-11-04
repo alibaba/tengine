@@ -25,9 +25,9 @@ static struct pollfd  *event_list;
 static ngx_uint_t      nevents;
 
 
-static ngx_str_t    poll_name = ngx_string("poll");
+static ngx_str_t           poll_name = ngx_string("poll");
 
-ngx_event_module_t  ngx_poll_module_ctx = {
+static ngx_event_module_t  ngx_poll_module_ctx = {
     &poll_name,
     NULL,                                  /* create configuration */
     ngx_poll_init_conf,                    /* init configuration */
@@ -88,7 +88,7 @@ ngx_poll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         }
 
         if (event_list) {
-            ngx_memcpy(list, event_list, sizeof(ngx_event_t *) * nevents);
+            ngx_memcpy(list, event_list, sizeof(struct pollfd) * nevents);
             ngx_free(event_list);
         }
 
@@ -357,13 +357,11 @@ ngx_poll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             continue;
         }
 
-        if ((revents & (POLLERR|POLLHUP|POLLNVAL))
-             && (revents & (POLLIN|POLLOUT)) == 0)
-        {
+        if (revents & (POLLERR|POLLHUP|POLLNVAL)) {
+
             /*
-             * if the error events were returned without POLLIN or POLLOUT,
-             * then add these flags to handle the events at least in one
-             * active handler
+             * if the error events were returned, add POLLIN and POLLOUT
+             * to handle the events at least in one active handler
              */
 
             revents |= POLLIN|POLLOUT;
@@ -417,15 +415,5 @@ ngx_poll_init_conf(ngx_cycle_t *cycle, void *conf)
         return NGX_CONF_OK;
     }
 
-#if (NGX_OLD_THREADS)
-
-    ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
-                  "poll() is not supported in the threaded mode");
-    return NGX_CONF_ERROR;
-
-#else
-
     return NGX_CONF_OK;
-
-#endif
 }

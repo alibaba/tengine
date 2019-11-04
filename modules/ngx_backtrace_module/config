@@ -1,0 +1,24 @@
+ngx_addon_name=ngx_backtrace_module
+HTTP_MODULES="$HTTP_MODULES ngx_backtrace_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_backtrace_module.c"
+LINK="$LINK -rdynamic"
+
+ngx_feature="BACKTRACE"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs="#include <execinfo.h>"
+ngx_feature_path=
+ngx_feature_test="void *buffer[10];
+                  backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));"
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    cat << END
+    
+    $0: error: the backtrace module requires backtrace function.
+    You can either do not enable the module or update your libc library.
+    
+END
+
+    exit 1
+fi

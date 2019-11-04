@@ -54,16 +54,18 @@ http {
 
 EOF
 
-$t->run_daemon(\&http_daemon, 8081);
-$t->run_daemon(\&http_daemon, 8082);
+$t->run_daemon(\&http_daemon, port(8081));
+$t->run_daemon(\&http_daemon, port(8082));
 $t->run();
 
-$t->waitforsocket('127.0.0.1:8081');
-$t->waitforsocket('127.0.0.1:8082');
+$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->waitforsocket('127.0.0.1:' . port(8082));
 
 ###############################################################################
 
-is(many('/', 10), '8081: 5, 8082: 5', 'balanced');
+my @ports = my ($port1, $port2) = (port(8081), port(8082));
+
+is(many('/', 10), "$port1: 5, $port2: 5", 'balanced');
 
 my @sockets;
 push(@sockets, http_get('/w', start => 1));
@@ -71,7 +73,7 @@ push(@sockets, http_get('/w', start => 1));
 
 select undef, undef, undef, 0.2;
 
-is(many('/w', 10), '8082: 10', 'least conn');
+is(many('/w', 10), "$port2: 10", 'least conn');
 
 ###############################################################################
 
@@ -86,7 +88,8 @@ sub many {
 		}
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################
@@ -118,7 +121,7 @@ sub http_daemon {
 
 		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
 
-		if ($uri eq '/w' && $port == 8081) {
+		if ($uri eq '/w' && $port == port(8081)) {
 			Test::Nginx::log_core('||', "$port: sleep(2.5)");
 			select undef, undef, undef, 2.5;
 		}

@@ -21,7 +21,7 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache ssi shmem/)
+my $t = Test::Nginx->new()->has(qw/http proxy cache ssi/)
 	->write_file_expand('nginx.conf', <<'EOF')->plan(2);
 
 %%TEST_GLOBALS%%
@@ -51,8 +51,6 @@ http {
             proxy_cache_lock_timeout 100ms;
 
             proxy_read_timeout 3s;
-
-            add_header X-Msec $msec;
         }
 
         location = /ssi.html {
@@ -83,7 +81,7 @@ $t->run();
 
 ###############################################################################
 
-# problem: if proxy cache lock wakeup happens in a an inactive
+# problem: if proxy cache lock wakeup happens in an inactive
 # subrequest, just a connection write event may not trigger any
 # further work
 
@@ -94,9 +92,14 @@ $t->run();
 # is woken up by the postpone filter once first subrequest completes,
 # but this is suboptimal behaviour
 
+http_get('/charge');
+my $start = time();
+
 my $s = http_get('/locked', start => 1);
+select undef, undef, undef, 0.2;
+
 like(http_get('/ssi.html'), qr/end/, 'cache lock ssi');
-my ($start) = http_end($s) =~ /X-Msec: (\d+)/;
+http_end($s);
 cmp_ok(time() - $start, '<=', 5, 'parallel execution after lock timeout');
 
 ###############################################################################

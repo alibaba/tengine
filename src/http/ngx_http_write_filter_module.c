@@ -12,7 +12,9 @@
 
 static ngx_int_t ngx_http_write_filter_init(ngx_conf_t *cf);
 
+#if (T_NGX_REQ_STATUS )
 ngx_int_t (*ngx_http_write_filter_stat)(ngx_http_request_t *r) = NULL;
+#endif
 
 
 static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
@@ -82,7 +84,6 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
                        cl->buf->file_pos,
                        cl->buf->file_last - cl->buf->file_pos);
 
-#if 1
         if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
             ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                           "zero size buf in writer "
@@ -100,7 +101,24 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ngx_debug_point();
             return NGX_ERROR;
         }
-#endif
+
+        if (ngx_buf_size(cl->buf) < 0) {
+            ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                          "negative size buf in writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          cl->buf->temporary,
+                          cl->buf->recycled,
+                          cl->buf->in_file,
+                          cl->buf->start,
+                          cl->buf->pos,
+                          cl->buf->last,
+                          cl->buf->file,
+                          cl->buf->file_pos,
+                          cl->buf->file_last);
+
+            ngx_debug_point();
+            return NGX_ERROR;
+        }
 
         size += ngx_buf_size(cl->buf);
 
@@ -138,7 +156,6 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
                        cl->buf->file_pos,
                        cl->buf->file_last - cl->buf->file_pos);
 
-#if 1
         if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
             ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                           "zero size buf in writer "
@@ -156,7 +173,24 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ngx_debug_point();
             return NGX_ERROR;
         }
-#endif
+
+        if (ngx_buf_size(cl->buf) < 0) {
+            ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                          "negative size buf in writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          cl->buf->temporary,
+                          cl->buf->recycled,
+                          cl->buf->in_file,
+                          cl->buf->start,
+                          cl->buf->pos,
+                          cl->buf->last,
+                          cl->buf->file,
+                          cl->buf->file_pos,
+                          cl->buf->file_last);
+
+            ngx_debug_point();
+            return NGX_ERROR;
+        }
 
         size += ngx_buf_size(cl->buf);
 
@@ -176,7 +210,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     *ll = NULL;
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http write filter: l:%d f:%d s:%O", last, flush, size);
+                   "http write filter: l:%ui f:%ui s:%O", last, flush, size);
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
@@ -220,9 +254,17 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
+    if (!r->limit_rate_set) {
+        r->limit_rate = ngx_http_complex_value_size(r, clcf->limit_rate, 0);
+        r->limit_rate_set = 1;
+    }
+
     if (r->limit_rate) {
-        if (r->limit_rate_after == 0) {
-            r->limit_rate_after = clcf->limit_rate_after;
+
+        if (!r->limit_rate_after_set) {
+            r->limit_rate_after = ngx_http_complex_value_size(r,
+                                                    clcf->limit_rate_after, 0);
+            r->limit_rate_after_set = 1;
         }
 
         limit = (off_t) r->limit_rate * (ngx_time() - r->start_sec + 1)
@@ -255,11 +297,13 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     chain = c->send_chain(c, r->out, limit);
 
+#if (T_NGX_REQ_STATUS )
     if (ngx_http_write_filter_stat != NULL) {
         if (ngx_http_write_filter_stat(r) == NGX_ERROR) {
             return NGX_ERROR;
         }
     }
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http write filter %p", chain);

@@ -37,6 +37,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     set_real_ip_from  127.0.0.1/32;
+    set_real_ip_from  192.0.2.1/32;
     real_ip_header    X-Forwarded-For;
 
     server {
@@ -54,7 +55,7 @@ EOF
 
 $t->write_file('index.html', '');
 $t->write_file('1', '');
-$t->try_run('no realip_remote_addr');
+$t->run();
 
 plan(skip_all => 'no 127.0.0.1 on host')
 	if http_get('/') !~ /X-IP: 127.0.0.1/m;

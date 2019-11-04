@@ -1,11 +1,10 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 155;
+plan tests => repeat_each() * 163;
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
 
@@ -28,7 +27,7 @@ __DATA__
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("ngx.say(101)")
             f:close()
             ngx.say("updated")
@@ -62,7 +61,7 @@ updated
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("ngx.say(101)")
             f:close()
             ngx.say("updated")
@@ -96,7 +95,7 @@ updated
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("ngx.say(101)")
             f:close()
             ngx.say("updated")
@@ -131,7 +130,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("ngx.say(101)")
             f:close()
             ngx.say("updated")
@@ -167,7 +166,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("ngx.say(101)")
             f:close()
             ngx.say("updated")
@@ -205,7 +204,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/foo.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/foo.lua", "w"))
             f:write("module(..., package.seeall); ngx.say(102);")
             f:close()
             ngx.say("updated")
@@ -241,7 +240,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/foo.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/foo.lua", "w"))
             f:write("module(..., package.seeall); ngx.say(102);")
             f:close()
             ngx.say("updated")
@@ -280,7 +279,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/foo.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/foo.lua", "w"))
             f:write("module(..., package.seeall); return 102;")
             f:close()
             ngx.say("updated")
@@ -319,7 +318,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/foo.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/foo.lua", "w"))
             f:write("module(..., package.seeall); return 102;")
             f:close()
             ngx.say("updated")
@@ -356,7 +355,7 @@ updated
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("return 101")
             f:close()
             ngx.say("updated")
@@ -391,7 +390,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
     location /update {
         content_by_lua '
             -- os.execute("(echo HERE; pwd) > /dev/stderr")
-            local f = assert(io.open("t/servroot/html/test.lua", "w"))
+            local f = assert(io.open("$TEST_NGINX_SERVER_ROOT/html/test.lua", "w"))
             f:write("return 101")
             f:close()
             ngx.say("updated")
@@ -1112,7 +1111,7 @@ lua tcp socket keepalive max idle timeout
 [
 qq{lua tcp socket keepalive create connection pool for key "127.0.0.1:$ENV{TEST_NGINX_MEMCACHED_PORT}"},
 qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/,
-"lua tcp socket keepalive: free connection pool for ",
+qr/\blua tcp socket keepalive: free connection pool [0-9A-F]+ for "127.0.0.1:/,
 ]
 
 
@@ -1246,3 +1245,132 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/,
 "lua close the global Lua VM",
 ]
 
+
+
+=== TEST 32: make sure inline code keys are correct
+GitHub issue #1428
+--- config
+include ../html/a/proxy.conf;
+include ../html/b/proxy.conf;
+include ../html/c/proxy.conf;
+
+location /t {
+    echo_location /a/;
+    echo_location /b/;
+    echo_location /a/;
+    echo_location /c/;
+}
+
+--- user_files
+>>> a/proxy.conf
+location /a/ {
+    content_by_lua_block { ngx.say("/a/ is called") }
+}
+
+>>> b/proxy.conf
+location /b/ {
+    content_by_lua_block { ngx.say("/b/ is called") }
+}
+
+>>> c/proxy.conf
+location /c/ {
+    content_by_lua_block { ngx.say("/b/ is called") }
+}
+
+--- request
+GET /t
+--- response_body
+/a/ is called
+/b/ is called
+/a/ is called
+/b/ is called
+--- grep_error_log eval: qr/looking up Lua code cache with key '.*?'/
+--- grep_error_log_out eval
+[
+"looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+",
+"looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
+looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+"]
+--- log_level: debug
+--- no_error_log
+[error]
+
+
+
+=== TEST 33: make sure Lua code file keys are correct
+GitHub issue #1428
+--- config
+include ../html/a/proxy.conf;
+include ../html/b/proxy.conf;
+include ../html/c/proxy.conf;
+
+location /t {
+    echo_location /a/;
+    echo_location /b/;
+    echo_location /a/;
+    echo_location /c/;
+}
+
+--- user_files
+>>> a.lua
+ngx.say("/a/ is called")
+
+>>> b.lua
+ngx.say("/b/ is called")
+
+>>> c.lua
+ngx.say("/b/ is called")
+
+>>> a/proxy.conf
+location /a/ {
+    content_by_lua_file html/a.lua;
+}
+
+>>> b/proxy.conf
+location /b/ {
+    content_by_lua_file html/b.lua;
+}
+
+>>> c/proxy.conf
+location /c/ {
+    content_by_lua_file html/c.lua;
+}
+
+--- request
+GET /t
+--- response_body
+/a/ is called
+/b/ is called
+/a/ is called
+/b/ is called
+--- grep_error_log eval: qr/looking up Lua code cache with key '.*?'/
+--- grep_error_log_out eval
+[
+"looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
+looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
+",
+"looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
+looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
+looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
+looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
+looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
+"
+]
+--- log_level: debug
+--- no_error_log
+[error]

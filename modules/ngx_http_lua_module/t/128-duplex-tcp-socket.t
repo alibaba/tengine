@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -316,19 +315,24 @@ failed to send request: closed)$
 
             local data = ""
             local ntm = 0
-            local done = false
+            local aborted = false
             for i = 1, 3 do
-                local res, err, part = sock:receive(1)
-                if not res then
-                    ngx.say("failed to receive: ", err)
-                    return
-                else
-                    data = data .. res
+                if not aborted then
+                    local res, err, part = sock:receive(1)
+                    if not res then
+                        ngx.say("failed to receive: ", err)
+                        aborted = true
+                    else
+                        data = data .. res
+                    end
                 end
+
                 ngx.sleep(0.001)
             end
 
-            ngx.say("received: ", data)
+            if not aborted then
+                ngx.say("received: ", data)
+            end
         ';
     }
 
@@ -351,6 +355,7 @@ F(ngx_http_lua_socket_tcp_finalize_write_part) {
 --- tcp_query_len: 11
 --- no_error_log
 [error]
+--- wait: 0.05
 
 
 
@@ -358,7 +363,7 @@ F(ngx_http_lua_socket_tcp_finalize_write_part) {
 --- config
     server_tokens off;
     lua_socket_log_errors off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     location /t {
         content_by_lua '
             local sock = ngx.socket.tcp()
@@ -391,7 +396,7 @@ F(ngx_http_lua_socket_tcp_finalize_write_part) {
             end
 
             sock:settimeout(300)
-            local ok, err = sock:connect("106.187.41.147", 12345)
+            local ok, err = sock:connect("127.0.0.2", 12345)
             ngx.say("connect: ", ok, " ", err)
 
             local ok, err = sock:close()
@@ -420,7 +425,7 @@ close: nil closed
 --- config
     server_tokens off;
     lua_socket_log_errors off;
-    resolver agentzh.org:12345;
+    resolver 127.0.0.2:12345;
     resolver_timeout 300ms;
     location /t {
         content_by_lua '
@@ -454,7 +459,7 @@ close: nil closed
             end
 
             sock:settimeout(300)
-            local ok, err = sock:connect("some2.agentzh.org", 12345)
+            local ok, err = sock:connect("some2.agentzh.org", 80)
             ngx.say("connect: ", ok, " ", err)
 
             local ok, err = sock:close()
@@ -624,4 +629,3 @@ close: 1 nil
 
 --- no_error_log
 [error]
-

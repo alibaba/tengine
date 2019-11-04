@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
@@ -1008,4 +1007,3 @@ Not found, dear...
 --- error_code: 404
 --- no_error_log
 [error]
-

@@ -161,6 +161,12 @@ ngx_http_dav_handler(ngx_http_request_t *r)
             return NGX_HTTP_CONFLICT;
         }
 
+        if (r->headers_in.content_range) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "PUT with range is unsupported");
+            return NGX_HTTP_NOT_IMPLEMENTED;
+        }
+
         r->request_body_in_file_only = 1;
         r->request_body_in_persistent_file = 1;
         r->request_body_in_clean_file = 1;
@@ -207,7 +213,16 @@ ngx_http_dav_put_handler(ngx_http_request_t *r)
     ngx_ext_rename_file_t     ext;
     ngx_http_dav_loc_conf_t  *dlcf;
 
-    if (r->request_body == NULL || r->request_body->temp_file == NULL) {
+    if (r->request_body == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "PUT request body is unavailable");
+        ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
+    if (r->request_body->temp_file == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "PUT request body must be in a file");
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
@@ -255,7 +270,7 @@ ngx_http_dav_put_handler(ngx_http_request_t *r)
     ext.log = r->connection->log;
 
     if (r->headers_in.date) {
-        date = ngx_http_parse_time(r->headers_in.date->value.data,
+        date = ngx_parse_http_time(r->headers_in.date->value.data,
                                    r->headers_in.date->value.len);
 
         if (date != NGX_ERROR) {
@@ -621,11 +636,11 @@ destination_done:
     if ((r->uri.data[r->uri.len - 1] == '/' && *(last - 1) != '/')
         || (r->uri.data[r->uri.len - 1] != '/' && *(last - 1) == '/'))
     {
-         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                       "both URI \"%V\" and \"Destination\" URI \"%V\" "
-                       "should be either collections or non-collections",
-                       &r->uri, &dest->value);
-         return NGX_HTTP_CONFLICT;
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "both URI \"%V\" and \"Destination\" URI \"%V\" "
+                      "should be either collections or non-collections",
+                      &r->uri, &dest->value);
+        return NGX_HTTP_CONFLICT;
     }
 
     depth = ngx_http_dav_depth(r, NGX_HTTP_DAV_INFINITY_DEPTH);
@@ -826,11 +841,9 @@ overwrite_done:
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        dlcf = ngx_http_get_module_loc_conf(r, ngx_http_dav_module);
-
         cf.size = ngx_file_size(&fi);
         cf.buf_size = 0;
-        cf.access = dlcf->access;
+        cf.access = ngx_file_access(&fi);
         cf.time = ngx_file_mtime(&fi);
         cf.log = r->connection->log;
 
@@ -1061,7 +1074,7 @@ ngx_http_dav_location(ngx_http_request_t *r, u_char *path)
     u_char                    *location;
     ngx_http_core_loc_conf_t  *clcf;
 
-    r->headers_out.location = ngx_palloc(r->pool, sizeof(ngx_table_elt_t));
+    r->headers_out.location = ngx_list_push(&r->headers_out.headers);
     if (r->headers_out.location == NULL) {
         return NGX_ERROR;
     }
@@ -1074,17 +1087,15 @@ ngx_http_dav_location(ngx_http_request_t *r, u_char *path)
     } else {
         location = ngx_pnalloc(r->pool, r->uri.len);
         if (location == NULL) {
+            ngx_http_clear_location(r);
             return NGX_ERROR;
         }
 
         ngx_memcpy(location, r->uri.data, r->uri.len);
     }
 
-    /*
-     * we do not need to set the r->headers_out.location->hash and
-     * r->headers_out.location->key fields
-     */
-
+    r->headers_out.location->hash = 1;
+    ngx_str_set(&r->headers_out.location->key, "Location");
     r->headers_out.location->value.len = r->uri.len;
     r->headers_out.location->value.data = location;
 

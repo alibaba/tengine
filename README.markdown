@@ -9,10 +9,11 @@ Tengine has been an open source project since December 2011. It is being activel
 Features
 ========
 
-* All features of nginx-1.8.1 are inherited, i.e., it is 100% compatible with nginx.
-* Dynamic module loading support. You don't need to recompile Tengine when adding new modules to it.
-* HTTP/2 support. The ngx_http_v2_module supersedes the ngx_http_spdy_module module.
-* Sends unbuffered upload directly to HTTP and FastCGI backend servers, which saves disk I/Os.
+* All features of nginx-1.17.3 are inherited, i.e., it is 100% compatible with nginx.
+* Support the CONNECT HTTP method for forward proxy.
+* Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
+* Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
+* Support server_name in Stream module.
 * More load balancing methods, e.g., consistent hashing, and session persistence.
 * Input body filter support. It's quite handy to write Web Application Firewalls using this mechanism.
 * Dynamic scripting language (Lua) support, which is very efficient and makes it easy to extend core functionalities.

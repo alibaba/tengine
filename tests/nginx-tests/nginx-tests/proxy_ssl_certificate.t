@@ -110,23 +110,25 @@ my $d = $t->testdir();
 
 foreach my $name ('1.example.com', '2.example.com') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
 
 foreach my $name ('3.example.com') {
 	system("openssl genrsa -out $d/$name.key -passout pass:$name "
-		. "-aes128 2048 >>$d/openssl.out 2>&1") == 0
+		. "-aes128 1024 >>$d/openssl.out 2>&1") == 0
 		or die "Can't create private key: $!\n";
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' "
-		. "-key '$d/$name.key' -passin pass:$name"
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt "
+		. "-key $d/$name.key -passin pass:$name"
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
+
+sleep 1 if $^O eq 'MSWin32';
 
 $t->write_file('password', '3.example.com');
 $t->write_file('index.html', '');
@@ -139,7 +141,7 @@ like(http_get('/verify'), qr/X-Verify: SUCCESS/ms, 'verify certificate');
 like(http_get('/fail'), qr/X-Verify: FAILED/ms, 'fail certificate');
 like(http_get('/encrypted'), qr/X-Verify: SUCCESS/ms, 'with encrypted key');
 
-like(http_get('/verify'), qr!X-Name: CN=1.example!, 'valid certificate');
-unlike(http_get('/fail'), qr!X-Name: /CN=1.example!, 'invalid certificate');
+like(http_get('/verify'), qr!X-Name: /?CN=1.example!, 'valid certificate');
+unlike(http_get('/fail'), qr!X-Name: /?CN=1.example!, 'invalid certificate');
 
 ###############################################################################

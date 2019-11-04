@@ -160,3 +160,8 @@ Example:
 
 It will compile the ngx_lua module into a shared object, and install it to the default module path. You can specify the destination directory you want install to by the **--dst** option.
 
+
+Note
+===========
+
+Removed dso_tool tool and dso directive after the Tengine-2.3.0 version, If before using Tengine dso feature, you could switch to the Nginx official load_module directive, detailed reference [document1](http://nginx.org/en/docs/ngx_core_module.html#load_module) 、[document2](https://www.nginx.com/resources/wiki/extending/converting/#compiling-dynamic).

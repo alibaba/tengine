@@ -24,7 +24,7 @@ select STDOUT; $| = 1;
 eval { require SCGI; };
 plan(skip_all => 'SCGI not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http scgi cache shmem/)->plan(9)
+my $t = Test::Nginx->new()->has(qw/http scgi cache/)->plan(9)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -71,7 +71,7 @@ http {
 EOF
 
 $t->run_daemon(\&scgi_daemon);
-$t->run();
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -115,25 +115,24 @@ EOF
 sub scgi_daemon {
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalHost => '127.0.0.1:8081',
+		LocalHost => '127.0.0.1:' . port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
 		or die "Can't create listening socket: $!\n";
 
 	my $scgi = SCGI->new($server, blocking => 1);
-	my $count = 0;
 
 	while (my $request = $scgi->accept()) {
-		$count++;
-		$request->read_env();
+		eval { $request->read_env(); };
+		next if $@;
 
 		my $ims = $request->env->{HTTP_IF_MODIFIED_SINCE} || '';
 		my $iums = $request->env->{HTTP_IF_UNMODIFIED_SINCE} || '';
 		my $blah = $request->env->{HTTP_X_BLAH} || '';
 
 		$request->connection()->print(<<EOF);
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 
 ims=$ims;iums=$iums;blah=$blah;

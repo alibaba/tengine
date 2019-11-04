@@ -65,24 +65,24 @@ fi
 
 
 if [ $ngx_found = yes ]; then
-   if [ $HTTP_GEOIP_SHARED = YES ]; then
-       DSO_LIBS="$DSO_LIBS|$HTTP_GEOIP_MODULE:$ngx_feature_libs"
-   else
-       CORE_INCS="$CORE_INCS $ngx_feature_path"
-       CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
-   fi
 
-   if [ $NGX_IPV6 = YES ]; then
-       ngx_feature="GeoIP IPv6 support"
-       ngx_feature_name="NGX_HAVE_GEOIP_V6"
-       ngx_feature_run=no
-       ngx_feature_incs="#include <stdio.h>
-                         #include <GeoIP.h>"
-       #ngx_feature_path=
-       #ngx_feature_libs=
-       ngx_feature_test="printf(\"%d\", GEOIP_CITY_EDITION_REV0_V6);"
-       . auto/feature
-   fi
+    CORE_INCS="$CORE_INCS $ngx_feature_path"
+
+    if [ $USE_GEOIP = YES ]; then
+        CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
+    fi
+
+    NGX_LIB_GEOIP=$ngx_feature_libs
+
+    ngx_feature="GeoIP IPv6 support"
+    ngx_feature_name="NGX_HAVE_GEOIP_V6"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <stdio.h>
+                      #include <GeoIP.h>"
+    #ngx_feature_path=
+    #ngx_feature_libs=
+    ngx_feature_test="printf(\"%d\", GEOIP_CITY_EDITION_REV0_V6);"
+    . auto/feature
 
 else
 

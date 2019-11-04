@@ -12,6 +12,7 @@
 
 #include "ngx_http_lua_initworkerby.h"
 #include "ngx_http_lua_util.h"
+#include "ngx_http_lua_pipe.h"
 
 
 static u_char *ngx_http_lua_log_init_worker_error(ngx_log_t *log,
@@ -25,7 +26,9 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     void                        *cur, *prev;
     ngx_uint_t                   i;
     ngx_conf_t                   conf;
+    ngx_conf_file_t              cf_file;
     ngx_cycle_t                 *fake_cycle;
+    ngx_module_t               **modules;
     ngx_open_file_t             *file, *ofile;
     ngx_list_part_t             *part;
     ngx_connection_t            *c = NULL;
@@ -33,21 +36,56 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     ngx_http_request_t          *r = NULL;
     ngx_http_lua_ctx_t          *ctx;
     ngx_http_conf_ctx_t         *conf_ctx, http_ctx;
-    ngx_http_lua_loc_conf_t     *llcf, *top_llcf;
+    ngx_http_lua_loc_conf_t     *top_llcf;
     ngx_http_lua_main_conf_t    *lmcf;
     ngx_http_core_loc_conf_t    *clcf, *top_clcf;
 
     lmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_lua_module);
 
-    if (lmcf == NULL
-        || lmcf->init_worker_handler == NULL
-        || lmcf->lua == NULL)
-    {
+    if (lmcf == NULL || lmcf->lua == NULL) {
         return NGX_OK;
     }
 
-    conf_ctx = ((ngx_http_conf_ctx_t *) cycle->conf_ctx[ngx_http_module.index]);
-    http_ctx.main_conf = conf_ctx->main_conf;
+    /* lmcf != NULL && lmcf->lua != NULL */
+
+#if !(NGX_WIN32)
+    if (ngx_process == NGX_PROCESS_HELPER
+#   ifdef HAVE_PRIVILEGED_PROCESS_PATCH
+        && !ngx_is_privileged_agent
+#   endif
+       )
+    {
+        /* disable init_worker_by_lua* and destroy lua VM in cache processes */
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "lua close the global Lua VM %p in the "
+                       "cache helper process %P", lmcf->lua, ngx_pid);
+
+        lmcf->vm_cleanup->handler(lmcf->vm_cleanup->data);
+        lmcf->vm_cleanup->handler = NULL;
+
+        return NGX_OK;
+    }
+
+#ifdef HAVE_NGX_LUA_PIPE
+    if (ngx_http_lua_pipe_add_signal_handler(cycle) != NGX_OK) {
+        return NGX_ERROR;
+    }
+#endif
+
+#endif  /* NGX_WIN32 */
+
+#if (NGX_HTTP_LUA_HAVE_SA_RESTART)
+    if (lmcf->set_sa_restart) {
+        ngx_http_lua_set_sa_restart(ngx_cycle->log);
+    }
+#endif
+
+    if (lmcf->init_worker_handler == NULL) {
+        return NGX_OK;
+    }
+
+    conf_ctx = (ngx_http_conf_ctx_t *) cycle->conf_ctx[ngx_http_module.index];
 
     top_clcf = conf_ctx->loc_conf[ngx_http_core_module.ctx_index];
     top_llcf = conf_ctx->loc_conf[ngx_http_lua_module.ctx_index];
@@ -142,6 +180,10 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     conf.pool = fake_cycle->pool;
     conf.log = cycle->log;
 
+    ngx_memzero(&cf_file, sizeof(cf_file));
+    cf_file.file.name = cycle->conf_file;
+    conf.conf_file = &cf_file;
+
     http_ctx.loc_conf = ngx_pcalloc(conf.pool,
                                     sizeof(void *) * ngx_http_max_module);
     if (http_ctx.loc_conf == NULL) {
@@ -154,18 +196,48 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_HTTP_MODULE) {
+    http_ctx.main_conf = ngx_pcalloc(conf.pool,
+                                     sizeof(void *) * ngx_http_max_module);
+    if (http_ctx.main_conf == NULL) {
+        return NGX_ERROR;
+    }
+
+#if defined(nginx_version) && nginx_version >= 1009011
+    modules = cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (i = 0; modules[i]; i++) {
+        if (modules[i]->type != NGX_HTTP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[i]->ctx;
+        module = modules[i]->ctx;
+
+        if (module->create_main_conf) {
+            cur = module->create_main_conf(&conf);
+            if (cur == NULL) {
+                return NGX_ERROR;
+            }
+
+            /* init lua module main conf */
+            if (ngx_modules[i]->index == ngx_http_lua_module.index) {
+                ngx_memcpy(cur,
+                           conf_ctx->main_conf[ngx_http_lua_module.ctx_index],
+                           sizeof(ngx_http_lua_main_conf_t));
+            }
+
+            http_ctx.main_conf[modules[i]->ctx_index] = cur;
+        }
 
         if (module->create_srv_conf) {
             cur = module->create_srv_conf(&conf);
             if (cur == NULL) {
                 return NGX_ERROR;
             }
+
+            http_ctx.srv_conf[modules[i]->ctx_index] = cur;
 
             if (module->merge_srv_conf) {
                 prev = module->create_srv_conf(&conf);
@@ -178,8 +250,6 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
                     goto failed;
                 }
             }
-
-            http_ctx.srv_conf[ngx_modules[i]->ctx_index] = cur;
         }
 
         if (module->create_loc_conf) {
@@ -188,10 +258,20 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
+            http_ctx.loc_conf[modules[i]->ctx_index] = cur;
+
             if (module->merge_loc_conf) {
-                prev = module->create_loc_conf(&conf);
-                if (prev == NULL) {
-                    return NGX_ERROR;
+                if (modules[i] == &ngx_http_lua_module) {
+                    prev = top_llcf;
+
+                } else if (modules[i] == &ngx_http_core_module) {
+                    prev = top_clcf;
+
+                } else {
+                    prev = module->create_loc_conf(&conf);
+                    if (prev == NULL) {
+                        return NGX_ERROR;
+                    }
                 }
 
                 rv = module->merge_loc_conf(&conf, prev, cur);
@@ -199,8 +279,6 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
                     goto failed;
                 }
             }
-
-            http_ctx.loc_conf[ngx_modules[i]->ctx_index] = cur;
         }
     }
 
@@ -247,10 +325,6 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
 
 #endif
 
-    if (top_clcf->resolver) {
-        clcf->resolver = top_clcf->resolver;
-    }
-
     ctx = ngx_http_lua_create_ctx(r);
     if (ctx == NULL) {
         goto failed;
@@ -259,11 +333,6 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
     ctx->context = NGX_HTTP_LUA_CONTEXT_INIT_WORKER;
     ctx->cur_co_ctx = NULL;
     r->read_event_handler = ngx_http_block_reading;
-
-    llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
-    if (top_llcf->log_socket_errors != NGX_CONF_UNSET) {
-        llcf->log_socket_errors = top_llcf->log_socket_errors;
-    }
 
     ngx_http_lua_set_req(lmcf->lua, r);
 

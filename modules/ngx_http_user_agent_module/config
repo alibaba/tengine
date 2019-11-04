@@ -1,0 +1,15 @@
+ngx_addon_name=ngx_http_user_agent_module
+HTTP_USER_AGENT_SRCS="$ngx_addon_dir/ngx_http_user_agent_module.c"
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_deps=
+    ngx_module_srcs="$HTTP_USER_AGENT_SRCS"
+
+    . auto/module
+else
+    HTTP_MODULES="$HTTP_MODULES ngx_http_user_agent_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_USER_AGENT_SRCS"
+    HTTP_USER_AGENT=YES
+fi

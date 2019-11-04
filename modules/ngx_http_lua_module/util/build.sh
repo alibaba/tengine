@@ -1,39 +1,70 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# this file is mostly meant to be used by the author himself.
+# this script is for developers only.
+# dependent on the ngx-build script from the nginx-devel-utils repostory:
+#   https://github.com/openresty/nginx-devel-utils/blob/master/ngx-build
+# the resulting nginx is located at ./work/nginx/sbin/nginx
 
-version=${1:-0.8.54}
-opts=$2
+root=`pwd`
+version=${1:-1.4.1}
+home=~
+force=$2
 
-root=$(cd ${0%/*}/.. && echo $PWD)
-mkdir -p $root/{build,work}
+# the ngx-build script is from https://github.com/agentzh/nginx-devel-utils
 
-cd $root
-git submodule update --init
+            #--add-module=$home/work/nginx_upload_module-2.2.0 \
 
-cd $root/build
-if [ ! -s nginx-$version.tar.gz ]; then
-    wget "http://sysoev.ru/nginx/nginx-$version.tar.gz" -O nginx-$version.tar.gz
-fi
-tar -xzvf nginx-$version.tar.gz
+            #--without-pcre \
+            #--without-http_rewrite_module \
+            #--without-http_autoindex_module \
+            #--with-cc=gcc46 \
+            #--with-cc=clang \
+            #--without-http_referer_module \
+            #--with-http_spdy_module \
 
-cd nginx-$version/
-if [[ "$BUILD_CLEAN" -eq 1 || ! -f Makefile || "$root/config" -nt Makefile || "$root/util/build.sh" -nt Makefile ]]; then
-	./configure --prefix=$root/work \
-				--add-module=$root \
-				--add-module=$root/deps/ngx_devel_kit \
-				$opts \
-                                --with-debug
-fi
+add_fake_shm_module="--add-module=$root/t/data/fake-shm-module"
+add_fake_merge_module="--add-module=$root/t/data/fake-merge-module"
 
-if [ -f $root/work/sbin/nginx ]; then
-    rm -f $root/work/sbin/nginx
-fi
-
-if [ -f $root/work/logs/nginx.pid ]; then
-    kill `cat $root/work/logs/nginx.pid`
-fi
-
-make -j2
-make install
+time ngx-build $force $version \
+            --with-pcre-jit \
+            --with-ipv6 \
+            --with-cc-opt="-I$PCRE_INC -I$OPENSSL_INC" \
+            --with-http_v2_module \
+            --with-http_realip_module \
+            --with-http_ssl_module \
+            --add-module=$root/../ndk-nginx-module \
+            --add-module=$root/../set-misc-nginx-module \
+            --with-ld-opt="-L$PCRE_LIB -L$OPENSSL_LIB -Wl,-rpath,$PCRE_LIB:$LIBDRIZZLE_LIB:$OPENSSL_LIB" \
+            --without-mail_pop3_module \
+            --without-mail_imap_module \
+            --with-http_image_filter_module \
+            --without-mail_smtp_module \
+            --with-stream \
+            --with-stream_ssl_module \
+            --without-http_upstream_ip_hash_module \
+            --without-http_memcached_module \
+            --without-http_auth_basic_module \
+            --without-http_userid_module \
+            --with-http_auth_request_module \
+                --add-module=$root/../echo-nginx-module \
+                --add-module=$root/../memc-nginx-module \
+                --add-module=$root/../srcache-nginx-module \
+                --add-module=$root \
+                --add-module=$root/../lua-upstream-nginx-module \
+              --add-module=$root/../headers-more-nginx-module \
+                --add-module=$root/../drizzle-nginx-module \
+                --add-module=$root/../rds-json-nginx-module \
+                --add-module=$root/../coolkit-nginx-module \
+                --add-module=$root/../redis2-nginx-module \
+                --add-module=$root/../stream-lua-nginx-module \
+                --add-module=$root/t/data/fake-module \
+                $add_fake_shm_module \
+                $add_fake_merge_module \
+                --add-module=$root/t/data/fake-delayed-load-module \
+                --with-http_gunzip_module \
+                --with-http_dav_module \
+          --with-select_module \
+          --with-poll_module \
+                $opts \
+                --with-debug
 

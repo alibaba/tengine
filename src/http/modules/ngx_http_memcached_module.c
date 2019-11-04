@@ -61,10 +61,17 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       NULL },
 
     { ngx_string("memcached_bind"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_upstream_bind_set_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_memcached_loc_conf_t, upstream.local),
+      NULL },
+
+    { ngx_string("memcached_socket_keepalive"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_memcached_loc_conf_t, upstream.socket_keepalive),
       NULL },
 
     { ngx_string("memcached_connect_timeout"),
@@ -95,6 +102,13 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       offsetof(ngx_http_memcached_loc_conf_t, upstream.read_timeout),
       NULL },
 
+    { ngx_string("memcached_next_upstream"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
+      ngx_conf_set_bitmask_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_memcached_loc_conf_t, upstream.next_upstream),
+      &ngx_http_memcached_next_upstream_masks },
+
     { ngx_string("memcached_next_upstream_tries"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -109,13 +123,6 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       offsetof(ngx_http_memcached_loc_conf_t, upstream.next_upstream_timeout),
       NULL },
 
-    { ngx_string("memcached_next_upstream"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
-      ngx_conf_set_bitmask_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_memcached_loc_conf_t, upstream.next_upstream),
-      &ngx_http_memcached_next_upstream_masks },
-
     { ngx_string("memcached_gzip_flag"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -128,7 +135,7 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_memcached_loc_conf_t, upstream.upstream_tries),
+      offsetof(ngx_http_memcached_loc_conf_t, upstream.next_upstream_tries),
       NULL },
 #endif
 
@@ -532,7 +539,7 @@ ngx_http_memcached_filter(void *data, ssize_t bytes)
     cl->buf->tag = u->output.tag;
 
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ctx->request->connection->log, 0,
-                   "memcached filter bytes:%z size:%z length:%z rest:%z",
+                   "memcached filter bytes:%z size:%z length:%O rest:%z",
                    bytes, b->last - b->pos, u->length, ctx->rest);
 
     if (bytes <= (ssize_t) (u->length - NGX_HTTP_MEMCACHED_END)) {
@@ -601,12 +608,12 @@ ngx_http_memcached_create_loc_conf(ngx_conf_t *cf)
      *     conf->upstream.bufs.num = 0;
      *     conf->upstream.next_upstream = 0;
      *     conf->upstream.temp_path = NULL;
-     *     conf->upstream.uri = { 0, NULL };
-     *     conf->upstream.location = NULL;
      */
 
     conf->upstream.local = NGX_CONF_UNSET_PTR;
+    conf->upstream.socket_keepalive = NGX_CONF_UNSET;
     conf->upstream.next_upstream_tries = NGX_CONF_UNSET_UINT;
+
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.read_timeout = NGX_CONF_UNSET_MSEC;
@@ -614,9 +621,6 @@ ngx_http_memcached_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.buffer_size = NGX_CONF_UNSET_SIZE;
 
-#if (T_UPSTREAM_TRIES)
-    conf->upstream.upstream_tries = NGX_CONF_UNSET_UINT;
-#endif
 
     /* the hardcoded values */
     conf->upstream.cyclic_temp_file = 0;
@@ -631,6 +635,7 @@ ngx_http_memcached_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.intercept_404 = 1;
     conf->upstream.pass_request_headers = 0;
     conf->upstream.pass_request_body = 0;
+    conf->upstream.force_ranges = 1;
 
     conf->index = NGX_CONF_UNSET;
     conf->gzip_flag = NGX_CONF_UNSET_UINT;
@@ -647,6 +652,9 @@ ngx_http_memcached_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_ptr_value(conf->upstream.local,
                               prev->upstream.local, NULL);
+
+    ngx_conf_merge_value(conf->upstream.socket_keepalive,
+                              prev->upstream.socket_keepalive, 0);
 
     ngx_conf_merge_uint_value(conf->upstream.next_upstream_tries,
                               prev->upstream.next_upstream_tries, 0);
@@ -678,11 +686,6 @@ ngx_http_memcached_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                                        |NGX_HTTP_UPSTREAM_FT_OFF;
     }
 
-#if (T_UPSTREAM_TRIES)
-    ngx_conf_merge_uint_value(conf->upstream.upstream_tries,
-                              prev->upstream.upstream_tries,
-                              NGX_CONF_UNSET_UINT);
-#endif
 
     if (conf->upstream.upstream == NULL) {
         conf->upstream.upstream = prev->upstream.upstream;
@@ -727,7 +730,7 @@ ngx_http_memcached_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     clcf->handler = ngx_http_memcached_handler;
 
-    if (clcf->name.data[clcf->name.len - 1] == '/') {
+    if (clcf->name.len && clcf->name.data[clcf->name.len - 1] == '/') {
         clcf->auto_redirect = 1;
     }
 

@@ -1,0 +1,15 @@
+ngx_addon_name=ngx_http_upstream_dynamic_module
+HTTP_UPSTREAM_DYNAMIC_SRCS="$ngx_addon_dir/ngx_http_upstream_dynamic_module.c"
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_srcs="$HTTP_UPSTREAM_DYNAMIC_SRCS"
+
+    . auto/module
+else
+    HTTP_MODULES="$HTTP_MODULES ngx_http_upstream_dynamic_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_UPSTREAM_DYNAMIC_SRCS"
+fi
+
+have=T_NGX_HTTP_DYNAMIC_RESOLVE  . auto/have

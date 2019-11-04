@@ -176,8 +176,8 @@ $t->write_file('gif', $im->gif);
 $t->write_file('png', $im->png);
 $t->write_file('txt', 'SEE-THIS');
 
-$t->run_daemon(\&http_daemon, $t->testdir());
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run_daemon(\&http_daemon, $t);
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -259,7 +259,7 @@ isnt(http_get('/proxy_buffer/jpeg'), undef, 'small buffer proxy');
 ###############################################################################
 
 sub gif_size {
-	join ' ', unpack("x6S2", http_get_body(@_));
+	join ' ', unpack("x6v2", http_get_body(@_));
 }
 
 sub http_get_body {
@@ -279,8 +279,8 @@ sub http_get_body {
 sub has_gdversion {
 	my ($need) = @_;
 
-	my $v_str = `gdlib-config --version 2>&1` or return;
-	($v_str) = $v_str =~ m!([0-9a-z.]+)!;
+	my $v_str = `gdlib-config --version 2>&1` or return 1;
+	($v_str) = $v_str =~ m!^([0-9.]+)! or return 1;
 	my @v = split(/\./, $v_str);
 	my ($n, $v);
 
@@ -298,12 +298,12 @@ sub has_gdversion {
 # serve static files without Content-Length
 
 sub http_daemon {
-	my ($root) = @_;
+	my ($t) = @_;
 
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
 		LocalHost => '127.0.0.1',
-		LocalPort => 8081,
+		LocalPort => port(8081),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -324,11 +324,7 @@ sub http_daemon {
 
 		next if $headers eq '';
 		$uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
-
-		open my $fh, '<', $root . $uri or next;
-		local $/;
-		my $data = <$fh>;
-		close $fh;
+		my $data = $t->read_file($uri);
 
 		print $client <<EOF;
 HTTP/1.1 200 OK

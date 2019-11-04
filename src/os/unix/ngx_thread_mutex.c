@@ -49,7 +49,7 @@
  *             for each mutex from 10 to 100 based on spin count taken
  *             previously.
  *   FreeBSD:  Deadlock detection.  The default spin count is 2000.
- *             It can be overriden using LIBPTHREAD_SPINLOOPS environment
+ *             It can be overridden using LIBPTHREAD_SPINLOOPS environment
  *             variable or by pthread_mutex_setspinloops_np().  If a lock
  *             is still busy, sched_yield() can be called on both UP and
  *             SMP systems.  The default yield loop count is zero, but
@@ -108,8 +108,6 @@ ngx_thread_mutex_create(ngx_thread_mutex_t *mtx, ngx_log_t *log)
                       "pthread_mutexattr_destroy() failed");
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0,
-                   "pthread_mutex_init(%p)", mtx);
     return NGX_OK;
 }
 
@@ -126,8 +124,6 @@ ngx_thread_mutex_destroy(ngx_thread_mutex_t *mtx, ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0,
-                   "pthread_mutex_destroy(%p)", mtx);
     return NGX_OK;
 }
 
@@ -136,9 +132,6 @@ ngx_int_t
 ngx_thread_mutex_lock(ngx_thread_mutex_t *mtx, ngx_log_t *log)
 {
     ngx_err_t  err;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0,
-                   "pthread_mutex_lock(%p) enter", mtx);
 
     err = pthread_mutex_lock(mtx);
     if (err == 0) {
@@ -163,8 +156,6 @@ ngx_thread_mutex_unlock(ngx_thread_mutex_t *mtx, ngx_log_t *log)
 #endif
 
     if (err == 0) {
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0,
-                       "pthread_mutex_unlock(%p) exit", mtx);
         return NGX_OK;
     }
 

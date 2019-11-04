@@ -1,11 +1,10 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (3 * blocks() + 13);
+plan tests => repeat_each() * (3 * blocks() + 14);
 
 our $HtmlDir = html_dir;
 
@@ -556,7 +555,7 @@ lua udp socket read timed out
 
             local udp = socket.udp()
 
-            udp:settimeout(2000) -- 2 sec
+            udp:settimeout(5000) -- 5 sec
 
             local ok, err = udp:setpeername("$TEST_NGINX_RESOLVER", 53)
             if not ok then
@@ -597,6 +596,7 @@ received a good response.
 --- log_level: debug
 --- error_log
 lua udp socket receive buffer size: 8192
+--- no_check_leak
 
 
 
@@ -663,12 +663,14 @@ received a good response.
 --- log_level: debug
 --- error_log
 lua udp socket receive buffer size: 8192
+--- no_check_leak
 
 
 
 === TEST 12: github issue #215: Handle the posted requests in lua cosocket api (failed to resolve)
 --- config
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    resolver_timeout 5s;
 
     location = /sub {
         content_by_lua '
@@ -705,13 +707,14 @@ resolve name done
 
 --- no_error_log
 [error]
+--- timeout: 10
 
 
 
 === TEST 13: github issue #215: Handle the posted requests in lua cosocket api (successfully resolved)
 --- config
-    resolver $TEST_NGINX_RESOLVER;
-    resolver_timeout 3s;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    resolver_timeout 5s;
 
     location = /sub {
         content_by_lua '
@@ -726,7 +729,7 @@ resolve name done
             local sock = ngx.socket.udp()
             local ok, err = sock:setpeername(server, 80)
             if not ok then
-                ngx.say("failed to connect to agentzh.org: ", err)
+                ngx.say("failed to connect to ", server, ": ", err)
                 return
             end
             ngx.say("successfully connected to xxx!")
@@ -1102,3 +1105,72 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 --- no_error_log
 [alert]
 
+
+
+=== TEST 20: the upper bound of port range should be 2^16 - 1
+--- config
+    location /t {
+        content_by_lua_block {
+            local sock = ngx.socket.udp()
+            local ok, err = sock:setpeername("127.0.0.1", 65536)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+failed to connect: bad port number: 65536
+--- no_error_log
+[error]
+
+
+
+=== TEST 21: send boolean and nil
+--- config
+    server_tokens off;
+    location /t {
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+
+        content_by_lua_block {
+            local socket = ngx.socket
+            local udp = socket.udp()
+            local port = ngx.var.port
+            udp:settimeout(1000) -- 1 sec
+
+            local ok, err = udp:setpeername("127.0.0.1", ngx.var.port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local function send(data)
+                local bytes, err = udp:send(data)
+                if not bytes then
+                    ngx.say("failed to send: ", err)
+                    return
+                end
+                ngx.say("sent ok")
+            end
+
+            send(true)
+            send(false)
+            send(nil)
+        }
+    }
+--- request
+GET /t
+--- response_body
+sent ok
+sent ok
+sent ok
+--- no_error_log
+[error]
+--- grep_error_log eval
+qr/send: fd:\d+ \d+ of \d+/
+--- grep_error_log_out eval
+qr/send: fd:\d+ 4 of 4
+send: fd:\d+ 5 of 5
+send: fd:\d+ 3 of 3/
+--- log_level: debug

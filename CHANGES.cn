@@ -1,3 +1,70 @@
+Tengine 2.3.2 [2019-08-20]
+
+* Security: 修复HTTP2安全漏洞CVE-2019-9511, CVE-2019-9513和CVE-2019-9516 (wangfakang)
+* Feature: 支持后端Dubbo协议 (MenqqiWu)
+* Feature: upstream支持VNSWRR高效负载均衡算法 (wangfakang)
+* Feature: dynamic_resolve模块支持IPv6 (wangfakang)
+* Change: proxy_connect模块支持动态编译并增加调试日志 (chobits)
+* Change: 升级core代码版本到Nginx-1.17.3 (wangfakang)
+* Change: 更新健康检查模块使用文档 (zhangqx2010)
+* Change: 更新README文档(Lin-Buo-Ren)
+* Bugfix: 修复健康检查模块的JSON输出格式问题 (IYism)
+* Bugfix: 修复ngx-lua模块在init_worker_by_lua*指令下的问题 (wangfakang)
+* Bugfix: 修复dyups模块与OpenSSL兼容性问题 (wangfakang)
+
+Tengine 2.3.1 [2019-06-18]
+
+* Feature: stream ssl模块新增$ssl_handshakd_time变量 [mrpre]
+* Feature: upstream check模块支持websocket健康检查 (mrpre)
+* Change: round robin负载均衡算法采用随机起点 (wangfakang)
+* Change: 升级http lua模块到v0.10.14 (mrpre)
+* Change: 升级dyups模块到yzprofile/dyups的最新主干版本 (chobits)
+* Change: 升级Nginx版本到Nginx-1.16.0(MenqqiWu)
+* Change: 支持reqstatus模块的dso编译 (chobits)
+* Change: 支持upstream dynamic模块的dso编译 (wangfakang)
+* Change: 支持trim模块的dso编译 (wangfakang)
+* Change: 支持footer模块的dso编译 (wangfakang)
+* Change: 支持user_agent模块的dso编译 (wangfakang)
+* Change: 支持concat模块的dso编译 (mathieu-aubin)
+* Fix: 修复部分服务端返回的HTTP头部服务端版本信息  (AstroProfundis)
+* Fix: 修复"-m"参数显示dynamic module的问题 (wangfakang)
+* Fix：修复limit_req指令的参数检查 (wangfakang)
+* Fix: 修复reqstatus在macOS下的兼容性问题 (chobits)
+
+Tengine 2.3.0 [2019-03-25]
+
+* Feature: 新增proxy_connect模块，可以支持HTTP的CONNECT方法 [chobits]
+* Feature: Stream模块server配置块支持server_name指令 [mrpre]
+* Feature: reqstat模块新增req_status_lazy指令 [taoyuanyuan]
+* Feature: 新增http2指令，可以在server配置块中控制http2开关 [jinjiu]
+* Feature: 新增ssl_handshake_time变量，统计SSL握手时间 [jinjiu]
+* Feature: limit_req_zone指令的rate参数支持变量模式 [Alaaask]
+* Change: 更新debug_pool模块，适配Nginx官方1.15.9 [chobits]
+* Change: 更新reuse_port、dso、limit_req指令使用文档 [chobits, wangfakang]
+* Change: 合并官方limit_req逻辑，当对应key所有的变量值为空才跳过统计 [chobits]
+* Change: 删除reuse_port、dso、slice指令，统一使用Nginx官方对应的功能 [wangfakang]
+* Change: 适配并合并官方1.15.9测试用列 [chobits, wangfakang]
+* Change: 对Tengine自身模块全部剥离到modules目录下，减少对core的入侵 [chobits, wangfakang]
+* Change: 升级合并官方1.15.9代码，并同步官方新功能如Stream、gRPC等 [chobits, wangfakang]
+* Change: 更新Lua模块至v0.10.14rc4 [wangfakang]
+* Change: 更新dyups文档 [lf1029698952]
+* Change: 对core代码的修改全部使用宏区分开 [chobits, wangfakang, fankeke, hongxiaolong, imkeeper]
+* Change: 恢复accpte_filter功能 [wangfakang]
+* Bugfix: 修复dyups模块在和高版本OpenSSL一起编译的报错问题 [wangfakang]
+* Bugfix: 修复dyups模块init_number初始化逻辑 [FengXingYuXin]
+* Bugfix: 修复rollback日志进程在reload时可能导致日志写到滚动后的文件里面 [MengqiWu]
+* Bugfix: 修复ssl_verify_client_exception指令导致的coredump问题 [chobits]
+* Bugfix: 修复dyups、session_sticky模块在升级core代码后导致的coredump问题 [wangfakang]
+* Bugfix: 修复limit_req、http2模块的编译错误 [hongxiaolong]
+* Bugfix: 修复日志pipe进程在关闭监听socket时误删除监听Unix domain文件 [wangfakang]
+* Bugfix: 修复静态加载OpenSSL库时导致async openssl无法检测 [mrpre]
+* Bugfix: 修复ngx_http_top_input_body_filter被删除的问题 [chobits]
+* Bugfix: 修复reuse_port和accept_mutex指令冲突问题 [innomentats]
+* Bugfix: 修复在高版本GCC下的编译报错问题 [wangfakang]
+
+Tengine 2.2.3 [2018-11-11]
+* Security: 修复安全漏洞CVE-2018-16843，CVE-2018-16844和CVE-2018-16845 [chobits]
+
 Tengine 2.2.2 [2018-01-26]
 * Feature: 支持异步OpenSSL，可使用相关硬件(如：QAT)进行SSL的卸载 [mrpre]
 * Feature: 支持TLS1.3，TLS握手0-RTT [jlijian3] 
@@ -117,7 +184,7 @@ Tengine 2.0.1 [2014-03-06]
 
 Tengine 2.0.0 [2014-01-08]
 * Feature: 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
-* Feature: 支持SPDY v3协议，自动检测同一端口的SPDY请求和HTTP请求 [lilbedwin、chobits]
+* Feature: 支持SPDY v3协议，自动检测同一端口的SPDY请求和HTTP请求 [lilbedwin, chobits]
 * Feature: 支持设置proxy、memcached、fastcgi、scgi、uwsgi在后端失败时的重试次数 [supertcy]
 * Feature: tfs模块在RcServer心跳时汇报访问统计 [zhcn381]
 * Feature: if指令支持比较数值大小：'>'、'<'、'>='、'<=' [flygoast]

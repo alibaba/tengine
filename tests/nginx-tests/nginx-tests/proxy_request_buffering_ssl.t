@@ -97,7 +97,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 2048
+default_bits = 1024
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -107,8 +107,8 @@ my $d = $t->testdir();
 
 foreach my $name ('localhost') {
 	system('openssl req -x509 -new '
-		. "-config '$d/openssl.conf' -subj '/CN=$name/' "
-		. "-out '$d/$name.crt' -keyout '$d/$name.key' "
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
@@ -147,7 +147,7 @@ like(http_get_body('/discard', '0123456789' x 128, '0123456789' x 512,
 
 # interactive tests
 
-my $s = get_body('/preread', 8082, 10);
+my $s = get_body('/preread', port(8082), 10);
 ok($s, 'no preread');
 
 SKIP: {
@@ -160,7 +160,7 @@ like($s->{http_end}(), qr/200 OK/, 'no preread - response');
 
 }
 
-$s = get_body('/preread', 8082, 15, '01234');
+$s = get_body('/preread', port(8082), 15, '01234');
 ok($s, 'preread');
 
 SKIP: {
@@ -228,6 +228,8 @@ EOF
 
 		$client = $server->accept();
 
+		log2c("(new connection $client)");
+
 		alarm(0);
 	};
 	alarm(0);
@@ -237,6 +239,8 @@ EOF
 	}
 
 	$client->sysread(my $buf, 1024);
+	log2i($buf);
+
 	$buf =~ s/.*?\x0d\x0a?\x0d\x0a?(.*)/$1/ms;
 
 	my $f = { preread => $buf };
@@ -248,8 +252,11 @@ EOF
 			local $SIG{PIPE} = sub { die "sigpipe\n" };
 			alarm(5);
 
+			log_out($buf);
 			$s->write($buf);
+
 			$client->sysread($buf, 1024);
+			log2i($buf);
 
 			alarm(0);
 		};
@@ -280,6 +287,7 @@ EOF
 			alarm(5);
 
 			$s->sysread($buf, 1024);
+			log_in($buf);
 
 			alarm(0);
 		};
@@ -293,5 +301,9 @@ EOF
 	};
 	return $f;
 }
+
+sub log2i { Test::Nginx::log_core('|| <<', @_); }
+sub log2o { Test::Nginx::log_core('|| >>', @_); }
+sub log2c { Test::Nginx::log_core('||', @_); }
 
 ###############################################################################

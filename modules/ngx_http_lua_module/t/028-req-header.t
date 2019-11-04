@@ -1,6 +1,5 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -9,10 +8,10 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (2 * blocks() + 21);
+plan tests => repeat_each() * (2 * blocks() + 44);
 
 #no_diff();
-#no_long_string();
+no_long_string();
 
 run_tests();
 
@@ -22,8 +21,14 @@ __DATA__
 --- config
     location /req-header {
         content_by_lua '
-            ngx.say("Foo: ", ngx.req.get_headers()["Foo"] or "nil")
-            ngx.say("Bar: ", ngx.req.get_headers()["Bar"] or "nil")
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("Foo: ", headers["Foo"] or "nil")
+            ngx.say("Bar: ", headers["Bar"] or "nil")
         ';
     }
 --- request
@@ -44,8 +49,14 @@ lua exceeding request header limit
 --- config
     location /req-header {
         content_by_lua '
+            local headers, err = ngx.req.get_headers(nil, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             local h = {}
-            for k, v in pairs(ngx.req.get_headers(nil, true)) do
+            for k, v in pairs(headers) do
                 h[k] = v
             end
             ngx.say("Foo: ", h["Foo"] or "nil")
@@ -290,16 +301,43 @@ GET /bar
 --- config
     location /foo {
         content_by_lua '
-            ngx.say("Foo: ", ngx.req.get_headers()["Foo"] or "nil")
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("Foo: ", headers["Foo"] or "nil")
 
             ngx.req.set_header("Foo", 32)
-            ngx.say("Foo 1: ", ngx.req.get_headers()["Foo"] or "nil")
+
+            headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("Foo 1: ", headers["Foo"] or "nil")
 
             ngx.req.set_header("Foo", "abc")
-            ngx.say("Foo 2: ", ngx.req.get_headers()["Foo"] or "nil")
+
+            headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("Foo 2: ", headers["Foo"] or "nil")
 
             ngx.req.clear_header("Foo")
-            ngx.say("Foo 3: ", ngx.req.get_headers()["Foo"] or "nil")
+
+            headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("Foo 3: ", headers["Foo"] or "nil")
         ';
     }
 --- more_headers
@@ -320,7 +358,13 @@ Foo 3: nil
     location /foo {
         content_by_lua '
             collectgarbage()
-            local vals = ngx.req.get_headers()["Foo"]
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            local vals = headers["Foo"]
             ngx.say("value is of type ", type(vals), ".")
             if type(vals) == "table" then
                 ngx.say("Foo takes ", #vals or "nil", " values.")
@@ -387,11 +431,15 @@ Content-Encoding: gzip
 
 
 
-=== TEST 19: default max 100 headers
+=== TEST 19: exceeding default max 100 header limit
 --- config
     location /lua {
         content_by_lua '
-            local headers = ngx.req.get_headers()
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.say("err: ", err)
+            end
+
             local keys = {}
             for key, val in pairs(headers) do
                 table.insert(keys, key)
@@ -408,7 +456,7 @@ GET /lua
 --- more_headers eval
 my $i = 1;
 my $s;
-while ($i <= 102) {
+while ($i <= 99) {
     $s .= "X-$i:$i\n";
     $i++;
 }
@@ -428,18 +476,78 @@ for my $k (@k) {
         $k .= ": $&\n";
     }
 }
-CORE::join("", @k);
+"err: truncated\n" . CORE::join("", @k);
 --- timeout: 4
 --- error_log
-lua exceeding request header limit 100
+lua exceeding request header limit 101 > 100
 
 
 
-=== TEST 20: custom max 102 headers
+=== TEST 20: NOT exceeding default max 100 header limit
 --- config
     location /lua {
         content_by_lua '
-            local headers = ngx.req.get_headers(102)
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local keys = {}
+            for key, val in pairs(headers) do
+                table.insert(keys, key)
+            end
+
+            table.sort(keys)
+            local cnt = 0
+            for i, key in ipairs(keys) do
+                ngx.say(key, ": ", headers[key])
+                cnt = cnt + 1
+            end
+            ngx.say("found ", cnt, " headers")
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 98) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body eval
+my @k;
+my $i = 1;
+while ($i <= 98) {
+    push @k, "x-$i";
+    $i++;
+}
+push @k, "connection: close\n";
+push @k, "host: localhost\n";
+@k = sort @k;
+for my $k (@k) {
+    if ($k =~ /\d+/) {
+        $k .= ": $&\n";
+    }
+}
+CORE::join("", @k) . "found 100 headers\n";
+--- timeout: 4
+--- no_error_log
+[error]
+lua exceeding request header limit
+
+
+
+=== TEST 21: execeeding custom max 102 header limit
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(102)
+            if err then
+                ngx.say("err: ", err)
+            end
+
             local keys = {}
             for key, val in pairs(headers) do
                 table.insert(keys, key)
@@ -456,7 +564,59 @@ GET /lua
 --- more_headers eval
 my $i = 1;
 my $s;
-while ($i <= 103) {
+while ($i <= 101) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body eval
+my @k;
+my $i = 1;
+while ($i <= 100) {
+    push @k, "x-$i";
+    $i++;
+}
+push @k, "connection: close\n";
+push @k, "host: localhost\n";
+@k = sort @k;
+for my $k (@k) {
+    if ($k =~ /\d+/) {
+        $k .= ": $&\n";
+    }
+}
+"err: truncated\n" . CORE::join("", @k);
+--- timeout: 4
+--- error_log
+lua exceeding request header limit 103 > 102
+
+
+
+=== TEST 22: NOT execeeding custom max 102 header limit
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(102)
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local keys = {}
+            for key, val in pairs(headers) do
+                table.insert(keys, key)
+            end
+
+            table.sort(keys)
+            for i, key in ipairs(keys) do
+                ngx.say(key, ": ", headers[key])
+            end
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 100) {
     $s .= "X-$i:$i\n";
     $i++;
 }
@@ -478,16 +638,21 @@ for my $k (@k) {
 }
 CORE::join("", @k);
 --- timeout: 4
---- error_log
-lua exceeding request header limit 102
+--- no_error_log
+[error]
+lua exceeding request header limit
 
 
 
-=== TEST 21: custom unlimited headers
+=== TEST 23: custom unlimited headers
 --- config
     location /lua {
         content_by_lua '
-            local headers = ngx.req.get_headers(0)
+            local headers, err = ngx.req.get_headers(0)
+            if err then
+                ngx.say("err: ", err)
+            end
+
             local keys = {}
             for key, val in pairs(headers) do
                 table.insert(keys, key)
@@ -529,7 +694,7 @@ CORE::join("", @k);
 
 
 
-=== TEST 22: modify subrequest req headers should not affect the parent
+=== TEST 24: modify subrequest req headers should not affect the parent
 --- config
     location = /main {
         rewrite_by_lua '
@@ -585,7 +750,7 @@ Bar: []
 
 
 
-=== TEST 23: clear_header should clear all the instances of the user custom header
+=== TEST 25: clear_header should clear all the instances of the user custom header
 --- config
     location = /t {
         rewrite_by_lua '
@@ -611,7 +776,7 @@ Test-Header: [1]
 
 
 
-=== TEST 24: clear_header should clear all the instances of the builtin header
+=== TEST 26: clear_header should clear all the instances of the builtin header
 --- config
     location = /t {
         rewrite_by_lua '
@@ -638,7 +803,7 @@ Test-Header: [1]
 
 
 
-=== TEST 25: Converting POST to GET - clearing headers (bug found by Matthieu Tourne, 411 error page)
+=== TEST 27: Converting POST to GET - clearing headers (bug found by Matthieu Tourne, 411 error page)
 --- config
     location /t {
         rewrite_by_lua '
@@ -669,7 +834,7 @@ $/
 
 
 
-=== TEST 26: clear_header() does not duplicate subsequent headers (old bug)
+=== TEST 28: clear_header() does not duplicate subsequent headers (old bug)
 --- config
     location = /t {
         rewrite_by_lua '
@@ -739,13 +904,19 @@ Foo22: foo22\r
 
 
 
-=== TEST 27: iterating through headers (raw form)
+=== TEST 29: iterating through headers (raw form)
 --- config
     location /t {
         content_by_lua '
             local h = {}
             local arr = {}
-            for k, v in pairs(ngx.req.get_headers(nil, true)) do
+            local headers, err = ngx.req.get_headers(nil, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            for k, v in pairs(headers) do
                 h[k] = v
                 table.insert(arr, k)
             end
@@ -768,11 +939,16 @@ My-Foo: bar
 
 
 
-=== TEST 28: __index metamethod not working for "raw" mode
+=== TEST 30: __index metamethod not working for "raw" mode
 --- config
     location /t {
         content_by_lua '
-            local h = ngx.req.get_headers(nil, true)
+            local h, err = ngx.req.get_headers(nil, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             ngx.say("My-Foo-Header: ", h.my_foo_header)
         ';
     }
@@ -785,11 +961,16 @@ My-Foo-Header: nil
 
 
 
-=== TEST 29: __index metamethod not working for the default mode
+=== TEST 31: __index metamethod not working for the default mode
 --- config
     location /t {
         content_by_lua '
-            local h = ngx.req.get_headers()
+            local h, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             ngx.say("My-Foo-Header: ", h.my_foo_header)
         ';
     }
@@ -802,7 +983,7 @@ My-Foo-Header: Hello World
 
 
 
-=== TEST 30: clear input header (just more than 20 headers)
+=== TEST 32: clear input header (just more than 20 headers)
 --- config
     location = /t {
         rewrite_by_lua 'ngx.req.clear_header("R")';
@@ -850,7 +1031,7 @@ Q: q\r
 
 
 
-=== TEST 31: clear input header (just more than 20 headers, and add more)
+=== TEST 33: clear input header (just more than 20 headers, and add more)
 --- config
     location = /t {
         rewrite_by_lua '
@@ -924,7 +1105,7 @@ foo-21: 21\r
 
 
 
-=== TEST 32: clear input header (just more than 21 headers)
+=== TEST 34: clear input header (just more than 21 headers)
 --- config
     location = /t {
         rewrite_by_lua '
@@ -975,7 +1156,7 @@ P: p\r
 
 
 
-=== TEST 33: clear input header (just more than 21 headers)
+=== TEST 35: clear input header (just more than 21 headers)
 --- config
     location = /t {
         rewrite_by_lua '
@@ -1050,21 +1231,27 @@ foo-21: 21\r
 
 
 
-=== TEST 34: raw form
+=== TEST 36: raw form
 --- config
     location /t {
         content_by_lua '
-           -- get ALL the raw headers (0 == no limit, not recommended)
-           local h = {}
-           local arr = {}
-           for k, v in pairs(ngx.req.get_headers(0, true)) do
-               h[k] = v
-               table.insert(arr, k)
-           end
-           table.sort(arr)
-           for i, k in ipairs(arr) do
-               ngx.say(k, ": ", h[k])
-           end
+            local headers, err = ngx.req.get_headers(0, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            -- get ALL the raw headers (0 == no limit, not recommended)
+            local h = {}
+            local arr = {}
+            for k, v in pairs(headers) do
+                h[k] = v
+                table.insert(arr, k)
+            end
+            table.sort(arr)
+            for i, k in ipairs(arr) do
+                ngx.say(k, ": ", h[k])
+            end
         ';
     }
 --- request
@@ -1082,7 +1269,7 @@ My-Foo: bar
 
 
 
-=== TEST 35: clear X-Real-IP
+=== TEST 37: clear X-Real-IP
 --- config
     location /t {
         rewrite_by_lua '
@@ -1128,7 +1315,7 @@ X-Real-IP:
 
 
 
-=== TEST 36: set custom X-Real-IP
+=== TEST 38: set custom X-Real-IP
 --- config
     location /t {
         rewrite_by_lua '
@@ -1173,7 +1360,7 @@ X-Real-IP: 8.8.4.4
 
 
 
-=== TEST 37: clear Via
+=== TEST 39: clear Via
 --- config
     location /t {
         rewrite_by_lua '
@@ -1219,7 +1406,7 @@ Via:
 
 
 
-=== TEST 38: set custom Via
+=== TEST 40: set custom Via
 --- config
     location /t {
         rewrite_by_lua '
@@ -1264,7 +1451,7 @@ Via: 1.0 fred, 1.1 nowhere.com (Apache/1.1)
 
 
 
-=== TEST 39: set input header (with underscores in the header name)
+=== TEST 41: set input header (with underscores in the header name)
 --- config
     location /req-header {
         rewrite_by_lua '
@@ -1287,12 +1474,18 @@ $}
 
 
 
-=== TEST 40: HTTP 0.9 (set & get)
+=== TEST 42: HTTP 0.9 (set & get)
 --- config
     location /foo {
         content_by_lua '
             ngx.req.set_header("X-Foo", "howdy");
-            ngx.say("X-Foo: ", ngx.req.get_headers()["X-Foo"])
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("X-Foo: ", headers["X-Foo"])
         ';
     }
 --- raw_request eval
@@ -1307,12 +1500,18 @@ X-Foo: nil
 
 
 
-=== TEST 41: HTTP 0.9 (clear)
+=== TEST 43: HTTP 0.9 (clear)
 --- config
     location /foo {
         content_by_lua '
             ngx.req.set_header("X-Foo", "howdy");
-            ngx.say("X-Foo: ", ngx.req.get_headers()["X-Foo"])
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
+            ngx.say("X-Foo: ", headers["X-Foo"])
         ';
     }
 --- raw_request eval
@@ -1327,7 +1526,7 @@ X-Foo: nil
 
 
 
-=== TEST 42: Host header with port and $host (github issue #292)
+=== TEST 44: Host header with port and $host (github issue #292)
 --- config
     location /bar {
         rewrite_by_lua '
@@ -1344,7 +1543,7 @@ http_host var: agentzh.org:1984
 
 
 
-=== TEST 43: Host header with upper case letters and $host (github issue #292)
+=== TEST 45: Host header with upper case letters and $host (github issue #292)
 --- config
     location /bar {
         rewrite_by_lua '
@@ -1361,11 +1560,16 @@ http_host var: agentZH.org:1984
 
 
 
-=== TEST 44: clear all and re-insert
+=== TEST 46: clear all and re-insert
 --- config
     location = /t {
         content_by_lua '
-            local headers = ngx.req.get_headers(100, true)
+            local headers, err = ngx.req.get_headers(100, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             local n = 0
             for header, _ in pairs(headers) do
                 n = n + 1
@@ -1378,7 +1582,13 @@ http_host var: agentZH.org:1984
                 print("1: reinsert header ", header, ": ", i)
                 ngx.req.set_header(header, value)
             end
-            local headers = ngx.req.get_headers(100, true)
+
+            headers, err = ngx.req.get_headers(100, true)
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             n = 0
             for header, _ in pairs(headers) do
                 n = n + 1
@@ -1418,13 +1628,18 @@ got 8 headers
 
 
 
-=== TEST 45: github issue #314: ngx.req.set_header does not override request headers with multiple values
+=== TEST 47: github issue #314: ngx.req.set_header does not override request headers with multiple values
 --- config
     #lua_code_cache off;
     location = /t {
         content_by_lua '
             ngx.req.set_header("AAA", "111")
-            local headers = ngx.req.get_headers()
+            local headers, err = ngx.req.get_headers()
+            if err then
+                ngx.log(ngx.ERR, "err: ", err)
+                return ngx.exit(500)
+            end
+
             ngx.say(headers["AAA"])
         ';
     }
@@ -1440,3 +1655,378 @@ AAA: 678
 --- no_error_log
 [error]
 
+
+
+=== TEST 48: clear If-Match req header
+--- config
+    location /t {
+        content_by_lua '
+            ngx.req.clear_header("if-match")
+            if not ngx.send_headers() then
+                return
+            end
+            ngx.say("test")
+        ';
+    }
+--- request
+GET /t
+--- more_headers
+If-Match: abc
+--- response_body
+test
+--- no_error_log
+[error]
+
+
+
+=== TEST 49: clear If-Unmodified-Since req header
+--- config
+    location /t {
+        content_by_lua '
+            ngx.req.clear_header("if-unmodified-since")
+            ngx.header["Last-Modified"] = "Tue, 30 Jun 2011 12:16:36 GMT"
+            if not ngx.send_headers() then
+                return
+            end
+            ngx.say("test")
+        ';
+    }
+--- request
+GET /t
+--- more_headers
+If-Unmodified-Since: Tue, 28 Jun 2011 12:16:36 GMT
+--- response_body
+test
+--- no_error_log
+[error]
+
+
+
+=== TEST 50: clear If-None-Match req header
+--- config
+    location /t {
+        content_by_lua '
+            ngx.req.clear_header("if-none-match")
+            -- ngx.header["etags"] = "abc"
+            if not ngx.send_headers() then
+                return
+            end
+            ngx.say("test")
+        ';
+    }
+--- request
+GET /t
+--- more_headers
+If-None-Match: *
+--- response_body
+test
+--- no_error_log
+[error]
+
+
+
+=== TEST 51: set the Destination request header for WebDav
+--- config
+    location = /a.txt {
+        rewrite_by_lua_block {
+            ngx.req.set_header("Destination", "/b.txt")
+        }
+        dav_methods MOVE;
+        dav_access            all:rw;
+        root                  html;
+    }
+
+--- user_files
+>>> a.txt
+hello, world!
+
+--- request
+MOVE /a.txt
+
+--- response_body
+--- no_error_log
+client sent no "Destination" header
+[error]
+--- error_code: 204
+
+
+
+=== TEST 52: X-Forwarded-For
+--- config
+    location = /t {
+        access_by_lua_block {
+            ngx.req.set_header("X-Forwarded-For", "8.8.8.8")
+        }
+        proxy_pass http://127.0.0.1:$server_port/back;
+        proxy_set_header Foo $proxy_add_x_forwarded_for;
+    }
+
+    location = /back {
+        echo "Foo: $http_foo";
+    }
+
+--- request
+GET /t
+
+--- response_body
+Foo: 8.8.8.8, 127.0.0.1
+--- no_error_log
+[error]
+
+
+
+=== TEST 53: X-Forwarded-For
+--- config
+    location = /t {
+        access_by_lua_block {
+            ngx.req.clear_header("X-Forwarded-For")
+        }
+        proxy_pass http://127.0.0.1:$server_port/back;
+        proxy_set_header Foo $proxy_add_x_forwarded_for;
+    }
+
+    location = /back {
+        echo "Foo: $http_foo";
+    }
+
+--- request
+GET /t
+
+--- more_headers
+X-Forwarded-For: 8.8.8.8
+--- response_body
+Foo: 127.0.0.1
+--- no_error_log
+[error]
+
+
+
+=== TEST 54: for bad requests (bad request method letter case)
+--- config
+    error_page 400 = /err;
+
+    location = /err {
+        content_by_lua_block {
+            ngx.req.set_header("Foo", "bar")
+            ngx.say("ok")
+        }
+    }
+--- raw_request
+GeT / HTTP/1.1
+--- response_body
+ok
+--- no_error_log
+[error]
+--- no_check_leak
+
+
+
+=== TEST 55: for bad requests (bad request method names)
+--- config
+    error_page 400 = /err;
+
+    location = /err {
+        content_by_lua_block {
+            ngx.req.set_header("Foo", "bar")
+            ngx.say("ok")
+        }
+    }
+--- raw_request
+GET x HTTP/1.1
+--- response_body
+ok
+--- no_error_log
+[error]
+--- no_check_leak
+
+
+
+=== TEST 56: for bad requests causing segfaults when setting & getting multi-value headers
+--- config
+    error_page 400 = /err;
+
+    location = /err {
+        content_by_lua_block {
+            ngx.req.set_header("Cookie", "foo=bar")
+            local test = ngx.var.cookie_bar
+
+            ngx.say("ok")
+        }
+    }
+--- raw_request
+GeT / HTTP/1.1
+--- response_body
+ok
+--- no_error_log
+[error]
+--- no_check_leak
+
+
+
+=== TEST 57: execeeding custom 3 header limit
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(3)
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local cnt = 0
+            for key, val in pairs(headers) do
+                cnt = cnt + 1
+            end
+
+            ngx.say("found ", cnt, " headers.");
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 2) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body
+err: truncated
+found 3 headers.
+--- timeout: 4
+--- error_log
+lua exceeding request header limit 4 > 3
+--- no_error_log
+[error]
+
+
+
+=== TEST 58: NOT execeeding custom 3 header limit
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(3)
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local cnt = 0
+            for key, val in pairs(headers) do
+                cnt = cnt + 1
+            end
+
+            ngx.say("found ", cnt, " headers.");
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 1) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body
+found 3 headers.
+--- timeout: 4
+--- no_error_log
+lua exceeding request header limit
+[error]
+
+
+
+=== TEST 59: execeeding custom 3 header limit (raw)
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(3, true)
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local cnt = 0
+            for key, val in pairs(headers) do
+                cnt = cnt + 1
+            end
+
+            ngx.say("found ", cnt, " headers.");
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 2) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body
+err: truncated
+found 3 headers.
+--- timeout: 4
+--- error_log
+lua exceeding request header limit 4 > 3
+--- no_error_log
+[error]
+
+
+
+=== TEST 60: NOT execeeding custom 3 header limit (raw)
+--- config
+    location /lua {
+        content_by_lua '
+            local headers, err = ngx.req.get_headers(3, true)
+            if err then
+                ngx.say("err: ", err)
+            end
+
+            local cnt = 0
+            for key, val in pairs(headers) do
+                cnt = cnt + 1
+            end
+
+            ngx.say("found ", cnt, " headers.");
+        ';
+    }
+--- request
+GET /lua
+--- more_headers eval
+my $i = 1;
+my $s;
+while ($i <= 1) {
+    $s .= "X-$i:$i\n";
+    $i++;
+}
+$s
+--- response_body
+found 3 headers.
+--- timeout: 4
+--- no_error_log
+lua exceeding request header limit
+[error]
+
+
+
+=== TEST 61: setting Host header clears cached $host variable
+--- config
+    location /req-header {
+        # this makes $host indexed and cacheable
+        set $foo $host;
+
+        content_by_lua_block {
+            ngx.say(ngx.var.host)
+            ngx.req.set_header("Host", "new");
+            ngx.say(ngx.var.host)
+        }
+    }
+--- request
+GET /req-header
+--- response_body
+localhost
+new
+--- no_error_log
+[error]

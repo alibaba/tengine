@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -24,6 +23,7 @@ __DATA__
             for m in ngx.re.gmatch("hello, halo", "h[a-z]|h[a-z][a-z]", "d") do
                 if m then
                     ngx.say(m[0])
+                    ngx.say(m[1])
                 else
                     ngx.say("not matched: ", m)
                 end
@@ -34,7 +34,9 @@ __DATA__
     GET /re
 --- response_body
 hel
+nil
 hal
+nil
 
 
 
@@ -287,3 +289,50 @@ exec opts: 0
 --- no_error_log
 [error]
 
+
+
+=== TEST 13: gmatched with submatch captures
+--- config
+    location /re {
+        content_by_lua '
+            for m in  ngx.re.gmatch("hello", "(he|hell)", "d") do
+                if m then
+                    ngx.say(m[0])
+                    ngx.say(m[1])
+                    ngx.say(m[2])
+                else
+                    ngx.say("not matched!")
+                end
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+nil
+
+
+
+=== TEST 14: gmatched with submatch captures (compile once)
+--- config
+    location /re {
+        content_by_lua '
+            for m in  ngx.re.gmatch("hello", "(he|hell)", "od") do
+                if m then
+                    ngx.say(m[0])
+                    ngx.say(m[1])
+                    ngx.say(m[2])
+                else
+                    ngx.say("not matched!")
+                end
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hell
+nil
+nil

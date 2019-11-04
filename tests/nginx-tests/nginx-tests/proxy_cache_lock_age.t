@@ -24,12 +24,13 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache shmem/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(4)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
+worker_processes 1;
 
 events {
 }
@@ -56,8 +57,8 @@ http {
 
 EOF
 
-$t->run_daemon(\&http_daemon, 8081);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run_daemon(\&http_daemon, port(8081));
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 

@@ -24,7 +24,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http access ipv6 realip/);
+my $t = Test::Nginx->new()->has(qw/http access realip/);
 
 $t->write_file_expand('nginx.conf', <<'EOF')->plan(18);
 
@@ -115,16 +115,7 @@ like($r, qr/403 Forbidden/, 'tcp6 access');
 
 $t->stop();
 
-my $log;
-
-{
-	open LOG, $t->testdir() . '/pp.log'
-		or die("Can't open nginx access log file.\n");
-	local $/;
-	$log = <LOG>;
-	close LOG;
-}
-
+my $log = $t->read_file('pp.log');
 like($log, qr!^192\.0\.2\.1 GET /pp_4!m, 'tcp4 access log');
 like($log, qr!^2001:DB8::1 GET /pp_6!mi, 'tcp6 access log');
 

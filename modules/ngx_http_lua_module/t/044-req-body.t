@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 
 #worker_connections(1014);
@@ -8,7 +7,7 @@ log_level('warn');
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 4 + 51);
+plan tests => repeat_each() * (blocks() * 4 + 52 );
 
 #no_diff();
 no_long_string();
@@ -728,7 +727,13 @@ hello, world"]
     }
 --- user_files
 >>> myscript.lua
-    local data, data2 = ngx.req.get_post_args(), {}
+    local data, err = ngx.req.get_post_args()
+    if err then
+        ngx.log(ngx.ERR, "err: ", err)
+        return ngx.exit(500)
+    end
+
+    local data2 = {}
     for k, v in pairs(data) do
         if type(v) == "table" then
             for i, val in ipairs(v) do
@@ -1604,6 +1609,138 @@ hiya, world"]
 ]
 --- error_code eval
 [404, 404]
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 49: get body data at log phase
+--- config
+    location = /test {
+        content_by_lua_block {
+            ngx.req.read_body()
+            ngx.say(ngx.req.get_body_data())
+        }
+        log_by_lua_block {
+            ngx.log(ngx.WARN, "request body:", ngx.req.get_body_data())
+        }
+    }
+--- request
+POST /test
+hello, world
+--- response_body
+hello, world
+--- error_log
+request body:hello, world
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 50: init & append & finish (content_length = 0)
+--- config
+    location /t {
+        content_by_lua '
+            local old_http_content_length = ngx.var.http_content_length
+
+            ngx.req.read_body()
+            ngx.req.init_body()
+            ngx.req.append_body("he")
+            ngx.req.append_body("llo")
+            ngx.req.finish_body()
+
+            ngx.say("old content length: ", old_http_content_length)
+
+            local data = ngx.req.get_body_data()
+            local data_file = ngx.req.get_body_file()
+
+            if not data and data_file then
+                ngx.say("no data in buf, go to data file")
+            end
+
+            ngx.say("content length: ", ngx.var.http_content_length)
+        ';
+    }
+--- request
+    GET /t
+--- more_headers
+Content-Length: 0
+--- response_body
+old content length: 0
+content length: 5
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 51: init & append & finish (init_body(0))
+--- config
+    location /t {
+        content_by_lua '
+            local old_http_content_length = ngx.var.http_content_length
+
+            ngx.req.read_body()
+            ngx.req.init_body(0)
+            ngx.req.append_body("he")
+            ngx.req.append_body("llo")
+            ngx.req.finish_body()
+
+            ngx.say("old content length: ", old_http_content_length)
+
+            local data = ngx.req.get_body_data()
+            local data_file = ngx.req.get_body_file()
+
+            if not data and data_file then
+                ngx.say("no data in buf, go to data file")
+            end
+
+            ngx.say("content length: ", ngx.var.http_content_length)
+        ';
+    }
+--- request
+    GET /t
+--- more_headers
+Content-Length: 0
+--- response_body
+old content length: 0
+no data in buf, go to data file
+content length: 5
+--- no_error_log
+[error]
+[alert]
+
+
+
+=== TEST 52: init & append & finish (client_body_buffer_size = 0)
+--- http_config
+    client_body_buffer_size 0;
+--- config
+    location /t {
+        content_by_lua '
+            ngx.req.read_body()
+            ngx.req.init_body()
+            ngx.req.append_body("he")
+            ngx.req.append_body("llo")
+            ngx.req.finish_body()
+
+            local data = ngx.req.get_body_data()
+            local data_file = ngx.req.get_body_file()
+
+            if not data and data_file then
+                ngx.say("no data in buf, go to data file")
+            end
+
+            ngx.say("content length: ", ngx.var.http_content_length)
+        ';
+    }
+--- request
+    GET /t
+--- response_body
+no data in buf, go to data file
+content length: 5
 --- no_error_log
 [error]
 [alert]

@@ -1,0 +1,40 @@
+ngx_addon_name=ngx_http_dubbo_module
+
+HTTP_DUBBO_DEPS=" \
+    $ngx_addon_dir/ngx_http_dubbo_module.h \
+    $ngx_addon_dir/ngx_dubbo.h"
+
+HTTP_DUBBO_SRCS=" \
+    $ngx_addon_dir/ngx_dubbo_util.cpp \
+    $ngx_addon_dir/utils/objects.cc \
+    $ngx_addon_dir/utils/utils.cc \
+    $ngx_addon_dir/hessian2/hessian2_ext.cc \
+    $ngx_addon_dir/hessian2/hessian2_input.cc \
+    $ngx_addon_dir/hessian2/hessian2_output.cc \
+    $ngx_addon_dir/ngx_dubbo.c \
+    $ngx_addon_dir/ngx_http_dubbo_module.c"
+
+ngx_module_incs=" \
+    $ngx_addon_dir \
+    $ngx_addon_dir/utils \
+    $ngx_addon_dir/hessian2"
+
+CORE_LIBS="$CORE_LIBS -lstdc++"
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_deps="$HTTP_DUBBO_DEPS"
+    ngx_module_srcs="$HTTP_DUBBO_SRCS"
+
+    . auto/module
+else
+    HTTP_MODULES="$HTTP_MODULES $ngx_addon_name"
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $HTTP_DUBBO_DEPS"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_DUBBO_SRCS"
+
+    CORE_INCS="$CORE_INCS $ngx_module_incs"
+fi
+
+have=T_NGX_DUBBO . auto/have
+

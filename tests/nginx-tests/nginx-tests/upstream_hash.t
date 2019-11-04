@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite upstream_hash/)->plan(11);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite upstream_hash/)->plan(13);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -115,6 +115,14 @@ http {
         location /cbad {
             proxy_pass http://cbad;
         }
+        location /busy {
+            proxy_pass http://bad/busy;
+            add_header X-IP $upstream_addr always;
+        }
+        location /cbusy {
+            proxy_pass http://cbad/busy;
+            add_header X-IP $upstream_addr always;
+        }
         location /pnu {
             proxy_pass http://u/;
             proxy_next_upstream http_502;
@@ -134,10 +142,14 @@ http {
         }
 
         location /502 {
-            if ($server_port = 8083) {
+            if ($server_port = %%PORT_8083%%) {
                 return 502;
             }
             return 204;
+        }
+
+        location /busy {
+            return 444;
         }
     }
 
@@ -154,21 +166,23 @@ $t->run();
 
 ###############################################################################
 
+my ($p1, $p2, $p3) = (port(8081), port(8082), port(8083));
+
 # Only requests for absent peer are moved to other peers if hash is consistent.
 # Check this by comparing two upstreams with different number of peers.
 
-ok(!cmp_peers([iter('/', 20)], [iter('/2', 20)], 8082), 'inconsistent');
-ok(cmp_peers([iter('/c', 20)], [iter('/c2', 20)], 8082), 'consistent');
-ok(cmp_peers([iter('/cw', 20)], [iter('/cw2', 20)], 8082), 'consistent weight');
+ok(!cmp_peers([iter('/', 20)], [iter('/2', 20)], $p2), 'inconsistent');
+ok(cmp_peers([iter('/c', 20)], [iter('/c2', 20)], $p2), 'consistent');
+ok(cmp_peers([iter('/cw', 20)], [iter('/cw2', 20)], $p2), 'consistent weight');
 
-like(many('/?a=1', 10), qr/808\d: 10/, 'stable hash');
-like(many('/c?a=1', 10), qr/808\d: 10/, 'stable hash - consistent');
+like(many('/?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash');
+like(many('/c?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash - consistent');
 
 my @res = iter('/', 10);
 
 is(@res, 10, 'all hashed peers');
 
-@res = grep { $_ != 8083 } @res;
+@res = grep { $_ != $p3 } @res;
 my @res2 = iter('/502', 10);
 
 is_deeply(\@res, \@res2, 'no proxy_next_upstream');
@@ -176,11 +190,16 @@ isnt(@res2, 10, 'no proxy_next_upstream peers');
 
 is(iter('/pnu/502', 10), 10, 'proxy_next_upstream peers');
 
-@res = grep { $_ == 8081 } iter('/bad', 20);
+@res = grep { $_ == $p1 } iter('/bad', 20);
 is(@res, 20, 'all hashed peers - bad');
 
-@res = grep { $_ == 8081 } iter('/cbad', 20);
+@res = grep { $_ == $p1 } iter('/cbad', 20);
 is(@res, 20, 'all hashed peers - bad consistent');
+
+like(http_get('/busy'), qr/X-IP: 127.0.0.1:$p1, bad/,
+	'upstream name - busy');
+like(http_get('/cbusy'), qr/X-IP: 127.0.0.1:$p1, cbad/,
+	'upstream name - busy consistent');
 
 ###############################################################################
 
@@ -218,7 +237,7 @@ sub many {
 	my ($uri, $count) = @_;
 	my %ports;
 
-	for my $i (1 .. $count) {
+	for (1 .. $count) {
 		if (http_get($uri) =~ /X-Port: (\d+)/) {
 			$ports{$1} = 0 unless defined $ports{$1};
 			$ports{$1}++;

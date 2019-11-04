@@ -61,7 +61,7 @@ http {
 EOF
 
 $t->run_daemon(\&fastcgi_daemon);
-$t->run()->waitforsocket('127.0.0.1:8081');
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 
@@ -73,13 +73,14 @@ unlike(http_head('/'), qr/SEE-THIS/, 'no data in HEAD');
 
 like(http_get('/stderr'), qr/SEE-THIS/, 'large stderr handled');
 
-like(http_get('/var?b=127.0.0.1:8081'), qr/SEE-THIS/, 'fastcgi with variables');
+like(http_get('/var?b=127.0.0.1:' . port(8081)), qr/SEE-THIS/,
+	'fastcgi with variables');
 like(http_get('/var?b=u'), qr/SEE-THIS/, 'fastcgi with variables to upstream');
 
 ###############################################################################
 
 sub fastcgi_daemon {
-	my $socket = FCGI::OpenSocket('127.0.0.1:8081', 5);
+	my $socket = FCGI::OpenSocket('127.0.0.1:' . port(8081), 5);
 	my $request = FCGI::Request(\*STDIN, \*STDOUT, \*STDERR, \%ENV,
 		$socket);
 
@@ -92,7 +93,7 @@ sub fastcgi_daemon {
 		}
 
 		print <<EOF;
-Location: http://127.0.0.1:8080/redirect
+Location: http://localhost/redirect
 Content-Type: text/html
 
 SEE-THIS

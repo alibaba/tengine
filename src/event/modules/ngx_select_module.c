@@ -33,9 +33,9 @@ static ngx_uint_t     nevents;
 static ngx_event_t  **event_index;
 
 
-static ngx_str_t    select_name = ngx_string("select");
+static ngx_str_t           select_name = ngx_string("select");
 
-ngx_event_module_t  ngx_select_module_ctx = {
+static ngx_event_module_t  ngx_select_module_ctx = {
     &select_name,
     NULL,                                  /* create configuration */
     ngx_select_init_conf,                  /* init configuration */
@@ -423,15 +423,5 @@ ngx_select_init_conf(ngx_cycle_t *cycle, void *conf)
         return NGX_CONF_ERROR;
     }
 
-#if (NGX_OLD_THREADS)
-
-    ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
-                  "select() is not supported in the threaded mode");
-    return NGX_CONF_ERROR;
-
-#else
-
     return NGX_CONF_OK;
-
-#endif
 }

@@ -26,18 +26,6 @@ version=$((`uname -r \
 version=${version:-0}
 
 
-# enable the rt signals on Linux between 2.2.19 and 2.6.17
-
-if [ \( $version -ge 131603 -a $version -lt 132626 \) -o $EVENT_RTSIG = YES ]
-then
-    echo " + rt signals found"
-    have=NGX_HAVE_RTSIG . auto/have
-    EVENT_MODULES="$EVENT_MODULES $RTSIG_MODULE"
-    CORE_SRCS="$CORE_SRCS $RTSIG_SRCS"
-    EVENT_FOUND=YES
-fi
-
-
 # posix_fadvise64() had been implemented in 2.5.60
 
 if [ $version -lt 132412 ]; then
@@ -56,6 +44,7 @@ ngx_feature_test="int efd = 0;
                   struct epoll_event ee;
                   ee.events = EPOLLIN|EPOLLOUT|EPOLLET;
                   ee.data.ptr = NULL;
+                  (void) ee;
                   efd = epoll_create(100);
                   if (efd == -1) return 1;"
 . auto/feature
@@ -78,6 +67,22 @@ if [ $ngx_found = yes ]; then
     ngx_feature_test="int efd = 0, fd = 0;
                       struct epoll_event ee;
                       ee.events = EPOLLIN|EPOLLRDHUP|EPOLLET;
+                      ee.data.ptr = NULL;
+                      epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ee)"
+    . auto/feature
+
+
+    # EPOLLEXCLUSIVE appeared in Linux 4.5, glibc 2.24
+
+    ngx_feature="EPOLLEXCLUSIVE"
+    ngx_feature_name="NGX_HAVE_EPOLLEXCLUSIVE"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/epoll.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="int efd = 0, fd = 0;
+                      struct epoll_event ee;
+                      ee.events = EPOLLIN|EPOLLEXCLUSIVE;
                       ee.data.ptr = NULL;
                       epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ee)"
     . auto/feature
@@ -152,18 +157,37 @@ ngx_feature_test="if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) == -1) return 1"
 . auto/feature
 
 
-# sched_setaffinity()
+# prctl(PR_SET_KEEPCAPS)
 
-ngx_feature="sched_setaffinity()"
-ngx_feature_name="NGX_HAVE_SCHED_SETAFFINITY"
-ngx_feature_run=no
-ngx_feature_incs="#include <sched.h>"
+ngx_feature="prctl(PR_SET_KEEPCAPS)"
+ngx_feature_name="NGX_HAVE_PR_SET_KEEPCAPS"
+ngx_feature_run=yes
+ngx_feature_incs="#include <sys/prctl.h>"
 ngx_feature_path=
 ngx_feature_libs=
-ngx_feature_test="cpu_set_t mask;
-                  CPU_ZERO(&mask);
-                  CPU_SET(0, &mask);
-                  sched_setaffinity(0, sizeof(cpu_set_t), &mask)"
+ngx_feature_test="if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) == -1) return 1"
+. auto/feature
+
+
+# capabilities
+
+ngx_feature="capabilities"
+ngx_feature_name="NGX_HAVE_CAPABILITIES"
+ngx_feature_run=no
+ngx_feature_incs="#include <linux/capability.h>
+                  #include <sys/syscall.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct __user_cap_data_struct    data;
+                  struct __user_cap_header_struct  header;
+
+                  header.version = _LINUX_CAPABILITY_VERSION_1;
+                  data.effective = CAP_TO_MASK(CAP_NET_RAW);
+                  data.permitted = 0;
+
+                  (void) header;
+                  (void) data;
+                  (void) SYS_capset"
 . auto/feature
 
 
@@ -177,19 +201,6 @@ ngx_feature_path=
 ngx_feature_libs=-lcrypt
 ngx_feature_test="struct crypt_data  cd;
                   crypt_r(\"key\", \"salt\", &cd);"
-. auto/feature
-
-
-# reuseport
-ngx_feature="SO_REUSEPORT"
-ngx_feature_name="NGX_HAVE_REUSEPORT"
-ngx_feature_run=no
-ngx_feature_incs="#include <sys/socket.h>
-                  #include <netinet/in.h>
-                  #include <netinet/tcp.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test="setsockopt(0, SOL_SOCKET, SO_REUSEPORT, NULL, 0)"
 . auto/feature
 
 

@@ -472,6 +472,10 @@ ngx_http_userid_create_uid(ngx_http_request_t *r, ngx_http_userid_ctx_t *ctx,
 
         vv = ngx_http_get_indexed_variable(r, ngx_http_userid_reset_index);
 
+        if (vv == NULL || vv->not_found) {
+            return NGX_ERROR;
+        }
+
         if (vv->len == 0 || (vv->len == 1 && vv->data[0] == '0')) {
 
             if (conf->mark == '\0'
@@ -541,6 +545,13 @@ ngx_http_userid_create_uid(ngx_http_request_t *r, ngx_http_userid_ctx_t *ctx,
 
                 break;
 #endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+            case AF_UNIX:
+                ctx->uid_set[0] = 0;
+                break;
+#endif
+
             default: /* AF_INET */
                 sin = (struct sockaddr_in *) c->local_sockaddr;
                 ctx->uid_set[0] = sin->sin_addr.s_addr;
@@ -836,7 +847,7 @@ ngx_http_userid_init_worker(ngx_cycle_t *cycle)
     ngx_gettimeofday(&tp);
 
     /* use the most significant usec part that fits to 16 bits */
-    start_value = ((tp.tv_usec / 20) << 16) | ngx_pid;
+    start_value = (((uint32_t) tp.tv_usec / 20) << 16) | ngx_pid;
 
     return NGX_OK;
 }

@@ -58,33 +58,15 @@ typedef struct {
     unsigned             redo:1;
     unsigned             done:1;
     unsigned             nomem:1;
-    unsigned             gzheader:1;
     unsigned             buffering:1;
+    unsigned             intel:1;
 
     size_t               zin;
     size_t               zout;
 
-    uint32_t             crc32;
     z_stream             zstream;
     ngx_http_request_t  *request;
 } ngx_http_gzip_ctx_t;
-
-
-#if (NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED)
-
-struct gztrailer {
-    uint32_t  crc32;
-    uint32_t  zlen;
-};
-
-#else /* NGX_HAVE_BIG_ENDIAN || !NGX_HAVE_NONALIGNED */
-
-struct gztrailer {
-    u_char  crc32[4];
-    u_char  zlen[4];
-};
-
-#endif
 
 
 static void ngx_http_gzip_filter_memory(ngx_http_request_t *r,
@@ -92,8 +74,6 @@ static void ngx_http_gzip_filter_memory(ngx_http_request_t *r,
 static ngx_int_t ngx_http_gzip_filter_buffer(ngx_http_gzip_ctx_t *ctx,
     ngx_chain_t *in);
 static ngx_int_t ngx_http_gzip_filter_deflate_start(ngx_http_request_t *r,
-    ngx_http_gzip_ctx_t *ctx);
-static ngx_int_t ngx_http_gzip_filter_gzheader(ngx_http_request_t *r,
     ngx_http_gzip_ctx_t *ctx);
 static ngx_int_t ngx_http_gzip_filter_add_data(ngx_http_request_t *r,
     ngx_http_gzip_ctx_t *ctx);
@@ -244,6 +224,8 @@ static ngx_str_t  ngx_http_gzip_ratio = ngx_string("gzip_ratio");
 
 static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
+
+static ngx_uint_t  ngx_http_gzip_assume_intel;
 
 
 static ngx_int_t
@@ -460,12 +442,6 @@ ngx_http_gzip_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             return ctx->busy ? NGX_AGAIN : NGX_OK;
         }
 
-        if (!ctx->gzheader) {
-            if (ngx_http_gzip_filter_gzheader(r, ctx) != NGX_OK) {
-                goto failed;
-            }
-        }
-
         rc = ngx_http_next_body_filter(r, ctx->out);
 
         if (rc == NGX_ERROR) {
@@ -544,7 +520,27 @@ ngx_http_gzip_filter_memory(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
      *  *) 5920 bytes on amd64 and sparc64
      */
 
-    ctx->allocated = 8192 + (1 << (wbits + 2)) + (1 << (memlevel + 9));
+    if (!ngx_http_gzip_assume_intel) {
+        ctx->allocated = 8192 + (1 << (wbits + 2)) + (1 << (memlevel + 9));
+
+    } else {
+        /*
+         * A zlib variant from Intel, https://github.com/jtkukunas/zlib.
+         * It can force window bits to 13 for fast compression level,
+         * on processors with SSE 4.2 it uses 64K hash instead of scaling
+         * it from the specified memory level, and also introduces
+         * 16-byte padding in one out of the two window-sized buffers.
+         */
+
+        if (conf->level == 1) {
+            wbits = ngx_max(wbits, 13);
+        }
+
+        ctx->allocated = 8192 + 16 + (1 << (wbits + 2))
+                         + (1 << (ngx_max(memlevel, 8) + 8))
+                         + (1 << (memlevel + 8));
+        ctx->intel = 1;
+    }
 }
 
 
@@ -637,7 +633,7 @@ ngx_http_gzip_filter_deflate_start(ngx_http_request_t *r,
     ctx->zstream.opaque = ctx;
 
     rc = deflateInit2(&ctx->zstream, (int) conf->level, Z_DEFLATED,
-                      - ctx->wbits, ctx->memlevel, Z_DEFAULT_STRATEGY);
+                      ctx->wbits + 16, ctx->memlevel, Z_DEFAULT_STRATEGY);
 
     if (rc != Z_OK) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
@@ -646,40 +642,7 @@ ngx_http_gzip_filter_deflate_start(ngx_http_request_t *r,
     }
 
     ctx->last_out = &ctx->out;
-    ctx->crc32 = crc32(0L, Z_NULL, 0);
     ctx->flush = Z_NO_FLUSH;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_gzip_filter_gzheader(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
-{
-    ngx_buf_t      *b;
-    ngx_chain_t    *cl;
-    static u_char  gzheader[10] =
-                               { 0x1f, 0x8b, Z_DEFLATED, 0, 0, 0, 0, 0, 0, 3 };
-
-    b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
-    if (b == NULL) {
-        return NGX_ERROR;
-    }
-
-    b->memory = 1;
-    b->pos = gzheader;
-    b->last = b->pos + 10;
-
-    cl = ngx_alloc_chain_link(r->pool);
-    if (cl == NULL) {
-        return NGX_ERROR;
-    }
-
-    cl->buf = b;
-    cl->next = ctx->out;
-    ctx->out = cl;
-
-    ctx->gzheader = 1;
 
     return NGX_OK;
 }
@@ -688,6 +651,8 @@ ngx_http_gzip_filter_gzheader(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 static ngx_int_t
 ngx_http_gzip_filter_add_data(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 {
+    ngx_chain_t  *cl;
+
     if (ctx->zstream.avail_in || ctx->flush != Z_NO_FLUSH || ctx->redo) {
         return NGX_OK;
     }
@@ -711,13 +676,16 @@ ngx_http_gzip_filter_add_data(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
         ctx->copy_buf = NULL;
     }
 
-    ctx->in_buf = ctx->in->buf;
+    cl = ctx->in;
+    ctx->in_buf = cl->buf;
+    ctx->in = cl->next;
 
     if (ctx->in_buf->tag == (ngx_buf_tag_t) &ngx_http_gzip_filter_module) {
-        ctx->copy_buf = ctx->in;
-    }
+        ctx->copy_buf = cl;
 
-    ctx->in = ctx->in->next;
+    } else {
+        ngx_free_chain(r->pool, cl);
+    }
 
     ctx->zstream.next_in = ctx->in_buf->pos;
     ctx->zstream.avail_in = ctx->in_buf->last - ctx->in_buf->pos;
@@ -732,14 +700,9 @@ ngx_http_gzip_filter_add_data(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 
     } else if (ctx->in_buf->flush) {
         ctx->flush = Z_SYNC_FLUSH;
-    }
 
-    if (ctx->zstream.avail_in) {
-
-        ctx->crc32 = crc32(ctx->crc32, ctx->zstream.next_in,
-                           ctx->zstream.avail_in);
-
-    } else if (ctx->flush == Z_NO_FLUSH) {
+    } else if (ctx->zstream.avail_in == 0) {
+        /* ctx->flush == Z_NO_FLUSH */
         return NGX_AGAIN;
     }
 
@@ -750,6 +713,7 @@ ngx_http_gzip_filter_add_data(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 static ngx_int_t
 ngx_http_gzip_filter_get_buf(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 {
+    ngx_chain_t           *cl;
     ngx_http_gzip_conf_t  *conf;
 
     if (ctx->zstream.avail_out) {
@@ -759,8 +723,12 @@ ngx_http_gzip_filter_get_buf(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
     conf = ngx_http_get_module_loc_conf(r, ngx_http_gzip_filter_module);
 
     if (ctx->free) {
-        ctx->out_buf = ctx->free->buf;
-        ctx->free = ctx->free->next;
+
+        cl = ctx->free;
+        ctx->out_buf = cl->buf;
+        ctx->free = cl->next;
+
+        ngx_free_chain(r->pool, cl);
 
     } else if (ctx->bufs < conf->bufs.num) {
 
@@ -827,7 +795,7 @@ ngx_http_gzip_filter_deflate(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
 
     ctx->out_buf->last = ctx->zstream.next_out;
 
-    if (ctx->zstream.avail_out == 0) {
+    if (ctx->zstream.avail_out == 0 && rc != Z_STREAM_END) {
 
         /* zlib wants to output some more gzipped data */
 
@@ -916,13 +884,12 @@ static ngx_int_t
 ngx_http_gzip_filter_deflate_end(ngx_http_request_t *r,
     ngx_http_gzip_ctx_t *ctx)
 {
-    int                rc;
-    ngx_buf_t         *b;
-    ngx_chain_t       *cl;
-    struct gztrailer  *trailer;
+    int           rc;
+    ngx_buf_t    *b;
+    ngx_chain_t  *cl;
 
     ctx->zin = ctx->zstream.total_in;
-    ctx->zout = 10 + ctx->zstream.total_out + 8;
+    ctx->zout = ctx->zstream.total_out;
 
     rc = deflateEnd(&ctx->zstream);
 
@@ -939,55 +906,18 @@ ngx_http_gzip_filter_deflate_end(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    cl->buf = ctx->out_buf;
+    b = ctx->out_buf;
+
+    if (ngx_buf_size(b) == 0) {
+        b->temporary = 0;
+    }
+
+    b->last_buf = 1;
+
+    cl->buf = b;
     cl->next = NULL;
     *ctx->last_out = cl;
     ctx->last_out = &cl->next;
-
-    if (ctx->zstream.avail_out >= 8) {
-        trailer = (struct gztrailer *) ctx->out_buf->last;
-        ctx->out_buf->last += 8;
-        ctx->out_buf->last_buf = 1;
-
-    } else {
-        b = ngx_create_temp_buf(r->pool, 8);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
-
-        b->last_buf = 1;
-
-        cl = ngx_alloc_chain_link(r->pool);
-        if (cl == NULL) {
-            return NGX_ERROR;
-        }
-
-        cl->buf = b;
-        cl->next = NULL;
-        *ctx->last_out = cl;
-        ctx->last_out = &cl->next;
-        trailer = (struct gztrailer *) b->pos;
-        b->last += 8;
-    }
-
-#if (NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED)
-
-    trailer->crc32 = ctx->crc32;
-    trailer->zlen = ctx->zin;
-
-#else
-
-    trailer->crc32[0] = (u_char) (ctx->crc32 & 0xff);
-    trailer->crc32[1] = (u_char) ((ctx->crc32 >> 8) & 0xff);
-    trailer->crc32[2] = (u_char) ((ctx->crc32 >> 16) & 0xff);
-    trailer->crc32[3] = (u_char) ((ctx->crc32 >> 24) & 0xff);
-
-    trailer->zlen[0] = (u_char) (ctx->zin & 0xff);
-    trailer->zlen[1] = (u_char) ((ctx->zin >> 8) & 0xff);
-    trailer->zlen[2] = (u_char) ((ctx->zin >> 16) & 0xff);
-    trailer->zlen[3] = (u_char) ((ctx->zin >> 24) & 0xff);
-
-#endif
 
     ctx->zstream.avail_in = 0;
     ctx->zstream.avail_out = 0;
@@ -1010,7 +940,7 @@ ngx_http_gzip_filter_alloc(void *opaque, u_int items, u_int size)
 
     alloc = items * size;
 
-    if (alloc % 512 != 0 && alloc < 8192) {
+    if (items == 1 && alloc % 512 != 0 && alloc < 8192) {
 
         /*
          * The zlib deflate_state allocation, it takes about 6K,
@@ -1026,15 +956,20 @@ ngx_http_gzip_filter_alloc(void *opaque, u_int items, u_int size)
         ctx->allocated -= alloc;
 
         ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ctx->request->connection->log, 0,
-                       "gzip alloc: n:%ud s:%ud a:%ud p:%p",
+                       "gzip alloc: n:%ud s:%ud a:%ui p:%p",
                        items, size, alloc, p);
 
         return p;
     }
 
-    ngx_log_error(NGX_LOG_ALERT, ctx->request->connection->log, 0,
-                  "gzip filter failed to use preallocated memory: %ud of %ud",
-                  items * size, ctx->allocated);
+    if (ctx->intel) {
+        ngx_log_error(NGX_LOG_ALERT, ctx->request->connection->log, 0,
+                      "gzip filter failed to use preallocated memory: "
+                      "%ud of %ui", items * size, ctx->allocated);
+
+    } else {
+        ngx_http_gzip_assume_intel = 1;
+    }
 
     p = ngx_palloc(ctx->request->pool, items * size);
 
@@ -1091,16 +1026,16 @@ ngx_http_gzip_ratio_variable(ngx_http_request_t *r,
     ngx_uint_t            zint, zfrac;
     ngx_http_gzip_ctx_t  *ctx;
 
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
     ctx = ngx_http_get_module_ctx(r, ngx_http_gzip_filter_module);
 
     if (ctx == NULL || ctx->zout == 0) {
         v->not_found = 1;
         return NGX_OK;
     }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     v->data = ngx_pnalloc(r->pool, NGX_INT32_LEN + 3);
     if (v->data == NULL) {

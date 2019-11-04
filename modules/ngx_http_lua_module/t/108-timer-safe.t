@@ -1,5 +1,4 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use lib 'lib';
 use Test::Nginx::Socket::Lua;
 use t::StapThread;
 
@@ -490,7 +489,7 @@ delete thread 2
 --- response_body
 hello world
 
---- wait: 0.1
+--- wait: 0.15
 --- no_error_log
 [error]
 [alert]
@@ -500,7 +499,7 @@ hello world
 [
 "registered timer",
 qr/\[lua\] .*? my lua timer handler/,
-qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
+qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-9]|8[0-6])/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -1008,7 +1007,7 @@ registered timer
                 ngx.log(ngx.ERR, ...)
             end
             local function handle()
-                function f()
+                local function f()
                     print("hello in thread")
                     return "done"
                 end
@@ -1396,4 +1395,3 @@ registered timer
 lua ngx.timer expired
 http lua close fake http connection
 trace: [m][f][g]
-
