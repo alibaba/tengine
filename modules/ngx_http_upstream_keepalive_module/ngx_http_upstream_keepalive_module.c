@@ -784,6 +784,10 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
         goto closed;
     }
 
+    if (!u->request_body_sent) {
+        goto closed;
+    }
+
     if (ngx_terminate || ngx_exiting) {
         goto closed;
     }

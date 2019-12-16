@@ -90,7 +90,6 @@ string to_hex_string(const void* ch, size_t size) {
 
 void write_hex_to_stream(ostream& os, const void* ch, size_t size) {
     static char alpha[] = "0123456789ABCDEF";
-    string hex_str;
     for (size_t i = 0; i < size; ++i) {
         uint8_t c = *((const uint8_t*)ch + i);
         os << alpha[c >> 4] << alpha[c & 0xF] << ' ';
