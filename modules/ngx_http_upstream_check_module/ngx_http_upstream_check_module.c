@@ -3468,12 +3468,14 @@ static void
 ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
     ngx_http_upstream_check_peers_t *peers, ngx_uint_t flag)
 {
-    ngx_uint_t                       count, i, last;
+    ngx_uint_t                       count, upCount, downCount, i, last;
     ngx_http_upstream_check_peer_t  *peer;
 
     peer = peers->peers.elts;
 
     count = 0;
+    upCount = 0;
+    downCount = 0;
 
     for (i = 0; i < peers->peers.nelts; i++) {
 
@@ -3495,14 +3497,23 @@ ngx_http_upstream_check_status_json_format(ngx_buf_t *b,
         }
 
         count++;
+        if (peer[i].shm->down) {
+            downCount++;
+        } else {
+            upCount++;
+        }
     }
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
             "{\"servers\": {\n"
             "  \"total\": %ui,\n"
+            "  \"up\": %ui,\n"
+            "  \"down\": %ui,\n"
             "  \"generation\": %ui,\n"
             "  \"server\": [\n",
             count,
+            upCount,
+            downCount,
             ngx_http_upstream_check_shm_generation);
 
     last = 0;
