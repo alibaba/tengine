@@ -1878,7 +1878,7 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
             ngx_memcpy(new_buf, ctx->recv.start, size);
 
             /* fix memory leak */
-	    ngx_pfree(c->pool, ctx->recv.start);
+            ngx_pfree(c->pool, ctx->recv.start);
 
             ctx->recv.pos = ctx->recv.start = new_buf;
             ctx->recv.last = new_buf + size;
