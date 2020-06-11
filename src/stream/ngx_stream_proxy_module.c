@@ -109,6 +109,11 @@ static ngx_conf_bitmask_t  ngx_stream_proxy_ssl_protocols[] = {
     { ngx_string("TLSv1.1"), NGX_SSL_TLSv1_1 },
     { ngx_string("TLSv1.2"), NGX_SSL_TLSv1_2 },
     { ngx_string("TLSv1.3"), NGX_SSL_TLSv1_3 },
+
+#if (T_NGX_HAVE_DTLS)
+    { ngx_string("DTLSv1"), NGX_SSL_DTLSv1 },
+    { ngx_string("DTLSv1.2"), NGX_SSL_DTLSv1_2 },
+#endif
     { ngx_null_string, 0 }
 };
 
