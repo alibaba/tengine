@@ -1477,4 +1477,4 @@ have=T_NGX_HTTP_UPSTREAM_ID . auto/have
 have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
 have=T_NGX_SHOW_INFO . auto/have
 have=T_NGX_HTTP_IMAGE_FILTER . auto/have
-
+have=T_NGX_HAVE_DTLS . auto/have
