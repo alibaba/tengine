@@ -164,7 +164,7 @@ ngx_stream_ssl_preread_handler(ngx_stream_session_t *s)
             return NGX_DECLINED;
         }
 
-        if (p[1] != 3) {
+        if (p[1] != 3 && p[1] != 1 /* TLCP */) {
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0,
                            "ssl preread: unsupported SSL version");
             ngx_stream_set_ctx(s, NULL, ngx_stream_ssl_preread_module);
@@ -519,6 +519,13 @@ ngx_stream_ssl_preread_protocol_variable(ngx_stream_session_t *s,
         switch (ctx->version[1]) {
         case 2:
             ngx_str_set(&version, "SSLv2");
+            break;
+        }
+        break;
+    case 1: /* TLCP */
+        switch (ctx->version[1]) {
+        case 1:
+            ngx_str_set(&version, "TLCPv1.1");
             break;
         }
         break;
