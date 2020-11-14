@@ -1516,6 +1516,17 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
         return;
     }
 
+    /* 
+     * The current time maybe delayed(some operation take too long)
+     * We don't need to trigger the check event at this point.
+     */
+    if (ngx_current_msec < peer->shm->access_time) {
+        ngx_log_error(NGX_LOG_WARN, event->log, 0,
+                    "time maybe delayed, got current_msec:%M, shm_access_time:%M",
+                    ngx_current_msec, peer->shm->access_time);
+        return;
+    }
+
     interval = ngx_current_msec - peer->shm->access_time;
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, event->log, 0,
                    "http check begin handler index: %ui, owner: %P, "
