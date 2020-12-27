@@ -1527,6 +1527,9 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
         return;
     }
 
+    ngx_shmtx_lock(&peer->shm->mutex);
+
+    /* interval should be protected by mutex. */
     interval = ngx_current_msec - peer->shm->access_time;
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, event->log, 0,
                    "http check begin handler index: %ui, owner: %P, "
@@ -1534,8 +1537,6 @@ ngx_http_upstream_check_begin_handler(ngx_event_t *event)
                    peer->index, peer->shm->owner,
                    ngx_pid, interval,
                    ucscf->check_interval);
-
-    ngx_shmtx_lock(&peer->shm->mutex);
 
     if (peers_shm->generation != ngx_http_upstream_check_shm_generation) {
         ngx_shmtx_unlock(&peer->shm->mutex);
