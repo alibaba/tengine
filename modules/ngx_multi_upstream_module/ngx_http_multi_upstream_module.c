@@ -467,12 +467,6 @@ ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
 
     c->data = fake_r;
 
-    c->log = ngx_pcalloc(c->pool, sizeof(ngx_log_t));
-    if (c->log == NULL) {
-        return NGX_ERROR;
-    }
-    *c->log = *kp->request->connection->log;
-
     log_ctx = ngx_pcalloc(c->pool, sizeof(ngx_http_log_ctx_t));
     if (log_ctx == NULL) {
         return NGX_ERROR;
