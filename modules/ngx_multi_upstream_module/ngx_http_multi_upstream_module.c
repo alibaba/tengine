@@ -375,18 +375,13 @@ ngx_http_multi_upstream_add_data(ngx_connection_t *c, ngx_http_request_t *r)
 static void
 ngx_http_multi_upstream_free_fake_request(void *data)
 {
-    ngx_http_request_t  *r = data;
-    ngx_pool_t          *pool;
+    ngx_http_request_t  *fake_r = data;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "multi upstream fake request cleanup: %p", r);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fake_r->connection->log, 0,
+                   "multi upstream fake request cleanup: %p", fake_r);
 
-    pool = r->pool;
-
-    if (pool) {
-        ngx_destroy_pool(pool);
-        r->pool = NULL;
-    }
+    fake_r->logged = 1;
+    ngx_http_free_request(fake_r, 0);
 }
 
 ngx_int_t
