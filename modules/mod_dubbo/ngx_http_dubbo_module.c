@@ -15,9 +15,9 @@
 typedef struct {
     ngx_http_upstream_conf_t    upstream;
 
-    ngx_str_t                   service_name;
-    ngx_str_t                   service_version;
-    ngx_str_t                   method;
+    ngx_http_complex_value_t    service_name;
+    ngx_http_complex_value_t    service_version;
+    ngx_http_complex_value_t    method;
 
     ngx_array_t                *args_in;
 
@@ -594,6 +594,10 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
     ngx_dubbo_connection_t      *dubbo_c;
     ngx_http_dubbo_loc_conf_t   *dlcf;
 
+    ngx_str_t                   *service_name;
+    ngx_str_t                   *service_version;
+    ngx_str_t                   *method;
+
     ngx_array_t                 *args;
     ngx_dubbo_arg_t             *arg;
     ngx_keyval_t                *kv;
@@ -648,6 +652,39 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
     *multi_rptr = multi_r;
     
     dlcf = ngx_http_get_module_loc_conf(r, ngx_http_dubbo_module);
+
+    service_name = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (service_name == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->service_name, service_name)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    service_version = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (service_version == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->service_version, service_version)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    method = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (method == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->method, method)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
 
     args = ngx_array_create(dubbo_c->temp_pool, 1, sizeof(ngx_dubbo_arg_t));
     if (args == NULL) {
@@ -754,7 +791,10 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
         }
     }
 
-    if (NGX_ERROR == ngx_dubbo_encode_request(dubbo_c, &dlcf->service_name, &dlcf->service_version, &dlcf->method, args, multi_r)) {
+    if (NGX_ERROR == ngx_dubbo_encode_request(dubbo_c, service_name,
+                                              service_version, method,
+                                              args, multi_r))
+    {
         ngx_log_error(NGX_LOG_ERR, dubbo_c->log, 0,
                       "dubbo: encode request failed");
         return NGX_ERROR;
@@ -967,8 +1007,17 @@ ngx_http_dubbo_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         clcf->handler = ngx_http_dubbo_handler;
     }
 
-    ngx_conf_merge_str_value(conf->service_name, prev->service_name, "");
-    ngx_conf_merge_str_value(conf->method, prev->method, "");
+    if (conf->service_name.value.data == NULL) {
+        conf->service_name = prev->service_name;
+    }
+
+    if (conf->service_version.value.data == NULL) {
+        conf->service_version = prev->service_version;
+    }
+
+    if (conf->method.value.data == NULL) {
+        conf->method = prev->method;
+    }
 
     ngx_conf_merge_ptr_value(conf->args_in, prev->args_in, NULL);
     ngx_conf_merge_value(conf->pass_all_headers, prev->pass_all_headers, 1);
@@ -982,6 +1031,25 @@ ngx_http_dubbo_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 static char *
+ngx_http_dubbo_compile_complex_value(ngx_conf_t *cf, ngx_str_t *value,
+                                     ngx_http_complex_value_t *cv)
+{
+    ngx_http_compile_complex_value_t   ccv;
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = value;
+    ccv.complex_value = cv;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+static char *
 ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_dubbo_loc_conf_t *dlcf = conf;
@@ -989,6 +1057,7 @@ ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                 *value;
     ngx_url_t                  u;
     ngx_http_core_loc_conf_t  *clcf;
+    char                      *msg;
 
     if (dlcf->upstream.upstream) {
         return "is duplicate";
@@ -996,9 +1065,26 @@ ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    dlcf->service_name = value[1];
-    dlcf->service_version = value[2];
-    dlcf->method = value[3];
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[1],
+                                                    &dlcf->service_name))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
+
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[2],
+                                                    &dlcf->service_version))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
+
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[3],
+                                                    &dlcf->method))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
 
     ngx_memzero(&u, sizeof(ngx_url_t));
 
