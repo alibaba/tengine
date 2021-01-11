@@ -83,6 +83,8 @@ static void ngx_http_multi_upstream_save_session(ngx_peer_connection_t *pc,
 static ngx_int_t
 ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
     ngx_peer_connection_t *pc, void *data);
+static void
+ngx_http_multi_upstream_free_fake_request(void *data);
 
 static void *ngx_http_multi_upstream_create_conf(ngx_conf_t *cf);
 static char *ngx_http_multi_upstream(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -370,6 +372,23 @@ ngx_http_multi_upstream_add_data(ngx_connection_t *c, ngx_http_request_t *r)
     return NGX_OK;
 }
 
+static void
+ngx_http_multi_upstream_free_fake_request(void *data)
+{
+    ngx_http_request_t  *r = data;
+    ngx_pool_t          *pool;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "multi upstream fake request cleanup: %p", r);
+
+    pool = r->pool;
+
+    if (pool) {
+        ngx_destroy_pool(pool);
+        r->pool = NULL;
+    }
+}
+
 ngx_int_t
 ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
     ngx_peer_connection_t *pc, void *data)
@@ -381,6 +400,7 @@ ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
     ngx_http_request_t                   *fake_r;
     ngx_http_log_ctx_t                   *log_ctx;
     ngx_http_upstream_t                  *u, *fake_u;
+    ngx_pool_cleanup_t                   *cln;
 
     c->pool = ngx_create_pool(128, kp->request->connection->log);
     if (c->pool == NULL) {
@@ -410,6 +430,18 @@ ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
 
     c->data = r->main->http_connection;
     fake_r = ngx_http_create_request(c);
+    if (fake_r == NULL) {
+        return NGX_ERROR;
+    }
+
+    cln = ngx_pool_cleanup_add(c->pool, sizeof(ngx_pool_cleanup_file_t));
+    if (cln == NULL) {
+        return NGX_ERROR;
+    }
+
+    cln->handler = ngx_http_multi_upstream_free_fake_request;
+    cln->data = fake_r;
+
     fake_r->main_conf = r->main_conf;
     fake_r->srv_conf = r->srv_conf;
     fake_r->loc_conf = r->loc_conf;
