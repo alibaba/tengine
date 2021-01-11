@@ -105,13 +105,20 @@ Context: `location, if in location`
 *method*: Dubbo provider发布的服务方法
 *upstream_name*: 后端upstream名称
 
+`service_name`、`service_version`、`method` 支持使用变量。
+
 ```
 # 代理到dubbo_backend这个upstream
 upstream dubbo_backend {
     multi 1;
     server 127.0.0.1:20880;
 }
-dubbo_pass org.apache.dubbo.demo.DemoService 0.0.0 http_dubbo_nginx dubbo_backend;
+
+set $dubbo_service_name "org.apache.dubbo.demo.DemoService";
+set $dubbo_service_name "0.0.0";
+set $dubbo_service_name "http_dubbo_nginx";
+
+dubbo_pass $dubbo_service_name $dubbo_service_version $dubbo_method dubbo_backend;
 ```
 
 注意：

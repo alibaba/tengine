@@ -57,12 +57,16 @@ http {
         
         #pass the Dubbo to Dubbo Provider server listening on 127.0.0.1:20880
         location / {
+            set $dubbo_service_name "org.apache.dubbo.samples.tengine.DemoService";
+            set $dubbo_service_name "0.0.0";
+            set $dubbo_service_name "tengineDubbo";
+
             dubbo_pass_all_headers on;
             dubbo_pass_set args $args;
             dubbo_pass_set uri $uri;
             dubbo_pass_set method $request_method;
         
-            dubbo_pass org.apache.dubbo.samples.tengine.DemoService 0.0.0 tengineDubbo dubbo_backend;
+            dubbo_pass $dubbo_service_name $dubbo_service_version $dubbo_method dubbo_backend;
         }
     }
 
