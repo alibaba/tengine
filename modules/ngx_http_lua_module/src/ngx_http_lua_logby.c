@@ -74,6 +74,9 @@ ngx_http_lua_log_handler(ngx_http_request_t *r)
 #if (NGX_HTTP_LUA_HAVE_MALLOC_TRIM)
     ngx_uint_t                   trim_cycle, trim_nreq;
     ngx_http_lua_main_conf_t    *lmcf;
+#if (NGX_DEBUG)
+    ngx_int_t                    trim_ret;
+#endif    
 #endif
     ngx_http_lua_loc_conf_t     *llcf;
     ngx_http_lua_ctx_t          *ctx;
@@ -93,8 +96,9 @@ ngx_http_lua_log_handler(ngx_http_request_t *r)
             lmcf->malloc_trim_req_count = 0;
 
 #if (NGX_DEBUG)
+            trim_ret = malloc_trim(1);
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "malloc_trim(1) returned %d", malloc_trim(1));
+                           "malloc_trim(1) returned %d", trim_ret);
 #else
             (void) malloc_trim(1);
 #endif
