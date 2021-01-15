@@ -104,10 +104,10 @@ Context: `location, if in location`
 
 configure use Dubbo protocol proxy to upstream
 
-*service_name*: Dubbo provider service name
-*service_version*: Dubbo provider service version
-*method*: Dubbo provider service method
-*upstream_name*: backend upstream name
+* *service_name*: Dubbo provider service name
+* *service_version*: Dubbo provider service version
+* *method*: Dubbo provider service method
+* *upstream_name*: backend upstream name
 
 Nginx variables can be used as `service_name`, `service_version` and `method`.
 
