@@ -100,10 +100,10 @@ Context: `location, if in location`
 
 该指令用于配置使用Dubbo协议，代理到后端upstream 
 
-*service_name*: Dubbo provider发布的服务名
-*service_version*: Dubbo provider发布的服务版本号
-*method*: Dubbo provider发布的服务方法
-*upstream_name*: 后端upstream名称
+* *service_name*: Dubbo provider发布的服务名
+* *service_version*: Dubbo provider发布的服务版本号
+* *method*: Dubbo provider发布的服务方法
+* *upstream_name*: 后端upstream名称
 
 `service_name`、`service_version`、`method` 支持使用变量。
 
