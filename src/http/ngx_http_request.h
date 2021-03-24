@@ -529,10 +529,10 @@ struct ngx_http_request_s {
     /*
      * instead of using the request context data in
      * ngx_http_limit_conn_module and ngx_http_limit_req_module
-     * we use the single bits in the request structure
+     * we use the bit fields in the request structure
      */
-    unsigned                          limit_conn_set:1;
-    unsigned                          limit_req_set:1;
+    unsigned                          limit_conn_status:2;
+    unsigned                          limit_req_status:3;
 
     unsigned                          limit_rate_set:1;
     unsigned                          limit_rate_after_set:1;

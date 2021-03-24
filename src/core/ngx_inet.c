@@ -1633,6 +1633,7 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
 
 #endif /* NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6 */
 
+
 static ngx_int_t
 ngx_inet_add_addr(ngx_pool_t *pool, ngx_url_t *u, struct sockaddr *sockaddr,
     socklen_t socklen, ngx_uint_t total)

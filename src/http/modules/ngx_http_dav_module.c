@@ -56,7 +56,7 @@ static ngx_int_t ngx_http_dav_copy_tree_file(ngx_tree_ctx_t *ctx,
 static ngx_int_t ngx_http_dav_depth(ngx_http_request_t *r, ngx_int_t dflt);
 static ngx_int_t ngx_http_dav_error(ngx_log_t *log, ngx_err_t err,
     ngx_int_t not_found, char *failed, u_char *path);
-static ngx_int_t ngx_http_dav_location(ngx_http_request_t *r, u_char *path);
+static ngx_int_t ngx_http_dav_location(ngx_http_request_t *r);
 static void *ngx_http_dav_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_dav_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
@@ -285,7 +285,7 @@ ngx_http_dav_put_handler(ngx_http_request_t *r)
     }
 
     if (status == NGX_HTTP_CREATED) {
-        if (ngx_http_dav_location(r, path.data) != NGX_OK) {
+        if (ngx_http_dav_location(r) != NGX_OK) {
             ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
         }
@@ -312,7 +312,7 @@ ngx_http_dav_delete_handler(ngx_http_request_t *r)
     ngx_file_info_t           fi;
     ngx_http_dav_loc_conf_t  *dlcf;
 
-    if (r->headers_in.content_length_n > 0) {
+    if (r->headers_in.content_length_n > 0 || r->headers_in.chunked) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "DELETE with body is unsupported");
         return NGX_HTTP_UNSUPPORTED_MEDIA_TYPE;
@@ -495,7 +495,7 @@ ngx_http_dav_mkcol_handler(ngx_http_request_t *r, ngx_http_dav_loc_conf_t *dlcf)
     size_t     root;
     ngx_str_t  path;
 
-    if (r->headers_in.content_length_n > 0) {
+    if (r->headers_in.content_length_n > 0 || r->headers_in.chunked) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "MKCOL with body is unsupported");
         return NGX_HTTP_UNSUPPORTED_MEDIA_TYPE;
@@ -513,7 +513,6 @@ ngx_http_dav_mkcol_handler(ngx_http_request_t *r, ngx_http_dav_loc_conf_t *dlcf)
     }
 
     *(p - 1) = '\0';
-    r->uri.len--;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http mkcol path: \"%s\"", path.data);
@@ -521,7 +520,7 @@ ngx_http_dav_mkcol_handler(ngx_http_request_t *r, ngx_http_dav_loc_conf_t *dlcf)
     if (ngx_create_dir(path.data, ngx_dir_access(dlcf->access))
         != NGX_FILE_ERROR)
     {
-        if (ngx_http_dav_location(r, path.data) != NGX_OK) {
+        if (ngx_http_dav_location(r) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -550,7 +549,9 @@ ngx_http_dav_copy_move_handler(ngx_http_request_t *r)
     ngx_http_dav_copy_ctx_t   copy;
     ngx_http_dav_loc_conf_t  *dlcf;
 
-    if (r->headers_in.content_length_n > 0) {
+    if (r->headers_in.content_length_n > 0 || r->headers_in.chunked) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "COPY and MOVE with body are unsupported");
         return NGX_HTTP_UNSUPPORTED_MEDIA_TYPE;
     }
 
@@ -1069,35 +1070,16 @@ ngx_http_dav_error(ngx_log_t *log, ngx_err_t err, ngx_int_t not_found,
 
 
 static ngx_int_t
-ngx_http_dav_location(ngx_http_request_t *r, u_char *path)
+ngx_http_dav_location(ngx_http_request_t *r)
 {
-    u_char                    *location;
-    ngx_http_core_loc_conf_t  *clcf;
-
     r->headers_out.location = ngx_list_push(&r->headers_out.headers);
     if (r->headers_out.location == NULL) {
         return NGX_ERROR;
     }
 
-    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
-    if (!clcf->alias && clcf->root_lengths == NULL) {
-        location = path + clcf->root.len;
-
-    } else {
-        location = ngx_pnalloc(r->pool, r->uri.len);
-        if (location == NULL) {
-            ngx_http_clear_location(r);
-            return NGX_ERROR;
-        }
-
-        ngx_memcpy(location, r->uri.data, r->uri.len);
-    }
-
     r->headers_out.location->hash = 1;
     ngx_str_set(&r->headers_out.location->key, "Location");
-    r->headers_out.location->value.len = r->uri.len;
-    r->headers_out.location->value.data = location;
+    r->headers_out.location->value = r->uri;
 
     return NGX_OK;
 }

@@ -2278,6 +2278,10 @@ ngx_ssl_recv_chain(ngx_connection_t *c, ngx_chain_t *cl, off_t limit)
             last += n;
             bytes += n;
 
+            if (!c->read->ready) {
+                return bytes;
+            }
+
             if (last == b->end) {
                 cl = cl->next;
 
@@ -2355,6 +2359,47 @@ ngx_ssl_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
             if (size == 0) {
                 c->read->ready = 1;
+
+                if (c->read->available >= 0) {
+                    c->read->available -= bytes;
+
+                    /*
+                     * there can be data buffered at SSL layer,
+                     * so we post an event to continue reading on the next
+                     * iteration of the event loop
+                     */
+
+                    if (c->read->available < 0) {
+                        c->read->available = 0;
+                        c->read->ready = 0;
+
+                        if (c->read->posted) {
+                            ngx_delete_posted_event(c->read);
+                        }
+
+                        ngx_post_event(c->read, &ngx_posted_next_events);
+                    }
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                                   "SSL_read: avail:%d", c->read->available);
+
+                } else {
+
+#if (NGX_HAVE_FIONREAD)
+
+                    if (ngx_socket_nread(c->fd, &c->read->available) == -1) {
+                        c->read->error = 1;
+                        ngx_connection_error(c, ngx_socket_errno,
+                                             ngx_socket_nread_n " failed");
+                        return NGX_ERROR;
+                    }
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                                   "SSL_read: avail:%d", c->read->available);
+
+#endif
+                }
+
                 return bytes;
             }
 
@@ -3334,6 +3379,9 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
     if (sslerr == SSL_ERROR_SYSCALL) {
 
         if (err == NGX_ECONNRESET
+#if (NGX_WIN32)
+            || err == NGX_ECONNABORTED
+#endif
             || err == NGX_EPIPE
             || err == NGX_ENOTCONN
             || err == NGX_ETIMEDOUT
