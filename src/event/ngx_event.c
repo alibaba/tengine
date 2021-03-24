@@ -250,6 +250,11 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }
 
+    if (!ngx_queue_empty(&ngx_posted_next_events)) {
+        ngx_event_move_posted_next(cycle);
+        timer = 0;
+    }
+
     delta = ngx_current_msec;
 
     (void) ngx_process_events(cycle, timer, flags);
@@ -663,6 +668,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 #endif
 
     ngx_queue_init(&ngx_posted_accept_events);
+    ngx_queue_init(&ngx_posted_next_events);
     ngx_queue_init(&ngx_posted_events);
 
     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {

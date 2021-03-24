@@ -266,6 +266,8 @@ struct ngx_stream_session_s {
     ngx_stream_addr_conf_t        *addr_conf;
 #endif
 
+    unsigned                       limit_conn_status:2;
+
 #if (T_NGX_MULTI_UPSTREAM)
     ngx_queue_t                   *multi_item;
     ngx_queue_t                   *backend_r;

@@ -135,7 +135,7 @@ ngx_http_header_t  ngx_http_headers_in[] = {
 
     { ngx_string("Transfer-Encoding"),
                  offsetof(ngx_http_headers_in_t, transfer_encoding),
-                 ngx_http_process_header_line },
+                 ngx_http_process_unique_header_line },
 
     { ngx_string("TE"),
                  offsetof(ngx_http_headers_in_t, te),
@@ -813,6 +813,7 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             }
 #endif
 
+            ngx_reusable_connection(c, 0);
             rc = ngx_ssl_handshake(c);
 
             if (rc == NGX_AGAIN) {
@@ -820,8 +821,6 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 if (!rev->timer_set) {
                     ngx_add_timer(rev, c->listening->post_accept_timeout);
                 }
-
-                ngx_reusable_connection(c, 0);
 
                 c->ssl->handler = ngx_http_ssl_handshake_handler;
                 return;
@@ -1918,9 +1917,17 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_int_t  rc;
     ngx_str_t  host;
 
-    if (r->headers_in.host == NULL) {
-        r->headers_in.host = h;
+    if (r->headers_in.host) {
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "client sent duplicate host header: \"%V: %V\", "
+                      "previous value: \"%V: %V\"",
+                      &h->key, &h->value, &r->headers_in.host->key,
+                      &r->headers_in.host->value);
+        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
+        return NGX_ERROR;
     }
+
+    r->headers_in.host = h;
 
     host = h->value;
 
@@ -2115,10 +2122,7 @@ ngx_http_process_request_header(ngx_http_request_t *r)
             r->headers_in.content_length_n = -1;
             r->headers_in.chunked = 1;
 
-        } else if (r->headers_in.transfer_encoding->value.len != 8
-            || ngx_strncasecmp(r->headers_in.transfer_encoding->value.data,
-                               (u_char *) "identity", 8) != 0)
-        {
+        } else {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                           "client sent unknown \"Transfer-Encoding\": \"%V\"",
                           &r->headers_in.transfer_encoding->value);
@@ -2646,26 +2650,6 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 
     if (r != r->main) {
-        clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
-        if (r->background) {
-            if (!r->logged) {
-                if (clcf->log_subrequest) {
-                    ngx_http_log_request(r);
-                }
-
-                r->logged = 1;
-
-            } else {
-                ngx_log_error(NGX_LOG_ALERT, c->log, 0,
-                              "subrequest: \"%V?%V\" logged again",
-                              &r->uri, &r->args);
-            }
-
-            r->done = 1;
-            ngx_http_finalize_connection(r);
-            return;
-        }
 
         if (r->buffered || r->postponed) {
 
@@ -2678,11 +2662,12 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 
         pr = r->parent;
 
-        if (r == c->data) {
-
-            r->main->count--;
+        if (r == c->data || r->background) {
 
             if (!r->logged) {
+
+                clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
                 if (clcf->log_subrequest) {
                     ngx_http_log_request(r);
                 }
@@ -2696,6 +2681,13 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
             }
 
             r->done = 1;
+
+            if (r->background) {
+                ngx_http_finalize_connection(r);
+                return;
+            }
+
+            r->main->count--;
 
             if (pr->postponed && pr->postponed->request == r) {
                 pr->postponed = pr->postponed->next;
