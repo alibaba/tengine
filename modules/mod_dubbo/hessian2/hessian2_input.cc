@@ -273,7 +273,7 @@ int32_t hessian2_input::read_int32() {
         case 61:
         case 62:
         case 63:
-            return (tag - (60 << 16)) + 256 * parse_8bit() + parse_8bit();
+            return ((tag - 60) << 16) + 256 * parse_8bit() + parse_8bit();
         case 64:
         case 65:
         case 66:
@@ -435,7 +435,7 @@ int32_t hessian2_input::read_int32() {
         case 205:
         case 206:
         case 207:
-            return (tag - (200 << 8)) + parse_8bit();
+            return ((tag - 200) << 8) + parse_8bit();
         case 208:
         case 209:
         case 210:
@@ -444,7 +444,7 @@ int32_t hessian2_input::read_int32() {
         case 213:
         case 214:
         case 215:
-            return (tag - (212 << 16)) + 256 * parse_8bit() + parse_8bit();
+            return ((tag - 212) << 16) + 256 * parse_8bit() + parse_8bit();
         case 216:
         case 217:
         case 218:
@@ -486,7 +486,7 @@ int32_t hessian2_input::read_int32() {
         case 253:
         case 254:
         case 255:
-            return (tag - (248 << 8)) + parse_8bit();
+            return ((tag - 248) << 8) + parse_8bit();
     }
 }
 
