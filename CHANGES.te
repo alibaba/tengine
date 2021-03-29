@@ -1,86 +1,189 @@
+Changes with Tengine 2.3.3                                         25 Mar 2021
+
+    *) Feature: tengine supports dtlsv1 and dtlsv1.2. (mrpre)
+
+    *) Feature: prometheus format and additional json properties 
+       was added to ngx_http_upstream_check_module. (dkrutsko)
+
+    *) Feature: the "dubbo_pass" directive can use the variables. (spacewander)
+
+    *) Change: all features of nginx-1.18.0 are inherited, i.e., 
+       it is 100% compatible with nginx. (lianglli)
+
+    *) Change: dingtalk user group was added to README. (cnmade)
+
+    *) Change: format document of the mod_dubbo. (spacewander)
+
+    *) Bugfix: int32 values are not decoded properly in the mod_dubbo. (spacewander)
+
+    *) Bugfix: a segmentation fault might occur in a worker process 
+       when decoding a dubbo payload with integer value in the mod_dubbo. (spacewander) 
+
+    *) Bugfix: memory leak in ngx_http_lua_module with debug log. (hawkxiang)
+
+    *) Bugfix: fake request was not freed in the ngx_multi_upstream_module. (spacewander)
+
+    *) Bugfix: shared memory mutex in the ngx_http_upstream_check_module. (scriptkids)
+
+    *) Bugfix: redundant upstream health check was removed 
+       in the ngx_http_upstream_check_module. (scriptkids)
+
+    *) Bugfix: duplicate log_ctx was deleted in the ngx_multi_upstream_module. (spacewander)
+
+    *) Bugfix: tengine hogged CPU during reading message in the ngx_http_upstream_dyups_module 
+       and when upstream check was used. (zjd87)
+
+    *) Bugfix: ngx_http_upstream_vnswrr_module did not support "dynamic_resolve" directive. (wangfakang)
+
+    *) Bugfix: "limit_req_zone" directive were used in multiple variables. (wangfakang)
+
+    *) Bugfix: a segmentation fault might occur in a master process. (wangfakang)
+
+    *) Bugfix: memory leak when rewrite string contains ASCII 0 character. (hongxiaolong)
+
+    *) Bugfix: variable hex_str was not used in the mod_dubbo. (Weiliang-Li)
+
+    *) Bugfix: keep-alive request did not transferred complete caused the 400 response. (fishgege)
+
+
 Changes with Tengine 2.3.2                                         20 Aug 2019
+
     *) Security: fixed CVE-2019-9511, CVE-2019-9513 and CVE-2019-9516. (wangfakang)
+
     *) Feature: added dubbo_pass directive to
        support the back-end HTTP to Dubbo protocol. (MenqqiWu)
+
     *) Feature: added VNSWRR algorithm for upstream module. (wangfakang)
+
     *) Feature: support IPv6 for dynamic_resolve module. (wangfakang)
+
     *) Change: support dynamic build and add some debug log
        for proxy_connect module. (chobits)
+
     *) Change: updated the code from Nginx-1.17.3 version. (wangfakang)
+
     *) Change: updated the health_check module document. (zhangqx2010)
+
     *) Change: updated README document. (Lin-Buo-Ren)
+
     *) Bugfix: fixed JSON format for health_check module. (IYism)
+
     *) Bugfix: ensured 'init_worker_by_lua*' does not
        mutate another Nginx module's main_conf. (wangfakang)
+
     *) Bugfix: fixed compilation error of dyups module compiled
        with a higher version of OpenSSL. (wangfakang)
+
 
 Changes with Tengine 2.3.1                                         18 Jun 2019
 
     *) Feature: add $ssl_handshakd_time variable for stream ssl module (mrpre)
+
     *) Feature: support websocket check of upstream check module (mrpre)
+
     *) Change: random index logical for round robin (wangfakang)
+
     *) Change: update http lua module to v0.10.14 (mrpre)
+
     *) Change: update dyups to master branch of yzprofile/dyups (chobits)
+
     *) Change: update core to Nginx-1.16.0 (MenqqiWu)
+
     *) Change: support dynamic module for reqstatus (chobits)
+
     *) Change: support dynamic build for upstream dynamic module (wangfakang)
+
     *) Change: support dynamic build for trim module (wangfakang)
+
     *) Change: support dynamic build for footer module (wangfakang)
+
     *) Change: support dynamic build for user_agent module (wangfakang)
+
     *) Change: support dynamic build for concat module (mathieu-aubin)
-    *) Fix: server version strings in http2 and stream response headers (AstroProfundis)
-    *) Fix: "-m" option to show dynamic module (wangfakang)
-    *) Fix：parameter number check for limit_req directive (wangfakang)
-    *) Fix: fixed compilation error on macOS for reqstatus (chobits)
+
+    *) Bugfix: server version strings in http2 and stream response headers (AstroProfundis)
+
+    *) Bugfix: "-m" option to show dynamic module (wangfakang)
+
+    *) Bugfix: parameter number check for limit_req directive (wangfakang)
+
+    *) Bugfix: fixed compilation error on macOS for reqstatus (chobits)
+
 
 Changes with Tengine 2.3.0                                         25 Mar 2019
 
     *) Feature: added proxy_connect module support for the CONNECT
        HTTP method. (chobits)
+
     *) Feature: added server_name directive for Stream module. (mrpre)
+
     *) Feature: added req_status_lazy directive for reqstat module. (taoyuanyuan)
+
     *) Feature: added http2 directive to enable or disable http2
        in the server block. (jinjiu)
+
     *) Feature: added $ssl_handshake_time variable used for monitoring
        SSL handshake time. (jinjiu)
+
     *) Feature: added support of variable of limit_req_zone
        parameter rate. (Alaaask)
+
     *) Change: updated debug_pool module for Nginx 1.15.9. (chobits)
+
     *) Change: updated documents for reuse_port, dso, limit_req
        directive changes. (chobits, wangfakang)
+
     *) Change: merged the official limit_req logic. Now will ignore statistics
        when all variable values are empty. (chobits)
+
     *) Change: the reuse_port, dso, slice directive has been removed and
        use the official features of Nginx. (wangfakang)
+
     *) Change: updated and modify the official 1.15.9 test cases.
        (chobits, wangfakang)
+
     *) Change: put all Tengine's modules into the modules directory
        which reduces the intrusion of Nginx's core module. (chobits, wangfakang)
+
     *) Change: updated the code from Nginx-1.15.9 version,
        Stream, gRPC etc. (chobits, wangfakang)
+
     *) Change: updated the Lua module to v0.10.14rc4. (wangfakang)
+
     *) Change: updated the dyups document. (lf1029698952)
+
     *) Change: changes of the core code are all guarded by macros.
        (chobits, wangfakang, fankeke, hongxiaolong, imkeeper)
+
     *) Change: rollback  accpte_filter feature. (wangfakang)
+
     *) Bugfix: fixed compilation error of dyups module compiled
        with a higher version of OpenSSL. (wangfakang)
+
     *) Bugfix: fixed init_number initialization for dyups. (FengXingYuXin)
+
     *) Bugfix: fixed the rollback log process that may cause logs
        to be written to a rolled-up file when reloaded. (MengqiWu)
+
     *) Bugfix: fixed coredump of referring null pointer
        for ssl_verify_client_exception. (chobits)
+
     *) Bugfix: fixed coredump caused by upgrading core code
        in dyups and session_sticky modules. (wangfakang)
+
     *) Bugfix: fixed compilation error of limit_req, http2 module. (hongxiaolong)
+
     *) Bugfix: fixed removes the Unix domain socket file
        when pipe proc close listen socket. (wangfakang)
+
     *) Bugfix: fixed compatibility for --with-openssl
        and --with-openssl-async. (mrpre)
+
     *) Bugfix: fixed bug that function ngx_http_top_intput_body_filter
        is removed mistakenly. (chobits)
+
     *) Bugfix: fixed reuse_port and accept_mutex conflict. (innomentats)
+
     *) Bugfix: fixed tengine build failure when compiled with
        gcc7 compiler. (wangfakang)
 
@@ -89,6 +192,7 @@ Changes with Tengine 2.2.3                                         11 Nov 2018
 
     *) Security: fixed CVE-2018-16843, CVE-2018-16844 and
        CVE-2018-16845. (chobits)
+
 
 Changes with Tengine 2.2.2                                         26 Jan 2018
 
@@ -481,6 +585,7 @@ Changes with Tengine 1.4.6                                       14 May 2013
 
     *) Bugfix: merged the changes of Nginx-1.2.9 and fixed the security problem
        CVE-2013-2070. This bug had appeared in 1.4.0. (yaoweibin)
+
 
 Changes with Tengine 1.4.5                                       1 May 2013
 
