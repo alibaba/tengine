@@ -1,7 +1,7 @@
 /* 
- * Copyright (C) 2002-2019 Igor Sysoev
- * Copyright (C) 2011,2019 Nginx, Inc.
- * Copyright (C) 2010-2019 Alibaba Group Holding Limited
+ * Copyright (C) 2002-2021 Igor Sysoev
+ * Copyright (C) 2011,2021 Nginx, Inc.
+ * Copyright (C) 2010-2021 Alibaba Group Holding Limited
  * Copyright (C) 2011-2013 Xiaozhe "chaoslawful" Wang
  * Copyright (C) 2011-2013 Zhang "agentzh" Yichun
  * Copyright (C) 2011-2013 Weibin Yao

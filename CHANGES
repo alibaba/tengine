@@ -1,3 +1,124 @@
+Changes with nginx 1.18.0                                        21 Apr 2020
+
+    *) 1.18.x stable branch.
+
+
+Changes with nginx 1.17.10                                       14 Apr 2020
+
+    *) Feature: the "auth_delay" directive.
+
+
+Changes with nginx 1.17.9                                        03 Mar 2020
+
+    *) Change: now nginx does not allow several "Host" request header lines.
+
+    *) Bugfix: nginx ignored additional "Transfer-Encoding" request header
+       lines.
+
+    *) Bugfix: socket leak when using HTTP/2.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if OCSP
+       stapling was used.
+
+    *) Bugfix: in the ngx_http_mp4_module.
+
+    *) Bugfix: nginx used status code 494 instead of 400 if errors with code
+       494 were redirected with the "error_page" directive.
+
+    *) Bugfix: socket leak when using subrequests in the njs module and the
+       "aio" directive.
+
+
+Changes with nginx 1.17.8                                        21 Jan 2020
+
+    *) Feature: variables support in the "grpc_pass" directive.
+
+    *) Bugfix: a timeout might occur while handling pipelined requests in an
+       SSL connection; the bug had appeared in 1.17.5.
+
+    *) Bugfix: in the "debug_points" directive when using HTTP/2.
+       Thanks to Daniil Bondarev.
+
+
+Changes with nginx 1.17.7                                        24 Dec 2019
+
+    *) Bugfix: a segmentation fault might occur on start or during
+       reconfiguration if the "rewrite" directive with an empty replacement
+       string was used in the configuration.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if the
+       "break" directive was used with the "alias" directive or with the
+       "proxy_pass" directive with a URI.
+
+    *) Bugfix: the "Location" response header line might contain garbage if
+       the request URI was rewritten to the one containing a null character.
+
+    *) Bugfix: requests with bodies were handled incorrectly when returning
+       redirections with the "error_page" directive; the bug had appeared in
+       0.7.12.
+
+    *) Bugfix: socket leak when using HTTP/2.
+
+    *) Bugfix: a timeout might occur while handling pipelined requests in an
+       SSL connection; the bug had appeared in 1.17.5.
+
+    *) Bugfix: in the ngx_http_dav_module.
+
+
+Changes with nginx 1.17.6                                        19 Nov 2019
+
+    *) Feature: the $proxy_protocol_server_addr and
+       $proxy_protocol_server_port variables.
+
+    *) Feature: the "limit_conn_dry_run" directive.
+
+    *) Feature: the $limit_req_status and $limit_conn_status variables.
+
+
+Changes with nginx 1.17.5                                        22 Oct 2019
+
+    *) Feature: now nginx uses ioctl(FIONREAD), if available, to avoid
+       reading from a fast connection for a long time.
+
+    *) Bugfix: incomplete escaped characters at the end of the request URI
+       were ignored.
+
+    *) Bugfix: "/." and "/.." at the end of the request URI were not
+       normalized.
+
+    *) Bugfix: in the "merge_slashes" directive.
+
+    *) Bugfix: in the "ignore_invalid_headers" directive.
+       Thanks to Alan Kemp.
+
+    *) Bugfix: nginx could not be built with MinGW-w64 gcc 8.1 or newer.
+
+
+Changes with nginx 1.17.4                                        24 Sep 2019
+
+    *) Change: better detection of incorrect client behavior in HTTP/2.
+
+    *) Change: in handling of not fully read client request body when
+       returning errors in HTTP/2.
+
+    *) Bugfix: the "worker_shutdown_timeout" directive might not work when
+       using HTTP/2.
+
+    *) Bugfix: a segmentation fault might occur in a worker process when
+       using HTTP/2 and the "proxy_request_buffering" directive.
+
+    *) Bugfix: the ECONNABORTED error log level was "crit" instead of
+       "error" on Windows when using SSL.
+
+    *) Bugfix: nginx ignored extra data when using chunked transfer
+       encoding.
+
+    *) Bugfix: nginx always returned the 500 error if the "return" directive
+       was used and an error occurred during reading client request body.
+
+    *) Bugfix: in memory allocation error handling.
+
+
 Changes with nginx 1.17.3                                        13 Aug 2019
 
     *) Security: when using HTTP/2 a client might cause excessive memory
