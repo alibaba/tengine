@@ -89,4 +89,10 @@ if [ $HTTP_SCGI = YES ]; then
     echo "  nginx http scgi temporary files: \"$NGX_HTTP_SCGI_TEMP_PATH\""
 fi
 
+if test -n "$NGX_RESOLVER_FILE"; then
+    echo "  resolv.conf file: \"$NGX_RESOLVER_FILE\""
+else
+    echo "  resolv.conf file: n/a"
+fi
+
 echo "$NGX_POST_CONF_MSG"
