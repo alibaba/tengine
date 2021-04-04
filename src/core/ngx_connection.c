@@ -104,7 +104,7 @@ ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls)
     ngx_core_conf_t  *ccf;
     ngx_listening_t   ols;
 
-    if (!ls->reuseport || ls->worker != 0) {
+    if (!ls->reuseport || ls->worker != 0 || ngx_test_config) {
         return NGX_OK;
     }
 
