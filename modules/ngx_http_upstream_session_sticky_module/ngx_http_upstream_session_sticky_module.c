@@ -45,6 +45,8 @@ typedef struct {
     ngx_str_t                           domain;
     ngx_str_t                           path;
     ngx_str_t                           maxage;
+    unsigned                            secure:1;
+    unsigned                            httponly:1;
 
     ngx_uint_t                          number;
     ngx_http_ss_server_t               *server;
@@ -992,6 +994,16 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
                               + sizeof("Xxx, 00-Xxx-00 00:00:00 GMT") - 1;
     }
 
+    if (ctx->sscf->secure) {
+        set_cookie->value.len = set_cookie->value.len
+                              + sizeof("; Secure") - 1;
+    }
+
+    if (ctx->sscf->httponly) {
+        set_cookie->value.len = set_cookie->value.len
+                              + sizeof("; HttpOnly") - 1;
+    }
+
     p = ngx_pnalloc(r->pool, set_cookie->value.len);
     if (p == NULL) {
         return NGX_ERROR;
@@ -1023,6 +1035,12 @@ ngx_http_session_sticky_insert(ngx_http_request_t *r)
         ngx_uint_t maxage = ngx_atoi(ctx->sscf->maxage.data,
                                       ctx->sscf->maxage.len);
         p = ngx_http_cookie_time(p, ngx_time() + maxage);
+    }
+    if (ctx->sscf->secure) {
+        p = ngx_cpymem(p, "; Secure", sizeof("; Secure") - 1);
+    }
+    if (ctx->sscf->httponly) {
+        p = ngx_cpymem(p, "; HttpOnly", sizeof("; HttpOnly") - 1);
     }
 
     set_cookie->value.len = p - set_cookie->value.data;
@@ -1113,6 +1131,8 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
     ngx_str_t                       *value;
     ngx_http_upstream_srv_conf_t    *uscf;
     ngx_http_upstream_ss_srv_conf_t *sscf = conf;
+    sscf->secure = 0;
+    sscf->httponly = 0;
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
 
@@ -1153,6 +1173,16 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid path");
                 return NGX_CONF_ERROR;
             }
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "secure", 6) == 0 && value[i].len == 6 ) {
+            sscf->secure = 1;
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "httponly", 8) == 0 && value[i].len == 8) {
+            sscf->httponly = 1;
             continue;
         }
 
@@ -1274,7 +1304,7 @@ ngx_http_upstream_session_sticky(ngx_conf_t *cf, ngx_command_t *cmd,
             continue;
         }
 
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid argument \"%s\"", value[i].data);
         return NGX_CONF_ERROR;
     }
 
