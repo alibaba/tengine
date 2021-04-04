@@ -1,0 +1,130 @@
+ngx_debug_conn
+==============
+
+该模块可以提供NGINX/Tengine连接的状态信息。
+
+示例
+=======
+
+获取NGINX/Tengine连接的状态信息
+---------------------------------
+
+```
+ http {
+    server {
+        listen 80;
+
+        location = /debug_conn {
+            debug_conn;
+        }
+    }
+ }
+```
+
+请求URI /debug_conn，可以获取到该NGINX/Tengine连接的使用情况统计。
+页面输出如下：
+
+```
+$ curl 'localhost:80/debug_conn'
+pid:70568
+connections:3
+--------- [1] --------
+conns[i]: 0
+      fd: 6
+    addr: 0.0.0.0:80
+    sent: 0
+  action: (null: listening)
+ handler: r:000000010DAEBEC0 w:0000000000000000
+requests: 0
+poolsize: 0
+--------- [2] --------
+conns[i]: 1
+      fd: 7
+    addr: (null)
+    sent: 0
+  action: (null: channel)
+ handler: r:000000010DAFB770 w:0000000000000000
+requests: 0
+poolsize: 0
+--------- [3] --------
+conns[i]: 2
+      fd: 3
+    addr: 127.0.0.1
+    sent: 0
+  action: (null)
+ handler: r:000000010DB28CA0 w:000000010DB28CA0
+requests: 1
+poolsize: 0
+********* request ******
+     uri: http://localhost/debug_conn
+ handler: r:000000010DB26820 w:000000010DB29770
+startsec: 1542356262
+poolsize: 0
+```
+
+连接的使用情况统计
+-----------------------------------
+
+数据说明
+====
+
+每个数据段落如"[1]"包含当前标号对应连接的状态信息，数据项意义如下：
+
+* __conns__: 当前连接标号，用于信息统计
+* __fd__: 当前连接的句柄号
+* __addr__: 当前连接的监听地址
+* __sent__: 当前连接的已发送数据量
+* __action__: 当前连接的log action
+* __handler__: 当前连接的读写事件挂载handler地址，配合addr2line来查询对应函数
+* __requests__: 当前连接上的请求量
+* __poolsize__: 当前连接的内存池大小
+* __request__: 当前连接上的请求
+* __uri__: 当前连接上的请求的请求地址
+* __handler__: 当前连接上的请求的读写事件挂载handler地址，配合addr2line来查询对应函数
+* __startsec__: 当前连接上的请求的起始时间戳
+* __poolsize__: 当前连接上的请求的内存池大小
+
+NGINX兼容性
+===================
+
+* 1.13.4 (stable version of 1.13.x) 及其更高版本
+
+Tengine兼容性
+=====================
+
+* 2.1.1 (stable version of 2.1.x) 及其更高版本
+
+安装说明
+=======
+
+源码安装，执行如下命令：
+
+```
+$ wget http://nginx.org/download/nginx-1.13.4.tar.gz
+$ tar -xzvf nginx-1.13.4.tar.gz
+$ cd nginx-1.13.4/
+$ ./configure --add-module=/path/to/ngx_debug_conn
+$ make -j4 && make install
+```
+
+
+配置指令
+=========
+
+语法: **debug_conn**
+
+默认: `none`
+
+位置: `server, location`
+
+NGINX/Tenigne的连接状态信息可以通过该location访问得到。
+
+注意信息
+=========
+
+```
+********* request ******
+```
+
+request数据段落仅在当前连接上有请求存在时展示
+
