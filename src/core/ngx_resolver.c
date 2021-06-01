@@ -4078,7 +4078,7 @@ ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name, u_char *buf, u_char *src,
     ngx_uint_t   i, n;
 
     p = src;
-    len = -1;
+    len = 0;
 
     /*
      * compression pointers allow to create endless loop, so we set limit;
@@ -4121,7 +4121,7 @@ done:
         return NGX_OK;
     }
 
-    if (len == -1) {
+    if (len == 0) {
         ngx_str_null(name);
         return NGX_OK;
     }
