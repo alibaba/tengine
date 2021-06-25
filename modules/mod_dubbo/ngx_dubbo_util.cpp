@@ -40,7 +40,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_str(ngx_pool_t *pool, ngx_str_t *in, ngx_str
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -74,7 +74,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_map(ngx_pool_t *pool, ngx_array_t *in, ngx_s
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -116,7 +116,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_payload_map(ngx_pool_t *pool, ngx_array_t *i
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -203,7 +203,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
         }
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
