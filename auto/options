@@ -167,6 +167,8 @@ LUAJIT_LIB=$LUAJIT_LIB
 LUA_INC=$LUA_INC
 LUA_LIB=$LUA_LIB
 
+NGX_RESOLVER_FILE=
+
 USE_LIBXSLT=NO
 USE_LIBGD=NO
 USE_GEOIP=NO
@@ -308,6 +310,9 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-luajit-lib=*)             LUAJIT_LIB="$value"        ;;
         --with-lua-inc=*)                LUA_INC="$value"           ;;
         --with-lua-lib=*)                LUA_LIB="$value"           ;;
+
+        # RESOLV
+        --with-resolve-file=*)           NGX_RESOLVER_FILE="$value" ;;
 
         # STUB
         --with-http_stub_status_module)  HTTP_STUB_STATUS=YES       ;;
@@ -545,6 +550,7 @@ cat << END
   --with-luajit-lib=PATH             set LuaJIT library path (where libluajit-5.1.{a,so} are located)
   --with-lua-inc=PATH                set Lua headers path (where lua.h/lauxlib.h/... are located)
   --with-lua-lib=PATH                set Lua library path (where liblua.{a,so} are located, only support Lua-5.1.x)
+  --with-resolve-file=PATH           unconditionally specify complete path to resolv.conf, e.g. /etc/resolv.conf
   --http-log-path=PATH               set http access log pathname
   --http-client-body-temp-path=PATH  set path to store
                                      http client request body temporary files
@@ -672,3 +678,4 @@ case ".$NGX_PERL_MODULES" in
         NGX_PERL_MODULES=$NGX_PREFIX/$NGX_PERL_MODULES
     ;;
 esac
+
