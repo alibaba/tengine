@@ -1,0 +1,138 @@
+#!/bin/sh
+#
+#     Template SUSE system startup script for example service/daemon FOO
+#     Copyright (C) 1995--2005  Kurt Garloff, SUSE / Novell Inc.
+#          
+#     This library is free software; you can redistribute it and/or modify it
+#     under the terms of the GNU Lesser General Public License as published by
+#     the Free Software Foundation; either version 2.1 of the License, or (at
+#     your option) any later version.
+#			      
+#     This library is distributed in the hope that it will be useful, but
+#     WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#     Lesser General Public License for more details.
+# 
+#     You should have received a copy of the GNU Lesser General Public
+#     License along with this library; if not, write to the Free Software
+#     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA     
+#
+### BEGIN INIT INFO
+# Provides: nginx
+# Required-Start: $local_fs $remote_fs $network
+# Required-Stop: $local_fs $remote_fs $network
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: start and stop nginx
+### END INIT INFO
+
+# Check for existence of needed config file and read it
+NGINX_CONFIG=/etc/sysconfig/nginx
+test -r $NGINX_CONFIG || { echo "$NGINX_CONFIG not existing";
+	if [ "$1" = "stop" ]; then exit 0;
+	else exit 6; fi; }
+
+# Read config	
+. $NGINX_CONFIG
+
+test -x $nginx || { echo "$nginx not installed"; 
+	if [ "$1" = "stop" ]; then exit 0;
+	else exit 5; fi; }
+
+nginx=${NGINX-/usr/sbin/nginx}
+conffile=${CONFFILE-/etc/nginx/nginx.conf}
+pidfile=${PIDFILE-/var/run/nginx.pid}
+SLEEPMSEC=100000
+
+. /etc/rc.status
+
+rc_reset
+
+upgrade() {
+    oldbinpidfile=${pidfile}.oldbin
+
+    configtest -q || return 6
+    echo -n $"Starting new master: "
+    /sbin/killproc -p ${pidfile} -USR2 $nginx
+    /bin/usleep $SLEEPMSEC
+    if [ -f ${oldbinpidfile} -a -f ${pidfile} ]; then
+        echo -n $"Graceful shutdown of old nginx: "
+        killproc -p ${oldbinpidfile} -QUIT $nginx
+    else
+        echo $"Upgrade failed!"
+        return 1
+    fi
+}
+
+configtest() {
+    if [ "$#" -ne 0 ] ; then
+        case "$1" in
+            -q)
+                FLAG=$1
+                ;;
+            *)
+                ;;
+        esac
+        shift
+    fi
+    ${nginx} -t -c ${conffile} $FLAG
+}
+
+
+case "$1" in
+    start)
+	echo -n "Starting nginx "
+        $0 status
+        if test $? -ne 0; then
+	    /sbin/startproc $nginx -c $conffile
+        else
+            rc_reset
+        fi
+	rc_status -v
+	;;
+    stop)
+	echo -n "Shutting down nginx "
+
+	/sbin/killproc -p $pidfile $nginx
+	rc_status -v
+	;;
+    try-restart|condrestart)
+	$0 status
+	if test $? -eq 0; then
+		$0 restart
+	else
+		rc_reset
+	fi
+	rc_status
+	;;
+    restart)
+        configtest -q || exit 6
+	$0 stop
+	$0 start
+	rc_status
+	;;
+    reload|force-reload)
+	echo -n "Reload service nginx "
+	/sbin/killproc -p $pidfile -HUP $nginx
+	rc_status -v
+	;;
+    status)
+	echo -n "Checking for service nginx "
+	
+	/sbin/checkproc $nginx
+	rc_status -v
+	;;
+    upgrade)
+        upgrade 
+        rc_status -v
+        ;;
+    configtest)
+        configtest
+        rc_status -v
+        ;;
+    *)
+	echo "Usage: $0 {start|stop|status|try-restart|restart|force-reload|reload|upgrade|configtest}"
+	exit 1
+	;;
+esac
+rc_exit
