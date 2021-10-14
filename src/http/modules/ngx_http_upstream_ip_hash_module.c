@@ -217,6 +217,7 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
                        peer->check_index);
 
         if (ngx_http_upstream_check_peer_down(peer->check_index)) {
+            ngx_http_upstream_rr_peer_unlock(iphp->rrp.peers, peer);
             goto next;
         }
 #endif
