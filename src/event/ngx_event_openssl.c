@@ -645,12 +645,21 @@ ngx_ssl_certificates(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_array_t *certs,
     ngx_str_t   *cert, *key;
     ngx_uint_t   i;
 
+#if (T_NGX_SSL_NTLS)
+    if (certs == NULL || keys == NULL)
+        return NGX_OK;
+#endif
     cert = certs->elts;
     key = keys->elts;
 
     for (i = 0; i < certs->nelts; i++) {
 
+#if (T_NGX_SSL_NTLS)
+        if (ngx_ssl_certificate(cf, ssl, &cert[i], &key[i], passwords,
+                                SSL_NORMAL_CERT)
+#else
         if (ngx_ssl_certificate(cf, ssl, &cert[i], &key[i], passwords)
+#endif
             != NGX_OK)
         {
             return NGX_ERROR;
@@ -661,9 +670,15 @@ ngx_ssl_certificates(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_array_t *certs,
 }
 
 
+#if (T_NGX_SSL_NTLS)
+ngx_int_t
+ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
+    ngx_str_t *key, ngx_array_t *passwords, ngx_flag_t cert_tag)
+#else
 ngx_int_t
 ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
     ngx_str_t *key, ngx_array_t *passwords)
+#endif
 {
     char            *err;
     X509            *x509;
@@ -681,6 +696,29 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_ERROR;
     }
 
+#if (T_NGX_SSL_NTLS)
+    if (cert_tag == SSL_ENC_CERT) {
+        if (SSL_CTX_use_enc_certificate(ssl->ctx, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_use_enc_certificate(\"%s\") failed",
+                          cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+
+    } else if (cert_tag == SSL_SIGN_CERT) {
+        if (SSL_CTX_use_sign_certificate(ssl->ctx, x509) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_use_sign_certificate(\"%s\") failed",
+                          cert->data);
+            X509_free(x509);
+            sk_X509_pop_free(chain, X509_free);
+            return NGX_ERROR;
+        }
+
+    } else
+#endif
     if (SSL_CTX_use_certificate(ssl->ctx, x509) == 0) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_certificate(\"%s\") failed", cert->data);
@@ -769,6 +807,27 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
         return NGX_ERROR;
     }
 
+#if (T_NGX_SSL_NTLS)
+    if (cert_tag == SSL_ENC_CERT) {
+        if (SSL_CTX_use_enc_PrivateKey(ssl->ctx, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_use_enc_PrivateKey(\"%s\") failed",
+                          key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+
+    } else if (cert_tag == SSL_SIGN_CERT) {
+        if (SSL_CTX_use_sign_PrivateKey(ssl->ctx, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_use_sign_PrivateKey(\"%s\") failed",
+                          key->data);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+
+    } else
+#endif
     if (SSL_CTX_use_PrivateKey(ssl->ctx, pkey) == 0) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_PrivateKey(\"%s\") failed", key->data);

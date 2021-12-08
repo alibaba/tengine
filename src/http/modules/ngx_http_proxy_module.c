@@ -4295,8 +4295,14 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
             return NGX_ERROR;
         }
 
+#if (T_NGX_SSL_NTLS)
+        if (ngx_ssl_certificate(cf, plcf->upstream.ssl, &plcf->ssl_certificate,
+                                &plcf->ssl_certificate_key, plcf->ssl_passwords,
+                                SSL_NORMAL_CERT)
+#else
         if (ngx_ssl_certificate(cf, plcf->upstream.ssl, &plcf->ssl_certificate,
                                 &plcf->ssl_certificate_key, plcf->ssl_passwords)
+#endif
             != NGX_OK)
         {
             return NGX_ERROR;

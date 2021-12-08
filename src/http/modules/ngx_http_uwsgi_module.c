@@ -2384,8 +2384,14 @@ ngx_http_uwsgi_set_ssl(ngx_conf_t *cf, ngx_http_uwsgi_loc_conf_t *uwcf)
             return NGX_ERROR;
         }
 
+#if (T_NGX_SSL_NTLS)
+        if (ngx_ssl_certificate(cf, uwcf->upstream.ssl, &uwcf->ssl_certificate,
+                                &uwcf->ssl_certificate_key, uwcf->ssl_passwords,
+                                SSL_NORMAL_CERT)
+#else
         if (ngx_ssl_certificate(cf, uwcf->upstream.ssl, &uwcf->ssl_certificate,
                                 &uwcf->ssl_certificate_key, uwcf->ssl_passwords)
+#endif
             != NGX_OK)
         {
             return NGX_ERROR;
