@@ -50,7 +50,7 @@ esac
 
 #NGX_GCC_OPT="-O2"
 #NGX_GCC_OPT="-Os"
-NGX_GCC_OPT="-O"
+#NGX_GCC_OPT="-O"
 
 #CFLAGS="$CFLAGS -fomit-frame-pointer"
 
@@ -169,7 +169,7 @@ esac
 CFLAGS="$CFLAGS -Werror"
 
 # debug
-CFLAGS="$CFLAGS -g"
+#CFLAGS="$CFLAGS -g"
 
 # DragonFly's gcc3 generates DWARF
 #CFLAGS="$CFLAGS -g -gstabs"
