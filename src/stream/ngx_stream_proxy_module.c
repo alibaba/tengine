@@ -2122,8 +2122,14 @@ ngx_stream_proxy_set_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *pscf)
             return NGX_ERROR;
         }
 
+#if (T_NGX_SSL_NTLS)
+        if (ngx_ssl_certificate(cf, pscf->ssl, &pscf->ssl_certificate,
+                                &pscf->ssl_certificate_key, pscf->ssl_passwords,
+                                SSL_NORMAL_CERT)
+#else
         if (ngx_ssl_certificate(cf, pscf->ssl, &pscf->ssl_certificate,
                                 &pscf->ssl_certificate_key, pscf->ssl_passwords)
+#endif
             != NGX_OK)
         {
             return NGX_ERROR;
