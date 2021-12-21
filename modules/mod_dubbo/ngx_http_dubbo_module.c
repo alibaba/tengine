@@ -15,14 +15,15 @@
 typedef struct {
     ngx_http_upstream_conf_t    upstream;
 
-    ngx_str_t                   service_name;
-    ngx_str_t                   service_version;
-    ngx_str_t                   method;
+    ngx_http_complex_value_t    service_name;
+    ngx_http_complex_value_t    service_version;
+    ngx_http_complex_value_t    method;
 
     ngx_array_t                *args_in;
 
-    ngx_flag_t                  pass_all;
+    ngx_flag_t                  pass_all_headers;
     ngx_flag_t                  pass_body;
+    ngx_flag_t                  ups_info;
 
     ngx_msec_t                  heartbeat_interval;
 } ngx_http_dubbo_loc_conf_t;
@@ -84,6 +85,8 @@ static char *ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 static char *ngx_http_dubbo_pass_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+static ngx_int_t ngx_http_dubbo_add_response_header(ngx_http_request_t *r, ngx_str_t *name, ngx_str_t *value);
 
 static ngx_conf_bitmask_t  ngx_http_dubbo_next_upstream_masks[] = {
     { ngx_string("error"), NGX_HTTP_UPSTREAM_FT_ERROR },
@@ -221,11 +224,11 @@ static ngx_command_t  ngx_http_dubbo_commands[] = {
       0,
       NULL },
 
-    { ngx_string("dubbo_pass_set_all"),
+    { ngx_string("dubbo_pass_all_headers"),
       NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_dubbo_loc_conf_t, pass_all),
+      offsetof(ngx_http_dubbo_loc_conf_t, pass_all_headers),
       NULL },
 
     { ngx_string("dubbo_pass_body"),
@@ -241,6 +244,14 @@ static ngx_command_t  ngx_http_dubbo_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_dubbo_loc_conf_t, heartbeat_interval),
       NULL },
+
+    { ngx_string("dubbo_upstream_error_info"),
+      NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_dubbo_loc_conf_t, ups_info),
+      NULL },
+
 
       ngx_null_command
 };
@@ -278,6 +289,8 @@ ngx_module_t  ngx_http_dubbo_module = {
 
 const ngx_str_t ngx_http_dubbo_str_body = ngx_string("body");
 const ngx_str_t ngx_http_dubbo_str_status = ngx_string("status");
+const ngx_str_t ngx_http_dubbo_content_type = ngx_string("Content-Type");
+const ngx_str_t ngx_http_dubbo_content_type_text = ngx_string("text/html");
 
 static ngx_int_t
 ngx_http_dubbo_handler(ngx_http_request_t *r)
@@ -360,57 +373,43 @@ ngx_http_dubbo_response_handler(ngx_connection_t *pc, ngx_http_request_t *r, ngx
     ngx_buf_t                       *buf;
     ngx_uint_t                       status;
 
-    ngx_table_elt_t                 *h;
-    ngx_http_upstream_header_t      *hh;
-    ngx_http_upstream_main_conf_t   *umcf;
-
     u = r->upstream;
-
-    umcf = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
 
     if (u->out_bufs != NULL) {
         ngx_log_error(NGX_LOG_ERR, pc->log, 0, "dubbo [%V]: out_bufs is not NULL, %p", r);
         return NGX_ERROR;
     }
 
-    cl = ngx_chain_get_free_buf(r->pool, &u->free_bufs);
-    if (cl == NULL) {
-        return NGX_ERROR;
-    }
-
-    u->out_bufs = cl;
-    buf = u->out_bufs->buf;
-
-    buf->flush = 1;
-    buf->memory = 1;
-
-    r->upstream->headers_in.status_n = NGX_HTTP_BAD_GATEWAY;
-    r->upstream->state->status = NGX_HTTP_BAD_GATEWAY;
+    u->headers_in.status_n = NGX_HTTP_BAD_GATEWAY;
+    u->state->status = NGX_HTTP_BAD_GATEWAY;
 
     kv = result->elts;
     for (i=0; i < result->nelts; i++) {
-        if (kv[i].key.len == 4 && 0 == ngx_strncasecmp(kv[i].key.data, ngx_http_dubbo_str_body.data, ngx_http_dubbo_str_body.len)) {
-            buf->pos = kv[i].value.data;
-            buf->last = kv[i].value.data + kv[i].value.len;
-        } else if (kv[i].key.len == 6 && 0 == ngx_strncasecmp(kv[i].key.data, ngx_http_dubbo_str_status.data, ngx_http_dubbo_str_status.len)) {
-            status = ngx_atoi(kv[i].value.data, kv[i].value.len);
-            r->upstream->headers_in.status_n = status;
-            r->upstream->state->status = status;
-        } else {
-            h = ngx_list_push(&u->headers_in.headers);
-            if (h == NULL) {
-                return NGX_ERROR;
+        if (kv[i].key.len == 4 && 0 == ngx_strncasecmp(kv[i].key.data,
+                    ngx_http_dubbo_str_body.data, ngx_http_dubbo_str_body.len)) {
+            if (kv[i].value.len > 0 && kv[i].value.data != NULL) {
+                cl = ngx_chain_get_free_buf(r->pool, &u->free_bufs);
+                if (cl == NULL) {
+                    return NGX_ERROR;
+                }
+
+                u->out_bufs = cl;
+                buf = u->out_bufs->buf;
+
+                buf->flush = 1;
+                buf->memory = 1;
+
+                buf->pos = kv[i].value.data;
+                buf->last = kv[i].value.data + kv[i].value.len;
             }
 
-            h->key = kv[i].key;
-            h->value = kv[i].value;
-            h->lowcase_key = kv[i].key.data;
-            h->hash = ngx_hash_key(h->key.data, h->key.len);
-
-            hh = ngx_hash_find(&umcf->headers_in_hash, h->hash,
-                    h->lowcase_key, h->key.len);
-
-            if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
+            u->headers_in.content_length_n = kv[i].value.len;
+        } else if (kv[i].key.len == 6 && 0 == ngx_strncasecmp(kv[i].key.data, ngx_http_dubbo_str_status.data, ngx_http_dubbo_str_status.len)) {
+            status = ngx_atoi(kv[i].value.data, kv[i].value.len);
+            u->headers_in.status_n = status;
+            u->state->status = status;
+        } else {
+            if (NGX_OK != ngx_http_dubbo_add_response_header(r, &kv[i].key, &kv[i].value)) {
                 return NGX_ERROR;
             }
         }
@@ -595,6 +594,10 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
     ngx_dubbo_connection_t      *dubbo_c;
     ngx_http_dubbo_loc_conf_t   *dlcf;
 
+    ngx_str_t                   *service_name;
+    ngx_str_t                   *service_version;
+    ngx_str_t                   *method;
+
     ngx_array_t                 *args;
     ngx_dubbo_arg_t             *arg;
     ngx_keyval_t                *kv;
@@ -650,7 +653,40 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
     
     dlcf = ngx_http_get_module_loc_conf(r, ngx_http_dubbo_module);
 
-    args = ngx_array_create(dubbo_c->pool, 1, sizeof(ngx_dubbo_arg_t));
+    service_name = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (service_name == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->service_name, service_name)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    service_version = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (service_version == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->service_version, service_version)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    method = ngx_palloc(r->pool, sizeof(ngx_str_t));
+    if (method == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &dlcf->method, method)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    args = ngx_array_create(dubbo_c->temp_pool, 1, sizeof(ngx_dubbo_arg_t));
     if (args == NULL) {
         return NGX_ERROR;
     }
@@ -681,7 +717,7 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
         kv->value.len = body->last - body->pos;
     }
 
-    if (dlcf->pass_all) {
+    if (dlcf->pass_all_headers) {
         //pass all
         ngx_uint_t                              i;
         ngx_list_part_t                        *part;
@@ -755,7 +791,10 @@ ngx_http_dubbo_create_dubbo_request(ngx_http_request_t *r, ngx_connection_t *pc,
         }
     }
 
-    if (NGX_ERROR == ngx_dubbo_encode_request(dubbo_c, &dlcf->service_name, &dlcf->service_version, &dlcf->method, args, multi_r)) {
+    if (NGX_ERROR == ngx_dubbo_encode_request(dubbo_c, service_name,
+                                              service_version, method,
+                                              args, multi_r))
+    {
         ngx_log_error(NGX_LOG_ERR, dubbo_c->log, 0,
                       "dubbo: encode request failed");
         return NGX_ERROR;
@@ -866,8 +905,9 @@ ngx_http_dubbo_create_loc_conf(ngx_conf_t *cf)
 
     ngx_str_set(&conf->upstream.module, "dubbo");
 
-    conf->pass_all = NGX_CONF_UNSET;
+    conf->pass_all_headers = NGX_CONF_UNSET;
     conf->pass_body = NGX_CONF_UNSET;
+    conf->ups_info = NGX_CONF_UNSET;
     conf->args_in = NULL;
     conf->heartbeat_interval = NGX_CONF_UNSET_MSEC;
 
@@ -967,15 +1007,44 @@ ngx_http_dubbo_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         clcf->handler = ngx_http_dubbo_handler;
     }
 
-    ngx_conf_merge_str_value(conf->service_name, prev->service_name, "");
-    ngx_conf_merge_str_value(conf->method, prev->method, "");
+    if (conf->service_name.value.data == NULL) {
+        conf->service_name = prev->service_name;
+    }
+
+    if (conf->service_version.value.data == NULL) {
+        conf->service_version = prev->service_version;
+    }
+
+    if (conf->method.value.data == NULL) {
+        conf->method = prev->method;
+    }
 
     ngx_conf_merge_ptr_value(conf->args_in, prev->args_in, NULL);
-    ngx_conf_merge_value(conf->pass_all, prev->pass_all, 1);
+    ngx_conf_merge_value(conf->pass_all_headers, prev->pass_all_headers, 1);
     ngx_conf_merge_value(conf->pass_body, prev->pass_body, 1);
+    ngx_conf_merge_value(conf->ups_info, prev->ups_info, 0);
 
     ngx_conf_merge_msec_value(conf->heartbeat_interval,
                               prev->heartbeat_interval, 60000);
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_http_dubbo_compile_complex_value(ngx_conf_t *cf, ngx_str_t *value,
+                                     ngx_http_complex_value_t *cv)
+{
+    ngx_http_compile_complex_value_t   ccv;
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = value;
+    ccv.complex_value = cv;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
 
     return NGX_CONF_OK;
 }
@@ -988,6 +1057,7 @@ ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                 *value;
     ngx_url_t                  u;
     ngx_http_core_loc_conf_t  *clcf;
+    char                      *msg;
 
     if (dlcf->upstream.upstream) {
         return "is duplicate";
@@ -995,9 +1065,26 @@ ngx_http_dubbo_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    dlcf->service_name = value[1];
-    dlcf->service_version = value[2];
-    dlcf->method = value[3];
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[1],
+                                                    &dlcf->service_name))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
+
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[2],
+                                                    &dlcf->service_version))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
+
+    if ((msg = ngx_http_dubbo_compile_complex_value(cf, &value[3],
+                                                    &dlcf->method))
+        != NGX_CONF_OK)
+    {
+        return msg;
+    }
 
     ngx_memzero(&u, sizeof(ngx_url_t));
 
@@ -1141,23 +1228,61 @@ ngx_http_dubbo_ping_handler(ngx_event_t *ev)
 }
 
 static ngx_int_t
+ngx_http_dubbo_add_response_header(ngx_http_request_t *r, ngx_str_t *name, ngx_str_t *value)
+{
+    ngx_table_elt_t                 *h;
+    ngx_http_upstream_header_t      *hh;
+    ngx_http_upstream_main_conf_t   *umcf;
+    ngx_http_upstream_t             *u;
+
+    umcf = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
+    u = r->upstream;
+
+    h = ngx_list_push(&u->headers_in.headers);
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+
+    h->key = *name;
+    h->value = *value;
+    h->lowcase_key = ngx_pcalloc(r->pool, h->key.len);
+    if (h->lowcase_key == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_strlow(h->lowcase_key, h->key.data, h->key.len);
+    h->hash = ngx_hash_key(h->lowcase_key, h->key.len);
+
+    hh = ngx_hash_find(&umcf->headers_in_hash, h->hash,
+            h->lowcase_key, h->key.len);
+
+    if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
 ngx_http_dubbo_parse_filter(ngx_http_request_t *r)
 {
-    ngx_http_request_t         *fake_r;
-    ngx_http_upstream_t        *fake_u;
-    ngx_chain_t                 in;
-    ngx_http_dubbo_ctx_t       *ctx, *fake_ctx;
-    ngx_int_t                   ret;
-    ngx_http_request_t         *real_r;
+    ngx_http_request_t              *fake_r;
+    ngx_http_upstream_t             *fake_u;
+    ngx_chain_t                      in;
+    ngx_http_dubbo_ctx_t            *ctx, *fake_ctx;
+    ngx_int_t                        ret;
+    ngx_http_request_t              *real_r;
 
-    ngx_queue_t                *q, *n;
-    ngx_multi_request_t        *multi_r, *tmp;
-    ngx_dubbo_resp_t           *resp;
-    ngx_str_t                   body;
-    ngx_flag_t                  find;
-    ngx_dubbo_connection_t     *dubbo_c;
-    ngx_multi_connection_t     *multi_c;
-    ngx_connection_t           *pc;
+    ngx_queue_t                     *q, *n;
+    ngx_multi_request_t             *multi_r, *tmp;
+    ngx_dubbo_resp_t                *resp;
+    ngx_str_t                        body;
+    ngx_flag_t                       find;
+    ngx_dubbo_connection_t          *dubbo_c;
+    ngx_multi_connection_t          *multi_c;
+    ngx_connection_t                *pc;
+
+    ngx_http_dubbo_loc_conf_t       *dlcf;
+    ngx_keyval_t                    *kv;
 
     fake_r = r;
     fake_u = r->upstream;
@@ -1214,8 +1339,7 @@ ngx_http_dubbo_parse_filter(ngx_http_request_t *r)
                             q = ngx_queue_next(q))
                     {
                         multi_r = ngx_queue_data(q, ngx_multi_request_t, backend_queue);
-                        if (multi_r->id == resp->header.reqid) {
-                            //find
+                        if (multi_r->id == resp->header.reqid) { //find
                             find = 1;
                             ngx_queue_remove(q);
 
@@ -1244,12 +1368,31 @@ ngx_http_dubbo_parse_filter(ngx_http_request_t *r)
 
                             multi_c->cur = multi_r->data;
 
-                            if (NGX_OK != ngx_dubbo_hessian2_decode_payload_map(dubbo_c->pool, &body, &ctx->result, dubbo_c->log)) {
-                                ngx_log_error(NGX_LOG_WARN, dubbo_c->log, 0, "dubbo: response decode result failed %V", &body);
-                                real_r->upstream->headers_in.status_n = NGX_HTTP_BAD_GATEWAY;
-                                real_r->upstream->state->status = NGX_HTTP_BAD_GATEWAY;
-                                ngx_destroy_pool(multi_r->pool);
-                                return NGX_ERROR;
+                            if (NGX_OK != ngx_dubbo_hessian2_decode_payload_map(real_r->pool,
+                                        &body, &ctx->result, dubbo_c->log)) {
+
+                                ngx_log_error(NGX_LOG_WARN, dubbo_c->log,
+                                              0, "dubbo: response decode result failed %V", &body);
+
+                                dlcf = ngx_http_get_module_loc_conf(real_r, ngx_http_dubbo_module);
+                                if (dlcf->ups_info) {
+                                    ctx->result = ngx_array_create(real_r->pool, 2, sizeof(ngx_keyval_t));
+                                    if (ctx->result == NULL) {
+                                        return NGX_ERROR;
+                                    };
+                                    kv = (ngx_keyval_t*)ngx_array_push(ctx->result);
+                                    kv->key = ngx_http_dubbo_str_body;
+                                    kv->value = body;
+
+                                    kv = (ngx_keyval_t*)ngx_array_push(ctx->result);
+                                    kv->key = ngx_http_dubbo_content_type;
+                                    kv->value = ngx_http_dubbo_content_type_text;
+                                } else {
+                                    real_r->upstream->headers_in.status_n = NGX_HTTP_BAD_GATEWAY;
+                                    real_r->upstream->state->status = NGX_HTTP_BAD_GATEWAY;
+                                    ngx_destroy_pool(multi_r->pool);
+                                    return NGX_HTTP_UPSTREAM_PARSE_ERROR;
+                                }
                             }
 
                             if (NGX_OK != ngx_http_dubbo_response_handler(pc, real_r, ctx->result)) {
@@ -1267,7 +1410,8 @@ ngx_http_dubbo_parse_filter(ngx_http_request_t *r)
                     }
 
                     if (!find) {
-                        ngx_log_error(NGX_LOG_ERR, dubbo_c->log, 0, "dubbo: response cannot find request %ui", resp->header.reqid);
+                        ngx_log_error(NGX_LOG_ERR, dubbo_c->log, 0,
+                                      "dubbo: response cannot find request %ui", resp->header.reqid);
                     }
 
                     continue;
@@ -1287,6 +1431,7 @@ ngx_http_dubbo_parse_filter(ngx_http_request_t *r)
             real_r->upstream->length = 0;
             ctx->state = ngx_http_dubbo_parse_st_start;
             return NGX_HTTP_UPSTREAM_GET_BODY_DATA;
+            //return NGX_ERROR;
         default:
             ngx_log_error(NGX_LOG_ERR, dubbo_c->log, 0, "dubbo: parse state error");
             break;

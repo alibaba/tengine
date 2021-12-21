@@ -178,6 +178,7 @@ static void ngx_http_v2_read_client_request_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_v2_terminate_stream(ngx_http_v2_connection_t *h2c,
     ngx_http_v2_stream_t *stream, ngx_uint_t status);
 static void ngx_http_v2_close_stream_handler(ngx_event_t *ev);
+static void ngx_http_v2_retry_close_stream_handler(ngx_event_t *ev);
 static void ngx_http_v2_handle_connection_handler(ngx_event_t *rev);
 static void ngx_http_v2_idle_handler(ngx_event_t *rev);
 static void ngx_http_v2_finalize_connection(ngx_http_v2_connection_t *h2c,
@@ -273,6 +274,7 @@ ngx_http_v2_init(ngx_event_t *rev)
     h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
 
     h2c->concurrent_pushes = h2scf->concurrent_pushes;
+    h2c->priority_limit = h2scf->concurrent_streams;
 
     h2c->pool = ngx_create_pool(h2scf->pool_size, h2c->connection->log);
     if (h2c->pool == NULL) {
@@ -353,6 +355,11 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
     if (c->close) {
         c->close = 0;
 
+        if (c->error) {
+            ngx_http_v2_finalize_connection(h2c, 0);
+            return;
+        }
+
         if (!h2c->goaway) {
             h2c->goaway = 1;
 
@@ -417,6 +424,14 @@ ngx_http_v2_read_handler(ngx_event_t *rev)
             }
 
         } while (p != end);
+
+        h2c->total_bytes += n;
+
+        if (h2c->total_bytes / 8 > h2c->payload_bytes + 1048576) {
+            ngx_log_error(NGX_LOG_INFO, c->log, 0, "http2 flood detected");
+            ngx_http_v2_finalize_connection(h2c, NGX_HTTP_V2_NO_ERROR);
+            return;
+        }
 
     } while (rev->ready);
 
@@ -504,12 +519,11 @@ ngx_http_v2_send_output_queue(ngx_http_v2_connection_t *h2c)
     ngx_http_core_loc_conf_t  *clcf;
 
     c = h2c->connection;
+    wev = c->write;
 
     if (c->error) {
-        return NGX_ERROR;
+        goto error;
     }
-
-    wev = c->write;
 
     if (!wev->ready) {
         return NGX_AGAIN;
@@ -946,6 +960,15 @@ ngx_http_v2_state_read_data(ngx_http_v2_connection_t *h2c, u_char *pos,
         return ngx_http_v2_state_skip_padded(h2c, pos, end);
     }
 
+    r = stream->request;
+
+    if (r->reading_body && !r->request_body_no_buffering) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
+                       "skipping http2 DATA frame");
+
+        return ngx_http_v2_state_skip_padded(h2c, pos, end);
+    }
+
     size = end - pos;
 
     if (size >= h2c->state.length) {
@@ -953,7 +976,7 @@ ngx_http_v2_state_read_data(ngx_http_v2_connection_t *h2c, u_char *pos,
         stream->in_closed = h2c->state.flags & NGX_HTTP_V2_END_STREAM_FLAG;
     }
 
-    r = stream->request;
+    h2c->payload_bytes += size;
 
     if (r->request_body) {
         rc = ngx_http_v2_process_request_body(r, pos, size, stream->in_closed);
@@ -1099,20 +1122,19 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_PROTOCOL_ERROR);
     }
 
-    h2c->last_sid = h2c->state.sid;
-
-    h2c->state.pool = ngx_create_pool(1024, h2c->connection->log);
-    if (h2c->state.pool == NULL) {
-        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_INTERNAL_ERROR);
-    }
-
     if (depend == h2c->state.sid) {
         ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
                       "client sent HEADERS frame for stream %ui "
                       "with incorrect dependency", h2c->state.sid);
 
-        status = NGX_HTTP_V2_PROTOCOL_ERROR;
-        goto rst_stream;
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_PROTOCOL_ERROR);
+    }
+
+    h2c->last_sid = h2c->state.sid;
+
+    h2c->state.pool = ngx_create_pool(1024, h2c->connection->log);
+    if (h2c->state.pool == NULL) {
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_INTERNAL_ERROR);
     }
 
     h2scf = ngx_http_get_module_srv_conf(h2c->http_connection->conf_ctx,
@@ -1546,6 +1568,14 @@ ngx_http_v2_state_process_header(ngx_http_v2_connection_t *h2c, u_char *pos,
         header->name.len = h2c->state.field_end - h2c->state.field_start;
         header->name.data = h2c->state.field_start;
 
+        if (header->name.len == 0) {
+            ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                          "client sent zero header name length");
+
+            return ngx_http_v2_connection_error(h2c,
+                                                NGX_HTTP_V2_PROTOCOL_ERROR);
+        }
+
         return ngx_http_v2_state_field_len(h2c, pos, end);
     }
 
@@ -1689,8 +1719,13 @@ ngx_http_v2_state_header_complete(ngx_http_v2_connection_t *h2c, u_char *pos,
     ngx_http_v2_stream_t  *stream;
 
     if (h2c->state.length) {
-        h2c->state.handler = ngx_http_v2_state_header_block;
-        return pos;
+        if (end - pos > 0) {
+            h2c->state.handler = ngx_http_v2_state_header_block;
+            return pos;
+        }
+
+        return ngx_http_v2_state_headers_save(h2c, pos, end,
+                                              ngx_http_v2_state_header_block);
     }
 
     if (!(h2c->state.flags & NGX_HTTP_V2_END_HEADERS_FLAG)) {
@@ -1796,6 +1831,13 @@ ngx_http_v2_state_priority(ngx_http_v2_connection_t *h2c, u_char *pos,
         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_SIZE_ERROR);
     }
 
+    if (--h2c->priority_limit == 0) {
+        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                      "client sent too many PRIORITY frames");
+
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_ENHANCE_YOUR_CALM);
+    }
+
     if (end - pos < NGX_HTTP_V2_PRIORITY_SIZE) {
         return ngx_http_v2_state_save(h2c, pos, end,
                                       ngx_http_v2_state_priority);
@@ -1826,28 +1868,7 @@ ngx_http_v2_state_priority(ngx_http_v2_connection_t *h2c, u_char *pos,
                       "client sent PRIORITY frame for stream %ui "
                       "with incorrect dependency", h2c->state.sid);
 
-        node = ngx_http_v2_get_node_by_id(h2c, h2c->state.sid, 0);
-
-        if (node && node->stream) {
-            if (ngx_http_v2_terminate_stream(h2c, node->stream,
-                                             NGX_HTTP_V2_PROTOCOL_ERROR)
-                == NGX_ERROR)
-            {
-                return ngx_http_v2_connection_error(h2c,
-                                                    NGX_HTTP_V2_INTERNAL_ERROR);
-            }
-
-        } else {
-            if (ngx_http_v2_send_rst_stream(h2c, h2c->state.sid,
-                                            NGX_HTTP_V2_PROTOCOL_ERROR)
-                == NGX_ERROR)
-            {
-                return ngx_http_v2_connection_error(h2c,
-                                                    NGX_HTTP_V2_INTERNAL_ERROR);
-            }
-        }
-
-        return ngx_http_v2_state_complete(h2c, pos, end);
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_PROTOCOL_ERROR);
     }
 
     node = ngx_http_v2_get_node_by_id(h2c, h2c->state.sid, 1);
@@ -2230,41 +2251,11 @@ ngx_http_v2_state_window_update(ngx_http_v2_connection_t *h2c, u_char *pos,
                    h2c->state.sid, window);
 
     if (window == 0) {
-        if (h2c->state.sid == 0) {
-            ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
-                          "client sent WINDOW_UPDATE frame "
-                          "with incorrect window increment 0");
-
-            return ngx_http_v2_connection_error(h2c,
-                                                NGX_HTTP_V2_PROTOCOL_ERROR);
-        }
-
         ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
-                      "client sent WINDOW_UPDATE frame for stream %ui "
-                      "with incorrect window increment 0", h2c->state.sid);
+                      "client sent WINDOW_UPDATE frame "
+                      "with incorrect window increment 0");
 
-        node = ngx_http_v2_get_node_by_id(h2c, h2c->state.sid, 0);
-
-        if (node && node->stream) {
-            if (ngx_http_v2_terminate_stream(h2c, node->stream,
-                                             NGX_HTTP_V2_PROTOCOL_ERROR)
-                == NGX_ERROR)
-            {
-                return ngx_http_v2_connection_error(h2c,
-                                                    NGX_HTTP_V2_INTERNAL_ERROR);
-            }
-
-        } else {
-            if (ngx_http_v2_send_rst_stream(h2c, h2c->state.sid,
-                                            NGX_HTTP_V2_PROTOCOL_ERROR)
-                == NGX_ERROR)
-            {
-                return ngx_http_v2_connection_error(h2c,
-                                                    NGX_HTTP_V2_INTERNAL_ERROR);
-            }
-        }
-
-        return ngx_http_v2_state_complete(h2c, pos, end);
+        return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_PROTOCOL_ERROR);
     }
 
     if (h2c->state.sid) {
@@ -2479,10 +2470,6 @@ ngx_http_v2_connection_error(ngx_http_v2_connection_t *h2c,
 {
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                    "http2 state connection error");
-
-    if (err == NGX_HTTP_V2_INTERNAL_ERROR) {
-        ngx_debug_point();
-    }
 
     ngx_http_v2_finalize_connection(h2c, err);
 
@@ -2938,9 +2925,9 @@ ngx_http_v2_get_frame(ngx_http_v2_connection_t *h2c, size_t length,
                       "requested control frame is too large: %uz", length);
         return NULL;
     }
+#endif
 
     frame->length = length;
-#endif
 
     buf->last = ngx_http_v2_write_len_and_type(buf->pos, length, type);
 
@@ -2966,6 +2953,8 @@ ngx_http_v2_frame_handler(ngx_http_v2_connection_t *h2c,
 
     frame->next = h2c->free_frames;
     h2c->free_frames = frame;
+
+    h2c->total_bytes += NGX_HTTP_V2_FRAME_HEADER_SIZE + frame->length;
 
     return NGX_OK;
 }
@@ -3112,6 +3101,8 @@ ngx_http_v2_create_stream(ngx_http_v2_connection_t *h2c, ngx_uint_t push)
         h2c->processing++;
     }
 
+    h2c->priority_limit += h2scf->concurrent_streams;
+
     return stream;
 }
 
@@ -3248,10 +3239,6 @@ ngx_http_v2_validate_header(ngx_http_request_t *r, ngx_http_v2_header_t *header)
     u_char                     ch;
     ngx_uint_t                 i;
     ngx_http_core_srv_conf_t  *cscf;
-
-    if (header->name.len == 0) {
-        return NGX_ERROR;
-    }
 
     r->invalid_header = 0;
 
@@ -3754,7 +3741,8 @@ ngx_http_v2_construct_cookie_header(ngx_http_request_t *r)
 static void
 ngx_http_v2_run_request(ngx_http_request_t *r)
 {
-    ngx_connection_t  *fc;
+    ngx_connection_t          *fc;
+    ngx_http_v2_connection_t  *h2c;
 
     fc = r->connection;
 
@@ -3785,6 +3773,10 @@ ngx_http_v2_run_request(ngx_http_request_t *r)
     if (r->headers_in.content_length_n == -1 && !r->stream->in_closed) {
         r->headers_in.chunked = 1;
     }
+
+    h2c = r->stream->connection;
+
+    h2c->payload_bytes += r->request_length;
 
     ngx_http_process_request(r);
 
@@ -4298,8 +4290,9 @@ ngx_http_v2_close_stream(ngx_http_v2_stream_t *stream, ngx_int_t rc)
     fc = stream->request->connection;
 
     if (stream->queued) {
-        fc->write->handler = ngx_http_v2_close_stream_handler;
-        fc->read->handler = ngx_http_empty_handler;
+        fc->error = 1;
+        fc->write->handler = ngx_http_v2_retry_close_stream_handler;
+        fc->read->handler = ngx_http_v2_retry_close_stream_handler;
         return;
     }
 
@@ -4315,33 +4308,11 @@ ngx_http_v2_close_stream(ngx_http_v2_stream_t *stream, ngx_int_t rc)
             }
 
         } else if (!stream->in_closed) {
-#if 0
             if (ngx_http_v2_send_rst_stream(h2c, node->id, NGX_HTTP_V2_NO_ERROR)
                 != NGX_OK)
             {
                 h2c->connection->error = 1;
             }
-#else
-            /*
-             * At the time of writing at least the latest versions of Chrome
-             * do not properly handle RST_STREAM with NO_ERROR status.
-             *
-             * See: https://bugs.chromium.org/p/chromium/issues/detail?id=603182
-             *
-             * As a workaround, the stream window is maximized before closing
-             * the stream.  This allows a client to send up to 2 GB of data
-             * before getting blocked on flow control.
-             */
-
-            if (stream->recv_window < NGX_HTTP_V2_MAX_WINDOW
-                && ngx_http_v2_send_window_update(h2c, node->id,
-                                                  NGX_HTTP_V2_MAX_WINDOW
-                                                  - stream->recv_window)
-                   != NGX_OK)
-            {
-                h2c->connection->error = 1;
-            }
-#endif
         }
     }
 
@@ -4364,6 +4335,8 @@ ngx_http_v2_close_stream(ngx_http_v2_stream_t *stream, ngx_int_t rc)
      * will be destroyed after a call to ngx_http_free_request().
      */
     pool = stream->pool;
+
+    h2c->frames -= stream->frames;
 
     ngx_http_free_request(stream->request, rc);
 
@@ -4436,6 +4409,22 @@ ngx_http_v2_close_stream_handler(ngx_event_t *ev)
         ngx_http_v2_close_stream(r->stream, NGX_HTTP_REQUEST_TIME_OUT);
         return;
     }
+
+    ngx_http_v2_close_stream(r->stream, 0);
+}
+
+
+static void
+ngx_http_v2_retry_close_stream_handler(ngx_event_t *ev)
+{
+    ngx_connection_t    *fc;
+    ngx_http_request_t  *r;
+
+    fc = ev->data;
+    r = fc->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                   "http2 retry close stream handler");
 
     ngx_http_v2_close_stream(r->stream, 0);
 }

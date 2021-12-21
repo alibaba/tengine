@@ -9,7 +9,7 @@ Tengine has been an open source project since December 2011. It is being activel
 Features
 ========
 
-* All features of nginx-1.16.0 are inherited, i.e., it is 100% compatible with nginx.
+* All features of nginx-1.18.0 are inherited, i.e., it is 100% compatible with nginx.
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
@@ -56,3 +56,4 @@ Contact
 
 [https://github.com/alibaba/tengine/issues](https://github.com/alibaba/tengine/issues)
 
+Dingtalk user group: 23394285

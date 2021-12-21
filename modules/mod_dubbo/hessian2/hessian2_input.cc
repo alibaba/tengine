@@ -93,19 +93,19 @@ bool hessian2_input::read_bool() {
         default:
             throw expect("boolean", tag);
         case 68:
-            return parse_double() != 0.0D;
+            return parse_double() != 0.0;
         case 70:
             return false;
         case 73:
             return parse_32bit() != 0;
         case 76:
-            return parse_64bit() != 0L;
+            return parse_64bit() != 0;
         case 78:
             return false;
         case 84:
             return true;
         case 89:
-            return 16777216L * (long)parse_8bit() + 65536L * (long)parse_8bit() + (long)(256 * parse_8bit()) + (long)parse_8bit() != 0L;
+            return 16777216 * (long)parse_8bit() + 65536 * (long)parse_8bit() + (long)(256 * parse_8bit()) + (long)parse_8bit() != 0;
         case 91:
             return false;
         case 92:
@@ -273,7 +273,7 @@ int32_t hessian2_input::read_int32() {
         case 61:
         case 62:
         case 63:
-            return (tag - (60 << 16)) + 256 * parse_8bit() + parse_8bit();
+            return ((tag - 60) << 16) + 256 * parse_8bit() + parse_8bit();
         case 64:
         case 65:
         case 66:
@@ -435,7 +435,7 @@ int32_t hessian2_input::read_int32() {
         case 205:
         case 206:
         case 207:
-            return (tag - (200 << 8)) + parse_8bit();
+            return ((tag - 200) << 8) + parse_8bit();
         case 208:
         case 209:
         case 210:
@@ -444,7 +444,7 @@ int32_t hessian2_input::read_int32() {
         case 213:
         case 214:
         case 215:
-            return (tag - (212 << 16)) + 256 * parse_8bit() + parse_8bit();
+            return ((tag - 212) << 16) + 256 * parse_8bit() + parse_8bit();
         case 216:
         case 217:
         case 218:
@@ -486,7 +486,7 @@ int32_t hessian2_input::read_int32() {
         case 253:
         case 254:
         case 255:
-            return (tag - (248 << 8)) + parse_8bit();
+            return ((tag - 248) << 8) + parse_8bit();
     }
 }
 
@@ -559,20 +559,20 @@ int64_t hessian2_input::read_int64() {
         case 68:
             return (int64_t)parse_double();
         case 70:
-            return 0L;
+            return 0;
         case 73:
         case 89:
             return (int64_t)parse_32bit();
         case 76:
             return parse_64bit();
         case 78:
-            return 0L;
+            return 0;
         case 84:
-            return 1L;
+            return 1;
         case 91:
-            return 0L;
+            return 0;
         case 92:
-            return 1L;
+            return 1;
         case 93:
             return (int64_t)parse_8bit();
         case 94:
@@ -580,7 +580,7 @@ int64_t hessian2_input::read_int64() {
         case 95:
             {
                 int mills = parse_32bit();
-                return (int64_t)(0.001D * (double)mills);
+                return (int64_t)(0.001 * (double)mills);
             }
         case 128:
         case 129:
@@ -787,20 +787,20 @@ double hessian2_input::read_double() {
         case 68:
             return parse_double();
         case 70:
-            return 0.0D;
+            return 0.0;
         case 73:
         case 89:
             return (double)parse_double();
         case 76:
             return (double)parse_64bit();
         case 78:
-            return 0.0D;
+            return 0.0;
         case 84:
-            return 1.0D;
+            return 1.0;
         case 91:
-            return 0.0D;
+            return 0.0;
         case 92:
-            return 1.0D;
+            return 1.0;
         case 93:
             return (double)parse_8bit();
         case 94:
@@ -808,7 +808,7 @@ double hessian2_input::read_double() {
         case 95:
             {
                 int mills = parse_32bit();
-                return 0.001D * (double)mills;
+                return 0.001 * (double)mills;
             }
         case 128:
         case 129:
@@ -952,7 +952,7 @@ int64_t hessian2_input::read_utc_date() {
     if(tag == 'J') {
         return parse_64bit();
     } else if(tag == 'K') {
-        return (int64_t)parse_32bit() * 60000L;
+        return (int64_t)parse_32bit() * 60000;
     } else {
         throw expect("date", tag);
     }
@@ -960,7 +960,7 @@ int64_t hessian2_input::read_utc_date() {
 
 std::string* hessian2_input::read_utf8_string(std::string *dest)
 {
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
     if (dest == NULL) {
         dest = new string();
         safeguard.reset(dest);
@@ -1131,7 +1131,7 @@ std::string* hessian2_input::read_utf8_string(std::string *dest)
         case 95:
             {
                 int ch = parse_32bit();
-                return new string(double_to_string(0.001D * (double)ch));
+                return new string(double_to_string(0.001 * (double)ch));
             }
         case 128:
         case 129:
@@ -1280,7 +1280,7 @@ string* hessian2_input::read_chunked_utf8_string(string* dest) {
         dest = new string();
     }
 
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     while (tag == 'R') {
         uint16_t char_size = parse_16bit();
@@ -1398,7 +1398,7 @@ string* hessian2_input::read_chunked_utf8_string(string* dest) {
 string* hessian2_input::read_bytes() {
     string *dest = new string();
 
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     uint8_t tag = parse_8bit();
     int len;
@@ -1459,6 +1459,7 @@ string* hessian2_input::read_bytes() {
             return dest;
         case 65:
             --_curr;
+            safeguard.release();
             return read_chunked_bytes(dest);
         case 66:
             {
@@ -1483,7 +1484,7 @@ string* hessian2_input::read_chunked_bytes(string* dest) {
     if (dest == NULL) {
         dest = new string();
     }
-    auto_ptr<string> safeguard(dest);
+    Safeguard<string> safeguard(dest);
 
     while (tag == 'A') {
         uint16_t byte_size = parse_16bit();
@@ -1593,7 +1594,7 @@ Object* hessian2_input::read_map(const string& classname) {
         return ext(type, *this);
     } else {
         Map* map = new Map(type);
-        auto_ptr<Map> safeguard(map);
+        Safeguard<Map> safeguard(map);
         add_ref(map);
 
         while ((tag = peek()) != 'Z') {

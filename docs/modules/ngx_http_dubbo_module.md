@@ -52,7 +52,7 @@ Map<String, Object> dubbo_method(Map<String, Object> context);
 
 ```
 
-Input param ```Map<String, Object> context``` with a number of key and value， you can use ```dubbo_pass_set```,```dubbo_pass_set_all```,```dubbo_pass_body``` directives to div them, last key is the retained field:
+Input param ```Map<String, Object> context``` with a number of key and value， you can use ```dubbo_pass_set```,```dubbo_pass_all_headers```,```dubbo_pass_body``` directives to div them, last key is the retained field:
 ```
 body: HTTP request Body, value Object type is byte[]
 
@@ -71,15 +71,27 @@ statue: HTTP response Status, value type is String
 Support configure param mapping on Tengine, support invoke any Dubbo Provider method not need any change (Stay tuned for updates).
 
 
+QuickStart
+=======
+This is a [QuickStart for Tengine Dubbo](https://github.com/apache/dubbo-samples/tree/master/dubbo-samples-tengine)
+
+
 Install
 =======
 
-* Build Tengine with this module from source:
+Build Tengine with this module from source:
 
 ```
-$ ./configure --add-module=./modules/ngx_dubbo --add-module=./modules/ngx_multi_upstream --add-module=./modules/mod_config
+$ ./configure --add-module=./modules/mod_dubbo --add-module=./modules/ngx_multi_upstream_module --add-module=./modules/mod_config
 $ make && make install
 ```
+
+Dynamic module support
+
+* mod_dubbo: ```support``` build as a dynamic module
+* ngx_multi_upstream_module: ```no support``` build as a dynamic module
+* mod_config: ```support but no need``` build as a dynamic module
+
 
 Directive
 =========
@@ -92,10 +104,12 @@ Context: `location, if in location`
 
 configure use Dubbo protocol proxy to upstream
 
-*service_name*: Dubbo provider service name
-*service_version*: Dubbo provider service version
-*method*: Dubbo provider service method
-*upstream_name*: backend upstream name
+* *service_name*: Dubbo provider service name
+* *service_version*: Dubbo provider service version
+* *method*: Dubbo provider service method
+* *upstream_name*: backend upstream name
+
+Nginx variables can be used as `service_name`, `service_version` and `method`.
 
 ```
 # proxy to upstream dubbo_backend
@@ -103,7 +117,12 @@ upstream dubbo_backend {
     multi 1;
     server 127.0.0.1:20880;
 }
-dubbo_pass org.apache.dubbo.demo.DemoService 0.0.0 http_dubbo_nginx dubbo_backend;
+
+set $dubbo_service_name "org.apache.dubbo.demo.DemoService";
+set $dubbo_service_name "0.0.0";
+set $dubbo_service_name "http_dubbo_nginx";
+
+dubbo_pass $dubbo_service_name $dubbo_service_version $dubbo_method dubbo_backend;
 ```
 
 Notice:
@@ -114,9 +133,9 @@ Notice:
 dubbo_pass_set
 -------------------
 
-Syntax: **dubbo_pass_set** *key* *value*;  
-Default: `none`  
-Context: `location, if in location`  
+Syntax: **dubbo_pass_set** *key* *value*;
+Default: `none`
+Context: `location, if in location`
 
 When proxy request to backend, need pass this key-value, key and value can contain variables.
 
@@ -124,30 +143,30 @@ When proxy request to backend, need pass this key-value, key and value can conta
 dubbo_pass_set username $cookie_user;
 ```
 
-dubbo_pass_set_all
+dubbo_pass_all_headers
 -----------------------------
 
-Syntax: **dubbo_pass_set_all** on | off;  
-Default: `off`  
-Context: `location, if in location`  
+Syntax: **dubbo_pass_all_headers** on | off;
+Default: `off`
+Context: `location, if in location`
 
 Enables or disables passing all http header to backend as key-value.
 
 dubbo_pass_body
 --------------------------
 
-Syntax: **dubbo_pass_body** on | off;  
-Default: `on`  
-Context: `location, if in location`  
+Syntax: **dubbo_pass_body** on | off;
+Default: `on`
+Context: `location, if in location`
 
 Enables or disables passing request body to backend.
 
 dubbo_heartbeat_interval
 --------------------------
 
-Syntax: **dubbo_heartbeat_interval** *time*; 
-Default: `60s`  
-Context: `http, server, location`  
+Syntax: **dubbo_heartbeat_interval** *time*;
+Default: `60s`
+Context: `http, server, location`
 
 Defines a interval for auto sending ping frame to backend.
 

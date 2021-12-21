@@ -1,7 +1,7 @@
 ngx_http_dubbo_module
 =================
 
-该模块提供对后端Dubbo服务体系对接的支持。（Tengine 2.3.2版本之后）  
+该模块提供对后端Dubbo服务体系对接的支持。（Tengine 2.3.2版本之后）
 [Apache Dubbo™](http://dubbo.apache.org) 是一款高性能Java RPC框架。最初由Alibaba开源，经过长期发展和演进，目前已经成为业界主流微服务框架之一。
 
 在Dubbo服务框架中包含Consumer（client）和Provider（Server）两个角色。该模块支持Tengine作为网关代理，前端接收HTTP/HTTPS/HTTP2等请求，后端作为Dubbo的Consumer调用Dubbo的Provider服务（业务）。
@@ -49,7 +49,7 @@ Map<String, Object> dubbo_method(Map<String, Object> context);
 
 ```
 
-其中，方法入参Map<String, Object> context中包含若干键值对，可以通过```dubbo_pass_set```、```dubbo_pass_set_all```、```dubbo_pass_body```等指令进行调整，如下Key为有特殊含义的规定：
+其中，方法入参Map<String, Object> context中包含若干键值对，可以通过```dubbo_pass_set```、```dubbo_pass_all_headers```、```dubbo_pass_body```等指令进行调整，如下Key为有特殊含义的规定：
 ```
 body： HTTP请求的Body，value的Object类型为byte[]
 
@@ -68,16 +68,26 @@ statue: HTTP响应的状态码，value的类型为String
 支持在Tengine侧配置参数映射，动态生成对后端任意Dubbo Provider方法的调用（持续更新中，敬请期待）。
 
 
+QuickStart
+=======
+这里有一个[Tengine Dubbo功能的QuickStart](https://github.com/apache/dubbo-samples/tree/master/dubbo-samples-tengine)
+
 
 Install
 =======
 
-* 源码安装此模块：
+源码安装此模块：
 
 ```
-$ ./configure --add-module=./modules/ngx_dubbo --add-module=./modules/ngx_multi_upstream --add-module=./modules/mod_config
+$ ./configure --add-module=./modules/mod_dubbo --add-module=./modules/ngx_multi_upstream_module --add-module=./modules/mod_config
 $ make && make install
 ```
+
+Dynamic module 支持
+* mod_dubbo: ```支持```编译成 dynamic module
+* ngx_multi_upstream_module: ```不支持```编译成 dynamic module
+* mod_config: ```支持但无需```编译成 dynamic module
+
 
 Directive
 =========
@@ -90,10 +100,12 @@ Context: `location, if in location`
 
 该指令用于配置使用Dubbo协议，代理到后端upstream 
 
-*service_name*: Dubbo provider发布的服务名
-*service_version*: Dubbo provider发布的服务版本号
-*method*: Dubbo provider发布的服务方法
-*upstream_name*: 后端upstream名称
+* *service_name*: Dubbo provider发布的服务名
+* *service_version*: Dubbo provider发布的服务版本号
+* *method*: Dubbo provider发布的服务方法
+* *upstream_name*: 后端upstream名称
+
+`service_name`、`service_version`、`method` 支持使用变量。
 
 ```
 # 代理到dubbo_backend这个upstream
@@ -101,7 +113,12 @@ upstream dubbo_backend {
     multi 1;
     server 127.0.0.1:20880;
 }
-dubbo_pass org.apache.dubbo.demo.DemoService 0.0.0 http_dubbo_nginx dubbo_backend;
+
+set $dubbo_service_name "org.apache.dubbo.demo.DemoService";
+set $dubbo_service_name "0.0.0";
+set $dubbo_service_name "http_dubbo_nginx";
+
+dubbo_pass $dubbo_service_name $dubbo_service_version $dubbo_method dubbo_backend;
 ```
 
 注意：
@@ -122,30 +139,30 @@ Context: `location, if in location`
 dubbo_pass_set username $cookie_user;
 ```
 
-dubbo_pass_set_all
+dubbo_pass_all_headers
 -----------------------------
 
-Syntax: **dubbo_pass_set_all** on | off;  
-Default: `off`  
-Context: `location, if in location`  
+Syntax: **dubbo_pass_all_headers** on | off;
+Default: `off`
+Context: `location, if in location`
 
 指定是否向后端自动携带所有http头的key、value对。
 
 dubbo_pass_body
 --------------------------
 
-Syntax: **dubbo_pass_body** on | off;  
-Default: `on`  
-Context: `location, if in location`  
+Syntax: **dubbo_pass_body** on | off;
+Default: `on`
+Context: `location, if in location`
 
 指定是否向后端携带请求Body。
 
 dubbo_heartbeat_interval
 --------------------------
 
-Syntax: **dubbo_heartbeat_interval** *time*; 
-Default: `60s`  
-Context: `http, server, location`  
+Syntax: **dubbo_heartbeat_interval** *time*;
+Default: `60s`
+Context: `http, server, location`
 
 指定后端Dubbo连接，自动发送ping帧的间隔。
 
