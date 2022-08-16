@@ -1615,10 +1615,10 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->header_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     if (rc == NGX_YIELD) {
         return;
-    }    
+    }
 #endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -1798,6 +1798,32 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
     }
+
+#if (T_NGX_SSL_NTLS)
+    if (u->conf->enable_ntls) {
+        ngx_str_t                    enable_ntls;
+
+        if (ngx_http_complex_value(r, u->conf->enable_ntls,
+                                   &enable_ntls) == NGX_OK &&
+            enable_ntls.len == 2 &&
+            ngx_strncmp(enable_ntls.data, "on", 2) == 0)
+        {
+            if (u->conf->tls_method != NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, NTLS_method());
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_enable_ntls(u->conf->ssl->ctx);
+            }
+        } else {
+            if (SSL_CTX_get_ssl_method(u->conf->ssl->ctx) == NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, u->conf->tls_method);
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_disable_ntls(u->conf->ssl->ctx);
+            }
+        }
+    }
+#endif
 
     if (ngx_ssl_create_connection(u->conf->ssl, c,
                                   NGX_SSL_BUFFER|NGX_SSL_CLIENT)
@@ -4492,7 +4518,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->peer.connection = NULL;
     }
 
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     u->peer.resolved = 0;
 #endif
     ngx_http_upstream_connect(r, u);
@@ -4552,7 +4578,7 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         ngx_resolve_name_done(u->dyn_resolve_ctx);
         u->dyn_resolve_ctx = NULL;
     }
-#endif    
+#endif
 
     if (u->state && u->state->response_time == (ngx_msec_t) -1) {
         u->state->response_time = ngx_current_msec - u->start_time;
@@ -6051,7 +6077,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     time_t                       fail_timeout;
     ngx_str_t                   *value, s;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                    id;
 #endif
     ngx_url_t                    u;
@@ -6072,7 +6098,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     max_conns = 0;
     max_fails = 1;
     fail_timeout = 10;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_null(&id);
 #endif
 
@@ -6163,7 +6189,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
         if (ngx_strncmp(value[i].data, "id=", 3) == 0) {
 
             id.len = value[i].len - 3;
@@ -6197,13 +6223,13 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->max_conns = max_conns;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     us->id = id;
-#endif    
+#endif
 
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE) 
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     us->host = u.host;
-#endif    
+#endif
 
     return NGX_CONF_OK;
 
