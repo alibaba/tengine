@@ -1,11 +1,11 @@
 # Quick Start
 
 ## Install Tengine
-1. Get BabaSSL
+1. Get Tongsuo
 
-NTLS (TLCP and GM/T 0024) is based on BabaSSL.
+NTLS (TLCP and GM/T 0024) is based on Tongsuo.
 ```bash
-git clone https://github.com/BabaSSL/BabaSSL.git
+git clone https://github.com/Tongsuo-Project/Tongsuo.git
 ```
 
 2. Get Tengine
@@ -17,15 +17,15 @@ git clone https://github.com/alibaba/tengine.git
 3. Build Tengine
 
 - Add ngx_openssl_ntls module
-- Set OpenSSL library path to BabaSSL
-- Set build options for BabaSSL: enable-ntls
+- Set OpenSSL library path to Tongsuo
+- Set build options for Tongsuo: enable-ntls
 
 ```bash
 cd tengine
 
 ./configure --add-module=modules/ngx_openssl_ntls \
-    --with-openssl=../BabaSSL \
-    --with-openssl-opt="--strict-warnings enable-ntls" \
+    --with-openssl=../Tongsuo \
+    --with-openssl-opt="--strict-warnings --api=1.1.1 enable-ntls" \
     --with-http_ssl_module --with-stream \
     --with-stream_ssl_module --with-stream_sni
 
@@ -80,30 +80,30 @@ stream {
 
 ## Test NTLS
 
-We need NTLS client to test tengine NTLS server. NTLS client is provided by 
-BabaSSL, so we need install BabaSSL firstly.
+We need NTLS client to test tengine NTLS server. NTLS client is provided by
+Tongsuo, so we need install Tongsuo firstly.
 ```bash
-git clone https://github.com/BabaSSL/BabaSSL.git
+git clone https://github.com/Tongsuo-Project/Tongsuo.git
 
-cd BabaSSL
+cd Tongsuo
 
-./config enable-ntls
+./config --prefix=/opt/tongsuo enable-ntls no-shared
 make -j
 sudo make install
 
 cd ../
 ```
 
-Set TEST_OPENSSL_BINARY to the path of openssl binary provided by BabaSSL.
+Set TEST_OPENSSL_BINARY to the path of openssl binary provided by Tongsuo.
 
 ```bash
 cd tengine
 
-TEST_OPENSSL_BINARY=/opt/babassl/bin/openssl \
+TEST_OPENSSL_BINARY=/opt/tongsuo/bin/openssl \
 TEST_NGINX_BINARY=`pwd`/objs/nginx \
 prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_openssl_ntls/t -v
 ```
 
 ## Reference
-- [BabaSSL website](https://www.babassl.cn/)
-- [BabaSSL document](https://babassl.readthedocs.io/)
+- [Tongsuo website](https://www.tongsuo.net/)
+- [Tongsuo document](https://tongsuo.readthedocs.io/)

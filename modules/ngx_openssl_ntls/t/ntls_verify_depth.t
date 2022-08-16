@@ -13,6 +13,7 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use lib ".";
 use CA qw/ make_sm2_end_certs make_sm2_ca_subca_end_certs /;
 ###############################################################################
 

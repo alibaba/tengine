@@ -15,7 +15,9 @@ use base qw/ Exporter /;
 our @EXPORT = qw/ make_sm2_ca_subca_end_certs  make_sm2_end_certs
     make_rsa_end_cert make_ec_end_cert /;
 
-our $openssl = $ENV{'TEST_OPENSSL_BINARY'} || '/opt/babassl/bin/openssl';
+our $openssl = $ENV{'TEST_OPENSSL_BINARY'} || '/opt/tongsuo/bin/openssl';
+our $is_tongsuo = `$openssl version | grep Tongsuo | wc -l`;
+our $pkey_type = $is_tongsuo == '1' ? "sm2" : "ec";
 
 sub make_sm2_subca($$) {
     my ($t, $tag) = @_;
@@ -186,7 +188,7 @@ sub make_sm2_double_certs($$) {
         or die "Can't create ${tag} param: $!\n";
 
     system("$openssl req -config $d/$subca_cnf "
-        . "-newkey ec:$d/${tag}_sm2.param "
+        . "-newkey $pkey_type:$d/${tag}_sm2.param "
         . "-nodes -keyout $d/${tag}_sign.key "
         . "-sm3 -sigopt sm2_id:1234567812345678 "
         . "-new -out $d/${tag}_sign.csr "
@@ -214,7 +216,7 @@ sub make_sm2_double_certs($$) {
         or die "Can't create ${tag} sign expire crt $!\n";
 
     system("$openssl req -config $d/$subca_cnf "
-        . "-newkey ec:$d/${tag}_sm2.param "
+        . "-newkey $pkey_type:$d/${tag}_sm2.param "
         . "-nodes -keyout $d/${tag}_enc.key "
         . "-sm3 -sigopt sm2_id:1234567812345678 "
         . "-new -out $d/${tag}_enc.csr "
