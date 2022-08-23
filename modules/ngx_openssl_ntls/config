@@ -1,0 +1,3 @@
+if [ $USE_OPENSSL = YES ]; then
+    have=T_NGX_SSL_NTLS . auto/have
+fi

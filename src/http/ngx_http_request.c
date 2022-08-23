@@ -812,6 +812,11 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
             c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
             }
 #endif
+#if (T_NGX_SSL_NTLS)
+            if (sscf->enable_ntls) {
+                SSL_enable_ntls(c->ssl->connection);
+            }
+#endif
 
             ngx_reusable_connection(c, 0);
             rc = ngx_ssl_handshake(c);
