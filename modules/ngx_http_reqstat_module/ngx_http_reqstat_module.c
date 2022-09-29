@@ -123,6 +123,15 @@ static ngx_int_t ngx_http_reqstat_input_body_filter(ngx_http_request_t *r,
 ngx_int_t ngx_http_reqstat_log_flow(ngx_http_request_t *r);
 
 
+// 添加的功能
+static char * ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,
+void *conf);
+
+static ngx_int_t ngx_http_reqstat_traffic_handler(ngx_http_request_t *r);
+
+static char *ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
 static ngx_command_t   ngx_http_reqstat_commands[] = {
 
     { ngx_string("req_status_zone"),
@@ -188,6 +197,21 @@ static ngx_command_t   ngx_http_reqstat_commands[] = {
       0,
       NULL },
 
+    { ngx_string("req_prome_status_zone"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_2MORE,
+      ngx_http_reqstat_prome_zone,
+      0,
+      0,
+      NULL },
+    
+
+    { ngx_string("req_status_prome"),
+      NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
+      ngx_http_reqstat_traffic_prome,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
       ngx_null_command
 };
 
@@ -246,6 +270,7 @@ ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf)
     conf->display = NGX_CONF_UNSET_PTR;
     conf->user_select = NGX_CONF_UNSET_PTR;
     conf->user_defined_str = NGX_CONF_UNSET_PTR;
+    conf->prome_display = NGX_CONF_UNSET_PTR;
 
     return conf;
 }
@@ -264,6 +289,7 @@ ngx_http_reqstat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_ptr_value(conf->display, prev->display, NULL);
     ngx_conf_merge_ptr_value(conf->user_select, prev->user_select, NULL);
     ngx_conf_merge_ptr_value(conf->user_defined_str, prev->user_defined_str, NULL);
+    ngx_conf_merge_ptr_value(conf->prome_display, prev->prome_display, NULL);
 
     return NGX_CONF_OK;
 }
@@ -1686,4 +1712,310 @@ ngx_http_reqstat_check_enable(ngx_http_request_t *r,
     *store = s;
 
     return NGX_OK;
+}
+
+static char * 
+ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
+{
+    ngx_str_t       *value;
+    ngx_uint_t      i;
+    ngx_shm_zone_t      *shm_zone,**z;
+    ngx_http_core_loc_conf_t        *clcf;
+    ngx_http_reqstat_conf_t          *rlcf = conf;
+    // 处理指令请求
+    // 从指令获取共享内存的名字
+    if(rlcf->prome_display !=  NGX_CONF_UNSET_PTR){
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+    
+    if(cf->args->nelts == 1) {
+        return "no prome_zone name";
+    }
+    rlcf->prome_display = ngx_array_create(cf->pool,cf->args->nelts -1,
+                                    sizeof(ngx_shm_zone_t*));
+    if(rlcf->prome_display == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    for(i = 1;i < cf->args->nelts; ++i) {
+        shm_zone = ngx_shared_memory_add(cf,&value[i],0,
+                                            &ngx_http_reqstat_module);
+        if(shm_zone == NULL) {
+            return NGX_CONF_ERROR;
+        }
+        z = ngx_array_push(rlcf->prome_display);
+        *z = shm_zone;
+    }
+
+    // 注册回调函数
+    clcf = ngx_http_conf_get_module_loc_conf(cf,ngx_http_core_module);
+    clcf->handler = ngx_http_reqstat_traffic_handler;
+    return NGX_CONF_OK;
+}
+
+static ngx_int_t 
+ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
+{
+
+    // 思路导师确认,监控需要拿到所有监控内容就需要拿到prome的共享内存name
+    ngx_int_t                                      rc;
+    ngx_str_t                                       type;
+    ngx_buf_t                                      *b;
+    ngx_uint_t                                     i;
+    ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
+    ngx_queue_t                                  *q;
+    ngx_shm_zone_t                            **shm_zone; //获取共享内存
+    ngx_http_reqstat_ctx_t                   *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_conf_t                 *rlcf; // 获取conf文件中的指令
+    ngx_http_reqstat_conf_t                 *smcf;
+    ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    // ngx_http_reqstat_rbnode_t             *display_node;
+    ngx_chain_t                                  *tl,out,**cl;
+
+    rlcf = ngx_http_get_module_loc_conf(r,ngx_http_reqstat_module);
+    smcf = ngx_http_get_module_main_conf(r,ngx_http_reqstat_module);
+    // 直接指向需要监控的指标
+    display_traffic = smcf->monitor;
+
+    if(display_traffic == NULL) {
+        r->headers_out.status = NGX_HTTP_NO_CONTENT;
+        return ngx_http_send_header(r);
+    }
+
+    ngx_str_set(&type,"text/plain");
+
+    r->headers_out.content_type_len = type.len;
+    r->headers_out.content_type = type;
+
+    if(r->method == NGX_HTTP_HEAD) {
+        r->headers_out.status = NGX_HTTP_OK;
+
+        rc = ngx_http_send_header(r);
+
+        if(rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+            return rc;
+        }
+    }
+
+    shm_zone = display_traffic->elts;
+    cl = &out.next;
+
+    // 循环遍历每一个已有的共享内存,将里面的内容按照prome的格式写入到prome_zone中
+    for(i = 0;i < display_traffic->nelts;i++) {
+        //如果遍历到prome_zone name 则跳过
+        if(rlcf->prome_display->elts == shm_zone[i]) continue;
+
+        ctx = shm_zone[i]->data;
+
+        for (q = ngx_queue_head(&ctx->sh->queue);
+             q != ngx_queue_sentinel(&ctx->sh->queue);
+             q = ngx_queue_next(q))
+        {
+            node = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
+
+            if(node->conn_total == 0) {
+                continue;
+            }
+            tl = ngx_alloc_chain_link(r->pool);
+            if(tl == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b = ngx_calloc_buf(r->pool);
+            if(b == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+            
+            tl->buf = b;
+            b->start = ngx_pcalloc(r->pool,1024);
+            if(b->start == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b->end = b->start + 1024;
+            b->last= b->pos = b->start;
+            b->temporary = 1;
+
+
+            b->last = ngx_slprintf(b->last,b->end, NGX_HTTP_REQSTAT_TRAFFIC_STATUS_PROMETHEUS_FMT_MAIN,
+                                        &shm_zone[i]->shm.name,node->bytes_in,
+                                        &shm_zone[i]->shm.name,node->bytes_out,
+                                        &shm_zone[i]->shm.name,node->conn_total,
+                                        &shm_zone[i]->shm.name,node->req_total,
+                                        &shm_zone[i]->shm.name,node->http_2xx,
+                                        &shm_zone[i]->shm.name,node->http_3xx,
+                                        &shm_zone[i]->shm.name,node->http_4xx,
+                                        &shm_zone[i]->shm.name,node->http_5xx,
+                                        &shm_zone[i]->shm.name,node->other_status,
+                                        &shm_zone[i]->shm.name,node->http_200,
+                                        &shm_zone[i]->shm.name,node->http_206,
+                                        &shm_zone[i]->shm.name,node->http_302,
+                                        &shm_zone[i]->shm.name,node->http_304,
+                                        &shm_zone[i]->shm.name,node->http_403,
+                                        &shm_zone[i]->shm.name,node->http_404,
+                                        &shm_zone[i]->shm.name,node->http_416,
+                                        &shm_zone[i]->shm.name,node->http_499,
+                                        &shm_zone[i]->shm.name,node->http_500,
+                                        &shm_zone[i]->shm.name,node->http_502,
+                                        &shm_zone[i]->shm.name,node->http_503,
+                                        &shm_zone[i]->shm.name,node->http_504,
+                                        &shm_zone[i]->shm.name,node->http_508,
+                                        &shm_zone[i]->shm.name,node->other_detail_status,
+                                        &shm_zone[i]->shm.name,node->rt,
+                                        &shm_zone[i]->shm.name,node->ureq,
+                                        &shm_zone[i]->shm.name,node->urt,
+                                        &shm_zone[i]->shm.name,node->utries,
+                                        &shm_zone[i]->shm.name,node->http_ups_4xx,
+                                        &shm_zone[i]->shm.name,node->http_ups_5xx);
+
+
+            // if(b->last == b->pos) {
+            //     b->last = ngx_sprintf(b->last,"#");
+            // }
+            *(b->last - 1) = '\n';
+            tl->next = NULL;
+            *cl = tl;
+            cl = &tl->next;
+        }
+
+    }
+
+    tl = ngx_alloc_chain_link(r->pool);
+    if(tl == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    tl->buf = ngx_calloc_buf(r->pool);
+    if(tl->buf == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    tl->buf->last_buf = 1;
+    tl->next = NULL;
+    *cl = tl;
+    return ngx_http_output_filter(r,out.next);
+}
+
+
+static ngx_int_t
+ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
+{
+    size_t            size;
+    ngx_http_reqstat_ctx_t *ctx,*oldctx;
+    
+    oldctx = data;
+    ctx = shm_zone->data;
+
+    if(oldctx != NULL) {
+        if(ngx_strcmp(ctx->val->data,oldctx->val->data) != 0) {
+            return NGX_ERROR;
+        }
+
+        ctx->shpool = oldctx->shpool;
+        ctx->sh = oldctx->sh;
+
+        return NGX_OK;
+    }
+    ctx->shpool = (ngx_slab_pool_t*) shm_zone->shm.addr;
+
+    ctx->sh = ngx_slab_alloc(ctx->shpool,sizeof(ngx_http_reqstat_shctx_t));
+    if(ctx->sh == NULL) {
+        return NGX_ERROR;
+    }
+    ctx->shpool->data = ctx->sh;
+
+    size = sizeof(" make prome_zone \"\"") + shm_zone->shm.name.len;
+    ctx->shpool->log_ctx = ngx_slab_alloc(ctx->shpool,size);
+    if (ctx->shpool->log_ctx == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_sprintf(ctx->shpool->log_ctx,
+                    "in prome_zone \" %V \"%Z",
+                    &shm_zone->shm.name);
+
+    ngx_queue_init(&ctx->sh->queue);
+
+    return NGX_OK;
+}
+
+static char *
+ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    // 获取指令
+    // 已有的req_stat_zone的指令格式为req_status_zone server "$host,$server_addr:$server_port" 10M;
+    // 目前思路:先按照已有的命令进行解析 问题:是否和req_stat一样引入变量("$host,$server_addr:$server_port")?
+    ssize_t                 size; //共享内存的大小
+    ngx_str_t              *value; //用于解析指令的指针
+    ngx_shm_zone_t     *shm_zone;//共享内存的指针
+    ngx_http_reqstat_ctx_t     *ctx;//用来存储解析conf的指针
+    ngx_http_compile_complex_value_t ccv;//是来保存解析出第二个指令
+
+    value = cf->args->elts;
+    // 获取指令给定的第三个值的大小
+    size = ngx_parse_size(&value[3]);
+    if(size == NGX_ERROR){
+        ngx_conf_log_error(NGX_LOG_EMERG,cf,0,
+                                "invalid prome zone size \"%V\"",&value[3]);
+        return NGX_CONF_ERROR;
+    }
+
+
+    // 这里是按照原有的共享内存来判断大小,最小设置32k
+    if(size < (ssize_t)(8 * ngx_pagesize)) {
+        ngx_conf_log_error(NGX_LOG_EMERG,cf,0,
+                                "zone \"%V\" is too small",&value[1]);
+        return NGX_CONF_ERROR;
+    }
+
+    ctx = ngx_pcalloc(cf->pool,sizeof(ngx_http_reqstat_ctx_t));
+    if(ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_http_script_variables_count(&value[2]) == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "the value \"%V\" is a constant",
+                           &value[2]);
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[2];
+    ccv.complex_value = &ctx->value;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    ctx->val = ngx_palloc(cf->pool, sizeof(ngx_str_t));
+    if (ctx->val == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    *ctx->val = value[2];
+
+    ctx->key_len = 152;          /* now an item is 640B at length. */
+    ctx->recycle_rate = 167;     /* rate threshold is 10r/min */
+    ctx->alloc_already_fail = 0;
+
+    shm_zone = ngx_shared_memory_add(cf,&value[1],size,
+                                    &ngx_http_reqstat_module);
+    if(shm_zone == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    // 共享内存已经存在就返回错误
+    if(shm_zone->data) {
+        ctx = shm_zone->data;
+       return NGX_CONF_ERROR;
+    }
+
+    shm_zone->init = ngx_http_reqstat_prome_init_zone;
+    shm_zone->data = ctx;
+
+    return NGX_CONF_OK;
+
 }

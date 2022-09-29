@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "ngx_http_reqstat.h": "c"
+    }
+}
