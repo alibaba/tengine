@@ -1,11 +1,18 @@
-#include <nginx.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include<nginx.h>
 
 #define NGX_HTTP_REQSTAT_TRAFFIC_STATUS_PROMETHEUS_FMT_MAIN                      \
+    "# HELP tengine_reqstat_info Nginx info\n"                                       \
+    "# TYPE tengine_reqstat_info gauge\n"                                            \
+    "tengine_reqstat_info{hostname=\"%V\",module_version=\"%s\",version=\"%s\"} 1\n" \
+    "# HELP tengine_reqstat_server_bytes_total The request/response bytes\n"         \
+    "# TYPE tengine_reqstat_server_bytes_total counter\n"                            \
     "tengine_reqstat_server_bytes_total{host=\"%V\",direction=\"in\"} %uA\n"         \
     "tengine_reqstat_server_bytes_total{host=\"%V\",direction=\"out\"} %uA\n"        \
+    "# HELP tengine_reqstat_server_requests_total The requests counter\n"            \
+    "# TYPE tengine_reqstat_server_requests_total counter\n"                         \
     "tengine_reqstat_server_requests_total{host=\"%V\",code=\"conn_total\"} %uA\n"          \
     "tengine_reqstat_server_requests_total{host=\"%V\",code=\"req_total\"} %uA\n"          \
     "tengine_reqstat_server_requests_total{host=\"%V\",code=\"2xx\"} %uA\n"          \
@@ -34,8 +41,6 @@
     "tengine_reqstat_server_requests_total{host=\"%V\",code=\"http_ups_4xx\"} %uA\n"          \
     "tengine_reqstat_server_requests_total{host=\"%V\",code=\"http_ups_5xx\"} %uA\n"             
 
-
-
 #define NGX_HTTP_REQSTAT_RSRV    29
 #define NGX_HTTP_REQSTAT_MAX     50
 #define NGX_HTTP_REQSTAT_USER    NGX_HTTP_REQSTAT_MAX - NGX_HTTP_REQSTAT_RSRV
@@ -52,7 +57,7 @@ struct variable_index_s {
     ngx_int_t                    index;
 };
 
-struct ngx_http_reqstat_rbnode_s {
+struct  ngx_http_reqstat_rbnode_s {
     u_char                       color;
     u_char                       padding[3];
     uint32_t                     len;
