@@ -1131,6 +1131,7 @@ ngx_http_tfs_send_response(ngx_http_request_t *r, ngx_http_tfs_t *t)
     r->write_event_handler = ngx_http_tfs_process_non_buffered_downstream;
 
     r->limit_rate = 0;
+    r->limit_rate_set = 1;
 
     if (clcf->tcp_nodelay && c->tcp_nodelay == NGX_TCP_NODELAY_UNSET) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "tcp_nodelay");
