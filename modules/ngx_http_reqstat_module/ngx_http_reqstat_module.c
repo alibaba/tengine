@@ -75,6 +75,40 @@ off_t ngx_http_reqstat_fields[29] = {
     NGX_HTTP_REQSTAT_UPS_5XX
 };
 
+#define NGX_HTTP_REQSTAT_FMT_KEY_NUMS               29
+
+char* ngx_http_reqstat_fmt_key[29] = {
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_REQ_TOTAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_2XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_3XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_5XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_OTHER_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_REQ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_TRIES,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_200,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_206,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_302,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_304,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_403,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_404,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_416,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_499,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_500 ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_502,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_503,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_504,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_508,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_OTHER_DETAIL_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX
+};
+
 
 static void *ngx_http_reqstat_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf);
@@ -1732,7 +1766,7 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
     if(cf->args->nelts == 1) {
         return "no prome_zone name";
     }
-    rlcf->prome_display = ngx_array_create(cf->pool,cf->args->nelts -1,
+    rlcf->prome_display = ngx_array_create(cf->pool, cf->args->nelts -1,
                                     sizeof(ngx_shm_zone_t*));
     if(rlcf->prome_display == NULL) {
         return NGX_CONF_ERROR;
@@ -1740,7 +1774,7 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
     // rlcf->prome_display
 
     for(i = 1;i < cf->args->nelts; ++i) {
-        shm_zone = ngx_shared_memory_add(cf,&value[i],0,
+        shm_zone = ngx_shared_memory_add(cf, &value[i], 0,
                                             &ngx_http_reqstat_module);
         if(shm_zone == NULL) {
             return NGX_CONF_ERROR;
@@ -1767,52 +1801,42 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
     ngx_int_t                                      rc;
     // ngx_str_t                                       type;
     ngx_buf_t                                      *b;
-    ngx_uint_t                                     i;
+    ngx_uint_t                                     i,j;
     ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
     ngx_queue_t                                  *q;
     ngx_shm_zone_t                            **shm_zone; //获取共享内存
     ngx_http_reqstat_ctx_t                   *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                 *rlcf; // 获取conf文件中的指令
-    ngx_http_reqstat_conf_t                 *smcf;
+    // ngx_http_reqstat_conf_t                 *smcf;
     ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
     // ngx_http_reqstat_rbnode_t             *display_node;
     ngx_chain_t                                  out;
-    size_t                                            size;
+    size_t                                            size,nodes;
+    size_t                                            host_len;
     // u_char                                          *o,*s,*p;
 
     rlcf = ngx_http_get_module_loc_conf(r,ngx_http_reqstat_module);
-    smcf = ngx_http_get_module_main_conf(r,ngx_http_reqstat_module);
-    // 直接指向需要监控的指标
-    display_traffic = rlcf->prome_display == NULL ? smcf->monitor : rlcf->prome_display;
-
-    if(rlcf->prome_display == NULL) {
-        r->headers_out.status = NGX_HTTP_NO_CONTENT;
-        return ngx_http_send_header(r);
-    }
-
-
-    // ngx_str_set(&type,"text/plain");
-
-    // r->headers_out.content_type_len = type.len;
-    // r->headers_out.content_type = type;
-
-    if(r->method == NGX_HTTP_HEAD) {
-        r->headers_out.status = NGX_HTTP_OK;
-
-        rc = ngx_http_send_header(r);
-
-        if(rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
-            return rc;
-        }
-    }
+    // smcf = ngx_http_get_module_main_conf(r,ngx_http_reqstat_module);
+    // 直接指向需要监控的指标X
+    display_traffic = rlcf->prome_display;
 
     shm_zone = rlcf->prome_display->elts;
 
     size = 0;
+    nodes = 0;
+    host_len =0;
+    
+    for(i = 0;i < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;i++) {
+        size += ngx_strlen(ngx_http_reqstat_fmt_key[i]);
+    }
+
+    
+    // size = 5800;
 
      for(i = 0;i < display_traffic->nelts;i++) {
 
         ctx = shm_zone[i]->data;
+
 
         for (q = ngx_queue_head(&ctx->sh->queue);
              q != ngx_queue_sentinel(&ctx->sh->queue);
@@ -1823,15 +1847,14 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
             if(node->conn_total == 0) {
                 continue;
             }
-            ++size;
+            host_len += ngx_strlen(node->data);
+            ++nodes;
         }
     }
 
-    if(size == 0){
-        size = 2500;
-    }else{
-        size *= 2500;
-    }
+    if(nodes == 0)
+    nodes = 1;
+    size = nodes*(size+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
 
 
     b = ngx_calloc_buf(r->pool);
@@ -1854,6 +1877,10 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
         // if(rlcf->prome_display->elts != shm_zone[i]) continue;
 
         ctx = shm_zone[i]->data;
+        // 先打印出共享内存和tengine的信息(可删)
+        b->last = ngx_slprintf(b->last,b->end,NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_INFO,
+                                    &shm_zone[i]->shm.name,
+                                    TENGINE_VERSION,NGINX_VERSION);
 
         for (q = ngx_queue_head(&ctx->sh->queue);
              q != ngx_queue_sentinel(&ctx->sh->queue);
@@ -1865,38 +1892,51 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
                 continue;
             }
 
-            b->last = ngx_slprintf(b->last,b->end, NGX_HTTP_REQSTAT_TRAFFIC_STATUS_PROMETHEUS_FMT_MAIN,
-                                        &ngx_cycle->hostname,
-                                        TENGINE_VERSION,NGINX_VERSION,
-                                        &shm_zone[i]->shm.name,node->bytes_in,
-                                        &shm_zone[i]->shm.name,node->bytes_out,
-                                        &shm_zone[i]->shm.name,node->conn_total,
-                                        &shm_zone[i]->shm.name,node->req_total,
-                                        &shm_zone[i]->shm.name,node->http_2xx,
-                                        &shm_zone[i]->shm.name,node->http_3xx,
-                                        &shm_zone[i]->shm.name,node->http_4xx,
-                                        &shm_zone[i]->shm.name,node->http_5xx,
-                                        &shm_zone[i]->shm.name,node->other_status,
-                                        &shm_zone[i]->shm.name,node->http_200,
-                                        &shm_zone[i]->shm.name,node->http_206,
-                                        &shm_zone[i]->shm.name,node->http_302,
-                                        &shm_zone[i]->shm.name,node->http_304,
-                                        &shm_zone[i]->shm.name,node->http_403,
-                                        &shm_zone[i]->shm.name,node->http_404,
-                                        &shm_zone[i]->shm.name,node->http_416,
-                                        &shm_zone[i]->shm.name,node->http_499,
-                                        &shm_zone[i]->shm.name,node->http_500,
-                                        &shm_zone[i]->shm.name,node->http_502,
-                                        &shm_zone[i]->shm.name,node->http_503,
-                                        &shm_zone[i]->shm.name,node->http_504,
-                                        &shm_zone[i]->shm.name,node->http_508,
-                                        &shm_zone[i]->shm.name,node->other_detail_status,
-                                        &shm_zone[i]->shm.name,node->rt,
-                                        &shm_zone[i]->shm.name,node->ureq,
-                                        &shm_zone[i]->shm.name,node->urt,
-                                        &shm_zone[i]->shm.name,node->utries,
-                                        &shm_zone[i]->shm.name,node->http_ups_4xx,
-                                        &shm_zone[i]->shm.name,node->http_ups_5xx);
+            for (j = 0; j < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;j++) {
+                    b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key[j],
+                                                node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                                                ngx_http_reqstat_fields[j]));
+                }
+
+                // if (ctx->user_defined) {
+                //     for (j = 0; j < ctx->user_defined->nelts; j++) {
+                //         b->last = ngx_slprintf(b->last, b->end, "%uA,",
+                //                            *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
+                //     }
+                // }
+            // b->last = ngx_slprintf(b->last,b->end, NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT,
+            //                             node->data,
+            //                             TENGINE_VERSION,NGINX_VERSION,
+            //                             &shm_zone[i]->shm.name,node->bytes_in,
+            //                             &shm_zone[i]->shm.name,node->bytes_out,
+            //                             &shm_zone[i]->shm.name,node->conn_total,
+            //                             &shm_zone[i]->shm.name,node->req_total,
+            //                             &shm_zone[i]->shm.name,node->http_2xx,
+            //                             &shm_zone[i]->shm.name,node->http_3xx,
+            //                             &shm_zone[i]->shm.name,node->http_4xx,
+            //                             &shm_zone[i]->shm.name,node->http_5xx,
+            //                             &shm_zone[i]->shm.name,node->other_status,
+            //                             &shm_zone[i]->shm.name,node->http_200,
+            //                             &shm_zone[i]->shm.name,node->http_206,
+            //                             &shm_zone[i]->shm.name,node->http_302,
+            //                             &shm_zone[i]->shm.name,node->http_304,
+            //                             &shm_zone[i]->shm.name,node->http_403,
+            //                             &shm_zone[i]->shm.name,node->http_404,
+            //                             &shm_zone[i]->shm.name,node->http_416,
+            //                             &shm_zone[i]->shm.name,node->http_499,
+            //                             &shm_zone[i]->shm.name,node->http_500,
+            //                             &shm_zone[i]->shm.name,node->http_502,
+            //                             &shm_zone[i]->shm.name,node->http_503,
+            //                             &shm_zone[i]->shm.name,node->http_504,
+            //                             &shm_zone[i]->shm.name,node->http_508,
+            //                             &shm_zone[i]->shm.name,node->other_detail_status,
+            //                             &shm_zone[i]->shm.name,node->rt,
+            //                             &shm_zone[i]->shm.name,node->ureq,
+            //                             &shm_zone[i]->shm.name,node->urt,
+            //                             &shm_zone[i]->shm.name,node->utries,
+            //                             &shm_zone[i]->shm.name,node->http_ups_4xx,
+            //                             &shm_zone[i]->shm.name,node->http_ups_5xx);
 
 
             if(b->last == b->pos) {
@@ -1909,7 +1949,7 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;
-    b->last_buf = (r==r->main) ? 1 : 0;
+    b->last_buf = 1;
     b->last_in_chain = 1;
 
     out.buf = b;

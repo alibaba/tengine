@@ -7,15 +7,25 @@
 
 typedef struct {
     ngx_int_t   test;
+    ngx_msec_t              time_out;
+    ngx_array_t              *uri_prome;
 } ngx_proc_prome_traffic_main_conf_t; 
+
 
 static ngx_int_t ngx_proc_prome_traffic_prepare(ngx_cycle_t *cycle);
 static void ngx_proc_prome_traffic_exit_worker(ngx_cycle_t *cycle);
 static ngx_int_t ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle);
 static void * ngx_proc_prome_traffic_create_main_conf(ngx_conf_t *cf);
 
+// 里面初始化指令数据(例如时间,port,)
 static ngx_command_t ngx_proc_prome_traffic_commands[] = {
-
+    { ngx_string("traffic_timeout"),
+      NGX_PROC_CONF | NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_PROC_CONF_OFFSET,
+      offsetof(ngx_proc_prome_traffic_main_conf_t, time_out),
+      NULL,
+    }
     
 
     ngx_null_command
@@ -59,6 +69,8 @@ ngx_proc_prome_traffic_prepare(ngx_cycle_t *cycle)
 static ngx_int_t
 ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
 {
+
+    
     return NGX_OK;
 }
 
@@ -82,6 +94,8 @@ ngx_proc_prome_traffic_create_main_conf(ngx_conf_t *cf)
     }
 
     conf->test = 0;
+    conf->time_out = 0;
+    conf->uri_prome = NGX_CONF_UNSET_PTR;
 
     return conf;
 }
