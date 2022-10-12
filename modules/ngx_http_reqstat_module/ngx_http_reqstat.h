@@ -4,160 +4,160 @@
 #include<nginx.h>
 
 
-#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_INFO                      \
+#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_INFO                      \
     "# HELP tengine_reqstat_info Nginx info\n"                                       \
     "# TYPE tengine_reqstat_info gauge\n"                                            \
     "tengine_reqstat_info{shm_zone=\"%V\",module_version=\"%s\",version=\"%s\"} 1\n" 
 
 
-#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN                      \
+#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_IN                      \
 "# HELP tengine_reqstat_bytes_in The request bytes\n"         \
 "# TYPE tengine_reqstat_bytes_in counter\n"    \
 "tengine_reqstat_bytes_in{host=\"%s\"} %uA\n" 
 
 
-#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT                      \
+#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_OUT                      \
     "# HELP tengine_reqstat_bytes_out The response bytes\n"         \
     "# TYPE tengine_reqstat_bytes_out counter\n"                                           \
     "tengine_reqstat_bytes_out{host=\"%s\"} %uA\n" 
 
 
-#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL                      \
+#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_CONN_TATAL                      \
     "# HELP tengine_reqstat_conn_total The connections of server\n"         \
     "# TYPE tengine_reqstat_conn_total counter\n"                                           \
     "tengine_reqstat_conn_total{host=\"%s\"} %uA\n" 
    
 
-#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_REQ_TOTAL                      \
+#define NGX_HTTP_REQSTAT_TRAFFIC_PROME_REQ_TOTAL                      \
     "# HELP tengine_reqstat_req_total The requests of server\n"         \
     "# TYPE tengine_reqstat_req_total counter\n"                                           \
     "tengine_reqstat_req_total{host=\"%s\"} %uA\n" 
    
 
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_2XX                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_2XX                      \
     "# HELP tengine_reqstat_http_2xx The 2xx\n"         \
     "# TYPE tengine_reqstat_http_2xx counter\n"                                           \
     "tengine_reqstat_http_2xx{host=\"%s\"} %uA\n" 
 
 
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_3XX                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_3XX                      \
     "# HELP tengine_reqstat_http_3xx The 2xx\n"         \
     "# TYPE tengine_reqstat_http_3xx counter\n"                                           \
     "tengine_reqstat_http_3xx{host=\"%s\"} %uA\n" 
 
 
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_4XX                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_4XX                      \
     "# HELP tengine_reqstat_http_4xx The 2xx\n"         \
     "# TYPE tengine_reqstat_http_4xx counter\n"                                           \
     "tengine_reqstat_http_4xx{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_5XX                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_5XX                      \
     "# HELP tengine_reqstat_http_5xx The 2xx\n"         \
     "# TYPE tengine_reqstat_http_5xx counter\n"                                           \
     "tengine_reqstat_http_5xx{host=\"%s\"} %uA\n" 
    
-     #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_OTHER_STATUS                      \
+     #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_OTHER_STATUS                      \
     "# HELP tengine_reqstat_http_other_status The 2xx\n"         \
     "# TYPE tengine_reqstat_http_other_status counter\n"                                           \
     "tengine_reqstat_http_other_status{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_RT                     \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_RT                     \
     "# HELP tengine_reqstat_rt The 2xx\n"         \
     "# TYPE tengine_reqstat_rt counter\n"                                           \
     "tengine_reqstat_rt{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_REQ                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_REQ                      \
     "# HELP tengine_reqstat_ups_req The request/response bytes\n"         \
     "# TYPE tengine_reqstat_ups_req counter\n"                                           \
     "tengine_reqstat_ups_req{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_RT                    \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_RT                    \
     "# HELP tengine_reqstat_ups_rt The request/response bytes\n"         \
     "# TYPE tengine_reqstat_ups_rt counter\n"                                           \
     "tengine_reqstat_ups_rt{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_TRIES                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_TRIES                      \
     "# HELP tengine_reqstat_ups_tries The request/response bytes\n"         \
     "# TYPE tengine_reqstat_ups_tries counter\n"                                           \
     "tengine_reqstat_ups_tries{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_200                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_200                      \
     "# HELP tengine_reqstat_http_200l The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_200 counter\n"                                           \
     "tengine_reqstat_http_200{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_206                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_206                      \
     "# HELP tengine_reqstat_http_206 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_206 counter\n"                                           \
     "tengine_reqstat_http_206{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_302                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_302                      \
     "# HELP tengine_reqstat_http_302 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_302 counter\n"                                           \
     "tengine_reqstat_http_302{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_304                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_304                      \
     "# HELP tengine_reqstat_http_304 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_304 counter\n"                                           \
     "tengine_reqstat_http_304{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_403                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_403                      \
     "# HELP tengine_reqstat_http_403 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_403 counter\n"                                           \
     "tengine_reqstat_http_403{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_404                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_404                      \
     "# HELP tengine_reqstat_http_404 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_404 counter\n"                                           \
     "tengine_reqstat_http_404{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_416                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_416                      \
     "# HELP tengine_reqstat_http_416 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_416 counter\n"                                           \
     "tengine_reqstat_http_416{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_499                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_499                      \
     "# HELP tengine_reqstat_http_499 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_499 counter\n"                                           \
     "tengine_reqstat_http_499{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_500                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_500                      \
     "# HELP tengine_reqstat_http_500 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_500 counter\n"                                           \
     "tengine_reqstat_http_500{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_502                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_502                      \
     "# HELP tengine_reqstat_http_502 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_502 counter\n"                                           \
     "tengine_reqstat_http_502{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_503                     \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_503                     \
     "# HELP tengine_reqstat_http_503 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_503 counter\n"                                           \
     "tengine_reqstat_http_503{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_504                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_504                      \
     "# HELP tengine_reqstat_http_504 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_504 counter\n"                                          \
     "tengine_reqstat_http_504{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_508                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_508                      \
     "# HELP tengine_reqstat_http_508 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_508 counter\n"                                           \
     "tengine_reqstat_http_508{host=\"%s\"} %uA\n" 
    
 
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_OTHER_DETAIL_STATUS                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_OTHER_DETAIL_STATUS                      \
     "# HELP tengine_reqstat_http_other_detail_status The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_other_detail_status counter\n"                                           \
     "tengine_reqstat_http_other_detail_status{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_4XX                      \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_4XX                      \
     "# HELP tengine_reqstat_ups_4xx The request/response bytes\n"         \
     "# TYPE tengine_reqstat_ups_4xx counter\n"                                           \
     "tengine_reqstat_ups_4xx{host=\"%s\"} %uA\n" 
    
-    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX                     \
+    #define NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_5XX                     \
     "# HELP tengine_reqstat_ups_5xx The request/response bytes\n"         \
     "# TYPE tengine_reqstat_ups_5xx counter\n"                                           \
     "tengine_reqstat_ups_5xx{host=\"%s\"} %uA\n" 

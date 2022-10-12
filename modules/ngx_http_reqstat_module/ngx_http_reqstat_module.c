@@ -4,7 +4,7 @@
 
 
 #include "ngx_http_reqstat.h"
-#include<stdio.h>
+
 
 static ngx_http_input_body_filter_pt  ngx_http_next_input_body_filter;
 extern ngx_int_t (*ngx_http_write_filter_stat)(ngx_http_request_t *r);
@@ -78,35 +78,35 @@ off_t ngx_http_reqstat_fields[29] = {
 #define NGX_HTTP_REQSTAT_FMT_KEY_NUMS               29
 
 char* ngx_http_reqstat_fmt_key[29] = {
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_REQ_TOTAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_2XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_3XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_5XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_OTHER_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_REQ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_TRIES,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_200,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_206,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_302,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_304,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_403,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_404,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_416,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_499,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_500 ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_502,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_503,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_504,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_508,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_OTHER_DETAIL_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_IN,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_OUT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_CONN_TATAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_REQ_TOTAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_2XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_3XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_5XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_OTHER_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_REQ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_TRIES,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_200,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_206,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_302,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_304,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_403,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_404,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_416,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_499,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_500 ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_502,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_503,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_504,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_508,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_OTHER_DETAIL_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_5XX
 };
 
 
@@ -1761,8 +1761,7 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
     }
 
     value = cf->args->elts;
-    // printf("%s***************************\n",(char*)(value+1)->data);
-    // printf("%ld+++++++++++++++++++++++++++++++++++\n",(ngx_uint_t)cf->args->nelts);
+  
     if(cf->args->nelts == 1) {
         return "no prome_zone name";
     }
@@ -1782,10 +1781,6 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
         z = ngx_array_push(rlcf->prome_display);
         *z = shm_zone;
     }
-    // printf("%ld***************************\n",(ngx_uint_t)rlcf->prome_display->nelts);
-    // value = rlcf->prome_display->elts;
-    // if(rlcf->prome_display == NULL)
-    // printf("%s****************************\n",(char*)(value)->data);
 
     // 注册回调函数
     clcf = ngx_http_conf_get_module_loc_conf(cf,ngx_http_core_module);
@@ -2086,36 +2081,3 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-// static ngx_int_t
-// ngx_http_reqstat_traffic_init_worker(ngx_cycle_t *cycle)
-// {
-//     ngx_event_t                          *req_event;
-//     ngx_http_reqstat_ctx_t  *ctx;
-
-//     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
-//                    "http reqstat init worker");
-
-//     ctx = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_reqstat_module);
-
-//     if (ctx == NULL) {
-//         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
-//                        "reqstat::init_worker(): is bypassed due to no http block in configure file");
-//         return NGX_OK;
-//     }
-
-//     if (!(ctx->enable & ctx->dump) || ctx->rbtree == NULL) {
-//         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cycle->log, 0,
-//                        "vts::init_worker(): is bypassed");
-//         return NGX_OK;
-//     }
-
-//     /* dumper */
-//     req_event = &ctx->req_event;
-//     req_event->handler = ngx_reqstat_traffic_prome_handler;
-//     req_event->log = ngx_cycle->log;
-//     req_event->data = ctx;
-//     ngx_add_timer(req_event, 1000);
-
-
-//     return NGX_OK;
-// }
