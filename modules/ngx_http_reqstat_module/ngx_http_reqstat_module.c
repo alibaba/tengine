@@ -1800,7 +1800,7 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 {
 
     ngx_int_t                                      rc;
-    // ngx_str_t                                       type;
+    ngx_str_t                                       type;
     ngx_buf_t                                      *b;
     ngx_uint_t                                     i,j;
     ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
@@ -1814,9 +1814,10 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
     ngx_chain_t                                  out,*tl,**cl;
     size_t                                            size,nodes,per_size;
     size_t                                            host_len,sum;
-    ngx_int_t                                       ngx_ret;
+    // ngx_int_t                                       ngx_ret;
     // u_char                                          *o,*s,*p;
-
+    // clock_t                                            start,finish;
+    // double                                            duration;
 
 
     // rlcf = ngx_http_conf_get_module_main_conf(r,ngx_http_reqstat_module);
@@ -1825,7 +1826,10 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
     // 直接指向需要监控的指标X
     display_traffic = rlcf->prome_display;
 
-  r->headers_out.status = NGX_HTTP_OK;
+    ngx_str_set(&type,"text/plain");
+    r->headers_out.content_type = type;
+    r->headers_out.content_type_len = type.len;
+    r->headers_out.status = NGX_HTTP_OK;
     ngx_http_clear_content_length(r);
 
     rc = ngx_http_send_header(r);
@@ -2143,4 +2147,5 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 
 }
+
 
