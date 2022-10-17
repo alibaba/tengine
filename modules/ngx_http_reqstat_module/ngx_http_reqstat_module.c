@@ -4,6 +4,8 @@
 
 
 #include "ngx_http_reqstat.h"
+#include<stdio.h>
+#include<time.h>
 
 
 static ngx_http_input_body_filter_pt  ngx_http_next_input_body_filter;
@@ -78,35 +80,35 @@ off_t ngx_http_reqstat_fields[29] = {
 #define NGX_HTTP_REQSTAT_FMT_KEY_NUMS               29
 
 char* ngx_http_reqstat_fmt_key[29] = {
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_IN,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_BYTES_OUT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_CONN_TATAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_REQ_TOTAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_2XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_3XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_5XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_OTHER_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_REQ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_TRIES,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_200,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_206,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_302,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_304,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_403,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_404,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_416,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_499,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_500 ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_502,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_503,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_504,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_508,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_HTTP_OTHER_DETAIL_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_UPS_5XX
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_REQ_TOTAL,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_2XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_3XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_5XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_OTHER_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_REQ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_RT,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_TRIES,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_200,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_206,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_302,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_304,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_403,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_404,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_416,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_499,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_500 ,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_502,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_503,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_504,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_508,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_OTHER_DETAIL_STATUS,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_4XX,
+    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX
 };
 
 
@@ -1761,7 +1763,8 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
     }
 
     value = cf->args->elts;
-  
+    // printf("%s***************************\n",(char*)(value+1)->data);
+    // printf("%ld+++++++++++++++++++++++++++++++++++\n",(ngx_uint_t)cf->args->nelts);
     if(cf->args->nelts == 1) {
         return "no prome_zone name";
     }
@@ -1781,6 +1784,10 @@ ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
         z = ngx_array_push(rlcf->prome_display);
         *z = shm_zone;
     }
+    // printf("%ld***************************\n",(ngx_uint_t)rlcf->prome_display->nelts);
+    // value = rlcf->prome_display->elts;
+    // if(rlcf->prome_display == NULL)
+    // printf("%s****************************\n",(char*)(value)->data);
 
     // 注册回调函数
     clcf = ngx_http_conf_get_module_loc_conf(cf,ngx_http_core_module);
@@ -1792,7 +1799,6 @@ static ngx_int_t
 ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 {
 
-    // 思路导师确认,监控需要拿到所有监控内容就需要拿到prome的共享内存name
     ngx_int_t                                      rc;
     // ngx_str_t                                       type;
     ngx_buf_t                                      *b;
@@ -1805,27 +1811,43 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
     // ngx_http_reqstat_conf_t                 *smcf;
     ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
     // ngx_http_reqstat_rbnode_t             *display_node;
-    ngx_chain_t                                  out;
-    size_t                                            size,nodes;
-    size_t                                            host_len;
+    ngx_chain_t                                  out,*tl,**cl;
+    size_t                                            size,nodes,per_size;
+    size_t                                            host_len,sum;
+    ngx_int_t                                       ngx_ret;
     // u_char                                          *o,*s,*p;
 
+
+
+    // rlcf = ngx_http_conf_get_module_main_conf(r,ngx_http_reqstat_module);
     rlcf = ngx_http_get_module_loc_conf(r,ngx_http_reqstat_module);
     // smcf = ngx_http_get_module_main_conf(r,ngx_http_reqstat_module);
     // 直接指向需要监控的指标X
     display_traffic = rlcf->prome_display;
 
+  r->headers_out.status = NGX_HTTP_OK;
+    ngx_http_clear_content_length(r);
+
+    rc = ngx_http_send_header(r);
+    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+        return rc;
+    }
+
     shm_zone = rlcf->prome_display->elts;
 
+    cl = &out.next;
+
+    per_size = 0;
+    sum = 0;
     size = 0;
     nodes = 0;
     host_len =0;
     
     for(i = 0;i < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;i++) {
-        size += ngx_strlen(ngx_http_reqstat_fmt_key[i]);
+        sum += ngx_strlen(ngx_http_reqstat_fmt_key[i]);
     }
 
-    
+    per_size = sum;
     // size = 5800;
 
      for(i = 0;i < display_traffic->nelts;i++) {
@@ -1849,23 +1871,23 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 
     if(nodes == 0)
     nodes = 1;
-    size = nodes*(size+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
+    sum = nodes*(sum+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
 
 
     b = ngx_calloc_buf(r->pool);
     if(b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
-    b->start = ngx_pcalloc(r->pool,size);
-    if(b->start == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
+    // b->start = ngx_pcalloc(r->pool,size);
+    // if(b->start == NULL) {
+    //     return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    // }
 
-    b->end = b->start + size;
-    b->last= b->pos = b->start;
-    b->temporary = 1;
+    // b->end = b->start + size;
+    // b->last= b->pos = b->start;
+    // b->temporary = 1;
 
-            
+
     // 循环遍历每一个已有的共享内存,将里面的内容按照prome的格式写入到prome_zone中
     for(i = 0;i < display_traffic->nelts;i++) {
         // 如果遍历到prome_zone name 则跳过
@@ -1887,11 +1909,36 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
                 continue;
             }
 
+            tl = ngx_alloc_chain_link(r->pool);
+            if (tl == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b = ngx_calloc_buf(r->pool);
+            if(b == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            // 每个结点的大小
+            size = per_size+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
+            tl->buf = b;
+            b->start = ngx_pcalloc(r->pool,size);
+            if(b->start == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            b->end = b->start + size;
+            b->last= b->pos = b->start;
+            b->temporary = 1;
+
+
             for (j = 0; j < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;j++) {
                     b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                 ngx_http_reqstat_fields[j]));
                 }
+
+
 
                 // if (ctx->user_defined) {
                 //     for (j = 0; j < ctx->user_defined->nelts; j++) {
@@ -1934,28 +1981,46 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
             //                             &shm_zone[i]->shm.name,node->http_ups_5xx);
 
 
-            if(b->last == b->pos) {
-                b->last = ngx_sprintf(b->last,"#");
-            }
+            // if(b->last == b->pos) {
+            //     b->last = ngx_sprintf(b->last,"#");
+            // }
             *(b->last - 1) = '\n';
+            tl->next = NULL;
+            *cl = tl;
+            cl = &tl->next;
         }
     }
 
 
-    r->headers_out.status = NGX_HTTP_OK;
-    r->headers_out.content_length_n = b->last - b->pos;
-    b->last_buf = 1;
-    b->last_in_chain = 1;
+    // r->headers_out.status = NGX_HTTP_OK;
+    // r->headers_out.content_length_n = sum;
+    // // b->last_buf = 1;
+    // // b->last_in_chain = 1;
 
-    out.buf = b;
-    out.next = NULL;
+    // // out.buf = b;
+    // // out.next = NULL;
 
-    rc = ngx_http_send_header(r);
-    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
-        return rc;
+    // rc = ngx_http_send_header(r);
+    // if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+    //     return rc;
+    // }
+
+    tl = ngx_alloc_chain_link(r->pool);
+    if (tl == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    return ngx_http_output_filter(r,&out);
+    tl->buf = ngx_calloc_buf(r->pool);
+    if (tl->buf == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    tl->buf->last_buf = 1;
+    tl->next = NULL;
+    *cl = tl;
+
+
+    return ngx_http_output_filter(r,out.next);
 }
 
 
@@ -1963,7 +2028,7 @@ static ngx_int_t
 ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
     size_t            size;
-    ngx_http_reqstat_ctx_t *ctx,*oldctx;
+    ngx_http_reqstat_prome_traffic_ctx_t *ctx,*oldctx;
     
     oldctx = data;
     ctx = shm_zone->data;
@@ -2009,8 +2074,8 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ssize_t                 size; //共享内存的大小
     ngx_str_t              *value; //用于解析指令的指针
     ngx_shm_zone_t     *shm_zone;//共享内存的指针
-    ngx_http_reqstat_ctx_t     *ctx;//用来存储解析conf的指针
-    ngx_http_compile_complex_value_t ccv;//是来保存解析出第二个指令
+    ngx_http_reqstat_prome_traffic_ctx_t     *ctx;//用来存储解析conf的指针
+    ngx_http_compile_complex_value_t        ccv;//是来保存解析出第二个指令
 
     value = cf->args->elts;
     // 获取指令给定的第三个值的大小
@@ -2029,7 +2094,7 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ctx = ngx_pcalloc(cf->pool,sizeof(ngx_http_reqstat_ctx_t));
+    ctx = ngx_pcalloc(cf->pool,sizeof(ngx_http_reqstat_prome_traffic_ctx_t));
     if(ctx == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -2057,9 +2122,8 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
     *ctx->val = value[2];
 
-    ctx->key_len = 152;          /* now an item is 640B at length. */
-    ctx->recycle_rate = 167;     /* rate threshold is 10r/min */
-    ctx->alloc_already_fail = 0;
+    // ctx->recycle_rate = 167;     /* rate threshold is 10r/min */
+    // ctx->alloc_already_fail = 0;
 
     shm_zone = ngx_shared_memory_add(cf,&value[1],size,
                                     &ngx_http_reqstat_module);
@@ -2079,5 +2143,4 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 
 }
-
 
