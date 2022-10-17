@@ -79,7 +79,7 @@ off_t ngx_http_reqstat_fields[29] = {
 
 #define NGX_HTTP_REQSTAT_FMT_KEY_NUMS               29
 
-char* ngx_http_reqstat_fmt_key[29] = {
+char* ngx_http_reqstat_fmt_key[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
     NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN,
     NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT,
     NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL,
