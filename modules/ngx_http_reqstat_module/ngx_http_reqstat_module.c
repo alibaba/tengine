@@ -1753,12 +1753,12 @@ ngx_http_reqstat_check_enable(ngx_http_request_t *r,
 static char * 
 ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 {
-    ngx_str_t       *value;
-    ngx_uint_t      i,j;
-    ngx_shm_zone_t      *shm_zone,**z;
-    ngx_http_core_loc_conf_t        *clcf;
-    ngx_http_reqstat_conf_t          *rlcf = conf;
-    ngx_http_reqstat_conf_t          *rmcf;
+    ngx_str_t                                   *value;
+    ngx_uint_t                                   i,j;
+    ngx_shm_zone_t                              *shm_zone,**z;
+    ngx_http_core_loc_conf_t                    *clcf;
+    ngx_http_reqstat_conf_t                     *rlcf = conf;
+    ngx_http_reqstat_conf_t                     *rmcf;
     // 处理指令请求
     // 从指令获取共享内存的名字
     if(rlcf->prome_display !=  NGX_CONF_UNSET_PTR){
@@ -1821,22 +1821,22 @@ static ngx_int_t
 ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 {
 
-    ngx_int_t                                      rc;
-    ngx_str_t                                       type;
-    ngx_buf_t                                      *b;
-    ngx_uint_t                                     i,j;
-    ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
-    ngx_queue_t                                  *q;
-    ngx_shm_zone_t                            **shm_zone; //获取共享内存
-    ngx_http_reqstat_ctx_t                   *ctx; // 获取监控指标以及用户定义的指标类型
-    ngx_http_reqstat_conf_t                 *rlcf; // 获取conf文件中的指令
-    ngx_http_reqstat_conf_t                 *rmcf;
-    ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    // ngx_http_reqstat_rbnode_t             *display_node;
-    ngx_chain_t                                  out,*tl,**cl;
-    size_t                                            size,nodes,per_size;
-    size_t                                            host_len,sum;
-    // ngx_int_t                                       ngx_ret;
+    size_t                                                host_len,sum;
+    size_t                                                size,nodes,per_size;
+    ngx_int_t                                             rc;
+    ngx_str_t                                             type;
+    ngx_buf_t                                            *b;
+    ngx_uint_t                                            i,j;
+    ngx_array_t                                          *display_traffic; //指向需要转换的监控节点
+    ngx_chain_t                                           out,*tl,**cl;
+    ngx_queue_t                                          *q;
+    ngx_shm_zone_t                                      **shm_zone; //获取共享内存
+    ngx_http_reqstat_ctx_t                               *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_conf_t                              *rlcf; // 获取conf文件中的指令
+    ngx_http_reqstat_conf_t                              *rmcf;
+    ngx_http_reqstat_rbnode_t                            *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    // ngx_http_reqstat_rbnode_t                                *display_node;
+    // ngx_int_t                                        ngx_ret;
     // u_char                                          *o,*s,*p;
     // clock_t                                            start,finish;
     // double                                            duration;
