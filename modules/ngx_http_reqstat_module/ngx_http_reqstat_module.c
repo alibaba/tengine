@@ -1821,25 +1821,25 @@ static ngx_int_t
 ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 {
 
-    ngx_int_t                                      rc;
-    ngx_str_t                                       type;
-    ngx_buf_t                                      *b;
-    ngx_uint_t                                     i,j;
-    ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
-    ngx_queue_t                                  *q;
-    ngx_shm_zone_t                            **shm_zone; //获取共享内存
-    ngx_http_reqstat_ctx_t                   *ctx; // 获取监控指标以及用户定义的指标类型
-    ngx_http_reqstat_conf_t                 *rlcf; // 获取conf文件中的指令
-    ngx_http_reqstat_conf_t                 *rmcf;
-    ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    // ngx_http_reqstat_rbnode_t             *display_node;
-    ngx_chain_t                                  out,*tl,**cl;
-    size_t                                            size,nodes,per_size;
-    size_t                                            host_len,sum;
-    // ngx_int_t                                       ngx_ret;
-    // u_char                                          *o,*s,*p;
-    // clock_t                                            start,finish;
-    // double                                            duration;
+    ngx_int_t                                                     rc;
+    ngx_str_t                                                     type;
+    ngx_buf_t                                                    *b;
+    ngx_uint_t                                                   i,j;
+    ngx_array_t                                                 *display_traffic; //指向需要转换的监控节点
+    ngx_queue_t                                                *q;
+    ngx_shm_zone_t                                          **shm_zone; //获取共享内存
+    ngx_http_reqstat_ctx_t                                  *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_conf_t                                *rlcf; // 获取conf文件中的指令
+    ngx_http_reqstat_conf_t                                *rmcf;
+    ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    // ngx_http_reqstat_rbnode_t                        *display_node;
+    ngx_chain_t                                                  out,*tl,**cl;
+    size_t                                                           size,nodes,per_size;
+    size_t                                                          host_len,sum;
+    // ngx_int_t                                                ngx_ret;
+    // u_char                                                   *o,*s,*p;
+    // clock_t                                                  start,finish;
+    // double                                                   duration;
 
 
     // rlcf = ngx_http_conf_get_module_main_conf(r,ngx_http_reqstat_module);
