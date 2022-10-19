@@ -281,6 +281,7 @@ typedef struct {
     ngx_array_t                 *user_select;
     ngx_array_t                 *user_defined_str;
     ngx_array_t                 *prome_display;
+    ngx_array_t                 *prome_zone;
 } ngx_http_reqstat_conf_t;
 
 
