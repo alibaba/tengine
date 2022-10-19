@@ -2072,7 +2072,6 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_reqstat_conf_t                        *rlcf = conf;
     value = cf->args->elts;
     if (rlcf->prome_zone != NGX_CONF_UNSET_PTR) {
-        printf("***********************%p\n",rlcf->prome_zone);
         return "is duplicate";
     }
 
