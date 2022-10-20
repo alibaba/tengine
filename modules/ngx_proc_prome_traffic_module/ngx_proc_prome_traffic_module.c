@@ -13,20 +13,20 @@ typedef struct {
 }ngx_proc_reqstat_prome_traffic_shctx_t;
 
 typedef struct {
-    ngx_str_t                                                *val;
-    ngx_slab_pool_t                                      *shpool;
-    ngx_proc_reqstat_prome_traffic_shctx_t     *sh;  //作为存储prome格式的结构体
-    ngx_shm_zone_t                                    **shm_zone;
+    ngx_str_t                                             *val;
+    ngx_slab_pool_t                                       *shpool;
+    ngx_proc_reqstat_prome_traffic_shctx_t                *sh;  //作为存储prome格式的结构体
+    ngx_shm_zone_t                                       **shm_zone;
 }ngx_proc_reqstat_prome_traffic_ctx_t;
 
 // 思路:从cycle中拿到共享内存的地址直接读,读完后将结果输出
 typedef struct {
-    ngx_flag_t                                           enable;
-    ngx_msec_t                                           interval;
-    ngx_uint_t                                           port;
-    ngx_socket_t                                         fd;
-    ngx_event_t                                          event;
-    ngx_http_reqstat_conf_t                             *rmcf;
+    ngx_flag_t                                             enable;
+    ngx_msec_t                                             interval;
+    ngx_uint_t                                             port;
+    ngx_socket_t                                           fd;
+    ngx_event_t                                            event;
+    ngx_http_reqstat_conf_t                               *rmcf;
 } ngx_proc_prome_traffic_main_conf_t; 
 
 
@@ -192,30 +192,30 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
     ngx_event_t                                             *loop_event;
     // ngx_http_reqstat_ctx_t                          *ctx;
     // ngx_shm_zone_t                                  **shm_zone;
-    ngx_proc_prome_traffic_main_conf_t          *pmcf;
-    ngx_http_reqstat_conf_t                            *rmcf;
+    ngx_proc_prome_traffic_main_conf_t                      *pmcf;
+    ngx_http_reqstat_conf_t                                 *rmcf;
     // int                                                       reuseaddr;
     // ngx_socket_t                                             fd;
     // ngx_connection_t                                    *c;
     // struct sockaddr_in                                   sin;
 
     // 疑问:两者接口的区别?
-    pmcf = ngx_proc_get_conf(cycle->conf_ctx,ngx_proc_prome_traffic_module);
+    pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_traffic_module);
 
     
     if(pmcf == NULL){
-        ngx_log_error(NGX_LOG_ERR,cycle->log,0,"init worker pmcf is NULL\n");
+        ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker pmcf is NULL\n");
         return NGX_ERROR;
     }
 
-    ngx_log_error(NGX_LOG_ERR,cycle->log,0,"init worker pmcf is time %i\n",pmcf->interval);
+    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "init worker pmcf is time %i\n", pmcf->interval);
 
-    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "port*****************************%i",pmcf->port);
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "port*****************************%i", pmcf->port);
 
-    rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle,ngx_http_reqstat_module);
+    rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_reqstat_module);
 
     if(rmcf == NULL){
-         ngx_log_error(NGX_LOG_ERR,cycle->log,0,"init worker rmcf is NULL\n");
+         ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker rmcf is NULL\n");
          return NGX_ERROR;
     }
 
@@ -223,10 +223,10 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
 
 
 
-    ngx_log_error(NGX_LOG_ERR,cycle->log,0,"rmcf_monitor*************>%d\n",rmcf->monitor->nelts);
-    ngx_log_error(NGX_LOG_ERR,cycle->log,0,"rmcf_pd*************>%d\n",rmcf->prome_display->nelts);
-    ngx_log_error(NGX_LOG_ERR,cycle->log,0,"rmcf_pz*************>%d\n",rmcf->prome_zone->nelts);
-    ngx_log_error(NGX_LOG_ERR,cycle->log,0,"rmcf*************>%p\n",((ngx_shm_zone_t*)rmcf->prome_display->elts));
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_monitor*************>%d\n", rmcf->monitor->nelts);
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pd*************>%d\n", rmcf->prome_display->nelts);
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pz*************>%d\n", rmcf->prome_zone->nelts);
+    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "rmcf*************>%p\n", ((ngx_shm_zone_t*)rmcf->prome_display->elts));
 
 
 
@@ -324,7 +324,7 @@ ngx_proc_prome_traffic_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->port, prev->port, 0);
     ngx_conf_merge_off_value(conf->enable, prev->enable, 0);
-    ngx_conf_merge_msec_value(conf->interval,prev->interval,0);
+    ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
     return NGX_CONF_OK;
 }
 
@@ -358,7 +358,7 @@ ngx_proc_prome_traffic_exit_worker(ngx_cycle_t *cycle)
 static void *
 ngx_proc_prome_traffic_create_conf(ngx_conf_t *cf)
 {
-    ngx_proc_prome_traffic_main_conf_t  *pmcf;
+    ngx_proc_prome_traffic_main_conf_t     *pmcf;
 
     pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_traffic_main_conf_t));
     if (pmcf == NULL) {
@@ -381,16 +381,16 @@ ngx_proc_prome_traffic_handler(ngx_event_t *ev){
     // ngx_str_t                                       type;
     // ngx_buf_t                                      *b;
     // ngx_uint_t                                      j;
-    ngx_uint_t                                             i;
-    ngx_array_t                                          *display_traffic; //指向需要转换的监控节点
-    ngx_queue_t                                        *q;
-    ngx_shm_zone_t                                  **shm_zone; //获取共享内存
-    ngx_http_reqstat_ctx_t                           *ctx; // 获取监控指标以及用户定义的指标类型
-    ngx_http_reqstat_conf_t                         *rmcf;
-    ngx_http_reqstat_rbnode_t                     *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    size_t                                                     host_len,sum;
-    size_t                                                     nodes;
-    ngx_proc_prome_traffic_main_conf_t       *pmcf;
+    size_t                                               host_len,sum;
+    size_t                                               nodes;
+    ngx_uint_t                                           i;
+    ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
+    ngx_queue_t                                         *q;
+    ngx_shm_zone_t                                     **shm_zone; //获取共享内存
+    ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_conf_t                             *rmcf;
+    ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    ngx_proc_prome_traffic_main_conf_t                  *pmcf;
     // ngx_http_reqstat_rbnode_t             *display_node;
     // ngx_chain_t                                  out,*tl,**cl;
     // size_t                                            size;
@@ -447,7 +447,7 @@ ngx_proc_prome_traffic_handler(ngx_event_t *ev){
     nodes = 1;
     sum = nodes*(sum+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
 
-     ngx_log_error(NGX_LOG_ERR,ngx_cycle->log,0," due with %d nums nodes\n",sum);
+     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
 
     // b = ngx_calloc_buf(r->pool);
     // if(b == NULL) {
