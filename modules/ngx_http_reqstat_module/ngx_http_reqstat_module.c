@@ -159,10 +159,10 @@ static ngx_int_t ngx_http_reqstat_input_body_filter(ngx_http_request_t *r,
 ngx_int_t ngx_http_reqstat_log_flow(ngx_http_request_t *r);
 
 // 添加的功能
-static char * ngx_http_prome(ngx_conf_t *cf,ngx_command_t *cmd,
+static char * ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,
 void *conf);
 
-static ngx_int_t ngx_http_handler(ngx_http_request_t *r);
+static ngx_int_t ngx_http_prome_status_handler(ngx_http_request_t *r);
 
 static char *ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -242,7 +242,7 @@ static ngx_command_t   ngx_http_reqstat_commands[] = {
 
     { ngx_string("req_status_prome"),
       NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
-      ngx_http_prome,
+      ngx_http_prome_status,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -1751,7 +1751,7 @@ ngx_http_reqstat_check_enable(ngx_http_request_t *r,
 
 
 static char * 
-ngx_http_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
+ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 {
     ngx_str_t                                           *value;
     ngx_uint_t                                           i,j;
@@ -1812,12 +1812,12 @@ ngx_http_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 
 
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
-    clcf->handler = ngx_http_handler;
+    clcf->handler = ngx_http_prome_status_handler;
     return NGX_CONF_OK;
 }
 
 static ngx_int_t 
-ngx_http_handler(ngx_http_request_t *r)
+ngx_http_prome_status_handler(ngx_http_request_t *r)
 {
 
     size_t                                                host_len,sum;

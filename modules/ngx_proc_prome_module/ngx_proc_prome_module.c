@@ -128,7 +128,7 @@ static ngx_command_t ngx_proc_prome_commands[] = {
 
 
 static ngx_proc_module_t ngx_proc_prome_module_ctx = {
-    ngx_string("prome"),
+    ngx_string("prome_traffic"),
     NULL,
     NULL,
     ngx_proc_prome_create_conf,
@@ -169,11 +169,6 @@ ngx_proc_prome_prepare(ngx_cycle_t *cycle)
         return NGX_DECLINED;
     }
 
-    if (pmcf->port == 0) {
-        return NGX_DECLINED;
-    }
-
-
     return NGX_OK;
 }
 
@@ -202,8 +197,7 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 
     ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "init worker pmcf is time %i\n", pmcf->interval);
 
-    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "port*****************************%i", pmcf->port);
-
+   
     rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_reqstat_module);
 
     if(rmcf == NULL){
@@ -314,7 +308,6 @@ ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_proc_prome_main_conf_t      *prev= parent;
     ngx_proc_prome_main_conf_t      *conf = child;
 
-    ngx_conf_merge_uint_value(conf->port, prev->port, 0);
     ngx_conf_merge_off_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
     return NGX_CONF_OK;
@@ -360,7 +353,6 @@ ngx_proc_prome_create_conf(ngx_conf_t *cf)
     }
     pmcf->enable = NGX_CONF_UNSET;
     pmcf->interval = NGX_CONF_UNSET_MSEC;
-    pmcf->port = NGX_CONF_UNSET_UINT;
 
     return pmcf;
 }
@@ -409,7 +401,7 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     nodes = 0;
     host_len =0;
     
-    for(i = 0;i < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;i++) {
+    for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
         sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
     }
 
@@ -437,7 +429,7 @@ ngx_proc_prome_handler(ngx_event_t *ev){
 
     if(nodes == 0)
     nodes = 1;
-    sum = nodes*(sum+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
+    sum = nodes*(sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
 
      ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
 
@@ -479,7 +471,7 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     //         }
 
     //         // 每个结点的大小
-    //         size = per_size+NGX_HTTP_REQSTAT_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
+    //         size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
     //         tl->buf = b;
     //         b->start = ngx_pcalloc(r->pool,size);
     //         if(b->start == NULL) {
@@ -491,7 +483,7 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     //         b->temporary = 1;
 
 
-    //         for (j = 0; j < NGX_HTTP_REQSTAT_FMT_KEY_NUMS;j++) {
+    //         for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
     //                 b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key2[j],
     //                                             node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
     //                                             ngx_http_reqstat_fields2[j]));
@@ -536,3 +528,21 @@ ngx_proc_prome_handler(ngx_event_t *ev){
 
 
 
+// ngx_http_prome_zone_node_t*
+//     ngx_http_reqstat_node_lookup(ngx_shm_zone_t *shm_zone,size_t size) {
+//         ngx_int_t                                i;
+//         ngx_queue_t                             *q;
+//         ngx_http_prome_zone_node_t              *pz;
+//         ngx_http_prome_ctx_t    *ptctx;
+
+//         ptctx = shm_zone->data;
+
+//         ngx_shmtx_lock(&ptctx->shpool->mutex);
+
+//         for(q = ngx_queue_head(&ptctx->sh->queue);
+//             q != ngx_queue_sentinel(&ptctx->sh->queue);
+//             q = ngx_queue_next(q))
+//             {
+                
+//             } 
+//     }
