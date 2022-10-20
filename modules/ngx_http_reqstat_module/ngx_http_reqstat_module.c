@@ -2062,14 +2062,14 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 获取指令
     // 已有的req_stat_zone的指令格式为req_status_zone server "$host,$server_addr:$server_port" 10M;
     // 目前思路:先按照已有的命令进行解析 问题:是否和req_stat一样引入变量("$host,$server_addr:$server_port")?
-    ssize_t                                                          size; //共享内存的大小
+    ssize_t                                                        size; //共享内存的大小
     ngx_str_t                                                     *value; //用于解析指令的指针
     ngx_uint_t                                                     j;
-    ngx_shm_zone_t                                          *shm_zone,**z;//共享内存的指针
-    ngx_http_reqstat_prome_traffic_ctx_t             *ctx;//用来存储解析conf的指针
-    ngx_http_compile_complex_value_t                 ccv;//是来保存解析出第二个指令
-    ngx_http_reqstat_conf_t                               *rmcf;
-    ngx_http_reqstat_conf_t                               *rlcf = conf;
+    ngx_shm_zone_t                                                *shm_zone,**z;//共享内存的指针
+    ngx_http_reqstat_prome_traffic_ctx_t                          *ctx;//用来存储解析conf的指针
+    ngx_http_compile_complex_value_t                               ccv;//是来保存解析出第二个指令
+    ngx_http_reqstat_conf_t                                       *rmcf;
+    ngx_http_reqstat_conf_t                                       *rlcf = conf;
     value = cf->args->elts;
     if (rlcf->prome_zone != NGX_CONF_UNSET_PTR) {
         return "is duplicate";
