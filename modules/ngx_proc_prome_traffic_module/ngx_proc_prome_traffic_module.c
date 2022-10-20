@@ -9,24 +9,24 @@
 extern ngx_module_t ngx_http_reqstat_module;
 
 typedef struct {
-    ngx_queue_t                 queue;
+    ngx_queue_t                                            queue;
 }ngx_proc_reqstat_prome_traffic_shctx_t;
 
 typedef struct {
-    ngx_str_t                                               *val;
-    ngx_slab_pool_t                                     *shpool;
+    ngx_str_t                                                *val;
+    ngx_slab_pool_t                                      *shpool;
     ngx_proc_reqstat_prome_traffic_shctx_t     *sh;  //作为存储prome格式的结构体
-    ngx_shm_zone_t                                     **shm_zone;
+    ngx_shm_zone_t                                    **shm_zone;
 }ngx_proc_reqstat_prome_traffic_ctx_t;
 
 // 思路:从cycle中拿到共享内存的地址直接读,读完后将结果输出
 typedef struct {
-    ngx_flag_t                                             enable;
-    ngx_msec_t                                          interval;
-    ngx_uint_t                                            port;
+    ngx_flag_t                                           enable;
+    ngx_msec_t                                           interval;
+    ngx_uint_t                                           port;
     ngx_socket_t                                         fd;
-    ngx_event_t                                             event;
-    ngx_http_reqstat_conf_t                           *rmcf;
+    ngx_event_t                                          event;
+    ngx_http_reqstat_conf_t                             *rmcf;
 } ngx_proc_prome_traffic_main_conf_t; 
 
 

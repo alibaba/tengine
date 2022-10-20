@@ -1753,10 +1753,10 @@ ngx_http_reqstat_check_enable(ngx_http_request_t *r,
 static char * 
 ngx_http_reqstat_traffic_prome(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 {
-    ngx_str_t                                   *value;
-    ngx_uint_t                                   i,j;
-    ngx_shm_zone_t                              *shm_zone,**z;
-    ngx_http_core_loc_conf_t                    *clcf;
+    ngx_str_t                                           *value;
+    ngx_uint_t                                           i,j;
+    ngx_shm_zone_t                                *shm_zone,**z;
+    ngx_http_core_loc_conf_t                   *clcf;
     ngx_http_reqstat_conf_t                     *rlcf = conf;
     ngx_http_reqstat_conf_t                     *rmcf;
     // 处理指令请求
@@ -1826,7 +1826,7 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
     ngx_int_t                                           rc;
     ngx_str_t                                           type;
     ngx_buf_t                                         *b;
-    ngx_uint_t                                         i,j;
+    ngx_uint_t                                          i,j;
     ngx_array_t                                      *display_traffic; //指向需要转换的监控节点
     ngx_chain_t                                       out,*tl,**cl;
     ngx_queue_t                                     *q;
@@ -2018,8 +2018,8 @@ ngx_http_reqstat_traffic_handler(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
-    size_t            size;
-    ngx_http_reqstat_prome_traffic_ctx_t *ctx,*oldctx;
+    size_t                                                           size;
+    ngx_http_reqstat_prome_traffic_ctx_t             *ctx,*oldctx;
     
     oldctx = data;
     ctx = shm_zone->data;
@@ -2062,14 +2062,14 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     // 获取指令
     // 已有的req_stat_zone的指令格式为req_status_zone server "$host,$server_addr:$server_port" 10M;
     // 目前思路:先按照已有的命令进行解析 问题:是否和req_stat一样引入变量("$host,$server_addr:$server_port")?
-    ssize_t                 size; //共享内存的大小
-    ngx_uint_t             j;
-    ngx_str_t              *value; //用于解析指令的指针
-    ngx_shm_zone_t     *shm_zone,**z;//共享内存的指针
-    ngx_http_reqstat_prome_traffic_ctx_t     *ctx;//用来存储解析conf的指针
-    ngx_http_compile_complex_value_t        ccv;//是来保存解析出第二个指令
-    ngx_http_reqstat_conf_t                        *rmcf;
-    ngx_http_reqstat_conf_t                        *rlcf = conf;
+    ssize_t                                                          size; //共享内存的大小
+    ngx_str_t                                                     *value; //用于解析指令的指针
+    ngx_uint_t                                                     j;
+    ngx_shm_zone_t                                          *shm_zone,**z;//共享内存的指针
+    ngx_http_reqstat_prome_traffic_ctx_t             *ctx;//用来存储解析conf的指针
+    ngx_http_compile_complex_value_t                 ccv;//是来保存解析出第二个指令
+    ngx_http_reqstat_conf_t                               *rmcf;
+    ngx_http_reqstat_conf_t                               *rlcf = conf;
     value = cf->args->elts;
     if (rlcf->prome_zone != NGX_CONF_UNSET_PTR) {
         return "is duplicate";
