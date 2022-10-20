@@ -64,7 +64,7 @@ char* ngx_http_reqstat_fmt_key2[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
     NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX
 };
 
-off_t ngx_http_reqstat_fields2[29] = {
+off_t ngx_http_reqstat_fields2[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
     NGX_HTTP_REQSTAT_BYTES_IN,
     NGX_HTTP_REQSTAT_BYTES_OUT,
     NGX_HTTP_REQSTAT_CONN_TOTAL,
