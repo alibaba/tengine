@@ -189,11 +189,11 @@ static ngx_int_t
 ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
 {
     // ngx_msec_t                                          time_interval;
-    ngx_event_t                                         *loop_event;
+    ngx_event_t                                             *loop_event;
     // ngx_http_reqstat_ctx_t                          *ctx;
     // ngx_shm_zone_t                                  **shm_zone;
-    ngx_proc_prome_traffic_main_conf_t      *pmcf;
-    ngx_http_reqstat_conf_t                        *rmcf;
+    ngx_proc_prome_traffic_main_conf_t          *pmcf;
+    ngx_http_reqstat_conf_t                            *rmcf;
     // int                                                       reuseaddr;
     // ngx_socket_t                                             fd;
     // ngx_connection_t                                    *c;
@@ -380,25 +380,25 @@ ngx_proc_prome_traffic_handler(ngx_event_t *ev){
     // ngx_int_t                                      rc;
     // ngx_str_t                                       type;
     // ngx_buf_t                                      *b;
-    ngx_uint_t                                     i;
     // ngx_uint_t                                      j;
-    ngx_array_t                                  *display_traffic; //指向需要转换的监控节点
-    ngx_queue_t                                  *q;
-    ngx_shm_zone_t                            **shm_zone; //获取共享内存
-    ngx_http_reqstat_ctx_t                   *ctx; // 获取监控指标以及用户定义的指标类型
-    ngx_http_reqstat_conf_t                 *rmcf;
-    ngx_http_reqstat_rbnode_t             *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    ngx_uint_t                                             i;
+    ngx_array_t                                          *display_traffic; //指向需要转换的监控节点
+    ngx_queue_t                                        *q;
+    ngx_shm_zone_t                                  **shm_zone; //获取共享内存
+    ngx_http_reqstat_ctx_t                           *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_conf_t                         *rmcf;
+    ngx_http_reqstat_rbnode_t                     *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    size_t                                                     host_len,sum;
+    size_t                                                     nodes;
+    ngx_proc_prome_traffic_main_conf_t       *pmcf;
     // ngx_http_reqstat_rbnode_t             *display_node;
     // ngx_chain_t                                  out,*tl,**cl;
     // size_t                                            size;
-    size_t                                              nodes;
     // size_t                                            per_size;
-    size_t                                            host_len,sum;
     // ngx_int_t                                       ngx_ret;
     // u_char                                          *o,*s,*p;
     // clock_t                                            start,finish;
     // double                                            duration;
-    ngx_proc_prome_traffic_main_conf_t       *pmcf;
 
     // 获取指令指针来寻找共享内存
     pmcf = ev->data;
