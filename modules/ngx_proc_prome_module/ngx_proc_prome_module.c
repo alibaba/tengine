@@ -10,61 +10,59 @@ extern ngx_module_t ngx_http_reqstat_module;
 
 typedef struct {
     ngx_queue_t                                            queue;
-}ngx_proc_reqstat_prome_traffic_shctx_t;
+}ngx_proc_prome_shctx_t;
 
 typedef struct {
     ngx_str_t                                             *val;
     ngx_slab_pool_t                                       *shpool;
-    ngx_proc_reqstat_prome_traffic_shctx_t                *sh;  //作为存储prome格式的结构体
+    ngx_proc_prome_shctx_t                *sh;  //作为存储prome格式的结构体
     ngx_shm_zone_t                                       **shm_zone;
-}ngx_proc_reqstat_prome_traffic_ctx_t;
+}ngx_proc_prome_ctx_t;
 
 // 思路:从cycle中拿到共享内存的地址直接读,读完后将结果输出
 typedef struct {
     ngx_flag_t                                             enable;
     ngx_msec_t                                             interval;
-    ngx_uint_t                                             port;
-    ngx_socket_t                                           fd;
     ngx_event_t                                            event;
     ngx_http_reqstat_conf_t                               *rmcf;
-} ngx_proc_prome_traffic_main_conf_t; 
+} ngx_proc_prome_main_conf_t; 
 
 
-#define NGX_HTTP_REQSTAT_FMT_KEY_NUMS               29
+#define NGX_HTTP_PROME_FMT_KEY_NUMS               29
 
-char* ngx_http_reqstat_fmt_key2[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_IN,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_BYTES_OUT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_CONN_TATAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_REQ_TOTAL,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_2XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_3XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_5XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_OTHER_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_REQ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_RT,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_TRIES,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_200,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_206,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_302,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_304,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_403,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_404,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_416,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_499,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_500 ,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_502,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_503,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_504,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_508,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_HTTP_OTHER_DETAIL_STATUS,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_4XX,
-    NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_UPS_5XX
+char* ngx_http_reqstat_fmt_key2[NGX_HTTP_PROME_FMT_KEY_NUMS] = {
+    NGX_HTTP_PROME_FMT_BYTES_IN,
+    NGX_HTTP_PROME_FMT_BYTES_OUT,
+    NGX_HTTP_PROME_FMT_CONN_TATAL,
+    NGX_HTTP_PROME_FMT_REQ_TOTAL,
+    NGX_HTTP_PROME_FMT_HTTP_2XX,
+    NGX_HTTP_PROME_FMT_HTTP_3XX,
+    NGX_HTTP_PROME_FMT_HTTP_4XX,
+    NGX_HTTP_PROME_FMT_HTTP_5XX,
+    NGX_HTTP_PROME_FMT_OTHER_STATUS,
+    NGX_HTTP_PROME_FMT_RT,
+    NGX_HTTP_PROME_FMT_UPS_REQ,
+    NGX_HTTP_PROME_FMT_UPS_RT,
+    NGX_HTTP_PROME_FMT_UPS_TRIES,
+    NGX_HTTP_PROME_FMT_HTTP_200,
+    NGX_HTTP_PROME_FMT_HTTP_206,
+    NGX_HTTP_PROME_FMT_HTTP_302,
+    NGX_HTTP_PROME_FMT_HTTP_304,
+    NGX_HTTP_PROME_FMT_HTTP_403,
+    NGX_HTTP_PROME_FMT_HTTP_404,
+    NGX_HTTP_PROME_FMT_HTTP_416,
+    NGX_HTTP_PROME_FMT_HTTP_499,
+    NGX_HTTP_PROME_FMT_HTTP_500 ,
+    NGX_HTTP_PROME_FMT_HTTP_502,
+    NGX_HTTP_PROME_FMT_HTTP_503,
+    NGX_HTTP_PROME_FMT_HTTP_504,
+    NGX_HTTP_PROME_FMT_HTTP_508,
+    NGX_HTTP_PROME_FMT_HTTP_OTHER_DETAIL_STATUS,
+    NGX_HTTP_PROME_FMT_UPS_4XX,
+    NGX_HTTP_PROME_FMT_UPS_5XX
 };
 
-off_t ngx_http_reqstat_fields2[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
+off_t ngx_http_reqstat_fields2[NGX_HTTP_PROME_FMT_KEY_NUMS] = {
     NGX_HTTP_REQSTAT_BYTES_IN,
     NGX_HTTP_REQSTAT_BYTES_OUT,
     NGX_HTTP_REQSTAT_CONN_TOTAL,
@@ -96,62 +94,56 @@ off_t ngx_http_reqstat_fields2[NGX_HTTP_REQSTAT_FMT_KEY_NUMS] = {
     NGX_HTTP_REQSTAT_UPS_5XX
 };
 
-static ngx_int_t ngx_proc_prome_traffic_prepare(ngx_cycle_t *cycle);
-static ngx_int_t ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle);
-static void ngx_proc_prome_traffic_exit_worker(ngx_cycle_t *cycle);
-// static void *ngx_proc_prome_traffic_create_main_conf(ngx_conf_t *cf);
-static void *ngx_proc_prome_traffic_create_conf(ngx_conf_t *cf);
-void ngx_proc_prome_traffic_handler (ngx_event_t *ev);
+static ngx_int_t ngx_proc_prome_prepare(ngx_cycle_t *cycle);
+static ngx_int_t ngx_proc_prome_init_worker(ngx_cycle_t *cycle);
+static void ngx_proc_prome_exit_worker(ngx_cycle_t *cycle);
+// static void *ngx_proc_prome_create_main_conf(ngx_conf_t *cf);
+static void *ngx_proc_prome_create_conf(ngx_conf_t *cf);
+void ngx_proc_prome_handler (ngx_event_t *ev);
 // ngx_shm_zone_t * ngx_shared_memory_add2(ngx_conf_t *cf, ngx_str_t *name, size_t size);
-static char *ngx_proc_prome_traffic_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 
 // static char *ngx_reqstat_zone_names(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 // static char *ngx_prome_zone_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
-static ngx_command_t ngx_proc_prome_traffic_commands[] = {
-      { ngx_string("ptstart"),
+static ngx_command_t ngx_proc_prome_commands[] = {
+      { ngx_string("start"),
       NGX_PROC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_PROC_CONF_OFFSET,
-      offsetof(ngx_proc_prome_traffic_main_conf_t, enable),
+      offsetof(ngx_proc_prome_main_conf_t, enable),
       NULL },
     
     { ngx_string("interval"),
       NGX_PROC_CONF | NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
       NGX_PROC_CONF_OFFSET,
-      offsetof(ngx_proc_prome_traffic_main_conf_t, interval),
+      offsetof(ngx_proc_prome_main_conf_t, interval),
       NULL },
 
-    { ngx_string("listen"),
-      NGX_PROC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      NGX_PROC_CONF_OFFSET,
-      offsetof(ngx_proc_prome_traffic_main_conf_t, port),
-      NULL },
 
     ngx_null_command
 };
 
 
-static ngx_proc_module_t ngx_proc_prome_traffic_module_ctx = {
-    ngx_string("prome_traffic"),
+static ngx_proc_module_t ngx_proc_prome_module_ctx = {
+    ngx_string("prome"),
     NULL,
     NULL,
-    ngx_proc_prome_traffic_create_conf,
-    ngx_proc_prome_traffic_merge_conf,
-    ngx_proc_prome_traffic_prepare,
-    ngx_proc_prome_traffic_init_worker,
+    ngx_proc_prome_create_conf,
+    ngx_proc_prome_merge_conf,
+    ngx_proc_prome_prepare,
+    ngx_proc_prome_init_worker,
     NULL,
-    ngx_proc_prome_traffic_exit_worker
+    ngx_proc_prome_exit_worker
 };
 
 
-ngx_module_t ngx_proc_prome_traffic_module = {
+ngx_module_t ngx_proc_prome_module = {
     NGX_MODULE_V1,
-    &ngx_proc_prome_traffic_module_ctx,
-    ngx_proc_prome_traffic_commands,
+    &ngx_proc_prome_module_ctx,
+    ngx_proc_prome_commands,
     NGX_PROC_MODULE,
     NULL,
     NULL,
@@ -164,11 +156,11 @@ ngx_module_t ngx_proc_prome_traffic_module = {
 };
 
 static ngx_int_t
-ngx_proc_prome_traffic_prepare(ngx_cycle_t *cycle)
+ngx_proc_prome_prepare(ngx_cycle_t *cycle)
 {
-   ngx_proc_prome_traffic_main_conf_t      *pmcf;
+   ngx_proc_prome_main_conf_t      *pmcf;
 
-    pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_traffic_module);
+    pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_module);
      if (!pmcf->enable) {
         return NGX_DECLINED;
     }
@@ -186,13 +178,13 @@ ngx_proc_prome_traffic_prepare(ngx_cycle_t *cycle)
 }
 
 static ngx_int_t
-ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
+ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 {
     // ngx_msec_t                                          time_interval;
     ngx_event_t                                             *loop_event;
     // ngx_http_reqstat_ctx_t                          *ctx;
     // ngx_shm_zone_t                                  **shm_zone;
-    ngx_proc_prome_traffic_main_conf_t                      *pmcf;
+    ngx_proc_prome_main_conf_t                      *pmcf;
     ngx_http_reqstat_conf_t                                 *rmcf;
     // int                                                       reuseaddr;
     // ngx_socket_t                                             fd;
@@ -200,7 +192,7 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
     // struct sockaddr_in                                   sin;
 
     // 疑问:两者接口的区别?
-    pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_traffic_module);
+    pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_module);
 
     
     if(pmcf == NULL){
@@ -283,7 +275,7 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
     loop_event->log = ngx_cycle->log;
     loop_event->data = pmcf;
     // loop_event->accept = 1;
-    loop_event->handler = ngx_proc_prome_traffic_handler;
+    loop_event->handler = ngx_proc_prome_handler;
 
     // if (ngx_add_event(loop_event, NGX_READ_EVENT, 0) == NGX_ERROR) {
     //     return NGX_ERROR;
@@ -309,7 +301,7 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
 
     // loop_event->log = ngx_cycle->log;
     // loop_event->data = pmcf;
-    // loop_event->handler = ngx_proc_prome_traffic_handler;
+    // loop_event->handler = ngx_proc_prome_handler;
     // 设置循环时间
     ngx_add_timer(loop_event,pmcf->interval);
     return NGX_OK;
@@ -317,10 +309,10 @@ ngx_proc_prome_traffic_init_worker(ngx_cycle_t *cycle)
 
 
 static char *
-ngx_proc_prome_traffic_merge_conf(ngx_conf_t *cf, void *parent, void *child)
+ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-    ngx_proc_prome_traffic_main_conf_t      *prev= parent;
-    ngx_proc_prome_traffic_main_conf_t      *conf = child;
+    ngx_proc_prome_main_conf_t      *prev= parent;
+    ngx_proc_prome_main_conf_t      *conf = child;
 
     ngx_conf_merge_uint_value(conf->port, prev->port, 0);
     ngx_conf_merge_off_value(conf->enable, prev->enable, 0);
@@ -331,18 +323,18 @@ ngx_proc_prome_traffic_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static void
-ngx_proc_prome_traffic_exit_worker(ngx_cycle_t *cycle)
+ngx_proc_prome_exit_worker(ngx_cycle_t *cycle)
 {
 
 }
 
 
 // static void *
-// ngx_proc_prome_traffic_create_main_conf(ngx_conf_t *cf)
+// ngx_proc_prome_create_main_conf(ngx_conf_t *cf)
 // {
-//     ngx_proc_prome_traffic_main_conf_t  *pmcf;
+//     ngx_proc_prome_main_conf_t  *pmcf;
 
-//     pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_traffic_main_conf_t));
+//     pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_main_conf_t));
 //     if (pmcf == NULL) {
 //         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
 //                            "daytime create proc conf error");
@@ -356,11 +348,11 @@ ngx_proc_prome_traffic_exit_worker(ngx_cycle_t *cycle)
 // }
 
 static void *
-ngx_proc_prome_traffic_create_conf(ngx_conf_t *cf)
+ngx_proc_prome_create_conf(ngx_conf_t *cf)
 {
-    ngx_proc_prome_traffic_main_conf_t     *pmcf;
+    ngx_proc_prome_main_conf_t     *pmcf;
 
-    pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_traffic_main_conf_t));
+    pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_main_conf_t));
     if (pmcf == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "daytime create proc conf error");
@@ -374,7 +366,7 @@ ngx_proc_prome_traffic_create_conf(ngx_conf_t *cf)
 }
 
 void
-ngx_proc_prome_traffic_handler(ngx_event_t *ev){
+ngx_proc_prome_handler(ngx_event_t *ev){
 
 
     // ngx_int_t                                      rc;
@@ -390,7 +382,7 @@ ngx_proc_prome_traffic_handler(ngx_event_t *ev){
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    ngx_proc_prome_traffic_main_conf_t                  *pmcf;
+    ngx_proc_prome_main_conf_t                  *pmcf;
     // ngx_http_reqstat_rbnode_t             *display_node;
     // ngx_chain_t                                  out,*tl,**cl;
     // size_t                                            size;
@@ -462,7 +454,7 @@ ngx_proc_prome_traffic_handler(ngx_event_t *ev){
 
     //     ctx = shm_zone[i]->data;
     //     // 先打印出共享内存和tengine的信息(可删)
-    //     b->last = ngx_slprintf(b->last,b->end,NGX_HTTP_REQSTAT_TRAFFIC_PROME_FMT_INFO,
+    //     b->last = ngx_slprintf(b->last,b->end,NGX_HTTP_PROME_FMT_INFO,
     //                                 &shm_zone[i]->shm.name,
     //                                 TENGINE_VERSION,NGINX_VERSION);
 
