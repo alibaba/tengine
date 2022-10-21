@@ -6,22 +6,22 @@
 #include <ngx_config.h>
 #include<ngx_event.h>
 
+ngx_uint_t          pz_flag;
 extern ngx_module_t ngx_http_reqstat_module;
+// typedef struct {
 
-typedef struct {
+//     ngx_uint_t                   flag;
+//     ngx_str_t                    buffer[2];
 
-    size_t                       b_len;
-    ngx_buf_t                   *buffer;
+// }ngx_http_prome_shctx_t;
 
-}ngx_http_prome_shctx_t;
-
-typedef struct {
-    ngx_str_t                   *val;
-    ngx_uint_t                   p_recycle_rate;
-    ngx_slab_pool_t             *shpool;
-    ngx_http_complex_value_t     value;
-    ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
-}ngx_http_prome_ctx_t;
+// typedef struct {
+//     ngx_str_t                   *val;
+//     ngx_uint_t                   p_recycle_rate;
+//     ngx_slab_pool_t             *shpool;
+//     ngx_http_complex_value_t     value;
+//     ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
+// }ngx_http_prome_ctx_t;
 
 // 思路:从cycle中拿到共享内存的地址直接读,读完后将结果输出
 typedef struct {
@@ -223,7 +223,7 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
     loop_event->log = ngx_cycle->log;
     loop_event->data = pmcf;
     loop_event->handler = ngx_proc_prome_handler;
-    ngx_add_timer(loop_event,(ngx_msec_t)1000);
+    ngx_add_timer(loop_event,(ngx_msec_t)10000);
 
     return NGX_OK;
 }
@@ -299,6 +299,7 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     ngx_pool_t                                          *pool;
     ngx_queue_t                                         *q;
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
+    ngx_shm_zone_t                                      *shm_pzone; 
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
@@ -319,6 +320,9 @@ ngx_proc_prome_handler(ngx_event_t *ev){
      // 直接指向需要监控的指标X
     display_traffic = rmcf->prome_display;
     shm_zone = rmcf->prome_display->elts;
+
+   shm_pzone = rmcf->prome_zone->elts;
+   pctx = shm_pzone->data;
 
 
     per_size = 0;
@@ -419,11 +423,18 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     
             *(b->last - 1) = '\n';
 
+            // 从这里出现问题
+            if(pz_flag % 2 == 1) {
+                pctx->sh->buffer1 = ngx_slab_alloc(pctx->shpool, size);
+                ngx_memcpy(pctx->sh->buffer1->data, b->start, size);
+            }else{
+                pctx->sh->buffer2 = ngx_slab_alloc(pctx->shpool, size);
+                 ngx_memcpy(pctx->sh->buffer2->data, b->start, size);
+            }
 
-    }
-
+        }
     }
 
     ngx_destroy_pool(pool);
-    ngx_add_timer(ev, 1000);
+    ngx_add_timer(ev, (ngx_msec_t)10000);
 }

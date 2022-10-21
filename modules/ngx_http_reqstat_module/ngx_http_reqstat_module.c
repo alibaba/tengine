@@ -2033,6 +2033,7 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     if(ctx->sh == NULL) {
         return NGX_ERROR;
     }
+  
     ctx->shpool->data = ctx->sh;
 
     size = sizeof(" make prome_zone \"\"") + shm_zone->shm.name.len;
@@ -2040,7 +2041,7 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     if (ctx->shpool->log_ctx == NULL) {
         return NGX_ERROR;
     }
-    
+
     ngx_sprintf(ctx->shpool->log_ctx,
                     "in prome_zone \" %V \"%Z",
                     &shm_zone->shm.name);
@@ -2163,3 +2164,5 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 
 }
+
+

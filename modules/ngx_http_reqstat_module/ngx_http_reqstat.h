@@ -278,8 +278,8 @@ typedef struct {
 
 typedef struct {
 
-    size_t                       b_len;
-    ngx_buf_t                   *buffer;
+    ngx_str_t                    *buffer1;
+    ngx_str_t                    *buffer2;
 
 }ngx_http_prome_shctx_t;
 
@@ -288,8 +288,8 @@ typedef struct {
     ngx_str_t                   *val;
     ngx_uint_t                   p_recycle_rate;
     ngx_slab_pool_t             *shpool;
-    ngx_http_complex_value_t     value;
     ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
+    ngx_http_complex_value_t     value;
 }ngx_http_prome_ctx_t;
 
 
@@ -391,3 +391,4 @@ typedef struct {
 ngx_http_reqstat_rbnode_t *
     ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val);
 
+extern  ngx_uint_t                                       pz_flag;
