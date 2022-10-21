@@ -1892,7 +1892,7 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     if(nodes == 0)
     nodes = 1;
     sum = nodes*(sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " http req due with %d nums nodes\n", sum);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " http req due with %zu nums nodes\n", sum);
 
     b = ngx_calloc_buf(r->pool);
     if(b == NULL) {
@@ -2040,11 +2040,10 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     if (ctx->shpool->log_ctx == NULL) {
         return NGX_ERROR;
     }
+    
     ngx_sprintf(ctx->shpool->log_ctx,
                     "in prome_zone \" %V \"%Z",
                     &shm_zone->shm.name);
-
-    ngx_queue_init(&ctx->sh->queue);
 
     return NGX_OK;
 }
@@ -2164,5 +2163,3 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 
 }
-
-

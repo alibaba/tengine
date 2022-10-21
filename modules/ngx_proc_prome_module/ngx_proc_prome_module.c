@@ -9,15 +9,19 @@
 extern ngx_module_t ngx_http_reqstat_module;
 
 typedef struct {
-    ngx_queue_t                                            queue;
-}ngx_proc_prome_shctx_t;
+
+    size_t                       b_len;
+    ngx_buf_t                   *buffer;
+
+}ngx_http_prome_shctx_t;
 
 typedef struct {
-    ngx_str_t                                             *val;
-    ngx_slab_pool_t                                       *shpool;
-    ngx_proc_prome_shctx_t                *sh;  //作为存储prome格式的结构体
-    ngx_shm_zone_t                                       **shm_zone;
-}ngx_proc_prome_ctx_t;
+    ngx_str_t                   *val;
+    ngx_uint_t                   p_recycle_rate;
+    ngx_slab_pool_t             *shpool;
+    ngx_http_complex_value_t     value;
+    ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
+}ngx_http_prome_ctx_t;
 
 // 思路:从cycle中拿到共享内存的地址直接读,读完后将结果输出
 typedef struct {
@@ -108,6 +112,7 @@ static char *ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child
 
 
 static ngx_command_t ngx_proc_prome_commands[] = {
+
       { ngx_string("start"),
       NGX_PROC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -121,7 +126,6 @@ static ngx_command_t ngx_proc_prome_commands[] = {
       NGX_PROC_CONF_OFFSET,
       offsetof(ngx_proc_prome_main_conf_t, interval),
       NULL },
-
 
     ngx_null_command
 };
@@ -175,33 +179,30 @@ ngx_proc_prome_prepare(ngx_cycle_t *cycle)
 static ngx_int_t
 ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 {
-    // ngx_msec_t                                          time_interval;
     ngx_event_t                                             *loop_event;
+    ngx_http_reqstat_conf_t                                 *rmcf;
+    ngx_proc_prome_main_conf_t                              *pmcf;
+    // ngx_msec_t                                          time_interval;
     // ngx_http_reqstat_ctx_t                          *ctx;
     // ngx_shm_zone_t                                  **shm_zone;
-    ngx_proc_prome_main_conf_t                      *pmcf;
-    ngx_http_reqstat_conf_t                                 *rmcf;
     // int                                                       reuseaddr;
     // ngx_socket_t                                             fd;
     // ngx_connection_t                                    *c;
     // struct sockaddr_in                                   sin;
 
-    // 疑问:两者接口的区别?
     pmcf = ngx_proc_get_conf(cycle->conf_ctx, ngx_proc_prome_module);
 
-    
     if(pmcf == NULL){
-        ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker pmcf is NULL\n");
+        ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker pmcf is NULL");
         return NGX_ERROR;
     }
 
-    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "init worker pmcf is time %i\n", pmcf->interval);
+    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "init worker pmcf is time %i", pmcf->interval);
 
-   
     rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_reqstat_module);
 
     if(rmcf == NULL){
-         ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker rmcf is NULL\n");
+         ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "init worker rmcf is NULL");
          return NGX_ERROR;
     }
 
@@ -209,95 +210,21 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 
 
 
-    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_monitor*************>%d\n", rmcf->monitor->nelts);
-    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pd*************>%d\n", rmcf->prome_display->nelts);
-    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pz*************>%d\n", rmcf->prome_zone->nelts);
-    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "rmcf*************>%p\n", ((ngx_shm_zone_t*)rmcf->prome_display->elts));
+
+    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_monitor*************>%d", rmcf->monitor->nelts);
+    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pd*************>%d", rmcf->prome_display->nelts);
+    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pz*************>%d", rmcf->prome_zone->nelts);
+    // ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "rmcf*************>%p", ((ngx_shm_zone_t*)rmcf->prome_display->elts));
 
 
 
-    // fd = ngx_socket(AF_INET, SOCK_STREAM, 0);
-    // if (fd == -1) {
-    //     ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "daytime socket error");
-    //     return NGX_ERROR;
-    // }
 
-    // reuseaddr = 1;
-
-    // if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-    //                (const void *) &reuseaddr, sizeof(int))
-    //     == -1)
-    // {
-    //     ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
-    //                   "daytime setsockopt(SO_REUSEADDR) failed");
-
-    //     ngx_close_socket(fd);
-    //     return NGX_ERROR;
-    // }
-    // if (ngx_nonblocking(fd) == -1) {
-    //     ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
-    //                   "daytime nonblocking failed");
-
-    //     ngx_close_socket(fd);
-    //     return NGX_ERROR;
-    // }
-
-    // sin.sin_family = AF_INET;
-    // sin.sin_addr.s_addr = htonl(INADDR_ANY);
-    // sin.sin_port = htons(pmcf->port);
-
-    // if (bind(fd, (struct sockaddr *) &sin, sizeof(sin)) == -1) {
-    //     ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "daytime bind error");
-    //     return NGX_ERROR;
-    // }
-
-    // if (listen(fd, 20) == -1) {
-    //     ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "daytime listen error");
-    //     return NGX_ERROR;
-    // }
-
-    // c = ngx_get_connection(fd, cycle->log);
-    // if (c == NULL) {
-    //     ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "daytime no connection");
-    //     return NGX_ERROR;
-    // }
-
-    // c->log = cycle->log;
-    // loop_event = c->read;
-    // loop_event->log = c->log;
     loop_event = &pmcf->event;
     loop_event->log = ngx_cycle->log;
     loop_event->data = pmcf;
-    // loop_event->accept = 1;
     loop_event->handler = ngx_proc_prome_handler;
+    ngx_add_timer(loop_event,(ngx_msec_t)1000);
 
-    // if (ngx_add_event(loop_event, NGX_READ_EVENT, 0) == NGX_ERROR) {
-    //     return NGX_ERROR;
-    // }
-
-    // pmcf->fd = fd;
-
-    // rmcf = ngx_http_cycle_get_module_main_conf(cycle,ngx_http_reqstat_module);
-    
-    // if(rmcf == NULL){
-    //       ngx_log_error(NGX_LOG_ERR,cycle->log,0,"init worker rmcf is NULL\n ->%p",rmcf);
-    //     return NGX_ERROR;
-    // }
-
-    // ngx_log_error(NGX_LOG_NOTICE,ngx_cycle->log,0,"the rlfc nums %i",(ngx_int_t)rmcf->prome_display);
-
-
-    // 拿到全局变量中reqstat已有的共享内存,赋值给二级指针,在后续进行遍历
-    // shm_zone = cycle->shared_memory.last->elts;
-    // 设置事件循环时间
-    // time_out = pmcf->time_out;
-    // 注册共享内存的首地址
-
-    // loop_event->log = ngx_cycle->log;
-    // loop_event->data = pmcf;
-    // loop_event->handler = ngx_proc_prome_handler;
-    // 设置循环时间
-    ngx_add_timer(loop_event,pmcf->interval);
     return NGX_OK;
 }
 
@@ -362,23 +289,23 @@ ngx_proc_prome_handler(ngx_event_t *ev){
 
 
     // ngx_int_t                                      rc;
-    // ngx_str_t                                       type;
-    // ngx_buf_t                                      *b;
-    // ngx_uint_t                                      j;
-    size_t                                               host_len,sum;
+    size_t                                               size;
+    size_t                                               per_size;
     size_t                                               nodes;
-    ngx_uint_t                                           i;
+    size_t                                               host_len,sum;
+    ngx_buf_t                                           *b;
+    ngx_uint_t                                           i,j;
     ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
+    ngx_pool_t                                          *pool;
     ngx_queue_t                                         *q;
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    ngx_proc_prome_main_conf_t                  *pmcf;
+    ngx_proc_prome_main_conf_t                          *pmcf;
+    ngx_http_prome_ctx_t                                *pctx;
     // ngx_http_reqstat_rbnode_t             *display_node;
     // ngx_chain_t                                  out,*tl,**cl;
-    // size_t                                            size;
-    // size_t                                            per_size;
     // ngx_int_t                                       ngx_ret;
     // u_char                                          *o,*s,*p;
     // clock_t                                            start,finish;
@@ -393,22 +320,21 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     display_traffic = rmcf->prome_display;
     shm_zone = rmcf->prome_display->elts;
 
-    // cl = &out.next;
 
-    // per_size = 0;
+    per_size = 0;
     sum = 0;
-    // size = 0;
+    size = 0;
     nodes = 0;
     host_len =0;
     
-    for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
+    for(i = 0; i < NGX_HTTP_PROME_FMT_KEY_NUMS; i++) {
         sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
     }
 
     // per_size = sum;
     // size = 5800;
 
-     for(i = 0;i < display_traffic->nelts;i++) {
+     for(i = 0; i < display_traffic->nelts; i++) {
 
         ctx = shm_zone[i]->data;
 
@@ -431,118 +357,73 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     nodes = 1;
     sum = nodes*(sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(sizeof(ngx_atomic_t)+host_len));
 
-     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
+     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %zu nums nodes\n", sum);
 
-    // b = ngx_calloc_buf(r->pool);
-    // if(b == NULL) {
-    //     return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    // }
+    pool = ngx_create_pool(NGX_MAX_ALLOC_FROM_POOL, ngx_cycle->log);
 
+    b = ngx_calloc_buf(pool);
+    if(b == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
+    }
 
-    // // 循环遍历每一个已有的共享内存,将里面的内容按照prome的格式写入到prome_zone中
-    // for(i = 0;i < display_traffic->nelts;i++) {
-    //     // 如果遍历到prome_zone name 则跳过
-    //     // if(rlcf->prome_display->elts != shm_zone[i]) continue;
+     for(i = 0; i < display_traffic->nelts; i++) {
+       
+        ctx = shm_zone[i]->data;
+        // 先打印出共享内存和tengine的信息(可删)
+        b->last = ngx_slprintf(b->last, b->end, NGX_HTTP_PROME_FMT_INFO,
+                                    &shm_zone[i]->shm.name,
+                                    TENGINE_VERSION,NGINX_VERSION);
 
-    //     ctx = shm_zone[i]->data;
-    //     // 先打印出共享内存和tengine的信息(可删)
-    //     b->last = ngx_slprintf(b->last,b->end,NGX_HTTP_PROME_FMT_INFO,
-    //                                 &shm_zone[i]->shm.name,
-    //                                 TENGINE_VERSION,NGINX_VERSION);
+        for (q = ngx_queue_head(&ctx->sh->queue);
+             q != ngx_queue_sentinel(&ctx->sh->queue);
+             q = ngx_queue_next(q))
+        {
+            node = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
 
-    //     for (q = ngx_queue_head(&ctx->sh->queue);
-    //          q != ngx_queue_sentinel(&ctx->sh->queue);
-    //          q = ngx_queue_next(q))
-    //     {
-    //         node = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
+            if(node->conn_total == 0) {
+                continue;
+            }
 
-    //         if(node->conn_total == 0) {
-    //             continue;
-    //         }
+            b = ngx_calloc_buf(pool);
+            if(b == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
+            }
 
-    //         tl = ngx_alloc_chain_link(r->pool);
-    //         if (tl == NULL) {
-    //             return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    //         }
+            // 每个结点的大小
+            size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
+            b->start = ngx_pcalloc(pool,size);
+            if(b->start == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "pcalloc b-start error");
+            }
 
-    //         b = ngx_calloc_buf(r->pool);
-    //         if(b == NULL) {
-    //             return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    //         }
-
-    //         // 每个结点的大小
-    //         size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
-    //         tl->buf = b;
-    //         b->start = ngx_pcalloc(r->pool,size);
-    //         if(b->start == NULL) {
-    //             return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    //         }
-
-    //         b->end = b->start + size;
-    //         b->last= b->pos = b->start;
-    //         b->temporary = 1;
+            b->end = b->start + size;
+            b->last= b->pos = b->start;
+            b->temporary = 1;
 
 
-    //         for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-    //                 b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key2[j],
-    //                                             node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
-    //                                             ngx_http_reqstat_fields2[j]));
-    //         }
-
-
-
-    //             // if (ctx->user_defined) {
-    //             //     for (j = 0; j < ctx->user_defined->nelts; j++) {
-    //             //         b->last = ngx_slprintf(b->last, b->end, "%uA,",
-    //             //                            *NGX_HTTP_REQSTAT_REQ_FIELD(node,
-    //             //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
-    //             //     }
-    //             // }
-    
-    //         *(b->last - 1) = '\n';
-    //         tl->next = NULL;
-    //         *cl = tl;
-    //         cl = &tl->next;
-    //     }
-    // }
-
-
-    // tl = ngx_alloc_chain_link(r->pool);
-    // if (tl == NULL) {
-    //     return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    // }
-
-    // tl->buf = ngx_calloc_buf(r->pool);
-    // if (tl->buf == NULL) {
-    //     return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    // }
-
-    // tl->buf->last_buf = 1;
-    // tl->next = NULL;
-    // *cl = tl;
-
-
-
-}
-
-
-
-
-// ngx_http_prome_zone_node_t*
-//     ngx_http_reqstat_node_lookup(ngx_shm_zone_t *shm_zone,size_t size) {
-//         ngx_int_t                                i;
-//         ngx_queue_t                             *q;
-//         ngx_http_prome_zone_node_t              *pz;
-//         ngx_http_prome_ctx_t    *ptctx;
-
-//         ptctx = shm_zone->data;
-
-//         ngx_shmtx_lock(&ptctx->shpool->mutex);
-
-//         for(q = ngx_queue_head(&ptctx->sh->queue);
-//             q != ngx_queue_sentinel(&ptctx->sh->queue);
-//             q = ngx_queue_next(q))
-//             {
+            for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
+                    b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key2[j],
+                                                node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                                                ngx_http_reqstat_fields2[j]));
+                }
                 
-//             } 
-//     }
+
+
+                // if (ctx->user_defined) {
+                //     for (j = 0; j < ctx->user_defined->nelts; j++) {
+                //         b->last = ngx_slprintf(b->last, b->end, "%uA,",
+                //                            *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
+                //     }
+                // }
+    
+            *(b->last - 1) = '\n';
+
+
+    }
+
+    }
+
+    ngx_destroy_pool(pool);
+    ngx_add_timer(ev, 1000);
+}

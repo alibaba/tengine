@@ -274,29 +274,22 @@ typedef struct {
 } ngx_http_reqstat_store_t;
 
 
-typedef struct {
-
-    ngx_int_t                    flag;
-    ngx_queue_t                  queue;
-
-    ngx_buf_t                    buf_node;
- 
-}ngx_http_prome_zone_node_t;
-
 
 
 typedef struct {
 
-    ngx_queue_t                  queue;
+    size_t                       b_len;
+    ngx_buf_t                   *buffer;
 
 }ngx_http_prome_shctx_t;
+
 
 typedef struct {
     ngx_str_t                   *val;
     ngx_uint_t                   p_recycle_rate;
     ngx_slab_pool_t             *shpool;
     ngx_http_complex_value_t     value;
-    ngx_http_prome_shctx_t *sh;  //作为存储prome格式的结构体
+    ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
 }ngx_http_prome_ctx_t;
 
 
