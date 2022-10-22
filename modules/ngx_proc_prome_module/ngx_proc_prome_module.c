@@ -208,17 +208,6 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 
     pmcf->rmcf = rmcf;
 
-
-
-
-    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_monitor*************>%d", rmcf->monitor->nelts);
-    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pd*************>%d", rmcf->prome_display->nelts);
-    // ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "rmcf_pz*************>%d", rmcf->prome_zone->nelts);
-    // ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "rmcf*************>%p", ((ngx_shm_zone_t*)rmcf->prome_display->elts));
-
-
-
-
     loop_event = &pmcf->event;
     loop_event->log = ngx_cycle->log;
     loop_event->data = pmcf;
@@ -289,17 +278,19 @@ ngx_proc_prome_handler(ngx_event_t *ev){
 
 
     // ngx_int_t                                      rc;
+    u_char                                              *p;
     size_t                                               size;
     size_t                                               per_size;
     size_t                                               nodes;
     size_t                                               host_len,sum;
-    ngx_buf_t                                           *b;
+    // ngx_buf_t                                           *b;
     ngx_uint_t                                           i,j;
     ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
-    ngx_pool_t                                          *pool;
+    ngx_array_t                                         *prome_traffic; //指向需要转换的监控节点
+    // ngx_pool_t                                          *pool;
     ngx_queue_t                                         *q;
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
-    ngx_shm_zone_t                                      *shm_pzone; 
+    ngx_shm_zone_t                                     **shm_pzone; 
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
@@ -321,8 +312,13 @@ ngx_proc_prome_handler(ngx_event_t *ev){
     display_traffic = rmcf->prome_display;
     shm_zone = rmcf->prome_display->elts;
 
+   prome_traffic = rmcf->prome_zone;
    shm_pzone = rmcf->prome_zone->elts;
-   pctx = shm_pzone->data;
+   pctx = shm_pzone[prome_traffic->nelts - 1]->data;
+
+    // ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  is %p \n", pctx->sh->buffer1->last);
+
+
 
 
     per_size = 0;
@@ -363,20 +359,23 @@ ngx_proc_prome_handler(ngx_event_t *ev){
 
      ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %zu nums nodes\n", sum);
 
-    pool = ngx_create_pool(NGX_MAX_ALLOC_FROM_POOL, ngx_cycle->log);
+    // pool = ngx_create_pool(NGX_MAX_ALLOC_FROM_POOL, ngx_cycle->log);
 
-    b = ngx_calloc_buf(pool);
-    if(b == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
-    }
+    // b = ngx_calloc_buf(pool);
+    // if(b == NULL) {
+    //     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
+    // }
+
+   
+
 
      for(i = 0; i < display_traffic->nelts; i++) {
        
         ctx = shm_zone[i]->data;
         // 先打印出共享内存和tengine的信息(可删)
-        b->last = ngx_slprintf(b->last, b->end, NGX_HTTP_PROME_FMT_INFO,
-                                    &shm_zone[i]->shm.name,
-                                    TENGINE_VERSION,NGINX_VERSION);
+        // b->last = ngx_slprintf(b->last, b->end, NGX_HTTP_PROME_FMT_INFO,
+        //                             &shm_zone[i]->shm.name,
+        //                             TENGINE_VERSION,NGINX_VERSION);
 
         for (q = ngx_queue_head(&ctx->sh->queue);
              q != ngx_queue_sentinel(&ctx->sh->queue);
@@ -388,30 +387,47 @@ ngx_proc_prome_handler(ngx_event_t *ev){
                 continue;
             }
 
-            b = ngx_calloc_buf(pool);
-            if(b == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
-            }
+            // b = ngx_calloc_buf(pool);
+            // if(b == NULL) {
+            //     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "calloc buf error");
+            // }
 
             // 每个结点的大小
             size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
-            b->start = ngx_pcalloc(pool,size);
-            if(b->start == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "pcalloc b-start error");
+            // b->start = ngx_pcalloc(pool,size);
+            // if(b->start == NULL) {
+            //     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "pcalloc b->start error");
+            // }
+
+            // b->end = b->start + size;
+            // b->last= b->pos = b->start;
+            // b->temporary = 1;
+
+
+
+             pctx->sh->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_str_t));
+            if(pctx->sh->buffer == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
             }
+            pctx->sh->buffer->data = ngx_slab_alloc(pctx->shpool,size);
+            if(pctx->sh->buffer->data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer->start error");
+            }
+            pctx->sh->buffer->len = size;
 
-            b->end = b->start + size;
-            b->last= b->pos = b->start;
-            b->temporary = 1;
-
-
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  is SIZE %d \n", size);
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  is SIZE %d \n", pctx->sh->buffer->len);
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx buffer %p \n",pctx->sh->buffer);
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  start %p \n",pctx->sh->buffer->data);
+            
+            // 向共享内存中写数据
             for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-                    b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key2[j],
+                    p = ngx_snprintf(pctx->sh->buffer->data, pctx->sh->buffer->len,
+                                                ngx_http_reqstat_fmt_key2[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                 ngx_http_reqstat_fields2[j]));
-                }
+            }
                 
-
 
                 // if (ctx->user_defined) {
                 //     for (j = 0; j < ctx->user_defined->nelts; j++) {
@@ -421,20 +437,13 @@ ngx_proc_prome_handler(ngx_event_t *ev){
                 //     }
                 // }
     
-            *(b->last - 1) = '\n';
+            *(p - 1) = '\n';
 
-            // 从这里出现问题
-            if(pz_flag % 2 == 1) {
-                pctx->sh->buffer1 = ngx_slab_alloc(pctx->shpool, size);
-                ngx_memcpy(pctx->sh->buffer1->data, b->start, size);
-            }else{
-                pctx->sh->buffer2 = ngx_slab_alloc(pctx->shpool, size);
-                 ngx_memcpy(pctx->sh->buffer2->data, b->start, size);
-            }
+
 
         }
     }
 
-    ngx_destroy_pool(pool);
+    // ngx_destroy_pool(pool);
     ngx_add_timer(ev, (ngx_msec_t)10000);
 }

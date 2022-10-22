@@ -278,8 +278,8 @@ typedef struct {
 
 typedef struct {
 
-    ngx_str_t                    *buffer1;
-    ngx_str_t                    *buffer2;
+    ngx_str_t                    *buffer;
+    // ngx_buf_t                    *buffer2;
 
 }ngx_http_prome_shctx_t;
 
