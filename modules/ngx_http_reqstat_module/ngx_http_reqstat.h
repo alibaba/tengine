@@ -1,8 +1,8 @@
-#include <ngx_config.h>
-#include <ngx_core.h>
-#include <ngx_http.h>
-#include<ngx_log.h>
 #include<nginx.h>
+#include<ngx_log.h>
+#include <ngx_http.h>
+#include <ngx_core.h>
+#include <ngx_config.h>
 
 
 #define NGX_HTTP_PROME_FMT_INFO                      \
@@ -83,7 +83,7 @@
     "tengine_reqstat_ups_tries{host=\"%s\"} %uA\n" 
    
     #define NGX_HTTP_PROME_FMT_HTTP_200                      \
-    "# HELP tengine_reqstat_http_200l The request/response bytes\n"         \
+    "# HELP tengine_reqstat_http_200 The request/response bytes\n"         \
     "# TYPE tengine_reqstat_http_200 counter\n"                                           \
     "tengine_reqstat_http_200{host=\"%s\"} %uA\n" 
    
@@ -163,11 +163,6 @@
     "# TYPE tengine_reqstat_ups_5xx counter\n"                                           \
     "tengine_reqstat_ups_5xx{host=\"%s\"} %uA\n" 
    
-
-
-
-
-
 #define NGX_HTTP_REQSTAT_RSRV    29
 #define NGX_HTTP_REQSTAT_MAX     50
 #define NGX_HTTP_REQSTAT_USER    NGX_HTTP_REQSTAT_MAX - NGX_HTTP_REQSTAT_RSRV
@@ -230,7 +225,6 @@ struct  ngx_http_reqstat_rbnode_s {
     u_char                       data[1];
 };
 
-
 typedef struct {
     ngx_flag_t                   lazy;
     ngx_array_t                 *monitor;
@@ -243,14 +237,12 @@ typedef struct {
     ngx_array_t                 *prome_zone;
 } ngx_http_reqstat_conf_t;
 
-
 typedef struct {
     ngx_rbtree_t                 rbtree;
     ngx_rbtree_node_t            sentinel;
     ngx_queue_t                  queue;
     ngx_queue_t                  visit;
 } ngx_http_reqstat_shctx_t;
-
 
 typedef struct {
     ngx_str_t                   *val;
@@ -277,8 +269,9 @@ typedef struct {
 
 
 typedef struct {
-
-    ngx_str_t                    *buffer;
+    u_char                        *data;
+    ngx_buf_t                    *buffer;
+    ngx_uint_t                      len;
     // ngx_buf_t                    *buffer2;
 
 }ngx_http_prome_shctx_t;
