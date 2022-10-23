@@ -1,12 +1,11 @@
 #include <nginx.h>
-#include<ngx_http_reqstat.h>
 #include<ngx_proc.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <ngx_config.h>
 #include<ngx_event.h>
+#include<ngx_http_reqstat.h>
 
-ngx_uint_t          pz_flag;
 extern ngx_module_t ngx_http_reqstat_module;
 
 typedef struct {
@@ -251,16 +250,16 @@ ngx_proc_prome_handler(ngx_event_t *ev)
 {
     size_t                                               size;
     size_t                                               per_size;
-    size_t                                               nodes;
-    size_t                                               host_len;
     size_t                                               sum;
-    size_t                                               num;
+    // size_t                                               nodes;
+    // size_t                                               host_len;
+    // size_t                                               num;
     // ngx_buf_t                                           *b;
     ngx_uint_t                                           i,j;
     ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
     ngx_array_t                                         *prome_traffic; //指向需要转换的监控节点
     // ngx_pool_t                                          *pool;
-    ngx_queue_t                                         *q;
+    ngx_queue_t                                         *q,*qz;
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
     ngx_shm_zone_t                                     **shm_pzone; 
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
@@ -268,6 +267,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
     ngx_proc_prome_main_conf_t                          *pmcf;
     ngx_http_prome_ctx_t                                *pctx;
+    ngx_http_prome_node_t                              *pnode;
     // ngx_http_reqstat_rbnode_t             *display_node;
     // ngx_chain_t                                  out,*tl,**cl;
     // ngx_int_t                                       ngx_ret;
@@ -287,14 +287,14 @@ ngx_proc_prome_handler(ngx_event_t *ev)
    shm_pzone = rmcf->prome_zone->elts;
    pctx = shm_pzone[prome_traffic->nelts - 1]->data;
 
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  is %p \n", pctx->sh);
 
-    num = 0;
     per_size = 0;
-    sum = 0;
     size = 0;
-    nodes = 0;
-    host_len =0;
+    sum = 0;
+
+    // num = 0;
+    // nodes = 0;
+    // host_len =0;
     
     for(i = 0; i < NGX_HTTP_PROME_FMT_KEY_NUMS; i++) {
         sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
@@ -302,44 +302,47 @@ ngx_proc_prome_handler(ngx_event_t *ev)
 
     per_size = sum;
 
-     for(i = 0; i < display_traffic->nelts; i++) {
+    //  for(i = 0; i < display_traffic->nelts; i++) {
 
-        ctx = shm_zone[i]->data;
+    //     ctx = shm_zone[i]->data;
 
-        for (q = ngx_queue_head(&ctx->sh->queue);
-             q != ngx_queue_sentinel(&ctx->sh->queue);
-             q = ngx_queue_next(q))
-        {
-            node = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
+    //     for (q = ngx_queue_head(&ctx->sh->queue);
+    //          q != ngx_queue_sentinel(&ctx->sh->queue);
+    //          q = ngx_queue_next(q))
+    //     {
+    //         node = ngx_queue_data(q, ngx_http_reqstat_rbnode_t, queue);
 
-            if(node->conn_total == 0) {
-                continue;
+    //         if(node->conn_total == 0) {
+    //             continue;
+    //         }
+    //         host_len += ngx_strlen(node->data);
+    //         ++nodes;
+    //     }
+    // }
+
+    // if(nodes == 0) {
+    //     nodes = 1;
+    // }
+    // sum = nodes * (sum + NGX_HTTP_PROME_FMT_KEY_NUMS * (sizeof(ngx_atomic_t) + host_len));
+
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
+
+    if(!ngx_queue_empty(&pctx->sh->queue)) {
+        for (qz = ngx_queue_head(&pctx->sh->queue);
+            qz != ngx_queue_sentinel(&pctx->sh->queue);
+            qz = ngx_queue_next(qz))
+            {
+                pnode = ngx_queue_data(qz, ngx_http_prome_node_t, queue);
+                if(pnode->pz_flag == 1) {
+                    ngx_queue_remove(&pnode->queue);
+                    // ngx_memzero(pnode->buffer->start,(pnode->buffer->end - pnode->buffer->start));
+                    pnode->pz_flag = 0;
+                    ngx_queue_insert_head(&pctx->sh->unused,&pnode->unused);
+                }
             }
-            host_len += ngx_strlen(node->data);
-            ++nodes;
-        }
     }
 
-    if(nodes == 0) {
-        nodes = 1;
-    }
-    sum = nodes * (sum + NGX_HTTP_PROME_FMT_KEY_NUMS * (sizeof(ngx_atomic_t) + host_len));
-
-     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
-
-    pctx->sh->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_buf_t));
-    if(pctx->sh->buffer == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
-    }
-    pctx->sh->buffer->start = ngx_slab_alloc(pctx->shpool,sizeof(u_char));
-    if(pctx->sh->buffer->start == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer->start error");
-    }
-    pctx->sh->data = pctx->sh->buffer->start;
-    
    
-
-    
      for(i = 0; i < display_traffic->nelts; i++) {
        
         ctx = shm_zone[i]->data;
@@ -365,22 +368,51 @@ ngx_proc_prome_handler(ngx_event_t *ev)
             // ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  start %p \n",pctx->sh->buffer->data);
             
             // 向共享内存中写数据
-            num += size;
-            pctx->sh->buffer->start = ngx_slab_alloc(pctx->shpool,size);
-            if(pctx->sh->buffer->start == NULL) {
+            // num += size;
+            pnode = NULL;
+            if(!ngx_queue_empty(&pctx->sh->unused)) {
+                for (qz = ngx_queue_head(&pctx->sh->unused);
+                qz != ngx_queue_sentinel(&pctx->sh->unused);
+                qz = ngx_queue_next(qz))
+                {
+                    pnode = ngx_queue_data(qz, ngx_http_prome_node_t, queue);
+                    ngx_queue_remove(&pnode->unused);
+                    ngx_queue_insert_head(&pctx->sh->queue,&pnode->queue);
+                    break;
+                }
+            }
+            if(pnode == NULL) {
+                pnode = ngx_slab_alloc(pctx->shpool,sizeof(ngx_http_prome_node_t));
+                if(pnode == NULL) {
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc pnode error");
+                }
+                pnode->pz_flag = 0;
+                pnode->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_buf_t));
+                if(pnode->buffer == NULL) {
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
+                }
+            }else {
+                pnode->pz_flag = 0;
+                pnode->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_buf_t));
+                if(pnode->buffer == NULL) {
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
+                }
+            }
+            pnode->buffer->start = ngx_slab_alloc(pctx->shpool,size);
+            if(pnode->buffer->start == NULL) {
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer->start error");
             }
-            pctx->sh->buffer->end = pctx->sh->buffer->start + size;
-            pctx->sh->buffer->pos = pctx->sh->buffer->last = pctx->sh->buffer->start;
-            pctx->sh->buffer->memory = 1;
-       
+            ngx_shmtx_lock(&pctx->shpool->mutex);
+            pnode->buffer->pos = pnode->buffer->last = pnode->buffer->start;
+            pnode->buffer->end = pnode->buffer->start + size;
+            pnode->buffer->memory = 1;
+            pnode->pz_flag = 0;
             for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-                pctx->sh->buffer->last = ngx_slprintf(pctx->sh->buffer->last, pctx->sh->buffer->end,
+            pnode->buffer->last = ngx_slprintf(pnode->buffer->last, pnode->buffer->end,
                                                 ngx_http_reqstat_fmt_key2[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                 ngx_http_reqstat_fields2[j]));
             }
-                
 
                 // if (ctx->user_defined) {
                 //     for (j = 0; j < ctx->user_defined->nelts; j++) {
@@ -389,13 +421,10 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
                 //     }
                 // }
-    
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the pctx  is sum %d \n", (pctx->sh->buffer->last - pctx->sh->buffer->start));
-            
+            *(pnode->buffer->last - 1) = '\n';
+            ngx_queue_insert_head(&pctx->sh->queue,&pnode->queue);
+            ngx_shmtx_unlock(&pctx->shpool->mutex);
         }
-    
-    pctx->sh->len = num;
-    // ngx_shmtx_unlock(&pctx->shpool->mutex);
     }
-    ngx_add_timer(ev, (ngx_msec_t)5000);
+    ngx_add_timer(ev, (ngx_msec_t)10000);
 }
