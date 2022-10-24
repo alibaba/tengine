@@ -326,7 +326,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     // sum = nodes * (sum + NGX_HTTP_PROME_FMT_KEY_NUMS * (sizeof(ngx_atomic_t) + host_len));
 
     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %d nums nodes\n", sum);
-
+    
     if(!ngx_queue_empty(&pctx->sh->queue)) {
         for (qz = ngx_queue_head(&pctx->sh->queue);
             qz != ngx_queue_sentinel(&pctx->sh->queue);
@@ -335,13 +335,14 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 pnode = ngx_queue_data(qz, ngx_http_prome_node_t, queue);
                 if(pnode->pz_flag == 1) {
                     ngx_queue_remove(&pnode->queue);
-                    // ngx_memzero(pnode->buffer->start,(pnode->buffer->end - pnode->buffer->start));
+                    ngx_memzero(pnode->buffer->start,(pnode->buffer->end - pnode->buffer->start));
+                    pnode->buffer->end = pnode->buffer->last = pnode->buffer->start;
                     pnode->pz_flag = 0;
                     ngx_queue_insert_head(&pctx->sh->unused,&pnode->unused);
                 }
             }
     }
-
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "find bug before***************************************");
    
      for(i = 0; i < display_traffic->nelts; i++) {
        
@@ -375,8 +376,9 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 qz != ngx_queue_sentinel(&pctx->sh->unused);
                 qz = ngx_queue_next(qz))
                 {
-                    pnode = ngx_queue_data(qz, ngx_http_prome_node_t, queue);
+                    pnode = ngx_queue_data(qz, ngx_http_prome_node_t, unused);
                     ngx_queue_remove(&pnode->unused);
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "pnode flag %d",pnode->pz_flag);
                     ngx_queue_insert_head(&pctx->sh->queue,&pnode->queue);
                     break;
                 }
@@ -391,18 +393,21 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 if(pnode->buffer == NULL) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
                 }
-            }else {
-                pnode->pz_flag = 0;
-                pnode->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_buf_t));
-                if(pnode->buffer == NULL) {
-                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
-                }
+                ngx_queue_insert_head(&pctx->sh->queue,&pnode->queue);
             }
+            // else {
+            //     pnode->pz_flag = 0;
+            //     pnode->buffer = ngx_slab_alloc(pctx->shpool,sizeof(ngx_buf_t));
+            //     if(pnode->buffer == NULL) {
+            //         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer error");
+            //     }
+            // }
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "find bug before2***************************************");
             pnode->buffer->start = ngx_slab_alloc(pctx->shpool,size);
             if(pnode->buffer->start == NULL) {
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "ngx_slab_alloc buffer->start error");
             }
-            ngx_shmtx_lock(&pctx->shpool->mutex);
+            // ngx_shmtx_lock(&pctx->shpool->mutex);
             pnode->buffer->pos = pnode->buffer->last = pnode->buffer->start;
             pnode->buffer->end = pnode->buffer->start + size;
             pnode->buffer->memory = 1;
@@ -422,8 +427,8 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 //     }
                 // }
             *(pnode->buffer->last - 1) = '\n';
-            ngx_queue_insert_head(&pctx->sh->queue,&pnode->queue);
-            ngx_shmtx_unlock(&pctx->shpool->mutex);
+            
+            // ngx_shmtx_unlock(&pctx->shpool->mutex);
         }
     }
     ngx_add_timer(ev, (ngx_msec_t)10000);

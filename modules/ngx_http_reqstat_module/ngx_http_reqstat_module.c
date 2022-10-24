@@ -2307,6 +2307,7 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
             ngx_shmtx_lock(&pctx->shpool->mutex);
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " pnode before  %p  \n",pnode->buffer->start);
             ngx_memcpy(b->last,pnode->buffer->start,size);
+            b->last += size;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " pnode after  %s \n",pnode->buffer->start);
             ngx_shmtx_unlock(&pctx->shpool->mutex);
             *(b->last - 1) = '\n';
