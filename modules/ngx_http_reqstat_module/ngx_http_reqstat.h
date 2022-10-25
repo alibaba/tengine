@@ -235,6 +235,7 @@ typedef struct {
     ngx_array_t                 *user_defined_str;
     ngx_array_t                 *prome_display;
     ngx_array_t                 *prome_zone;
+    // ngx_array_t                 *prome_point;
 } ngx_http_reqstat_conf_t;
 
 typedef struct {
@@ -267,15 +268,16 @@ typedef struct {
 
 
 typedef struct {
-    ngx_queue_t                   queue;
-    ngx_queue_t                   unused;
-    ngx_int_t                     pz_flag;
-    ngx_buf_t                    *buffer;
+    ngx_queue_t                  q_unused;
+    ngx_queue_t                  q_ready;
+    ngx_buf_t                    buffer;
+    ngx_int_t                    prome_flag;
+
 }ngx_http_prome_node_t;
 
 typedef struct {
-    ngx_queue_t                   queue;
-    ngx_queue_t                   unused;
+    ngx_queue_t                  q_unused;
+    ngx_queue_t                  q_ready;
 }ngx_http_prome_shctx_t;
 
 typedef struct {
@@ -384,3 +386,4 @@ typedef struct {
 
 ngx_http_reqstat_rbnode_t *
     ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val);
+

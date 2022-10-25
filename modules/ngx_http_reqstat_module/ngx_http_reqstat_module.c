@@ -319,6 +319,7 @@ ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf)
     conf->user_defined_str = NGX_CONF_UNSET_PTR;
     conf->prome_display = NGX_CONF_UNSET_PTR;
     conf->prome_zone = NGX_CONF_UNSET_PTR;
+    // conf->prome_point = NGX_CONF_UNSET_PTR;
     return conf;
 }
 
@@ -338,6 +339,7 @@ ngx_http_reqstat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_ptr_value(conf->user_defined_str, prev->user_defined_str, NULL);
     ngx_conf_merge_ptr_value(conf->prome_display, prev->prome_display, NULL);
     ngx_conf_merge_ptr_value(conf->prome_zone, prev->prome_zone, NULL);
+    // ngx_conf_merge_ptr_value(conf->prome_point, prev->prome_point, NULL);
     return NGX_CONF_OK;
 }
 
@@ -2033,8 +2035,8 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
                     "in prome_zone \" %V \"%Z",
                     &shm_zone->shm.name);
     
-    ngx_queue_init(&ctx->sh->queue);
-    ngx_queue_init(&ctx->sh->unused);
+    ngx_queue_init(&ctx->sh->q_ready);
+    ngx_queue_init(&ctx->sh->q_unused);
     return NGX_OK;
 }
 
@@ -2175,6 +2177,14 @@ ngx_str_t                                           *value;
 
     rmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_reqstat_module);
 
+    // if(rmcf->prome_point == NULL) {
+    //     rmcf->prome_point = ngx_array_create(cf->pool,1,sizeof(ngx_uint_t));
+    //     if(rmcf->prome_point == NULL) {
+    //         return NGX_CONF_ERROR;
+    //     }
+    // }
+
+
     if(rmcf->prome_display == NULL) {
         rmcf->prome_display = ngx_array_create(cf->pool, cf->args->nelts - 1,
                                          sizeof(ngx_shm_zone_t *));
@@ -2222,26 +2232,23 @@ ngx_str_t                                           *value;
 static ngx_int_t 
 ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r) 
 {
-    size_t                                                size;
+    static u_char                                      buffer[943718400];
+    size_t                                                size,bfsize;
+    u_char                                              *last,*end;
     ngx_int_t                                             rc;
     ngx_str_t                                             type;
     ngx_buf_t                                            *b;
-    // ngx_uint_t                                            i,j;
     ngx_chain_t                                           out,*tl,**cl;
     ngx_array_t                                          *prome_traffic; //指向需要转换的监控节点
-    ngx_queue_t                                          *qz;
     ngx_shm_zone_t                                      **shm_zone; //获取共享内存
     ngx_http_reqstat_conf_t                              *rscf;
-    ngx_http_prome_ctx_t                                 *pctx;
-    ngx_http_prome_node_t                                *pnode;
-    // ngx_http_reqstat_conf_t                              *rlcf; // 获取conf文件中的指令
-
+    
 
     rscf = ngx_http_get_module_main_conf(r, ngx_http_reqstat_module);
     
     prome_traffic = rscf->prome_zone;
     shm_zone = rscf->prome_zone->elts;
-    pctx = shm_zone[prome_traffic->nelts - 1]->data;
+    // pctx = shm_zone[prome_traffic->nelts - 1]->data;
 
     ngx_str_set(&type,"text/plain");
     r->headers_out.content_type = type;
@@ -2254,33 +2261,28 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
         return rc;
     }
 
-    // // ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %p  \n", pctx);
     cl = &out.next;
-    // // ngx_shmtx_lock(&pctx->shpool->mutex);
-    
-    // // ngx_shmtx_unlock(&pctx->shpool->mutex);
-    // ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %d  \n", ngx_strlen(buffer[0]));
-    size = 0;
- 
+    ngx_memzero(buffer, sizeof(buffer));
+    bfsize = ngx_strlen(shm_zone[prome_traffic->nelts - 1]->shm.addr);
+    ngx_memcpy(buffer, shm_zone[prome_traffic->nelts - 1]->shm.addr, bfsize);
 
 
-    // 循环遍历每一个已有的共享内存,将里面的内容按照prome的格式写入到prome_zone中
 
-        // 如果遍历到prome_zone name 则跳过
-        // if(rlcf->prome_display->elts != shm_zone[i]) continue;
+    // ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of pzone_point  %d  \n",*(ngx_uint_t*)(rscf->prome_point->elts));
 
-        // 先打印出共享内存和tengine的信息(可删)
-        // b->last = ngx_slprintf(b->last, b->end, NGX_HTTP_PROME_FMT_INFO,
-        //                             &shm_zone[i]->shm.name,
-        //                             TENGINE_VERSION,NGINX_VERSION);
-       
-        for (qz = ngx_queue_head(&pctx->sh->queue);
-             qz != ngx_queue_sentinel(&pctx->sh->queue);
-             qz = ngx_queue_next(qz))
-        {
-            pnode = ngx_queue_data(qz, ngx_http_prome_node_t, queue);
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %d  \n", 
+    ngx_strlen(shm_zone[prome_traffic->nelts - 1]->shm.addr));
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %s  \n",buffer);
+    last = buffer;
+    end = buffer + bfsize; 
 
-           pnode->pz_flag = 1;
+        while(last < end) {
+
+            if((ngx_uint_t)(end - last) >= NGX_MAX_ALLOC_FROM_POOL) {
+                size = NGX_MAX_ALLOC_FROM_POOL;
+            }else {
+                size = end - last;
+            }
 
             tl = ngx_alloc_chain_link(r->pool);
             if (tl == NULL) {
@@ -2293,7 +2295,7 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
             }
 
             // 每个结点的大小
-            size = (size_t)(pnode->buffer->end - pnode->buffer->start);
+
             tl->buf = b;
             b->start = ngx_pcalloc(r->pool,size);
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents size  %d  \n", size);
@@ -2304,13 +2306,11 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
             b->end = b->start + size;
             b->last= b->pos = b->start;
             b->temporary = 1;
-            ngx_shmtx_lock(&pctx->shpool->mutex);
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " pnode before  %p  \n",pnode->buffer->start);
-            ngx_memcpy(b->last,pnode->buffer->start,size);
+           
+            ngx_memcpy(b->last,last,size);
             b->last += size;
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " pnode after  %s \n",pnode->buffer->start);
-            ngx_shmtx_unlock(&pctx->shpool->mutex);
-            *(b->last - 1) = '\n';
+            last += size;
+            
             tl->next = NULL;
             *cl = tl;
             cl = &tl->next;
