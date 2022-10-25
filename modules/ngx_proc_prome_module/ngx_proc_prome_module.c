@@ -237,7 +237,7 @@ ngx_proc_prome_create_conf(ngx_conf_t *cf)
     pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_main_conf_t));
     if (pmcf == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "daytime create proc conf error");
+                           "ngx_pcalloc create proc conf error");
         return NULL;
     }
     pmcf->enable = NGX_CONF_UNSET;
@@ -249,17 +249,10 @@ ngx_proc_prome_create_conf(ngx_conf_t *cf)
 void
 ngx_proc_prome_handler(ngx_event_t *ev)
 {
-    // size_t                                               size;
-    // size_t                                               per_size;
-    // size_t                                               sum;
-    // size_t                                               nodes;
-    // size_t                                               host_len;
-    // size_t                                               num;
-    // ngx_buf_t                                           *b;
+    size_t                                               sum,size;
+    u_char                                              *last,*start;
     ngx_uint_t                                           i,j;
     ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
-    ngx_array_t                                         *prome_traffic; //指向需要转换的监控节点
-    // ngx_pool_t                                          *pool;
     ngx_queue_t                                         *q;
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
     ngx_shm_zone_t                                     **shm_pzone; 
@@ -267,17 +260,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
     ngx_proc_prome_main_conf_t                          *pmcf;
-    // ngx_http_prome_ctx_t                                *pctx;
-    // ngx_http_prome_node_t                              *pnode;
-    size_t                                                              num;
-    u_char                                                  *last;
-    u_char                                         *start;
-    // ngx_http_reqstat_rbnode_t             *display_node;
-    // ngx_chain_t                                  out,*tl,**cl;
-    // ngx_int_t                                       ngx_ret;
-    // u_char                                          *o,*s,*p;
-    // clock_t                                            start,finish;
-    // double                                            duration;
+    ngx_http_prome_ctx_t                                *pctx;
 
     // 获取指令指针来寻找共享内存
     pmcf = ev->data;
@@ -287,14 +270,17 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     display_traffic = rmcf->prome_display;
     shm_zone = rmcf->prome_display->elts;
 
-   prome_traffic = rmcf->prome_zone;
-   shm_pzone = rmcf->prome_zone->elts;
-//    pctx = shm_pzone[prome_traffic->nelts - 1]->data;
 
-    last = shm_pzone[prome_traffic->nelts - 1]->shm.addr;
-    start = shm_pzone[prome_traffic->nelts - 1]->shm.addr;
-    num = shm_pzone[prome_traffic->nelts - 1]->shm.size;
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " due with %zu nums nodes\n", shm_pzone[prome_traffic->nelts - 1]->shm.size);
+   shm_pzone = rmcf->prome_zone->elts;
+   pctx = shm_pzone[0]->data;
+
+    ++pctx->sh->status;
+    last = start = pctx->sh->prome_start[pctx->sh->status%2];
+
+    sum = 0;
+    for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
+        sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
+    }
     
      for(i = 0; i < display_traffic->nelts; i++) {
        
@@ -310,10 +296,15 @@ ngx_proc_prome_handler(ngx_event_t *ev)
             if(node->conn_total == 0) {
                 continue;
             }
+            size = sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
 
- 
+
+            if((size_t)(pctx->sh->prome_end[pctx->sh->status%2] - last) < size){
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "not have enough memory");
+                break;
+            }
             for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-                                        last = ngx_slprintf(last, start + num + 1,
+                                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
                                                 ngx_http_reqstat_fmt_key2[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                 ngx_http_reqstat_fields2[j]));
@@ -327,11 +318,9 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
                 //     }
                 // }
-
+        
         }
     }
     *(last) = '\0';
-    // (*(ngx_uint_t*)(rmcf->prome_point->elts))++;
-    // ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " contents of pzone_point  %d  \n",*(ngx_uint_t*)(rmcf->prome_point->elts));
     ngx_add_timer(ev, (ngx_msec_t)15000);
 }

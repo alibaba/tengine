@@ -2015,28 +2015,37 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 
         return NGX_OK;
     }
-    ctx->shpool = (ngx_slab_pool_t*) shm_zone->shm.addr;
 
-    ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_prome_shctx_t));
-    if(ctx->sh == NULL) {
-        return NGX_ERROR;
-    }
+    ctx->sh =(ngx_http_prome_shctx_t*)shm_zone->shm.addr;
+    ctx->sh->prome_start[0] = shm_zone->shm.addr + sizeof(ngx_http_prome_shctx_t);
+    size = shm_zone->shm.size - sizeof(ngx_http_prome_shctx_t);
+    ctx->sh->prome_end[0] = (ctx->sh->prome_start[0] + size / 2);
+    ctx->sh->prome_start[1] = (ctx->sh->prome_end[0] + 1);
+    ctx->sh->prome_end[1] = (shm_zone->shm.addr + shm_zone->shm.size - 1);
+    ctx->sh->prome_size[0] = ctx->sh->prome_end[0] - ctx->sh->prome_start[0] + 1;
+    ctx->sh->prome_size[1] = ctx->sh->prome_end[1] - ctx->sh->prome_start[1] + 1;
+    ctx->sh->status = 0;
+    
+    // ctx->shpool = (ngx_slab_pool_t*) shm_zone->shm.addr;
+
+    // ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_prome_shctx_t));
+    // if(ctx->sh == NULL) {
+    //     return NGX_ERROR;
+    // }
   
-    ctx->shpool->data = ctx->sh;
+    // ctx->shpool->data = ctx->sh;
    
 
-    size = sizeof(" make prome_zone \"\"") + shm_zone->shm.name.len;
-    ctx->shpool->log_ctx = ngx_slab_alloc(ctx->shpool, size);
-    if (ctx->shpool->log_ctx == NULL) {
-        return NGX_ERROR;
-    }
+    // size = sizeof(" make prome_zone \"\"") + shm_zone->shm.name.len;
+    // ctx->shpool->log_ctx = ngx_slab_alloc(ctx->shpool, size);
+    // if (ctx->shpool->log_ctx == NULL) {
+    //     return NGX_ERROR;
+    // }
 
-    ngx_sprintf(ctx->shpool->log_ctx,
-                    "in prome_zone \" %V \"%Z",
-                    &shm_zone->shm.name);
+    // ngx_sprintf(ctx->shpool->log_ctx,
+    //                 "in prome_zone \" %V \"%Z",
+    //                 &shm_zone->shm.name);
     
-    ngx_queue_init(&ctx->sh->q_ready);
-    ngx_queue_init(&ctx->sh->q_unused);
     return NGX_OK;
 }
 
@@ -2177,13 +2186,6 @@ ngx_str_t                                           *value;
 
     rmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_reqstat_module);
 
-    // if(rmcf->prome_point == NULL) {
-    //     rmcf->prome_point = ngx_array_create(cf->pool,1,sizeof(ngx_uint_t));
-    //     if(rmcf->prome_point == NULL) {
-    //         return NGX_CONF_ERROR;
-    //     }
-    // }
-
 
     if(rmcf->prome_display == NULL) {
         rmcf->prome_display = ngx_array_create(cf->pool, cf->args->nelts - 1,
@@ -2232,23 +2234,26 @@ ngx_str_t                                           *value;
 static ngx_int_t 
 ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r) 
 {
-    static u_char                                      buffer[943718400];
+    static u_char                                         buffer[943718400];
     size_t                                                size,bfsize;
-    u_char                                              *last,*end;
+    u_char                                               *last,*end;
+    u_char                                               *prome_start;
+    // u_char                                               *prome_end;
     ngx_int_t                                             rc;
     ngx_str_t                                             type;
     ngx_buf_t                                            *b;
     ngx_chain_t                                           out,*tl,**cl;
-    ngx_array_t                                          *prome_traffic; //指向需要转换的监控节点
+    // ngx_array_t                                          *prome_traffic; //指向需要转换的监控节点
     ngx_shm_zone_t                                      **shm_zone; //获取共享内存
     ngx_http_reqstat_conf_t                              *rscf;
+    ngx_http_prome_ctx_t                               *prome_ctx;
     
 
     rscf = ngx_http_get_module_main_conf(r, ngx_http_reqstat_module);
     
-    prome_traffic = rscf->prome_zone;
     shm_zone = rscf->prome_zone->elts;
-    // pctx = shm_zone[prome_traffic->nelts - 1]->data;
+    prome_ctx = shm_zone[0]->data;
+    prome_start = prome_ctx->sh->prome_start[prome_ctx->sh->status%2];
 
     ngx_str_set(&type,"text/plain");
     r->headers_out.content_type = type;
@@ -2263,16 +2268,18 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
 
     cl = &out.next;
     ngx_memzero(buffer, sizeof(buffer));
-    bfsize = ngx_strlen(shm_zone[prome_traffic->nelts - 1]->shm.addr);
-    ngx_memcpy(buffer, shm_zone[prome_traffic->nelts - 1]->shm.addr, bfsize);
+    bfsize = ngx_strlen(prome_start);
+    ngx_memcpy(buffer, prome_start, bfsize);
 
-
-
-    // ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of pzone_point  %d  \n",*(ngx_uint_t*)(rscf->prome_point->elts));
 
     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %d  \n", 
-    ngx_strlen(shm_zone[prome_traffic->nelts - 1]->shm.addr));
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %s  \n",buffer);
+    prome_ctx->sh->status);
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %s  \n", prome_ctx->sh->prome_start[0]);
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %p  \n", 
+    prome_start);
+
+
+
     last = buffer;
     end = buffer + bfsize; 
 
