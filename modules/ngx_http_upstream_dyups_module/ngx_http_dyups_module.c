@@ -1699,7 +1699,7 @@ ngx_dyups_init_upstream(ngx_http_dyups_srv_conf_t *duscf, ngx_str_t *name,
 static void
 ngx_dyups_mark_upstream_delete(ngx_http_dyups_srv_conf_t *duscf)
 {
-    ngx_uint_t                      i, j;
+    ngx_uint_t                      i;
     ngx_http_upstream_server_t     *us;
     ngx_http_upstream_srv_conf_t   *uscf, **uscfp;
     ngx_http_upstream_main_conf_t  *umcf;
@@ -1719,6 +1719,8 @@ ngx_dyups_mark_upstream_delete(ngx_http_dyups_srv_conf_t *duscf)
         us[i].down = 1;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
+        ngx_uint_t  j;
+
         for (j = 0; j < us[i].naddrs; j++) {
             ngx_http_upstream_check_delete_dynamic_peer(&uscf->host,
                                                         &us[i].addrs[j]);
@@ -2090,7 +2092,9 @@ ngx_http_dyups_read_msg(ngx_event_t *ev)
 
     ngx_http_dyups_read_msg_locked(ev);
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
 finish:
+#endif
     ngx_shmtx_unlock(&shpool->mutex);
 
     ngx_dyups_add_timer(ev, dmcf->read_msg_timeout);
