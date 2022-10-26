@@ -170,7 +170,6 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-    ngx_log_error(NGX_LOG_ERR,cycle->log, 0, "init worker pmcf is time %i", pmcf->interval);
 
     rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_reqstat_module);
 
@@ -185,7 +184,7 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
     loop_event->log = ngx_cycle->log;
     loop_event->data = pmcf;
     loop_event->handler = ngx_proc_prome_handler;
-    ngx_add_timer(loop_event,(ngx_msec_t)1000);
+    ngx_add_timer(loop_event,pmcf->interval);
 
     return NGX_OK;
 }
@@ -258,10 +257,10 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     ngx_shm_zone_t                                     **shm_zone; //获取共享内存
     ngx_shm_zone_t                                     **shm_pzone; 
     ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_prome_ctx_t                                *prome_ctx;
     ngx_http_reqstat_conf_t                             *rmcf;
     ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
     ngx_proc_prome_main_conf_t                          *pmcf;
-    ngx_http_prome_ctx_t                                *pctx;
 
     // 获取指令指针来寻找共享内存
     pmcf = ev->data;
@@ -273,10 +272,10 @@ ngx_proc_prome_handler(ngx_event_t *ev)
 
 
    shm_pzone = rmcf->prome_zone->elts;
-   pctx = shm_pzone[0]->data;
+   prome_ctx = shm_pzone[0]->data;
 
-    ++pctx->sh->status;
-    last = start = pctx->sh->prome_start[pctx->sh->status%2];
+    ++prome_ctx->sh->status;
+    last = start = prome_ctx->sh->prome_start[prome_ctx->sh->status % 2];
 
     sum = 0;
 
@@ -292,7 +291,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
             }
         }
     }else {
-        for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
+        for(i = 0; i < NGX_HTTP_PROME_FMT_KEY_NUMS; i++) {
             sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
         }
     }
@@ -314,7 +313,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
 
             size = sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
 
-            if((size_t)(pctx->sh->prome_end[pctx->sh->status%2] - last) < size){
+            if((size_t)(prome_ctx->sh->prome_end[prome_ctx->sh->status % 2] - last) < size){
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "not have enough memory");
                 break;
             }
@@ -325,13 +324,13 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 for (j = 0; j < pmcf->rmcf->prome_select->nelts; j++) {
                     if (select[j] < NGX_HTTP_REQSTAT_RSRV) {
                         index = select[j];
-                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                        last = ngx_slprintf(last, prome_ctx->sh->prome_end[prome_ctx->sh->status % 2],
                                 ngx_http_reqstat_fmt_key2[index],
                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                 ngx_http_reqstat_fields2[index]));
                     } else {
                         index = select[j] - NGX_HTTP_REQSTAT_RSRV;
-                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                        last = ngx_slprintf(last, prome_ctx->sh->prome_end[prome_ctx->sh->status % 2],
                                 ngx_http_reqstat_fmt_key2[j],
                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                 NGX_HTTP_REQSTAT_EXTRA(index)));
@@ -339,8 +338,8 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                     }
                 }
             } else {
-                for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-                                            last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS; j++) {
+                                            last = ngx_slprintf(last, prome_ctx->sh->prome_end[prome_ctx->sh->status % 2],
                                                     ngx_http_reqstat_fmt_key2[j],
                                                     node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                     ngx_http_reqstat_fields2[j]));
@@ -349,5 +348,5 @@ ngx_proc_prome_handler(ngx_event_t *ev)
          }
     }
     *(last) = '\0';
-    ngx_add_timer(ev, (ngx_msec_t)15000);
+    ngx_add_timer(ev, pmcf->interval);
 }

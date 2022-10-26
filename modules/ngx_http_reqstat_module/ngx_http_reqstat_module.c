@@ -319,7 +319,7 @@ ngx_http_reqstat_create_loc_conf(ngx_conf_t *cf)
     conf->user_defined_str = NGX_CONF_UNSET_PTR;
     conf->prome_display = NGX_CONF_UNSET_PTR;
     conf->prome_zone = NGX_CONF_UNSET_PTR;
-    // conf->prome_point = NGX_CONF_UNSET_PTR;
+    conf->prome_select = NGX_CONF_UNSET_PTR;
     return conf;
 }
 
@@ -339,7 +339,7 @@ ngx_http_reqstat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_ptr_value(conf->user_defined_str, prev->user_defined_str, NULL);
     ngx_conf_merge_ptr_value(conf->prome_display, prev->prome_display, NULL);
     ngx_conf_merge_ptr_value(conf->prome_zone, prev->prome_zone, NULL);
-    // ngx_conf_merge_ptr_value(conf->prome_point, prev->prome_point, NULL);
+    ngx_conf_merge_ptr_value(conf->prome_select, prev->prome_select, NULL);
     return NGX_CONF_OK;
 }
 
@@ -1847,7 +1847,6 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     ngx_http_reqstat_ctx_t                               *ctx; // 获取监控指标以及用户定义的指标类型
     ngx_http_reqstat_conf_t                              *rlcf; // 获取conf文件中的指令
     ngx_http_reqstat_rbnode_t                            *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-    // ngx_http_reqstat_conf_t                              *rmcf;
 
 
     rlcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
@@ -1882,7 +1881,7 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     per_size = sum;
     // size = 5800;
 
-     for(i = 0;i < display_traffic->nelts;i++) {
+     for(i = 0; i < display_traffic->nelts; i++) {
 
         ctx = shm_zone[i]->data;
 
@@ -1961,14 +1960,6 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
                                                 ngx_http_reqstat_fields[j]));
                 }
 
-                // if (ctx->user_defined) {
-                //     for (j = 0; j < ctx->user_defined->nelts; j++) {
-                //         b->last = ngx_slprintf(b->last, b->end, "%uA,",
-                //                            *NGX_HTTP_REQSTAT_REQ_FIELD(node,
-                //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
-                //     }
-                // }
-            // ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " the req_prome  is  %s \n", b->start);
             *(b->last - 1) = '\n';
             tl->next = NULL;
             *cl = tl;
@@ -2010,12 +2001,13 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
             return NGX_ERROR;
         }
 
-        ctx->shpool = oldctx->shpool;
         ctx->sh = oldctx->sh;
 
         return NGX_OK;
     }
 
+
+    //定义管理结构
     ctx->sh =(ngx_http_prome_shctx_t*)shm_zone->shm.addr;
     ctx->sh->prome_start[0] = shm_zone->shm.addr + sizeof(ngx_http_prome_shctx_t);
     size = shm_zone->shm.size - sizeof(ngx_http_prome_shctx_t);
@@ -2025,26 +2017,7 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     ctx->sh->prome_size[0] = ctx->sh->prome_end[0] - ctx->sh->prome_start[0] + 1;
     ctx->sh->prome_size[1] = ctx->sh->prome_end[1] - ctx->sh->prome_start[1] + 1;
     ctx->sh->status = 0;
-    
-    // ctx->shpool = (ngx_slab_pool_t*) shm_zone->shm.addr;
 
-    // ctx->sh = ngx_slab_alloc(ctx->shpool, sizeof(ngx_http_prome_shctx_t));
-    // if(ctx->sh == NULL) {
-    //     return NGX_ERROR;
-    // }
-  
-    // ctx->shpool->data = ctx->sh;
-   
-
-    // size = sizeof(" make prome_zone \"\"") + shm_zone->shm.name.len;
-    // ctx->shpool->log_ctx = ngx_slab_alloc(ctx->shpool, size);
-    // if (ctx->shpool->log_ctx == NULL) {
-    //     return NGX_ERROR;
-    // }
-
-    // ngx_sprintf(ctx->shpool->log_ctx,
-    //                 "in prome_zone \" %V \"%Z",
-    //                 &shm_zone->shm.name);
     
     return NGX_OK;
 }
@@ -2238,12 +2211,10 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     size_t                                                size,bfsize;
     u_char                                               *last,*end;
     u_char                                               *prome_start;
-    // u_char                                               *prome_end;
     ngx_int_t                                             rc;
     ngx_str_t                                             type;
     ngx_buf_t                                            *b;
     ngx_chain_t                                           out,*tl,**cl;
-    // ngx_array_t                                          *prome_traffic; //指向需要转换的监控节点
     ngx_shm_zone_t                                      **shm_zone; //获取共享内存
     ngx_http_reqstat_conf_t                              *rscf;
     ngx_http_prome_ctx_t                               *prome_ctx;
@@ -2252,8 +2223,9 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     rscf = ngx_http_get_module_main_conf(r, ngx_http_reqstat_module);
     
     shm_zone = rscf->prome_zone->elts;
+    // 因为默认只开一个共享内存,所以array中只需找下标0即可
     prome_ctx = shm_zone[0]->data;
-    prome_start = prome_ctx->sh->prome_start[prome_ctx->sh->status%2];
+    prome_start = prome_ctx->sh->prome_start[prome_ctx->sh->status % 2];
 
     ngx_str_set(&type,"text/plain");
     r->headers_out.content_type = type;
@@ -2267,18 +2239,10 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     }
 
     cl = &out.next;
+
     ngx_memzero(buffer, sizeof(buffer));
     bfsize = ngx_strlen(prome_start);
     ngx_memcpy(buffer, prome_start, bfsize);
-
-
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %d  \n", 
-    prome_ctx->sh->status);
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %s  \n", prome_ctx->sh->prome_start[0]);
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents of prome  %p  \n", 
-    prome_start);
-
-
 
     last = buffer;
     end = buffer + bfsize; 
@@ -2305,7 +2269,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
 
             tl->buf = b;
             b->start = ngx_pcalloc(r->pool,size);
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " contents size  %d  \n", size);
             if(b->start == NULL) {
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
