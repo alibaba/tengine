@@ -235,7 +235,7 @@ typedef struct {
     ngx_array_t                 *user_defined_str;
     ngx_array_t                 *prome_display;
     ngx_array_t                 *prome_zone;
-    // ngx_array_t                 *prome_point;
+    ngx_array_t                 *prome_select;
 } ngx_http_reqstat_conf_t;
 
 typedef struct {
@@ -268,16 +268,7 @@ typedef struct {
 
 
 typedef struct {
-    ngx_queue_t                  q_unused;
-    ngx_queue_t                  q_ready;
-    ngx_buf_t                    buffer;
-    ngx_int_t                    prome_flag;
 
-}ngx_http_prome_node_t;
-
-typedef struct {
-
-    // u_char                        *prome_last[2];
     u_char                        *prome_start[2];
     u_char                        *prome_end[2];
     ssize_t                        prome_size[2];
@@ -285,14 +276,10 @@ typedef struct {
 
     ngx_uint_t                     status;
 
-
-
 }ngx_http_prome_shctx_t;
 
 typedef struct {
     ngx_str_t                   *val;
-    ngx_uint_t                   p_recycle_rate;
-    ngx_slab_pool_t             *shpool;
     ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
     ngx_http_complex_value_t     value;
 }ngx_http_prome_ctx_t;

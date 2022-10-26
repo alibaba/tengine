@@ -251,6 +251,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
 {
     size_t                                               sum,size;
     u_char                                              *last,*start;
+    ngx_int_t                                            index,*select;
     ngx_uint_t                                           i,j;
     ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
     ngx_queue_t                                         *q;
@@ -278,8 +279,22 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     last = start = pctx->sh->prome_start[pctx->sh->status%2];
 
     sum = 0;
-    for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
-        sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
+
+    if(pmcf->rmcf->prome_select != NULL) {
+        select = pmcf->rmcf->prome_select->elts;
+        for (j = 0; j < pmcf->rmcf->prome_select->nelts; j++) {
+            if (select[j] < NGX_HTTP_REQSTAT_RSRV) {
+                index = select[j];
+                sum += ngx_strlen(ngx_http_reqstat_fmt_key2[index]);
+            } else {
+                index = select[j] - NGX_HTTP_REQSTAT_RSRV;
+                sum += ngx_strlen(ngx_http_reqstat_fmt_key2[index]);
+            }
+        }
+    }else {
+        for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
+            sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
+        }
     }
     
      for(i = 0; i < display_traffic->nelts; i++) {
@@ -296,30 +311,42 @@ ngx_proc_prome_handler(ngx_event_t *ev)
             if(node->conn_total == 0) {
                 continue;
             }
-            size = sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
 
+            size = sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
 
             if((size_t)(pctx->sh->prome_end[pctx->sh->status%2] - last) < size){
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "not have enough memory");
                 break;
             }
-            for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
-                                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
-                                                ngx_http_reqstat_fmt_key2[j],
-                                                node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
-                                                ngx_http_reqstat_fields2[j]));
+
+
+            if(pmcf->rmcf->prome_select != NULL) {
+                select = pmcf->rmcf->prome_select->elts;
+                for (j = 0; j < pmcf->rmcf->prome_select->nelts; j++) {
+                    if (select[j] < NGX_HTTP_REQSTAT_RSRV) {
+                        index = select[j];
+                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                                ngx_http_reqstat_fmt_key2[index],
+                                node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                                ngx_http_reqstat_fields2[index]));
+                    } else {
+                        index = select[j] - NGX_HTTP_REQSTAT_RSRV;
+                        last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                                ngx_http_reqstat_fmt_key2[j],
+                                node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                                NGX_HTTP_REQSTAT_EXTRA(index)));
+                
+                    }
+                }
+            } else {
+                for (j = 0;j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
+                                            last = ngx_slprintf(last, pctx->sh->prome_end[pctx->sh->status%2],
+                                                    ngx_http_reqstat_fmt_key2[j],
+                                                    node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
+                                                    ngx_http_reqstat_fields2[j]));
+                }
             }
-            
-            
-                // if (ctx->user_defined) {
-                //     for (j = 0; j < ctx->user_defined->nelts; j++) {
-                //         b->last = ngx_slprintf(b->last, b->end, "%uA,",
-                //                            *NGX_HTTP_REQSTAT_REQ_FIELD(node,
-                //                                    NGX_HTTP_REQSTAT_EXTRA(j)));
-                //     }
-                // }
-        
-        }
+         }
     }
     *(last) = '\0';
     ngx_add_timer(ev, (ngx_msec_t)15000);
