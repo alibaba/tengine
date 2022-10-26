@@ -1233,9 +1233,8 @@ ngx_dyups_update_upstream(ngx_str_t *name, ngx_buf_t *buf, ngx_str_t *rv)
     } else {
 
         if (!ngx_shmtx_trylock(&shpool->mutex)) {
-            status = NGX_HTTP_CONFLICT;
             ngx_str_set(rv, "wait and try again\n");
-            goto finish;
+            return NGX_HTTP_CONFLICT;
         }
     }
 
@@ -2092,11 +2091,11 @@ ngx_http_dyups_read_msg(ngx_event_t *ev)
 
     ngx_http_dyups_read_msg_locked(ev);
 
+    ngx_shmtx_unlock(&shpool->mutex);
+
 #if (NGX_HTTP_UPSTREAM_CHECK)
 finish:
 #endif
-    ngx_shmtx_unlock(&shpool->mutex);
-
     ngx_dyups_add_timer(ev, dmcf->read_msg_timeout);
 }
 
