@@ -1,5 +1,5 @@
 
-Introduction [![Build Status](https://travis-ci.org/alibaba/tengine.svg?branch=master)](https://travis-ci.org/alibaba/tengine)
+Introduction [![Build Status](https://github.com/alibaba/tengine/actions/workflows/ci.yml/badge.svg)](https://github.com/alibaba/tengine/actions/workflows/ci.yml)
 ============
 
 Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on the [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
