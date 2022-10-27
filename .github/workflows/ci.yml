@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+   runs-on: "ubuntu-20.04"
+   strategy:
+     fail-fast: false
+     matrix:
+       compiler:
+         - { compiler: GNU,  CC: gcc,  CXX: g++}
+         - { compiler: LLVM, CC: clang, CXX: clang++}
+   steps:
+     - uses: actions/checkout@v3
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx libgd3
+         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev
+
+# TODO: fix tests so they don't depend on /usr/local/nginx/logs/
+#       so we can run `make`, `make test`, `make install`.
+
+     - name: build
+       env:
+         CC: ${{ matrix.compiler.CC }}
+         CXX: ${{ matrix.compiler.CXX }}
+       run: |
+         ./configure --with-ipv6 --with-http_v2_module
+         make -j2
+         sudo make install
