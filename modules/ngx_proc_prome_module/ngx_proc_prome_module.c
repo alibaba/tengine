@@ -18,6 +18,7 @@ typedef struct {
 
 #define NGX_HTTP_PROME_FMT_KEY_NUMS               29
 
+
 char* ngx_http_reqstat_fmt_key2[NGX_HTTP_PROME_FMT_KEY_NUMS] = {
     NGX_HTTP_PROME_FMT_BYTES_IN,
     NGX_HTTP_PROME_FMT_BYTES_OUT,
@@ -89,7 +90,7 @@ static void *ngx_proc_prome_create_conf(ngx_conf_t *cf);
 void ngx_proc_prome_handler (ngx_event_t *ev);
 static char *ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 ngx_int_t ngx_proc_prome_node_recycle(ngx_http_prome_ctx_t *prome_ctx);
-// static void *ngx_proc_prome_create_main_conf(ngx_conf_t *cf);
+
 
 static ngx_command_t ngx_proc_prome_commands[] = {
 
@@ -201,32 +202,11 @@ ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     return NGX_CONF_OK;
 }
 
-
-
 static void
 ngx_proc_prome_exit_worker(ngx_cycle_t *cycle)
 {
 
 }
-
-
-// static void *
-// ngx_proc_prome_create_main_conf(ngx_conf_t *cf)
-// {
-//     ngx_proc_prome_main_conf_t  *pmcf;
-
-//     pmcf = ngx_pcalloc(cf->pool, sizeof(ngx_proc_prome_main_conf_t));
-//     if (pmcf == NULL) {
-//         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-//                            "daytime create proc conf error");
-//         return NULL;
-//     }
-//     pmcf->enable = NGX_CONF_UNSET;
-//     pmcf->time_interval = NGX_CONF_UNSET_MSEC;
-//     pmcf->port = NGX_CONF_UNSET_UINT;
-
-//     return pmcf;
-// }
 
 static void *
 ngx_proc_prome_create_conf(ngx_conf_t *cf)
@@ -252,27 +232,24 @@ ngx_proc_prome_handler(ngx_event_t *ev)
     u_char                                              *last,*start;
     ngx_int_t                                            index,*select;
     ngx_uint_t                                           i,j;
-    ngx_array_t                                         *display_traffic; //指向需要转换的监控节点
+    ngx_array_t                                         *display_traffic;
     ngx_queue_t                                         *q;
-    ngx_shm_zone_t                                     **shm_zone; //获取共享内存
+    ngx_shm_zone_t                                     **shm_zone; 
     ngx_shm_zone_t                                     **shm_pzone; 
-    ngx_http_reqstat_ctx_t                              *ctx; // 获取监控指标以及用户定义的指标类型
+    ngx_http_reqstat_ctx_t                              *ctx;
     ngx_http_prome_ctx_t                                *prome_ctx;
     ngx_http_reqstat_conf_t                             *rmcf;
-    ngx_http_reqstat_rbnode_t                           *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
+    ngx_http_reqstat_rbnode_t                           *node;
     ngx_proc_prome_main_conf_t                          *pmcf;
 
-    // 获取指令指针来寻找共享内存
     pmcf = ev->data;
     rmcf = pmcf->rmcf;
 
-     // 直接指向需要监控的指标X
     display_traffic = rmcf->prome_display;
     shm_zone = rmcf->prome_display->elts;
 
-
-   shm_pzone = rmcf->prome_zone->elts;
-   prome_ctx = shm_pzone[0]->data;
+    shm_pzone = rmcf->prome_zone->elts;
+    prome_ctx = shm_pzone[0]->data;
 
     ++prome_ctx->sh->status;
     last = start = prome_ctx->sh->prome_start[prome_ctx->sh->status % 2];
@@ -299,7 +276,6 @@ ngx_proc_prome_handler(ngx_event_t *ev)
      for(i = 0; i < display_traffic->nelts; i++) {
        
         ctx = shm_zone[i]->data;
-        // ngx_shmtx_lock(&pctx->shpool->mutex);
         
         for (q = ngx_queue_head(&ctx->sh->queue);
              q != ngx_queue_sentinel(&ctx->sh->queue);
