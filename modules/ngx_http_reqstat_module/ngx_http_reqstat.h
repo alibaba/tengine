@@ -193,15 +193,15 @@
 
 
 typedef struct ngx_http_reqstat_rbnode_s ngx_http_reqstat_rbnode_t;
-
 typedef struct variable_index_s variable_index_t;
+
 
 struct variable_index_s {
     ngx_str_t                    name;
     ngx_int_t                    index;
 };
 
-struct  ngx_http_reqstat_rbnode_s {
+struct ngx_http_reqstat_rbnode_s {
     u_char                       color;
     u_char                       padding[3];
     uint32_t                     len;
@@ -247,6 +247,7 @@ struct  ngx_http_reqstat_rbnode_s {
     u_char                       data[1];
 };
 
+
 typedef struct {
     ngx_flag_t                   lazy;
     ngx_array_t                 *monitor;
@@ -259,6 +260,7 @@ typedef struct {
     ngx_array_t                 *prome_zone;
     ngx_array_t                 *prome_select;
 } ngx_http_reqstat_conf_t;
+
 
 typedef struct {
     ngx_rbtree_t                 rbtree;
@@ -294,14 +296,14 @@ typedef struct {
     u_char                        *prome_end[2];
     ssize_t                        prome_size[2];
     ngx_uint_t                     status;
-}ngx_http_prome_shctx_t;
+} ngx_http_prome_shctx_t;
 
 
 typedef struct {
     ngx_str_t                   *val;
     ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
     ngx_http_complex_value_t     value;
-}ngx_http_prome_ctx_t;
+} ngx_http_prome_ctx_t;
 
 
 #define NGX_HTTP_REQSTAT_BYTES_IN                                       \

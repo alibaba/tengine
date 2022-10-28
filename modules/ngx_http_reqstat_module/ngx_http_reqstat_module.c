@@ -2049,7 +2049,7 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ctx = ngx_pcalloc(cf->pool,sizeof(ngx_http_prome_ctx_t));
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_prome_ctx_t));
     if(ctx == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -2087,7 +2087,7 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     z = rmcf->prome_zone->elts;
     for(j = 0; rmcf->prome_zone->nelts; j++) {
-        if(!ngx_strcmp(value[1].data,z[j]->shm.name.data)) {
+        if(!ngx_strcmp(value[1].data, z[j]->shm.name.data)) {
             break;
         }
     }
@@ -2116,9 +2116,9 @@ ngx_http_prome_status_from_proc(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                                           *value;
     ngx_uint_t                                           i,j;
     ngx_shm_zone_t                                      *shm_zone,**z;
-    ngx_http_core_loc_conf_t                            *clcf;
     ngx_http_reqstat_conf_t                             *rlcf = conf;
     ngx_http_reqstat_conf_t                             *rmcf;
+    ngx_http_core_loc_conf_t                            *clcf;
 
     if(rlcf->prome_display !=  NGX_CONF_UNSET_PTR){
         return "is duplicate";
@@ -2234,7 +2234,7 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
         }
 
         tl->buf = b;
-        b->start = ngx_pcalloc(r->pool,size);
+        b->start = ngx_pcalloc(r->pool, size);
         if(b->start == NULL) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -2243,7 +2243,7 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
         b->last= b->pos = b->start;
         b->temporary = 1;
         
-        ngx_memcpy(b->last,last,size);
+        ngx_memcpy(b->last, last, size);
         b->last += size;
         last += size;
         
@@ -2266,6 +2266,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     tl->next = NULL;
     *cl = tl;
 
-    return ngx_http_output_filter(r,out.next);
+    return ngx_http_output_filter(r, out.next);
 }   
 

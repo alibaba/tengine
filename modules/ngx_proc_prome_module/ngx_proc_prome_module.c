@@ -92,7 +92,7 @@ ngx_int_t ngx_proc_prome_node_recycle(ngx_http_prome_ctx_t *prome_ctx);
 
 static ngx_command_t ngx_proc_prome_commands[] = {
 
-      { ngx_string("start"),
+    { ngx_string("start"),
       NGX_PROC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_PROC_CONF_OFFSET,
@@ -193,6 +193,7 @@ ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_off_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
+
     return NGX_CONF_OK;
 }
 
@@ -261,7 +262,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 sum += ngx_strlen(ngx_http_reqstat_fmt_key2[index]);
             }
         }
-    }else {
+    } else {
         for(i = 0; i < NGX_HTTP_PROME_FMT_KEY_NUMS; i++) {
             sum += ngx_strlen(ngx_http_reqstat_fmt_key2[i]);
         }
@@ -281,7 +282,7 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 continue;
             }
 
-            size = sum+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
+            size = sum + NGX_HTTP_PROME_FMT_KEY_NUMS * (ngx_strlen(node->data) + sizeof(ngx_atomic_t));
 
             if((size_t)(prome_ctx->sh->prome_end[prome_ctx->sh->status % 2] - last) < size){
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "not have enough memory");
