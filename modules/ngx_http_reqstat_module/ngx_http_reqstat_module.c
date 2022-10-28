@@ -1931,7 +1931,7 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
-            size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
+            size = per_size + NGX_HTTP_PROME_FMT_KEY_NUMS * (ngx_strlen(node->data) + sizeof(ngx_atomic_t));
             tl->buf = b;
             b->start = ngx_pcalloc(r->pool,size);
             if(b->start == NULL) {
@@ -1942,7 +1942,7 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
             b->last= b->pos = b->start;
             b->temporary = 1;
 
-            for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
+            for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS; j++) {
                     b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
                                                 ngx_http_reqstat_fields[j]));

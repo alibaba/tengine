@@ -301,7 +301,7 @@ typedef struct {
 
 typedef struct {
     ngx_str_t                   *val;
-    ngx_http_prome_shctx_t      *sh;  //作为存储prome格式的结构体
+    ngx_http_prome_shctx_t      *sh;
     ngx_http_complex_value_t     value;
 } ngx_http_prome_ctx_t;
 
