@@ -16,4 +16,5 @@ else
     HTTP_INCS="$HTTP_INCS $ngx_addon_dir"
 fi
 
+CORE_INCS="$CORE_INCS $ngx_addon_dir"
 have=T_NGX_REQ_STATUS . auto/have
