@@ -6,7 +6,10 @@
 #include<ngx_event.h>
 #include<ngx_http_reqstat.h>
 
+
 extern ngx_module_t ngx_http_reqstat_module;
+
+#define NGX_HTTP_PROME_FMT_KEY_NUMS               29
 
 typedef struct {
     ngx_flag_t                                             enable;
@@ -14,10 +17,6 @@ typedef struct {
     ngx_event_t                                            event;
     ngx_http_reqstat_conf_t                               *rmcf;
 } ngx_proc_prome_main_conf_t; 
-
-
-#define NGX_HTTP_PROME_FMT_KEY_NUMS               29
-
 
 char* ngx_http_reqstat_fmt_key2[NGX_HTTP_PROME_FMT_KEY_NUMS] = {
     NGX_HTTP_PROME_FMT_BYTES_IN,
@@ -91,7 +90,6 @@ void ngx_proc_prome_handler (ngx_event_t *ev);
 static char *ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 ngx_int_t ngx_proc_prome_node_recycle(ngx_http_prome_ctx_t *prome_ctx);
 
-
 static ngx_command_t ngx_proc_prome_commands[] = {
 
       { ngx_string("start"),
@@ -111,7 +109,6 @@ static ngx_command_t ngx_proc_prome_commands[] = {
     ngx_null_command
 };
 
-
 static ngx_proc_module_t ngx_proc_prome_module_ctx = {
     ngx_string("prome_traffic"),
     NULL,
@@ -123,7 +120,6 @@ static ngx_proc_module_t ngx_proc_prome_module_ctx = {
     NULL,
     ngx_proc_prome_exit_worker
 };
-
 
 ngx_module_t ngx_proc_prome_module = {
     NGX_MODULE_V1,
@@ -171,7 +167,6 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-
     rmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_reqstat_module);
 
     if(rmcf == NULL){
@@ -189,7 +184,6 @@ ngx_proc_prome_init_worker(ngx_cycle_t *cycle)
 
     return NGX_OK;
 }
-
 
 static char *
 ngx_proc_prome_merge_conf(ngx_conf_t *cf, void *parent, void *child)
@@ -293,7 +287,6 @@ ngx_proc_prome_handler(ngx_event_t *ev)
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "not have enough memory");
                 break;
             }
-
 
             if(pmcf->rmcf->prome_select != NULL) {
                 select = pmcf->rmcf->prome_select->elts;

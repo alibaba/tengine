@@ -1763,7 +1763,6 @@ ngx_http_reqstat_check_enable(ngx_http_request_t *r,
     return NGX_OK;
 }
 
-
 static char * 
 ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 {
@@ -1773,7 +1772,6 @@ ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
     ngx_http_core_loc_conf_t                            *clcf;
     ngx_http_reqstat_conf_t                             *rlcf = conf;
     ngx_http_reqstat_conf_t                             *rmcf;
-
 
     if(rlcf->prome_display !=  NGX_CONF_UNSET_PTR){
         return "is duplicate";
@@ -1824,9 +1822,9 @@ ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
         }
     }
 
-
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
     clcf->handler = ngx_http_prome_status_handler;
+
     return NGX_CONF_OK;
 }
 
@@ -1944,7 +1942,6 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
             b->last= b->pos = b->start;
             b->temporary = 1;
 
-
             for (j = 0; j < NGX_HTTP_PROME_FMT_KEY_NUMS;j++) {
                     b->last = ngx_slprintf(b->last, b->end, ngx_http_reqstat_fmt_key[j],
                                                 node->data, *NGX_HTTP_REQSTAT_REQ_FIELD(node,
@@ -1957,7 +1954,6 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
             cl = &tl->next;
         }
     }
-
 
     tl = ngx_alloc_chain_link(r->pool);
     if (tl == NULL) {
@@ -1973,10 +1969,8 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     tl->next = NULL;
     *cl = tl;
 
-
     return ngx_http_output_filter(r,out.next);
 }
-
 
 static ngx_int_t
 ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
@@ -2112,8 +2106,8 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     shm_zone->init = ngx_http_reqstat_prome_init_zone;
     shm_zone->data = ctx;
-    return NGX_CONF_OK;
 
+    return NGX_CONF_OK;
 }
 
 static char *
@@ -2125,7 +2119,6 @@ ngx_http_prome_status_from_proc(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_core_loc_conf_t                            *clcf;
     ngx_http_reqstat_conf_t                             *rlcf = conf;
     ngx_http_reqstat_conf_t                             *rmcf;
-
 
     if(rlcf->prome_display !=  NGX_CONF_UNSET_PTR){
         return "is duplicate";
@@ -2192,11 +2185,10 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     ngx_str_t                                             type;
     ngx_buf_t                                            *b;
     ngx_chain_t                                           out,*tl,**cl;
-    ngx_shm_zone_t                                      **shm_zone; //获取共享内存
+    ngx_shm_zone_t                                      **shm_zone;
     ngx_http_reqstat_conf_t                              *rscf;
-    ngx_http_prome_ctx_t                               *prome_ctx;
+    ngx_http_prome_ctx_t                                 *prome_ctx;
     
-
     rscf = ngx_http_get_module_main_conf(r, ngx_http_reqstat_module);
     
     shm_zone = rscf->prome_zone->elts;
@@ -2223,42 +2215,42 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     last = buffer;
     end = buffer + bfsize; 
 
-        while(last < end) {
+    while(last < end) {
 
-            if((ngx_uint_t)(end - last) >= NGX_MAX_ALLOC_FROM_POOL) {
-                size = NGX_MAX_ALLOC_FROM_POOL;
-            }else {
-                size = end - last;
-            }
-
-            tl = ngx_alloc_chain_link(r->pool);
-            if (tl == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            b = ngx_calloc_buf(r->pool);
-            if(b == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            tl->buf = b;
-            b->start = ngx_pcalloc(r->pool,size);
-            if(b->start == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            b->end = b->start + size;
-            b->last= b->pos = b->start;
-            b->temporary = 1;
-           
-            ngx_memcpy(b->last,last,size);
-            b->last += size;
-            last += size;
-            
-            tl->next = NULL;
-            *cl = tl;
-            cl = &tl->next;
+        if((ngx_uint_t)(end - last) >= NGX_MAX_ALLOC_FROM_POOL) {
+            size = NGX_MAX_ALLOC_FROM_POOL;
+        }else {
+            size = end - last;
         }
+
+        tl = ngx_alloc_chain_link(r->pool);
+        if (tl == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        b = ngx_calloc_buf(r->pool);
+        if(b == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        tl->buf = b;
+        b->start = ngx_pcalloc(r->pool,size);
+        if(b->start == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        b->end = b->start + size;
+        b->last= b->pos = b->start;
+        b->temporary = 1;
+        
+        ngx_memcpy(b->last,last,size);
+        b->last += size;
+        last += size;
+        
+        tl->next = NULL;
+        *cl = tl;
+        cl = &tl->next;
+    }
         
     tl = ngx_alloc_chain_link(r->pool);
     if (tl == NULL) {
@@ -2274,7 +2266,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     tl->next = NULL;
     *cl = tl;
 
-
-     return ngx_http_output_filter(r,out.next);
+    return ngx_http_output_filter(r,out.next);
 }   
 
