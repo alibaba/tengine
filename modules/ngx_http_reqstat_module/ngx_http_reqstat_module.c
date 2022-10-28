@@ -1833,24 +1833,21 @@ ngx_http_prome_status(ngx_conf_t *cf,ngx_command_t *cmd,void *conf)
 static ngx_int_t 
 ngx_http_prome_status_handler(ngx_http_request_t *r)
 {
-
     size_t                                                host_len,sum;
     size_t                                                size,nodes,per_size;
     ngx_int_t                                             rc;
     ngx_str_t                                             type;
     ngx_buf_t                                            *b;
     ngx_uint_t                                            i,j;
-    ngx_array_t                                          *display_traffic; //指向需要转换的监控节点
+    ngx_array_t                                          *display_traffic;
     ngx_chain_t                                           out,*tl,**cl;
     ngx_queue_t                                          *q;
-    ngx_shm_zone_t                                      **shm_zone; //获取共享内存
-    ngx_http_reqstat_ctx_t                               *ctx; // 获取监控指标以及用户定义的指标类型
-    ngx_http_reqstat_conf_t                              *rlcf; // 获取conf文件中的指令
-    ngx_http_reqstat_rbnode_t                            *node; // 通过将节点挂载到系统的红黑树上进行获取节点信息
-
+    ngx_shm_zone_t                                      **shm_zone; 
+    ngx_http_reqstat_ctx_t                               *ctx;
+    ngx_http_reqstat_conf_t                              *rlcf; 
+    ngx_http_reqstat_rbnode_t                            *node; 
 
     rlcf = ngx_http_get_module_loc_conf(r, ngx_http_reqstat_module);
-    // 直接指向需要监控的指标X
     display_traffic = rlcf->prome_display;
 
     ngx_str_set(&type,"text/plain");
@@ -1874,12 +1871,11 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     nodes = 0;
     host_len =0;
     
-    for(i = 0;i < NGX_HTTP_PROME_FMT_KEY_NUMS;i++) {
+    for(i = 0; i < NGX_HTTP_PROME_FMT_KEY_NUMS; i++) {
         sum += ngx_strlen(ngx_http_reqstat_fmt_key[i]);
     }
 
     per_size = sum;
-    // size = 5800;
 
      for(i = 0; i < display_traffic->nelts; i++) {
 
@@ -1902,21 +1898,17 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
     if(nodes == 0) {
         nodes = 1;
     }
+
     sum = nodes * (sum + NGX_HTTP_PROME_FMT_KEY_NUMS * (sizeof(ngx_atomic_t) + host_len));
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, " http req due with %zu nums nodes\n", sum);
 
     b = ngx_calloc_buf(r->pool);
     if(b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    // 循环遍历每一个已有的共享内存,将里面的内容按照prome的格式写入到prome_zone中
     for(i = 0; i < display_traffic->nelts; i++) {
-        // 如果遍历到prome_zone name 则跳过
-        // if(rlcf->prome_display->elts != shm_zone[i]) continue;
 
         ctx = shm_zone[i]->data;
-        // 先打印出共享内存和tengine的信息(可删)
         b->last = ngx_slprintf(b->last, b->end, NGX_HTTP_PROME_FMT_INFO,
                                     &shm_zone[i]->shm.name,
                                     TENGINE_VERSION,NGINX_VERSION);
@@ -1941,7 +1933,6 @@ ngx_http_prome_status_handler(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
-            // 每个结点的大小
             size = per_size+NGX_HTTP_PROME_FMT_KEY_NUMS*(ngx_strlen(node->data)+sizeof(ngx_atomic_t));
             tl->buf = b;
             b->start = ngx_pcalloc(r->pool,size);
@@ -1991,7 +1982,7 @@ static ngx_int_t
 ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
 {
     size_t                                                           size;
-    ngx_http_prome_ctx_t                            *ctx,*oldctx;
+    ngx_http_prome_ctx_t                                            *ctx,*oldctx;
     
     oldctx = data;
     ctx = shm_zone->data;
@@ -2006,8 +1997,6 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
-
-    //定义管理结构
     ctx->sh =(ngx_http_prome_shctx_t*)shm_zone->shm.addr;
     ctx->sh->prome_start[0] = shm_zone->shm.addr + sizeof(ngx_http_prome_shctx_t);
     size = shm_zone->shm.size - sizeof(ngx_http_prome_shctx_t);
@@ -2018,24 +2007,21 @@ ngx_http_reqstat_prome_init_zone(ngx_shm_zone_t *shm_zone, void *data)
     ctx->sh->prome_size[1] = ctx->sh->prome_end[1] - ctx->sh->prome_start[1] + 1;
     ctx->sh->status = 0;
 
-    
     return NGX_OK;
 }
 
 static char *
 ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    // 获取指令
-    // 已有的req_stat_zone的指令格式为req_status_zone server "$host,$server_addr:$server_port" 10M;
-    // 目前思路:先按照已有的命令进行解析 问题:是否和req_stat一样引入变量("$host,$server_addr:$server_port")?
-    ssize_t                                                        size; //共享内存的大小
-    ngx_str_t                                                     *value; //用于解析指令的指针
+    ssize_t                                                        size;
+    ngx_str_t                                                     *value;
     ngx_uint_t                                                     j;
-    ngx_shm_zone_t                                                *shm_zone,**z;//共享内存的指针
-    ngx_http_prome_ctx_t                          *ctx;//用来存储解析conf的指针
-    ngx_http_compile_complex_value_t                               ccv;//是来保存解析出第二个指令
+    ngx_shm_zone_t                                                *shm_zone,**z;
+    ngx_http_prome_ctx_t                                          *ctx;
     ngx_http_reqstat_conf_t                                       *rmcf;
     ngx_http_reqstat_conf_t                                       *rlcf = conf;
+    ngx_http_compile_complex_value_t                               ccv;
+
     value = cf->args->elts;
     if (rlcf->prome_zone != NGX_CONF_UNSET_PTR) {
         return "is duplicate";
@@ -2056,7 +2042,6 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    // 获取指令给定的第三个值的大小
     size = ngx_parse_size(&value[3]);
     if(size == NGX_ERROR){
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -2064,8 +2049,6 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-
-    // 这里是按照原有的共享内存来判断大小,最小设置32k
     if(size < (ssize_t)(8 * ngx_pagesize)) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                 "prome_zone \"%V\" is too small", &value[1]);
@@ -2100,9 +2083,6 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
     *ctx->val = value[2];
 
-    // ctx->recycle_rate = 167;     /* rate threshold is 10r/min */
-    // ctx->alloc_already_fail = 0;
-
     shm_zone = ngx_shared_memory_add(cf, &value[1], size,
                                     &ngx_http_reqstat_module);
     if(shm_zone == NULL) {
@@ -2125,7 +2105,6 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         *z = shm_zone;
     }
 
-    // 共享内存已经存在就返回错误
     if(shm_zone->data) {
         ctx = shm_zone->data;
        return NGX_CONF_ERROR;
@@ -2140,7 +2119,7 @@ ngx_http_reqstat_prome_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_http_prome_status_from_proc(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
 {
-ngx_str_t                                           *value;
+    ngx_str_t                                           *value;
     ngx_uint_t                                           i,j;
     ngx_shm_zone_t                                      *shm_zone,**z;
     ngx_http_core_loc_conf_t                            *clcf;
@@ -2158,7 +2137,6 @@ ngx_str_t                                           *value;
     value = cf->args->elts;
 
     rmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_reqstat_module);
-
 
     if(rmcf->prome_display == NULL) {
         rmcf->prome_display = ngx_array_create(cf->pool, cf->args->nelts - 1,
@@ -2198,7 +2176,6 @@ ngx_str_t                                           *value;
         }
     }
 
-
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
     clcf->handler = ngx_http_prome_status_from_proc_handler;
     return NGX_CONF_OK;
@@ -2207,7 +2184,7 @@ ngx_str_t                                           *value;
 static ngx_int_t 
 ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r) 
 {
-    static u_char                                         buffer[943718400];
+    static u_char                                         buffer[NGX_MAX_PROME_BUFFER];
     size_t                                                size,bfsize;
     u_char                                               *last,*end;
     u_char                                               *prome_start;
@@ -2223,7 +2200,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
     rscf = ngx_http_get_module_main_conf(r, ngx_http_reqstat_module);
     
     shm_zone = rscf->prome_zone->elts;
-    // 因为默认只开一个共享内存,所以array中只需找下标0即可
     prome_ctx = shm_zone[0]->data;
     prome_start = prome_ctx->sh->prome_start[prome_ctx->sh->status % 2];
 
@@ -2265,8 +2241,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
-            // 每个结点的大小
-
             tl->buf = b;
             b->start = ngx_pcalloc(r->pool,size);
             if(b->start == NULL) {
@@ -2286,8 +2260,6 @@ ngx_http_prome_status_from_proc_handler(ngx_http_request_t *r)
             cl = &tl->next;
         }
         
-    
-
     tl = ngx_alloc_chain_link(r->pool);
     if (tl == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
