@@ -30,8 +30,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -75,8 +73,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
