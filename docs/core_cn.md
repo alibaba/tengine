@@ -64,34 +64,6 @@ Context: core
 worker_cpu_affinity的error log最多显示64个CPU的绑定情况。
 
 
-### error_page
-
-Syntax: **error_page** code ... [default] [=[response]]
-
-Default: -
-
-Context: http, server, location, if in location
-
-该指令用于设置如果出现指定的HTTP错误状态码，返回给客户端显示的对应uri地址。
-
-*   支持default，可以把上一级设置的error_page重新设定；
-*   修正error_page不能发现重复的code的问题，不能正常继承上一级设置的问题。
-
-举例：
-
-```
-http {
-    error_page 404 /404.html;
-
-    server {
-        error_page 404 default;
-    }
-}
-```
-
-server中的"error_page"指令将404的页面还原成系统默认。
-
-
 ### msie_padding
 
 Syntax: **msie_padding** [on | off]
