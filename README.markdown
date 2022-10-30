@@ -28,7 +28,6 @@ Features
 * Enhanced diagnostic information makes it easier to troubleshoot errors.
 * More user-friendly command lines, e.g., showing all compiled-in modules and supported directives.
 * Expiration times can be specified for certain MIME types.
-* Error pages can be reset to 'default'.
 * ...
 
 Installation

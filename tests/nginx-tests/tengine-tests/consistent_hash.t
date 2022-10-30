@@ -30,8 +30,6 @@ worker_processes  1;
 events {
 }
 
-%%TEST_GLOBALS_DSO%%
-
 http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
@@ -43,35 +41,35 @@ http {
     }
 
     server {
-        listen 8080;
+        listen 127.0.0.1:8080;
         location / {
             proxy_pass http://consistent_hash/;
         }
     }
 
     server {
-        listen 9000;
+        listen 127.0.0.1:9000;
         location / {
             index 9000;
         }
     }
 
     server {
-        listen 9001;
+        listen 127.0.0.1:9001;
         location / {
             index 9001;
         }
     }
 
     server {
-        listen 9002;
+        listen 127.0.0.1:9002;
         location / {
             index 9002;
         }
     }
 
     server {
-        listen 9003;
+        listen 127.0.0.1:9003;
         location / {
             index 9003;
         }
@@ -99,8 +97,6 @@ worker_processes  1;
 events {
 }
 
-%%TEST_GLOBALS_DSO%%
-
 http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
@@ -113,14 +109,14 @@ http {
     }
 
     server {
-        listen 8080;
+        listen 127.0.0.1:8080;
         location / {
             proxy_pass http://consistent_hash/;
         }
     }
 
     server {
-        listen 9004;
+        listen 127.0.0.1:9004;
         location / {
             index 9004;
         }
@@ -147,7 +143,6 @@ worker_processes  1;
 events {
 }
 
-%%TEST_GLOBALS_DSO%%
 http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
@@ -159,35 +154,35 @@ http {
     }
 
     server {
-        listen 8080;
+        listen 127.0.0.1:8080;
         location / {
             proxy_pass http://consistent_hash/;
         }
     }
 
     server {
-        listen 9000;
+        listen 127.0.0.1:9000;
         location / {
             index 9000;
         }
     }
 
     server {
-        listen 9001;
+        listen 127.0.0.1:9001;
         location / {
             index 9001;
         }
     }
 
     server {
-        listen 9002;
+        listen 127.0.0.1:9002;
         location / {
             index 9002;
         }
     }
 
     server {
-        listen 9003;
+        listen 127.0.0.1:9003;
         location / {
             index 9003;
         }
@@ -220,7 +215,6 @@ worker_processes  1;
 events {
 }
 
-%%TEST_GLOBALS_DSO%%
 http {
     %%TEST_GLOBALS_HTTP%%
     upstream consistent_hash {
@@ -231,35 +225,35 @@ http {
     }
 
     server {
-        listen 8080;
+        listen 127.0.0.1:8080;
         location / {
             proxy_pass http://consistent_hash/;
         }
     }
 
     server {
-        listen 9000;
+        listen 127.0.0.1:9000;
         location / {
             index 9000;
         }
     }
 
     server {
-        listen 9001;
+        listen 127.0.0.1:9001;
         location / {
             index 9001;
         }
     }
 
     server {
-        listen 9002;
+        listen 127.0.0.1:9002;
         location / {
             index 9002;
         }
     }
 
     server {
-        listen 9003;
+        listen 127.0.0.1:9003;
         location / {
             index 9003;
         }
