@@ -14,6 +14,7 @@
 
 typedef struct {
     ngx_uint_t                         max_cached;
+    ngx_msec_t                         time;
     ngx_msec_t                         keepalive_timeout;
     ngx_uint_t                         max_key_length;
     ngx_uint_t                         pool_size;
@@ -39,7 +40,7 @@ typedef struct {
     u_char                             color;
     u_char                             count;
     u_short                            len;
-    ngx_queue_t                        cache; 
+    ngx_queue_t                        cache;
     ngx_queue_t                        index;
     u_char                             data[1];
 } ngx_http_upstream_keepalive_node_t;
@@ -137,6 +138,13 @@ static ngx_command_t  ngx_http_upstream_keepalive_commands[] = {
       ngx_http_upstream_keepalive,
       NGX_HTTP_SRV_CONF_OFFSET,
       0,
+      NULL },
+
+    { ngx_string("keepalive_time"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_keepalive_srv_conf_t, time),
       NULL },
 
     { ngx_string("keepalive_timeout"),
@@ -431,6 +439,8 @@ ngx_http_upstream_init_keepalive(ngx_conf_t *cf,
 
     kcf = ngx_http_conf_upstream_srv_conf(us,
                                           ngx_http_upstream_keepalive_module);
+
+    ngx_conf_init_msec_value(kcf->time, 3600000);
 
     if (kcf->original_init_upstream(cf, us) != NGX_OK) {
         return NGX_ERROR;
@@ -780,6 +790,10 @@ ngx_http_upstream_free_keepalive_peer(ngx_peer_connection_t *pc, void *data,
         goto closed;
     }
 
+    if (ngx_current_msec - c->start_time > kp->conf->time) {
+        goto invalid;
+    }
+
     if (!u->keepalive) {
         goto closed;
     }
@@ -1063,6 +1077,7 @@ ngx_http_upstream_keepalive_create_conf(ngx_conf_t *cf)
      */
 
     conf->max_cached = 1;
+    conf->time = NGX_CONF_UNSET_MSEC;
     conf->pool_size = 20;
     conf->max_key_length = 40;   /* 128B at length */
     conf->keepalive_timeout = NGX_CONF_UNSET_MSEC;

@@ -87,13 +87,14 @@ CORE_SRCS="src/core/nginx.c \
 
 EVENT_MODULES="ngx_events_module ngx_event_core_module"
 
-EVENT_INCS="src/event src/event/modules"
+EVENT_INCS="src/event src/event/modules src/event/quic"
 
 EVENT_DEPS="src/event/ngx_event.h \
             src/event/ngx_event_timer.h \
             src/event/ngx_event_posted.h \
             src/event/ngx_event_connect.h \
-            src/event/ngx_event_pipe.h"
+            src/event/ngx_event_pipe.h \
+            src/event/ngx_event_udp.h"
 
 EVENT_SRCS="src/event/ngx_event.c \
             src/event/ngx_event_timer.c \
@@ -272,7 +273,8 @@ NGX_WIN32_RC="src/os/win32/nginx.rc"
 
 HTTP_FILE_CACHE_SRCS=src/http/ngx_http_file_cache.c
 
-
+HTTP_HUFF_SRCS="src/http/ngx_http_huff_decode.c
+                src/http/ngx_http_huff_encode.c"
 
 NGX_HTTP_LUA_MODULE=ngx_http_lua_module
 NGX_HTTP_LUA_MODULE_SRCS="modules/ngx_http_lua_module/src/ngx_http_lua_script.c \

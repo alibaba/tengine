@@ -425,7 +425,7 @@ main(int argc, char *const *argv)
 static void
 ngx_show_version_info(void)
 {
-#if (T_NGX_SERVER_INFO) 
+#if (T_NGX_SERVER_INFO)
     ngx_write_stderr("Tengine version: " TENGINE_VER_BUILD NGX_LINEFEED);
 #endif
     ngx_write_stderr("nginx version: " NGINX_VER_BUILD NGX_LINEFEED);
@@ -715,6 +715,9 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
+        if (ls[i].ignore) {
+            continue;
+        }
         p = ngx_sprintf(p, "%ud;", ls[i].fd);
     }
 

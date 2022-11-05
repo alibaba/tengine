@@ -141,28 +141,28 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
      ssize_t         n;
      ngx_str_t      *address;
      ngx_array_t     addrs;
- 
+
      if (ngx_array_init(&addrs, cf->pool, 2, sizeof(ngx_str_t)) != NGX_OK) {
          return NGX_ERROR;
      }
- 
+
      if (ngx_fd_info(file->fd, &file->info) == NGX_FILE_ERROR) {
          ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
                        ngx_fd_info_n " \"%s\" failed", file->name.data);
      }
- 
+
      file_size = ngx_file_size(&file->info);
- 
+
      buf = ngx_pnalloc(cf->pool, file_size + 1);
      if (buf == NULL) {
          return NGX_ERROR;
      }
- 
+
      n = ngx_read_file(file, buf, file_size, 0);
      if (n == NGX_ERROR) {
          return NGX_ERROR;
      }
- 
+
      if (n != file_size) {
          ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                             ngx_read_file_n " returned "
@@ -170,29 +170,29 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                             n, file_size);
          return NGX_ERROR;
      }
- 
+
      p = buf;
      end = buf + file_size;
      line = p;
- 
+
      for (/* void */; p < end; p++) {
          if (*p == CR || *p == LF || p == (end - 1) || *(p + 1) == '#') {
- 
+
              while (*line == ' ' || *line == '\t') {
                  line++;
              }
- 
+
              if (ngx_strncmp(line, "nameserver", sizeof("nameserver") - 1)
                  == 0)
              {
                  line += sizeof("nameserver") - 1;
- 
+
                  while (*line == ' ' || *line == '\t') {
                      line++;
                  }
- 
+
                  line_end = p;
- 
+
                  while (*line_end == ' ' || *line_end == '\t'
                         || *line_end == CR || *line_end == LF)
                  {
@@ -200,14 +200,14 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                  }
                  /* put a null character for string parse */
                  *++line_end = '\0';
- 
+
                  address = ngx_array_push(&addrs);
                  if (address == NULL) {
                      return NGX_ERROR;
                  }
- 
+
  #if (NGX_HAVE_INET6)
- 
+
                  if (ngx_strlchr(line, line_end, ':')) {
                      address->len = line_end - line + 2;
                      address->data = ngx_palloc(cf->pool, address->len + 2);
@@ -217,7 +217,7 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                      address->data[0] = '[';
                      ngx_memcpy(address->data + 1, line, address->len - 2);
                      address->data[address->len - 1] = ']';
- 
+
                  } else {
  #endif
                      address->data = line;
@@ -226,41 +226,41 @@ ngx_resolver_parse_resolv_address(ngx_conf_t *cf, ngx_file_t *file,
                  }
  #endif
              }
- 
+
              line = p + 1;
          }
      }
- 
+
      *names = addrs.elts;
      *num = addrs.nelts;
- 
+
      return NGX_OK;
  }
- 
- 
+
+
  ngx_int_t
  ngx_resolver_read_resolv_file(ngx_conf_t *cf, ngx_str_t *filename, ngx_str_t **names, ngx_uint_t *n)
  {
      ngx_int_t       rc;
      ngx_file_t      file;
- 
+
      ngx_memzero(&file, sizeof(ngx_file_t));
- 
+
      file.name.data = filename->data;
      file.name.len = filename->len;
      file.log = cf->log;
- 
+
      file.fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
                              NGX_FILE_OPEN, NGX_FILE_DEFAULT_ACCESS);
- 
+
      if (file.fd == NGX_INVALID_FILE) {
          ngx_log_error(NGX_LOG_ERR, cf->log, ngx_errno,
                        ngx_open_file_n " \"%s\" failed", file.name.data);
          return NGX_ERROR;
      }
- 
+
      rc = ngx_resolver_parse_resolv_address(cf, &file, names, n);
- 
+
      if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
          ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
                        ngx_close_file_n " \"%s\" failed", file.name.data);
@@ -4594,6 +4594,8 @@ ngx_udp_connect(ngx_resolver_connection_t *rec)
 
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
+    c->start_time = ngx_current_msec;
+
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, &rec->log, 0,
                    "connect to %V, fd:%d #%uA", &rec->server, s, c->number);
 
@@ -4679,6 +4681,8 @@ ngx_tcp_connect(ngx_resolver_connection_t *rec)
     rec->tcp = c;
 
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
+
+    c->start_time = ngx_current_msec;
 
     if (ngx_add_conn) {
         if (ngx_add_conn(c) == NGX_ERROR) {
