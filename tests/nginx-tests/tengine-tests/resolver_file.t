@@ -19,6 +19,9 @@ use Net::DNS::Nameserver;
 
 ###############################################################################
 
+select STDERR; $| = 1;
+select STDOUT; $| = 1;
+
 sub http_get_host($;$;%) {
     my ($url, $host, %extra) = @_;
     return http(<<EOF, %extra);
@@ -28,11 +31,7 @@ Host: $host
 EOF
 }
 
-my $t = Test::Nginx->new();
-
-select STDERR; $| = 1;
-select STDOUT; $| = 1;
-
+my $t = Test::Nginx->new()->plan(1);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -83,29 +82,25 @@ my %aroute_map = (
 # AAAA record (ipv6)
 my %aaaaroute_map;
 
-start_bind();
-
+start_bind($t);
 # --- end ---
 
 my $test_dir = $t->testdir();
 $t->run();
+
 
 like(http_get_host("/", "test.com"),
      qr/resolved success/,
      "auto load $test_dir/resolv.conf");
 
 $t->stop();
-
-done_testing();
 stop_bind();
 
 # --- DNS Server ---
 
 sub reply_handler {
-    print("+ dns server reply:");
     my ($qname, $qclass, $qtype, $peerhost, $query, $conn) = @_;
     my ($rcode, @ans, @auth, @add);
-    # print("DNS reply: receive query=$qname, $qclass, $qtype, $peerhost, $query, $conn\n");
 
     if ($qtype eq "SRV" && exists($route_map{$qname})) {
         my @records = @{$route_map{$qname}};
@@ -113,7 +108,6 @@ sub reply_handler {
             my ($ttl, $weight, $priority, $port, $origin_addr) = @{$records[$i]};
             my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $priority $weight $port $origin_addr");
             push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
         }
 
         $rcode = "NOERROR";
@@ -123,7 +117,6 @@ sub reply_handler {
             my ($ttl, $origin_addr) = @{$records[$i]};
             my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $origin_addr");
             push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
         }
 
         $rcode = "NOERROR";
@@ -133,7 +126,6 @@ sub reply_handler {
             my ($ttl, $origin_addr) = @{$records[$i]};
             my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $origin_addr");
             push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
         }
 
         $rcode = "NOERROR";
@@ -164,17 +156,18 @@ sub bind_daemon {
 }
 
 sub start_bind {
+    # cannot refer $t in start_bind directly, otherwise NGINX::TEST will fail
+    my ($nt) = @_;
     if (defined $bind_server_port) {
 
-        print "+ DNS server: try to bind server port: $bind_server_port\n";
+        print("+ DNS server: try to bind server port: $bind_server_port\n");
 
-        $t->run_daemon(\&bind_daemon);
-        $bind_pid = pop @{$t->{_daemons}};
+        $nt->run_daemon(\&bind_daemon);
+        $bind_pid = pop @{$nt->{_daemons}};
 
-        print "+ DNS server: daemon pid: $bind_pid\n";
+        print("+ DNS server: daemon pid: $bind_pid\n");
 
         END {
-            print("+ try to stop $bind_pid\n");
             stop_bind();
         }
 
@@ -193,7 +186,7 @@ sub start_bind {
         $s or die "cannot connect to DNS server";
         close($s) or die 'can not connect to DNS server';
 
-        print "+ DNS server: working\n";
+        print("+ DNS server: working\n");
     }
 }
 
@@ -204,6 +197,8 @@ sub stop_bind {
         wait;
 
         $bind_pid = undef;
-        print ("+ DNS server: stop\n");
+        print("+ DNS server: stop\n");
+    } else {
+        print("+ DNS server has been stopped\n");
     }
 }
