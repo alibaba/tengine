@@ -48,6 +48,9 @@ jobs:
          sudo make install
      - name: test
        working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
        run: |
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
-         TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx prove -v -Inginx-tests/lib tengine-tests
+         ls tengine-tests | grep -v resolver_file | xargs -I {} prove -v -Inginx-tests/lib tengine-tests/{}
+         sudo TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx prove -v -Inginx-tests/lib tengine-tests/resolver_file.t
