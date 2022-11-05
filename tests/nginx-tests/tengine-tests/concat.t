@@ -1805,7 +1805,7 @@ my $url="/concatFile/??";
 foreach $i(1..100){
 	$url=$url."hello.js,";
 }
-my $tmp;
+my $tmp="";
 foreach $i(1..100){
 	$tmp=$tmp."hello.js"
 }
@@ -1862,7 +1862,7 @@ my $url2="/concatFile/??";
 foreach $i2(1..101){
 	$url2=$url2."hello.js,";
 }
-my $tmp2;
+my $tmp2="";
 foreach $i2(1..101){
 	$tmp2=$tmp2."hello.js"
 }

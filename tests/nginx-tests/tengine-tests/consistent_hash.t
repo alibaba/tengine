@@ -199,7 +199,7 @@ for (my $count = 1; $count <= 10000; $count++) {
     $arg = join '', map { $cset[int rand @cset] } 0..1000;
     $r = http_get("/?$arg");
     $res = getres($r);
-    $result{$res} += 1;
+    $result{$res} += 1 if defined($res);
 }
 print "9000 weight=1  9001 weight=1  9002 weight=1  9003 weight=1\n";
 foreach $res (keys(%result)) {
@@ -270,7 +270,7 @@ for (my $count = 1; $count <= 10000; $count++) {
     $arg = join '', map { $cset[int rand @cset] } 0..1000;
     $r = http_get("/?$arg");
     $res = getres($r);
-    $result{$res} += 1;
+    $result{$res} += 1 if defined($res);
 }
 
 print "9000 weight=1  9001 weight=10  9002 weight=100\n";
@@ -283,6 +283,7 @@ $t->stop();
 sub getres
 {
     my ($c) = @_;
+    return undef unless defined($c);
     $c =~ m/\r\n\r\n(\d*)/;
     return $1;
 }
