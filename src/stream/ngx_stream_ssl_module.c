@@ -1380,11 +1380,12 @@ invalid:
 static ngx_int_t
 ngx_stream_ssl_init(ngx_conf_t *cf)
 {
+    ngx_uint_t                    i;
+    ngx_stream_listen_t          *listen;
     ngx_stream_handler_pt        *h;
+    ngx_stream_ssl_conf_t        *scf;
     ngx_stream_core_main_conf_t  *cmcf;
 #if (T_NGX_HAVE_DTLS)
-    ngx_uint_t                    i;
-    ngx_stream_listen_t          *ls;
     ngx_stream_conf_ctx_t       *sctx;
     ngx_stream_ssl_conf_t       **sscfp, *sscf;
     ngx_stream_core_srv_conf_t  **cscfp, *cscf;
@@ -1399,14 +1400,29 @@ ngx_stream_ssl_init(ngx_conf_t *cf)
 
     *h = ngx_stream_ssl_handler;
 
-#if (T_NGX_HAVE_DTLS)
-    cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
-
-    ls = cmcf->listen.elts;
+    listen = cmcf->listen.elts;
 
     for (i = 0; i < cmcf->listen.nelts; i++) {
-        if (ls[i].ssl) {
-            sctx = ls[i].ctx;
+        if (!listen[i].quic) {
+            continue;
+        }
+
+        scf = listen[i].ctx->srv_conf[ngx_stream_ssl_module.ctx_index];
+
+        if (scf->certificates && !(scf->protocols & NGX_SSL_TLSv1_3)) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "\"ssl_protocols\" must enable TLSv1.3 for "
+                          "the \"listen ... quic\" directive in %s:%ui",
+                          scf->file, scf->line);
+            return NGX_ERROR;
+        }
+    }
+
+#if (T_NGX_HAVE_DTLS)
+
+    for (i = 0; i < cmcf->listen.nelts; i++) {
+        if (listen[i].ssl) {
+            sctx = listen[i].ctx;
 
             sscfp = (ngx_stream_ssl_conf_t **)sctx->srv_conf;
             cscfp = (ngx_stream_core_srv_conf_t **)sctx->srv_conf;
@@ -1432,7 +1448,7 @@ ngx_stream_ssl_init(ngx_conf_t *cf)
                 return NGX_ERROR;
             }
 
-            if (ls[i].type == SOCK_DGRAM) {
+            if (listen[i].type == SOCK_DGRAM) {
                 if (!(sscf->protocols & NGX_SSL_DTLSv1
                       || sscf->protocols & NGX_SSL_DTLSv1_2))
                 {

@@ -110,7 +110,7 @@ typedef struct {
     time_t                           fail_timeout;
     ngx_msec_t                       slow_start;
     ngx_uint_t                       down;
-#if (T_NGX_HTTP_UPSTREAM_ID)    
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                        id;
 #endif
 
@@ -314,8 +314,8 @@ typedef struct {
     ngx_table_elt_t                 *content_encoding;
 #endif
 
-    ngx_array_t                      cache_control;
-    ngx_array_t                      cookies;
+    ngx_table_elt_t                 *cache_control;
+    ngx_table_elt_t                 *set_cookie;
 
     off_t                            content_length_n;
     time_t                           last_modified_time;

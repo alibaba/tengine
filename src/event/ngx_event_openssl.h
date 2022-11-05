@@ -22,6 +22,14 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/evp.h>
+#if (NGX_QUIC)
+#ifdef OPENSSL_IS_BORINGSSL
+#include <openssl/hkdf.h>
+#include <openssl/chacha.h>
+#else
+#include <openssl/kdf.h>
+#endif
+#endif
 #include <openssl/hmac.h>
 #ifndef OPENSSL_NO_OCSP
 #include <openssl/ocsp.h>
@@ -108,7 +116,7 @@ struct ngx_ssl_connection_s {
     unsigned                    early_preread:1;
     unsigned                    write_blocked:1;
 
-    
+
 
 #if (T_NGX_HAVE_DTLS)
     unsigned                    bio_changed:1;
