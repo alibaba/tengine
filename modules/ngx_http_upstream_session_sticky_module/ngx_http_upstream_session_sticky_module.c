@@ -298,14 +298,14 @@ ngx_http_session_sticky_header_handler(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 {
-    time_t                           now;
-    u_char                          *p, *v, *vv, *st, *last, *end;
-    ngx_int_t                        diff, delimiter, legal;
-    ngx_str_t                       *cookie;
-    ngx_uint_t                       i;
-    ngx_table_elt_t                **cookies;
-    ngx_http_ss_ctx_t               *ctx;
-    ngx_http_upstream_ss_srv_conf_t *sscf;
+    time_t                            now;
+    u_char                           *p, *v, *vv, *st, *last, *end;
+    ngx_int_t                         diff, delimiter, legal;
+    ngx_flag_t                        cookie_found;
+    ngx_str_t                        *cookie;
+    ngx_table_elt_t                  *h;
+    ngx_http_ss_ctx_t                *ctx;
+    ngx_http_upstream_ss_srv_conf_t  *sscf;
     enum {
         pre_key = 0,
         key,
@@ -321,26 +321,28 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
 
     p = NULL;
     cookie = NULL;
+    cookie_found = 0;
     now = ngx_time();
-    cookies = (ngx_table_elt_t **) r->headers_in.cookies.elts;
-    for (i = 0; i < r->headers_in.cookies.nelts; i++) {
-        cookie = &cookies[i]->value;
+
+    for (h = r->headers_in.cookie; h; h = h->next) {
+        cookie = &h->value;
         p = ngx_strnstr(cookie->data, (char *) sscf->cookie.data, cookie->len);
         if (p == NULL) {
             continue;
         }
 
         if (*(p + sscf->cookie.len) == ' ' || *(p + sscf->cookie.len) == '=') {
+            cookie_found = 1;
             break;
         }
     }
 
-    if (i >= r->headers_in.cookies.nelts) {
+    if (cookie_found == 0) {
         goto not_found;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "session sticky cookie: \"%V\"", &cookies[i]->value);
+                   "session sticky cookie: \"%V\"", &h->value);
     st = p;
     v = p + sscf->cookie.len + 1;
     last = cookie->data + cookie->len;
@@ -536,7 +538,7 @@ finish:
         cookie->len -= (end - st);
 
         if (cookie->len == 0) {
-            cookies[i]->hash = 0;
+            h->hash = 0;
             return NGX_OK;
         }
 

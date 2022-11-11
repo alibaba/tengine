@@ -82,6 +82,7 @@ typedef struct {
     unsigned                   wildcard:1;
     unsigned                   ssl:1;
     unsigned                   http2:1;
+    unsigned                   http3:1;
 #if (NGX_HAVE_INET6)
     unsigned                   ipv6only:1;
 #endif
@@ -93,6 +94,7 @@ typedef struct {
     int                        backlog;
     int                        rcvbuf;
     int                        sndbuf;
+    int                        type;
 #if (NGX_HAVE_SETFIB)
     int                        setfib;
 #endif
@@ -247,6 +249,7 @@ struct ngx_http_addr_conf_s {
 
     unsigned                   ssl:1;
     unsigned                   http2:1;
+    unsigned                   http3:1;
     unsigned                   proxy_protocol:1;
 };
 
@@ -276,6 +279,7 @@ typedef struct {
 
 typedef struct {
     ngx_int_t                  family;
+    ngx_int_t                  type;
     in_port_t                  port;
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
 } ngx_http_conf_port_t;
@@ -373,6 +377,7 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_msec_t    client_body_timeout;     /* client_body_timeout */
     ngx_msec_t    send_timeout;            /* send_timeout */
+    ngx_msec_t    keepalive_time;          /* keepalive_time */
     ngx_msec_t    keepalive_timeout;       /* keepalive_timeout */
     ngx_msec_t    lingering_time;          /* lingering_time */
     ngx_msec_t    lingering_timeout;       /* lingering_timeout */
@@ -561,8 +566,10 @@ ngx_int_t ngx_http_set_disable_symlinks(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_str_t *path, ngx_open_file_info_t *of);
 
 ngx_int_t ngx_http_get_forwarded_addr(ngx_http_request_t *r, ngx_addr_t *addr,
-    ngx_array_t *headers, ngx_str_t *value, ngx_array_t *proxies,
+    ngx_table_elt_t *headers, ngx_str_t *value, ngx_array_t *proxies,
     int recursive);
+
+ngx_int_t ngx_http_link_multi_headers(ngx_http_request_t *r);
 
 
 extern ngx_module_t  ngx_http_core_module;

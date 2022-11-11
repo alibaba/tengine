@@ -272,7 +272,7 @@ static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
     { ngx_string("Set-Cookie"),
                  ngx_http_upstream_process_set_cookie,
-                 offsetof(ngx_http_upstream_headers_in_t, cookies),
+                 offsetof(ngx_http_upstream_headers_in_t, set_cookie),
                  ngx_http_upstream_rewrite_set_cookie, 0, 1 },
 
     { ngx_string("Content-Disposition"),
@@ -550,6 +550,13 @@ ngx_http_upstream_init(ngx_http_request_t *r)
 
 #if (NGX_HTTP_V2)
     if (r->stream) {
+        ngx_http_upstream_init_request(r);
+        return;
+    }
+#endif
+
+#if (NGX_HTTP_V3)
+    if (c->quic) {
         ngx_http_upstream_init_request(r);
         return;
     }
@@ -1421,6 +1428,19 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     }
 #endif
 
+#if (NGX_HTTP_V3)
+
+    if (c->quic) {
+        if (c->write->error) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_CLIENT_CLOSED_REQUEST);
+        }
+
+        return;
+    }
+
+#endif
+
 #if (NGX_HAVE_KQUEUE)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
@@ -1615,10 +1635,10 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->header_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     if (rc == NGX_YIELD) {
         return;
-    }    
+    }
 #endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -4492,7 +4512,7 @@ ngx_http_upstream_next(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->peer.connection = NULL;
     }
 
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE)    
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     u->peer.resolved = 0;
 #endif
     ngx_http_upstream_connect(r, u);
@@ -4552,7 +4572,7 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
         ngx_resolve_name_done(u->dyn_resolve_ctx);
         u->dyn_resolve_ctx = NULL;
     }
-#endif    
+#endif
 
     if (u->state && u->state->response_time == (ngx_msec_t) -1) {
         u->state->response_time = ngx_current_msec - u->start_time;
@@ -4756,26 +4776,16 @@ static ngx_int_t
 ngx_http_upstream_process_set_cookie(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
 {
-    ngx_array_t           *pa;
     ngx_table_elt_t      **ph;
     ngx_http_upstream_t   *u;
 
     u = r->upstream;
-    pa = &u->headers_in.cookies;
+    ph = &u->headers_in.set_cookie;
 
-    if (pa->elts == NULL) {
-        if (ngx_array_init(pa, r->pool, 1, sizeof(ngx_table_elt_t *)) != NGX_OK)
-        {
-            return NGX_ERROR;
-        }
-    }
-
-    ph = ngx_array_push(pa);
-    if (ph == NULL) {
-        return NGX_ERROR;
-    }
+    while (*ph) { ph = &(*ph)->next; }
 
     *ph = h;
+    h->next = NULL;
 
 #if (NGX_HTTP_CACHE)
     if (!(u->conf->ignore_headers & NGX_HTTP_UPSTREAM_IGN_SET_COOKIE)) {
@@ -4791,26 +4801,16 @@ static ngx_int_t
 ngx_http_upstream_process_cache_control(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset)
 {
-    ngx_array_t          *pa;
     ngx_table_elt_t     **ph;
     ngx_http_upstream_t  *u;
 
     u = r->upstream;
-    pa = &u->headers_in.cache_control;
+    ph = &u->headers_in.cache_control;
 
-    if (pa->elts == NULL) {
-        if (ngx_array_init(pa, r->pool, 2, sizeof(ngx_table_elt_t *)) != NGX_OK)
-        {
-            return NGX_ERROR;
-        }
-    }
-
-    ph = ngx_array_push(pa);
-    if (ph == NULL) {
-        return NGX_ERROR;
-    }
+    while (*ph) { ph = &(*ph)->next; }
 
     *ph = h;
+    h->next = NULL;
 
 #if (NGX_HTTP_CACHE)
     {
@@ -5193,17 +5193,7 @@ static ngx_int_t
 ngx_http_upstream_copy_multi_header_lines(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset)
 {
-    ngx_array_t      *pa;
     ngx_table_elt_t  *ho, **ph;
-
-    pa = (ngx_array_t *) ((char *) &r->headers_out + offset);
-
-    if (pa->elts == NULL) {
-        if (ngx_array_init(pa, r->pool, 2, sizeof(ngx_table_elt_t *)) != NGX_OK)
-        {
-            return NGX_ERROR;
-        }
-    }
 
     ho = ngx_list_push(&r->headers_out.headers);
     if (ho == NULL) {
@@ -5212,12 +5202,12 @@ ngx_http_upstream_copy_multi_header_lines(ngx_http_request_t *r,
 
     *ho = *h;
 
-    ph = ngx_array_push(pa);
-    if (ph == NULL) {
-        return NGX_ERROR;
-    }
+    ph = (ngx_table_elt_t **) ((char *) &r->headers_out + offset);
+
+    while (*ph) { ph = &(*ph)->next; }
 
     *ph = ho;
+    ho->next = NULL;
 
     return NGX_OK;
 }
@@ -5830,9 +5820,9 @@ ngx_http_upstream_cookie_variable(ngx_http_request_t *r,
     s.len = name->len - (sizeof("upstream_cookie_") - 1);
     s.data = name->data + sizeof("upstream_cookie_") - 1;
 
-    if (ngx_http_parse_set_cookie_lines(&r->upstream->headers_in.cookies,
+    if (ngx_http_parse_set_cookie_lines(r, r->upstream->headers_in.set_cookie,
                                         &s, &cookie)
-        == NGX_DECLINED)
+        == NULL)
     {
         v->not_found = 1;
         return NGX_OK;
@@ -6051,7 +6041,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     time_t                       fail_timeout;
     ngx_str_t                   *value, s;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                    id;
 #endif
     ngx_url_t                    u;
@@ -6072,7 +6062,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     max_conns = 0;
     max_fails = 1;
     fail_timeout = 10;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_null(&id);
 #endif
 
@@ -6163,7 +6153,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
         if (ngx_strncmp(value[i].data, "id=", 3) == 0) {
 
             id.len = value[i].len - 3;
@@ -6197,13 +6187,13 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     us->max_conns = max_conns;
     us->max_fails = max_fails;
     us->fail_timeout = fail_timeout;
-#if (T_NGX_HTTP_UPSTREAM_ID) 
+#if (T_NGX_HTTP_UPSTREAM_ID)
     us->id = id;
-#endif    
+#endif
 
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE) 
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
     us->host = u.host;
-#endif    
+#endif
 
     return NGX_CONF_OK;
 
