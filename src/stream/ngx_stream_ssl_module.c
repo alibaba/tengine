@@ -875,7 +875,6 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (NGX_STREAM_SNI)
     ngx_conf_merge_value(conf->sni_force, prev->sni_force, 0);
-    if (!conf->listen)
 #endif
 
     conf->ssl.log = cf->log;
