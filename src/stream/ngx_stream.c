@@ -872,6 +872,8 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs6[i].conf.addr_text = addr[i].opt.addr_text;
 
 #if (NGX_STREAM_SNI)
+        addrs6[i].conf.default_server = addr[i].default_server;
+
         if (addr[i].hash.buckets == NULL
             && (addr[i].wc_head == NULL
                 || addr[i].wc_head->hash.buckets == NULL)
