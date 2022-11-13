@@ -23,9 +23,17 @@ git clone https://github.com/alibaba/tengine.git
 ```bash
 cd tengine
 
+# For Tongsuo master branch
 ./configure --add-module=modules/ngx_openssl_ntls \
     --with-openssl=../Tongsuo \
     --with-openssl-opt="--strict-warnings --api=1.1.1 enable-ntls" \
+    --with-http_ssl_module --with-stream \
+    --with-stream_ssl_module --with-stream_sni
+
+# for Tongsuo version 8.3 or lower
+./configure --add-module=modules/ngx_openssl_ntls \
+    --with-openssl=../Tongsuo \
+    --with-openssl-opt="--strict-warnings enable-ntls" \
     --with-http_ssl_module --with-stream \
     --with-stream_ssl_module --with-stream_sni
 
