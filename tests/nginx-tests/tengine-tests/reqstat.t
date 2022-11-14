@@ -217,11 +217,11 @@ my_http_get('/proxy/B4', 'www.test_app_a.com', 3129);
 
 #5
 $r = my_http_get('/usr', 'www.test_cp.com', 3128);
-like($r, qr/1,400\d,2/, 'upstream');
+like($r, qr/1,40\d\d,2/, 'upstream: check ups_rt ~4s');
 my $r1 = content(my_http_get('/usr1', 'www.test_cp.com', 3128));
 my $r2 = content(my_http_get('/usr2', 'www.test_cp.com', 3128));
 $r = substr($r1, length($r2), length($r1)-length($r2));
-like($r, qr/^,2,200\d$/, 'user defined variable');
+like($r, qr/^,2,20\d\d$/, 'user defined variable: check ups_rt ~2s');
 
 #14
 my_http_get('/B3', 'www.test_app_a.com', 3129);

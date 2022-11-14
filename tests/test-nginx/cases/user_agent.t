@@ -19,23 +19,23 @@ __DATA__
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome";
+               return 200 "Chrome\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -60,23 +60,23 @@ Firefox
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome";
+               return 200 "Chrome\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -102,23 +102,23 @@ msie6
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome";
+               return 200 "Chrome\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -143,23 +143,23 @@ Opera
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome";
+               return 200 "Chrome\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -184,23 +184,23 @@ msie6
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome";
+               return 200 "Chrome\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -226,27 +226,27 @@ msie6
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome1";
+               return 200 "Chrome1\n";
            }
 
            if ($browser = 8) {
-               echo "Chrome2";
+               return 200 "Chrome2\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -273,27 +273,27 @@ Chrome2
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome1";
+               return 200 "Chrome1\n";
            }
 
            if ($browser = 8) {
-               echo "Chrome2";
+               return 200 "Chrome2\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -320,31 +320,31 @@ msie9
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome1";
+               return 200 "Chrome1\n";
            }
 
            if ($browser = 8) {
-               echo "Chrome2";
+               return 200 "Chrome2\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 9) {
-               echo "Chrome3";
+               return 200 "Chrome3\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
@@ -371,27 +371,27 @@ Chrome3
 --- config
        location /exact {
            if ($browser = 1) {
-               echo "msie6";
+               return 200 "msie6\n";
            }
 
            if ($browser = 4) {
-               echo "Chrome1";
+               return 200 "Chrome1\n";
            }
 
            if ($browser = 8) {
-               echo "Chrome2";
+               return 200 "Chrome2\n";
            }
 
            if ($browser = 5) {
-               echo "Firefox";
+               return 200 "Firefox\n";
            }
 
            if ($browser = 6) {
-               echo "Opera";
+               return 200 "Opera\n";
            }
 
            if ($browser = 7) {
-               echo "msie9";
+               return 200 "msie9\n";
            }
        }
 --- request
