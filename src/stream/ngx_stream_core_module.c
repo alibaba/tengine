@@ -25,7 +25,7 @@ static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 static char *ngx_stream_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
@@ -109,7 +109,7 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       offsetof(ngx_stream_core_srv_conf_t, preread_timeout),
       NULL },
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     { ngx_string("server_name"),
       NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
       ngx_stream_core_server_name,
@@ -398,7 +398,7 @@ ngx_stream_core_create_main_conf(ngx_conf_t *cf)
     cmcf->variables_hash_max_size = NGX_CONF_UNSET_UINT;
     cmcf->variables_hash_bucket_size = NGX_CONF_UNSET_UINT;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     cmcf->server_names_hash_max_size = NGX_CONF_UNSET_UINT;
     cmcf->server_names_hash_bucket_size = NGX_CONF_UNSET_UINT;
 #endif
@@ -415,7 +415,7 @@ ngx_stream_core_init_main_conf(ngx_conf_t *cf, void *conf)
     ngx_conf_init_uint_value(cmcf->variables_hash_max_size, 1024);
     ngx_conf_init_uint_value(cmcf->variables_hash_bucket_size, 64);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_conf_init_uint_value(cmcf->server_names_hash_max_size, 512);
     ngx_conf_init_uint_value(cmcf->server_names_hash_bucket_size,
                              ngx_cacheline_size);
@@ -457,7 +457,7 @@ ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
     cscf->preread_buffer_size = NGX_CONF_UNSET_SIZE;
     cscf->preread_timeout = NGX_CONF_UNSET_MSEC;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     if (ngx_array_init(&cscf->server_names, cf->temp_pool, 4,
                        sizeof(ngx_stream_server_name_t))
         != NGX_OK)
@@ -475,7 +475,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_stream_core_srv_conf_t *prev = parent;
     ngx_stream_core_srv_conf_t *conf = child;
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_str_t                   name;
     ngx_stream_server_name_t   *sn;
 #endif
@@ -528,7 +528,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->preread_timeout,
                               prev->preread_timeout, 30000);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     if (conf->server_names.nelts == 0) {
         /* the array has 4 empty preallocated elements, so push cannot fail */
         sn = ngx_array_push(&conf->server_names);
@@ -705,7 +705,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 #endif
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
         if (ngx_strcmp(value[i].data, "default_server") == 0
             || ngx_strcmp(value[i].data, "default") == 0) {
 
@@ -957,7 +957,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ls[n].addr_text = u.addrs[n].name;
         ls[n].wildcard = ngx_inet_wildcard(ls[n].sockaddr);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
         continue;
 #endif
 
@@ -1005,7 +1005,7 @@ ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 static char *
 ngx_stream_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
