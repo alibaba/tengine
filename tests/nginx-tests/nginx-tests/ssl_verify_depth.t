@@ -63,7 +63,7 @@ my $d = $t->testdir();
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -76,7 +76,7 @@ default_ca = myca
 [ myca ]
 new_certs_dir = $d
 database = $d/certindex
-default_md = sha1
+default_md = sha256
 policy = myca_policy
 serial = $d/certserial
 default_days = 1

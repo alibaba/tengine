@@ -104,7 +104,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -122,7 +122,7 @@ foreach my $name ('1.example.com', '2.example.com') {
 
 foreach my $name ('3.example.com') {
 	system("openssl genrsa -out $d/$name.key -passout pass:$name "
-		. "-aes128 1024 >>$d/openssl.out 2>&1") == 0
+		. "-aes128 2048 >>$d/openssl.out 2>&1") == 0
 		or die "Can't create private key: $!\n";
 	system('openssl req -x509 -new '
 		. "-config $d/openssl.conf -subj /CN=$name/ "

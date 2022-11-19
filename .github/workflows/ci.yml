@@ -55,6 +55,7 @@ jobs:
             --with-stream_geoip_module \
             --with-stream_ssl_preread_module \
             --with-stream_sni \
+            --with-http_slice_module \
             --add-module=./modules/ngx_backtrace_module \
             --add-module=./modules/ngx_debug_pool \
             --add-module=./modules/ngx_debug_timer \
@@ -63,7 +64,6 @@ jobs:
             --add-module=./modules/ngx_http_lua_module \
             --add-module=./modules/ngx_http_proxy_connect_module \
             --add-module=./modules/ngx_http_reqstat_module \
-            --add-module=./modules/ngx_http_slice_module \
             --add-module=./modules/ngx_http_sysguard_module \
             --add-module=./modules/ngx_http_trim_filter_module \
             --add-module=./modules/ngx_http_upstream_check_module \
@@ -85,7 +85,7 @@ jobs:
          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
        run: |
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
-         prove -v -Inginx-tests/lib $(ls -d tengine-tests/* | grep -v resolver_file)
+         prove -v -Inginx-tests/lib $(ls -d tengine-tests/* | grep -v resolver_file | grep -v slice)
          sudo TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx prove -v -Inginx-tests/lib tengine-tests/resolver_file.t
      - name: tengine test cases using test-nginx lib
        working-directory: tests/test-nginx
@@ -94,3 +94,9 @@ jobs:
          mkdir t
          PATH=/usr/local/nginx/sbin:$PATH \
          prove -v -Itest-nginx/lib cases/
+     - name: nginx test
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+       run: |
+         sudo TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx prove -Inginx-tests/lib $(ls -d nginx-tests/* | grep -v http_ssl_asynchronous_mode)
