@@ -109,7 +109,7 @@ EOF
 $t->write_file('openssl.1.example.com.conf', <<EOF);
 [ req ]
 prompt = no
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 x509_extensions = v3_req
@@ -124,7 +124,7 @@ EOF
 $t->write_file('openssl.2.example.com.conf', <<EOF);
 [ req ]
 prompt = no
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 
