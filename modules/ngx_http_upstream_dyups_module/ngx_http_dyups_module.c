@@ -541,7 +541,7 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
     ngx_int_t                    i;
     ngx_pid_t                    pid;
     ngx_time_t                  *tp;
-    ngx_msec_t                   now;
+    ngx_msec_t                   now, delay;
     ngx_event_t                 *timer;
     ngx_core_conf_t             *ccf;
     ngx_slab_pool_t             *shpool;
@@ -568,7 +568,11 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
     timer->log = cycle->log;
     timer->data = dmcf;
 
-    ngx_add_timer(timer, dmcf->read_msg_timeout);
+    /*
+     * when init process, break up timer, in case of shpool->mutex compete
+     */
+    delay = dmcf->read_msg_timeout > 1000 ? dmcf->read_msg_timeout : 1000;
+    ngx_add_timer(timer, ngx_random() % delay);
 
     shpool = ngx_dyups_global_ctx.shpool;
     sh = ngx_dyups_global_ctx.sh;
