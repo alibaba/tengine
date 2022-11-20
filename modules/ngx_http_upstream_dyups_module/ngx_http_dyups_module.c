@@ -571,8 +571,6 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
     /*
      * when init process, break up timer, in case of shpool->mutex compete
      */
-    srandom(ngx_pid);
-
     delay = dmcf->read_msg_timeout > 1000 ? dmcf->read_msg_timeout : 1000;
     t = ngx_random() % delay;
 
