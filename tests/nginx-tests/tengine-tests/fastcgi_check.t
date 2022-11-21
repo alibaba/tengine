@@ -37,7 +37,10 @@ http {
         server_name  localhost;
 
         location / {
-            fastcgi_pass 127.0.0.1:8081;
+            # If we create daemon in test case, we should
+            # skip port replacing logic in Nginx.pm port()
+            # 127.0.0.1:8xxx -> 127.0.0.01:8xxx
+            fastcgi_pass 127.0.0.01:8081;
             fastcgi_param REQUEST_URI $request_uri;
         }
     }
@@ -79,7 +82,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream fastcgi {
-        server 127.0.0.1:8081;
+        server 127.0.0.01:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi default_down=false;
         check_fastcgi_param "REQUEST_METHOD" "GET";
         check_fastcgi_param "REQUEST_URI" "/redir";
@@ -133,7 +136,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream fastcgi {
-        server 127.0.0.1:8081;
+        server 127.0.0.01:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi;
         check_fastcgi_param "REQUEST_METHOD" "GET";
         check_fastcgi_param "REQUEST_URI" "/redir";
@@ -185,7 +188,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream fastcgi {
-        server 127.0.0.1:8081;
+        server 127.0.0.01:8081;
         check interval=3000 rise=2 fall=3 timeout=1000 type=fastcgi;
         check_fastcgi_param "REQUEST_METHOD" "GET";
         check_fastcgi_param "REQUEST_URI" "/redir";
@@ -242,7 +245,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream fastcgi {
-        server 127.0.0.1:8081;
+        server 127.0.0.01:8081;
         check interval=1000 rise=1 fall=1 timeout=1000 type=fastcgi;
         check_fastcgi_param "REQUEST_METHOD" "GET";
         check_fastcgi_param "REQUEST_URI" "/404";
@@ -297,7 +300,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     upstream fastcgi {
-        server 127.0.0.1:8081;
+        server 127.0.0.01:8081;
         check interval=1000 rise=1 fall=1 timeout=1000 type=fastcgi;
         check_fastcgi_param "REQUEST_METHOD" "GET";
         check_fastcgi_param "REQUEST_URI" "/";

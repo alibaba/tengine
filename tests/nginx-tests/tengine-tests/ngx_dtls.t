@@ -45,7 +45,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -63,7 +63,8 @@ foreach my $name ('localhost') {
 
 
 $t->run();
-my $ret1 = `openssl s_client -connect 127.0.0.1:8980 -dtls1 | grep "ok"`;
+my $ret1 = `openssl s_client -connect 127.0.0.1:8980 -dtls1 | grep -i "ok"`;
 
-like($ret1, qr/ok/, 'https success');
+# check string "Verification: OK"
+like($ret1, qr/ok/i, 'https success');
 $t->stop();

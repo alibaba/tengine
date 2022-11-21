@@ -1251,7 +1251,7 @@ if [ $STREAM != NO ]; then
             echo "--with-stream_ssl_module is needed by --with-stream_sni"
             exit 1;
         fi
-        have=NGX_STREAM_SNI . auto/have
+        have=T_NGX_STREAM_SNI . auto/have
     fi
 fi
 

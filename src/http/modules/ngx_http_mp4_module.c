@@ -1076,6 +1076,12 @@ ngx_http_mp4_read_ftyp_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
         return NGX_ERROR;
     }
 
+    if (mp4->ftyp_atom.buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 ftyp atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     atom_size = sizeof(ngx_mp4_atom_header_t) + (size_t) atom_data_size;
 
     ftyp_atom = ngx_palloc(mp4->request->pool, atom_size);
@@ -1132,6 +1138,12 @@ ngx_http_mp4_read_moov_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
          * mdat atom and client requests integral file
          */
         return NGX_DECLINED;
+    }
+
+    if (mp4->moov_atom.buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 moov atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
     }
 
     conf = ngx_http_get_module_loc_conf(mp4->request, ngx_http_mp4_module);
@@ -1200,6 +1212,12 @@ ngx_http_mp4_read_mdat_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_buf_t  *data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, mp4->file.log, 0, "mp4 mdat atom");
+
+    if (mp4->mdat_atom.buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 mdat atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     data = &mp4->mdat_data_buf;
     data->file = &mp4->file;
@@ -1326,6 +1344,12 @@ ngx_http_mp4_read_mvhd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_mp4_mvhd64_atom_t  *mvhd64_atom;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, mp4->file.log, 0, "mp4 mvhd atom");
+
+    if (mp4->mvhd_atom.buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 mvhd atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     atom_header = ngx_mp4_atom_header(mp4);
     mvhd_atom = (ngx_mp4_mvhd_atom_t *) atom_header;
@@ -1592,6 +1616,13 @@ ngx_http_mp4_read_tkhd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_size = sizeof(ngx_mp4_atom_header_t) + (size_t) atom_data_size;
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_TKHD_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 tkhd atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->tkhd_size = atom_size;
 
     ngx_mp4_set_32value(tkhd_atom->size, atom_size);
@@ -1629,6 +1660,12 @@ ngx_http_mp4_read_mdia_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_mp4_set_atom_name(atom_header, 'm', 'd', 'i', 'a');
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_MDIA_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 mdia atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     atom = &trak->mdia_atom_buf;
     atom->temporary = 1;
@@ -1753,6 +1790,13 @@ ngx_http_mp4_read_mdhd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_size = sizeof(ngx_mp4_atom_header_t) + (size_t) atom_data_size;
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_MDHD_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 mdhd atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->mdhd_size = atom_size;
     trak->timescale = timescale;
 
@@ -1795,6 +1839,12 @@ ngx_http_mp4_read_hdlr_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
 
     trak = ngx_mp4_last_trak(mp4);
 
+    if (trak->out[NGX_HTTP_MP4_HDLR_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 hdlr atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     atom = &trak->hdlr_atom_buf;
     atom->temporary = 1;
     atom->pos = atom_header;
@@ -1822,6 +1872,12 @@ ngx_http_mp4_read_minf_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_mp4_set_atom_name(atom_header, 'm', 'i', 'n', 'f');
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_MINF_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 minf atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     atom = &trak->minf_atom_buf;
     atom->temporary = 1;
@@ -1866,6 +1922,15 @@ ngx_http_mp4_read_vmhd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
 
     trak = ngx_mp4_last_trak(mp4);
 
+    if (trak->out[NGX_HTTP_MP4_VMHD_ATOM].buf
+        || trak->out[NGX_HTTP_MP4_SMHD_ATOM].buf)
+    {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 vmhd/smhd atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     atom = &trak->vmhd_atom_buf;
     atom->temporary = 1;
     atom->pos = atom_header;
@@ -1896,6 +1961,15 @@ ngx_http_mp4_read_smhd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_mp4_set_atom_name(atom_header, 's', 'm', 'h', 'd');
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_VMHD_ATOM].buf
+        || trak->out[NGX_HTTP_MP4_SMHD_ATOM].buf)
+    {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 vmhd/smhd atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     atom = &trak->smhd_atom_buf;
     atom->temporary = 1;
@@ -1928,6 +2002,12 @@ ngx_http_mp4_read_dinf_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
 
     trak = ngx_mp4_last_trak(mp4);
 
+    if (trak->out[NGX_HTTP_MP4_DINF_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 dinf atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     atom = &trak->dinf_atom_buf;
     atom->temporary = 1;
     atom->pos = atom_header;
@@ -1955,6 +2035,12 @@ ngx_http_mp4_read_stbl_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     ngx_mp4_set_atom_name(atom_header, 's', 't', 'b', 'l');
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STBL_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stbl atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
 
     atom = &trak->stbl_atom_buf;
     atom->temporary = 1;
@@ -2024,6 +2110,12 @@ ngx_http_mp4_read_stsd_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
 
     trak = ngx_mp4_last_trak(mp4);
 
+    if (trak->out[NGX_HTTP_MP4_STSD_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stsd atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     atom = &trak->stsd_atom_buf;
     atom->temporary = 1;
     atom->pos = atom_header;
@@ -2092,6 +2184,13 @@ ngx_http_mp4_read_stts_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_end = atom_table + entries * sizeof(ngx_mp4_stts_entry_t);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STTS_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stts atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->time_to_sample_entries = entries;
 
     atom = &trak->stts_atom_buf;
@@ -2297,6 +2396,13 @@ ngx_http_mp4_read_stss_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
                    "sync sample entries:%uD", entries);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STSS_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stss atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->sync_samples_entries = entries;
 
     atom_table = atom_header + sizeof(ngx_http_mp4_stss_atom_t);
@@ -2495,6 +2601,13 @@ ngx_http_mp4_read_ctts_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
                    "composition offset entries:%uD", entries);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_CTTS_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 ctts atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->composition_offset_entries = entries;
 
     atom_table = atom_header + sizeof(ngx_mp4_ctts_atom_t);
@@ -2698,6 +2811,13 @@ ngx_http_mp4_read_stsc_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_end = atom_table + entries * sizeof(ngx_mp4_stsc_entry_t);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STSC_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stsc atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->sample_to_chunk_entries = entries;
 
     atom = &trak->stsc_atom_buf;
@@ -3030,6 +3150,13 @@ ngx_http_mp4_read_stsz_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
                    "sample uniform size:%uD, entries:%uD", size, entries);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STSZ_ATOM].buf) {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stsz atom in \"%s\"", mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->sample_sizes_entries = entries;
 
     atom_table = atom_header + sizeof(ngx_mp4_stsz_atom_t);
@@ -3213,6 +3340,16 @@ ngx_http_mp4_read_stco_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_end = atom_table + entries * sizeof(uint32_t);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STCO_ATOM].buf
+        || trak->out[NGX_HTTP_MP4_CO64_ATOM].buf)
+    {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stco/co64 atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->chunks = entries;
 
     atom = &trak->stco_atom_buf;
@@ -3419,6 +3556,16 @@ ngx_http_mp4_read_co64_atom(ngx_http_mp4_file_t *mp4, uint64_t atom_data_size)
     atom_end = atom_table + entries * sizeof(uint64_t);
 
     trak = ngx_mp4_last_trak(mp4);
+
+    if (trak->out[NGX_HTTP_MP4_STCO_ATOM].buf
+        || trak->out[NGX_HTTP_MP4_CO64_ATOM].buf)
+    {
+        ngx_log_error(NGX_LOG_ERR, mp4->file.log, 0,
+                      "duplicate mp4 stco/co64 atom in \"%s\"",
+                      mp4->file.name.data);
+        return NGX_ERROR;
+    }
+
     trak->chunks = entries;
 
     atom = &trak->co64_atom_buf;

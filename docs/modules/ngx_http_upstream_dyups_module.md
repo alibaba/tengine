@@ -89,7 +89,7 @@ $ ./configure --add-dynamic-module=./modules/ngx_http_upstream_dyups_module
 
 ```bash
 # to compile as a static module
-$ ./configure --add-module=./modules/nginx_http_upstream_check_module --add-module=./modules/ngx_http_lua_module --add-module=./modules/ngx_http_upstream_dyups_module
+$ ./configure --add-module=./modules/ngx_http_upstream_check_module --add-module=./modules/ngx_http_lua_module --add-module=./modules/ngx_http_upstream_dyups_module
 ```
 
 ## Directives

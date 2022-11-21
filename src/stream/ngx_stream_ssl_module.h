@@ -62,7 +62,7 @@ typedef struct {
     ngx_str_t        sign_certificate;
     ngx_str_t        sign_certificate_key;
 #endif
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_flag_t       sni_force;
 #endif
 } ngx_stream_ssl_conf_t;

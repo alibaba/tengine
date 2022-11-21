@@ -265,6 +265,12 @@ typedef struct {
     ngx_flag_t                       ssl_verify;
 #endif
 
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        ssl_ciphers;
+    const SSL_METHOD                *tls_method;
+    ngx_http_complex_value_t        *enable_ntls;
+#endif
+
     ngx_str_t                        module;
 
     NGX_COMPAT_BEGIN(2)

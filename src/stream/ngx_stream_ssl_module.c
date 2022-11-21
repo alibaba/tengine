@@ -47,7 +47,7 @@ static char *ngx_stream_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_stream_ssl_init(ngx_conf_t *cf);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 int ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad,
     void *arg);
 #endif
@@ -251,7 +251,7 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
       offsetof(ngx_stream_ssl_conf_t, crl),
       NULL },
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     { ngx_string("ssl_sni_force"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -514,7 +514,7 @@ ngx_stream_ssl_handshake_handler(ngx_connection_t *c)
     ngx_stream_core_run_phases(s);
 }
 
-#ifdef NGX_STREAM_SNI
+#ifdef T_NGX_STREAM_SNI
 static ngx_int_t
 ngx_stream_find_virtual_server(ngx_connection_t *c,
     ngx_stream_virtual_names_t *virtual_names, ngx_str_t *host,
@@ -807,7 +807,7 @@ ngx_stream_ssl_create_conf(ngx_conf_t *cf)
     scf->session_tickets = NGX_CONF_UNSET;
     scf->session_ticket_keys = NGX_CONF_UNSET_PTR;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     scf->sni_force = NGX_CONF_UNSET;
 #endif
 
@@ -873,9 +873,8 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_conf_merge_value(conf->sni_force, prev->sni_force, 0);
-    if (!conf->listen)
 #endif
 
     conf->ssl.log = cf->log;
@@ -973,7 +972,7 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 #if (SSL_CTRL_SET_TLSEXT_HOSTNAME)
     if (SSL_CTX_set_tlsext_servername_callback(conf->ssl.ctx,
                                                ngx_stream_ssl_servername)

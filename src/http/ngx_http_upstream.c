@@ -1819,6 +1819,32 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
         return;
     }
 
+#if (T_NGX_SSL_NTLS)
+    if (u->conf->enable_ntls) {
+        ngx_str_t                    enable_ntls;
+
+        if (ngx_http_complex_value(r, u->conf->enable_ntls,
+                                   &enable_ntls) == NGX_OK &&
+            enable_ntls.len == 2 &&
+            ngx_strncmp(enable_ntls.data, "on", 2) == 0)
+        {
+            if (u->conf->tls_method != NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, NTLS_method());
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_enable_ntls(u->conf->ssl->ctx);
+            }
+        } else {
+            if (SSL_CTX_get_ssl_method(u->conf->ssl->ctx) == NTLS_method()) {
+                SSL_CTX_set_ssl_version(u->conf->ssl->ctx, u->conf->tls_method);
+                SSL_CTX_set_cipher_list(u->conf->ssl->ctx,
+                                        (char *)u->conf->ssl_ciphers.data);
+                SSL_CTX_disable_ntls(u->conf->ssl->ctx);
+            }
+        }
+    }
+#endif
+
     if (ngx_ssl_create_connection(u->conf->ssl, c,
                                   NGX_SSL_BUFFER|NGX_SSL_CLIENT)
         != NGX_OK)
