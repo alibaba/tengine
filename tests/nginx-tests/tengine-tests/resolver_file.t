@@ -22,6 +22,8 @@ use Net::DNS::Nameserver;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+plan(skip_all => 'must be root') if $> != 0;
+
 sub http_get_host($;$;%) {
     my ($url, $host, %extra) = @_;
     return http(<<EOF, %extra);
