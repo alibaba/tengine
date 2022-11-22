@@ -632,11 +632,12 @@ found:
     if (addr == NULL) {
         return NGX_ERROR;
     }
+
     ngx_memset(addr, 0, sizeof(ngx_stream_conf_addr_t));
     addr->opt = *listen;
     addr->default_server = cscf;
 
-    return ngx_stream_add_server(cf, cscf, &addr[i]);
+    return ngx_stream_add_server(cf, cscf, addr);
 
 #else
 
