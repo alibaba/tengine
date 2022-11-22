@@ -1,4 +1,4 @@
-name: CI
+name: Linux AMD64 CI
 
 on:
   push:

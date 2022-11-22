@@ -1,4 +1,4 @@
-name: CI
+name: Linux ARM64 CI
 
 on:
   push:
