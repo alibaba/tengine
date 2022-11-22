@@ -35,7 +35,7 @@ jobs:
           install: |
             set -x
             apt-get update -q -y
-            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
           run: |
             set -x
             cd /tengine
@@ -85,13 +85,4 @@ jobs:
               --without-http_upstream_keepalive_module
             make -j2
             make install
-            echo "Test..."
-            cd tests/nginx-tests
-            export TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx
-            cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
-            prove -v -Inginx-tests/lib $(ls -d tengine-tests/* | grep -v resolver_file)
-            prove -v -Inginx-tests/lib tengine-tests/resolver_file.t
-            cd ../test-nginx
-            cpanm --notest Shell Test::Base Test::LongString List::MoreUtils LWP::UserAgent HTTP::Response  > build.log 2>&1 || (cat build.log && exit 1)
-            mkdir t
-            PATH=/usr/local/nginx/sbin:$PATH prove -v -Itest-nginx/lib cases/
+            file /usr/local/nginx/sbin/nginx | grep aarch64
