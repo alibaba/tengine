@@ -8,7 +8,6 @@
 
 use warnings;
 use strict;
-#use v5.14;
 
 use Test::More;
 
@@ -25,7 +24,6 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(6);
-my @server_addrs = ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4");
 my @domain_addrs = ("127.0.0.2");
 
 my $ipv6 = $t->has_version('1.11.5') ? "ipv6=off" : "";
@@ -49,14 +47,14 @@ http {
     upstream backend {
         server www.taobao.com fail_timeout=0s;
 
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.1:8081 backup;
     }
 
     upstream backend1 {
         dynamic_resolve;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.1:8081 backup;
     }
 
     upstream backend2 {
@@ -69,14 +67,14 @@ http {
         dynamic_resolve fallback=next;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.1:8081 backup;
     }
 
     upstream backend4 {
         dynamic_resolve fallback=shutdown;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.1:8081 backup;
     }
 
     upstream backend-ka {
@@ -115,6 +113,36 @@ http {
             proxy_pass http://backend4;
         }
     }
+
+    server {
+        # must listen on 127.0.0.2, dont replace port
+        listen 127.0.0.02:8081;
+        return 200 "from server 127.0.0.2";
+    }
+
+    server {
+        listen 127.0.0.1:8081;
+
+        location / {
+            return 404 "Oops, '$uri' not found";
+        }
+
+        location /proxy_pass_var {
+            return 200 "cannot be here! It should go to 127.0.0.02:8081";
+        }
+
+        location /stale {
+            return 200 "from server 127.0.0.2";
+        }
+
+        location /next {
+            return 200 "from server 127.0.0.4";
+        }
+
+        location /static {
+            return 200 "from server 127.0.0.4";
+        }
+    }
 }
 
 EOF
@@ -122,10 +150,6 @@ EOF
 $nginx_conf =~ s/%%TEST_CONF_IPV6%%/$ipv6/gmse;
 
 $t->write_file_expand('nginx.conf', $nginx_conf);
-
-foreach my $ip (@server_addrs) {
-    $t->run_daemon(\&http_daemon, $ip);
-}
 
 $t->run_daemon(\&dns_server_daemon);
 my $dns_pid = pop @{$t->{_daemons}};
@@ -159,69 +183,6 @@ like(http_get('/shutdown'), qr/502 Bad Gateway/,
 like(http_get('/next'), qr/127\.0\.0\.4/, 'next upstream should be 127.0.0.4');
 
 ###############################################################################
-
-sub http_daemon {
-    my $addr = shift @_;
-    my $server = IO::Socket::INET->new(
-        Proto => 'tcp',
-        LocalHost => "$addr:8081",
-        Listen => 5,
-        Reuse => 1
-    ) or die "Can't create listening socket: $!\n";
-
-    my $resp;
-
-#    for ($addr) {
-#        when ("127.0.0.1") {$resp = "from server 127.0.0.1";}
-#        when ("127.0.0.2") {$resp = "from server 127.0.0.2";}
-#        when ("127.0.0.3") {$resp = "from server 127.0.0.3";}
-#        when ("127.0.0.4") {$resp = "from server 127.0.0.4";}
-#    }
-
-    if ($addr eq "127.0.0.1") {$resp = "from server 127.0.0.1";}
-    elsif ($addr eq "127.0.0.2") {$resp = "from server 127.0.0.2";}
-    elsif ($addr eq "127.0.0.3") {$resp = "from server 127.0.0.3";}
-    elsif ($addr eq "127.0.0.4") {$resp = "from server 127.0.0.4";}
-
-    while (my $client = $server->accept()) {
-        $client->autoflush(1);
-
-        my $headers = '';
-        my $uri = '';
-
-        while (<$client>) {
-            $headers .= $_;
-            last if (/^\x0d?\x0a?$/);
-        }
-
-        $uri = $1 if $headers =~ /^\S+\s+([^ ]+)\s+HTTP/i;
-
-        if ($uri eq '/'
-            or $uri eq '/proxy_pass_var'
-            or $uri eq '/static'
-            or $uri eq '/next'
-            or $uri eq '/stale'
-            or $uri eq '/shutdown') {
-
-            print $client <<'EOF';
-HTTP/1.1 200 OK
-Connection: close
-
-EOF
-            print $client "$resp" unless $headers =~ /^HEAD/i;
-        } else {
-            print $client <<"EOF";
-HTTP/1.1 404 Not Found
-Connection: close
-
-Oops, '$uri' not found
-EOF
-        }
-
-        close $client;
-    }
-}
-
 
 sub reply_handler {
     my ($qname, $qclass, $qtype, $peerhost,$query,$conn) = @_;
