@@ -25,7 +25,7 @@ eval {
     require IO::Socket::SSL;
 };
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)
+my $t = Test::Nginx->new()->has(qw/http http_ssl openssl-async/)
     ->has_daemon('openssl');
 
 $t->plan(2)->write_file_expand('nginx.conf', <<'EOF');

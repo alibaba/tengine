@@ -627,7 +627,7 @@ cat << END
 
   --with-openssl=DIR                 set path to OpenSSL library sources
   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
-
+  --with-openssl-async               enable asynchronous SSL/TLS mode for OpenSSL library
   --with-debug                       enable debug logging
 
 END
