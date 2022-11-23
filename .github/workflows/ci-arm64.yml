@@ -1,4 +1,4 @@
-name: Linux ARM64 CI
+name: build tengine
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Linux AMD64 CI
+name: test tengine
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-and-test:
    runs-on: "ubuntu-20.04"
    strategy:
      fail-fast: false
