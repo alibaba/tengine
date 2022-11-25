@@ -13,7 +13,7 @@ use Test::Nginx;
 
 my $NGINX = defined $ENV{TEST_NGINX_BINARY} ? $ENV{TEST_NGINX_BINARY}
         : '../nginx/objs/nginx';
-my $t = Test::Nginx->new()->plan(76);
+my $t = Test::Nginx->new()->plan(77);
 
 sub mhttp_get($;$;$;%) {
     my ($url, $host, $port, %extra) = @_;
@@ -97,6 +97,11 @@ events {
 }
 
 http {
+
+    # Must be less than 2s (mhttp_get->mhttp->alarm(2)).
+    # If upstream (e.g. "dyhost") is deleted by dyups api,
+    # proxy module tries to resolve its name via public DNS server.
+    resolver_timeout 500ms;
 
     upstream host1 {
         server 127.0.0.1:8088;
@@ -213,7 +218,11 @@ like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:41:09');
 
 
 like(mhttp_delete('/upstream/dyhost', 8081), qr/success/m, '2013-02-26 16:51:57');
-like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '2013-02-26 16:52:00');
+# use unlike() instead of like(502),
+# proxy module tries to resolver "dyhost" via public DNS
+# like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '2013-02-26 16:52:00');
+unlike(mhttp_get('/', 'dyhost', 8080), qr/8089|8088/m, '2013-02-26 17:40:32');
+unlike(mhttp_get('/detail', 'localhost', 8081), qr/dyhost/, '2013-02-26 17:41:09');
 
 $rep = qr/
 host1
@@ -233,7 +242,8 @@ like(mhttp_get('/detail', 'localhost', 8081), $rep, '2013-02-26 17:42:27');
 like(mhttp_delete('/upstream/dyhost', 8081), qr/404/m, '2013-02-26 17:44:34');
 
 like(mhttp_delete('/upstream/host1', 8081), qr/success/m, '2013-02-26 17:08:00');
-like(mhttp_get('/', 'host1', 8080), qr/502/m, '2013-02-26 17:08:04');
+#like(mhttp_get('/', 'host1', 8080), qr/502/m, '2013-02-26 17:08:04');
+unlike(mhttp_get('/', 'host1', 8080), qr/8088|8089/m, '2013-02-26 17:40:36');
 
 $rep = qr/
 host2
@@ -281,7 +291,8 @@ like(mhttp_delete('/upstream/dyhost', 8081), qr/success/m, '2013-03-25 10:39:28'
 
 like(mhttp_post('/upstream/dyhost', 'server 127.0.0.1:8088;check interval=1000 rise=2 fall=5 timeout=1000 type=http default_down=true;', 8081),
      qr/success/m, '2013-03-25 10:49:44');
-like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '2013-03-25 10:49:47');
+#like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '2013-03-25 10:49:47');
+unlike(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '2013-03-25 10:39:02');
 sleep(2);
 like(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '2013-03-25 10:50:41');
 like(mhttp_delete('/upstream/dyhost', 8081), qr/success/m, '2013-03-25 10:49:51');
@@ -313,6 +324,7 @@ events {
 }
 
 http {
+    resolver_timeout 500ms;
 
     upstream host1 {
         server 127.0.0.1:8088;
@@ -481,6 +493,7 @@ events {
 }
 
 http {
+    resolver_timeout 500ms;
 
     server {
         listen   8080;
@@ -544,7 +557,8 @@ sleep(1);
 like(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '5/ 5 11:04:42 2014');
 like(mhttp_get('/lua/delete', 'localhost', 8081), qr/200success/m, '5/ 5 11:08:08 2014');
 sleep(1);
-like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '5/ 5 11:08:16 2014');
+#like(mhttp_get('/', 'dyhost', 8080), qr/502/m, '5/ 5 11:08:16 2014');
+unlike(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '5/ 5 11:04:42 2014');
 
 
 $t->stop();
