@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 # (C) Maxim Dounin
+# (C) Nginx, Inc.
 
-# Test for uwsgi backend.
+# Test for uwsgi backend with SSL.
 
 ###############################################################################
 
@@ -10,6 +11,7 @@ use warnings;
 use strict;
 
 use Test::More;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -21,7 +23,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http uwsgi/)->has_daemon('uwsgi')->plan(8)
+my $t = Test::Nginx->new()->has(qw/http uwsgi http_ssl/)
+	->has_daemon('uwsgi')->has_daemon('openssl')->plan(7)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -43,13 +46,14 @@ http {
         server_name  localhost;
 
         location / {
-            uwsgi_pass 127.0.0.1:8081;
+            uwsgi_pass suwsgi://127.0.0.1:8081;
             uwsgi_param SERVER_PROTOCOL $server_protocol;
             uwsgi_param HTTP_X_BLAH "blah";
+            uwsgi_pass_request_body off;
         }
 
         location /var {
-            uwsgi_pass $arg_b;
+            uwsgi_pass suwsgi://$arg_b;
             uwsgi_param SERVER_PROTOCOL $server_protocol;
         }
     }
@@ -57,15 +61,30 @@ http {
 
 EOF
 
+$t->write_file('openssl.conf', <<EOF);
+[ req ]
+default_bits = 2048
+encrypt_key = no
+distinguished_name = req_distinguished_name
+[ req_distinguished_name ]
+EOF
+
+my $d = $t->testdir();
+my $crt = "$d/uwsgi.crt";
+my $key = "$d/uwsgi.key";
+
+foreach my $name ('uwsgi') {
+	system('openssl req -x509 -new '
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
+		. ">>$d/openssl.out 2>&1") == 0
+		or die "Can't create certificate for $name: $!\n";
+}
+
 $t->write_file('uwsgi_test_app.py', <<END);
 
 def application(env, start_response):
-    start_response('200 OK', [
-       ('Content-Type', 'text/plain'),
-       ('X-Forwarded-For', env.get('HTTP_X_FORWARDED_FOR', '')),
-       ('X-Cookie', env.get('HTTP_COOKIE', '')),
-       ('X-Foo', env.get('HTTP_FOO', ''))
-    ])
+    start_response('200 OK', [('Content-Type','text/plain')])
     return b"SEE-THIS"
 
 END
@@ -80,9 +99,10 @@ if ($uwsgihelp !~ /--wsgi-file/) {
 }
 
 open OLDERR, ">&", \*STDERR; close STDERR;
-$t->run_daemon('uwsgi', '--socket', '127.0.0.1:' . port(8081), @uwsgiopts,
-	'--wsgi-file', $t->testdir() . '/uwsgi_test_app.py',
-	'--logto', $t->testdir() . '/uwsgi_log');
+$t->run_daemon('uwsgi', @uwsgiopts,
+	'--ssl-socket', '127.0.0.1:' . port(8081) . ",$crt,$key",
+	'--wsgi-file', $d . '/uwsgi_test_app.py',
+	'--logto', $d . '/uwsgi_log');
 open STDERR, ">&", \*OLDERR;
 
 $t->run();
@@ -93,7 +113,7 @@ $t->waitforsocket('127.0.0.1:' . port(8081))
 ###############################################################################
 
 like(http_get('/'), qr/SEE-THIS/, 'uwsgi request');
-unlike(http_head('/head'), qr/SEE-THIS/, 'no data in HEAD');
+like(http_head('/head'), qr/200 OK(?!.*SEE-THIS)/s, 'no data in HEAD');
 
 like(http_get_headers('/headers'), qr/SEE-THIS/,
 	'uwsgi request with many ignored headers');
@@ -102,32 +122,8 @@ like(http_get('/var?b=127.0.0.1:' . port(8081)), qr/SEE-THIS/,
 	'uwsgi with variables');
 like(http_get('/var?b=u'), qr/SEE-THIS/, 'uwsgi with variables to upstream');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
-my $r = http(<<EOF);
-GET / HTTP/1.0
-Host: localhost
-X-Forwarded-For: foo
-X-Forwarded-For: bar
-X-Forwarded-For: bazz
-Cookie: foo
-Cookie: bar
-Cookie: bazz
-Foo: foo
-Foo: bar
-Foo: bazz
-
-EOF
-
-like($r, qr/X-Forwarded-For: foo, bar, bazz/,
-	'uwsgi with multiple X-Forwarded-For headers');
-like($r, qr/X-Cookie: foo; bar; bazz/,
-	'uwsgi with multiple Cookie headers');
-like($r, qr/X-Foo: foo, bar, bazz/,
-	'uwsgi with multiple unknown headers');
-
-}
+like(http_post('/'), qr/SEE-THIS/, 'uwsgi post');
+like(http_post_big('/'), qr/SEE-THIS/, 'uwsgi big post');
 
 ###############################################################################
 
@@ -157,6 +153,30 @@ X-Blah: ignored header
 X-Blah: ignored header
 
 EOF
+}
+
+sub http_post {
+	my ($url, %extra) = @_;
+
+	my $p = "POST $url HTTP/1.0" . CRLF .
+		"Host: localhost" . CRLF .
+		"Content-Length: 10" . CRLF .
+		CRLF .
+		"1234567890";
+
+	return http($p, %extra);
+}
+
+sub http_post_big {
+	my ($url, %extra) = @_;
+
+	my $p = "POST $url HTTP/1.0" . CRLF .
+		"Host: localhost" . CRLF .
+		"Content-Length: 10240" . CRLF .
+		CRLF .
+		("1234567890" x 1024);
+
+	return http($p, %extra);
 }
 
 ###############################################################################
