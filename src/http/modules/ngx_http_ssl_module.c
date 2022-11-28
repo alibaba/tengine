@@ -128,6 +128,43 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       0,
       NULL },
 
+#if (T_NGX_SSL_NTLS)
+    { ngx_string("enable_ntls"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, enable_ntls),
+      NULL },
+
+    { ngx_string("ssl_enc_certificate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, enc_certificate),
+      NULL },
+
+    { ngx_string("ssl_enc_certificate_key"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, enc_certificate_key),
+      NULL },
+
+    { ngx_string("ssl_sign_certificate"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, sign_certificate),
+      NULL },
+
+    { ngx_string("ssl_sign_certificate_key"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, sign_certificate_key),
+      NULL },
+#endif
+
     { ngx_string("ssl_dhparam"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -645,6 +682,9 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
     sscf->async_enable = NGX_CONF_UNSET;
 #endif
+#if (T_NGX_SSL_NTLS)
+    sscf->enable_ntls = NGX_CONF_UNSET;
+#endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
     sscf->early_data = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
@@ -737,6 +777,17 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_ptr_value(conf->passwords, prev->passwords, NULL);
 
+#if (T_NGX_SSL_NTLS)
+    ngx_conf_merge_value(conf->enable_ntls, prev->enable_ntls, 0);
+    ngx_conf_merge_str_value(conf->enc_certificate, prev->enc_certificate, "");
+    ngx_conf_merge_str_value(conf->enc_certificate_key,
+                         prev->enc_certificate_key, "");
+    ngx_conf_merge_str_value(conf->sign_certificate, prev->sign_certificate,
+                         "");
+    ngx_conf_merge_str_value(conf->sign_certificate_key,
+                         prev->sign_certificate_key, "");
+#endif
+
     ngx_conf_merge_str_value(conf->dhparam, prev->dhparam, "");
 
     ngx_conf_merge_str_value(conf->client_certificate, prev->client_certificate,
@@ -760,14 +811,26 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->enable) {
 
-        if (conf->certificates == NULL) {
+        if (conf->certificates == NULL
+#if (T_NGX_SSL_NTLS)
+            && conf->enc_certificate.len == 0
+            && conf->sign_certificate.len == 0
+#endif
+        ) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+#if (T_NGX_SSL_NTLS)
+                          "no \"ssl_certificate\", \"ssl_enc_certificate\" or"
+                          " \"ssl_sign_certificate\" is defined for "
+#else
                           "no \"ssl_certificate\" is defined for "
+#endif
                           "the \"ssl\" directive in %s:%ui",
                           conf->file, conf->line);
             return NGX_CONF_ERROR;
         }
-
+#if (T_NGX_SSL_NTLS)
+        if (conf->certificates != NULL) {
+#endif
         if (conf->certificate_keys == NULL) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"ssl_certificate_key\" is defined for "
@@ -789,13 +852,23 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           conf->file, conf->line);
             return NGX_CONF_ERROR;
         }
+#if (T_NGX_SSL_NTLS)
+        }
+#endif
 
     } else {
 
-        if (conf->certificates == NULL) {
+        if (conf->certificates == NULL
+#if (T_NGX_SSL_NTLS)
+            && conf->enc_certificate.len == 0
+            && conf->sign_certificate.len == 0
+#endif
+        ) {
             return NGX_CONF_OK;
         }
-
+#if (T_NGX_SSL_NTLS)
+        if (conf->certificates != NULL) {
+#endif
         if (conf->certificate_keys == NULL
             || conf->certificate_keys->nelts < conf->certificates->nelts)
         {
@@ -806,7 +879,46 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           + conf->certificates->nelts - 1);
             return NGX_CONF_ERROR;
         }
+#if (T_NGX_SSL_NTLS)
+        }
+#endif
     }
+
+#if (T_NGX_SSL_NTLS)
+    if (conf->enc_certificate.len != 0 || conf->sign_certificate.len != 0) {
+        if (conf->enc_certificate.len == 0) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "no \"ssl_enc_certificate\" is defined for "
+                          "the \"ssl\" directive in %s:%ui",
+                          conf->file, conf->line);
+            return NGX_CONF_ERROR;
+        }
+
+        if (conf->sign_certificate.len == 0) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "no \"ssl_sign_certificate\" is defined for "
+                          "the \"ssl\" directive in %s:%ui",
+                          conf->file, conf->line);
+            return NGX_CONF_ERROR;
+        }
+
+        if (conf->enc_certificate_key.len == 0) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "no \"ssl_enc_certificate_key\" is defined for "
+                          "the \"ssl\" directive in %s:%ui",
+                          conf->file, conf->line);
+            return NGX_CONF_ERROR;
+        }
+
+        if (conf->sign_certificate_key.len == 0) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "no \"ssl_sign_certificate_key\" is defined for "
+                          "the \"ssl\" directive in %s:%ui",
+                          conf->file, conf->line);
+            return NGX_CONF_ERROR;
+        }
+    }
+#endif
 
     if (ngx_ssl_create(&conf->ssl, conf->protocols, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -875,7 +987,27 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
             return NGX_CONF_ERROR;
         }
     }
+#if (T_NGX_SSL_NTLS)
+    if (conf->enc_certificate.len != 0) {
+        if (ngx_ssl_certificate(cf, &conf->ssl, &conf->enc_certificate,
+                                &conf->enc_certificate_key, conf->passwords,
+                                SSL_ENC_CERT)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+    }
 
+    if (conf->sign_certificate.len != 0) {
+        if (ngx_ssl_certificate(cf, &conf->ssl, &conf->sign_certificate,
+                                &conf->sign_certificate_key, conf->passwords,
+                                SSL_SIGN_CERT)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+    }
+#endif
     if (ngx_ssl_ciphers(cf, &conf->ssl, &conf->ciphers,
                         conf->prefer_server_ciphers)
         != NGX_OK)
@@ -982,6 +1114,10 @@ ngx_http_ssl_compile_certificates(ngx_conf_t *cf,
     ngx_http_complex_value_t          *cv;
     ngx_http_compile_complex_value_t   ccv;
 
+#if (T_NGX_SSL_NTLS)
+    if (conf->certificates == NULL)
+        return NGX_OK;
+#endif
     cert = conf->certificates->elts;
     key = conf->certificate_keys->elts;
     nelts = conf->certificates->nelts;
@@ -1291,9 +1427,19 @@ ngx_http_ssl_init(ngx_conf_t *cf)
             cscf = addr[a].default_server;
             sscf = cscf->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
 
-            if (sscf->certificates == NULL) {
+            if (sscf->certificates == NULL
+#if (T_NGX_SSL_NTLS)
+                && sscf->sign_certificate.len == 0
+                && sscf->enc_certificate.len == 0
+#endif
+            ) {
                 ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+#if (T_NGX_SSL_NTLS)
+                              "no \"ssl_certificate\", \"ssl_enc_certificate\" "
+                              "or \"ssl_sign_certificate\" is defined for "
+#else
                               "no \"ssl_certificate\" is defined for "
+#endif
                               "the \"listen ... ssl\" directive in %s:%ui",
                               cscf->file_name, cscf->line);
                 return NGX_ERROR;

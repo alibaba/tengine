@@ -2,6 +2,7 @@ ngx_feature="ngx_http_upstream_check_module"
 ngx_feature_name=
 ngx_feature_run=no
 ngx_feature_incs=
+ngx_feature_libs=
 ngx_feature_path="$ngx_addon_dir"
 ngx_feature_deps="$ngx_addon_dir/ngx_http_upstream_check_module.h"
 ngx_check_src="$ngx_addon_dir/ngx_http_upstream_check_module.c"

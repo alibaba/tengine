@@ -317,7 +317,7 @@ ngx_stream_init_phases(ngx_conf_t *cf, ngx_stream_core_main_conf_t *cmcf)
     return NGX_OK;
 }
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 
 static int ngx_libc_cdecl
 ngx_stream_cmp_dns_wildcards(const void *one, const void *two)
@@ -555,7 +555,7 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     struct sockaddr         *sa;
     ngx_stream_conf_port_t  *port;
     ngx_stream_conf_addr_t  *addr;
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_stream_core_srv_conf_t *cscf;
 #endif
 
@@ -595,7 +595,7 @@ ngx_stream_add_ports(ngx_conf_t *cf, ngx_array_t *ports,
     }
 
 found:
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 
     cscf = listen->ctx->srv_conf[ngx_stream_core_module.ctx_index];
     addr = port->addrs.elts;
@@ -632,11 +632,12 @@ found:
     if (addr == NULL) {
         return NGX_ERROR;
     }
+
     ngx_memset(addr, 0, sizeof(ngx_stream_conf_addr_t));
     addr->opt = *listen;
     addr->default_server = cscf;
 
-    return ngx_stream_add_server(cf, cscf, &addr[i]);
+    return ngx_stream_add_server(cf, cscf, addr);
 
 #else
 
@@ -662,7 +663,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
     ngx_stream_conf_addr_t      *addr;
     ngx_stream_core_srv_conf_t  *cscf;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_stream_core_main_conf_t *cmcf;
 #endif
     port = ports->elts;
@@ -743,7 +744,7 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             stport->naddrs = i + 1;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
             cmcf = addr->opt.ctx->main_conf[ngx_stream_core_module.ctx_index];
             /*Because of ssl_sni_force we have to do this even one server*/
             if (addr[i].servers.nelts >= 1) {
@@ -784,7 +785,7 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_uint_t             i;
     struct sockaddr_in    *sin;
     ngx_stream_in_addr_t  *addrs;
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_stream_virtual_names_t  *vn;
 #endif
 
@@ -808,7 +809,7 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
         addrs[i].conf.addr_text = addr[i].opt.addr_text;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
         addrs[i].conf.default_server = addr[i].default_server;
 
         if (addr[i].hash.buckets == NULL
@@ -847,7 +848,7 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
     ngx_uint_t              i;
     struct sockaddr_in6    *sin6;
     ngx_stream_in6_addr_t  *addrs6;
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_stream_virtual_names_t  *vn;
 #endif
 
@@ -871,7 +872,9 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs6[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
         addrs6[i].conf.addr_text = addr[i].opt.addr_text;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
+        addrs6[i].conf.default_server = addr[i].default_server;
+
         if (addr[i].hash.buckets == NULL
             && (addr[i].wc_head == NULL
                 || addr[i].wc_head->hash.buckets == NULL)

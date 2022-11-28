@@ -1,3 +1,11 @@
+Tengine 2.3.4 [2022-10-18]
+* Feature: 增加新模块ngx_openssl_ntls，以支持NTLS协议 (dongbeiouba)
+* Change: 将ngx_openssl_ntls模块中依赖的SSL库从BabaSSL更新为Tongsuo (wa5i)
+* Bugfix: 修复CVE-2021-23017 (chobits)
+* Bugfix: 修复upstream check模块在upstream配置块中使用zone指令时导致的死锁 (zjd87)
+* Bugfix：修复upstream check编译错误 (RocFang)
+* Bugfix: 修复dubbo编译报错 (MengqiWu)
+
 Tengine 2.3.3 [2021-03-25]
 * Feature: 支持dtlsv1和dtlsv1.2 (mrpre)
 * Feature: ngx_http_upstream_check_module模块增加prometheus格式和json属性 (dkrutsko)

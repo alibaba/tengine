@@ -77,19 +77,19 @@ file: conf/upstream.conf
 
 ```bash
 # to compile as a static module
-$ ./configure --add-module=./modules/ngx_http_dyups_module
+$ ./configure --add-module=./modules/ngx_http_upstream_dyups_module
 
 # to compile as a dynamic module
-$ ./configure --add-dynamic-module=./modules/ngx_http_dyups_module
+$ ./configure --add-dynamic-module=./modules/ngx_http_upstream_dyups_module
 ```
 
 * Install dyups module with lua-nginx-module and upstream check module
     * upstream check module: To make upstream check module work well with dyups module, you should use `./modules/ngx_http_upstream_check_module`.
-    * lua-nginx-module: To enable [dyups LUA API](#lua-api-example), you MUST put `--add-module=./modules/ngx_http_lua_module` in front of `--add-module=./modules/ngx_http_dyups_module` in the `./configure` command.
+    * lua-nginx-module: To enable [dyups LUA API](#lua-api-example), you MUST put `--add-module=./modules/ngx_http_lua_module` in front of `--add-module=./modules/ngx_http_upstream_dyups_module` in the `./configure` command.
 
 ```bash
 # to compile as a static module
-$ ./configure --add-module=./modules/nginx_upstream_check_module --add-module=./modules/ngx_http_lua_module --add-module=./modules/ngx_http_dyups_module
+$ ./configure --add-module=./modules/ngx_http_upstream_check_module --add-module=./modules/ngx_http_lua_module --add-module=./modules/ngx_http_upstream_dyups_module
 ```
 
 ## Directives

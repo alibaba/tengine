@@ -23,9 +23,15 @@ use Test::Nginx::SMTP;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+eval { require IO::Socket::SSL; };
+plan(skip_all => 'IO::Socket::SSL not installed') if $@;
+eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
+plan(skip_all => 'IO::Socket::SSL too old') if $@;
+
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()->has(qw/mail smtp http rewrite/)->plan(8)
+my $t = Test::Nginx->new()->has(qw/mail mail_ssl smtp http rewrite/)
+	->has_daemon('openssl')->plan(11)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -39,6 +45,8 @@ mail {
     auth_http    http://127.0.0.1:8080/mail/auth;
     smtp_auth    none;
     server_name  locahost;
+
+    proxy_timeout 15s;
 
     # prevent useless resend
     resolver_timeout 2s;
@@ -89,6 +97,14 @@ mail {
         resolver  127.0.0.1:%%PORT_8987_UDP%%;
     }
 
+    server {
+        ssl_certificate_key localhost.key;
+        ssl_certificate localhost.crt;
+
+        listen    127.0.0.1:8033 ssl;
+        protocol  smtp;
+        resolver  127.0.0.1:%%PORT_8983_UDP%%;
+    }
 }
 
 http {
@@ -115,6 +131,24 @@ http {
 
 EOF
 
+$t->write_file('openssl.conf', <<EOF);
+[ req ]
+default_bits = 2048
+encrypt_key = no
+distinguished_name = req_distinguished_name
+[ req_distinguished_name ]
+EOF
+
+my $d = $t->testdir();
+
+foreach my $name ('localhost') {
+	system('openssl req -x509 -new '
+		. "-config $d/openssl.conf -subj /CN=$name/ "
+		. "-out $d/$name.crt -keyout $d/$name.key "
+		. ">>$d/openssl.out 2>&1") == 0
+		or die "Can't create certificate for $name: $!\n";
+}
+
 $t->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon);
 $t->run_daemon(\&dns_daemon, port($_), $t) foreach (8981 .. 8987);
 
@@ -128,6 +162,7 @@ $t->waitforfile($t->testdir . '/' . port($_)) foreach (8981 .. 8987);
 # PTR
 
 my $s = Test::Nginx::SMTP->new();
+my $s2 = Test::Nginx::SMTP->new();
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -139,6 +174,10 @@ $s->ok('PTR');
 
 $s->send('QUIT');
 $s->read();
+
+$s2->read();
+$s2->send('EHLO example.com');
+$s2->ok('PTR waiting');
 
 # Cached PTR prevents from querying bad ns on port 8983
 
@@ -173,6 +212,7 @@ $s->read();
 # PTR with zero length RDATA
 
 $s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8028));
+$s2 = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8028));
 $s->read();
 $s->send('EHLO example.com');
 $s->read();
@@ -184,6 +224,12 @@ $s->check(qr/TEMPUNAVAIL/, 'PTR empty');
 
 $s->send('QUIT');
 $s->read();
+
+# resolver timeout is set
+
+$s2->read();
+$s2->send('EHLO example.com');
+$s2->ok('PTR empty waiting');
 
 # CNAME
 
@@ -244,6 +290,27 @@ $s->read();
 
 $s->send('RCPT TO:<test@example.com>');
 $s->ok('CNAME with PTR');
+
+$s->send('QUIT');
+$s->read();
+
+# before 1.17.3, read event while in resolving resulted in duplicate resolving
+
+my %ssl = (
+	SSL => 1,
+	SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+	SSL_error_trap => sub { die $_[1] },
+);
+
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8033), %ssl);
+$s->send('EHLO example.com');
+$s->read();
+$s->send('MAIL FROM:<test@example.com> SIZE=100');
+$s->read();
+$s->read();
+
+$s->send('RCPT TO:<test@example.com>');
+$s->check(qr/TEMPUNAVAIL/, 'PTR SSL empty');
 
 $s->send('QUIT');
 $s->read();

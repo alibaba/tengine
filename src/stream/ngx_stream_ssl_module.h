@@ -55,7 +55,14 @@ typedef struct {
     u_char          *file;
     ngx_uint_t       line;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_SSL_NTLS)
+    ngx_flag_t       enable_ntls;
+    ngx_str_t        enc_certificate;
+    ngx_str_t        enc_certificate_key;
+    ngx_str_t        sign_certificate;
+    ngx_str_t        sign_certificate_key;
+#endif
+#if (T_NGX_STREAM_SNI)
     ngx_flag_t       sni_force;
 #endif
 } ngx_stream_ssl_conf_t;

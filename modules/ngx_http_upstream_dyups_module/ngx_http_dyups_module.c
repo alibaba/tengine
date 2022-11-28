@@ -541,7 +541,7 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
     ngx_int_t                    i;
     ngx_pid_t                    pid;
     ngx_time_t                  *tp;
-    ngx_msec_t                   now;
+    ngx_msec_t                   now, delay;
     ngx_event_t                 *timer;
     ngx_core_conf_t             *ccf;
     ngx_slab_pool_t             *shpool;
@@ -568,7 +568,11 @@ ngx_http_dyups_init_process(ngx_cycle_t *cycle)
     timer->log = cycle->log;
     timer->data = dmcf;
 
-    ngx_add_timer(timer, dmcf->read_msg_timeout);
+    /*
+     * when init process, break up timer, in case of shpool->mutex compete
+     */
+    delay = dmcf->read_msg_timeout > 1000 ? dmcf->read_msg_timeout : 1000;
+    ngx_add_timer(timer, ngx_random() % delay);
 
     shpool = ngx_dyups_global_ctx.shpool;
     sh = ngx_dyups_global_ctx.sh;
@@ -1233,9 +1237,8 @@ ngx_dyups_update_upstream(ngx_str_t *name, ngx_buf_t *buf, ngx_str_t *rv)
     } else {
 
         if (!ngx_shmtx_trylock(&shpool->mutex)) {
-            status = NGX_HTTP_CONFLICT;
             ngx_str_set(rv, "wait and try again\n");
-            goto finish;
+            return NGX_HTTP_CONFLICT;
         }
     }
 
@@ -1719,9 +1722,11 @@ ngx_dyups_mark_upstream_delete(ngx_http_dyups_srv_conf_t *duscf)
         us[i].down = 1;
 
 #if (NGX_HTTP_UPSTREAM_CHECK)
-        if (us[i].addrs) {
+        ngx_uint_t  j;
+
+        for (j = 0; j < us[i].naddrs; j++) {
             ngx_http_upstream_check_delete_dynamic_peer(&uscf->host,
-                                                        us[i].addrs);
+                                                        &us[i].addrs[j]);
         }
 #endif
     }
@@ -2090,9 +2095,11 @@ ngx_http_dyups_read_msg(ngx_event_t *ev)
 
     ngx_http_dyups_read_msg_locked(ev);
 
-finish:
     ngx_shmtx_unlock(&shpool->mutex);
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+finish:
+#endif
     ngx_dyups_add_timer(ev, dmcf->read_msg_timeout);
 }
 
