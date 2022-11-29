@@ -71,12 +71,9 @@ typedef struct {
 
 
 typedef struct {
+    /* the round robin data must be first */
     ngx_http_upstream_rr_peer_data_t    rrp;
     ngx_http_request_t                 *r;
-
-#if (NGX_HTTP_SSL)
-    ngx_ssl_session_t                  *ssl_session;
-#endif
 
     ngx_event_get_peer_pt               get_rr_peer;
 
@@ -116,15 +113,6 @@ static ngx_int_t ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us);
 static ngx_int_t ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
     ngx_http_ss_server_t *s);
-
-#if (NGX_HTTP_SSL)
-
-static ngx_int_t ngx_http_upstream_session_sticky_set_peer_session(
-    ngx_peer_connection_t *pc, void *data);
-static void ngx_http_upstream_session_sticky_save_peer_session(
-    ngx_peer_connection_t *pc, void *data);
-
-#endif
 
 
 static ngx_conf_deprecated_t ngx_conf_deprecated_session_sticky_header = {
@@ -246,15 +234,7 @@ ngx_http_upstream_session_sticky_init_peer(ngx_http_request_t *r,
     sspd->sscf = sscf;
     sspd->get_rr_peer = ngx_http_upstream_get_round_robin_peer;
 
-    r->upstream->peer.data = sspd;
     r->upstream->peer.get = ngx_http_upstream_session_sticky_get_peer;
-
-#if (NGX_HTTP_SSL)
-    r->upstream->peer.set_session =
-                            ngx_http_upstream_session_sticky_set_peer_session;
-    r->upstream->peer.save_session =
-                            ngx_http_upstream_session_sticky_save_peer_session;
-#endif
 
     return NGX_OK;
 }
@@ -1406,63 +1386,3 @@ ngx_http_upstream_session_sticky_set_sid(ngx_conf_t *cf,
 
     return NGX_OK;
 }
-
-
-#if (NGX_HTTP_SSL)
-
-static ngx_int_t
-ngx_http_upstream_session_sticky_set_peer_session(ngx_peer_connection_t *pc,
-    void *data)
-{
-    ngx_http_upstream_ss_peer_data_t *sspd = data;
-
-    ngx_int_t            rc;
-    ngx_ssl_session_t   *ssl_session;
-
-    ssl_session = sspd->ssl_session;
-    rc = ngx_ssl_set_session(pc->connection, ssl_session);
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "set session: %p:%d",
-                   ssl_session, ssl_session ? ssl_session->references : 0);
-#endif
-
-    return rc;
-}
-
-
-static void
-ngx_http_upstream_session_sticky_save_peer_session(ngx_peer_connection_t *pc,
-    void *data)
-{
-    ngx_http_upstream_ss_peer_data_t *sspd = data;
-
-    ngx_ssl_session_t   *old_ssl_session, *ssl_session;
-
-    ssl_session = ngx_ssl_get_session(pc->connection);
-
-    if (ssl_session == NULL) {
-        return;
-    }
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "save session: %p:%d", ssl_session, ssl_session->references);
-#endif
-
-    old_ssl_session = sspd->ssl_session;
-    sspd->ssl_session = ssl_session;
-
-    if (old_ssl_session) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                       "old session: %p:%d",
-                       old_ssl_session, old_ssl_session->references);
-#endif
-
-        ngx_ssl_free_session(old_ssl_session);
-    }
-}
-
-#endif
