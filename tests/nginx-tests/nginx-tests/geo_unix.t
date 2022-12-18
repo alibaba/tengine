@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http geo proxy unix/)->plan(5);
+my $t = Test::Nginx->new()->has(qw/http geo proxy unix/)->plan(6);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -93,18 +93,15 @@ $t->run();
 ###############################################################################
 
 my $r = http_get('/');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.8');
-
 like($r, qr/^X-Geo: none/m, 'geo unix');
 like($r, qr/^X-Ranges: none/m, 'geo unix ranges');
-
-}
-
 like($r, qr/^X-Addr: none/m, 'geo unix remote addr');
 like($r, qr/^X-Ranges-Addr: none/m, 'geo unix ranges remote addr');
 
 like(http_get('/?ip=192.0.2.1'), qr/^X-Arg: test/m, 'geo unix variable');
+
+$t->stop();
+
+is(-e $t->testdir() . '/unix.sock', undef, 'unix socket removed');
 
 ###############################################################################

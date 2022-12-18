@@ -401,7 +401,14 @@ Content-Type: application/ocsp-response
 
 EOF
 
-		print $client $headers . $t->read_file("$resp.der");
+		local $/;
+		open my $fh, '<', "$d/$resp.der"
+			or die "Can't open $resp.der: $!";
+		binmode $fh;
+		my $content = <$fh>;
+		close $fh;
+
+		print $client $headers . $content;
 	}
 }
 

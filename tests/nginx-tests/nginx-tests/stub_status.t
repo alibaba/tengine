@@ -167,8 +167,8 @@ sub status {
 
 	$r =~ /
 		Active\ connections:\ +(\d+)
-		\s+server\ accepts\ handled\ requests\ request_time
-		\s+(\d+)\ +(\d+)\ +(\d+)\ +(\d+)
+		\s+server\ accepts\ handled\ requests
+		\s+(\d+)\ +(\d+)\ +(\d+)
 		\s+Reading:\ +(\d+)
 		\s+Writing:\ +(\d+)
 		\s+Waiting:\ +(\d+)
@@ -178,10 +178,9 @@ sub status {
 		'accepts' => $2,
 		'handled' => $3,
 		'requests' => $4,
-		'request_time' => $5,
-		'reading' => $6,
-		'writing' => $7,
-		'waiting' => $8,
+		'reading' => $5,
+		'writing' => $6,
+		'waiting' => $7,
 	);
 }
 

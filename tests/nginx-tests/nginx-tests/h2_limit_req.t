@@ -104,11 +104,6 @@ is($frame->{headers}->{':status'}, 200, 'request body - limit req - empty');
 # predict send windows
 
 $sid = $s->new_stream();
-my ($maxwin) = sort {$a <=> $b} $s->{streams}{$sid}, $s->{conn_window};
-
-SKIP: {
-skip 'not enough window', 1 if $maxwin < 5;
-
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ path => '/proxy_limit_req/', body => 'TEST2' });
 select undef, undef, undef, 1.1;
@@ -118,24 +113,16 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 is(read_body_file($frame->{headers}->{'x-body-file'}), 'TEST2',
 	'request body - limit req 2');
 
-}
-
 # partial request body data frame received (to be discarded) within request
 # delayed in limit_req, the rest of data frame is received after response
 
 $s = Test::Nginx::HTTP2->new();
-
-SKIP: {
-skip 'not enough window', 1 if $maxwin < 4;
-
 $sid = $s->new_stream({ path => '/limit_req', body => 'TEST', split => [61],
 	split_delay => 1.1 });
 $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, '200', 'discard body - limit req - limited');
-
-}
 
 $sid = $s->new_stream({ path => '/' });
 $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
@@ -146,9 +133,6 @@ is($frame->{headers}->{':status'}, '200', 'discard body - limit req - next');
 # ditto, but instead of receiving the rest of data frame, connection is closed
 # 'http request already closed while closing request' alert can be produced
 
-SKIP: {
-skip 'not enough window', 1 if $maxwin < 4;
-
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ path => '/limit_req', body => 'TEST', split => [61],
 	abort => 1 });
@@ -157,8 +141,6 @@ select undef, undef, undef, 1.1;
 close $s->{socket};
 
 pass('discard body - limit req - eof');
-
-}
 
 ###############################################################################
 

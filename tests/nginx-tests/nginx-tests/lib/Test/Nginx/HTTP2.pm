@@ -39,14 +39,6 @@ sub new {
 	my $preface = defined $extra{preface} ? $extra{preface}
 		: 'PRI * HTTP/2.0' . CRLF . CRLF . 'SM' . CRLF . CRLF;
 
-	if ($extra{proxy}) {
-		raw_write($s, $extra{proxy});
-	}
-
-	# preface
-
-	raw_write($s, $preface);
-
 	my $self = bless {
 		socket => $s, last_stream => -1,
 		dynamic_encode => [ static_table() ],
@@ -54,6 +46,14 @@ sub new {
 		static_table_size => scalar @{[static_table()]},
 		iws => 65535, conn_window => 65535, streams => {}
 	}, $class;
+
+	if ($extra{proxy}) {
+		$self->raw_write($extra{proxy});
+	}
+
+	# preface
+
+	$self->raw_write($preface);
 
 	return $self if $extra{pure};
 
@@ -76,13 +76,13 @@ sub new {
 sub h2_ping {
 	my ($self, $payload) = @_;
 
-	raw_write($self->{socket}, pack("x2C2x5a8", 8, 0x6, $payload));
+	$self->raw_write(pack("x2C2x5a8", 8, 0x6, $payload));
 }
 
 sub h2_rst {
 	my ($self, $stream, $error) = @_;
 
-	raw_write($self->{socket}, pack("x2C2xNN", 4, 0x3, $stream, $error));
+	$self->raw_write(pack("x2C2xNN", 4, 0x3, $stream, $error));
 }
 
 sub h2_goaway {
@@ -92,11 +92,11 @@ sub h2_goaway {
 	my $buf = pack("x2C2xN3A*", $len, 0x7, $stream, $lstream, $err, $debug);
 
 	my @bufs = map {
-		raw_write($self->{socket}, substr $buf, 0, $_, "");
+		$self->raw_write(substr $buf, 0, $_, "");
 		select undef, undef, undef, 0.2;
 	} @{$extra{split}};
 
-	raw_write($self->{socket}, $buf);
+	$self->raw_write($buf);
 }
 
 sub h2_priority {
@@ -105,14 +105,14 @@ sub h2_priority {
 	$stream = 0 unless defined $stream;
 	$dep = 0 unless defined $dep;
 	$dep |= $extra{excl} << 31 if exists $extra{excl};
-	raw_write($self->{socket}, pack("x2C2xNNC", 5, 0x2, $stream, $dep, $w));
+	$self->raw_write(pack("x2C2xNNC", 5, 0x2, $stream, $dep, $w));
 }
 
 sub h2_window {
 	my ($self, $win, $stream) = @_;
 
 	$stream = 0 unless defined $stream;
-	raw_write($self->{socket}, pack("x2C2xNN", 4, 0x8, $stream, $win));
+	$self->raw_write(pack("x2C2xNN", 4, 0x8, $stream, $win));
 }
 
 sub h2_settings {
@@ -121,14 +121,14 @@ sub h2_settings {
 	my $len = 6 * @pairs / 2;
 	my $buf = pack_length($len) . pack "CCx4", 0x4, $ack ? 0x1 : 0x0;
 	$buf .= pack "nN", splice @pairs, 0, 2 while @pairs;
-	raw_write($self->{socket}, $buf);
+	$self->raw_write($buf);
 }
 
 sub h2_unknown {
 	my ($self, $payload) = @_;
 
 	my $buf = pack_length(length($payload)) . pack("Cx5a*", 0xa, $payload);
-	raw_write($self->{socket}, $buf);
+	$self->raw_write($buf);
 }
 
 sub h2_continue {
@@ -167,12 +167,12 @@ sub h2_body {
 
 	$split = ref $extra->{split} && $extra->{split} || [];
 	for (@$split) {
-		raw_write($self->{socket}, substr($buf, 0, $_, ""));
+		$self->raw_write(substr($buf, 0, $_, ""));
 		return if $extra->{abort};
 		select undef, undef, undef, ($extra->{split_delay} || 0.2);
 	}
 
-	raw_write($self->{socket}, $buf);
+	$self->raw_write($buf);
 }
 
 sub new_stream {
@@ -268,12 +268,12 @@ sub new_stream {
 
 	$split = ref $uri->{split} && $uri->{split} || [];
 	for (@$split) {
-		raw_write($self->{socket}, substr($buf, 0, $_, ""));
+		$self->raw_write(substr($buf, 0, $_, ""));
 		goto done if $uri->{abort};
 		select undef, undef, undef, ($uri->{split_delay} || 0.2);
 	}
 
-	raw_write($self->{socket}, $buf);
+	$self->raw_write($buf);
 done:
 	return $self->{last_stream};
 }
@@ -288,7 +288,7 @@ sub read {
 	local $Data::Dumper::Terse = 1;
 
 	while (1) {
-		$buf = raw_read($s, $buf, 9, $wait);
+		$buf = $self->raw_read($buf, 9, $wait);
 		last if length $buf < 9;
 
 		my $length = unpack_length($buf);
@@ -299,7 +299,7 @@ sub read {
 		substr($stream, 0, 1) = 0;
 		$stream = unpack("N", pack("B32", $stream));
 
-		$buf = raw_read($s, $buf, $length + 9, $wait);
+		$buf = $self->raw_read($buf, $length + 9, $wait);
 		last if length($buf) < $length + 9;
 
 		$buf = substr($buf, 9);
@@ -319,6 +319,64 @@ sub read {
 		last unless $extra{all} && test_fin($got[-1], $extra{all});
 	};
 	return \@got;
+}
+
+sub raw_read {
+	my ($self, $buf, $len, $timo) = @_;
+	$timo = 8 unless $timo;
+	my $got = '';
+	my $s = $self->{socket};
+
+	while (length($buf) < $len && IO::Select->new($s)->can_read($timo)) {
+		$s->sysread($got, 16384) or last;
+		log_in($got);
+		$buf .= $got;
+	}
+	return $buf;
+}
+
+sub raw_write {
+	my ($self, $message) = @_;
+
+	if ($self->{chaining}) {
+		return add_chain($self, $message);
+	}
+
+	my $s = $self->{socket};
+
+	local $SIG{PIPE} = 'IGNORE';
+
+	while (IO::Select->new($s)->can_write(0.4)) {
+		log_out($message);
+		my $n = $s->syswrite($message);
+		last unless $n;
+		$message = substr($message, $n);
+		last unless length $message;
+	}
+}
+
+sub start_chain {
+	my ($self) = @_;
+
+	$self->{chaining} = 1;
+}
+
+sub add_chain {
+	my ($self, $buf) = @_;
+
+	if ($self->{chained_buf}) {
+		$self->{chained_buf} .= $buf;
+	} else {
+		$self->{chained_buf} = $buf;
+	}
+}
+
+sub send_chain {
+	my ($self) = @_;
+
+	undef $self->{chaining};
+	$self->raw_write($self->{chained_buf}) if $self->{chained_buf};
+	undef $self->{chained_buf};
 }
 
 ###############################################################################
@@ -380,9 +438,15 @@ sub headers {
 
 sub continuation {
 	my ($ctx, $buf, $len, $flags) = @_;
+	my %payload;
+
 	$ctx->{headers} .= substr($buf, 0, $len);
-	return unless $flags & 0x4;
-	{ headers => hunpack($ctx, $ctx->{headers}, length($ctx->{headers})) };
+	$payload{promised} = $ctx->{promised} if $ctx->{promised};
+	return \%payload unless $flags & 0x4;
+
+	$ctx->{promised} = undef;
+	return { %payload, headers => hunpack($ctx, $ctx->{headers},
+		length($ctx->{headers})) };
 }
 
 sub data {
@@ -406,10 +470,13 @@ sub settings {
 
 sub push_promise {
 	my ($ctx, $buf, $len, $flags) = @_;
+	my %payload;
 	$len -= 4;
 
-	{ promised => unpack("N", $buf),
-	  headers => hunpack($ctx, substr($buf, 4, $len), $len) };
+	$ctx->{promised} = $payload{promised} = unpack("N", $buf);
+	$ctx->{headers} = substr($buf, 4, $len);
+	return \%payload unless $flags & 0x4;
+	return { %payload, headers => hunpack($ctx, $ctx->{headers}, $len) };
 }
 
 sub ping {
@@ -463,33 +530,6 @@ sub unpack_length {
 	unpack 'N', pack 'xc3', unpack 'c3', $_[0];
 }
 
-sub raw_read {
-	my ($s, $buf, $len, $timo) = @_;
-	$timo = 5 unless $timo;
-	my $got = '';
-
-	while (length($buf) < $len && IO::Select->new($s)->can_read($timo)) {
-		$s->sysread($got, 16384) or last;
-		log_in($got);
-		$buf .= $got;
-	}
-	return $buf;
-}
-
-sub raw_write {
-	my ($s, $message) = @_;
-
-	local $SIG{PIPE} = 'IGNORE';
-
-	while (IO::Select->new($s)->can_write(0.4)) {
-		log_out($message);
-		my $n = $s->syswrite($message);
-		last unless $n;
-		$message = substr($message, $n);
-		last unless length $message;
-	}
-}
-
 sub new_socket {
 	my ($port, %extra) = @_;
 	my $npn = $extra{'npn'};
@@ -501,7 +541,7 @@ sub new_socket {
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(2);
+		alarm(8);
 		$s = IO::Socket::INET->new(
 			Proto => 'tcp',
 			PeerAddr => "127.0.0.1:$port",

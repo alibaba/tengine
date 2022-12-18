@@ -14,14 +14,14 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx qw/ :DEFAULT :gzip /;
+use Test::Nginx;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(1)
+my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(2)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -46,6 +46,7 @@ http {
             proxy_pass        http://127.0.0.1:8081;
             proxy_cache       cache;
             proxy_cache_lock  on;
+            proxy_cache_valid 1h;
         }
 
         location /error412 {
@@ -75,6 +76,15 @@ $t->run();
 like(http_match_get('/t.html'), qr//, 'request 412');
 
 $t->todo_alerts();
+
+# in addition, in 1.11.10 .. 1.17.1, if the response was previously
+# cached, such a request resulted in r->cache null pointer dereference
+# in ngx_http_upstream_cache_background_update(), after it was reset
+# during internal redirect
+
+http_get('/t.html');
+
+like(http_match_get('/t.html'), qr//, 'request 412 cached');
 
 ###############################################################################
 

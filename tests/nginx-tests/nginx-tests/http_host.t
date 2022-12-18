@@ -15,14 +15,14 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_content /;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(35);
+my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(37);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -52,10 +52,9 @@ $t->run();
 
 ###############################################################################
 
-
 is(http_host_header('www.abcd-ef.g02.xyz'), 'www.abcd-ef.g02.xyz',
 	'domain w/o port (host header)');
-is(http_host_header('abcd-ef.g02.xyz:8080'), 'abcd-ef.g02.xyz',
+is(http_host_header('abcd-ef.g02.xyz:' . port(8080)), 'abcd-ef.g02.xyz',
 	'domain w/port (host header)');
 
 is(http_absolute_path('abcd-ef.g02.xyz'), 'abcd-ef.g02.xyz',
@@ -170,6 +169,15 @@ is(http_absolute_path(
 is(http_host_header('123.40.56.78:9000:80'), '123.40.56.78',
 	'double port hack');
 
+like(http_host_header("localhost\nHost: again", 1), qr/ 400 /, 'host repeat');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.1');
+
+like(http_host_header("localhost\x02", 1), qr/ 400 /, 'control');
+
+}
+
 ###############################################################################
 
 sub http_host_header {
@@ -179,7 +187,7 @@ GET / HTTP/1.0
 Host: $host
 
 EOF
-	return ($all ? $r : Test::Nginx::http_content($r));
+	return ($all ? $r : http_content($r));
 }
 
 sub http_absolute_path {
@@ -189,5 +197,7 @@ GET http://$host/ HTTP/1.0
 Host: localhost
 
 EOF
-	return ($all ? $r : Test::Nginx::http_content($r));
+	return ($all ? $r : http_content($r));
 }
+
+###############################################################################

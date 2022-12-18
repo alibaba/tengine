@@ -20,18 +20,13 @@ typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
 #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
 #define NGX_DEFAULT_ECDH_CURVE  "auto"
 
-#define NGX_HTTP_NPN_ADVERTISE  "\x08http/1.1"
+#define NGX_HTTP_ALPN_PROTOS    "\x08http/1.1\x08http/1.0\x08http/0.9"
 
 
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
 static int ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn,
     const unsigned char **out, unsigned char *outlen,
     const unsigned char *in, unsigned int inlen, void *arg);
-#endif
-
-#ifdef TLSEXT_TYPE_next_proto_neg
-static int ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
-    const unsigned char **out, unsigned int *outlen, void *arg);
 #endif
 
 static ngx_int_t ngx_http_ssl_static_variable(ngx_http_request_t *r,
@@ -60,6 +55,11 @@ static char *ngx_http_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_ssl_session_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_ssl_ocsp_cache(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
+static char *ngx_http_ssl_conf_command_check(ngx_conf_t *cf, void *post,
+    void *data);
 
 static ngx_int_t ngx_http_ssl_init(ngx_conf_t *cf);
 
@@ -84,9 +84,21 @@ static ngx_conf_enum_t  ngx_http_ssl_verify[] = {
 };
 
 
+static ngx_conf_enum_t  ngx_http_ssl_ocsp[] = {
+    { ngx_string("off"), 0 },
+    { ngx_string("on"), 1 },
+    { ngx_string("leaf"), 2 },
+    { ngx_null_string, 0 }
+};
+
+
 static ngx_conf_deprecated_t  ngx_http_ssl_deprecated = {
     ngx_conf_deprecated, "ssl", "listen ... ssl"
 };
+
+
+static ngx_conf_post_t  ngx_http_ssl_conf_command_post =
+    { ngx_http_ssl_conf_command_check };
 
 
 static ngx_command_t  ngx_http_ssl_commands[] = {
@@ -279,6 +291,27 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, crl),
       NULL },
 
+    { ngx_string("ssl_ocsp"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, ocsp),
+      &ngx_http_ssl_ocsp },
+
+    { ngx_string("ssl_ocsp_responder"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, ocsp_responder),
+      NULL },
+
+    { ngx_string("ssl_ocsp_cache"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_http_ssl_ocsp_cache,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
     { ngx_string("ssl_stapling"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -312,6 +345,20 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, early_data),
+      NULL },
+
+    { ngx_string("ssl_conf_command"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE2,
+      ngx_conf_set_keyval_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, conf_commands),
+      &ngx_http_ssl_conf_command_post },
+
+    { ngx_string("ssl_reject_handshake"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, reject_handshake),
       NULL },
 
       ngx_null_command
@@ -364,6 +411,9 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
     { ngx_string("ssl_ciphers"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_ciphers, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
+    { ngx_string("ssl_curve"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_curve, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
     { ngx_string("ssl_curves"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_curves, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
@@ -379,6 +429,9 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
 
     { ngx_string("ssl_server_name"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_server_name, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_alpn_protocol"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_alpn_protocol, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
     { ngx_string("ssl_client_cert"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_certificate, NGX_HTTP_VAR_CHANGEABLE, 0 },
@@ -489,80 +542,24 @@ ngx_http_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 #endif
         )
     {
-        srv =
-           (unsigned char *) NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-        srvlen = sizeof(NGX_HTTP_V2_ALPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-
+        srv = (unsigned char *) NGX_HTTP_V2_ALPN_PROTO NGX_HTTP_ALPN_PROTOS;
+        srvlen = sizeof(NGX_HTTP_V2_ALPN_PROTO NGX_HTTP_ALPN_PROTOS) - 1;
     } else
 #endif
     {
-        srv = (unsigned char *) NGX_HTTP_NPN_ADVERTISE;
-        srvlen = sizeof(NGX_HTTP_NPN_ADVERTISE) - 1;
+        srv = (unsigned char *) NGX_HTTP_ALPN_PROTOS;
+        srvlen = sizeof(NGX_HTTP_ALPN_PROTOS) - 1;
     }
 
     if (SSL_select_next_proto((unsigned char **) out, outlen, srv, srvlen,
                               in, inlen)
         != OPENSSL_NPN_NEGOTIATED)
     {
-        return SSL_TLSEXT_ERR_NOACK;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "SSL ALPN selected: %*s", (size_t) *outlen, *out);
-
-    return SSL_TLSEXT_ERR_OK;
-}
-
-#endif
-
-
-#ifdef TLSEXT_TYPE_next_proto_neg
-
-static int
-ngx_http_ssl_npn_advertised(ngx_ssl_conn_t *ssl_conn,
-    const unsigned char **out, unsigned int *outlen, void *arg)
-{
-#if (NGX_HTTP_V2 || NGX_DEBUG)
-    ngx_connection_t  *c;
-
-    c = ngx_ssl_get_connection(ssl_conn);
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "SSL NPN advertised");
-#endif
-
-#if (NGX_HTTP_V2)
-    {
-    ngx_http_connection_t  *hc;
-#if (T_NGX_HTTP2_SRV_ENABLE)
-    ngx_http_v2_srv_conf_t *h2scf;
-#endif
-
-    hc = c->data;
-
-#if (T_NGX_HTTP2_SRV_ENABLE)
-    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
-#endif
-
-    if (
-#if (T_NGX_HTTP2_SRV_ENABLE)
-        (
-#endif
-        hc->addr_conf->http2
-#if (T_NGX_HTTP2_SRV_ENABLE)
-        && h2scf->enable != 0) || h2scf->enable == 1
-#endif
-        )
-    {
-        *out =
-            (unsigned char *) NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE;
-        *outlen = sizeof(NGX_HTTP_V2_NPN_ADVERTISE NGX_HTTP_NPN_ADVERTISE) - 1;
-
-        return SSL_TLSEXT_ERR_OK;
-    }
-    }
-#endif
-
-    *out = (unsigned char *) NGX_HTTP_NPN_ADVERTISE;
-    *outlen = sizeof(NGX_HTTP_NPN_ADVERTISE) - 1;
 
     return SSL_TLSEXT_ERR_OK;
 }
@@ -674,6 +671,7 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
      *     sscf->crl = { 0, NULL };
      *     sscf->ciphers = { 0, NULL };
      *     sscf->shm_zone = NULL;
+     *     sscf->ocsp_responder = { 0, NULL };
      *     sscf->stapling_file = { 0, NULL };
      *     sscf->stapling_responder = { 0, NULL };
      */
@@ -687,16 +685,20 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
 #endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
     sscf->early_data = NGX_CONF_UNSET;
+    sscf->reject_handshake = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
     sscf->verify = NGX_CONF_UNSET_UINT;
     sscf->verify_depth = NGX_CONF_UNSET_UINT;
     sscf->certificates = NGX_CONF_UNSET_PTR;
     sscf->certificate_keys = NGX_CONF_UNSET_PTR;
     sscf->passwords = NGX_CONF_UNSET_PTR;
+    sscf->conf_commands = NGX_CONF_UNSET_PTR;
     sscf->builtin_session_cache = NGX_CONF_UNSET;
     sscf->session_timeout = NGX_CONF_UNSET;
     sscf->session_tickets = NGX_CONF_UNSET;
     sscf->session_ticket_keys = NGX_CONF_UNSET_PTR;
+    sscf->ocsp = NGX_CONF_UNSET_UINT;
+    sscf->ocsp_cache_zone = NGX_CONF_UNSET_PTR;
     sscf->stapling = NGX_CONF_UNSET;
     sscf->stapling_verify = NGX_CONF_UNSET;
 
@@ -760,6 +762,7 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          prev->prefer_server_ciphers, 0);
 
     ngx_conf_merge_value(conf->early_data, prev->early_data, 0);
+    ngx_conf_merge_value(conf->reject_handshake, prev->reject_handshake, 0);
 
     ngx_conf_merge_bitmask_value(conf->protocols, prev->protocols,
                          (NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1
@@ -801,6 +804,13 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
+    ngx_conf_merge_ptr_value(conf->conf_commands, prev->conf_commands, NULL);
+
+    ngx_conf_merge_uint_value(conf->ocsp, prev->ocsp, 0);
+    ngx_conf_merge_str_value(conf->ocsp_responder, prev->ocsp_responder, "");
+    ngx_conf_merge_ptr_value(conf->ocsp_cache_zone,
+                         prev->ocsp_cache_zone, NULL);
+
     ngx_conf_merge_value(conf->stapling, prev->stapling, 0);
     ngx_conf_merge_value(conf->stapling_verify, prev->stapling_verify, 0);
     ngx_conf_merge_str_value(conf->stapling_file, prev->stapling_file, "");
@@ -811,64 +821,39 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->enable) {
 
-        if (conf->certificates == NULL
-#if (T_NGX_SSL_NTLS)
-            && conf->enc_certificate.len == 0
-            && conf->sign_certificate.len == 0
-#endif
-        ) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-#if (T_NGX_SSL_NTLS)
-                          "no \"ssl_certificate\", \"ssl_enc_certificate\" or"
-                          " \"ssl_sign_certificate\" is defined for "
-#else
-                          "no \"ssl_certificate\" is defined for "
-#endif
-                          "the \"ssl\" directive in %s:%ui",
-                          conf->file, conf->line);
-            return NGX_CONF_ERROR;
-        }
-#if (T_NGX_SSL_NTLS)
-        if (conf->certificates != NULL) {
-#endif
-        if (conf->certificate_keys == NULL) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "no \"ssl_certificate_key\" is defined for "
-                          "the \"ssl\" directive in %s:%ui",
-                          conf->file, conf->line);
-            return NGX_CONF_ERROR;
-        }
+        if (conf->certificates) {
+            if (conf->certificate_keys == NULL) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_certificate_key\" is defined for "
+                              "the \"ssl\" directive in %s:%ui",
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-        conf->ssl.async_enable = conf->async_enable;
+            conf->ssl.async_enable = conf->async_enable;
 #endif
 
-        if (conf->certificate_keys->nelts < conf->certificates->nelts) {
+            if (conf->certificate_keys->nelts < conf->certificates->nelts) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_certificate_key\" is defined "
+                              "for certificate \"%V\" and "
+                              "the \"ssl\" directive in %s:%ui",
+                              ((ngx_str_t *) conf->certificates->elts)
+                              + conf->certificates->nelts - 1,
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
+
+        } else if (!conf->reject_handshake) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "no \"ssl_certificate_key\" is defined "
-                          "for certificate \"%V\" and "
+                          "no \"ssl_certificate\" is defined for "
                           "the \"ssl\" directive in %s:%ui",
-                          ((ngx_str_t *) conf->certificates->elts)
-                          + conf->certificates->nelts - 1,
                           conf->file, conf->line);
             return NGX_CONF_ERROR;
         }
-#if (T_NGX_SSL_NTLS)
-        }
-#endif
 
-    } else {
+    } else if (conf->certificates) {
 
-        if (conf->certificates == NULL
-#if (T_NGX_SSL_NTLS)
-            && conf->enc_certificate.len == 0
-            && conf->sign_certificate.len == 0
-#endif
-        ) {
-            return NGX_CONF_OK;
-        }
-#if (T_NGX_SSL_NTLS)
-        if (conf->certificates != NULL) {
-#endif
         if (conf->certificate_keys == NULL
             || conf->certificate_keys->nelts < conf->certificates->nelts)
         {
@@ -879,9 +864,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           + conf->certificates->nelts - 1);
             return NGX_CONF_ERROR;
         }
-#if (T_NGX_SSL_NTLS)
-        }
-#endif
+
+    } else if (!conf->reject_handshake) {
+        return NGX_CONF_OK;
     }
 
 #if (T_NGX_SSL_NTLS)
@@ -951,10 +936,12 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     SSL_CTX_set_alpn_select_cb(conf->ssl.ctx, ngx_http_ssl_alpn_select, NULL);
 #endif
 
-#ifdef TLSEXT_TYPE_next_proto_neg
-    SSL_CTX_set_next_protos_advertised_cb(conf->ssl.ctx,
-                                          ngx_http_ssl_npn_advertised, NULL);
-#endif
+    if (ngx_ssl_ciphers(cf, &conf->ssl, &conf->ciphers,
+                        conf->prefer_server_ciphers)
+        != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
 
     if (ngx_http_ssl_compile_certificates(cf, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -976,7 +963,7 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
 #endif
 
-    } else {
+    } else if (conf->certificates) {
 
         /* configure certificates */
 
@@ -1046,6 +1033,23 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
+    if (conf->ocsp) {
+
+        if (conf->verify == 3) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          "\"ssl_ocsp\" is incompatible with "
+                          "\"ssl_verify_client optional_no_ca\"");
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_ssl_ocsp(cf, &conf->ssl, &conf->ocsp_responder, conf->ocsp,
+                         conf->ocsp_cache_zone)
+            != NGX_OK)
+        {
+            return NGX_CONF_ERROR;
+        }
+    }
+
     if (ngx_ssl_dhparam(cf, &conf->ssl, &conf->dhparam) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -1101,6 +1105,10 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
+    if (ngx_ssl_conf_commands(cf, &conf->ssl, conf->conf_commands) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     return NGX_CONF_OK;
 }
 
@@ -1114,10 +1122,10 @@ ngx_http_ssl_compile_certificates(ngx_conf_t *cf,
     ngx_http_complex_value_t          *cv;
     ngx_http_compile_complex_value_t   ccv;
 
-#if (T_NGX_SSL_NTLS)
-    if (conf->certificates == NULL)
+    if (conf->certificates == NULL) {
         return NGX_OK;
-#endif
+    }
+
     cert = conf->certificates->elts;
     key = conf->certificate_keys->elts;
     nelts = conf->certificates->nelts;
@@ -1378,6 +1386,96 @@ invalid:
 }
 
 
+static char *
+ngx_http_ssl_ocsp_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_ssl_srv_conf_t *sscf = conf;
+
+    size_t       len;
+    ngx_int_t    n;
+    ngx_str_t   *value, name, size;
+    ngx_uint_t   j;
+
+    if (sscf->ocsp_cache_zone != NGX_CONF_UNSET_PTR) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (ngx_strcmp(value[1].data, "off") == 0) {
+        sscf->ocsp_cache_zone = NULL;
+        return NGX_CONF_OK;
+    }
+
+    if (value[1].len <= sizeof("shared:") - 1
+        || ngx_strncmp(value[1].data, "shared:", sizeof("shared:") - 1) != 0)
+    {
+        goto invalid;
+    }
+
+    len = 0;
+
+    for (j = sizeof("shared:") - 1; j < value[1].len; j++) {
+        if (value[1].data[j] == ':') {
+            break;
+        }
+
+        len++;
+    }
+
+    if (len == 0) {
+        goto invalid;
+    }
+
+    name.len = len;
+    name.data = value[1].data + sizeof("shared:") - 1;
+
+    size.len = value[1].len - j - 1;
+    size.data = name.data + len + 1;
+
+    n = ngx_parse_size(&size);
+
+    if (n == NGX_ERROR) {
+        goto invalid;
+    }
+
+    if (n < (ngx_int_t) (8 * ngx_pagesize)) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "OCSP cache \"%V\" is too small", &value[1]);
+
+        return NGX_CONF_ERROR;
+    }
+
+    sscf->ocsp_cache_zone = ngx_shared_memory_add(cf, &name, n,
+                                                  &ngx_http_ssl_module_ctx);
+    if (sscf->ocsp_cache_zone == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    sscf->ocsp_cache_zone->init = ngx_ssl_ocsp_cache_init;
+
+    return NGX_CONF_OK;
+
+invalid:
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid OCSP cache \"%V\"", &value[1]);
+
+    return NGX_CONF_ERROR;
+}
+
+
+static char *
+ngx_http_ssl_conf_command_check(ngx_conf_t *cf, void *post, void *data)
+{
+#ifndef SSL_CONF_FLAG_FILE
+    return "is not supported on this platform";
+#else
+    return NGX_CONF_OK;
+#endif
+}
+
+
 static ngx_int_t
 ngx_http_ssl_init(ngx_conf_t *cf)
 {
@@ -1396,17 +1494,28 @@ ngx_http_ssl_init(ngx_conf_t *cf)
 
         sscf = cscfp[s]->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
 
-        if (sscf->ssl.ctx == NULL || !sscf->stapling) {
+        if (sscf->ssl.ctx == NULL) {
             continue;
         }
 
         clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
 
-        if (ngx_ssl_stapling_resolver(cf, &sscf->ssl, clcf->resolver,
+        if (sscf->stapling) {
+            if (ngx_ssl_stapling_resolver(cf, &sscf->ssl, clcf->resolver,
+                                          clcf->resolver_timeout)
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        if (sscf->ocsp) {
+            if (ngx_ssl_ocsp_resolver(cf, &sscf->ssl, clcf->resolver,
                                       clcf->resolver_timeout)
-            != NGX_OK)
-        {
-            return NGX_ERROR;
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
         }
     }
 
@@ -1427,12 +1536,38 @@ ngx_http_ssl_init(ngx_conf_t *cf)
             cscf = addr[a].default_server;
             sscf = cscf->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
 
-            if (sscf->certificates == NULL
+            if (sscf->certificates) {
+                continue;
+            }
+
+            if (!sscf->reject_handshake) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_certificate\" is defined for "
+                              "the \"listen ... ssl\" directive in %s:%ui",
+                              cscf->file_name, cscf->line);
+                return NGX_ERROR;
+            }
+
+            /*
+             * if no certificates are defined in the default server,
+             * check all non-default server blocks
+             */
+
+            cscfp = addr[a].servers.elts;
+            for (s = 0; s < addr[a].servers.nelts; s++) {
+
+                cscf = cscfp[s];
+                sscf = cscf->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
+
+                if (sscf->certificates || sscf->reject_handshake) {
+                    continue;
+                }
+
 #if (T_NGX_SSL_NTLS)
-                && sscf->sign_certificate.len == 0
-                && sscf->enc_certificate.len == 0
-#endif
-            ) {
+                if (sscf->sign_certificate.len > 0 || sscf->enc_certificate.len > 0) {
+                    continue;
+                }
+#endif              
                 ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
 #if (T_NGX_SSL_NTLS)
                               "no \"ssl_certificate\", \"ssl_enc_certificate\" "

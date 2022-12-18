@@ -23,7 +23,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
-	->has(qw/stream stream_upstream_zone stream_upstream_random/)
+	->has(qw/stream stream_upstream_zone stream_upstream_random/)->plan(12)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     upstream u {
         zone z 1m;
         random;
@@ -108,6 +110,8 @@ stream {
         server 127.0.0.1:8082;
     }
 
+    proxy_connect_timeout 2;
+
     server {
         listen      127.0.0.1:8080;
         proxy_pass  u;
@@ -153,8 +157,6 @@ stream {
         proxy_pass  ztwo;
     }
 
-    proxy_connect_timeout 1s;
-
     server {
         listen      127.0.0.1:8091;
         proxy_pass  fail;
@@ -170,7 +172,7 @@ EOF
 
 $t->run_daemon(\&http_daemon, port(8081));
 $t->run_daemon(\&http_daemon, port(8082));
-$t->try_run('no upstream random')->plan(12);
+$t->run();
 
 $t->waitforsocket('127.0.0.1:' . port(8081));
 $t->waitforsocket('127.0.0.1:' . port(8082));
@@ -245,7 +247,8 @@ sub parallel {
 	my @s = map { get($port, $uri, start => 1, sleep => 0.1) } (1 .. $n);
 
 	for (@s) {
-		if (http_end($_) =~ /X-Port: (\d+)/) {
+		my $r = http_end($_);
+		if ($r && $r =~ /X-Port: (\d+)/) {
 			$ports{$1} = 0 unless defined $ports{$1};
 			$ports{$1}++;
 		}

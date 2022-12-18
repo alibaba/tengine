@@ -25,7 +25,7 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
 	->has(qw/http rewrite proxy cache fastcgi auth_basic auth_request/)
-	->plan(19);
+	->plan(20);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -129,6 +129,20 @@ http {
             proxy_cache_valid 1m;
         }
 
+        location /proxy-multi {
+            auth_request /auth-proxy-multi;
+        }
+        location = /auth-proxy-multi {
+            proxy_pass http://127.0.0.1:8080/auth-multi;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+        }
+        location = /auth-multi {
+            add_header WWW-Authenticate foo always;
+            add_header WWW-Authenticate bar always;
+            return 401;
+        }
+
         location /fastcgi {
             auth_request /auth-fastcgi;
         }
@@ -186,6 +200,16 @@ like(http_get('/proxy-cache'), qr/ 404 /, 'proxy auth cached');
 # in case of header_only and hence do not work for us at all.
 
 like(http_post_big('/proxy-double'), qr/ 204 /, 'proxy auth with body read');
+
+# Multiple WWW-Authenticate headers (ticket #485).
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.23.0');
+
+like(http_get('/proxy-multi-auth'), qr/WWW-Authenticate: foo.*bar/s,
+	'multiple www-authenticate headers');
+
+}
 
 SKIP: {
 	eval { require FCGI; };

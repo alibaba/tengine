@@ -40,6 +40,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     proxy_ssl       on;
     proxy_protocol  on;
 

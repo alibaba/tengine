@@ -272,7 +272,8 @@ NGX_WIN32_RC="src/os/win32/nginx.rc"
 
 HTTP_FILE_CACHE_SRCS=src/http/ngx_http_file_cache.c
 
-
+HTTP_HUFF_SRCS="src/http/ngx_http_huff_decode.c
+                src/http/ngx_http_huff_encode.c"
 
 NGX_HTTP_LUA_MODULE=ngx_http_lua_module
 NGX_HTTP_LUA_MODULE_SRCS="modules/ngx_http_lua_module/src/ngx_http_lua_script.c \

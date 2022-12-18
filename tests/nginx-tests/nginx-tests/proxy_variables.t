@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(4)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -52,7 +52,7 @@ http {
 EOF
 
 $t->run_daemon(\&http_daemon, port(8081));
-$t->try_run('upstream_bytes_sent')->plan(4);
+$t->run();
 
 $t->waitforsocket('127.0.0.1:' . port(8081));
 

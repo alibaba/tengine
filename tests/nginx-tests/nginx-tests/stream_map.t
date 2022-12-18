@@ -36,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     map $server_port $x {
         %%PORT_8080%%             literal;
         default                   default;

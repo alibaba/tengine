@@ -40,7 +40,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    log_format test "$bytes_sent $body_bytes_sent";
+    log_format test "$bytes_sent $body_bytes_sent $sent_http_connection";
     access_log %%TESTDIR%%/cc.log test;
 
     server {
@@ -147,9 +147,9 @@ $t->stop();
 
 open my $f, '<', "$d/cc.log" or die "Can't open cc.log: $!";
 
-is($f->getline(), shift (@r) . " 540793\n", 'log - bytes');
-is($f->getline(), shift (@r) . " 22\n", 'log - bytes pipelined');
-like($f->getline(), qr/\d+ 0\n/, 'log - bytes noupgrade');
+is($f->getline(), shift (@r) . " 540793 upgrade\n", 'log - bytes');
+is($f->getline(), shift (@r) . " 22 upgrade\n", 'log - bytes pipelined');
+like($f->getline(), qr/\d+ 0 /, 'log - bytes noupgrade');
 
 ###############################################################################
 

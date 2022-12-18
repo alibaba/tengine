@@ -36,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format  status  $status;
 
     limit_conn_zone  $binary_remote_addr  zone=zone:1m;
@@ -101,10 +103,7 @@ $t->stop();
 is($t->read_file('200.log'), "200\n", 'stream status 200');
 is($t->read_file('400.log'), "400\n", 'stream status 400');
 is($t->read_file('403.log'), "403\n", 'stream status 403');
-SKIP: {
-skip 'Tengine using the /etc/resolv.conf as dns servers default';
 is($t->read_file('500.log'), "500\n", 'stream status 500');
-}
 is($t->read_file('502.log'), "502\n", 'stream status 502');
 is($t->read_file('503.log'), "503\n200\n", 'stream status 503');
 

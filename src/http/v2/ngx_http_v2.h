@@ -13,8 +13,7 @@
 #include <ngx_http.h>
 
 
-#define NGX_HTTP_V2_ALPN_ADVERTISE       "\x02h2"
-#define NGX_HTTP_V2_NPN_ADVERTISE        NGX_HTTP_V2_ALPN_ADVERTISE
+#define NGX_HTTP_V2_ALPN_PROTO           "\x02h2"
 
 #define NGX_HTTP_V2_STATE_BUFFER_SIZE    16
 
@@ -156,6 +155,8 @@ struct ngx_http_v2_connection_s {
 
     ngx_uint_t                       last_sid;
     ngx_uint_t                       last_push;
+
+    time_t                           lingering_time;
 
     unsigned                         closed_nodes:8;
     unsigned                         settings_ack:1;

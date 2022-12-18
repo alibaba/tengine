@@ -24,7 +24,7 @@ use Socket qw/ CRLF /;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_content /;
 
 ###############################################################################
 
@@ -105,28 +105,28 @@ like(http_get('/cache/chunked'), qr/MISS/, 'unfinished chunked');
 
 # make sure there is no final chunk in unfinished responses
 
-like(http_get_11('/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+like(http_get_11('/length'), qr/unfinished.*no-last-chunk/s,
 	'length no final chunk');
-like(http_get_11('/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+like(http_get_11('/chunked'), qr/unfinished.*no-last-chunk/s,
 	'chunked no final chunk');
 
 # but there is final chunk in complete responses
 
-like(http_get_11('/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+like(http_get_11('/length/ok'), qr/finished\x0d\x0a$/s,
 	'length final chunk');
-like(http_get_11('/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+like(http_get_11('/chunked/ok'), qr/finished\x0d\x0a$/s,
 	'chunked final chunk');
 
 # the same with proxy_buffering set to off
 
-like(http_get_11('/un/length'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+like(http_get_11('/un/length'), qr/unfinished.*no-last-chunk/s,
 	'unbuffered length no final chunk');
-like(http_get_11('/un/chunked'), qr/unfinished(?!.*\x0d\x0a?0\x0d\x0a?)/s,
+like(http_get_11('/un/chunked'), qr/unfinished.*no-last-chunk/s,
 	'unbuffered chunked no final chunk');
 
-like(http_get_11('/un/length/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+like(http_get_11('/un/length/ok'), qr/finished\x0d\x0a$/s,
 	'unbuffered length final chunk');
-like(http_get_11('/un/chunked/ok'), qr/finished.*\x0d\x0a?0\x0d\x0a?/s,
+like(http_get_11('/un/chunked/ok'), qr/finished\x0d\x0a$/s,
 	'unbuffered chunked final chunk');
 
 # big responses
@@ -144,7 +144,7 @@ chmod(0000, $t->testdir() . '/proxy_temp');
 my $r = http_get_11('/proxy/big.html', sleep => 0.5);
 
 SKIP: {
-skip 'finished', 1 if length(Test::Nginx::http_content($r)) == 1024 * 1024 + 8;
+skip 'finished', 1 if length($r) == 1024 * 1024 + 8;
 
 like($r, qr/X(?!.*\x0d\x0a?0\x0d\x0a?)/s, 'no proxy temp');
 
@@ -157,12 +157,12 @@ chmod(0700, $t->testdir() . '/proxy_temp');
 sub http_get_11 {
 	my ($uri, %extra) = @_;
 
-	return http(
+	return http_content(http(
 		"GET $uri HTTP/1.1" . CRLF .
 		"Connection: close" . CRLF .
 		"Host: localhost" . CRLF . CRLF,
 		%extra
-	);
+	));
 }
 
 ###############################################################################

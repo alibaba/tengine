@@ -15,7 +15,7 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx qw/ :DEFAULT http_end /;
+use Test::Nginx;
 
 ###############################################################################
 
@@ -23,7 +23,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice rewrite/)
-	->plan(76);
+	->plan(79);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -109,6 +109,8 @@ http {
         listen       127.0.0.1:8081;
         server_name  localhost;
 
+        add_header Accept-Ranges bytes;
+
         location / {
             if ($http_range = "") {
                 set $limit_rate 100;
@@ -128,6 +130,11 @@ my $r;
 
 like(http_get('/cache/nx'), qr/ 404 /, 'not found');
 like(http_get('/cache/t'), qr/ 200 .*0123456789abcdef$/ms, 'no range');
+
+$r = get('/proxy/t', 'Range: bytes=3-4');
+like($r, qr/ 206 /, 'proxy - 206 partial reply');
+like($r, qr/^34$/m, 'proxy - correct content');
+unlike($r, qr/Accept-Ranges/, 'proxy - no original accept-ranges');
 
 $r = get('/cache/t?single', "Range: bytes=0-0");
 like($r, qr/ 206 /, 'single - 206 partial reply');
