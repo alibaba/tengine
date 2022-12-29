@@ -52,14 +52,42 @@ make install
 vnswrr
 =======
 ```
-Syntax: vnswrr
-Default: none
+Syntax: vnswrr [max_init=number]
+Default: —
 Context: upstream
 ```
 
-Enable `vnswrr` load balancing algorithm.
+Enable `vnswrr` load balancing algorithm. 
+
+- max_init
+
+    The max number of virtual node per initialization, to avoid initializing too many virtual nodes in one request.
     
+    In very large clusters, setting this argument can significantly reduce the time overhead of a single request.
+
+```
+http {
+
+    upstream backend {
+        # at most 10 virtual node per initialization
+        vnswrr max_init=10;
+        127.0.0.1 port=81 weight=101;
+        127.0.0.1 port=82 weight=102;
+        127.0.0.1 port=83 weight=103;
+        127.0.0.1 port=84 weight=104;
+        127.0.0.1 port=85 weight=105;
+    }
     
+    server {
+        server_name localhost;
+        
+        location / {
+            proxy_pass http://backend;
+        }
+    }
+}
+```
+
 ## Performance
 
 
