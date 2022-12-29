@@ -52,7 +52,7 @@ make install
 vnswrr
 =======
 ```
-Syntax: vnswrr
+Syntax: vnswrr [max_init=number]
 Default: none
 Context: upstream
 ```
