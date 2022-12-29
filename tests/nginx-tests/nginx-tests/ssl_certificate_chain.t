@@ -97,6 +97,7 @@ commonName = supplied
 
 [ myca_extensions ]
 basicConstraints = critical,CA:TRUE
+subjectAltName = IP:127.0.0.1
 EOF
 
 foreach my $name ('root') {
