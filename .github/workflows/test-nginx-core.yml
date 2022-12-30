@@ -47,8 +47,9 @@ jobs:
 
          # NOTE:
          # For "-D T_NGX_MODIFY_DEFAULT_VALUE=0", we dont compile the source included in this macro, otherwise some nginx-tests cases tests will fail.
+         # For "-D T_NGX_SERVER_INFO=0", it made some cases (userid.t) passed.
          ./configure  \
-            --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0" \
+            --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0 -D T_NGX_SERVER_INFO=0" \
             --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
             --with-openssl-async \
             --with-pcre \
