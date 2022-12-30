@@ -47,8 +47,9 @@ jobs:
 
          # NOTE:
          # For "-D T_NGX_MODIFY_DEFAULT_VALUE=0", we dont compile the source included in this macro, otherwise some nginx-tests cases tests will fail.
+         # For "-D T_NGX_SERVER_INFO=0", it made some cases (userid.t) passed.
          ./configure  \
-            --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0" \
+            --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0 -D T_NGX_SERVER_INFO=0" \
             --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
             --with-openssl-async \
             --with-pcre \
@@ -84,7 +85,6 @@ jobs:
             --add-module=modules/mod_config \
             --add-module=modules/mod_dubbo \
             --add-module=modules/ngx_backtrace_module \
-            --add-module=modules/ngx_debug_pool \
             --add-module=modules/ngx_debug_timer \
             --add-module=modules/ngx_http_concat_module \
             --add-module=modules/ngx_http_footer_filter_module \
@@ -106,6 +106,7 @@ jobs:
             --with-stream_sni \
             --with-openssl-async \
             --with-debug
+            # skip ngx_debug_pool, it modified NGX_MIN_POOL_SIZE, which made some test case failed (http_header_buffers.t)
             # skip tengine upstream keepalive module
             #--without-http_upstream_keepalive_module \
             #--add-module=modules/ngx_http_upstream_keepalive_module \
@@ -119,7 +120,11 @@ jobs:
          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
          TEST_NGINX_UNSAFE: yes
        run: |
+         # prepare perl library for test case
          sudo cpanm --notest SCGI Protocol::WebSocket Net::SSLeay IO::Socket::SSL Cache::Memcached Cache::Memcached::Fast Net::DNS::Nameserver GD > build.log 2>&1 || (cat build.log && exit 1)
+         # fixed http_method.t for tengine proxy_connect module
+         sed -i -e "s+405 Not Allowed(?!.*200 OK)/s, 'connect'+400 Bad Request(?!.*200 OK)/s, 'connect'+" nginx-tests/http_method.t
+         # run cases in nginx-tests
          prove -I nginx-tests/lib nginx-tests/
          # It must be root for some cases.
          sudo groupadd wheel    # for proxy_bind_transparent.t
