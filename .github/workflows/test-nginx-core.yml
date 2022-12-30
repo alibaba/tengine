@@ -84,7 +84,6 @@ jobs:
             --add-module=modules/mod_config \
             --add-module=modules/mod_dubbo \
             --add-module=modules/ngx_backtrace_module \
-            --add-module=modules/ngx_debug_pool \
             --add-module=modules/ngx_debug_timer \
             --add-module=modules/ngx_http_concat_module \
             --add-module=modules/ngx_http_footer_filter_module \
@@ -106,6 +105,7 @@ jobs:
             --with-stream_sni \
             --with-openssl-async \
             --with-debug
+            # skip ngx_debug_pool, it modified NGX_MIN_POOL_SIZE, which made some test case failed (http_header_buffers.t)
             # skip tengine upstream keepalive module
             #--without-http_upstream_keepalive_module \
             #--add-module=modules/ngx_http_upstream_keepalive_module \
