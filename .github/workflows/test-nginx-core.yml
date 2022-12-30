@@ -119,7 +119,11 @@ jobs:
          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
          TEST_NGINX_UNSAFE: yes
        run: |
+         # prepare perl library for test case
          sudo cpanm --notest SCGI Protocol::WebSocket Net::SSLeay IO::Socket::SSL Cache::Memcached Cache::Memcached::Fast Net::DNS::Nameserver GD > build.log 2>&1 || (cat build.log && exit 1)
+         # fixed http_method.t for tengine proxy_connect module
+         sed -i -e "s+405 Not Allowed(?!.*200 OK)/s, 'connect'+400 Bad Request(?!.*200 OK)/s, 'connect'+" nginx-tests/http_method.t
+         # run cases in nginx-tests
          prove -I nginx-tests/lib nginx-tests/
          # It must be root for some cases.
          sudo groupadd wheel    # for proxy_bind_transparent.t

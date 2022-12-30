@@ -2023,7 +2023,7 @@ ngx_http_proxy_connect_post_read_handler(ngx_http_request_t *r)
         if (!pclcf->accept_connect) {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                           "proxy_connect: client sent connect method");
-            return NGX_HTTP_BAD_REQUEST;
+            return NGX_HTTP_NOT_ALLOWED;
         }
 
         /* init ctx */
