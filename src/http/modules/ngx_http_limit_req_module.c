@@ -418,6 +418,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
 #if (T_LIMIT_REQ)
         if (rc == NGX_ERROR || limit->forbid_action.len == 0) {
+            r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED;
+
             return lrcf->status_code;
 
         } else if (limit->forbid_action.data[0] == '@') {
@@ -442,7 +444,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 #else
         r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED;
 
-		return lrcf->status_code;
+        return lrcf->status_code;
 #endif
     }
 
