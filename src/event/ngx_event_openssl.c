@@ -2030,7 +2030,7 @@ ngx_ssl_handshake(ngx_connection_t *c)
 {
     int        n, sslerr;
     ngx_err_t  err;
-	ngx_int_t  rc;
+    ngx_int_t  rc;
 
 #ifdef SSL_READ_EARLY_DATA_SUCCESS
     if (c->ssl->try_early_data) {

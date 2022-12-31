@@ -9,6 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+
 #define NGX_HTTP_LIMIT_REQ_PASSED            1
 #define NGX_HTTP_LIMIT_REQ_DELAYED           2
 #define NGX_HTTP_LIMIT_REQ_REJECTED          3
@@ -440,6 +441,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         return NGX_DONE;
 #else
         r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED;
+
 		return lrcf->status_code;
 #endif
     }

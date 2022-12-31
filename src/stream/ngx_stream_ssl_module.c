@@ -659,7 +659,7 @@ not_match:
 #else
 #ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
 
-int
+static int
 ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 {
     return SSL_TLSEXT_ERR_OK;
@@ -711,7 +711,7 @@ ngx_stream_ssl_alpn_select(ngx_ssl_conn_t *ssl_conn, const unsigned char **out,
 
 #ifdef SSL_R_CERT_CB_ERROR
 
-int
+static int
 ngx_stream_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg)
 {
     ngx_str_t                    cert, key;
@@ -953,8 +953,8 @@ ngx_stream_ssl_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
 
-	ngx_conf_merge_ptr_value(conf->conf_commands, prev->conf_commands, NULL);
-	
+    ngx_conf_merge_ptr_value(conf->conf_commands, prev->conf_commands, NULL);
+
 #if (T_NGX_STREAM_SNI)
     ngx_conf_merge_value(conf->sni_force, prev->sni_force, 0);
 #endif

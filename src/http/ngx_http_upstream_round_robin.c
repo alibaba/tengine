@@ -403,7 +403,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
 
     peers->single = (ur->naddrs == 1);
     peers->number = ur->naddrs;
-	peers->tries = ur->naddrs;
+    peers->tries = ur->naddrs;
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
     peers->init_number = NGX_CONF_UNSET_UINT;
 #endif
