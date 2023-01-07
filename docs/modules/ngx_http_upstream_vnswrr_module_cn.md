@@ -65,12 +65,16 @@ Context: upstream
 
     在超大集群中，设置这个参数可以显著减少单次请求的开销。
 
+    关于`max_init`有两条额外的规则
+    1. 如果`max_init`没有设置或值为`0`，那么它将会被调整为节点数。
+    2. 如果`max_init`大于所有节点的权重之和，那么它将会被调整为所有节点的权重之和。
+
 ```
 http {
 
     upstream backend {
-        # at most 10 virtual node per initialization
-        vnswrr max_init=10;
+        # at most 3 virtual node per initialization
+        vnswrr max_init=3;
         127.0.0.1 port=81 weight=101;
         127.0.0.1 port=82 weight=102;
         127.0.0.1 port=83 weight=103;
