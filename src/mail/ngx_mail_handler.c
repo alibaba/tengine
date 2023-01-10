@@ -710,28 +710,30 @@ ngx_mail_read_command(ngx_mail_session_t *s, ngx_connection_t *c)
     ngx_str_t                  l;
     ngx_mail_core_srv_conf_t  *cscf;
 
-    n = c->recv(c, s->buffer->last, s->buffer->end - s->buffer->last);
+    if (s->buffer->last < s->buffer->end) {
+        
+        n = c->recv(c, s->buffer->last, s->buffer->end - s->buffer->last);
 
-    if (n == NGX_ERROR || n == 0) {
-        ngx_mail_close_connection(c);
-        return NGX_ERROR;
-    }
-
-    if (n > 0) {
-        s->buffer->last += n;
-    }
-
-    if (n == NGX_AGAIN) {
-        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-            ngx_mail_session_internal_server_error(s);
+        if (n == NGX_ERROR || n == 0) {
+            ngx_mail_close_connection(c);
             return NGX_ERROR;
         }
 
-        if (s->buffer->pos == s->buffer->last) {
-            return NGX_AGAIN;
+        if (n > 0) {
+            s->buffer->last += n;
+        }
+
+        if (n == NGX_AGAIN) {
+            if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                ngx_mail_session_internal_server_error(s);
+                return NGX_ERROR;
+            }
+
+            if (s->buffer->pos == s->buffer->last) {
+                return NGX_AGAIN;
+            }
         }
     }
-
     cscf = ngx_mail_get_module_srv_conf(s, ngx_mail_core_module);
 
     rc = cscf->protocol->parse_command(s);
