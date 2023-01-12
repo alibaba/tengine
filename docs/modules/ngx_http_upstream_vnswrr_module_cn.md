@@ -52,14 +52,45 @@ make install
 vnswrr
 =======
 ```
-Syntax: vnswrr
+Syntax: vnswrr [max_init=number]
 Default: none
 Context: upstream
 ```
 
 在upstream里面启用 `vnswrr` 加权轮询算法。
     
+- max_init
+
+    每次初始化虚拟结点的最大数量，避免再一次请求中初始化过多的虚拟节点。
+
+    在超大集群中，设置这个参数可以显著减少单次请求的开销。
+
+    关于`max_init`有两条额外的规则
+    1. 如果`max_init`没有设置或值为`0`，那么它将会被调整为节点数。
+    2. 如果`max_init`大于所有节点的权重之和，那么它将会被调整为所有节点的权重之和。
+
+```
+http {
+
+    upstream backend {
+        # at most 3 virtual node per initialization
+        vnswrr max_init=3;
+        127.0.0.1 port=81 weight=101;
+        127.0.0.1 port=82 weight=102;
+        127.0.0.1 port=83 weight=103;
+        127.0.0.1 port=84 weight=104;
+        127.0.0.1 port=85 weight=105;
+    }
     
+    server {
+        server_name localhost;
+        
+        location / {
+            proxy_pass http://backend;
+        }
+    }
+}
+```
 
 ## 性能数据
 
