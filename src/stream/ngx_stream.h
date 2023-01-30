@@ -65,6 +65,9 @@ typedef struct {
     int                            backlog;
     int                            rcvbuf;
     int                            sndbuf;
+#if (NGX_HAVE_TCP_FASTOPEN)
+    int                            fastopen;
+#endif
     int                            type;
 #if (T_NGX_STREAM_SNI)
     unsigned                       default_server;

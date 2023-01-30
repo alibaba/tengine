@@ -26,7 +26,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite charset gzip/)
-	->plan(147);
+	->plan(144);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -107,32 +107,11 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8084 http2;
-        server_name  localhost;
-
-        http2_recv_timeout 1s;
-        client_header_timeout 1s;
-        send_timeout 1s;
-    }
-
-    server {
-        listen       127.0.0.1:8085 http2;
-        server_name  localhost;
-
-        http2_idle_timeout 1s;
-        client_body_timeout 1s;
-
-        location /proxy2/ {
-            add_header X-Body $request_body;
-            proxy_pass http://127.0.0.1:8081/;
-        }
-    }
-
-    server {
         listen       127.0.0.1:8086 http2;
         server_name  localhost;
 
         send_timeout 1s;
+        lingering_close off;
     }
 
     server {
@@ -141,6 +120,9 @@ http {
 
         client_header_timeout 1s;
         client_body_timeout 1s;
+        lingering_close off;
+
+        location / { }
 
         location /proxy/ {
             proxy_pass http://127.0.0.1:8081/;
@@ -162,25 +144,6 @@ $t->write_file('tbig.html',
 $t->write_file('t2.html', 'SEE-THIS');
 
 ###############################################################################
-
-# Upgrade mechanism
-
-my $r = http(<<EOF);
-GET / HTTP/1.1
-Host: localhost
-Connection: Upgrade, HTTP2-Settings
-Upgrade: h2c
-HTTP2-Settings: AAMAAABkAAQAAP__
-
-EOF
-
-SKIP: {
-skip 'no Upgrade-based negotiation', 2 if $r !~ m!HTTP/1.1 101!;
-
-like($r, qr!Connection: Upgrade!, 'upgrade - connection');
-like($r, qr!Upgrade: h2c!, 'upgrade - token');
-
-}
 
 # SETTINGS
 
@@ -244,40 +207,6 @@ is($frame->{value}, 'SEE-THIS', 'PING payload');
 is($frame->{flags}, 1, 'PING flags ack');
 is($frame->{sid}, 0, 'PING stream');
 
-# timeouts
-
-SKIP: {
-skip 'long tests', 6 unless $ENV{TEST_NGINX_UNSAFE};
-
-push my @s, Test::Nginx::HTTP2->new(port(8084), pure => 1);
-push @s, Test::Nginx::HTTP2->new(port(8084), pure => 1);
-$s[-1]->h2_ping('SEE-THIS');
-push @s, Test::Nginx::HTTP2->new(port(8085), pure => 1);
-push @s, Test::Nginx::HTTP2->new(port(8085), pure => 1);
-$s[-1]->h2_ping('SEE-THIS');
-
-select undef, undef, undef, 2.1;
-
-$frames = (shift @s)->read(all => [{ type => "GOAWAY" }]);
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-ok($frame, 'recv timeout - new connection GOAWAY');
-is($frame->{code}, 1, 'recv timeout - new connection code');
-
-$frames = (shift @s)->read(all => [{ type => "GOAWAY" }]);
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-is($frame, undef, 'recv timeout - idle connection GOAWAY');
-
-$frames = (shift @s)->read(all => [{ type => "GOAWAY" }]);
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-is($frame, undef, 'idle timeout - new connection GOAWAY');
-
-$frames = (shift @s)->read(all => [{ type => "GOAWAY" }]);
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-ok($frame, 'idle timeout - idle connection GOAWAY');
-is($frame->{code}, 0, 'idle timeout - idle connection code');
-
-}
-
 # GOAWAY
 
 Test::Nginx::HTTP2->new()->h2_goaway(0, 0, 5);
@@ -300,9 +229,6 @@ is($frame->{code}, 6, 'GOAWAY invalid length - GOAWAY FRAME_SIZE_ERROR');
 #   An endpoint MUST treat a GOAWAY frame with a stream identifier other
 #   than 0x0 as a connection error (Section 5.4.1) of type PROTOCOL_ERROR.
 
-TODO: {
-local $TODO = 'not yet';
-
 $s = Test::Nginx::HTTP2->new();
 $s->h2_goaway(1, 0, 5, 'foobar');
 $frames = $s->read(all => [{ type => "GOAWAY" }], wait => 0.5);
@@ -310,8 +236,6 @@ $frames = $s->read(all => [{ type => "GOAWAY" }], wait => 0.5);
 ($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
 ok($frame, 'GOAWAY invalid stream - GOAWAY frame');
 is($frame->{code}, 1, 'GOAWAY invalid stream - GOAWAY PROTOCOL_ERROR');
-
-}
 
 # client-initiated PUSH_PROMISE, just to ensure nothing went wrong
 # N.B. other implementation returns zero code, which is not anyhow regulated
@@ -373,6 +297,29 @@ is($frame->{headers}->{'x-header'}, 'X-Foo', 'HEAD - HEADERS header');
 
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 is($frame, undef, 'HEAD - no body');
+
+# CONNECT
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.1');
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ method => 'CONNECT' });
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 405, 'CONNECT - not allowed');
+
+}
+
+# TRACE
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ method => 'TRACE' });
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 405, 'TRACE - not allowed');
 
 # range filter
 
@@ -656,6 +603,23 @@ $frames = $s->read(all => [{ type => 'PING' }]);
 ($frame) = grep { $_->{type} eq "PING" && $_->{flags} & 0x1 } @$frames;
 ok($frame, 'client header timeout - PING');
 
+# partial request header frame received (no field split),
+# the rest of frame is received after client header timeout
+
+$s = Test::Nginx::HTTP2->new(port(8087));
+$sid = $s->new_stream({ path => '/t2.html', split => [20], split_delay => 2.1 });
+$frames = $s->read(all => [{ type => 'RST_STREAM' }]);
+
+($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
+ok($frame, 'client header timeout 2');
+is($frame->{code}, 1, 'client header timeout 2 - protocol error');
+
+$s->h2_ping('SEE-THIS');
+$frames = $s->read(all => [{ type => 'PING' }]);
+
+($frame) = grep { $_->{type} eq "PING" && $_->{flags} & 0x1 } @$frames;
+ok($frame, 'client header timeout 2 - PING');
+
 # partial request body data frame received, the rest is after body timeout
 
 $s = Test::Nginx::HTTP2->new(port(8087));
@@ -672,6 +636,15 @@ $frames = $s->read(all => [{ type => 'PING' }]);
 
 ($frame) = grep { $_->{type} eq "PING" && $_->{flags} & 0x1 } @$frames;
 ok($frame, 'client body timeout - PING');
+
+# partial request body data frame with connection close after body timeout
+
+$s = Test::Nginx::HTTP2->new(port(8087));
+$sid = $s->new_stream({ path => '/proxy/t2.html', body_more => 1 });
+$s->h2_body('TEST', { split => [ 12 ], abort => 1 });
+
+select undef, undef, undef, 1.1;
+undef $s;
 
 # proxied request with logging pristine request header field (e.g., referer)
 
@@ -852,6 +825,7 @@ unlike($lengths, qr/16384 0 16384/, 'SETTINGS ack after queued DATA');
 SKIP: {
 skip 'unsafe socket tests', 4 unless $ENV{TEST_NGINX_UNSAFE};
 
+$s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ path => '/tbig.html' });
 
 $s->h2_window(2**30, $sid);
@@ -1117,29 +1091,14 @@ is($frame->{value}, 'SEE-THIS', 'unknown frame type');
 
 # graceful shutdown with stream waiting on HEADERS payload
 
-my $grace = Test::Nginx::HTTP2->new(port(8084));
+my $grace = Test::Nginx::HTTP2->new(port(8087));
 $grace->new_stream({ split => [ 9 ], abort => 1 });
-
-# graceful shutdown with stream waiting on WINDOW_UPDATE
-
-my $grace2 = Test::Nginx::HTTP2->new(port(8084));
-$sid = $grace2->new_stream({ path => '/t1.html' });
-$grace2->read(all => [{ sid => $sid, length => 2**16 - 1 }]);
 
 # graceful shutdown waiting on incomplete request body DATA frames
 
-my $grace3 = Test::Nginx::HTTP2->new(port(8085));
-$sid = $grace3->new_stream({ path => '/proxy2/t2.html', body_more => 1 });
+my $grace3 = Test::Nginx::HTTP2->new(port(8087));
+$sid = $grace3->new_stream({ path => '/proxy/t2.html', body_more => 1 });
 $grace3->h2_body('TEST', { body_more => 1 });
-
-# partial request body data frame with connection close after body timeout
-
-my $grace4 = Test::Nginx::HTTP2->new(port(8087));
-$sid = $grace4->new_stream({ path => '/proxy/t2.html', body_more => 1 });
-$grace4->h2_body('TEST', { split => [ 12 ], abort => 1 });
-
-select undef, undef, undef, 1.1;
-undef $grace4;
 
 # GOAWAY without awaiting active streams, further streams ignored
 
@@ -1170,7 +1129,7 @@ is($sum, 81, 'GOAWAY with active stream - active stream DATA after GOAWAY');
 
 # GOAWAY - force closing a connection by server with idle or active streams
 
-$s = Test::Nginx::HTTP2->new();
+$s = Test::Nginx::HTTP2->new(port(8086));
 $sid = $s->new_stream();
 $s->read(all => [{ sid => $sid, fin => 1 }]);
 

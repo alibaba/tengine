@@ -37,6 +37,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     server {
         listen            127.0.0.1:8081;
         proxy_bind        127.0.0.2;

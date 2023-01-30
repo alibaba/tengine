@@ -24,7 +24,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http rewrite http_v2 grpc/)
-	->has(qw/upstream_keepalive/);
+	->has(qw/upstream_keepalive/)->plan(146);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -47,9 +47,8 @@ http {
         listen       127.0.0.1:8080 http2;
         server_name  localhost;
 
-        http2_max_field_size 128k;
-        http2_max_header_size 128k;
         http2_body_preread_size 128k;
+        large_client_header_buffers 4 32k;
 
         location / {
             grpc_pass grpc://127.0.0.1:8081;
@@ -91,7 +90,7 @@ http {
 
 EOF
 
-$t->try_run('no grpc')->plan(100);
+$t->run();
 
 ###############################################################################
 
@@ -155,6 +154,23 @@ $frames = $f->{http_end}();
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 cmp_ok($frame->{headers}{'x-connection'}, '>', $c, 'response 2 - connection');
 
+# request body - special last buffer
+
+$f->{http_start}('/SayHello');
+$frames = $f->{data}('Hello', body_more => 1);
+($frame) = grep { $_->{type} eq "DATA" } @$frames;
+is($frame->{data}, 'Hello', 'request body first - DATA');
+is($frame->{length}, 5, 'request body first - DATA length');
+is($frame->{flags}, 0, 'request body first - DATA flags');
+$frames = $f->{data}('');
+($frame) = grep { $_->{type} eq "DATA" } @$frames;
+is($frame->{data}, '', 'special buffer last - DATA');
+is($frame->{length}, 0, 'special buffer last - DATA length');
+is($frame->{flags}, 1, 'special buffer last - DATA flags');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, '200', 'special buffer last - response');
+
 # upstream keepalive
 
 $frames = $f->{http_start}('/KeepAlive');
@@ -172,6 +188,124 @@ $f->{data}('Hello');
 $frames = $f->{http_end}();
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}{'x-connection'}, $c, 'keepalive - connection reuse');
+
+# upstream keepalive
+# pending control frame ack after the response
+
+undef $f;
+$f = grpc();
+
+$frames = $f->{http_start}('/KeepAlive');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{sid}, $sid, 'keepalive 2 - HEADERS sid');
+$f->{data}('Hello');
+$f->{settings}(0, 1 => 4096);
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($c = $frame->{headers}{'x-connection'}, 'keepalive 2 - connection');
+
+$frames = $f->{http_start}('/KeepAlive', reuse => 1);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($frame, 'upstream keepalive reused');
+
+cmp_ok($frame->{sid}, '>', $sid, 'keepalive 2 - HEADERS sid next');
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{'x-connection'}, $c, 'keepalive 2 - connection reuse');
+
+undef $f;
+$f = grpc();
+
+# upstream keepalive
+# grpc filter setting INITIAL_WINDOW_SIZE is inherited in the next stream
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$f->{settings}(0, 1 => 4096);
+$frames = $f->{http_end}(grpc_filter_settings => { 0x4 => 2 });
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($c = $frame->{headers}{'x-connection'}, 'keepalive 3 - connection');
+
+$f->{http_start}('/KeepAlive', reuse => 1);
+$frames = $f->{data_len}('Hello', 2);
+($frame) = grep { $_->{type} eq "DATA" } @$frames;
+is($frame->{data}, 'He', 'grpc filter setting - DATA');
+is($frame->{length}, 2, 'grpc filter setting - DATA length');
+is($frame->{flags}, 0, 'grpc filter setting - DATA flags');
+$f->{settings}(0, 0x4 => 5);
+$frames = $f->{data_len}(undef, 3);
+($frame) = grep { $_->{type} eq "DATA" } @$frames;
+is($frame->{data}, 'llo', 'setting updated - DATA');
+is($frame->{length}, 3, 'setting updated - DATA length');
+is($frame->{flags}, 1, 'setting updated - DATA flags');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{'x-connection'}, $c, 'keepalive 3 - connection reuse');
+
+undef $f;
+$f = grpc();
+
+# upstream keepalive - GOAWAY, current request aborted
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($c = $frame->{headers}{'x-connection'}, 'keepalive 4 - connection');
+
+$f->{http_start}('/KeepAlive', reuse => 1);
+$f->{goaway}(0, 0, 5);
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'keepalive 4 - GOAWAY aborted request');
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+cmp_ok($frame->{headers}{'x-connection'}, '>', $c, 'keepalive 4 - closed');
+
+undef $f;
+$f = grpc();
+
+# upstream keepalive - disabled with a higher GOAWAY Last-Stream-ID
+
+$f->{http_start}('/KeepAlive');
+$f->{goaway}(0, 3, 5);
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($c = $frame->{headers}{'x-connection'}, 'keepalive 5 - GOAWAY next stream');
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+cmp_ok($frame->{headers}{'x-connection'}, '>', $c, 'keepalive 5 - closed');
+
+undef $f;
+$f = grpc();
+
+# upstream keepalive - GOAWAY in grpc filter, current stream aborted
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_end}(grpc_filter_goaway => [0, 0, 5]);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($c = $frame->{headers}{'x-connection'}, 'keepalive 6 - connection');
+($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
+ok($frame, 'keepalive 6 - grpc filter GOAWAY aborted stream');
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_end}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+cmp_ok($frame->{headers}{'x-connection'}, '>', $c, 'keepalive 6 - closed');
+
+undef $f;
+$f = grpc();
 
 # various header compression formats
 
@@ -248,6 +382,20 @@ $frames = $f->{http_err}();
 is($frame->{flags}, 5, 'grpc error - HEADERS flags');
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
 ok(!$frame, 'grpc error - no DATA frame');
+
+# malformed response body length not equal to content-length
+
+$f->{http_start}('/SayHello');
+$f->{data}('Hello');
+$frames = $f->{http_err2}(cl => 42);
+($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
+ok($frame, 'response body less than content-length');
+
+$f->{http_start}('/SayHello');
+$f->{data}('Hello');
+$frames = $f->{http_err2}(cl => 8);
+($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
+ok($frame, 'response body more than content-length');
 
 # continuation from backend, expect parts assembled
 
@@ -331,6 +479,63 @@ $frames = $f->{field_len}(2**15);
 ($frame) = grep { $_->{flags} & 0x4 } @$frames;
 is($frame->{headers}{'x' x 2**15}, 'y' x 2**15, 'long header field 3');
 
+# Intermediary Encapsulation Attacks, malformed header fields
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}(n => 'n:n');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid header name colon');
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}(n => 'NN');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid header name uppercase');
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}(n => "n\nn");
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid header name ctl');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.1');
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}(n => "n n");
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid header name space');
+
+}
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}(v => "v\nv");
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid header value ctl');
+
+# invalid HPACK index
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}('m' => 0);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid index - indexed header');
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}('m' => 1);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid index - with indexing');
+
+$f->{http_start}('/');
+$f->{data}('Hello');
+$frames = $f->{field_bad}('m' => 3);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}{':status'}, 502, 'invalid index - without indexing');
+
 # flow control
 
 $f->{http_start}('/FlowControl');
@@ -377,9 +582,19 @@ $f->{http_start}('/SayPadding');
 $f->{data}('Hello');
 $frames = $f->{http_end}(body_padding => 42);
 ($frame) = grep { $_->{type} eq "DATA" } @$frames;
-is($frame->{data}, 'Hello world', 'response - DATA');
-is($frame->{length}, 11, 'response - DATA length');
-is($frame->{flags}, 0, 'response - DATA flags');
+is($frame->{data}, 'Hello world', 'DATA padding');
+is($frame->{length}, 11, 'DATA padding - length');
+is($frame->{flags}, 0, 'DATA padding - flags');
+
+# DATA padding with Content-Length
+
+$f->{http_start}('/SayPadding');
+$f->{data}('Hello');
+$frames = $f->{http_end}(body_padding => 42, cl => length('Hello world'));
+($frame) = grep { $_->{type} eq "DATA" } @$frames;
+is($frame->{data}, 'Hello world', 'DATA padding cl');
+is($frame->{length}, 11, 'DATA padding cl - length');
+is($frame->{flags}, 0, 'DATA padding cl - flags');
 
 # :authority inheritance
 
@@ -410,12 +625,6 @@ is($frame->{headers}{':path'}, '/SetArgs?1', 'set args len');
 $f->{data}('Hello');
 $f->{http_end}();
 
-$frames = $f->{http_start}('/SetArgs esc');
-($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
-is($frame->{headers}{':path'}, '/SetArgs%20esc', 'uri escape');
-$f->{data}('Hello');
-$f->{http_end}();
-
 $frames = $f->{http_start}('/');
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}{':path'}, '/', 'root index');
@@ -433,6 +642,53 @@ $frames = $f->{http_start}('/', method => 'HEAD');
 is($frame->{headers}{':method'}, 'HEAD', 'method head');
 $f->{data}('Hello');
 $f->{http_end}();
+
+# receiving END_STREAM followed by WINDOW_UPDATE on incomplete request body
+
+$f->{http_start}('/Discard_WU');
+$frames = $f->{discard}();
+(undef, $frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{flags}, 5, 'discard WINDOW_UPDATE - trailers');
+
+# receiving END_STREAM followed by RST_STREAM NO_ERROR
+
+$f->{http_start}('/Discard_NE');
+$frames = $f->{discard}();
+(undef, $frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{flags}, 5, 'discard NO_ERROR - trailers');
+
+# receiving END_STREAM followed by several RST_STREAM NO_ERROR
+
+$f->{http_start}('/Discard_NE3');
+$frames = $f->{discard}();
+(undef, $frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{flags}, undef, 'discard NO_ERROR many - no trailers');
+
+# receiving END_STREAM followed by RST_STREAM CANCEL
+
+$f->{http_start}('/Discard_CNL');
+$frames = $f->{discard}();
+(undef, $frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{flags}, undef, 'discard CANCEL - no trailers');
+
+undef $f;
+$f = grpc();
+
+# upstream keepalive, grpc error
+# receiving END_STREAM followed by RST_STREAM NO_ERROR
+
+$f->{http_start}('/KeepAlive');
+$f->{data}('Hello');
+$frames = $f->{http_err_rst}();
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($frame->{headers}{'grpc-status'}, 'keepalive 3 - grpc error, rst');
+
+$frames = $f->{http_start}('/KeepAlive', reuse => 1);
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+ok($frame, 'keepalive 3 - connection reused');
+
+undef $f;
+$f = grpc();
 
 ###############################################################################
 
@@ -463,17 +719,13 @@ sub grpc {
 			{ name => 'te', value => 'trailers', mode => 2 }]});
 
 		if (!$extra{reuse}) {
-			eval {
-				local $SIG{ALRM} = sub { die "timeout\n" };
-				alarm(5);
+			if (IO::Select->new($server)->can_read(5)) {
+				$client = $server->accept();
 
-				$client = $server->accept() or return;
-
-				alarm(0);
-			};
-			alarm(0);
-			if ($@) {
-				log_in("died: $@");
+			} else {
+				log_in("timeout");
+				# connection could be unexpectedly reused
+				goto reused if $client;
 				return undef;
 			}
 
@@ -486,6 +738,7 @@ sub grpc {
 				pure => 1, preface => "") or return;
 		}
 
+reused:
 		my $frames = $c->read(all => [{ fin => 4 }]);
 
 		if (!$extra{reuse}) {
@@ -514,18 +767,30 @@ sub grpc {
 	$f->{update_sid} = sub {
 		$c->h2_window(shift, $sid);
 	};
+	$f->{settings} = sub {
+		$c->h2_settings(@_);
+	};
+	$f->{goaway} = sub {
+		$c->h2_goaway(@_);
+	};
 	$f->{http_end} = sub {
 		my (%extra) = @_;
-		$c->new_stream({ body_more => 1, %extra, headers => [
+		my $h = [
 			{ name => ':status', value => '200',
 				mode => $extra{mode} || 0 },
 			{ name => 'content-type', value => 'application/grpc',
 				mode => $extra{mode} || 1, huff => 1 },
 			{ name => 'x-connection', value => $n,
-				mode => 2, huff => 1 },
-		]}, $sid);
+				mode => 2, huff => 1 }];
+		push @$h, { name => 'content-length', value => $extra{cl} }
+			if $extra{cl};
+		$c->new_stream({ body_more => 1, headers => $h, %extra }, $sid);
 		$c->h2_body('Hello world', { body_more => 1,
 			body_padding => $extra{body_padding} });
+		$c->h2_settings(0, %{$extra{grpc_filter_settings}})
+			if $extra{grpc_filter_settings};
+		$c->h2_goaway(@{$extra{grpc_filter_goaway}})
+			if $extra{grpc_filter_goaway};
 		$c->new_stream({ headers => [
 			{ name => 'grpc-status', value => '0',
 				mode => 2, huff => 1 },
@@ -533,6 +798,8 @@ sub grpc {
 				mode => 2, huff => 1 },
 		]}, $sid);
 
+		return $s->read(all => [{ type => 'RST_STREAM' }])
+			if $extra{grpc_filter_goaway};
 		return $s->read(all => [{ fin => 1 }]);
 	};
 	$f->{http_pres} = sub {
@@ -577,6 +844,40 @@ sub grpc {
 
 		return $s->read(all => [{ fin => 1 }]);
 	};
+	$f->{http_err_rst} = sub {
+		$c->start_chain();
+		$c->new_stream({ headers => [
+			{ name => ':status', value => '200', mode => 0 },
+			{ name => 'content-type', value => 'application/grpc' },
+			{ name => 'grpc-status', value => '12', mode => 2 },
+			{ name => 'grpc-message', value => 'unknown service',
+				mode => 2 },
+		]}, $sid);
+		$c->h2_rst($sid, 0);
+		$c->send_chain();
+
+		return $s->read(all => [{ fin => 1 }]);
+	};
+	$f->{http_err2} = sub {
+		my %extra = @_;
+		$c->new_stream({ body_more => 1, headers => [
+			{ name => ':status', value => '200', mode => 0 },
+			{ name => 'content-type', value => 'application/grpc',
+				mode => 1, huff => 1 },
+			{ name => 'content-length', value => $extra{cl},
+				mode => 1, huff => 1 },
+		]}, $sid);
+		$c->h2_body('Hello world',
+			{ body_more => 1, body_split => [5] });
+		$c->new_stream({ headers => [
+			{ name => 'grpc-status', value => '0',
+				mode => 2, huff => 1 },
+			{ name => 'grpc-message', value => '',
+				mode => 2, huff => 1 },
+		]}, $sid);
+
+		return $s->read(all => [{ type => 'RST_STREAM' }]);
+	};
 	$f->{continuation} = sub {
 		$c->new_stream({ continuation => 1, body_more => 1, headers => [
 			{ name => ':status', value => '200', mode => 0 },
@@ -618,6 +919,48 @@ sub grpc {
 		]}, $sid);
 
 		return $s->read(all => [{ fin => 1 }]);
+	};
+	$f->{field_bad} = sub {
+		my (%extra) = @_;
+		my $n = defined $extra{'n'} ? $extra{'n'} : 'n';
+		my $v = defined $extra{'v'} ? $extra{'v'} : 'v';
+		my $m = defined $extra{'m'} ? $extra{'m'} : 2;
+		$c->new_stream({ headers => [
+			{ name => ':status', value => '200' },
+			{ name => $n, value => $v, mode => $m },
+		]}, $sid);
+
+		return $s->read(all => [{ fin => 1 }]);
+	};
+	$f->{discard} = sub {
+		my (%extra) = @_;
+		$c->new_stream({ body_more => 1, %extra, headers => [
+			{ name => ':status', value => '200',
+				mode => $extra{mode} || 0 },
+			{ name => 'content-type', value => 'application/grpc',
+				mode => $extra{mode} || 1, huff => 1 },
+			{ name => 'x-connection', value => $n,
+				mode => 2, huff => 1 },
+		]}, $sid);
+		$c->h2_body('Hello world', { body_more => 1,
+			body_padding => $extra{body_padding} });
+
+		# stick trailers and subsequent frames for reproducibility
+
+		$c->start_chain();
+		$c->new_stream({ headers => [
+			{ name => 'grpc-status', value => '0', mode => 2 }
+		]}, $sid);
+		$c->h2_window(42, $sid) if $uri eq '/Discard_WU';
+		$c->h2_rst($sid, 0) if $uri eq '/Discard_NE';
+		$c->h2_rst($sid, 0), $c->h2_rst($sid, 0), $c->h2_rst($sid, 0)
+			if $uri eq '/Discard_NE3';
+		$c->h2_rst($sid, 8) if $uri eq '/Discard_CNL';
+		$c->send_chain();
+
+		return $s->read(all => [{ fin => 1 }], wait => 2)
+			if $uri eq '/Discard_WU' || $uri eq '/Discard_NE';
+		return $s->read(all => [{ type => 'RST_STREAM' }]);
 	};
 	return $f;
 }

@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http xslt/)->plan(5);
+my $t = Test::Nginx->new()->has(qw/http xslt/)->plan(8);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -55,6 +55,10 @@ http {
         location /x4 {
             xslt_stylesheet %%TESTDIR%%/first.xslt;
             xslt_stylesheet %%TESTDIR%%/test.xslt;
+        }
+        location /x5 {
+            xslt_stylesheet %%TESTDIR%%/test.xslt
+                            param1='$server_name';
         }
     }
 }
@@ -102,6 +106,7 @@ $t->write_file('x1', '<empty/>');
 $t->write_file('x2', '<root>data</root>');
 $t->write_file('x3', '<!DOCTYPE root><root>&test;</root>');
 $t->write_file('x4', '<root>data</root>');
+$t->write_file('x5', '<root>data</root>');
 
 $t->run();
 
@@ -113,5 +118,17 @@ like(http_get("/x2"), qr!200 OK.*param1=value1.*param2=data.*param3=value3!ms,
 	'params');
 like(http_get("/x3"), qr!200 OK.*data=test entity!ms, 'entities');
 like(http_get("/x4"), qr!200 OK.*data=other data!ms, 'several stylesheets');
+like(http_get("/x5"), qr!200 OK.*param1=localhost!ms, 'params variable');
+
+# xslt and ranges
+
+unlike(http_get("/x1"), qr!Accept-Ranges!, 'no Accept-Ranges');
+like(http(<<EOF), qr!200 OK.*test xslt result!ms, 'no ranges');
+GET /x1 HTTP/1.1
+Host: localhost
+Connection: close
+Range: bytes=-10
+
+EOF
 
 ###############################################################################

@@ -39,6 +39,7 @@ events {
 
 mail {
     proxy_pass_error_message  on;
+    proxy_timeout  15s;
     auth_http  http://127.0.0.1:8080/mail/auth;
     xclient    off;
 
@@ -46,6 +47,13 @@ mail {
         listen     127.0.0.1:8025;
         protocol   smtp;
         smtp_auth  login plain none cram-md5 external;
+    }
+
+    server {
+        listen     127.0.0.1:8027;
+        protocol   smtp;
+        smtp_auth  none;
+        smtp_client_buffer 128;
     }
 }
 
@@ -90,7 +98,7 @@ http {
 EOF
 
 $t->run_daemon(\&Test::Nginx::SMTP::smtp_test_daemon);
-$t->run()->plan(30);
+$t->run()->plan(41);
 
 $t->waitforsocket('127.0.0.1:' . port(8026));
 
@@ -240,6 +248,55 @@ $s->ok('pipelined mail from');
 $s->ok('pipelined rcpt to');
 $s->ok('pipelined rset');
 
+# Pipelining with split command
+
+$s = Test::Nginx::SMTP->new();
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+
+$s->print('MAIL FROM:<test@example.com> SIZE=100' . CRLF
+	. 'RCPT TO:<test@example.com>' . CRLF
+	. 'RS');
+
+$s->ok('split pipelined mail from');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.0');
+
+$s->ok('split pipelined rcpt to');
+
+}
+
+$s->send('ET');
+$s->ok('split pipelined rset');
+
+# Pipelining longer than smtp_client_buffer
+
+$s = Test::Nginx::SMTP->new(PeerAddr => '127.0.0.1:' . port(8027));
+$s->read();
+$s->send('EHLO example.com');
+$s->read();
+
+$s->send('MAIL FROM:<test@example.com> SIZE=100' . CRLF
+	. 'RCPT TO:<foo@example.com>' . CRLF
+	. 'RCPT TO:<bar@example.com>' . CRLF
+	. 'RCPT TO:<baz@example.com>' . CRLF
+	. 'RCPT TO:<foobar@example.com>' . CRLF
+	. 'RSET');
+
+TODO: {
+todo_skip 'long pipelined - not yet', 6 unless $t->has_version('1.21.0');
+
+$s->ok('long pipelined mail from');
+$s->ok('long pipelined rcpt to');
+$s->ok('long pipelined rcpt to 2');
+$s->ok('long pipelined rcpt to 3');
+$s->ok('long pipelined rcpt to 4');
+$s->ok('long pipelined rset');
+
+}
+
 # Connection must stay even if error returned to rcpt to command
 
 $s = Test::Nginx::SMTP->new();
@@ -262,7 +319,26 @@ $s = Test::Nginx::SMTP->new();
 $s->read();
 
 $s->print('HEL');
+select undef, undef, undef, 0.1;
 $s->send('O example.com');
 $s->ok('split command');
+
+# Invalid command split into many packets
+
+$s = Test::Nginx::SMTP->new();
+$s->read();
+
+$s->print('FOO B');
+select undef, undef, undef, 0.1;
+$s->send('AR');
+$s->check(qr/^5.. /, 'invalid split command');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.0');
+
+$s->send('HELO example.com');
+$s->ok('good after invalid split command');
+
+}
 
 ###############################################################################

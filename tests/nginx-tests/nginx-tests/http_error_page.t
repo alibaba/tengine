@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(7)
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(9)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -61,6 +61,20 @@ http {
 
         location /return302text {
             return 302 "http://example.com/";
+        }
+
+        location /error302return302args {
+            error_page 302 /return302args?1;
+            return 302 "first";
+        }
+
+        location /error302return302varargs {
+            error_page 302 /return302args?$arg_a;
+            return 302 "first";
+        }
+
+        location /return302args {
+            return 302 "http://example.com/$args";
         }
 
         location /error302rewrite {
@@ -115,6 +129,14 @@ like(http_get('/error302redirect'),
 like(http_get('/error302return302text'),
 	qr{HTTP/1.1 302(?!.*Location: first).*Location: http://example.com/}ms,
 	'error 302 return 302 text - old location cleared');
+
+like(http_get('/error302return302args'),
+	qr{HTTP/1.1 302(?!.*Location: first).*Location: http://example.com/1}ms,
+	'error 302 return 302 args - old location cleared');
+
+like(http_get('/error302return302varargs?a=2'),
+	qr{HTTP/1.1 302(?!.*Location: first).*Location: http://example.com/2}ms,
+	'error 302 return 302 var args - old location cleared');
 
 like(http_get('/error302rewrite'),
 	qr{HTTP/1.1 302(?!.*Location: first).*Location: http://example.com/}ms,

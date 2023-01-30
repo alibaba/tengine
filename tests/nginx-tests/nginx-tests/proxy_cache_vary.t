@@ -22,7 +22,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy cache gzip rewrite/)
-	->plan(42)->write_file_expand('nginx.conf', <<'EOF');
+	->plan(52)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -92,6 +92,18 @@ http {
             gzip off;
             add_header Vary ",, Accept-encoding , ,";
         }
+
+        location /multi {
+            gzip off;
+            add_header Vary Accept-Encoding;
+            add_header Vary Foo;
+        }
+
+        location /cold {
+            expires max;
+            add_header Vary $arg_vary;
+            add_header Xtra $arg_xtra;
+        }
     }
 }
 
@@ -100,6 +112,8 @@ EOF
 $t->write_file('index.html', 'SEE-THIS');
 $t->write_file('asterisk', 'SEE-THIS');
 $t->write_file('complex', 'SEE-THIS');
+$t->write_file('multi', 'SEE-THIS');
+$t->write_file('cold', 'SEE-THIS');
 
 $t->run();
 
@@ -248,6 +262,45 @@ like(get('/', 'bar,foo'), qr/HIT/ms, 'normalize order');
 
 }
 
+# Multiple Vary headers (ticket #1423).
+
+like(get('/multi', 'foo'), qr/MISS/ms, 'multi first');
+like(get('/multi', 'foo'), qr/HIT/ms, 'multi second');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.23.0');
+
+like(get('/multi', 'bar'), qr/MISS/ms, 'multi other');
+
+}
+
+# keep c->body_start when Vary changes (ticket #2029)
+
+# before 1.19.3, this prevented updating c->body_start of a main key
+# triggering "cache file .. has too long header" critical errors
+
+get1('/cold?vary=z', 'z:1');
+like(get1('/cold?vary=x,y', 'x:1'), qr/MISS/, 'change first');
+like(get1('/cold?vary=x,y', 'x:1'), qr/HIT/, 'change first cached');
+
+like(get1('/cold?vary=x,y&xtra=1', 'x:2'), qr/MISS/, 'change second');
+like(get1('/cold?vary=x,y&xtra=1', 'x:2'), qr/HIT/, 'change second cached');
+
+$t->stop();
+$t->run();
+
+# reset c->body_start when loading a secondary key variant
+
+# before 1.19.3, it was loaded using a variant stored with a main key
+# triggering "cache file .. has too long header" critical errors
+
+like(get1('/cold?vary=x,y', 'x:1'), qr/HIT/, 'cold first');
+like(get1('/cold?vary=x,y&xtra=1', 'x:2'), qr/HIT/, 'cold second');
+
+$t->stop();
+
+like(`grep -F '[crit]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no crit');
+
 ###############################################################################
 
 sub get {
@@ -257,6 +310,17 @@ GET $url HTTP/1.1
 Host: localhost
 Connection: close
 Accept-Encoding: $extra
+
+EOF
+}
+
+sub get1 {
+	my ($url, $extra) = @_;
+	return http(<<EOF);
+GET $url HTTP/1.1
+Host: localhost
+Connection: close
+$extra
 
 EOF
 }

@@ -12,6 +12,8 @@ use strict;
 
 use Test::More;
 
+use Sys::Hostname;
+
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -35,6 +37,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     server {
         listen  127.0.0.1:8080;
         return  $connection:$nginx_version:$hostname:$pid:$bytes_sent;
@@ -80,7 +84,7 @@ $t->try_run('no inet6 support')->plan(8);
 
 ###############################################################################
 
-chomp(my $hostname = lc `hostname`);
+my $hostname = lc hostname();
 like(stream('127.0.0.1:' . port(8080))->read(),
 	qr/^\d+:[\d.]+:$hostname:\d+:0$/, 'vars');
 

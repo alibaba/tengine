@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format status $status;
 
     map $ssl_preread_server_name $name {

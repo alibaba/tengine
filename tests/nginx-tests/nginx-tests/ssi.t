@@ -22,7 +22,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http ssi cache proxy rewrite/)
-	->plan(27);
+	->plan(30);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -90,6 +90,15 @@ $t->write_file('test2.html',
 	'X<!--#include virtual="/test1.html?test=test" -->X');
 $t->write_file('test3.html',
 	'X<!--#set var="blah" value="test" --><!--#echo var="blah" -->X');
+$t->write_file('test4-echo-none.html',
+	'X<!--#set var="blah" value="<test>" -->'
+	. '<!--#echo var="blah" encoding="none" -->X');
+$t->write_file('test5-echo-url.html',
+	'X<!--#set var="blah" value="<test>" -->'
+	. '<!--#echo var="blah" encoding="url" -->X');
+$t->write_file('test6-echo-entity.html',
+	'X<!--#set var="blah" value="<test>" -->'
+	. '<!--#echo var="blah" encoding="entity" -->X');
 $t->write_file('test-args-rewrite.html',
 	'X<!--#include virtual="/check?found" -->X');
 $t->write_file('test-empty1.html', 'X<!--#include virtual="/empty.html" -->X');
@@ -135,6 +144,20 @@ like(http_get('/test1.html?atest=a&testb=b&ctestc=c&test=test'), qr/^XtestX$/m,
 like(http_get('/test2.html'), qr/^XXtestXX$/m, 'argument via include');
 
 like(http_get('/test3.html'), qr/^XtestX$/m, 'set');
+
+like(http_get('/test4-echo-none.html'), qr/^X<test>X$/m,
+	'echo encoding none');
+
+TODO: {
+local $TODO = 'no strict URI escaping yet' unless $t->has_version('1.21.1');
+
+like(http_get('/test5-echo-url.html'), qr/^X%3Ctest%3EX$/m,
+	'echo encoding url');
+
+}
+
+like(http_get('/test6-echo-entity.html'), qr/^X&lt;test&gt;X$/m,
+	'echo encoding entity');
 
 # args should be in subrequest even if original request has no args and that
 # was queried somehow (e.g. by server rewrites)

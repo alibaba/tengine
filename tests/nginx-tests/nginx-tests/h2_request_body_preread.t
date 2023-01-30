@@ -37,7 +37,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    limit_req_zone   $binary_remote_addr  zone=req:1m rate=30r/m;
+    limit_req_zone   $binary_remote_addr  zone=req:1m rate=20r/m;
 
     server {
         listen       127.0.0.1:8080 http2;
@@ -89,7 +89,7 @@ http {
 EOF
 
 $t->write_file('t', '');
-$t->run()->plan(8);
+$t->run()->plan(9);
 
 ###############################################################################
 
@@ -128,6 +128,21 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{'x-body'}, 'TEST', 'within preread limited');
+
+# processing request body without END_STREAM in preread
+
+$sid = $s->new_stream({ path => '/req', body_more => 1, continuation => 1 });
+$s->h2_continue($sid,
+	{ headers => [{ name => 'content-length', value => '8' }]});
+
+$s->h2_body('SEE', { body_more => 1 });
+$s->read(all => [{ type => 'WINDOW_UPDATE' }]);
+
+$s->h2_body('-THIS');
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{'x-body'}, 'SEE-THIS', 'within preread limited - more');
 
 # beyond preread size - limited
 

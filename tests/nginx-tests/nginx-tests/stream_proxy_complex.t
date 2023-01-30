@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     upstream %%PORT_8081%% {
         server 127.0.0.1:8091;
     }

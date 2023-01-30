@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(10);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(18);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -64,6 +64,10 @@ http {
             client_body_in_single_buffer on;
             add_header X-Body "$request_body";
             add_header X-Body-File "$request_body_file";
+            proxy_pass http://127.0.0.1:8081;
+        }
+        location /large {
+            client_max_body_size 1k;
             proxy_pass http://127.0.0.1:8081;
         }
         location /discard {
@@ -114,6 +118,8 @@ like(read_body_file(http_get_body('/b', '0123456789' x 512)),
 like(http_get_body('/single', '0123456789' x 128),
 	qr/X-Body: (0123456789){128}\x0d?$/ms, 'body in single buffer');
 
+like(http_get_body('/large', '0123456789' x 128), qr/ 413 /, 'body too large');
+
 # pipelined requests
 
 like(http_get_body('/', '0123456789', '0123456789' x 128, '0123456789' x 512,
@@ -128,10 +134,65 @@ like(http_get_body('/discard', '0123456789' x 128, '0123456789' x 512,
 	'0123456789', 'foobar'), qr/(TEST.*){4}/ms,
 	'chunked body discard 2');
 
+# invalid chunks
+
+like(
+	http(
+		'GET / HTTP/1.1' . CRLF
+		. 'Host: localhost' . CRLF
+		. 'Connection: close' . CRLF
+		. 'Transfer-Encoding: chunked' . CRLF . CRLF
+		. '4' . CRLF
+		. 'SEE-THIS' . CRLF
+		. '0' . CRLF . CRLF
+	),
+	qr/400 Bad/, 'runaway chunk'
+);
+
+like(
+	http(
+		'GET /discard HTTP/1.1' . CRLF
+		. 'Host: localhost' . CRLF
+		. 'Connection: close' . CRLF
+		. 'Transfer-Encoding: chunked' . CRLF . CRLF
+		. '4' . CRLF
+		. 'SEE-THIS' . CRLF
+		. '0' . CRLF . CRLF
+	),
+	qr/400 Bad/, 'runaway chunk discard'
+);
+
 # proxy_next_upstream
 
 like(http_get_body('/next', '0123456789'),
 	qr/X-Body: 0123456789\x0d?$/ms, 'body chunked next upstream');
+
+# invalid Transfer-Encoding
+
+like(http_transfer_encoding('identity'), qr/501 Not Implemented/,
+	'transfer encoding identity');
+
+like(http_transfer_encoding("chunked\nTransfer-Encoding: chunked"),
+	qr/400 Bad/, 'transfer encoding repeat');
+
+like(http_transfer_encoding('chunked, identity'), qr/501 Not Implemented/,
+	'transfer encoding list');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.1');
+
+like(http_transfer_encoding("chunked\nContent-Length: 5"), qr/400 Bad/,
+	'transfer encoding with content-length');
+
+}
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.2');
+
+like(http_transfer_encoding("chunked", "1.0"), qr/400 Bad/,
+	'transfer encoding in HTTP/1.0 requests');
+
+}
 
 ###############################################################################
 
@@ -166,6 +227,17 @@ sub http_get_body {
 		. $last . CRLF
 		. "0" . CRLF . CRLF
 	);
+}
+
+sub http_transfer_encoding {
+	my ($encoding, $version) = @_;
+	$version ||= "1.1";
+
+	http("GET / HTTP/$version" . CRLF
+		. "Host: localhost" . CRLF
+		. "Connection: close" . CRLF
+		. "Transfer-Encoding: $encoding" . CRLF . CRLF
+		. "0" . CRLF . CRLF);
 }
 
 ###############################################################################

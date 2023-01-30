@@ -12,8 +12,6 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ :DEFAULT $CRLF /;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -35,8 +33,11 @@ eval {
 };
 plan(skip_all => 'Net::SSLeay not installed') if $@;
 
+eval { exists &Net::SSLeay::P_alpn_selected or die; };
+plan(skip_all => 'Net::SSLeay with OpenSSL ALPN support required') if $@;
+
 my $t = Test::Nginx->new()->has(qw/mail mail_ssl imap pop3 smtp/)
-	->has_daemon('openssl')->plan(20);
+	->has_daemon('openssl')->plan(22);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -213,6 +214,25 @@ like(Net::SSLeay::dump_peer_certificate($ssl), qr/CN=localhost/, 'CN');
 ($s, $ssl) = get_ssl_socket(8148);
 like(Net::SSLeay::dump_peer_certificate($ssl), qr/CN=inherits/, 'CN inner');
 
+# alpn
+
+ok(get_ssl_socket(8148, undef, ['imap']), 'alpn');
+
+SKIP: {
+$t->{_configure_args} =~ /LibreSSL ([\d\.]+)/;
+skip 'LibreSSL too old', 1 if defined $1 and $1 lt '3.4.0';
+$t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
+skip 'OpenSSL too old', 1 if defined $1 and $1 lt '1.1.0';
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.4');
+
+ok(!get_ssl_socket(8148, undef, ['unknown']), 'alpn rejected');
+
+}
+
+}
+
 # starttls imap
 
 $s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8149));
@@ -294,19 +314,14 @@ $s->ok('smtp starttls only');
 ###############################################################################
 
 sub get_ssl_socket {
-	my ($port, $ses) = @_;
-	my $s;
+	my ($port, $ses, $alpn) = @_;
 
-	my $dest_ip = inet_aton('127.0.0.1');
-	my $dest_serv_params = sockaddr_in(port($port), $dest_ip);
-
-	socket($s, &AF_INET, &SOCK_STREAM, 0) or die "socket: $!";
-	connect($s, $dest_serv_params) or die "connect: $!";
-
+	my $s = IO::Socket::INET->new('127.0.0.1:' . port($port));
 	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
 	Net::SSLeay::set_session($ssl, $ses) if defined $ses;
+	Net::SSLeay::set_alpn_protos($ssl, $alpn) if defined $alpn;
 	Net::SSLeay::set_fd($ssl, fileno($s));
-	Net::SSLeay::connect($ssl) or die("ssl connect");
+	Net::SSLeay::connect($ssl) == 1 or return;
 	return ($s, $ssl);
 }
 

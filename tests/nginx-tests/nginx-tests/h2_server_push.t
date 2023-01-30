@@ -23,7 +23,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite gzip/)->plan(42)
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite gzip/)->plan(54)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -103,6 +103,11 @@ http {
 
         location /arg {
             http2_push $arg_push;
+            return 204;
+        }
+
+        location /continuation {
+            http2_push /push?arg="$args$args$args$args";
             return 204;
         }
 
@@ -409,9 +414,6 @@ gunzip_like($frame->{data}, qr/^PROMISED\Z/, 'gzip - response');
 
 # scheme https
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.1');
-
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
 	{ name => ':method', value => 'GET', mode => 0 },
@@ -423,7 +425,29 @@ $frames = $s->read(all => [{ sid => 2, fin => 1 }]);
 ($frame) = grep { $_->{type} eq "PUSH_PROMISE" && $_->{sid} == $sid } @$frames;
 is($frame->{headers}->{':scheme'}, 'https', 'scheme https');
 
-}
+# CONTINUATION
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ path => '/continuation?x=' . ('X' x 4096) });
+$frames = $s->read(all => [{ sid => 1, fin => 1 }, { sid => 2, fin => 1 }]);
+
+@$frames = grep { $_->{promised} } @$frames;
+is(@$frames, 2, 'continuation - frames');
+
+$frame = shift @$frames;
+is($frame->{type}, 'PUSH_PROMISE', 'continuation - PUSH_PROMISE');
+is($frame->{length}, 16384, 'continuation - PUSH_PROMISE length');
+is($frame->{flags}, 0, 'continuation - PUSH_PROMISE flags');
+is($frame->{sid}, $sid, 'continuation - PUSH_PROMISE sid');
+is($frame->{promised}, 2, 'continuation - promised stream');
+
+$frame = shift @$frames;
+is($frame->{type}, 'CONTINUATION', 'continuation - CONTINUATION');
+is($frame->{flags}, 4, 'continuation - CONTINUATION flags');
+is($frame->{headers}->{':authority'}, 'localhost', 'continuation - authority');
+is($frame->{headers}->{':scheme'}, 'http', 'continuation - scheme');
+is($frame->{headers}->{':method'}, 'GET', 'continuation - method');
+like($frame->{headers}->{':path'}, qr!^/push!, 'continuation - path');
 
 ###############################################################################
 

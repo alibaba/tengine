@@ -1456,6 +1456,9 @@ ngx_http_v2_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
     size = 0;
 #endif
 
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                   "http2 send chain: %p", in);
+
     while (in) {
         size = ngx_buf_size(in->buf);
 
@@ -1474,12 +1477,8 @@ ngx_http_v2_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
             return NGX_CHAIN_ERROR;
         }
 
-        if (stream->queued) {
-            fc->write->active = 1;
-            fc->write->ready = 0;
-
-        } else {
-            fc->buffered &= ~NGX_HTTP_V2_BUFFERED;
+        if (ngx_http_v2_filter_send(fc, stream) == NGX_ERROR) {
+            return NGX_CHAIN_ERROR;
         }
 
         return NULL;
@@ -1488,9 +1487,16 @@ ngx_http_v2_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
     h2c = stream->connection;
 
     if (size && ngx_http_v2_flow_control(h2c, stream) == NGX_DECLINED) {
-        fc->write->active = 1;
-        fc->write->ready = 0;
-        return in;
+
+        if (ngx_http_v2_filter_send(fc, stream) == NGX_ERROR) {
+            return NGX_CHAIN_ERROR;
+        }
+
+        if (ngx_http_v2_flow_control(h2c, stream) == NGX_DECLINED) {
+            fc->write->active = 1;
+            fc->write->ready = 0;
+            return in;
+        }
     }
 
     if (in->buf->tag == (ngx_buf_tag_t) &ngx_http_v2_filter_get_shadow) {
@@ -1833,6 +1839,11 @@ ngx_http_v2_waiting_queue(ngx_http_v2_connection_t *h2c,
 static ngx_inline ngx_int_t
 ngx_http_v2_filter_send(ngx_connection_t *fc, ngx_http_v2_stream_t *stream)
 {
+    if (stream->queued == 0) {
+        fc->buffered &= ~NGX_HTTP_V2_BUFFERED;
+        return NGX_OK;
+    }
+
     stream->blocked = 1;
 
     if (ngx_http_v2_send_output_queue(stream->connection) == NGX_ERROR) {

@@ -37,6 +37,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     geo $geo {
         127.0.0.0/8   loopback;
         192.0.2.0/24  test;

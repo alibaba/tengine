@@ -212,7 +212,8 @@ is($im->interlaced, 0, 'gif interlaced off');
 is($im->transparent, 0, 'gif transparent white');
 
 SKIP: {
-skip 'broken libgd', 1 unless has_gdversion('2.1.0') or $ENV{TEST_NGINX_UNSAFE};
+skip 'broken/unknown libgd', 1
+	unless has_gdversion('2.1.0') or $ENV{TEST_NGINX_UNSAFE};
 
 $im = GD::Image->newFromGifData(http_get_body('/interlaced/gif'));
 is($im->interlaced, 1, 'gif interlaced on');
@@ -279,8 +280,9 @@ sub http_get_body {
 sub has_gdversion {
 	my ($need) = @_;
 
-	my $v_str = `gdlib-config --version 2>&1` or return 1;
-	($v_str) = $v_str =~ m!^([0-9.]+)! or return 1;
+	my $v_str = `gdlib-config --version 2>&1`
+		|| eval { GD::VERSION_STRING() } or return 0;
+	($v_str) = $v_str =~ m!^([0-9.]+)!m or return 0;
 	my @v = split(/\./, $v_str);
 	my ($n, $v);
 

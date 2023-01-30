@@ -44,8 +44,6 @@ http {
             add_trailer X-Var $host;
         }
 
-        http2_max_field_size 256k;
-
         location /continuation {
             # many trailers to send in parts
             add_trailer X-LongHeader $arg_h;
@@ -108,7 +106,7 @@ is($frame->{flags}, 5, 'no data - trailer flags');
 # CONTINUATION in response trailers
 
 $s = Test::Nginx::HTTP2->new();
-$sid = $s->new_stream({ path => '/continuation?h=' . 'x' x 2**12 });
+$sid = $s->new_stream({ path => '/continuation?h=' . 'x' x 4000 });
 $frames = $s->read(all => [{ sid => $sid, type => 'CONTINUATION' }]);
 @$frames = grep { $_->{type} =~ "HEADERS|CONTINUATION|DATA" } @$frames;
 

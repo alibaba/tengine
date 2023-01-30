@@ -84,7 +84,7 @@ sub read {
 	$s = $self->{_socket};
 
 	$s->blocking(0);
-	if (IO::Select->new($s)->can_read($extra{read_timeout} || 5)) {
+	if (IO::Select->new($s)->can_read($extra{read_timeout} || 8)) {
 		$s->sysread($buf, 1024);
 	};
 

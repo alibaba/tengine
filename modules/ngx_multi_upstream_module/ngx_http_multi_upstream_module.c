@@ -452,9 +452,6 @@ ngx_http_multi_upstream_init_connection(ngx_connection_t *c,
     fake_u->peer.connection = c;
 #if (NGX_HAVE_FILE_AIO || NGX_COMPAT)
     fake_u->output.aio_handler = u->output.aio_handler;
-#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
-    fake_u->output.aio_preload = u->output.aio_preload;
-#endif
 #endif
 
 #if (NGX_THREADS || NGX_COMPAT)

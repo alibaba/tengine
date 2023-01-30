@@ -13,12 +13,10 @@ use strict;
 
 use Test::More;
 
-use Config;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_content /;
 
 ###############################################################################
 
@@ -67,7 +65,23 @@ system('ffmpeg -nostdin -loglevel quiet -y '
 	. "${\($t->testdir())}/no_mdat.mp4") == 0
 	or die "Can't create mp4 file: $!";
 
-$t->run()->plan(26);
+my $sbad = <<'EOF';
+00000000:  00 00 00 1c 66 74 79 70  69 73 6f 6d 00 00 02 00  |....ftypisom....|
+00000010:  69 73 6f 6d 69 73 6f 32  6d 70 34 31 00 00 00 09  |isomiso2mp41....|
+00000020:  6d 64 61 74 00 00 00 00  94 6d 6f 6f 76 00 00 00  |mdat.....moov...|
+00000030:  8c 74 72 61 6b 00 00 00  84 6d 64 69 61 00 00 00  |.trak....mdia...|
+00000040:  7c 6d 69 6e 66 00 00 00  74 73 74 62 6c 00 00 00  ||minf...tstbl...|
+00000050:  18 73 74 74 73 00 00 00  00 00 00 00 01 00 00 03  |.stts...........|
+00000060:  3a 00 00 04 00 00 00 00  28 73 74 73 63 00 00 00  |:.......(stsc...|
+00000070:  00 00 00 00 02 00 00 00  01 00 00 03 0f 00 00 00  |................|
+00000080:  01 00 00 00 02 00 00 00  2b 00 00 00 01 00 00 00  |........+.......|
+00000090:  14 73 74 73 7a 00 00 00  00 00 00 05 a9 00 00 03  |.stsz...........|
+000000a0:  3b 00 00 00 18 63 6f 36  34 00 00 00 00 00 00 00  |;....co64.......|
+000000b0:  01 ff ff ff ff f0 0f fb  e7                       |.........|
+EOF
+
+$t->write_file('bad.mp4', unhex($sbad));
+$t->run()->plan(27);
 
 ###############################################################################
 
@@ -101,6 +115,10 @@ like(http_head("$test_uri?start=21"), qr!HTTP/1.1 500!, 'start beyond EOF');
 
 $test_uri = '/no_mdat.mp4', goto again unless $test_uri eq '/no_mdat.mp4';
 
+# corrupted formats
+
+like(http_get("/bad.mp4?start=0.5"), qr/500 Internal/, 'co64 chunk beyond EOF');
+
 ###############################################################################
 
 sub durations {
@@ -118,11 +136,24 @@ sub durations {
 		$uri .= "?end=$end";
 	}
 
-	$t->write_file('frag.mp4', Test::Nginx::http_content(http_get($uri)));
+	$t->write_file('frag.mp4', http_content(http_get($uri)));
 
 	my $r = `ffprobe -show_streams $path 2>/dev/null`;
 	Test::Nginx::log_core('||', $r);
 	sprintf "%.1f %.1f", $r =~ /duration=(\d+\.\d+)/g;
+}
+
+sub unhex {
+	my ($input) = @_;
+	my $buffer = '';
+
+	for my $l ($input =~ m/:  +((?:[0-9a-f]{2,4} +)+) /gms) {
+		for my $v ($l =~ m/[0-9a-f]{2}/g) {
+			$buffer .= chr(hex($v));
+		}
+	}
+
+	return $buffer;
 }
 
 ###############################################################################

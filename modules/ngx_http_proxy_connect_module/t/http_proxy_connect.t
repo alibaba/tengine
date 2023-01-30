@@ -171,7 +171,7 @@ like(http_connect_request('www.no-dns-reply.com', '80', '/'), qr/502/, '200 Conn
 like(http_connect_request('127.0.0.1', '9999', '/'), qr/403/, '200 Connection Established not allowed port');
 like(http_get('/'), qr/backend server/, 'Get method: proxy_pass');
 like(http_get('/hello'), qr/world/, 'Get method: return 200');
-like(http_connect_request('forbidden.example.com', '8080', '/'), qr/400 Bad Request/, 'forbid CONNECT request without proxy_connect command enabled');
+like(http_connect_request('forbidden.example.com', '8080', '/'), qr/405 Not Allowed/, 'forbid CONNECT request without proxy_connect command enabled');
 
 # proxy_remote_address directive supports dynamic domain resolving.
 like(http_connect_request('proxy-remote-address-resolve-domain.com', '8081', '/'),

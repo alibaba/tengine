@@ -11,9 +11,10 @@
 
 
 static ngx_int_t ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all);
-#if (!T_NGX_ACCEPT_FILTER)
-static void ngx_close_accepted_connection(ngx_connection_t *c);
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+static void ngx_reorder_accept_events(ngx_listening_t *ls);
 #endif
+static void ngx_close_accepted_connection(ngx_connection_t *c);
 
 
 void
@@ -261,6 +262,8 @@ ngx_event_accept(ngx_event_t *ev)
 
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
+        c->start_time = ngx_current_msec;
+
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_handled, 1);
 #endif
@@ -333,6 +336,10 @@ ngx_event_accept(ngx_event_t *ev)
         }
 
     } while (ev->available);
+
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+    ngx_reorder_accept_events(ls);
+#endif
 }
 
 
@@ -447,10 +454,58 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
 }
 
 
-#if (!T_NGX_ACCEPT_FILTER)
-static
+#if (NGX_HAVE_EPOLLEXCLUSIVE)
+
+static void
+ngx_reorder_accept_events(ngx_listening_t *ls)
+{
+    ngx_connection_t  *c;
+
+    /*
+     * Linux with EPOLLEXCLUSIVE usually notifies only the process which
+     * was first to add the listening socket to the epoll instance.  As
+     * a result most of the connections are handled by the first worker
+     * process.  To fix this, we re-add the socket periodically, so other
+     * workers will get a chance to accept connections.
+     */
+
+    if (!ngx_use_exclusive_accept) {
+        return;
+    }
+
+#if (NGX_HAVE_REUSEPORT)
+
+    if (ls->reuseport) {
+        return;
+    }
+
 #endif
-void
+
+    c = ls->connection;
+
+    if (c->requests++ % 16 != 0
+        && ngx_accept_disabled <= 0)
+    {
+        return;
+    }
+
+    if (ngx_del_event(c->read, NGX_READ_EVENT, NGX_DISABLE_EVENT)
+        == NGX_ERROR)
+    {
+        return;
+    }
+
+    if (ngx_add_event(c->read, NGX_READ_EVENT, NGX_EXCLUSIVE_EVENT)
+        == NGX_ERROR)
+    {
+        return;
+    }
+}
+
+#endif
+
+
+static void
 ngx_close_accepted_connection(ngx_connection_t *c)
 {
     ngx_socket_t  fd;
