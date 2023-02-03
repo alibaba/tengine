@@ -2559,8 +2559,10 @@ ngx_http_uwsgi_set_ssl(ngx_conf_t *cf, ngx_http_uwsgi_loc_conf_t *uwcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, uwcf->upstream.ssl, &uwcf->enc_certificate,
-                                &uwcf->enc_certificate_key, uwcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, uwcf->upstream.ssl,
+                                &uwcf->upstream.ssl_certificate->value,
+                                &uwcf->upstream.ssl_certificate_key->value,
+                                uwcf->upstream.ssl_passwords,
                                 SSL_ENC_CERT)
             != NGX_OK)
         {
@@ -2577,8 +2579,10 @@ ngx_http_uwsgi_set_ssl(ngx_conf_t *cf, ngx_http_uwsgi_loc_conf_t *uwcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, uwcf->upstream.ssl, &uwcf->sign_certificate,
-                                &uwcf->sign_certificate_key, uwcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, uwcf->upstream.ssl,
+                                &uwcf->upstream.ssl_certificate->value,
+                                &uwcf->upstream.ssl_certificate_key->value,
+                                uwcf->upstream.ssl_passwords,
                                 SSL_SIGN_CERT)
             != NGX_OK)
         {

@@ -5015,8 +5015,10 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, glcf->upstream.ssl, &glcf->enc_certificate,
-                                &glcf->enc_certificate_key, glcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
+                                &glcf->upstream.ssl_certificate->value,
+                                &glcf->upstream.ssl_certificate_key->value,
+                                glcf->upstream.ssl_passwords,
                                 SSL_ENC_CERT)
             != NGX_OK)
         {
@@ -5033,8 +5035,10 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, glcf->upstream.ssl, &glcf->sign_certificate,
-                                &glcf->sign_certificate_key, glcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
+                                &glcf->upstream.ssl_certificate->value,
+                                &glcf->upstream.ssl_certificate_key->value,
+                                glcf->upstream.ssl_passwords,
                                 SSL_SIGN_CERT)
             != NGX_OK)
         {
