@@ -5072,8 +5072,10 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, plcf->upstream.ssl, &plcf->enc_certificate,
-                                &plcf->enc_certificate_key, plcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, plcf->upstream.ssl,
+                                &plcf->upstream.ssl_certificate->value,
+                                &plcf->upstream.ssl_certificate_key->value,
+                                plcf->upstream.ssl_passwords,
                                 SSL_ENC_CERT)
             != NGX_OK)
         {
@@ -5090,8 +5092,10 @@ ngx_http_proxy_set_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *plcf)
             return NGX_ERROR;
         }
 
-        if (ngx_ssl_certificate(cf, plcf->upstream.ssl, &plcf->sign_certificate,
-                                &plcf->sign_certificate_key, plcf->ssl_passwords,
+        if (ngx_ssl_certificate(cf, plcf->upstream.ssl,
+                                &plcf->upstream.ssl_certificate->value,
+                                &plcf->upstream.ssl_certificate_key->value,
+                                plcf->upstream.ssl_passwords,
                                 SSL_SIGN_CERT)
             != NGX_OK)
         {
