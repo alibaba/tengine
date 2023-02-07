@@ -1199,10 +1199,6 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 r->http_protocol.len = r->request_end - r->http_protocol.data;
             }
 
-            if (ngx_http_process_request_uri(r) != NGX_OK) {
-                break;
-            }
-
 #if (NGX_HTTP_PROXY_CONNECT)
 
             if (r->connect_host_start && r->connect_host_end) {
@@ -1247,8 +1243,14 @@ ngx_http_process_request_line(ngx_event_t *rev)
                 }
 
                 r->connect_port_n = port;
-            }
+
+                /* skip processing request uri */
+            } else
 #endif
+
+            if (ngx_http_process_request_uri(r) != NGX_OK) {
+                break;
+            }
 
             if (r->schema_end) {
                 r->schema.len = r->schema_end - r->schema_start;
