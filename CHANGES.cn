@@ -1,3 +1,6 @@
+Tengine 2.4.0 [2023-02-08]
+* Feature: 更新到nginx官方1.22.1版本 (jiuzhoucui)
+
 Tengine 2.3.4 [2022-10-18]
 * Feature: 增加新模块ngx_openssl_ntls，以支持NTLS协议 (dongbeiouba)
 * Change: 将ngx_openssl_ntls模块中依赖的SSL库从BabaSSL更新为Tongsuo (wa5i)

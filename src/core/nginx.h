@@ -14,8 +14,8 @@
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
 #define TENGINE            "Tengine"
-#define tengine_version    2003004
-#define TENGINE_VERSION    "2.3.4"
+#define tengine_version    2004000
+#define TENGINE_VERSION    "2.4.0"
 #define TENGINE_VER        TENGINE "/" TENGINE_VERSION
 
 #ifdef NGX_BUILD
