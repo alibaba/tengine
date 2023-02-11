@@ -92,15 +92,15 @@ $t->run()->plan(12);
 
 ###############################################################################
 
-my $re = qr/Tengine\/\d+\.\d+\.\d+/;
+my $re = qr/nginx\/\d+\.\d+\.\d+/;
 
 like(header_server('/200'), qr/^$re$/, 'http2 tokens default 200');
 like(header_server('/404'), qr/^$re$/, 'http2 tokens default 404');
 like(body('/404'), qr/$re/, 'http2 tokens default 404 body');
 
-is(header_server('/off/200'), 'Tengine', 'http2 tokens off 200');
-is(header_server('/off/404'), 'Tengine', 'http2 tokens off 404');
-like(body('/off/404'), qr/Tengine(?!\/)/, 'http2 tokens off 404 body');
+is(header_server('/off/200'), 'nginx', 'http2 tokens off 200');
+is(header_server('/off/404'), 'nginx', 'http2 tokens off 404');
+like(body('/off/404'), qr/nginx(?!\/)/, 'http2 tokens off 404 body');
 
 like(header_server('/on/200'), qr/^$re$/, 'http2 tokens on 200');
 like(header_server('/on/404'), qr/^$re$/, 'http2 tokens on 404');

@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(21)
+my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(24)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -48,6 +48,12 @@ http {
                 auth_basic off;
                 alias %%TESTDIR%%/;
             }
+
+            location /var {
+                # prepended with conf_prefix
+                auth_basic_user_file $arg_f;
+                alias %%TESTDIR%%/;
+	    }
         }
     }
 }
@@ -111,6 +117,13 @@ like(http_get_auth('/', 'sha3', '1'), qr!401 Unauthorized!, 'sha broken 2');
 
 like(http_get_auth('/', 'notfound', '1'), qr!401 Unauthorized!, 'not found');
 like(http_get('/inner/'), qr!SEETHIS!, 'inner off');
+
+like(http_get_auth('/var/?f=htpasswd', 'apr1', 'password'), qr!SEETHIS!,
+	'user file variable');
+unlike(http_get_auth('/var/?f=nx', 'apr1', 'password'), qr!SEETHIS!,
+	'user file variable not found');
+unlike(http_get_auth('/var/', 'apr1', 'password'), qr!SEETHIS!,
+	'user file variable bad value');
 
 ###############################################################################
 

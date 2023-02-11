@@ -11,8 +11,6 @@ use strict;
 
 use Test::More;
 
-use Socket;
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -23,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(30);
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(28);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -59,13 +57,13 @@ http {
 
         location / {
             proxy_pass http://127.0.0.1:8081;
-            proxy_read_timeout 1s;
+            proxy_read_timeout 2s;
             proxy_connect_timeout 2s;
         }
 
         location /var {
             proxy_pass http://$arg_b;
-            proxy_read_timeout 1s;
+            proxy_read_timeout 2s;
             proxy_connect_timeout 2s;
         }
 
@@ -139,25 +137,15 @@ close ($s);
 
 $re = qr/(\d\.\d{3}|-)/;
 ($ct, $ct2, $ht, $ht2, $rt, $rt2) = get('/pnu', many => 1);
+
 cmp_ok($ct, '<', 1, 'connect time - next');
 cmp_ok($ct2, '<', 1, 'connect time - next 2');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.7');
-
 is($ht, '-', 'header time - next');
-
-}
-
 cmp_ok($ht2, '<', 1, 'header time - next 2');
+
 cmp_ok($rt, '>=', 1, 'response time - next');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.7');
-
 is($rt2, '-', 'response time - next 2');
-
-}
 
 $t->stop();
 
@@ -166,15 +154,6 @@ $t->stop();
 
 cmp_ok($ct, '<', 1, 'connect time log - slow response header');
 cmp_ok($ct2, '<', 1, 'connect time log - slow response body');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.7');
-
-isnt($ct3, '-', 'connect time log - client close set');
-
-}
-
-$ct3 = 0 if $ct3 eq '-';
 cmp_ok($ct3, '<', 1, 'connect time log - client close');
 
 cmp_ok($ht, '>=', 1, 'header time log - slow response header');
@@ -183,15 +162,7 @@ is($ht3, '-', 'header time log - client close');
 
 cmp_ok($rt, '>=', 1, 'response time log - slow response header');
 cmp_ok($rt2, '>=', 1, 'response time log - slow response body');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.7');
-
-isnt($rt3, '-', 'response time log - client close set');
-$rt3 = 0 if $rt3 eq '-';
 cmp_ok($rt3, '>', $ct3, 'response time log - client close');
-
-}
 
 ###############################################################################
 

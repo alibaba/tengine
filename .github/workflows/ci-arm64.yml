@@ -1,0 +1,88 @@
+name: build tengine
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  build-arm64:
+    runs-on: "ubuntu-20.04"
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+         - { compiler: GNU,  CC: gcc,  CXX: g++}
+         - { compiler: LLVM, CC: clang, CXX: clang++}
+    steps:
+      - name: Checkout Tengine
+        uses: actions/checkout@v3
+
+      - name: 'checkout luajit2'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/luajit2
+          path: luajit2
+
+      - name: Compile with ${{ matrix.compiler.compiler }}
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu20.04
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}:/tengine"
+          install: |
+            set -x
+            apt-get update -q -y
+            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
+          run: |
+            set -x
+            cd /tengine
+            echo "Build luajit2"
+            cd luajit2
+            make -j2
+            make install
+            cd ..
+            echo "Build tengine"
+            export CC=${{ matrix.compiler.CC }}
+            export CXX=${{ matrix.compiler.CXX }}
+            export LUAJIT_LIB=/usr/local/lib
+            export LUAJIT_INC=/usr/local/include/luajit-2.1
+            ./configure \
+              --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
+              --with-ipv6 \
+              --with-http_ssl_module \
+              --with-http_v2_module \
+              --with-http_addition_module \
+              --with-stream \
+              --with-stream_ssl_module \
+              --with-stream_realip_module \
+              --with-stream_geoip_module \
+              --with-stream_ssl_preread_module \
+              --with-stream_sni \
+              --add-module=./modules/ngx_backtrace_module \
+              --add-module=./modules/ngx_debug_pool \
+              --add-module=./modules/ngx_debug_timer \
+              --add-module=./modules/ngx_http_concat_module \
+              --add-module=./modules/ngx_http_footer_filter_module \
+              --add-module=./modules/ngx_http_lua_module \
+              --add-module=./modules/ngx_http_proxy_connect_module \
+              --add-module=./modules/ngx_http_reqstat_module \
+              --add-module=./modules/ngx_http_slice_module \
+              --add-module=./modules/ngx_http_sysguard_module \
+              --add-module=./modules/ngx_http_trim_filter_module \
+              --add-module=./modules/ngx_http_upstream_check_module \
+              --add-module=./modules/ngx_http_upstream_consistent_hash_module \
+              --add-module=./modules/ngx_http_upstream_dynamic_module \
+              --add-module=./modules/ngx_http_upstream_dyups_module \
+              --add-module=./modules/ngx_http_upstream_keepalive_module \
+              --add-module=./modules/ngx_http_upstream_session_sticky_module \
+              --add-module=./modules/ngx_http_upstream_vnswrr_module \
+              --add-module=./modules/ngx_http_user_agent_module \
+              --add-module=./modules/ngx_multi_upstream_module \
+              --add-module=./modules/ngx_slab_stat \
+              --without-http_upstream_keepalive_module
+            make -j2
+            make install
+            file /usr/local/nginx/sbin/nginx | grep aarch64

@@ -34,6 +34,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     map $server_port $upstream {
         %%PORT_8081%%  a.example.com:%%PORT_8090%%;
         %%PORT_8082%%  a.example.com;

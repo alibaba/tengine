@@ -113,6 +113,11 @@ if [ $HTTP = YES ]; then
     fi
 
 
+    if [ $HTTP_V2 = YES ]; then
+        HTTP_SRCS="$HTTP_SRCS $HTTP_HUFF_SRCS"
+    fi
+
+
     # the module order is important
     #     ngx_http_static_module
     #     ngx_http_gzip_static_module
@@ -425,8 +430,6 @@ if [ $HTTP = YES ]; then
         ngx_module_srcs="src/http/v2/ngx_http_v2.c \
                          src/http/v2/ngx_http_v2_table.c \
                          src/http/v2/ngx_http_v2_encode.c \
-                         src/http/v2/ngx_http_v2_huff_decode.c \
-                         src/http/v2/ngx_http_v2_huff_encode.c \
                          src/http/v2/ngx_http_v2_module.c"
         ngx_module_libs=
         ngx_module_link=$HTTP_V2
@@ -1004,6 +1007,12 @@ if [ $MAIL != NO ]; then
     ngx_module_srcs=src/mail/ngx_mail_proxy_module.c
 
     . auto/module
+
+    ngx_module_name=ngx_mail_realip_module
+    ngx_module_deps=
+    ngx_module_srcs=src/mail/ngx_mail_realip_module.c
+
+    . auto/module
 fi
 
 
@@ -1138,6 +1147,16 @@ if [ $STREAM != NO ]; then
         . auto/module
     fi
 
+    if [ $STREAM_SET = YES ]; then
+        ngx_module_name=ngx_stream_set_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_set_module.c
+        ngx_module_libs=
+        ngx_module_link=$STREAM_SET
+
+        . auto/module
+    fi
+
     if [ $STREAM_UPSTREAM_HASH = YES ]; then
         ngx_module_name=ngx_stream_upstream_hash_module
         ngx_module_deps=
@@ -1195,7 +1214,7 @@ if [ $STREAM != NO ]; then
             echo "--with-stream_ssl_module is needed by --with-stream_sni"
             exit 1;
         fi
-        have=NGX_STREAM_SNI . auto/have
+        have=T_NGX_STREAM_SNI . auto/have
     fi
 fi
 
@@ -1462,4 +1481,3 @@ have=T_NGX_HTTP_UPSTREAM_ID . auto/have
 have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
 have=T_NGX_SHOW_INFO . auto/have
 have=T_NGX_HTTP_IMAGE_FILTER . auto/have
-have=T_NGX_HAVE_DTLS . auto/have

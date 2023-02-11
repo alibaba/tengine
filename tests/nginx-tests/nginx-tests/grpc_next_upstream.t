@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 grpc rewrite/);
+my $t = Test::Nginx->new()->has(qw/http http_v2 grpc rewrite/)->plan(9);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -107,7 +107,7 @@ http {
 
 EOF
 
-$t->try_run('no grpc')->plan(9);
+$t->run();
 
 ###############################################################################
 

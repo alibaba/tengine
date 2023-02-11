@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     server {
         listen       127.0.0.1:8082;
         proxy_pass   [::1]:%%PORT_8080%%;

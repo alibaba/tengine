@@ -114,7 +114,7 @@ sub fastcgi_daemon {
 		$socket);
 
 	while( $request->Accept() >= 0 ) {
-		read(STDIN, my $body, $ENV{'CONTENT_LENGTH'});
+		read(STDIN, my $body, $ENV{'CONTENT_LENGTH'} || 0);
 		my $len = length $body;
 
 		sleep 3 if $port == port(8081);

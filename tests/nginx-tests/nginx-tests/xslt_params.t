@@ -95,13 +95,8 @@ like(http_get("/x1"), qr!200 OK.*param1=value1.*param2=data.*param3=value3!ms,
 
 # before 1.13.7, nginx used to overwrite xslt_stylesheet configuration data
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.13.7');
-
 like(http_get("/x1"), qr!200 OK.*param1=value1.*param2=data.*param3=value3!ms,
 	'params from xslt_stylesheet again');
-
-}
 
 like(http_get("/x2"), qr!200 OK.*param1=value1.*param2=data.*param3=value3!ms,
 	'params from xslt_param/xslt_string_param');

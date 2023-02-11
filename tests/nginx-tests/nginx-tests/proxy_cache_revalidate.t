@@ -14,7 +14,7 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx qw/ :DEFAULT :gzip /;
+use Test::Nginx;
 
 ###############################################################################
 

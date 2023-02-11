@@ -23,7 +23,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy upstream_zone upstream_random/)
-	->write_file_expand('nginx.conf', <<'EOF');
+	->plan(12)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -140,7 +140,7 @@ EOF
 
 $t->run_daemon(\&http_daemon, port(8081));
 $t->run_daemon(\&http_daemon, port(8082));
-$t->try_run('no upstream random')->plan(12);
+$t->run();
 
 $t->waitforsocket('127.0.0.1:' . port(8081));
 $t->waitforsocket('127.0.0.1:' . port(8082));

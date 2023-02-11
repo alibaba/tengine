@@ -94,7 +94,7 @@ like(http_100_request('/', '1.1', 'token=param'), qr/ 417 /,
 sub http_100_request {
 	my ($url, $version, $value) = @_;
 	$value = '100-continue' unless defined $value;
-	my $r = http(<<EOF);
+	http(<<EOF);
 POST $url HTTP/$version
 Host: localhost
 Expect: $value

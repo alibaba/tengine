@@ -51,6 +51,7 @@ http {
         ssl_certificate localhost.crt;
 
         send_timeout 1s;
+        lingering_close off;
 
         location / {
             proxy_pass   http://127.0.0.1:8081;
@@ -70,7 +71,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -116,11 +117,6 @@ $s2->h2_window(2**30);
 select undef, undef, undef, 0.2;
 
 $t->stop();
-
-# "aio_write" is used to produce "open socket ... left in connection" alerts.
-
-$t->todo_alerts() if $t->read_file('nginx.conf') =~ /aio_write on/
-	and $t->read_file('nginx.conf') =~ /aio threads/ and $^O eq 'linux';
 
 ###############################################################################
 

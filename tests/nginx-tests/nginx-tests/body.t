@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(13);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(15);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -71,11 +71,18 @@ http {
             add_header X-Body-File "$request_body_file";
             proxy_pass http://127.0.0.1:8081;
         }
+        location /large {
+            client_max_body_size 1k;
+            proxy_pass http://127.0.0.1:8081;
+        }
         location /discard {
             return 200 "TEST\n";
         }
         location /next {
             proxy_pass http://u/;
+        }
+        location /redirect {
+            error_page 404 http://example.com/;
         }
     }
 
@@ -121,6 +128,8 @@ like(read_body_file(http_get_body('/b', '0123456789' x 512)),
 like(http_get_body('/single', '0123456789' x 128),
 	qr/X-Body: (0123456789){128}\x0d?$/ms, 'body in single buffer');
 
+like(http_get_body('/large', '0123456789' x 128), qr/ 413 /, 'body too large');
+
 # pipelined requests
 
 like(http_get_body('/', '0123456789', '0123456789' x 128, '0123456789' x 512,
@@ -158,6 +167,19 @@ like(
 
 like(http_get_body('/next', '0123456789'),
 	qr/X-Body: 0123456789\x0d?$/ms, 'body next upstream');
+
+# discarded request body in redirect via error_page
+
+unlike(
+	http(
+		'POST /redirect HTTP/1.1' . CRLF
+		. 'Host: localhost' . CRLF
+		. 'Content-Length: 10' . CRLF . CRLF
+		. '0123456789' .
+		'GET /next HTTP/1.0' . CRLF . CRLF
+	),
+	qr/400 Bad Request/ms, 'redirect - discard request body'
+);
 
 ###############################################################################
 

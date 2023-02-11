@@ -19,12 +19,7 @@ use Test::Nginx qw/ :DEFAULT :gzip /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http concat/)->plan(169);
-
-$t->set_dso("ngx_http_concat_module", "ngx_http_concat_module.so");
-$t->set_dso("ngx_http_fastcgi_module", "ngx_http_fastcgi_module.so");
-$t->set_dso("ngx_http_uwsgi_module", "ngx_http_uwsgi_module.so");
-$t->set_dso("ngx_http_scgi_module", "ngx_http_scgi_module.so");
+my $t = Test::Nginx->new()->has(qw/http concat/)->plan(168);
 
 my $d = $t->testdir();
 
@@ -76,8 +71,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -122,8 +115,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -170,8 +161,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -217,8 +206,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -263,8 +250,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -312,8 +297,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -359,8 +342,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -408,8 +389,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -456,8 +435,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -502,8 +479,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -550,8 +525,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -596,8 +569,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -644,8 +615,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -690,8 +659,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -740,8 +707,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -788,8 +753,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -838,8 +801,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -886,8 +847,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -936,8 +895,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -984,8 +941,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1034,8 +989,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1082,8 +1035,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1132,8 +1083,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1181,8 +1130,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1227,8 +1174,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1275,8 +1220,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1322,8 +1265,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1368,8 +1309,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1417,8 +1356,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1464,8 +1401,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1513,8 +1448,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1560,8 +1493,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1609,8 +1540,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1656,8 +1585,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1705,8 +1632,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1752,56 +1677,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
-
-events {
-}
-
-http {
-    %%TEST_GLOBALS_HTTP%%
-
-    types {
-        text/html                             html htm shtml;
-        text/css                              css;
-        image/jpeg                            jpeg jpg;
-        application/javascript                js;
-    }
-    
-    default_type application/octet-stream;
-
-    server {
-        listen      127.0.0.1:8080;
-        server_name localhost;
-
-        location /concatFile/ {
-            concat  on;
-            concat_max_files 17;
-        }
-    }
-}
-
-EOF
-
-$t->run();
-###############################################################################
-my $concat_message36 = qr/hello.jsworld.jsjack.js1234567891011121314/s;
-
-like(http_get('/concatFile/??hello.js,world.js,jack.js,t1.js,t2.js,t3.js,t4.js,t5.js,t6.js,t7.js,t8.js,t9.js,t10.js,t11.js,t12.js,t13.js,t14.js'), $concat_message36, 'concat - concat_max_files: 17 ; 17 files');
-
-$t->stop();
-###############################################################################
-###############################################################################
-#Test37
-#concat_max_files: 17 ; 18 files
-$t->write_file_expand('nginx.conf', <<'EOF');
-
-%%TEST_GLOBALS%%
-
-master_process off;
-daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1849,8 +1724,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1897,8 +1770,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -1934,7 +1805,7 @@ my $url="/concatFile/??";
 foreach $i(1..100){
 	$url=$url."hello.js,";
 }
-my $tmp;
+my $tmp="";
 foreach $i(1..100){
 	$tmp=$tmp."hello.js"
 }
@@ -1955,8 +1826,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -1993,7 +1862,7 @@ my $url2="/concatFile/??";
 foreach $i2(1..101){
 	$url2=$url2."hello.js,";
 }
-my $tmp2;
+my $tmp2="";
 foreach $i2(1..101){
 	$tmp2=$tmp2."hello.js"
 }
@@ -2013,8 +1882,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2062,8 +1929,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2109,8 +1974,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2158,8 +2021,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2206,8 +2067,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process  off;
 daemon          off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2253,8 +2112,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process  off;
 daemon          off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2303,8 +2160,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process  off;
 daemon          off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2350,8 +2205,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2451,8 +2304,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2512,8 +2363,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 master_process off;
 daemon         off;
-
-%%TEST_GLOBALS_DSO%%
 
 events {
 }
@@ -2725,8 +2574,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 master_process off;
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 
@@ -2861,7 +2708,7 @@ like(http_get('/concatFile/??dir1/hello.js,world.js,dir1/jack.js'), $concat_mess
 $concat_message35 = qr/hello.jsworld.js_dir1jack.js_dir1/s;
 like(http_get('/concatFile/??hello.js,dir1/world.js,dir1/jack.js'), $concat_message35, 'concat - concat_url test -- with two directory BAA');
 
-$concat_message36 = qr/hello.jsworld.js_dir1jack.js/s;
+my $concat_message36 = qr/hello.jsworld.js_dir1jack.js/s;
 like(http_get('/concatFile/??hello.js,/dir1/world.js,jack.js'), $concat_message36, 'concat - concat_url test -- with one directory strarts with slash middle');
 
 $concat_message37 = qr/hello.js_dir1world.jsjack.js/s;

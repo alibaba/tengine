@@ -135,6 +135,24 @@ ngx_http_upstream_init_dynamic(ngx_conf_t *cf,
     dcf = ngx_http_conf_upstream_srv_conf(us,
                                           ngx_http_upstream_dynamic_module);
 
+    /*
+     * Keep one static address for each server to resolve name only one
+     * time. And server[].addrs should not be used in this case.
+     */
+
+    if (us->servers) {
+        server = us->servers->elts;
+
+        for (i = 0; i < us->servers->nelts; i++) {
+            host = server[i].host;
+            if (ngx_inet_addr(host.data, host.len) == INADDR_NONE) {
+                if (server[i].naddrs > 1) {
+                    server[i].naddrs = 1;
+                }
+            }
+        }
+    }
+
     if (dcf->original_init_upstream(cf, us) != NGX_OK) {
         return NGX_ERROR;
     }

@@ -25,7 +25,7 @@ eval { require IO::Socket::SSL; };
 plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 
 my $t = Test::Nginx->new()->has(qw/http proxy http_ssl/)->has_daemon('openssl')
-	->plan(7)->write_file_expand('nginx.conf', <<'EOF');
+	->plan(8)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -80,12 +80,13 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
 EOF
 
+$t->write_file('big.html', 'xxxxxxxxxx' x 72000);
 $t->write_file('index.html', '');
 
 my $d = $t->testdir();
@@ -120,6 +121,9 @@ like(http_get('/timeout'), qr/200 OK/, 'proxy connect timeout');
 }
 
 like(http_get('/timeout_h'), qr/504 Gateway/, 'proxy handshake timeout');
+
+is(length(Test::Nginx::http_content(http_get('/ssl/big.html'))), 720000,
+	'big length');
 
 ###############################################################################
 

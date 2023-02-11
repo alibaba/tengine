@@ -34,6 +34,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     geo $geo {
         ::1/128         loopback;
         2001:0db8::/32  test;

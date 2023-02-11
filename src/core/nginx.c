@@ -203,6 +203,7 @@ static ngx_uint_t   ngx_show_configure;
 static ngx_uint_t   ngx_no_ssl_init;
 #endif
 static u_char      *ngx_prefix;
+static u_char      *ngx_error_log;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
 static char        *ngx_signal;
@@ -250,7 +251,7 @@ main(int argc, char *const *argv)
     ngx_pid = ngx_getpid();
     ngx_parent = ngx_getppid();
 
-    log = ngx_log_init(ngx_prefix);
+    log = ngx_log_init(ngx_prefix, ngx_error_log);
     if (log == NULL) {
         return 1;
     }
@@ -432,9 +433,9 @@ ngx_show_version_info(void)
 
     if (ngx_show_help) {
         ngx_write_stderr(
-            "Usage: nginx [-?hvVtTq] [-s signal] [-c filename] "
-                         "[-p prefix] [-g directives]" NGX_LINEFEED
-                         NGX_LINEFEED
+            "Usage: nginx [-?hvVtTq] [-s signal] [-p prefix]" NGX_LINEFEED
+            "             [-e filename] [-c filename] [-g directives]"
+                          NGX_LINEFEED NGX_LINEFEED
             "Options:" NGX_LINEFEED
             "  -?,-h         : this help" NGX_LINEFEED
             "  -v            : show version and exit" NGX_LINEFEED
@@ -452,6 +453,12 @@ ngx_show_version_info(void)
                                NGX_LINEFEED
 #else
             "  -p prefix     : set prefix path (default: NONE)" NGX_LINEFEED
+#endif
+            "  -e filename   : set error log file (default: "
+#ifdef NGX_ERROR_LOG_STDERR
+                               "stderr)" NGX_LINEFEED
+#else
+                               NGX_ERROR_LOG_PATH ")" NGX_LINEFEED
 #endif
             "  -c filename   : set configuration file (default: " NGX_CONF_PATH
                                ")" NGX_LINEFEED
@@ -535,6 +542,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
             ngx_memzero(ls, sizeof(ngx_listening_t));
 
             ls->fd = (ngx_socket_t) s;
+            ls->inherited = 1;
         }
     }
 
@@ -862,6 +870,24 @@ ngx_get_options(int argc, char *const *argv)
                 ngx_log_stderr(0, "option \"-p\" requires directory name");
                 return NGX_ERROR;
 
+            case 'e':
+                if (*p) {
+                    ngx_error_log = p;
+
+                } else if (argv[++i]) {
+                    ngx_error_log = (u_char *) argv[i];
+
+                } else {
+                    ngx_log_stderr(0, "option \"-e\" requires file name");
+                    return NGX_ERROR;
+                }
+
+                if (ngx_strcmp(ngx_error_log, "stderr") == 0) {
+                    ngx_error_log = (u_char *) "";
+                }
+
+                goto next;
+
             case 'c':
                 if (*p) {
                     ngx_conf_file = p;
@@ -1058,6 +1084,14 @@ ngx_process_options(ngx_cycle_t *cycle)
             cycle->conf_prefix.data = cycle->conf_file.data;
             break;
         }
+    }
+
+    if (ngx_error_log) {
+        cycle->error_log.len = ngx_strlen(ngx_error_log);
+        cycle->error_log.data = ngx_error_log;
+
+    } else {
+        ngx_str_set(&cycle->error_log, NGX_ERROR_LOG_PATH);
     }
 
     if (ngx_conf_params) {

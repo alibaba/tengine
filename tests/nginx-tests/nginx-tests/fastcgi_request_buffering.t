@@ -350,7 +350,7 @@ sub fastcgi_daemon {
 
 	while( $request->Accept() >= 0 ) {
 		$count++;
-		read(STDIN, $body, $ENV{'CONTENT_LENGTH'});
+		read(STDIN, $body, $ENV{'CONTENT_LENGTH'} || 0);
 
 		if ($ENV{REQUEST_URI} eq '/error_page') {
 			print "Status: 404 Not Found" . CRLF . CRLF;

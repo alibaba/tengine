@@ -36,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     geo $geo {
         default                  default;
         255.255.255.255          none;
@@ -77,15 +79,8 @@ $t->run();
 ###############################################################################
 
 my %data = stream('127.0.0.1:' . port(8080))->read() =~ /(\w+):(\w+)/g;
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.8');
-
 is($data{geo}, 'none', 'geo unix');
 is($data{geor}, 'none', 'geo unix ranges');
-
-}
-
 is($data{geora}, 'none', 'geo unix remote addr');
 is($data{georra}, 'none', 'geo unix ranges remote addr');
 

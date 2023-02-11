@@ -1,3 +1,26 @@
+Changes with Tengine 2.4.0                                         08 Feb 2023
+
+    *) Feature: Update to nginx 1.22.1  (jiuzhoucui)
+
+
+Changes with Tengine 2.3.4                                         18 Oct 2022
+
+    *) Feature: added new module ngx_openssl_ntls to support NTLS protocol
+       (dongbeiouba)
+
+    *) Change: updated SSL library from BabaSSL to Tongsuo in the
+       ngx_openssl_ntls module (wa5i)
+
+    *) Bugfix: fixed CVE-2021-23017 (chobits)
+
+    *) Bugfix: fixed deadlock in the upstream check module with "zone"
+       directive configured in upstream block (zjd87)
+
+    *) Bugfix：fixed compilation in the upstream check module (RocFang)
+
+    *) Bugfix: fixed compilation error in the dubbo module (MengqiWu)
+
+
 Changes with Tengine 2.3.3                                         25 Mar 2021
 
     *) Feature: tengine supports dtlsv1 and dtlsv1.2. (mrpre)

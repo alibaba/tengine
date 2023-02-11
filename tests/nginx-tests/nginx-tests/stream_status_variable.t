@@ -36,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format  status  $status;
 
     limit_conn_zone  $binary_remote_addr  zone=zone:1m;

@@ -12,6 +12,8 @@ use strict;
 
 use Test::More;
 
+use Sys::Hostname;
+
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -35,6 +37,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format  test  $server_addr;
     log_format  vars  $connection:$nginx_version:$hostname:$pid;
     log_format  addr  $binary_remote_addr:$remote_addr:$remote_port:
@@ -43,7 +47,7 @@ stream {
     log_format  byte  $bytes_received:$bytes_sent:
                       $upstream_bytes_sent:$upstream_bytes_received;
     log_format  time  $upstream_connect_time:$upstream_first_byte_time:
-                      $upstream_session_time;
+                      $upstream_session_time:$session_time;
 
     access_log  %%TESTDIR%%/off.log test;
 
@@ -61,6 +65,7 @@ stream {
     server {
         listen      127.0.0.1:8082;
         proxy_pass  127.0.0.1:8080;
+        proxy_download_rate 2;
         access_log  %%TESTDIR%%/time.log time;
     }
 
@@ -157,14 +162,14 @@ is($t->read_file('filtered.log'), "127.0.0.1\n", 'log filtering');
 ok($t->read_file('complex.log'), 'if with complex value');
 ok($t->read_file('varlog_3.log'), 'variable in file');
 
-chomp(my $hostname = lc `hostname`);
+my $hostname = lc hostname();
 like($t->read_file('vars.log'), qr/^\d+:[\d.]+:$hostname:\d+$/, 'log vars');
 is($t->read_file('addr.log'),
 	"$escaped:$lhost:$lport:127.0.0.1:$dport:127.0.0.1:$uport\n",
 	'log addr');
 like($t->read_file('date.log'), qr#^\d+.\d+![-+\w/: ]+![-+\dT:]+$#, 'log date');
 is($t->read_file('byte.log'), "8:3:8:3\n", 'log bytes');
-like($t->read_file('time.log'), qr/0\.\d{3}:0\.\d{3}:0\.\d{3}/, 'log time');
+like($t->read_file('time.log'), qr/0\.\d+:0\.\d+:1\.\d+:1\.\d+/, 'log time');
 
 ###############################################################################
 

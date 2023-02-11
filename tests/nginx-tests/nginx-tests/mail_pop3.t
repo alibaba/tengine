@@ -12,6 +12,7 @@ use strict;
 use Test::More;
 
 use MIME::Base64;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -38,6 +39,7 @@ events {
 
 mail {
     proxy_pass_error_message  on;
+    proxy_timeout  15s;
     auth_http  http://127.0.0.1:8080/mail/auth;
 
     server {
@@ -57,10 +59,6 @@ http {
         location = /mail/auth {
             set $reply ERROR;
             set $passw "";
-
-            if ($http_auth_smtp_to ~ example.com) {
-                set $reply OK;
-            }
 
             set $userpass "$http_auth_user:$http_auth_pass";
             if ($userpass ~ '^test@example.com:secret$') {
@@ -92,7 +90,7 @@ http {
 EOF
 
 $t->run_daemon(\&Test::Nginx::POP3::pop3_test_daemon);
-$t->run()->plan(20);
+$t->run()->plan(28);
 
 $t->waitforsocket('127.0.0.1:' . port(8111));
 
@@ -195,6 +193,51 @@ $s->read();
 
 $s->send('AUTH EXTERNAL ' . encode_base64('test@example.com', ''));
 $s->ok('auth external with username');
+
+# pipelining
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('INVALID COMMAND WITH ARGUMENTS' . CRLF
+	. 'NOOP');
+$s->check(qr/^-ERR/, 'pipelined invalid command');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.0');
+
+$s->ok('pipelined noop after invalid command');
+
+}
+
+$s->send('USER test@example.com' . CRLF
+	. 'PASS secret' . CRLF
+	. 'QUIT');
+$s->ok('pipelined user');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.0');
+
+$s->ok('pipelined pass');
+$s->ok('pipelined quit');
+
+}
+
+$s = Test::Nginx::POP3->new();
+$s->read();
+
+$s->send('AUTH LOGIN' . CRLF
+	. encode_base64('test@example.com', '') . CRLF
+	. encode_base64('secret', ''));
+$s->check(qr/\+ VXNlcm5hbWU6/, 'pipelined auth username challenge');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.21.0');
+
+$s->check(qr/\+ UGFzc3dvcmQ6/, 'pipelined auth password challenge');
+$s->ok('pipelined auth');
+
+}
 
 ###############################################################################
 

@@ -48,7 +48,7 @@ http {
         location / {
             proxy_pass http://127.0.0.1:8080/data;
             proxy_buffer_size 4k;
-            proxy_limit_rate 12000;
+            proxy_limit_rate 20000;
             add_header X-Msec $msec;
         }
 
@@ -57,7 +57,7 @@ http {
             proxy_set_header Connection "";
             proxy_pass http://u/data;
             proxy_buffer_size 4k;
-            proxy_limit_rate 12000;
+            proxy_limit_rate 20000;
             add_header X-Msec $msec;
         }
 
@@ -80,7 +80,7 @@ my $diff = time() - $t1;
 
 # four chunks are split with three 1s delays
 
-cmp_ok($diff, '>=', 3, 'proxy_limit_rate');
+cmp_ok($diff, '>=', 1, 'proxy_limit_rate');
 like($r, qr/^(XXXXXXXXXX){4000}\x0d?\x0a?$/m, 'response body');
 
 # in case keepalive connection was saved with the delayed flag,

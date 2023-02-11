@@ -23,7 +23,7 @@ use Test::Nginx::Stream qw/ dgram /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream udp/)
+my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(8)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -35,8 +35,11 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     proxy_requests           2;
     proxy_responses          1;
+    proxy_timeout            3s;
 
     server {
         listen               127.0.0.1:%%PORT_8982_UDP%% udp;
@@ -59,7 +62,7 @@ stream {
 EOF
 
 $t->run_daemon(\&udp_daemon, port(8980), $t);
-$t->try_run('no proxy_requests')->plan(8);
+$t->run();
 
 $t->waitforfile($t->testdir . '/' . port(8980));
 
@@ -75,23 +78,14 @@ is($s->io($str), $str, 'unlimited 2');
 
 # datagram doesn't get split
 
-my $t1;
-
-TODO: {
-local $TODO = 'split datagram' unless $t->has_version('1.15.9');
-
 $s = dgram('127.0.0.1:' . port(8983));
 is($s->io($str), $str, 'download');
-$t1 = time();
+my $t1 = time();
 is($s->io($str), $str, 'download 2');
-
-}
-
 my $t2 = time();
 cmp_ok($t1, '<', $t2, 'download 2 delayed');
 
-TODO: {
-todo_skip 'infinite event report', 3 unless $t->has_version('1.15.9');
+# infinite event report before 1.15.9
 
 $s = dgram('127.0.0.1:' . port(8984));
 is($s->io($str), $str, 'upload');
@@ -99,8 +93,6 @@ is($s->io($str, read_timeout => 0.5), '', 'upload limited');
 
 select undef, undef, undef, 1.6;
 is($s->io($str), $str, 'upload passed');
-
-}
 
 ###############################################################################
 
