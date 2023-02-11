@@ -16,15 +16,17 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use Test::Nginx::Stream qw/ stream /;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl/)->has_daemon('openssl');
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return/)
+	->has_daemon('openssl')->plan(6);
 
-$t->write_file_expand('nginx.conf', <<'EOF')->plan(6);
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -34,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     proxy_ssl on;
     proxy_ssl_verify on;
 
@@ -87,8 +91,8 @@ stream {
 
     server {
         listen      127.0.0.1:8086 ssl;
-        proxy_pass  127.0.0.1:8088;
         proxy_ssl   off;
+        return      OK;
 
         ssl_certificate 1.example.com.crt;
         ssl_certificate_key 1.example.com.key;
@@ -96,8 +100,8 @@ stream {
 
     server {
         listen      127.0.0.1:8087 ssl;
-        proxy_pass  127.0.0.1:8088;
         proxy_ssl   off;
+        return      OK;
 
         ssl_certificate 2.example.com.crt;
         ssl_certificate_key 2.example.com.key;
@@ -109,7 +113,7 @@ EOF
 $t->write_file('openssl.1.example.com.conf', <<EOF);
 [ req ]
 prompt = no
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 x509_extensions = v3_req
@@ -124,7 +128,7 @@ EOF
 $t->write_file('openssl.2.example.com.conf', <<EOF);
 [ req ]
 prompt = no
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 
@@ -144,73 +148,29 @@ foreach my $name ('1.example.com', '2.example.com') {
 
 sleep 1 if $^O eq 'MSWin32';
 
-$t->write_file('index.html', '');
-
-$t->run_daemon(\&http_daemon);
 $t->run();
-
-$t->waitforsocket('127.0.0.1:' . port(8088));
 
 ###############################################################################
 
 # subjectAltName
 
-like(get('/', '127.0.0.1:' . port(8080)), qr/200 OK/, 'verify');
-like(get('/', '127.0.0.1:' . port(8081)), qr/200 OK/, 'verify wildcard');
-unlike(get('/', '127.0.0.1:' . port(8082)), qr/200 OK/, 'verify fail');
+is(get(8080), 'OK', 'verify');
+is(get(8081), 'OK', 'verify wildcard');
+isnt(get(8082), 'OK', 'verify fail');
 
 # commonName
 
-like(get('/', '127.0.0.1:' . port(8083)), qr/200 OK/, 'verify cn');
-unlike(get('/', '127.0.0.1:' . port(8084)), qr/200 OK/, 'verify cn fail');
+is(get(8083), 'OK', 'verify cn');
+isnt(get(8084), 'OK', 'verify cn fail');
 
 # untrusted
 
-unlike(get('/', '127.0.0.1:' . port(8085)), qr/200 OK/, 'untrusted');
+isnt(get(8085), 'OK', 'untrusted');
 
 ###############################################################################
 
 sub get {
-	my ($uri, $peer) = @_;
-
-	my $s = IO::Socket::INET->new(
-		Proto => 'tcp',
-		PeerAddr => $peer
-	)
-		or die "Can't connect to nginx: $!\n";
-
-	my $r = http_get($uri, socket => $s);
-	return defined $r ? $r : '';
-}
-
-###############################################################################
-
-sub http_daemon {
-	my $server = IO::Socket::INET->new(
-		Proto => 'tcp',
-		LocalHost => '127.0.0.1:' . port(8088),
-		Listen => 5,
-		Reuse => 1
-	)
-		or die "Can't create listening socket: $!\n";
-
-	local $SIG{PIPE} = 'IGNORE';
-
-	while (my $client = $server->accept()) {
-		$client->autoflush(1);
-
-		while (<$client>) {
-			last if (/^\x0d?\x0a?$/);
-		}
-
-		print $client <<EOF;
-HTTP/1.1 200 OK
-Connection: close
-
-EOF
-
-		close $client;
-	}
+	stream('127.0.0.1:' . port(shift))->read();
 }
 
 ###############################################################################

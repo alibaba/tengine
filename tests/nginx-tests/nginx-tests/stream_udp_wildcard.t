@@ -40,6 +40,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     server {
         listen  %%PORT_8999_UDP%% udp;
         return  $server_addr;

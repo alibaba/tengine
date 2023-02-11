@@ -38,6 +38,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     upstream u {
         server unix:%%TESTDIR%%/unix.sock;
     }

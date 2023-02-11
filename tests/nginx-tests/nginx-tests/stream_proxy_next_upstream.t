@@ -23,7 +23,7 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream/)->plan(3);
+my $t = Test::Nginx->new()->has(qw/stream/)->plan(5);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     upstream u {
         server 127.0.0.1:8083 max_fails=0;
         server 127.0.0.1:8084 max_fails=0;
@@ -46,7 +48,12 @@ stream {
         server 127.0.0.1:8085 backup;
     }
 
-    proxy_connect_timeout 1s;
+    upstream u3 {
+        server 127.0.0.1:8083;
+        server 127.0.0.1:8085 down;
+    }
+
+    proxy_connect_timeout 2;
 
     server {
         listen      127.0.0.1:8080;
@@ -66,6 +73,15 @@ stream {
         proxy_next_upstream on;
         proxy_next_upstream_tries 2;
     }
+
+    log_format test "$upstream_addr";
+
+    server {
+        listen      127.0.0.1:8086;
+        proxy_pass  u3;
+        proxy_next_upstream on;
+        access_log  %%TESTDIR%%/test.log test;
+    }
 }
 
 EOF
@@ -81,6 +97,15 @@ is(stream('127.0.0.1:' . port(8081))->io('.'), 'SEE-THIS', 'next on');
 # make sure backup is not tried
 
 is(stream('127.0.0.1:' . port(8082))->io('.'), '', 'next tries');
+
+# make sure backend marked as down doesn't count towards "no live upstreams"
+
+is(stream('127.0.0.1:' . port(8086))->io('.'), '', 'next down');
+
+$t->stop();
+
+is($t->read_file('test.log'), '127.0.0.1:' . port(8083) . "\n",
+	'next down log');
 
 ###############################################################################
 

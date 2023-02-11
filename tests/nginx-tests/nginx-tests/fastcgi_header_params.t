@@ -25,7 +25,7 @@ eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(1)
+my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(4)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -58,6 +58,37 @@ $t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 like(http_get_headers('/'), qr/SEE-THIS/,
 	'fastcgi request with many ignored headers');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.23.0');
+
+my $r;
+
+$r = http(<<EOF);
+GET / HTTP/1.0
+Host: localhost
+X-Forwarded-For: foo
+X-Forwarded-For: bar
+X-Forwarded-For: bazz
+Cookie: foo
+Cookie: bar
+Cookie: bazz
+Foo: foo
+Foo: bar
+Foo: bazz
+
+EOF
+
+like($r, qr/X-Forwarded-For: foo, bar, bazz/,
+	'fastcgi with multiple X-Forwarded-For headers');
+
+like($r, qr/X-Cookie: foo; bar; bazz/,
+	'fastcgi with multiple Cookie headers');
+
+like($r, qr/X-Foo: foo, bar, bazz/,
+	'fastcgi with multiple unknown headers');
+
+}
 
 ###############################################################################
 
@@ -100,9 +131,16 @@ sub fastcgi_daemon {
 	while( $request->Accept() >= 0 ) {
 		$count++;
 
+		my $xfwd = $ENV{HTTP_X_FORWARDED_FOR} || '';
+		my $cookie = $ENV{HTTP_COOKIE} || '';
+		my $foo = $ENV{HTTP_FOO} || '';
+
 		print <<EOF;
 Location: http://localhost/redirect
 Content-Type: text/html
+X-Forwarded-For: $xfwd
+X-Cookie: $cookie
+X-Foo: $foo
 
 SEE-THIS
 $count

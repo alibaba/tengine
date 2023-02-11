@@ -25,7 +25,7 @@ eval { require FCGI; };
 plan(skip_all => 'FCGI not installed') if $@;
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
-my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(7)
+my $t = Test::Nginx->new()->has(qw/http fastcgi/)->plan(8)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -51,6 +51,12 @@ http {
             fastcgi_param REQUEST_URI $request_uri;
         }
 
+        location /catch {
+            fastcgi_pass 127.0.0.1:8081;
+            fastcgi_param REQUEST_URI "/stderr";
+            fastcgi_catch_stderr sample;
+        }
+
         location /var {
             fastcgi_pass $arg_b;
             fastcgi_param REQUEST_URI $request_uri;
@@ -72,6 +78,7 @@ like(http_get('/'), qr/^3$/m, 'fastcgi third request');
 unlike(http_head('/'), qr/SEE-THIS/, 'no data in HEAD');
 
 like(http_get('/stderr'), qr/SEE-THIS/, 'large stderr handled');
+like(http_get('/catch'), qr/502 Bad/, 'catch stderr');
 
 like(http_get('/var?b=127.0.0.1:' . port(8081)), qr/SEE-THIS/,
 	'fastcgi with variables');

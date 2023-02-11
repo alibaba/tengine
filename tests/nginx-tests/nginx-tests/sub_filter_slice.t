@@ -17,7 +17,7 @@ use Test::More;
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
-use Test::Nginx;
+use Test::Nginx qw/ :DEFAULT http_content /;
 
 ###############################################################################
 
@@ -83,7 +83,7 @@ local $TODO = 'not yet';
 
 $r = get('/t', 'Range: bytes=3-4');
 like($r, qr/ 206 /, 'range request - 206 partial reply');
-is(Test::Nginx::http_content($r), '34', 'range request - correct content');
+is(http_content($r), '34', 'range request - correct content');
 
 }
 

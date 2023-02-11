@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     split_clients $connection $variant {
         51.2%  "first";
         10%    "second";

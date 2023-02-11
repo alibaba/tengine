@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http --with-debug ipv6 proxy/);
+my $t = Test::Nginx->new()->has(qw/http --with-debug proxy/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -41,11 +41,11 @@ http {
 
     server {
         listen       127.0.0.1:8080;
-        listen       [::1]:8080;
+        listen       [::1]:%%PORT_8080%%;
         server_name  localhost;
 
         location /debug {
-            proxy_pass http://[::1]:8080/;
+            proxy_pass http://[::1]:%%PORT_8080%%/;
         }
     }
 }
@@ -60,7 +60,7 @@ http_get('/');
 
 select undef, undef, undef, 0.1;
 is($t->read_file('debug1.log'), '', 'no debug_connection file 1');
-is($t->read_file('debug2.log'), '', 'no debug_connection file 1');
+is($t->read_file('debug2.log'), '', 'no debug_connection file 2');
 
 http_get('/debug');
 

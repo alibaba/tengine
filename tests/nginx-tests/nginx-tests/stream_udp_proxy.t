@@ -22,7 +22,7 @@ use Test::Nginx::Stream qw/ dgram /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(8)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -33,6 +33,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     proxy_timeout        1s;
 
     server {
@@ -75,6 +77,17 @@ is($s->io('2', read => 2), '12', 'proxy responses 2');
 $s = dgram('127.0.0.1:' . port(8983));
 is($s->io('3', read => 3), '123', 'proxy responses default');
 
+# zero-length payload
+
+$s = dgram('127.0.0.1:' . port(8982));
+$s->write('');
+is($s->read(), 'zero', 'upstream read zero bytes');
+is($s->read(), '', 'upstream sent zero bytes');
+
+$s->write('');
+is($s->read(), 'zero', 'upstream read zero bytes again');
+is($s->read(), '', 'upstream sent zero bytes again');
+
 ###############################################################################
 
 sub udp_daemon {
@@ -94,7 +107,15 @@ sub udp_daemon {
 
 	while (1) {
 		$server->recv(my $buffer, 65536);
-		$server->send($_) for (1 .. $buffer);
+
+		if (length($buffer) > 0) {
+			$server->send($_) for (1 .. $buffer);
+
+		} else {
+			$server->send('zero');
+			select undef, undef, undef, 0.2;
+			$server->send('');
+		}
 	}
 }
 

@@ -34,6 +34,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     limit_conn_zone  $binary_remote_addr$server_port  zone=zone:1m;
 
     server {

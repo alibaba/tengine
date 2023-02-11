@@ -37,7 +37,9 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    resolver 127.0.0.1:8900 valid=1s ipv6=on;
+    # skip port replacing logic in Nginx.pm port()
+    # 127.0.0.1:8xxx -> 127.0.0.01:8xxx
+    resolver 127.0.0.01:8900 valid=1s ipv6=on;
     resolver_timeout 1s;
 
     upstream backend {
@@ -80,13 +82,15 @@ http {
 
 EOF
 
+
 $t->write_file_expand('nginx.conf', $nginx_conf);
 
+$t->run_daemon(\&dns_daemon, 8900, $t);
+$t->waitforfile($t->testdir . '/dns_server.pid')
+    or die "\n+ failed to create dns server!\n\n";
 
 $t->run()->plan(2);
 
-$t->run_daemon(\&dns_daemon, 8900, $t);
-$t->waitforfile($t->testdir . '/8900');
 ###############################################################################
 my (@n, $response);
 
@@ -182,7 +186,7 @@ sub dns_daemon {
 
 	# signal we are ready
 
-	open my $fh, '>', $t->testdir() . '/' . $port;
+	open my $fh, '>', $t->testdir() . '/dns_server.pid';
 	close $fh;
 
 	while (1) {

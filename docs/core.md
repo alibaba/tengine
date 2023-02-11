@@ -69,33 +69,6 @@ When set to 'auto', Tengine will automatically bind each worker process to a spe
 When set to 'off', Tengine will disable the CPU affinity.
 
 
-### error_page
-
-Syntax: **error_page** code ... [default] [=[response]]
-
-Default: -
-
-Context: http, server, location, if in location
-
-This directive can specify the page for the specific HTTP response status.
-
-*   Tengine also has a 'default' parameter which can be used to clear the error_page settings in higher level blocks.
-
-For example:
-
-```
-    http {
-        error_page 404 /404.html;
-
-        server {
-            error_page 404 default;
-        }
-    }
-```
-
-In this server block, the 404 error page will be set to Tengine's default 404 page. 
-
-
 ### request_time_cache
 
 Syntax: **request_time_cache** [on | off]

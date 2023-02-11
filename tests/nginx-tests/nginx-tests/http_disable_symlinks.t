@@ -155,7 +155,7 @@ http {
 EOF
 
 my $uid = getuid();
-my ($extfile) = grep { -f "$_" && $uid != (stat($_))[4] }
+my ($extfile) = grep { -f && !-l && $uid != (stat())[4] }
 	('/etc/resolv.conf', '/etc/protocols', '/etc/host.conf');
 
 plan(skip_all => 'no external file found')
@@ -209,7 +209,7 @@ symlink($extfile, "$d/cached/link");
 ###############################################################################
 
 SKIP: {
-skip 'cannot test under symlink', 25 if $d ne realpath($d);
+skip 'cannot test under symlink', 25 if $d ne realpath($d) or $^O eq 'netbsd';
 
 like(http_get_host('s1', '/link'), qr!200 OK!, 'static (off, same uid)');
 like(http_get_host('s1', '/link2'), qr!200 OK!, 'static (off, other uid)');

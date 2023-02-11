@@ -34,6 +34,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format test $upstream_addr;
 
     upstream u {
@@ -76,8 +78,8 @@ $t->run();
 
 my $p = port(8081);
 
-stream('127.0.0.1:' . port(8091));
-stream("127.0.0.1:" . port(8092));
+stream('127.0.0.1:' . port(8091))->read();
+stream("127.0.0.1:" . port(8092))->read();
 
 $t->stop();
 

@@ -12,7 +12,7 @@ use strict;
 
 use Test::More;
 
-use Socket qw/ :DEFAULT CRLF /;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -76,7 +76,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -104,8 +104,6 @@ $t->plan(8);
 
 ###############################################################################
 
-my ($ossl) = $t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
-
 my ($s, $ssl) = get_ssl_socket(8080);
 ok($s, 'connection');
 
@@ -121,18 +119,11 @@ ok(Net::SSLeay::set_tlsext_host_name($ssl, 'localhost'), 'SNI');
 
 Net::SSLeay::write($ssl, 'Host: localhost' . CRLF . CRLF);
 
-TODO: {
-local $TODO = 'not yet' if $ossl ge '1.1.1' and $^O eq 'linux'
-	and !$t->has_version('1.15.2');
-
 ok(!Net::SSLeay::read($ssl), 'response');
 
 }
 
-}
-
 # virtual servers
-# in [1.15.4..1.15.5) SSL_OP_NO_RENEGOTIATION is cleared in servername callback
 
 ($s, $ssl) = get_ssl_socket(8081);
 ok($s, 'connection 2');
@@ -149,13 +140,7 @@ ok(Net::SSLeay::set_tlsext_host_name($ssl, 'localhost'), 'SNI');
 
 Net::SSLeay::write($ssl, 'Host: localhost' . CRLF . CRLF);
 
-TODO: {
-local $TODO = 'not yet' if $ossl ge '1.1.1' and $^O eq 'linux'
-	and !$t->has_version('1.15.2');
-
 ok(!Net::SSLeay::read($ssl), 'virtual servers');
-
-}
 
 }
 
@@ -165,15 +150,11 @@ sub get_ssl_socket {
 	my ($port) = @_;
 	my $s;
 
-	my $dest_ip = inet_aton('127.0.0.1');
-	my $dest_serv_params = sockaddr_in(port($port), $dest_ip);
-
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
 		alarm(8);
-		socket($s, &AF_INET, &SOCK_STREAM, 0) or die "socket: $!";
-		connect($s, $dest_serv_params) or die "connect: $!";
+		$s = IO::Socket::INET->new('127.0.0.1:' . port($port));
 		alarm(0);
 	};
 	alarm(0);
