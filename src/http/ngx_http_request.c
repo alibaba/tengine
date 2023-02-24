@@ -606,6 +606,12 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->srv_conf = hc->conf_ctx->srv_conf;
     r->loc_conf = hc->conf_ctx->loc_conf;
 
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    r->connect_time = NGX_CONF_UNSET_MSEC;
+    r->read_time = NGX_CONF_UNSET_MSEC;
+    r->send_time = NGX_CONF_UNSET_MSEC;
+#endif
+
     r->read_event_handler = ngx_http_block_reading;
 
     r->header_in = hc->busy ? hc->busy->buf : c->buffer;

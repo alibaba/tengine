@@ -404,6 +404,13 @@ struct ngx_http_request_s {
     time_t                            lingering_time;
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
+
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    ngx_msec_t                        connect_time;
+    ngx_msec_t                        read_time;
+    ngx_msec_t                        send_time;
+#endif
+
 #if (T_NGX_RET_CACHE)
     ngx_usec_t                        start_usec;
 #endif
