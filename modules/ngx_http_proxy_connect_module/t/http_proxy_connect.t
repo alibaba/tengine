@@ -47,6 +47,9 @@ my %route_map;
 my %aroute_map = (
     'www.test-a.com' => [[300, "127.0.0.1"]],
     'www.test-b.com' => [[300, "127.0.0.1"]],
+    'get-default-response.com' => [[300, "127.0.0.1"]],
+    'set-response-header.com' => [[300, "127.0.0.1"]],
+    'set-response-status.com' => [[300, "127.0.0.1"]],
 );
 
 # AAAA record (ipv6)
@@ -76,6 +79,10 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
     log_format connect '$remote_addr - $remote_user [$time_local] "$request" '
                        '$status $body_bytes_sent var:$connect_host-$connect_port-$connect_addr';
 
@@ -84,9 +91,9 @@ http {
     resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
     server {
-        listen  8081;
-        listen  8082;   # address.com
-        listen  8083;   # bind.conm
+        listen  127.0.0.1:8081;
+        listen  127.0.0.1:8082;   # address.com
+        listen  127.0.0.1:8083;   # bind.conm
         server_name server_8081;
         access_log off;
         location / {
@@ -104,18 +111,16 @@ http {
         proxy_connect;
         proxy_connect_allow 443 80 8081;
         proxy_connect_connect_timeout 10s;
-        proxy_connect_read_timeout 10s;
-        proxy_connect_send_timeout 10s;
-        proxy_connect_send_lowat 0;
+        proxy_connect_data_timeout 10s;
         proxy_connect_address $proxy_remote_address;
         proxy_connect_bind $proxy_local_address;
 
         if ($host = "address.com") {
-            set $proxy_remote_address "127.0.0.1:8082";
+            set $proxy_remote_address "127.0.0.01:8082";
         }
 
         if ($host = "bind.com") {
-            set $proxy_remote_address "127.0.0.1:8083";
+            set $proxy_remote_address "127.0.0.01:8083";
             set $proxy_local_address "127.0.0.1";   # NOTE that we cannot bind 127.0.0.3 in mac os x.
         }
 
@@ -124,7 +129,7 @@ http {
         }
 
         location / {
-            proxy_pass http://127.0.0.1:8081;
+            proxy_pass http://127.0.0.01:8081;
         }
 
         location = /hello {
@@ -205,10 +210,14 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
     access_log off;
 
     server {
-        listen  8082;
+        listen  127.0.0.1:8082;
         location / {
             return 200 "backend server: $remote_addr $server_port\n";
         }
@@ -223,7 +232,7 @@ http {
         proxy_connect;
         proxy_connect_allow all;
 
-        proxy_connect_address 127.0.0.1:8082;
+        proxy_connect_address 127.0.0.01:8082;
 
         if ($host = "if-return-skip.com") {
             return 200 "if-return\n";
@@ -259,6 +268,10 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
     access_log off;
 
     server {
@@ -279,6 +292,124 @@ like(http_get('/test.html'), qr/test page/, '200 for default root directive with
 like(http_get('/404'), qr/ 404 Not Found/, '404 for default root directive without location {}');
 
 $t->stop();
+
+###############################################################################
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
+    access_log off;
+
+    resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
+
+    server {
+        listen       127.0.0.1:8080;
+        proxy_connect;
+        proxy_connect_allow all;
+
+        if ($host = "get-default-response.com") {
+            return 403 "|$proxy_connect_response|";
+        }
+
+        if ($host = "set-response-header.com") {
+            set $proxy_connect_response "HTTP/1.1 200\r\nFoo: bar\r\n\r\n";
+        }
+
+        if ($host = "set-response-status.com") {
+            set $proxy_connect_response "HTTP/1.1 403\r\n\r\n";
+        }
+    }
+
+    server {
+        listen  8081;
+        location / {
+            return 200 "backend";
+        }
+    }
+}
+
+EOF
+
+# test $proxy_connect_response variable
+
+$t->run();
+
+if ($test_enable_rewrite_phase) {
+    like(http_connect_request('www.test-a.com', '8081', '/'), qr/OK/, 'nothing changed with CONNECT response');
+
+    like(http_connect_request_raw('get-default-response.com', '8081', '/'),
+         qr/\|HTTP\/1\.1 200 Connection Established\r\nProxy-agent: nginx\r\n\r\n\|/,
+        'get default CONNECT response');
+
+    like(http_connect_request('set-response-header.com', '8081', '/'), qr/Foo: bar\r/, 'added header "Foo: bar" to CONNECT response');
+    like(http_connect_request('set-response-status.com', '8081', '/'), qr/HTTP\/1.1 403/, 'change CONNECT response status');
+}
+
+$t->stop();
+
+###############################################################################
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
+    access_log off;
+
+    resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
+
+    server {
+        listen       127.0.0.1:8080;
+        proxy_connect;
+        proxy_connect_allow all;
+
+        proxy_connect_response "HTTP/1.1 200 Connection Established\r\nProxy-agent: nginx\r\nX-Proxy-Connected-Addr: $connect_addr\r\n\r\n";
+    }
+
+    server {
+        listen  8081;
+        location / {
+            return 200 "backend";
+        }
+    }
+}
+
+EOF
+
+# test proxy_connect_response directive
+
+$t->run();
+
+if ($test_enable_rewrite_phase) {
+    like(http_connect_request('set-response-header.com', '8081', '/'), qr/X-Proxy-Connected-Addr: 127.0.0.1:8081\r/, 'added header "Foo: bar" to CONNECT response');
+}
+
+$t->stop();
+
 
 
 # --- stop DNS server ---
@@ -331,6 +462,57 @@ EOF
         return '' if $extra{aborted};
         $reply = $s->getline();
         alarm(0);
+    };
+    alarm(0);
+    if ($@) {
+        log_in("died: $@");
+        return undef;
+    }
+    log_in($reply);
+    return $reply;
+}
+
+sub http_connect_request_raw {
+    my ($host, $port, $url) = @_;
+    my $r = http_connect_raw($host, $port, <<EOF);
+GET $url HTTP/1.0
+Host: $host
+Connection: close
+
+EOF
+    return $r
+}
+
+sub http_connect_raw($;%) {
+    my ($host, $port, $request, %extra) = @_;
+    my $reply;
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        local $SIG{PIPE} = sub { die "sigpipe\n" };
+        alarm(2);
+        my $s = IO::Socket::INET->new(
+            Proto => 'tcp',
+            PeerAddr => '127.0.0.1:8080'
+        );
+        $s->print(<<EOF);
+CONNECT $host:$port HTTP/1.0
+Host: $host
+
+EOF
+        select undef, undef, undef, $extra{sleep} if $extra{sleep};
+        return '' if $extra{aborted};
+        my $n = $s->sysread($reply, 65536);
+        return unless $n;
+        return $reply;
+
+        # ignore data flow over CONNECT tunnel
+        #log_out($request);
+        #$s->print($request);
+        #local $/;
+        #select undef, undef, undef, $extra{sleep} if $extra{sleep};
+        #return '' if $extra{aborted};
+        #$reply =  $s->getline();
+        #alarm(0);
     };
     alarm(0);
     if ($@) {
@@ -425,9 +607,15 @@ sub start_bind {
             $i++ > 20 and last;
         }
         sleep 0.1;
-        $s and close($s) || die 'can not connect to DNS server';
+        $s or die "cannot connect to DNS server";
+        close($s) or die 'can not connect to DNS server';
 
         print "+ DNS server: working\n";
+
+        END {
+            print("+ try to stop\n");
+            stop_bind();
+        }
     }
 }
 
