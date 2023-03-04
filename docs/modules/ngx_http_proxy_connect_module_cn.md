@@ -16,6 +16,7 @@ Table of Contents
    * [Directive](#directive)
       * [proxy_connect](#proxy_connect)
       * [proxy_connect_allow](#proxy_connect_allow)
+      * [proxy_connect_auth](#proxy_connect_auth)
       * [proxy_connect_connect_timeout](#proxy_connect_connect_timeout)
       * [proxy_connect_data_timeout](#proxy_connect_data_timeout)
       * [proxy_connect_read_timeout(deprecated)](#proxy_connect_read_timeout)
@@ -192,6 +193,45 @@ Context: `server`
 
 ```
 proxy_connect_allow 1000-2000 3000-4000; # 允许端口范围1000-2000 和 3000-4000
+```
+
+proxy_connect_auth
+------------------
+
+Syntax: **proxy_connect_auth `<on|off>`**  
+Default: `off`  
+Context: `server`  
+
+设置是否打开代理认证功能。如果开启的话会对客户端进行身份认证，当前仅支持`Basic`。
+要打开认证功能可以修改样例配置：
+
+```
+ server {
+     listen                         3128;
+
+     # dns resolver used by forward proxying
+     resolver                       8.8.8.8;
+
+     # forward proxy for CONNECT request
+     proxy_connect;
+     proxy_connect_allow            443 563;
+     proxy_connect_connect_timeout  10s;
+     proxy_connect_read_timeout     10s;
+     proxy_connect_send_timeout     10s;
+
+     # proxy auth
+     proxy_connect_auth     on;                     # 打开认证功能
+     auth_basic             web_proxy;              # 配置认证域
+     auth_basic_user_file   user_list.htpasswd;     # 配置用户名密码
+
+     # forward proxy for non-CONNECT request
+     location / {
+         auth_basic off;                            # 关闭认证：非CONNECT请求无需认证
+
+         proxy_pass http://$host;
+         proxy_set_header Host $host;
+     }
+ }
 ```
 
 proxy_connect_connect_timeout
