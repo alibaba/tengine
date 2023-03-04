@@ -26,6 +26,7 @@ typedef void (*ngx_http_proxy_connect_upstream_handler_pt)(
 typedef struct {
     ngx_flag_t                           accept_connect;
     ngx_flag_t                           allow_port_all;
+    ngx_flag_t                           auth;
     ngx_array_t                         *allow_ports;
 
     ngx_msec_t                           data_timeout;
@@ -145,7 +146,9 @@ static ngx_int_t ngx_http_proxy_connect_sock_ntop(ngx_http_request_t *r,
     ngx_http_proxy_connect_upstream_t *u);
 static ngx_int_t ngx_http_proxy_connect_create_peer(ngx_http_request_t *r,
     ngx_http_upstream_resolved_t *ur);
-
+static ngx_int_t
+ngx_http_proxy_connect_proxy_auth_basic_set_realm(ngx_http_request_t *r,
+    ngx_str_t *realm);
 
 
 static ngx_command_t  ngx_http_proxy_connect_commands[] = {
@@ -155,6 +158,13 @@ static ngx_command_t  ngx_http_proxy_connect_commands[] = {
       ngx_http_proxy_connect,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_proxy_connect_loc_conf_t, accept_connect),
+      NULL },
+
+    { ngx_string("proxy_connect_auth"),
+      NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_connect_loc_conf_t, auth),
       NULL },
 
     { ngx_string("proxy_connect_allow"),
@@ -1936,6 +1946,7 @@ ngx_http_proxy_connect_create_loc_conf(ngx_conf_t *cf)
 
     conf->accept_connect = NGX_CONF_UNSET;
     conf->allow_port_all = NGX_CONF_UNSET;
+    conf->auth           = NGX_CONF_UNSET;
     conf->allow_ports = NGX_CONF_UNSET_PTR;
 
     conf->connect_timeout = NGX_CONF_UNSET_MSEC;
@@ -1959,6 +1970,7 @@ ngx_http_proxy_connect_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->accept_connect, prev->accept_connect, 0);
     ngx_conf_merge_value(conf->allow_port_all, prev->allow_port_all, 0);
+    ngx_conf_merge_value(conf->auth, prev->auth, 0);
     ngx_conf_merge_ptr_value(conf->allow_ports, prev->allow_ports, NULL);
 
     ngx_conf_merge_msec_value(conf->connect_timeout,
@@ -2344,6 +2356,21 @@ ngx_http_proxy_connect_post_read_handler(ngx_http_request_t *r)
             return NGX_HTTP_NOT_ALLOWED;
         }
 
+        /* proxy auth */
+
+        if (pclcf->auth) {
+            ngx_str_t realm = ngx_string("proxy-authorization");
+
+            if (!r->headers_in.proxy_authorization) {
+                return ngx_http_proxy_connect_proxy_auth_basic_set_realm(
+                    r, &realm);
+            }
+
+            if (!r->headers_in.authorization) {
+                r->headers_in.authorization = r->headers_in.proxy_authorization;
+            }
+        }
+
         /* init ctx */
 
         ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_proxy_connect_ctx_t));
@@ -2366,6 +2393,38 @@ ngx_http_proxy_connect_post_read_handler(ngx_http_request_t *r)
     return NGX_DECLINED;
 }
 
+static ngx_int_t
+ngx_http_proxy_connect_proxy_auth_basic_set_realm(ngx_http_request_t *r,
+                                                  ngx_str_t          *realm)
+{
+    size_t  len;
+    u_char *basic, *p;
+
+    r->headers_out.proxy_authenticate = ngx_list_push(&r->headers_out.headers);
+    if (r->headers_out.proxy_authenticate == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    len = sizeof("Basic realm=\"\"") - 1 + realm->len;
+
+    basic = ngx_pnalloc(r->pool, len);
+    if (basic == NULL) {
+        r->headers_out.proxy_authenticate->hash = 0;
+        r->headers_out.proxy_authenticate       = NULL;
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    p  = ngx_cpymem(basic, "Basic realm=\"", sizeof("Basic realm=\"") - 1);
+    p  = ngx_cpymem(p, realm->data, realm->len);
+    *p = '"';
+
+    r->headers_out.proxy_authenticate->hash = 1;
+    ngx_str_set(&r->headers_out.proxy_authenticate->key, "Proxy-Authenticate");
+    r->headers_out.proxy_authenticate->value.data = basic;
+    r->headers_out.proxy_authenticate->value.len  = len;
+
+    return NGX_HTTP_PROXY_AUTHENTICATION_REQUIRED;
+}
 
 static ngx_int_t
 ngx_http_proxy_connect_init(ngx_conf_t *cf)

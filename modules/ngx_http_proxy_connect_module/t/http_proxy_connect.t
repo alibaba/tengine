@@ -50,6 +50,7 @@ my %aroute_map = (
     'get-default-response.com' => [[300, "127.0.0.1"]],
     'set-response-header.com' => [[300, "127.0.0.1"]],
     'set-response-status.com' => [[300, "127.0.0.1"]],
+    'auth.example.com' => [[300, "127.0.0.1"]],
 );
 
 # AAAA record (ipv6)
@@ -144,6 +145,19 @@ http {
     }
 
     server {
+        listen 127.0.0.1:8080;
+
+        server_name auth.example.com;
+
+        proxy_connect;
+        proxy_connect_auth  on;
+        proxy_connect_allow 443 80 8081;
+
+        auth_basic              web_proxy;
+        auth_basic_user_file    user_list.htpasswd;
+    }
+
+    server {
         listen       127.0.0.1:8080;
         server_name  forbidden.example.com;
 
@@ -155,7 +169,15 @@ http {
 
 EOF
 
+my $user_list = <<'EOF';
+# password is '123456'
+user:$apr1$1Jt/1uYP$bSBtyBO3gRdxsaTXe20td0
+EOF
+
 $t->write_file_expand('nginx.conf', $nginx_conf);
+$t->write_file('user_list.htpasswd', $user_list);
+
+system('chmod', 'o+rx', $t->testdir()); # solve Permission denied
 
 eval {
     $t->run();
@@ -177,6 +199,11 @@ like(http_connect_request('127.0.0.1', '9999', '/'), qr/403/, '200 Connection Es
 like(http_get('/'), qr/backend server/, 'Get method: proxy_pass');
 like(http_get('/hello'), qr/world/, 'Get method: return 200');
 like(http_connect_request('forbidden.example.com', '8080', '/'), qr/405 Not Allowed/, 'forbid CONNECT request without proxy_connect command enabled');
+
+# proxy auth
+like(http_connect_request('auth.example.com', '8081', '/'), qr/407 Proxy Authentication Required/, 'must to carry Proxy-Authorization');
+like(http_connect_request_carry_authorization('auth.example.com', '8081', '/', "Basic dXNlcjoxMjM0NTY="), qr/backend server/, 'carry valid Proxy-Authorization');
+like(http_connect_request_carry_authorization('auth.example.com', '8081', '/', "Basic abcd"), qr/401 Unauthorized/, 'carry invalid Proxy-Authorization');
 
 # proxy_remote_address directive supports dynamic domain resolving.
 like(http_connect_request('proxy-remote-address-resolve-domain.com', '8081', '/'),
@@ -432,9 +459,25 @@ EOF
     return $r
 }
 
+sub http_connect_request_carry_authorization {
+    my ($host, $port, $url, $credentials) = @_;
+    my $r = http_connect($host, $port, <<EOF, credentials => $credentials);
+GET $url HTTP/1.0
+Host: $host
+Connection: close
+
+EOF
+    return $r
+}
+
 sub http_connect($;%) {
     my ($host, $port, $request, %extra) = @_;
     my $reply;
+
+    my $proxy_authorization = defined $extra{credentials}
+                                ? "Proxy-Authorization: $extra{credentials}"
+                                : "";
+
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         local $SIG{PIPE} = sub { die "sigpipe\n" };
@@ -446,6 +489,7 @@ sub http_connect($;%) {
         $s->print(<<EOF);
 CONNECT $host:$port HTTP/1.1
 Host: $host
+$proxy_authorization
 
 EOF
         select undef, undef, undef, $extra{sleep} if $extra{sleep};
