@@ -15,17 +15,3 @@ CORE_LIBS="$CORE_LIBS -lrt -lprotobuf-c"
 
 have=T_INGRESS_SHARED_MEMORY_PB . auto/have
 
-which protoc-c
-if [ $? != 0 ]; then
-    echo "error: ngx_ingress_module requires the protoc-c."
-    exit 1
-else
-    pushd modules/ngx_ingress_module
-    protoc-c --c_out=. ./ingress.proto
-    popd
-
-    if [ $? != 0 ]; then
-        echo "error: ngx_ingress_module protoc-c exec failed."
-        exit 1
-    fi
-fi
