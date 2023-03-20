@@ -70,6 +70,17 @@
 #define NGX_CHANGEBIN_SIGNAL     USR2
 #endif
 
+#if (NGX_HAVE_XUDP)
+
+#define SIGXUDP                 __SIGRTMAX - 10
+
+/**
+ * 注册 __SIGRTMAX - 1作为 xudp 的 worker终结信号。 xudp模块会检查该值的合法性。
+ * 如果检查失败，会自动降级。
+ */
+#define NGX_XUDP_TERMINATE_SIGNAL   XUDP
+#endif
+
 #define ngx_cdecl
 #define ngx_libc_cdecl
 

@@ -89,6 +89,12 @@ typedef struct {
     unsigned                   reuseport:1;
     unsigned                   so_keepalive:2;
     unsigned                   proxy_protocol:1;
+#if (NGX_XQUIC)
+    unsigned                   xquic:1;
+#endif
+#if (NGX_HAVE_XUDP)
+    unsigned                   xudp:1;
+#endif
 
     int                        backlog;
     int                        rcvbuf;
@@ -244,7 +250,12 @@ struct ngx_http_addr_conf_s {
     ngx_http_core_srv_conf_t  *default_server;
 
     ngx_http_virtual_names_t  *virtual_names;
-
+#if (NGX_XQUIC)
+    unsigned                   xquic:1;
+#endif
+#if (NGX_HAVE_XUDP)
+    unsigned                   xudp:1;
+#endif
     unsigned                   ssl:1;
     unsigned                   http2:1;
     unsigned                   proxy_protocol:1;
@@ -278,6 +289,16 @@ typedef struct {
     ngx_int_t                  family;
     in_port_t                  port;
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
+#if (NGX_XQUIC)
+    unsigned                   udp:1;
+#endif
+#if (NGX_HAVE_XUDP)
+    /**
+     *  当且仅当该端口下有通配地址被配置为xudp on时，该值被设为1。
+     *  当该值为1时，所有被加入 addrs的 地址（ngx_http_conf_addr_t）都会被设置xudp；
+     * */
+    unsigned                   xudp:1;
+#endif
 } ngx_http_conf_port_t;
 
 

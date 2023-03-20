@@ -416,6 +416,15 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+#if (NGX_HAVE_XUDP)
+        if (ls[i].for_xudp) {
+            /*
+            * xudp套接字由进程独占，关闭该套接字会导致xudp的所有拦截的数据无法被处理。
+            */
+            continue;
+        }
+#endif
+
         c = ls[i].connection;
 
         if (c == NULL || !c->read->active) {

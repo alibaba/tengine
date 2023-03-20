@@ -15,6 +15,27 @@
 
 typedef struct ngx_listening_s  ngx_listening_t;
 
+#if (NGX_UDPV2)
+
+typedef enum
+{
+    NGX_UDPV2_DONE = 0,
+    NGX_UDPV2_PASS,
+    NGX_UDPV2_DROP,
+} ngx_udpv2_traffic_filter_retcode;
+
+/**
+ * @return
+ * */
+typedef ngx_udpv2_traffic_filter_retcode (*ngx_udpv2_traffic_filter_handler) (ngx_listening_t *ls, const ngx_udpv2_packet_t *upkt);
+
+struct ngx_udpv2_traffic_filter_st
+{
+    ngx_udpv2_traffic_filter_handler    func;
+    ngx_queue_t                         sk;
+};
+#endif
+
 struct ngx_listening_s {
     ngx_socket_t        fd;
 
@@ -32,6 +53,17 @@ struct ngx_listening_s {
     int                 keepidle;
     int                 keepintvl;
     int                 keepcnt;
+#endif
+
+#if (NGX_UDPV2)
+    /* distribution of writable events */
+    ngx_queue_t                 writable_queue;
+    /* filter for udpv2 */
+    ngx_queue_t                 udpv2_filter;
+    /* current processing */
+    ngx_udpv2_packet_t*         udpv2_current_processing;
+    /* default filter */
+    ngx_udpv2_traffic_filter_t  udpv2_traffic_filter;
 #endif
 
     /* handler of accepted connection */
@@ -52,6 +84,11 @@ struct ngx_listening_s {
     ngx_rbtree_t        rbtree;
     ngx_rbtree_node_t   sentinel;
 
+#if (NGX_HAVE_XUDP)
+    ngx_xudp_channel_t *ngx_xudp_ch;
+    ngx_queue_t         xudp_sentinel;
+#endif //NGX_HAVE_XUDP
+
     ngx_uint_t          worker;
 
     unsigned            open:1;
@@ -66,13 +103,26 @@ struct ngx_listening_s {
     unsigned            shared:1;    /* shared between threads or processes */
     unsigned            addr_ntop:1;
     unsigned            wildcard:1;
-
+#if (NGX_XQUIC)
+    unsigned            xquic:1;
+#endif
 #if (NGX_HAVE_INET6)
     unsigned            ipv6only:1;
 #endif
     unsigned            reuseport:1;
     unsigned            add_reuseport:1;
     unsigned            keepalive:2;
+
+#if (NGX_UDPV2)
+    unsigned            support_udpv2:1;
+#endif
+
+#if (NGX_HAVE_XUDP)
+    /* 表明当前监听器是xudp的监听器 */
+    unsigned            for_xudp:1;
+    /* */
+    unsigned            xudp:1;
+#endif
 
     unsigned            deferred_accept:1;
     unsigned            delete_deferred:1;
@@ -209,6 +259,10 @@ struct ngx_connection_s {
 
 #if (NGX_THREADS || NGX_COMPAT)
     ngx_thread_task_t  *sendfile_task;
+#endif
+
+#if (NGX_HAVE_XUDP)
+    unsigned            xudp_tx:1;
 #endif
 };
 
