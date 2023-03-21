@@ -24,6 +24,9 @@
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
 #define NGX_HTTP_VERSION_20                2000
+#if (NGX_XQUIC)
+#define NGX_HTTP_VERSION_30                3000
+#endif
 
 #define NGX_HTTP_UNKNOWN                   0x00000001
 #define NGX_HTTP_GET                       0x00000002
@@ -101,6 +104,7 @@
 #define NGX_HTTP_REQUEST_URI_TOO_LARGE     414
 #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
 #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
+#define NGX_HTTP_REQUEST_LIMITED           420
 #define NGX_HTTP_MISDIRECTED_REQUEST       421
 #define NGX_HTTP_TOO_MANY_REQUESTS         429
 
@@ -464,6 +468,9 @@ struct ngx_http_request_s {
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
+#if (NGX_XQUIC)
+    ngx_http_v3_stream_t             *xqstream;
+#endif
 
     ngx_http_log_handler_pt           log_handler;
 
