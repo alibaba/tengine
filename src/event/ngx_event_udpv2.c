@@ -1,6 +1,6 @@
 #include <ngx_event.h>
 #include <ngx_event_udpv2.h>
-
+#if (NGX_UDPV2)
 /**
  * for udpv2 posted event
  * */
@@ -188,3 +188,5 @@ ngx_udpv2_dispatch_packet(ngx_listening_t* ls, ngx_udpv2_packet_t *upkt, ngx_uin
     ngx_udpv2_dispatch_traffic(&uhdr);
     ngx_udpv2_process_posted_traffic();
 }
+
+#endif

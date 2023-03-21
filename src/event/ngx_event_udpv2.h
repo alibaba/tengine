@@ -1,6 +1,6 @@
 #ifndef _NGX_EVENT_UDP_V2_H_INCLUDED_
 #define _NGX_EVENT_UDP_V2_H_INCLUDED_
-
+#if (NGX_UDPV2)
 /**
  *  @david.sw
  *  基于nginx官方的udp实现，提供更具扩展性的udpv2实现。
@@ -162,5 +162,5 @@ ngx_listening_t* ngx_udpv2_reset_dispatch_filter(ngx_listening_t *ls);
  * */
 ngx_listening_t* ngx_udpv2_add_dispatch_filter(ngx_listening_t *ls, ngx_udpv2_traffic_filter_t *filter);
 
-
+#endif
 #endif // _NGX_EVENT_UDP_V2_H_INCLUDED_`
