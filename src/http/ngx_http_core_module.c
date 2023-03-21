@@ -2536,6 +2536,11 @@ ngx_http_subrequest(ngx_http_request_t *r,
 
     c = r->connection;
     sr->connection = c;
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    sr->connect_time = NGX_CONF_UNSET_MSEC;
+    sr->read_time = NGX_CONF_UNSET_MSEC;
+    sr->send_time = NGX_CONF_UNSET_MSEC;
+#endif
 
     sr->ctx = ngx_pcalloc(r->pool, sizeof(void *) * ngx_http_max_module);
     if (sr->ctx == NULL) {

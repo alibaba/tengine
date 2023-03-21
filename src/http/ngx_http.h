@@ -114,6 +114,12 @@ void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
 ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_http_chunked_t *ctx);
 
+#if (T_HTTP_HEADER)
+ngx_int_t ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+#endif
 
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
 ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);

@@ -2533,3 +2533,60 @@ invalid:
 
     return NGX_ERROR;
 }
+
+#if (T_HTTP_HEADER)
+
+static ngx_int_t
+ngx_http_header(ngx_list_part_t *part, u_char *name, size_t len,
+    ngx_str_t *value)
+{
+    ngx_uint_t        i;
+    ngx_table_elt_t  *header;
+
+    header = part->elts;
+
+    for (i = 0; /* void */; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            header = part->elts;
+            i = 0;
+        }
+
+        if (header[i].hash == 0) {
+            continue;
+        }
+
+        if (len == header[i].key.len
+            && ngx_strncasecmp(header[i].key.data, name, len) == 0)
+        {
+            *value = header[i].value;
+
+            return NGX_OK;
+        }
+    }
+
+    return NGX_DECLINED;
+
+}
+
+ngx_int_t
+ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value)
+{
+    return ngx_http_header(&r->headers_in.headers.part, name, len, value);
+}
+
+
+ngx_int_t
+ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value)
+{
+    return ngx_http_header(&r->headers_out.headers.part, name, len, value);
+}
+#endif
+
