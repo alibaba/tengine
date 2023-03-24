@@ -44,7 +44,7 @@ xqc_transport_callbacks_t ngx_xquic_transport_callbacks = {
     .write_mmsg  = ngx_xquic_server_send_mmsg,
 #endif
     .conn_update_cid_notify = ngx_http_v3_conn_update_cid_notify,
-
+    .conn_cert_cb = ngx_http_v3_cert_cb,
 };
 
 
