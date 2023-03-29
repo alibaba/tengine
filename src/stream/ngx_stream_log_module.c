@@ -389,6 +389,12 @@ ngx_stream_log_write(ngx_stream_session_t *s, ngx_stream_log_t *log,
 
     now = ngx_time();
 
+#if (T_PIPES)
+    if (name == NULL) {
+        name = (u_char *) "log file";
+    }
+#endif
+
     if (n == -1) {
         err = ngx_errno;
 
@@ -1028,6 +1034,34 @@ ngx_stream_log_set_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         log->syslog_peer = peer;
 
         goto process_formats;
+#if (T_PIPES) && !(NGX_WIN32)
+    } else if (ngx_strncmp(value[1].data, "pipe:", 5) == 0) {
+        if (value[1].len == 5) {
+            return NGX_CONF_ERROR;
+        }
+
+        value[1].len -= 5;
+        value[1].data += 5;
+
+        ngx_open_pipe_t *pipe_conf = ngx_conf_open_pipe(cf->cycle, &value[1], "w");
+        if (pipe_conf == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        log->file = pipe_conf->open_fd;
+#ifdef LOG_PIPE_NEED_BACKUP
+        if (log->file != NULL) {
+            name = ngx_log_access_backup;
+            if (ngx_conf_full_name(cf->cycle, &name, 0) != NGX_OK) {
+                return "fail to set bakup";
+            }
+
+            log->file->name = name;
+        }
+#endif
+
+        goto process_formats;
+#endif
     }
 
     n = ngx_stream_script_variables_count(&value[1]);
