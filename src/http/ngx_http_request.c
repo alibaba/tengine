@@ -4144,3 +4144,11 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
 
     return buf;
 }
+
+ngx_int_t
+ngx_http_find_virtual_server_inner(ngx_connection_t *c,
+    ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
+    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp)
+{
+    return ngx_http_find_virtual_server(c, virtual_names, host, r, cscfp);
+}

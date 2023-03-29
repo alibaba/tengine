@@ -151,6 +151,98 @@ ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn,
     (void) ngx_atomic_fetch_add(ngx_stat_quic_concurrent_conns, -1);
 }
 
+ngx_int_t
+ngx_http_find_virtual_server_inner(ngx_connection_t *c,
+    ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
+    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
+
+xqc_int_t
+ngx_http_v3_cert_cb(const char *sni, void **chain,
+    void **cert, void **key, void *conn_user_data)
+{
+    ngx_int_t                       ret;
+    int                             ssl_ret;
+    ngx_str_t                       host;
+    ngx_connection_t               *c;
+    ngx_http_connection_t          *hc;
+    ngx_http_ssl_srv_conf_t        *sscf;
+    ngx_http_core_srv_conf_t       *cscf;
+    ngx_http_xquic_connection_t    *qc;
+    STACK_OF(X509)                 *cert_chain;
+    X509                           *certificate;
+    EVP_PKEY                       *private_key;
+
+    if (NULL == sni || NULL == conn_user_data) {
+        return -XQC_EPARAM;
+    }
+
+    host.data = (u_char *)sni;
+    host.len = strlen(sni);
+
+    /* default http connection */
+    qc = (ngx_http_xquic_connection_t *)conn_user_data;
+    hc = qc->http_connection;
+    c = qc->connection;
+
+    /*
+     * get the server core conf by sni, this is useful when multiple server
+     * block listen on the same port. but useless when there is noly a single
+     * server block
+    */
+   ret = ngx_http_find_virtual_server_inner(c,
+            hc->addr_conf->virtual_names, &host, NULL, &cscf);
+    if (ret == NGX_OK) {
+        hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
+        if (hc->ssl_servername == NULL) {
+            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                        "|xquic|crete ssl_servername fail|");
+
+            return XQC_ERROR;
+        }
+
+        /* get server config */
+        *hc->ssl_servername = host;
+        hc->conf_ctx = cscf->ctx;
+
+    } else {
+        /* try to get ssl config from the default connection */
+        ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                     "|xquic|can't find virtual server, use default server|");
+    }
+
+    /* get http ssl config */
+    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
+    if (NULL == sscf || NULL == sscf->ssl.ctx) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|xquic|CFG or CTX not found||sni:%s|", sni);
+        return XQC_ERROR;
+    }
+
+    ssl_ret = SSL_CTX_get0_chain_certs(sscf->ssl.ctx, &cert_chain);
+    certificate = SSL_CTX_get0_certificate(sscf->ssl.ctx);
+    private_key = SSL_CTX_get0_privatekey(sscf->ssl.ctx);
+
+    if (NULL == certificate) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|xquic|get certificate fail|");
+        return XQC_ERROR;
+    }
+
+    if (NULL == private_key) {
+        /*  keyless server */
+        ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                    "|xquic|get private key fail, \"ssl_keyless off\" config "
+                    "lost|sni:%s", sni);
+        return XQC_ERROR;
+    }
+
+    *chain = cert_chain;
+    *cert = certificate;
+    *key = private_key;
+
+    return XQC_OK;
+}
+
 int 
 ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn, 
     const xqc_cid_t *cid, void *user_data)
