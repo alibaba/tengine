@@ -20,7 +20,7 @@ use CA qw/ make_sm2_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(4);
 
@@ -39,7 +39,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:9050 ssl;
         server_name  server1.com;
 
         enable_ntls  on;
@@ -54,7 +54,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8080;
+        listen       127.0.0.1:9050;
         server_name  server2.com;
 
         enable_ntls  on;
@@ -78,10 +78,10 @@ $t->run();
 
 my $d = $t->testdir();
 
-my $ret1 = `echo Q | $openssl s_client -connect localhost:8080 -noservername -quiet -no_ign_eof -enable_ntls -ntls 2>&1`;
-my $ret2 = `echo Q | $openssl s_client -connect localhost:8080 -servername server2.com -quiet -no_ign_eof -enable_ntls -ntls 2>&1`;
-my $ret3 = `echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername server2.com -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret4 = `echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername server2.org -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret1 = `/bin/echo Q | $openssl s_client -connect localhost:9050 -noservername -quiet -no_ign_eof -enable_ntls -ntls 2>&1`;
+my $ret2 = `/bin/echo Q | $openssl s_client -connect localhost:9050 -servername server2.com -quiet -no_ign_eof -enable_ntls -ntls 2>&1`;
+my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:9050 -servername server2.com -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret4 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:9050 -servername server2.org -quiet -ign_eof -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/CN = server1_sign$/m, 'default cert');
 like($ret2, qr/CN = server2_sign$/m, 'sni cert');

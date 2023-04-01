@@ -267,6 +267,13 @@ typedef struct {
     ngx_http_complex_value_t        *ssl_certificate;
     ngx_http_complex_value_t        *ssl_certificate_key;
     ngx_array_t                     *ssl_passwords;
+
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        enc_certificate;
+    ngx_str_t                        enc_certificate_key;
+    ngx_str_t                        sign_certificate;
+    ngx_str_t                        sign_certificate_key;
+#endif
 #endif
 
 #if (T_NGX_SSL_NTLS)

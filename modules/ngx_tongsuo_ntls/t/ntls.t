@@ -20,7 +20,7 @@ use CA qw/ make_sm2_ca_subca_end_certs make_rsa_end_cert make_ec_end_cert /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(8);
 
@@ -39,7 +39,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:9090 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -54,7 +54,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081 ssl;
+        listen       127.0.0.1:9091 ssl;
         server_name  localhost;
 
         enable_ntls  on;
@@ -71,7 +71,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 ssl;
+        listen       127.0.0.1:9092 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -104,14 +104,14 @@ make_sm2_ca_subca_end_certs($t, "server");
 
 $t->run();
 
-my $ret1 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8080 -cipher aRSA -quiet -ign_eof 2>&1`;
-my $ret2 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8080 -cipher aECDSA -quiet -ign_eof 2>&1`;
-my $ret3 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret4 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -cipher ECC-SM2-SM4-GCM-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret5 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -cipher ECDHE-SM2-SM4-CBC-SM3 -quiet -ign_eof  -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
-my $ret6 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
-my $ret7 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8082 -cipher aRSA -quiet -ign_eof 2>&1`;
-my $ret8 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8082 -cipher aECDSA -quiet -ign_eof 2>&1`;
+my $ret1 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9090 -cipher aRSA -quiet -ign_eof 2>&1`;
+my $ret2 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9090 -cipher aECDSA -quiet -ign_eof 2>&1`;
+my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9091 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret4 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9091 -cipher ECC-SM2-SM4-GCM-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret5 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9091 -cipher ECDHE-SM2-SM4-CBC-SM3 -quiet -ign_eof  -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret6 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9091 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret7 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9092 -cipher aRSA -quiet -ign_eof 2>&1`;
+my $ret8 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9092 -cipher aECDSA -quiet -ign_eof 2>&1`;
 
 like($ret1, qr/^body TLSv(\d|\.)+/m, 'disable NTLS, TLS handshake success with aRSA');
 like($ret2, qr/^body TLSv(\d|\.)+$/m, 'disable NTLS, TLS handshake success with aECDSA');

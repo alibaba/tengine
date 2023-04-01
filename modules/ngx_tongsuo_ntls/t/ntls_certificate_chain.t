@@ -20,7 +20,7 @@ use CA qw/ make_sm2_ca_subca_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(3);
 
@@ -39,7 +39,7 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:9010 ssl;
         server_name  localhost;
 
         enable_ntls  on;
@@ -54,7 +54,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081 ssl;
+        listen       127.0.0.1:9011 ssl;
         server_name  localhost;
 
         enable_ntls  on;
@@ -69,7 +69,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 ssl;
+        listen       127.0.0.1:9012 ssl;
         server_name  localhost;
 
         enable_ntls  on;
@@ -102,9 +102,9 @@ $t->run();
 
 my $d = $t->testdir();
 
-my $ret1 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8080 -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
-my $ret2 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -CAfile $d/server_ca.crt -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
-my $ret3 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8082 -CAfile $d/server_ca.crt -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
+my $ret1 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9010 -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
+my $ret2 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9011 -CAfile $d/server_ca.crt -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
+my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9012 -CAfile $d/server_ca.crt -verify_return_error -quiet -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/^verify error/m, 'NTLS handshake no issuer certificate');
 like($ret2, qr/^body NTLSv(\d|\.)+$/m, 'NTLS handshake success with subca');
