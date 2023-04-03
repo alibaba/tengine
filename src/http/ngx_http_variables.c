@@ -1651,6 +1651,23 @@ ngx_http_variable_scheme(ngx_http_request_t *r,
 
 #endif
 
+#if (T_NGX_XQUIC)
+
+    if (r->xqstream) {
+        if (r->schema_end - r->schema_start == 5
+            && ngx_strncmp(r->schema_start, "https", 5) == 0) {
+            v->len = sizeof("https") - 1;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+            v->data = (u_char *) "https";
+
+            return NGX_OK;
+        }
+    }
+
+#endif
+
     v->len = sizeof("http") - 1;
     v->valid = 1;
     v->no_cacheable = 0;

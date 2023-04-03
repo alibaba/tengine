@@ -2925,6 +2925,13 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        ngx_http_close_request(r, 0);
+        return;
+    }
+#endif
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->main->count != 1) {
@@ -3129,6 +3136,19 @@ ngx_http_test_reading(ngx_http_request_t *r)
 #if (NGX_HTTP_V2)
 
     if (r->stream) {
+        if (c->error) {
+            err = 0;
+            goto closed;
+        }
+
+        return;
+    }
+
+#endif
+
+#if (T_NGX_XQUIC)
+
+    if (r->xqstream) {
         if (c->error) {
             err = 0;
             goto closed;

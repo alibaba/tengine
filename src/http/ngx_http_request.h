@@ -24,6 +24,9 @@
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
 #define NGX_HTTP_VERSION_20                2000
+#if (T_NGX_XQUIC)
+#define NGX_HTTP_VERSION_30                3000
+#endif
 
 #define NGX_HTTP_UNKNOWN                   0x00000001
 #define NGX_HTTP_GET                       0x00000002
@@ -471,6 +474,9 @@ struct ngx_http_request_s {
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
+#if (T_NGX_XQUIC)
+    ngx_http_v3_stream_t             *xqstream;
+#endif
 
     ngx_http_log_handler_pt           log_handler;
 

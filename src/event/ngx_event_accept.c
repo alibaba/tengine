@@ -416,6 +416,16 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+#if (T_NGX_HAVE_XUDP)
+        if (ls[i].for_xudp) {
+            /*
+             * do not disable xudp sockets
+             * closes the xudp sockets, xudp will not process data anymore
+             */
+            continue;
+        }
+#endif
+
         c = ls[i].connection;
 
         if (c == NULL || !c->read->active) {

@@ -67,6 +67,13 @@ ngx_signal_t  signals[] = {
       "",
       ngx_signal_handler },
 
+#if (T_NGX_HAVE_XUDP)
+    { ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL),
+      "SIG" ngx_value(NGX_XUDP_TERMINATE_SIGNAL),
+      "",
+      ngx_signal_handler },
+#endif
+
     { SIGALRM, "SIGALRM", "", ngx_signal_handler },
 
     { SIGINT, "SIGINT", "", ngx_signal_handler },

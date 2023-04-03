@@ -103,6 +103,10 @@ ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
         if (!r->stream) {
 #endif
 
+#if (T_NGX_XQUIC)
+        if (!r->xqstream) {
+#endif
+
         rev = r->connection->read;
 
         if (!rev->active) {
@@ -110,6 +114,10 @@ ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
                 return NGX_ERROR;
             }
         }
+
+#if (T_NGX_XQUIC)
+        }
+#endif
 
 #if (NGX_HTTP_V2)
         }
