@@ -1,0 +1,38 @@
+ngx_addon_name="ngx_http_xquic_module"
+
+next=ngx_http_chunked_filter_module
+HTTP_FILTER_MODULES=`echo $HTTP_FILTER_MODULES \
+                     | sed "s/$next/$next ngx_http_xquic_filter_module/"`
+
+next=ngx_http_v2_module
+HTTP_MODULES=`echo $HTTP_MODULES \
+                     | sed "s/$next/$next ngx_http_xquic_module/"`
+
+
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS \
+                $ngx_addon_dir/ngx_xquic.h \
+                $ngx_addon_dir/ngx_http_xquic_module.h \
+                $ngx_addon_dir/ngx_http_xquic.h \
+                $ngx_addon_dir/ngx_xquic_intercom.h \
+                $ngx_addon_dir/ngx_xquic_recv.h \
+                $ngx_addon_dir/ngx_xquic_send.h \
+                $ngx_addon_dir/ngx_http_v3_stream.h"
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
+                $ngx_addon_dir/ngx_xquic.c \
+                $ngx_addon_dir/ngx_http_xquic_module.c \
+                $ngx_addon_dir/ngx_http_xquic.c \
+                $ngx_addon_dir/ngx_xquic_intercom.c \
+                $ngx_addon_dir/ngx_xquic_recv.c \
+                $ngx_addon_dir/ngx_xquic_send.c \
+                $ngx_addon_dir/ngx_http_v3_stream.c \
+                $ngx_addon_dir/ngx_http_xquic_filter_module.c"
+
+CORE_INCS="$CORE_INCS \
+           $ngx_addon_dir \
+           $XQUIC_INC"
+
+CORE_LIBS="$CORE_LIBS \
+           -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm"
+
+have=T_NGX_XQUIC . auto/have
