@@ -46,7 +46,7 @@ ssize_t
 ngx_xquic_cid_generate_cb(const xqc_cid_t *ori_cid, uint8_t *cid_buf, size_t cid_buflen, void *engine_user_data);
 
 /* worker ID is 4 bytes */
-#define T_NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH         (4)
+#define NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH         (4)
 
 /**
  * @return CID length based on negotiation result
