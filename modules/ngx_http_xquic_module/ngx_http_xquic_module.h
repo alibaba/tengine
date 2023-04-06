@@ -46,10 +46,10 @@ typedef struct {
     /* for HTTP/3 */
     size_t                      qpack_encoder_dynamic_table_capacity;
     size_t                      qpack_decoder_dynamic_table_capacity;
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
     /* udp bacth */
     ngx_event_t                 udpv2_batch;
-#endif //NGX_UDPV2
+#endif
 
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
     /* for cid route , 0 for off, other for on*/

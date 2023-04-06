@@ -737,7 +737,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 #if (T_NGX_HAVE_XUDP)
     ngx_queue_init(&ngx_posted_commit);
 #endif
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
     ngx_queue_init(&ngx_udpv2_posted_event);
 #endif
 
@@ -909,7 +909,7 @@ ngx_event_process_init(ngx_cycle_t *cycle)
             return NGX_ERROR;
         }
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
         if (ls[i].type == SOCK_DGRAM) {
             ngx_queue_init(&ls[i].writable_queue);
             ngx_event_udpv2_init_listening(&ls[i]);

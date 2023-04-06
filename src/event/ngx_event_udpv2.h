@@ -1,9 +1,10 @@
 #ifndef _NGX_EVENT_UDP_V2_H_INCLUDED_
 #define _NGX_EVENT_UDP_V2_H_INCLUDED_
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 /**
- *  @david.sw
- *  基于nginx官方的udp实现，提供更具扩展性的udpv2实现。
+ * @david.sw
+ * udpv2 is extensible
+ * it is based on nginx udp
  * */
 
 #ifndef _NGX_EVENT_H_INCLUDED_

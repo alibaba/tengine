@@ -46,4 +46,4 @@ else
            -L$XUDP_LIB -lxudp"
 fi
 
-have=NGX_UDPV2 . auto/have
+have=T_NGX_UDPV2 . auto/have
