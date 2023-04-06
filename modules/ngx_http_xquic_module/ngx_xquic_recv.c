@@ -622,10 +622,10 @@ ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt
         u_char     text[NGX_SOCKADDR_STRLEN], text2[NGX_SOCKADDR_STRLEN];
         if (c->log->log_level & NGX_LOG_DEBUG_EVENT) {
             addr.data = text;
-            addr.len = ngx_sock_ntop(&upkt->pkt_local_sockaddr, upkt->pkt_local_socklen, text,
+            addr.len = ngx_sock_ntop((struct sockaddr *) &(upkt->pkt_local_sockaddr), upkt->pkt_local_socklen, text,
                                      NGX_SOCKADDR_STRLEN, 1);
             addr2.data = text2;
-            addr2.len = ngx_sock_ntop(&upkt->pkt_sockaddr, upkt->pkt_socklen, text2,
+            addr2.len = ngx_sock_ntop((struct sockaddr *) &(upkt->pkt_sockaddr), upkt->pkt_socklen, text2,
                                      NGX_SOCKADDR_STRLEN, 1);
 
             ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
