@@ -42,6 +42,14 @@ struct ngx_cycle_s {
 
     ngx_log_t                *log;
     ngx_log_t                 new_log;
+#if (T_NGX_XQUIC)
+    ngx_log_t                *x_log;
+    ngx_log_t                 xquic_log;
+#endif
+
+#if (T_NGX_HAVE_XUDP)
+    ngx_xudp_cycle_ctx_t     *xudp_ctx ;
+#endif
 
     ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */
 

@@ -553,7 +553,7 @@ ngx_xquic_recv_from_intercom(ngx_xquic_recv_packet_t *packet)
                   &addr);
 }
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 
 static void
 ngx_xquic_udpv2_dispatch_packet(xqc_engine_t *engine, const ngx_udpv2_packet_t *upkt, void *user_data)

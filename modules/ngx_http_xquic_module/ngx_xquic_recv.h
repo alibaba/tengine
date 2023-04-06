@@ -1,5 +1,5 @@
-#ifndef _NGX_XQUIC_RECV_H_INCLUDED_
-#define _NGX_XQUIC_RECV_H_INCLUDED_
+#ifndef _T_NGX_XQUIC_RECV_H_INCLUDED_
+#define _T_NGX_XQUIC_RECV_H_INCLUDED_
 
 
 #include <ngx_config.h>
@@ -44,26 +44,26 @@ void ngx_xquic_packet_get_cid(ngx_xquic_recv_packet_t *packet,
 void ngx_xquic_packet_get_cid_raw(xqc_engine_t *engine, unsigned char *payload, size_t sz,
     xqc_cid_t *dcid, xqc_cid_t *scid);
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 void ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt);
 #endif
 
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
 /**
- * 生成符合 worker ID规范的本机CID。
+ * generate local CID based on spec of worker ID
  * */
 ssize_t     ngx_xquic_generate_route_cid(unsigned char *buf, size_t len, const uint8_t *current_cid_buf, size_t current_cid_buflen);
 
 /**
- * 根据收到的报文判定当前报文应由哪个进程处理。
+ * choose the specific worker based on received packets
  * */
 ngx_int_t   ngx_xquic_get_target_worker_from_cid(ngx_xquic_recv_packet_t *packet);
-#endif //NGX_XQUIC_SUPPORT_CID_ROUTE
+#endif
 
 #define NGX_XQUIC_CHECK_MAGIC_BIT(pos) (((*(pos)) & 0x40) == 0x40)
 #define NGX_XQUIC_HEALTH_CHECK  "Healthcheck"
 #define NGX_XQUIC_HEALTH_CHECK_REQ  "UDPSTATUS"
 #define NGX_XQUIC_HEALTH_CHECK_RSP  "UDPOK"
 
-#endif /* _NGX_XQUIC_RECV_H_INCLUDED_ */
+#endif /* _T_NGX_XQUIC_RECV_H_INCLUDED_ */
 

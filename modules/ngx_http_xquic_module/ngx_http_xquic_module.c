@@ -606,11 +606,11 @@ ngx_http_xquic_init_main_conf(ngx_conf_t *cf, void *conf)
 
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
 
-#define NGX_QUIC_CID_ROUTE_FIRST_OCTER              (1)
-#define NGX_QUIC_CID_ROUTE_SERVER_ID                (3)
-#define NGX_QUIC_CID_ROUTE_ENTROPY                  (4)
+#define T_NGX_QUIC_CID_ROUTE_FIRST_OCTER              (1)
+#define T_NGX_QUIC_CID_ROUTE_SERVER_ID                (3)
+#define T_NGX_QUIC_CID_ROUTE_ENTROPY                  (4)
 
-#define NGX_QUIC_CID_ROUTE_WORKER_ID_OFFSET         (NGX_QUIC_CID_ROUTE_FIRST_OCTER + NGX_QUIC_CID_ROUTE_SERVER_ID + NGX_QUIC_CID_ROUTE_ENTROPY)
+#define T_NGX_QUIC_CID_ROUTE_WORKER_ID_OFFSET         (T_NGX_QUIC_CID_ROUTE_FIRST_OCTER + T_NGX_QUIC_CID_ROUTE_SERVER_ID + T_NGX_QUIC_CID_ROUTE_ENTROPY)
 
     ngx_conf_init_uint_value(qmcf->cid_server_id_offset, NGX_QUIC_CID_ROUTE_FIRST_OCTER);
     ngx_conf_init_uint_value(qmcf->cid_server_id_length, NGX_QUIC_CID_ROUTE_SERVER_ID);
@@ -624,7 +624,7 @@ ngx_http_xquic_init_main_conf(ngx_conf_t *cf, void *conf)
 
     /* overlap */
     if (qmcf->cid_worker_id_offset < qmcf->cid_server_id_offset + qmcf->cid_server_id_length 
-        && qmcf->cid_worker_id_offset + NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH > qmcf->cid_server_id_offset)
+        && qmcf->cid_worker_id_offset + T_NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH > qmcf->cid_server_id_offset)
     {
         return "|xquic|overlap server id and worker id|";
     }

@@ -573,7 +573,7 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 #include <ngx_iocp_module.h>
 #endif
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 #include <ngx_event_udpv2.h>
 #endif
 

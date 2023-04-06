@@ -103,7 +103,7 @@ ngx_xquic_server_send(const unsigned char *buf, size_t size,
 }
 
 
-#if defined(NGX_XQUIC_SUPPORT_SENDMMSG)
+#if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
 ssize_t 
 ngx_xquic_server_send_mmsg(const struct iovec *msg_iov, unsigned int vlen,
     const struct sockaddr *peer_addr, socklen_t peer_addrlen, void *user_data)
@@ -131,7 +131,7 @@ ngx_xquic_server_send_mmsg(const struct iovec *msg_iov, unsigned int vlen,
 
     wev = qc->connection->write;
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 #if (T_NGX_HAVE_XUDP)
     if (ngx_xudp_is_tx_enable(qc->connection)) {
         res = ngx_xudp_sendmmsg(qc->connection, (struct iovec *) msg_iov, vlen, peer_addr, peer_addrlen, /**push*/ 1);

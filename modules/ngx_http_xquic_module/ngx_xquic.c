@@ -17,7 +17,7 @@
 
 #define NGX_XQUIC_TMP_BUF_LEN 512
 #define NGX_XQUIC_SUPPORT_CID_ROUTE 1
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 static void ngx_xquic_batch_udp_traffic(ngx_event_t * ev);
 #endif
 
@@ -40,7 +40,7 @@ xqc_transport_callbacks_t ngx_xquic_transport_callbacks = {
     .server_accept = ngx_xquic_conn_accept,
     .server_refuse = ngx_xquic_conn_refuse,
     .write_socket = ngx_xquic_server_send,
-#if defined(NGX_XQUIC_SUPPORT_SENDMMSG)
+#if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
     .write_mmsg  = ngx_xquic_server_send_mmsg,
 #endif
     .conn_update_cid_notify = ngx_http_v3_conn_update_cid_notify,
@@ -108,7 +108,7 @@ ngx_xquic_engine_init_event_timer(ngx_http_xquic_main_conf_t *qmcf, xqc_engine_t
     ev->log = ngx_cycle->log;
     ev->data = engine;
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
     ngx_memcpy(&qmcf->udpv2_batch, ev, sizeof(*ev));
     qmcf->udpv2_batch.handler = ngx_xquic_batch_udp_traffic;
 #endif
@@ -190,7 +190,7 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
-    /* enable cid negotiate*/
+    /* enable cid negotiate */
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
     if (ngx_xquic_is_cid_route_on(cycle)) {
         config.cid_negotiate = 1;
@@ -204,7 +204,7 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     config.cfg_log_level = qmcf->log_level;
     config.cfg_log_timestamp = 0;
 
-#if defined(NGX_XQUIC_SUPPORT_SENDMMSG)
+#if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
     /* set sendmmsg */
     config.sendmmsg_on = 1;
 #endif
@@ -339,7 +339,7 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 
 static void
 ngx_xquic_batch_udp_traffic(ngx_event_t * ev)
@@ -408,7 +408,7 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
         c = ls[i].connection;
         rev = c->read;
 
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
         /* outofband */
         if (ls[i].support_udpv2) {
             ngx_udpv2_reset_dispatch_filter(&ls[i]);

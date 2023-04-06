@@ -430,7 +430,11 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
 
-            if (ls[i].ignore) {
+            if (ls[i].ignore
+#if (T_NGX_HAVE_XUDP)
+                || ls[i].for_xudp
+#endif
+            ) {
                 continue;
             }
 
@@ -727,6 +731,12 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
     for (i = 0; i < cycle->listening.nelts; i++) {
 
         ls[i].log = *ls[i].logp;
+
+#if (T_NGX_HAVE_XUDP)
+        if (ls[i].for_xudp) {
+            continue ;
+        }
+#endif
 
         if (ls[i].rcvbuf != -1) {
             if (setsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF,
@@ -1026,6 +1036,10 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
     ngx_uint_t         i;
     ngx_listening_t   *ls;
     ngx_connection_t  *c;
+
+#if (T_NGX_HAVE_XUDP)
+    ngx_xudp_terminate_xudp_binding(cycle);
+#endif
 
     if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
         return;

@@ -70,6 +70,18 @@
 #define NGX_CHANGEBIN_SIGNAL     USR2
 #endif
 
+#if (T_NGX_HAVE_XUDP)
+
+#define SIGXUDP                 __SIGRTMAX - 10
+
+/**
+ * register __SIGRTMAX - 1 as the signal-exit of the worker xudp
+ * then, xudp module will test validity
+ * if check failed, auto downgrade
+ */
+#define NGX_XUDP_TERMINATE_SIGNAL   XUDP
+#endif
+
 #define ngx_cdecl
 #define ngx_libc_cdecl
 

@@ -1,6 +1,6 @@
 #include <ngx_event.h>
 #include <ngx_event_udpv2.h>
-#if (NGX_UDPV2)
+#if (T_NGX_UDPV2)
 /**
  * for udpv2 posted event
  * */
