@@ -219,6 +219,12 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     }
 
     ssl_ret = SSL_CTX_get0_chain_certs(sscf->ssl.ctx, &cert_chain);
+    if (ssl_ret != 1) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|xquic|get chain certificate fail|err=%i", ssl_ret);
+        return XQC_ERROR;
+    }
+
     certificate = SSL_CTX_get0_certificate(sscf->ssl.ctx);
     private_key = SSL_CTX_get0_privatekey(sscf->ssl.ctx);
 
