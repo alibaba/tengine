@@ -17,17 +17,23 @@ Table of Contents
       * [proxy_connect](#proxy_connect)
       * [proxy_connect_allow](#proxy_connect_allow)
       * [proxy_connect_connect_timeout](#proxy_connect_connect_timeout)
-      * [proxy_connect_read_timeout](#proxy_connect_read_timeout)
-      * [proxy_connect_send_timeout](#proxy_connect_send_timeout)
+      * [proxy_connect_data_timeout](#proxy_connect_data_timeout)
+      * [proxy_connect_read_timeout(deprecated)](#proxy_connect_read_timeout)
+      * [proxy_connect_send_timeout(deprecated)](#proxy_connect_send_timeout)
       * [proxy_connect_address](#proxy_connect_address)
       * [proxy_connect_bind](#proxy_connect_bind)
+      * [proxy_connect_response](#proxy_connect_response)
    * [Variables](#variables)
       * [$connect_host](#connect_host)
       * [$connect_port](#connect_port)
       * [$connect_addr](#connect_addr)
       * [$proxy_connect_connect_timeout](#proxy_connect_connect_timeout-1)
       * [$proxy_connect_read_timeout](#proxy_connect_read_timeout-1)
-      * [$proxy_connect_send_timeout](#proxy_connect_send_timeout-1)
+      * [$proxy_connect_send_timeout(deprecated)](#proxy_connect_send_timeout-1)
+      * [$proxy_connect_resolve_time](#proxy_connect_resolve_time)
+      * [$proxy_connect_connect_time](#proxy_connect_connect_time)
+      * [$proxy_connect_first_byte_time](#proxy_connect_first_byte_time)
+      * [$proxy_connect_response](#proxy_connect_response-1)
    * [Known Issues](#known-issues)
 
 Example
@@ -36,7 +42,7 @@ Example
 Configuration Example
 ---------------------
 
-```
+```nginx
  server {
      listen                         3128;
 
@@ -47,8 +53,7 @@ Configuration Example
      proxy_connect;
      proxy_connect_allow            443 563;
      proxy_connect_connect_timeout  10s;
-     proxy_connect_read_timeout     10s;
-     proxy_connect_send_timeout     10s;
+     proxy_connect_data_timeout     10s;
 
      # forward proxy for non-CONNECT request
      location / {
@@ -114,7 +119,7 @@ The sequence diagram of above example is as following:
     |   Connection Established    |                          |
     |                             |                          |
     |                                                        |
-    ========= CONNECT tunnel has been establesied. ===========
+    ========= CONNECT tunnel has been established. ===========
     |                                                        |
     |                             |                          |
     |                             |                          |
@@ -196,6 +201,14 @@ Context: `server`
 
 Defines a timeout for establishing a connection with a proxied server.
 
+proxy_connect_data_timeout
+--------------------------
+
+Syntax: **proxy_connect_data_timeout `time`**  
+Default: `60s`  
+Context: `server`  
+
+Sets the timeout between two successive read or write operations on client or proxied server connections. If no data is transmitted within this time, the connection is closed.
 
 proxy_connect_read_timeout
 --------------------------
@@ -204,9 +217,9 @@ Syntax: **proxy_connect_read_timeout `time`**
 Default: `60s`  
 Context: `server`  
 
-Defines a timeout for reading a response from the proxied server.  
-The timeout is set only between two successive read operations, not for the transmission of the whole response.  
-If the proxied server does not transmit anything within this time, the connection is closed.
+Deprecated.
+
+It has the same function as the directive `proxy_connect_data_timeout` for compatibility. You can configure only one of the directives (`proxy_connect_data_timeout` or `proxy_connect_read_timeout`).
 
 proxy_connect_send_timeout
 --------------------------
@@ -215,9 +228,9 @@ Syntax: **proxy_connect_send_timeout `time`**
 Default: `60s`  
 Context: `server`  
 
-Sets a timeout for transmitting a request to the proxied server.  
-The timeout is set only between two successive write operations, not for the transmission of the whole request.  
-If the proxied server does not receive anything within this time, the connection is closed.
+Deprecated.
+
+It has no function.
 
 proxy_connect_address
 ---------------------
@@ -248,6 +261,44 @@ proxy_connect_bind $remote_addr transparent;
 
 In order for this parameter to work, it is usually necessary to run nginx worker processes with the [superuser](http://nginx.org/en/docs/ngx_core_module.html#user) privileges. On Linux it is not required (1.13.8) as if the transparent parameter is specified, worker processes inherit the CAP_NET_RAW capability from the master process. It is also necessary to configure kernel routing table to intercept network traffic from the proxied server.
 
+proxy_connect_response
+----------------------
+
+Syntax: **proxy_connect_response `CONNECT response`**  
+Default: `HTTP/1.1 200 Connection Established\r\nProxy-agent: nginx\r\n\r\n`  
+Context: `server`
+
+Set the response of CONNECT request.
+
+Note that it is only used for CONNECT request, it cannot modify the data flow over CONNECT tunnel.
+
+For example:
+
+```
+proxy_connect_response "HTTP/1.1 200 Connection Established\r\nProxy-agent: nginx\r\nX-Proxy-Connected-Addr: $connect_addr\r\n\r\n";
+
+```
+
+The `curl` command test case with above config is as following:
+
+```
+$ curl https://github.com -sv -x localhost:3128
+* Connected to localhost (127.0.0.1) port 3128 (#0)
+* allocate connect buffer!
+* Establish HTTP proxy tunnel to github.com:443
+> CONNECT github.com:443 HTTP/1.1
+> Host: github.com:443
+> User-Agent: curl/7.64.1
+> Proxy-Connection: Keep-Alive
+>
+< HTTP/1.1 200 Connection Established            --.
+< Proxy-agent: nginx                               | custom CONNECT response
+< X-Proxy-Connected-Addr: 13.229.188.59:443      --'
+...
+
+```
+
+
 Variables
 =========
 
@@ -274,31 +325,79 @@ Get or set timeout of [`proxy_connect_connect_timeout` directive](#proxy_connect
 
 For example:
 
-```
+```nginx
 # Set default value
 
 proxy_connect_connect_timeout   10s;
-proxy_connect_read_timeout      10s;
-proxy_connect_send_timeout      10s;
+proxy_connect_data_timeout      10s;
 
 # Overlap default value
 
 if ($host = "test.com") {
     set $proxy_connect_connect_timeout  "10ms";
-    set $proxy_connect_read_timeout     "10ms";
-    set $proxy_connect_send_timeout     "10ms";
+    set $proxy_connect_data_timeout     "10ms";
 }
 ```
+
+$proxy_connect_data_timeout
+---------------------------
+
+Get or set a timeout of [`proxy_connect_data_timeout` directive](#proxy_connect_data_timeout).
 
 $proxy_connect_read_timeout
 ---------------------------
 
-Get or set a timeout of [`proxy_connect_read_timeout` directive](#proxy_connect_read_timeout).
+Deprecated. 
+It still can get or set a timeout of [`proxy_connect_data_timeout` directive](#proxy_connect_data_timeout) for compatibility.
 
 $proxy_connect_send_timeout
 ---------------------------
 
-Get or set a timeout of [`proxy_connect_send_timeout` directive](#proxy_connect_send_timeout).
+Deprecated.
+It has no function.
+
+$proxy_connect_resolve_time
+---------------------------
+
+Keeps time spent on name resolving; the time is kept in seconds with millisecond resolution.
+
+* Value of "" means this module does not work on this request.
+* Value of "-" means name resolving failed.
+
+
+$proxy_connect_connect_time
+---------------------------
+
+Keeps time spent on establishing a connection with the upstream server; the time is kept in seconds with millisecond resolution.
+
+* Value of "" means this module does not work on this request.
+* Value of "-" means name resolving or connecting failed.
+
+
+$proxy_connect_first_byte_time
+---------------------------
+
+Keeps time to receive the first byte of data from the upstream server; the time is kept in seconds with millisecond resolution.
+
+* Value of "" means this module does not work on this request.
+* Value of "-" means name resolving, connecting or receving failed.
+
+
+$proxy_connect_response
+---------------------------
+
+Get or set the response of CONNECT request.  
+The default response of CONNECT request is "HTTP/1.1 200 Connection Established\r\nProxy-agent: nginx\r\n\r\n".
+
+Note that it is only used for CONNECT request, it cannot modify the data flow over CONNECT tunnel.
+
+For example:
+
+```nginx
+
+# modify default Proxy-agent header
+set $proxy_connect_response "HTTP/1.1 200\r\nProxy-agent: nginx/1.19\r\n\r\n";
+```
 
 
 Known Issues
