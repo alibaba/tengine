@@ -613,7 +613,7 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {
     size_t                   size;
     ssize_t                  n = 0;
-    off_t                    send, buf_size = 0;
+    off_t                    send = 0, buf_size = 0;
     ngx_http_request_t      *r;
     ngx_http_v3_stream_t    *h3_stream;
     ngx_chain_t             *last_out = NULL, *last_chain, *cl;
