@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #ifndef _NGX_XUDP_INTERNAL_H_INCLUDED_
 #define _NGX_XUDP_INTERNAL_H_INCLUDED_
 
@@ -13,28 +17,28 @@ typedef struct ngx_xudp_port_map_node_s ngx_xudp_port_map_node_t;
 
 struct ngx_xudp_port_map_node_s
 {
-    // 基于IP地址的常规匹配的存放listenr的 ngx_queue_t
+    /* ngx_queue_t of listenr based on IP addr */
     ngx_radix_tree_t    *regular  ;
 
-    // 存放通配的listener
+    /* wildcard listener */
     ngx_queue_t          wildcard ;
 };
 
 struct ngx_xudp_cycle_ctx_s
 {
-    // 基于16位端口的映射
+    /* mapping based on 16-bit port */
     ngx_radix_tree_t    *ports_map ;
-    // 发送监听器
+    /* send listener */
     ngx_listening_t     *tx;
-    // group
+    /* group */
     xudp_group          *group;
 };
 
 struct ngx_xudp_channel_s
 {
-    //读取通道
+    /* read channel */
     xudp_channel    *ch ;
-    //强制刷新发送缓冲区。
+    /* force to flush buffer */
     ngx_event_t     commit;
 };
 
@@ -56,7 +60,5 @@ struct ngx_xudp_conf_parser_s
 extern struct kern_xquic ngx_xudp_xquic_kern_cid_route_info;
 
 #endif
-
-
 
 #endif

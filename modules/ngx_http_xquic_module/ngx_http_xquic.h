@@ -1,4 +1,6 @@
-
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 #ifndef _NGX_HTTP_XQUIC_H_INCLUDED_
 #define _NGX_HTTP_XQUIC_H_INCLUDED_

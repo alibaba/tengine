@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #ifndef _NGX_XUDP_H_INCLUDED_
 #define _NGX_XUDP_H_INCLUDED_
 
@@ -5,15 +9,15 @@
 
 
 /**
- * 获取当前进程的发送通道。
- * 自xudp2.0起，任意xudp监听的ls都可以被用作tx，该接口后续可以废弃。
+ * get send channel of the worker
+ * from xudp2.0, xudp listener can be use as tx
  * */
 ngx_listening_t *ngx_xudp_get_tx(void);
 
 
 /**
- *  发送数据。
- *  @param push 是否需要立刻写入网卡
+ *  send data
+ *  @param push send data to NIC immediately
  *  @ls tx from `ngx_xudp_get_tx`
  * */
 ssize_t ngx_xudp_sendmmsg(ngx_connection_t *c , struct iovec *msg_iov, unsigned int vlen,

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #ifndef _NGX_XUDP_INC_H_INCLUDED_
 #define _NGX_XUDP_INC_H_INCLUDED_
 
@@ -23,9 +27,10 @@ ngx_int_t ngx_xudp_open_listening_sockets(ngx_cycle_t *cycle);
 
 
 /**
- * 解除当前进程和xdp的绑定关系，当调用后，该进程将无法通过xudp收到和发送任何数据。
- * xudp会自动释放和该进程关联的所有XDP socket和共享内存。
+ * release relationship between worker and xdp
+ * worker will not send and recv traffic via xudp
+ * xudp will release all the xdp socket and shm of the worker
  * */
 void ngx_xudp_terminate_xudp_binding(ngx_cycle_t *cycle);
 
-#endif //
+#endif

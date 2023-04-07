@@ -1,8 +1,10 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 /**
  * for engine and socket operation
  */
-
 
 #include <ngx_xquic.h>
 #include <ngx_http_xquic_module.h>
@@ -51,7 +53,7 @@ xqc_transport_callbacks_t ngx_xquic_transport_callbacks = {
 uint64_t 
 ngx_xquic_get_time()
 {
-    /*获取微秒单位时间*/
+    /* take the time in microseconds */
     struct timeval tv;
     gettimeofday(&tv, NULL);
     uint64_t ul = tv.tv_sec * 1000000 + tv.tv_usec;
@@ -495,7 +497,7 @@ ngx_xquic_init_cid_route(ngx_cycle_t *cycle, ngx_http_xquic_main_conf_t *qmcf)
     /* set salt range */
     qmcf->cid_worker_id_salt_range  = qmcf->cid_worker_id_offset;
 
-    /* 即使进程reload我们也需要 保持 cid_worker_id_secret不变  */
+    /* keep the same cid_worker_id_secret for the tengine reload */
     if (old_qmcf) {
         /* use same cid_worker_id_secret */
         qmcf->cid_worker_id_secret  = old_qmcf->cid_worker_id_secret;
@@ -605,7 +607,7 @@ ngx_xquic_generate_route_cid(unsigned char *buf, size_t len, const uint8_t *curr
     if (XQC_UNLIKELY(len < qmcf->cid_len)) {
         /**
         * just return 0 to force xquic generate random cid
-        * 注意这里会破坏DCID的规约
+        * Notes: broke the DCID spec
         */
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|dismatch cid length %d (required %d)|", len, qmcf->cid_len);
         return 0;
@@ -686,8 +688,8 @@ ngx_xquic_get_target_worker_from_cid(ngx_xquic_recv_packet_t *packet)
         return ngx_sum_complement(worker >> PID_MAX_BIT, salt, ccf->worker_processes);
 #else
         /**
-         * 在数学意义上， 可以简化成 ((worker >> PID_MAX_BIT) + salt) % ccf->worker_processes 
-         * 但在实现中，(worker >> PID_MAX_BIT) + salt 运算可能造成溢出。
+         * For the mathematics, ((worker >> PID_MAX_BIT) + salt) % ccf->worker_processes is better
+         * (worker >> PID_MAX_BIT) + salt may overflow in practice
          * */
         return ((worker >> PID_MAX_BIT) % ccf->worker_processes + salt % ccf->worker_processes)
                 % ccf->worker_processes;

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #include <ngx_xudp.h>
 #include <ngx_xudp_internal.h>
 #include <netinet/in.h>
@@ -55,10 +59,10 @@ ngx_xudp_sendmmsg(ngx_connection_t *c ,struct iovec *msg_iov, unsigned int vlen,
     }
 
     /**
-     * xudp 发送处理包含
-     * 1. 将待发送的内存移入xudp内存准备区 (xudp_send_channel), 此时默认不会将内存刷新到网卡上（ 除非buffer到达一个阈值，
-     * 目前是 100 ）
-     * 2. 使用 xudp_commit_channel手动刷新内存到网卡上。
+     * xudp send data:
+     * 1. move the send buffer to xudp_send_channel
+     * if the threshold (100) of buffer is reached, buffer will be flush to NIC immediately
+     * 2. flush data to NIC via xudp_commit_channel actively
     * */
     for(packet_count = 0; packet_count < vlen; packet_count++) {
         err = xudp_send_channel(xudp_ch->ch, msg_iov->iov_base, msg_iov->iov_len, (struct sockaddr *) &xaddr, xudp_flags);
@@ -80,7 +84,7 @@ ngx_xudp_sendmmsg(ngx_connection_t *c ,struct iovec *msg_iov, unsigned int vlen,
         if (!push) {
             ngx_post_event(&(xudp_ch->commit), &ngx_posted_commit);
         }else {
-            /* 执行手动刷新数据到网卡 */
+            /* flush data to NIC actively */
             err = xudp_commit_channel(xudp_ch->ch);
             if (err < 0 && ngx_xudp_error_is_fatal(err)) {
                 ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xudp|nginx|xudp_commit_channel failed [err:%d]", err);

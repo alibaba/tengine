@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #ifndef _T_NGX_XQUIC_INTERCOM_INCLUDED_H_
 #define _T_NGX_XQUIC_INTERCOM_INCLUDED_H_
 
