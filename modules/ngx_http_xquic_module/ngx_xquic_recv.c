@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 #include <ngx_xquic_recv.h>
 #include <ngx_xquic_intercom.h>

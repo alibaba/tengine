@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #include <ngx_xudp_module.h>
 #include <ngx_xudp_internal.h>
 #include <ngx_http.h>
@@ -81,7 +85,7 @@ static ngx_int_t ngx_xudp_create_listening_sockets(ngx_cycle_t *cycle);
 static ngx_int_t ngx_xudp_create_address_map(ngx_cycle_t *cycle);
 
 /**
- * 刷新网卡发送队列。
+ * flush NIC send queue 
  * */
 static void ngx_xudp_flush_send_data(ngx_event_t *ev);
 
@@ -132,7 +136,7 @@ static ngx_int_t ngx_xudp_module_init_process(ngx_cycle_t *cycle);
 static void ngx_event_xudp_recvmsg(ngx_event_t *rev);
 
 /**
- * 通过收到报文的目的地址，查找报文应被投入到哪个连接中。
+ * choose connection based on the destination address of the packet
  * */
 static ngx_listening_t *ngx_xudp_find_listening(ngx_listening_t *xudp_ls, const struct sockaddr *sa);
 
@@ -434,13 +438,13 @@ ngx_xudp_core_module_init_module(ngx_cycle_t *cycle)
     /* free old xudp engine if necessary */
     if (ngx_xudp_engine) {
 
-        /** 通知 旧 worker 需要快速解绑 xudp */
+        /* notify old worker to unbind xudp asap */
         ngx_xudp_signal_worker_process(cycle);
 
-        /** 释放当前持有的 ngx_xudp_engine */
+        /* free current ngx_xudp_engine */
         ngx_xudp_free(cycle);
 
-        /* 标记需要等待 旧worker 解绑  */
+        /* wait old worker for unbinding */
         need_wait = 1;
 
         ngx_memory_barrier();
@@ -560,14 +564,16 @@ ngx_xudp_core_module_init_process(ngx_cycle_t *cycle)
 {
     /**
      * NOTICE
-     * xdp套接字在worker中创建需要至少CAP_NET_RAW, CAP_NET_ADMIN两个权限。
-     * 但nginx的用户管理使得setuid后，worker无法保留任何权限。三个方案
-     * 1. ngx_xudp_core_module_init_process 进行空实现，将ngx_xudp_open_listening_sockets移动到setuid之前
-     * 2. 将setuid移动到ngx_xudp_core_module_init_process最后执行。
-     * 3. 使用keep_caps对linux在setuid时保留权限，但worker会保留所有的超级权限，存在安全风险，需要进行权限管控。
-     * 但若有多个模块存在权限纠缠，管理会及其复杂。
-     *
-     * 本次实现采用第一种方案。 若nginx后续支持linux权限管理模块，方案三是更为清晰和独立的方案设计。
+     * xdp socket in the worker needs CAP_NET_RAW and CAP_NET_ADMIN at least
+     * nginx with setuid, the worker cannot save any permission
+     * 
+     * there are three methods:
+     * 1. set ngx_xudp_core_module_init_process as a empty function, execute ngx_xudp_open_listening_sockets before setuid
+     * 2. for the ngx_xudp_core_module_init_process, execute setuid in the end 
+     * 3. save permission during the linux setuid via keep_caps, manage permission of worker
+     * 
+     * Now, xudp uses the method 1.
+     * If nginx supports linux permission mod, the method 3 will be better.
      * */
     return NGX_OK;
     //return ngx_xudp_open_listening_sockets(cycle);
@@ -944,13 +950,13 @@ ngx_xudp_create_listening_sockets(ngx_cycle_t *cycle)
         ls->for_xudp    = 1;
         ls->worker      = xudp_channel_get_groupid(ch);
         ls->logp        = cycle->log;
-        // 防止被负载均衡影响。
+        // protect against load balancing
         ls->reuseport   = 1 ;
         ls->ngx_xudp_ch = xudp_ch;
         ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "|xudp|nginx|init[sockfd:%d] success", ls->fd);
     }
 
-    //set group key
+    // set group key
     xudp_dict_set_group_key(group, pid);
     cycle->xudp_ctx->group = group;
     return NGX_OK;
@@ -1266,7 +1272,7 @@ ngx_xudp_terminate_xudp_binding(ngx_cycle_t *cycle)
         return;
     }
 
-    /** 将全局的 ngx_xudp_engine置空 */
+    /* reset global ngx_xudp_engine */
     engine  = ngx_xudp_clear(cycle);
     ngx_memory_barrier();
 
@@ -1318,8 +1324,10 @@ ngx_xudp_terminate_xudp_binding(ngx_cycle_t *cycle)
 
             if (c->write->active) {
                 /**
-                 * 触发所有的挂载在该事件上的所有待触发事件，同时我们提前清空了 ngx_xudp_engine
-                 * 因此xudp send 会立刻失败，并触发上层降级处理。
+                 * trigger all the events that run on this event
+                 * because the ngx_xudp_engine has been cleared in advance,
+                 * xudp send will be failed
+                 * trigger degrade at last
                  * */
                 ngx_event_process_posted((ngx_cycle_t *) ngx_cycle, &ls[i].writable_queue);
                 /* del from event poll */

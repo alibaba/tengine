@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
+
 #include "xudp.h"
 #include <sys/epoll.h>
 #include <malloc.h>

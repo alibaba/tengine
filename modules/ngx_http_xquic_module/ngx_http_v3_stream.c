@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 #include <nginx.h>
 
@@ -966,8 +969,8 @@ ngx_http_v3_request_read_notify(xqc_h3_request_t *h3_request, xqc_request_notify
     unsigned char                fin = 0;
     ngx_http_v3_stream_t        *user_stream = (ngx_http_v3_stream_t *) user_data;
     ngx_http_request_t          *r = user_stream->request;
-//    ngx_connection_t            *fc = r->connection;
-//    ngx_http_request_body_t     *rb = r->request_body;
+  //ngx_connection_t            *fc = r->connection;
+  //ngx_http_request_body_t     *rb = r->request_body;
     ngx_int_t                    ret;
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 

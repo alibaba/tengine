@@ -1,4 +1,6 @@
-
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 #include <ngx_core.h>
 #include <ngx_http.h>

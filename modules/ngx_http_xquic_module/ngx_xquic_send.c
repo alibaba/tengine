@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ */
 
 #include <ngx_xquic_send.h>
 #include <ngx_http_xquic_module.h>

@@ -1,4 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * SPDX-License-Identifier: GPL-2.0
+ */
 
 #include "kern_core.c"
 #include "xquic_xdp.h"
@@ -44,7 +47,7 @@ ngx_murmur_hash2(struct xudp_ctx *ctx, u8 *data, u8 len, u8 *err)
     do {
 
         /**
-         *  DCID的长度不超过20个字节。
+         * DCID max length is 20 bytes
          * */
         MURMUR_ROUND();
         MURMUR_ROUND();
