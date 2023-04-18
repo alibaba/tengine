@@ -20,7 +20,7 @@ use CA qw/ make_sm2_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(6);
 
@@ -45,7 +45,7 @@ http {
     ssl_enc_certificate_key     server_enc.key;
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:9040 ssl;
         server_name  default;
 
         ssl_session_tickets off;
@@ -57,7 +57,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8080;
+        listen       127.0.0.1:9040;
         server_name  nocache;
 
         ssl_session_tickets off;
@@ -69,7 +69,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081 ssl;
+        listen       127.0.0.1:9041 ssl;
         server_name  default;
 
         ssl_session_ticket_key ticket1.key;
@@ -80,7 +80,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081;
+        listen       127.0.0.1:9041;
         server_name  tickets;
 
         ssl_session_ticket_key ticket2.key;
@@ -103,14 +103,14 @@ $t->run();
 my $d = $t->testdir();
 
 my $host = "default";
-my $ret1 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername $host -quiet -sess_out $d/1.sess -enable_ntls -ntls 2>&1`;
-my $ret2 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername $host -quiet -sess_in $d/1.sess -enable_ntls -ntls 2>&1`;
+my $ret1 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9040 -servername $host -quiet -sess_out $d/1.sess -enable_ntls -ntls 2>&1`;
+my $ret2 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9040 -servername $host -quiet -sess_in $d/1.sess -enable_ntls -ntls 2>&1`;
 $host = "nocache";
-my $ret3 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername $host -quiet -sess_out $d/3.sess -enable_ntls -ntls 2>&1`;
-my $ret4 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8080 -servername $host -quiet -sess_in $d/3.sess -enable_ntls -ntls 2>&1`;
+my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9040 -servername $host -quiet -sess_out $d/3.sess -enable_ntls -ntls 2>&1`;
+my $ret4 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9040 -servername $host -quiet -sess_in $d/3.sess -enable_ntls -ntls 2>&1`;
 $host = "tickets";
-my $ret5 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8081 -servername $host -quiet -sess_out $d/5.sess -enable_ntls -ntls 2>&1`;
-my $ret6 = `echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:8081 -servername $host -quiet -sess_in $d/5.sess -enable_ntls -ntls 2>&1`;
+my $ret5 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9041 -servername $host -quiet -sess_out $d/5.sess -enable_ntls -ntls 2>&1`;
+my $ret6 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: $host\r\n\r\n" | $openssl s_client -connect localhost:9041 -servername $host -quiet -sess_in $d/5.sess -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/^default:\.$/m, 'default server');
 like($ret2, qr/^default:r$/m, 'default server reused');
