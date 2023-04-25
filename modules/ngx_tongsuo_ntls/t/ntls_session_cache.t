@@ -20,7 +20,7 @@ use CA qw/ make_sm2_ca_subca_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(11);
 
@@ -47,7 +47,7 @@ http {
     ssl_session_tickets off;
 
     server {
-        listen       127.0.0.1:8081;
+        listen       127.0.0.1:9031;
         server_name  localhost;
 
         # Special case for enabled "ssl" directive.
@@ -62,7 +62,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 ssl;
+        listen       127.0.0.1:9032 ssl;
         server_name  localhost;
 
         ssl_session_cache builtin:1000;
@@ -73,7 +73,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8083 ssl;
+        listen       127.0.0.1:9033 ssl;
         server_name  localhost;
 
         ssl_session_cache none;
@@ -84,7 +84,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8084 ssl;
+        listen       127.0.0.1:9034 ssl;
         server_name  localhost;
 
         ssl_session_cache off;
@@ -95,7 +95,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8085 ssl;
+        listen       127.0.0.1:9035 ssl;
         server_name  localhost;
 
         ssl_session_cache shared:SSL:1m;
@@ -116,19 +116,19 @@ make_sm2_ca_subca_end_certs($t, "server");
 
 $t->run();
 
-my $ret1 = `echo -e "GET /reuse HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8085 -quiet -sess_out 1.sess -enable_ntls -ntls 2>&1`;
-my $ret2 = `echo -e "GET /reuse HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8085 -quiet -sess_in 1.sess -enable_ntls -ntls 2>&1`;
-my $ret3 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -quiet -sess_out 3.sess -enable_ntls -ntls 2>&1`;
-my $ret4 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -quiet -sess_in 3.sess -enable_ntls -ntls 2>&1`;
-my $ret5 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8082 -quiet -sess_out 5.sess -enable_ntls -ntls 2>&1`;
-my $ret6 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8082 -quiet -sess_in 5.sess -enable_ntls -ntls 2>&1`;
-my $ret7 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8083 -quiet -sess_out 7.sess -enable_ntls -ntls 2>&1`;
-my $ret8 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8083 -quiet -sess_in 7.sess -enable_ntls -ntls 2>&1`;
-my $ret9 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8084 -quiet -sess_out 9.sess -enable_ntls -ntls 2>&1`;
+my $ret1 = `/bin/echo -e "GET /reuse HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9035 -quiet -sess_out 1.sess -enable_ntls -ntls 2>&1`;
+my $ret2 = `/bin/echo -e "GET /reuse HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9035 -quiet -sess_in 1.sess -enable_ntls -ntls 2>&1`;
+my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9031 -quiet -sess_out 3.sess -enable_ntls -ntls 2>&1`;
+my $ret4 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9031 -quiet -sess_in 3.sess -enable_ntls -ntls 2>&1`;
+my $ret5 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9032 -quiet -sess_out 5.sess -enable_ntls -ntls 2>&1`;
+my $ret6 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9032 -quiet -sess_in 5.sess -enable_ntls -ntls 2>&1`;
+my $ret7 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9033 -quiet -sess_out 7.sess -enable_ntls -ntls 2>&1`;
+my $ret8 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9033 -quiet -sess_in 7.sess -enable_ntls -ntls 2>&1`;
+my $ret9 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9034 -quiet -sess_out 9.sess -enable_ntls -ntls 2>&1`;
 
 # session timeout
 select undef, undef, undef, 2.1;
-my $ret11 = `echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -quiet -sess_in 3.sess -enable_ntls -ntls 2>&1`;
+my $ret11 = `/bin/echo -e "GET / HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9031 -quiet -sess_in 3.sess -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/^body \.$/m, 'shared initial session');
 like($ret2, qr/^body r$/m, 'shared session reused');

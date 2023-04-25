@@ -16,7 +16,7 @@ git clone https://github.com/alibaba/tengine.git
 
 3. Build Tengine
 
-- Add ngx_openssl_ntls module
+- Add ngx_tongsuo_ntls module
 - Set OpenSSL library path to Tongsuo
 - Set build options for Tongsuo: enable-ntls
 
@@ -24,14 +24,14 @@ git clone https://github.com/alibaba/tengine.git
 cd tengine
 
 # For Tongsuo master branch
-./configure --add-module=modules/ngx_openssl_ntls \
+./configure --add-module=modules/ngx_tongsuo_ntls \
     --with-openssl=../Tongsuo \
     --with-openssl-opt="--strict-warnings --api=1.1.1 enable-ntls" \
     --with-http_ssl_module --with-stream \
     --with-stream_ssl_module --with-stream_sni
 
 # for Tongsuo version 8.3 or lower
-./configure --add-module=modules/ngx_openssl_ntls \
+./configure --add-module=modules/ngx_tongsuo_ntls \
     --with-openssl=../Tongsuo \
     --with-openssl-opt="--strict-warnings enable-ntls" \
     --with-http_ssl_module --with-stream \
@@ -109,9 +109,9 @@ cd tengine
 
 TEST_OPENSSL_BINARY=/opt/tongsuo/bin/openssl \
 TEST_NGINX_BINARY=`pwd`/objs/nginx \
-prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_openssl_ntls/t -v
+prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_tongsuo_ntls/t -v
 ```
 
 ## Reference
 - [Tongsuo website](https://www.tongsuo.net/)
-- [Tongsuo document](https://tongsuo.readthedocs.io/)
+- [Tongsuo document](https://www.yuque.com/tsdoc)

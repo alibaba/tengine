@@ -38,13 +38,6 @@ typedef struct {
     ngx_str_t                  ssl_trusted_certificate;
     ngx_str_t                  ssl_crl;
     ngx_array_t               *ssl_conf_commands;
-
-#if (T_NGX_SSL_NTLS)
-    ngx_str_t                  enc_certificate;
-    ngx_str_t                  enc_certificate_key;
-    ngx_str_t                  sign_certificate;
-    ngx_str_t                  sign_certificate_key;
-#endif
 #endif
 } ngx_http_grpc_loc_conf_t;
 
@@ -468,28 +461,28 @@ static ngx_command_t  ngx_http_grpc_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, enc_certificate),
+      offsetof(ngx_http_grpc_loc_conf_t, upstream.enc_certificate),
       NULL },
 
     { ngx_string("grpc_ssl_enc_certificate_key"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, enc_certificate_key),
+      offsetof(ngx_http_grpc_loc_conf_t, upstream.enc_certificate_key),
       NULL },
 
     { ngx_string("grpc_ssl_sign_certificate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, sign_certificate),
+      offsetof(ngx_http_grpc_loc_conf_t, upstream.sign_certificate),
       NULL },
 
     { ngx_string("grpc_ssl_sign_certificate_key"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, sign_certificate_key),
+      offsetof(ngx_http_grpc_loc_conf_t, upstream.sign_certificate_key),
       NULL },
 
 #endif
@@ -4548,14 +4541,14 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     if (conf->upstream.enable_ntls == NULL) {
         conf->upstream.enable_ntls = prev->upstream.enable_ntls;
     }
-    ngx_conf_merge_str_value(conf->enc_certificate,
-                             prev->enc_certificate, "");
-    ngx_conf_merge_str_value(conf->enc_certificate_key,
-                             prev->enc_certificate_key, "");
-    ngx_conf_merge_str_value(conf->sign_certificate,
-                             prev->sign_certificate, "");
-    ngx_conf_merge_str_value(conf->sign_certificate_key,
-                             prev->sign_certificate_key, "");
+    ngx_conf_merge_str_value(conf->upstream.enc_certificate,
+                             prev->upstream.enc_certificate, "");
+    ngx_conf_merge_str_value(conf->upstream.enc_certificate_key,
+                             prev->upstream.enc_certificate_key, "");
+    ngx_conf_merge_str_value(conf->upstream.sign_certificate,
+                             prev->upstream.sign_certificate, "");
+    ngx_conf_merge_str_value(conf->upstream.sign_certificate_key,
+                             prev->upstream.sign_certificate_key, "");
     conf->upstream.ssl_ciphers = conf->ssl_ciphers;
 #endif
 #endif
@@ -5016,8 +5009,8 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
         }
 
         if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                &glcf->upstream.ssl_certificate->value,
-                                &glcf->upstream.ssl_certificate_key->value,
+                                &glcf->upstream.enc_certificate->value,
+                                &glcf->upstream.enc_certificate_key->value,
                                 glcf->upstream.ssl_passwords,
                                 SSL_ENC_CERT)
             != NGX_OK)
@@ -5036,8 +5029,8 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
         }
 
         if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                &glcf->upstream.ssl_certificate->value,
-                                &glcf->upstream.ssl_certificate_key->value,
+                                &glcf->upstream.sign_certificate,
+                                &glcf->upstream.sign_certificate_key,
                                 glcf->upstream.ssl_passwords,
                                 SSL_SIGN_CERT)
             != NGX_OK)

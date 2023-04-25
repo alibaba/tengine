@@ -20,7 +20,7 @@ use CA qw/ make_sm2_end_certs make_sm2_ca_subca_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(2);
 
@@ -47,7 +47,7 @@ http {
     ssl_verify_client on;
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:9080 ssl;
         server_name  localhost;
 
         ssl_verify_depth 0;
@@ -59,7 +59,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081 ssl;
+        listen       127.0.0.1:9081 ssl;
         server_name  localhost;
 
         ssl_verify_depth 0;
@@ -77,8 +77,8 @@ $t->run();
 
 my $d = $t->testdir();
 
-my $ret1 = `echo -e "GET /t HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8080 -sign_cert $d/client1_sign.crt -sign_key $d/client1_sign.key -enc_cert $d/client1_enc.crt -enc_key $d/client1_enc.key -quiet -enable_ntls -ntls 2>&1`;
-my $ret2 = `echo -e "GET /t HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:8081 -sign_cert $d/client2_sign.crt -sign_key $d/client2_sign.key -enc_cert $d/client2_enc.crt -enc_key $d/client2_enc.key -quiet -enable_ntls -ntls 2>&1`;
+my $ret1 = `/bin/echo -e "GET /t HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9080 -sign_cert $d/client1_sign.crt -sign_key $d/client1_sign.key -enc_cert $d/client1_enc.crt -enc_key $d/client1_enc.key -quiet -enable_ntls -ntls 2>&1`;
+my $ret2 = `/bin/echo -e "GET /t HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9081 -sign_cert $d/client2_sign.crt -sign_key $d/client2_sign.key -enc_cert $d/client2_enc.crt -enc_key $d/client2_enc.key -quiet -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/^NTLSv(\d|\.)+:SUCCESS$/m, 'NTLS verify depth');
 like($ret2, qr/400 Bad Request/, 'NTLS verify depth limited');

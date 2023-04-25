@@ -843,7 +843,40 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                               conf->file, conf->line);
                 return NGX_CONF_ERROR;
             }
+#if (T_NGX_SSL_NTLS)
+        } else if (conf->enc_certificate.len != 0 || conf->sign_certificate.len != 0) {
+            if (conf->enc_certificate.len == 0) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_enc_certificate\" is defined for "
+                              "the \"ssl\" directive in %s:%ui",
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
 
+            if (conf->sign_certificate.len == 0) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_sign_certificate\" is defined for "
+                              "the \"ssl\" directive in %s:%ui",
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
+
+            if (conf->enc_certificate_key.len == 0) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_enc_certificate_key\" is defined for "
+                              "the \"ssl\" directive in %s:%ui",
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
+
+            if (conf->sign_certificate_key.len == 0) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "no \"ssl_sign_certificate_key\" is defined for "
+                              "the \"ssl\" directive in %s:%ui",
+                              conf->file, conf->line);
+                return NGX_CONF_ERROR;
+            }
+#endif
         } else if (!conf->reject_handshake) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"ssl_certificate\" is defined for "
@@ -864,13 +897,8 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           + conf->certificates->nelts - 1);
             return NGX_CONF_ERROR;
         }
-
-    } else if (!conf->reject_handshake) {
-        return NGX_CONF_OK;
-    }
-
 #if (T_NGX_SSL_NTLS)
-    if (conf->enc_certificate.len != 0 || conf->sign_certificate.len != 0) {
+    } else if (conf->enc_certificate.len != 0 || conf->sign_certificate.len != 0) {
         if (conf->enc_certificate.len == 0) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"ssl_enc_certificate\" is defined for "
@@ -902,8 +930,10 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                           conf->file, conf->line);
             return NGX_CONF_ERROR;
         }
-    }
 #endif
+    } else if (!conf->reject_handshake) {
+        return NGX_CONF_OK;
+    }
 
     if (ngx_ssl_create(&conf->ssl, conf->protocols, conf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -1534,9 +1564,19 @@ ngx_http_ssl_init(ngx_conf_t *cf)
                 continue;
             }
 
+#if (T_NGX_SSL_NTLS)
+            if (sscf->sign_certificate.len > 0 || sscf->enc_certificate.len > 0) {
+                continue;
+            }
+#endif
             if (!sscf->reject_handshake) {
                 ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+#if (T_NGX_SSL_NTLS)
+                              "no \"ssl_certificate\", \"ssl_enc_certificate\" "
+                              "or \"ssl_sign_certificate\" is defined for "
+#else
                               "no \"ssl_certificate\" is defined for "
+#endif
                               "the \"listen ... ssl\" directive in %s:%ui",
                               cscf->file_name, cscf->line);
                 return NGX_ERROR;
@@ -1561,7 +1601,7 @@ ngx_http_ssl_init(ngx_conf_t *cf)
                 if (sscf->sign_certificate.len > 0 || sscf->enc_certificate.len > 0) {
                     continue;
                 }
-#endif              
+#endif
                 ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
 #if (T_NGX_SSL_NTLS)
                               "no \"ssl_certificate\", \"ssl_enc_certificate\" "

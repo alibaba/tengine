@@ -22,7 +22,7 @@ select STDOUT; $| = 1;
 
 my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(12);
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl/)->plan(12);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,7 +38,7 @@ worker_processes 1;  # NOTE: The default value of Tengine worker_processes direc
 stream {
 
     server {
-        listen       127.0.0.1:8082 ssl;
+        listen       127.0.0.1:9102 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -63,7 +63,7 @@ stream {
     }
 
     server {
-        listen       127.0.0.1:8083 ssl;
+        listen       127.0.0.1:9103 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -90,11 +90,11 @@ stream {
         proxy_ssl_trusted_certificate     server_ca_chain.crt;
         proxy_ssl_ciphers "ECC-SM2-WITH-SM4-SM3:ECDHE-SM2-WITH-SM4-SM3:RSA";
 
-        proxy_pass localhost:8082;
+        proxy_pass localhost:9102;
     }
 
     server {
-        listen       127.0.0.1:8084 ssl;
+        listen       127.0.0.1:9104 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -121,11 +121,11 @@ stream {
         proxy_ssl_trusted_certificate     server_ca_chain.crt;
         proxy_ssl_ciphers "ECDHE-SM2-SM4-CBC-SM3";
 
-        proxy_pass localhost:8082;
+        proxy_pass localhost:9102;
     }
 
     server {
-        listen       127.0.0.1:8085 ssl;
+        listen       127.0.0.1:9105 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -152,12 +152,12 @@ stream {
         proxy_ssl_trusted_certificate     server_ca_chain.crt;
         proxy_ssl_ciphers "ECC-SM2-SM4-CBC-SM3:ECDHE-SM2-WITH-SM4-SM3:AES128-GCM-SHA256";
 
-        proxy_pass localhost:8082;
+        proxy_pass localhost:9102;
     }
 
 
     server {
-        listen       127.0.0.1:8086 ssl;
+        listen       127.0.0.1:9106 ssl;
         server_name  localhost;
 
         ssl_certificate_key rsa.key;
@@ -178,7 +178,7 @@ stream {
         proxy_ssl on;
         proxy_ssl_ciphers "AES256-GCM-SHA384";
 
-        proxy_pass localhost:8082;
+        proxy_pass localhost:9102;
     }
 }
 
@@ -194,18 +194,18 @@ make_sm2_ca_subca_end_certs($t, "server");
 
 $t->run();
 
-my $ret1 = `$openssl s_client -connect localhost:8083 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
-my $ret2 = `$openssl s_client -connect localhost:8083 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret3 = `$openssl s_client -connect localhost:8083 -cipher ECDHE-SM2-SM4-CBC-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
-my $ret4 = `$openssl s_client -connect localhost:8084 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
-my $ret5 = `$openssl s_client -connect localhost:8084 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret6 = `$openssl s_client -connect localhost:8084 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
-my $ret7 = `$openssl s_client -connect localhost:8085 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
-my $ret8 = `$openssl s_client -connect localhost:8085 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret9 = `$openssl s_client -connect localhost:8085 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
-my $ret10 = `$openssl s_client -connect localhost:8086 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
-my $ret11 = `$openssl s_client -connect localhost:8086 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
-my $ret12 = `$openssl s_client -connect localhost:8086 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret1 = `$openssl s_client -connect localhost:9103 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
+my $ret2 = `$openssl s_client -connect localhost:9103 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret3 = `$openssl s_client -connect localhost:9103 -cipher ECDHE-SM2-SM4-CBC-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret4 = `$openssl s_client -connect localhost:9104 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
+my $ret5 = `$openssl s_client -connect localhost:9104 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret6 = `$openssl s_client -connect localhost:9104 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret7 = `$openssl s_client -connect localhost:9105 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
+my $ret8 = `$openssl s_client -connect localhost:9105 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret9 = `$openssl s_client -connect localhost:9105 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
+my $ret10 = `$openssl s_client -connect localhost:9106 -cipher AES128-GCM-SHA256 -quiet -ign_eof 2>&1`;
+my $ret11 = `$openssl s_client -connect localhost:9106 -cipher ECC-SM2-SM4-CBC-SM3 -quiet -ign_eof -enable_ntls -ntls 2>&1`;
+my $ret12 = `$openssl s_client -connect localhost:9106 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
 
 like($ret1, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECC-SM2-SM4-CBC-SM3/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> origin');
 like($ret2, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECC-SM2-SM4-CBC-SM3/m, 'client -----(TLSv1.2 ECC-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> origin');
