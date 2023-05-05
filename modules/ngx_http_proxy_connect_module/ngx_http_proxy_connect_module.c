@@ -7,6 +7,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <nginx.h>
+#include <ngx_http_auth_basic_module.h>
 
 
 #define NGX_HTTP_PROXY_CONNECT_ESTABLISTHED     \
@@ -2359,16 +2360,26 @@ ngx_http_proxy_connect_post_read_handler(ngx_http_request_t *r)
         /* proxy auth */
 
         if (pclcf->auth) {
-            ngx_str_t realm = ngx_string("proxy-authorization");
+            ngx_str_t realm;
+            ngx_int_t rc;
 
-            if (!r->headers_in.proxy_authorization) {
-                return ngx_http_proxy_connect_proxy_auth_basic_set_realm(
-                    r, &realm);
+            rc = ngx_http_auth_basic_get_realm(r, &realm);
+
+            if (rc == NGX_OK) {
+                if (!r->headers_in.proxy_authorization) {
+                    return ngx_http_proxy_connect_proxy_auth_basic_set_realm(
+                        r, &realm);
+                }
+
+                if (!r->headers_in.authorization) {
+                    r->headers_in.authorization = r->headers_in.proxy_authorization;
+                }
+            }
+            else if (rc == NGX_ERROR) {
+                return NGX_ERROR;
             }
 
-            if (!r->headers_in.authorization) {
-                r->headers_in.authorization = r->headers_in.proxy_authorization;
-            }
+            /* rc == NGX_AGAIN */
         }
 
         /* init ctx */

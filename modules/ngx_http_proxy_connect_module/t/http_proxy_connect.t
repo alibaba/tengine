@@ -202,6 +202,7 @@ like(http_connect_request('forbidden.example.com', '8080', '/'), qr/405 Not Allo
 
 # proxy auth
 like(http_connect_request('auth.example.com', '8081', '/'), qr/407 Proxy Authentication Required/, 'must to carry Proxy-Authorization');
+like(http_connect_request('auth.example.com', '8081', '/'), qr/Proxy-Authenticate: Basic realm="proxy-authorization"/, 'must to carry Proxy-Authorization');
 like(http_connect_request_carry_authorization('auth.example.com', '8081', '/', "Basic dXNlcjoxMjM0NTY="), qr/backend server/, 'carry valid Proxy-Authorization');
 like(http_connect_request_carry_authorization('auth.example.com', '8081', '/', "Basic abcd"), qr/401 Unauthorized/, 'carry invalid Proxy-Authorization');
 
