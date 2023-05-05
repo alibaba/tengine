@@ -2385,6 +2385,24 @@ ngx_ssl_try_early_data(ngx_connection_t *c)
         return NGX_AGAIN;
     }
 
+#if (NGX_SSL && NGX_SSL_ASYNC)
+    if (c->async_enable && sslerr == SSL_ERROR_WANT_ASYNC)
+    {
+        c->async->handler = ngx_ssl_handshake_async_handler;
+        c->read->saved_handler = c->read->handler;
+        c->read->handler = ngx_ssl_empty_handler;
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                       "SSL ASYNC WANT recieved: \"%s\"", __func__);
+
+        if (ngx_ssl_async_process_fds(c) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+
+        return NGX_AGAIN;
+    }
+#endif
+
     err = (sslerr == SSL_ERROR_SYSCALL) ? ngx_errno : 0;
 
     c->ssl->no_wait_shutdown = 1;
