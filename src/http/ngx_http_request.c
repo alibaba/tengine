@@ -3586,14 +3586,14 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
         if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
         {
 #endif
-        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+            if (ngx_pfree(c->pool, b->start) == NGX_OK) {
 
-            /*
-             * the special note that c->buffer's memory was freed
-             */
+                /*
+                 * the special note that c->buffer's memory was freed
+                 */
 
-            b->pos = NULL;
-        }
+                b->pos = NULL;
+            }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
 #endif
@@ -3898,6 +3898,13 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 #if (NGX_HTTP_V2)
     if (r->stream) {
         ngx_http_v2_close_stream(r->stream, rc);
+        return;
+    }
+#endif
+
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        ngx_http_v3_close_stream(r->xqstream, rc);
         return;
     }
 #endif
