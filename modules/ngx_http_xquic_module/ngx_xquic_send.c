@@ -176,8 +176,8 @@ degrade:
     } else if (res < 0) {
 
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-            "|xquic|ngx_xquic_server_send_mmsg err|total_len=%z now=%i|dcid=%s|send_len=%z|",
-            vlen, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid), res);
+            "|xquic|ngx_xquic_server_send_mmsg err|total_len=%z now=%i|dcid=%s|send_len=%z|errno=%s|",
+            vlen, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid), res, strerror(errno));
         return XQC_SOCKET_ERROR;
     }
 
