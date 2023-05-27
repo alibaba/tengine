@@ -7,17 +7,12 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
-#include <ngx_http.h>
 #include <ngx_crypt.h>
+#include <ngx_http_auth_basic_module.h>
 
 
 #define NGX_HTTP_AUTH_BUF_SIZE  2048
 
-
-typedef struct {
-    ngx_http_complex_value_t  *realm;
-    ngx_http_complex_value_t  *user_file;
-} ngx_http_auth_basic_loc_conf_t;
 
 
 static ngx_int_t ngx_http_auth_basic_handler(ngx_http_request_t *r);
@@ -428,4 +423,27 @@ ngx_http_auth_basic_user_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     return NGX_CONF_OK;
+}
+
+
+ngx_int_t
+ngx_http_auth_basic_get_realm(ngx_http_request_t *r, ngx_str_t *realm)
+{
+    ngx_http_auth_basic_loc_conf_t *alcf;
+
+    alcf = ngx_http_get_module_loc_conf(r, ngx_http_auth_basic_module);
+
+    if (alcf->realm == NULL || alcf->user_file == NULL) {
+        return NGX_AGAIN;
+    }
+
+    if (ngx_http_complex_value(r, alcf->realm, realm) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (realm->len == 3 && ngx_strncmp(realm->data, "off", 3) == 0) {
+        return NGX_AGAIN;
+    }
+
+    return NGX_OK;
 }

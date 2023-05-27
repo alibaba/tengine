@@ -16,6 +16,7 @@ Table of Contents
    * [Directive](#directive)
       * [proxy_connect](#proxy_connect)
       * [proxy_connect_allow](#proxy_connect_allow)
+      * [proxy_connect_auth](#proxy_connect_auth)
       * [proxy_connect_connect_timeout](#proxy_connect_connect_timeout)
       * [proxy_connect_data_timeout](#proxy_connect_data_timeout)
       * [proxy_connect_read_timeout(deprecated)](#proxy_connect_read_timeout)
@@ -190,6 +191,47 @@ The value `port-range` will allow specified range of port to proxy, for example:
 
 ```
 proxy_connect_allow 1000-2000 3000-4000; # allow range of port from 1000 to 2000, from 3000 to 4000.
+```
+
+proxy_connect_auth
+------------------
+
+Syntax: **proxy_connect_auth `<on|off>`**  
+Default: `off`  
+Context: `server`  
+
+Enable "Proxy Authorication" feature. Now, only `Basic` is supported.
+
+Configure example:
+
+```
+ server {
+     listen                         3128;
+
+     # dns resolver used by forward proxying
+     resolver                       8.8.8.8;
+
+     # forward proxy for CONNECT request
+     proxy_connect;
+     proxy_connect_allow            443 563;
+     proxy_connect_connect_timeout  10s;
+     proxy_connect_read_timeout     10s;
+     proxy_connect_send_timeout     10s;
+
+     # proxy auth
+     proxy_connect_auth     on;                 # open proxy auth
+     proxy_set_header Authorization "";         # Eliminate the authentication information.
+     auth_basic             web_proxy;
+     auth_basic_user_file   user_list.htpasswd;
+
+     # forward proxy for non-CONNECT request
+     location / {
+         auth_basic off;                        # close basic auth
+
+         proxy_pass http://$host;
+         proxy_set_header Host $host;
+     }
+ }
 ```
 
 proxy_connect_connect_timeout
