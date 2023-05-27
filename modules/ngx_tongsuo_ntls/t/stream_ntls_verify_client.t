@@ -27,7 +27,7 @@ use CA qw/ make_sm2_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return/)
     ->has_daemon('openssl');
 
@@ -58,7 +58,7 @@ stream {
     }
 
     server {
-        listen  127.0.0.1:8081 ssl;
+        listen  127.0.0.1:9131 ssl;
         return  $ssl_client_verify:$ssl_client_cert;
 
         ssl_verify_client on;
@@ -68,7 +68,7 @@ stream {
     }
 
     server {
-        listen  127.0.0.1:8082 ssl;
+        listen  127.0.0.1:9132 ssl;
         return  $ssl_client_verify:$ssl_client_cert;
 
         ssl_verify_client optional;
@@ -77,7 +77,7 @@ stream {
     }
 
     server {
-        listen  127.0.0.1:8083 ssl;
+        listen  127.0.0.1:9133 ssl;
         return  $ssl_client_verify:$ssl_client_cert;
 
         ssl_verify_client optional_no_ca;
@@ -99,14 +99,14 @@ $t->run()->plan(10);
 
 is(stream('127.0.0.1:' . port(8080))->read(), ':', 'plain connection');
 
-my $ret1 = `$openssl s_client -connect localhost:8081 -quiet -enable_ntls -ntls 2>/dev/null`;
-my $ret2 = `$openssl s_client -connect localhost:8082 -quiet -sign_cert $d/1.example.com_sign.crt -sign_key $d/1.example.com_sign.key -enc_cert $d/1.example.com_enc.crt -enc_key $d/1.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
-my $ret3 = `$openssl s_client -connect localhost:8082 -quiet -enable_ntls -ntls 2>/dev/null`;
-my $ret4 = `$openssl s_client -connect localhost:8083 -quiet -sign_cert $d/1.example.com_sign.crt -sign_key $d/1.example.com_sign.key -enc_cert $d/1.example.com_enc.crt -enc_key $d/1.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
-my $ret5 = `$openssl s_client -connect localhost:8081 -quiet -sign_cert $d/2.example.com_sign.crt -sign_key $d/2.example.com_sign.key -enc_cert $d/2.example.com_enc.crt -enc_key $d/2.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
-my $ret6 = `$openssl s_client -connect localhost:8082 -quiet -sign_cert $d/2.example.com_sign.crt -sign_key $d/2.example.com_sign.key -enc_cert $d/2.example.com_enc.crt -enc_key $d/2.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
-my $ret7 = `$openssl s_client -connect localhost:8082 -quiet -sign_cert $d/3.example.com_sign.crt -sign_key $d/3.example.com_sign.key -enc_cert $d/3.example.com_enc.crt -enc_key $d/3.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
-my $ret8 = `$openssl s_client -connect localhost:8082 -quiet -sign_cert $d/3.example.com_sign.crt -sign_key $d/3.example.com_sign.key -enc_cert $d/3.example.com_enc.crt -enc_key $d/3.example.com_enc.key -enable_ntls -ntls -trace 2>/dev/null | grep -A 1 certificate_authorities`;
+my $ret1 = `$openssl s_client -connect localhost:9131 -quiet -enable_ntls -ntls 2>/dev/null`;
+my $ret2 = `$openssl s_client -connect localhost:9132 -quiet -sign_cert $d/1.example.com_sign.crt -sign_key $d/1.example.com_sign.key -enc_cert $d/1.example.com_enc.crt -enc_key $d/1.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
+my $ret3 = `$openssl s_client -connect localhost:9132 -quiet -enable_ntls -ntls 2>/dev/null`;
+my $ret4 = `$openssl s_client -connect localhost:9133 -quiet -sign_cert $d/1.example.com_sign.crt -sign_key $d/1.example.com_sign.key -enc_cert $d/1.example.com_enc.crt -enc_key $d/1.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
+my $ret5 = `$openssl s_client -connect localhost:9131 -quiet -sign_cert $d/2.example.com_sign.crt -sign_key $d/2.example.com_sign.key -enc_cert $d/2.example.com_enc.crt -enc_key $d/2.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
+my $ret6 = `$openssl s_client -connect localhost:9132 -quiet -sign_cert $d/2.example.com_sign.crt -sign_key $d/2.example.com_sign.key -enc_cert $d/2.example.com_enc.crt -enc_key $d/2.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
+my $ret7 = `$openssl s_client -connect localhost:9132 -quiet -sign_cert $d/3.example.com_sign.crt -sign_key $d/3.example.com_sign.key -enc_cert $d/3.example.com_enc.crt -enc_key $d/3.example.com_enc.key -enable_ntls -ntls 2>/dev/null`;
+my $ret8 = `$openssl s_client -connect localhost:9132 -quiet -sign_cert $d/3.example.com_sign.crt -sign_key $d/3.example.com_sign.key -enc_cert $d/3.example.com_enc.crt -enc_key $d/3.example.com_enc.key -enable_ntls -ntls -trace 2>/dev/null | grep -A 1 certificate_authorities`;
 
 is($ret1, '', 'no cert');
 is($ret2, '', 'bad optional cert');

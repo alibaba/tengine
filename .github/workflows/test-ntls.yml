@@ -1,0 +1,63 @@
+name: test tengine ntls
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: "ubuntu-20.04"
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - { compiler: GNU,  CC: gcc,  CXX: g++}
+          - { compiler: LLVM, CC: clang, CXX: clang++}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: tengine
+      - name: checkout Tongsuo
+        uses: actions/checkout@v3
+        with:
+          repository: Tongsuo-Project/Tongsuo
+          path: Tongsuo
+      - name: build Tongsuo
+        working-directory: Tongsuo
+        env:
+          CC: ${{ matrix.compiler.CC }}
+        run: |
+          ./config --prefix=${RUNNER_TEMP}/tongsuo enable-ntls no-shared
+          make -s -j4
+          make install_sw
+          make clean
+      - name: build Tengine
+        working-directory: tengine
+        env:
+          CC: ${{ matrix.compiler.CC }}
+          CXX: ${{ matrix.compiler.CXX }}
+        run: |
+          ./configure \
+            --add-module=modules/ngx_tongsuo_ntls \
+            --with-openssl=../Tongsuo \
+            --with-openssl-opt="--api=1.1.1 enable-ntls" \
+            --with-http_ssl_module \
+            --with-stream \
+            --with-stream_ssl_module \
+            --with-stream_sni
+          make -j2
+          sudo make install
+      - name: run test cases
+        working-directory: tengine
+        env:
+          TEST_OPENSSL_BINARY: ${{ runner.temp }}/tongsuo/bin/tongsuo
+          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+          TEST_NGINX_LEAVE: 1
+        run: |
+          prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_tongsuo_ntls/t
+      - name: debug
+        if: ${{ failure() }}
+        run: |
+          for file in `ls /tmp/nginx-test-*/error.log`; do cat $file; done

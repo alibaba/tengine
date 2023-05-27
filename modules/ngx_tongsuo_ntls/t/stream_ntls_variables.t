@@ -27,7 +27,7 @@ use CA qw/ make_sm2_end_certs /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/babassl/bin/openssl";
+my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 my $t = Test::Nginx->new()->has(qw/stream stream_ssl sni stream_return/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -48,14 +48,14 @@ stream {
 
     server {
         listen  127.0.0.1:8080;
-        listen  127.0.0.1:8081 ssl;
+        listen  127.0.0.1:9121 ssl;
         return  $ssl_session_reused:$ssl_session_id:$ssl_cipher:$ssl_protocol;
 
         ssl_session_cache builtin;
     }
 
     server {
-        listen  127.0.0.1:8082 ssl;
+        listen  127.0.0.1:9122 ssl;
         return  $ssl_server_name;
     }
 }
@@ -73,10 +73,10 @@ $t->run()->plan(5);
 
 is(stream('127.0.0.1:' . port(8080))->read(), ':::', 'no ssl');
 
-my $ret1 = `$openssl s_client -connect localhost:8081 -quiet -sess_out 1.sess -enable_ntls -ntls 2>&1`;
-my $ret2 = `$openssl s_client -connect localhost:8081 -quiet -sess_in 1.sess -enable_ntls -ntls 2>&1`;
-my $ret3 = `$openssl s_client -connect localhost:8082 -quiet -servername example.com -enable_ntls -ntls 2>&1`;
-my $ret4 = `$openssl s_client -connect localhost:8082 -quiet -enable_ntls -ntls 2>/dev/null`;
+my $ret1 = `$openssl s_client -connect localhost:9121 -quiet -sess_out 1.sess -enable_ntls -ntls 2>&1`;
+my $ret2 = `$openssl s_client -connect localhost:9121 -quiet -sess_in 1.sess -enable_ntls -ntls 2>&1`;
+my $ret3 = `$openssl s_client -connect localhost:9122 -quiet -servername example.com -enable_ntls -ntls 2>&1`;
+my $ret4 = `$openssl s_client -connect localhost:9122 -quiet -enable_ntls -ntls 2>/dev/null`;
 
 like($ret1, qr/^\.:(\w{64})?:[\w-]+:NTLSv(\d|\.)+$/m, 'ssl variables');
 like($ret2, qr/^r:\w{64}:[\w-]+:NTLSv(\d|\.)+$/m, 'ssl variables - session reused');
