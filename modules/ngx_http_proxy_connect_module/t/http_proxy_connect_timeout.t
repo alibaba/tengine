@@ -145,7 +145,7 @@ http {
     access_log %%TESTDIR%%/connect.log connect;
     error_log %%TESTDIR%%/connect_timeout_error.log debug;
 
-    resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
+    resolver 127.0.0.1:8085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
     server {
         listen       127.0.0.1:8080;

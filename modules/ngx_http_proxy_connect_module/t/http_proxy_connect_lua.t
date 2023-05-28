@@ -36,7 +36,7 @@ print("+ test_enable_rewrite_phase: $test_enable_rewrite_phase\n");
 # --- init DNS server ---
 
 my $bind_pid;
-my $bind_server_port = 18085;
+my $bind_server_port = 8085;
 
 # SRV record, not used
 my %route_map;
@@ -84,7 +84,7 @@ http {
 
     access_log off;
 
-    resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
+    resolver 127.0.0.1:8085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
     server {
         listen       127.0.0.1:8080;
