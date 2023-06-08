@@ -1,3 +1,16 @@
+Changes with Tengine 2.4.1                                         08 Jun 2023
+
+    *) Change: updated ngx_http_proxy_connect_module to v0.0.4 (chobits)
+
+    *) Bugfix: fixed compilation error in stream_set module (chobits)
+
+    *) Bugfix: fixed NTLS cert check, move sign/enc certficate to upstream,
+       add ngx_tongsuo_ntls module (dongbeiouba)
+
+    *) Bugfix: fixed bug that client cannot receive right packages with
+       ssl_async enabled (oyaya)
+
+
 Changes with Tengine 2.4.0                                         08 Feb 2023
 
     *) Feature: Update to nginx 1.22.1  (jiuzhoucui)

@@ -1,3 +1,9 @@
+Tengine 2.4.1 [2023-06-08]
+* Change: 更新ngx_http_proxy_connect_module模块到v0.0.4 (chobits)
+* Bugfix: 修复stream_set模块编译错误 (chobits)
+* Bugfix: 修复NTLS证书检测，将sign/enc证书移到upstream，增加ngx_tongsuo_ntls模块 (dongbeiouba)
+* Bugfix: 修复当开启ssl_async功能后，客户端无法接受到正确数据包的问题 (oyaya)
+
 Tengine 2.4.0 [2023-02-08]
 * Feature: 更新到nginx官方1.22.1版本 (jiuzhoucui)
 
