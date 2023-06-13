@@ -27,8 +27,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 
 daemon         off;
 
-%%TEST_GLOBALS_DSO%%
-
 events {
 }
 

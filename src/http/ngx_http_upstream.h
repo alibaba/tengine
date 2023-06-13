@@ -110,7 +110,7 @@ typedef struct {
     time_t                           fail_timeout;
     ngx_msec_t                       slow_start;
     ngx_uint_t                       down;
-#if (T_NGX_HTTP_UPSTREAM_ID)    
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                        id;
 #endif
 
@@ -263,6 +263,23 @@ typedef struct {
     ngx_http_complex_value_t        *ssl_name;
     ngx_flag_t                       ssl_server_name;
     ngx_flag_t                       ssl_verify;
+
+    ngx_http_complex_value_t        *ssl_certificate;
+    ngx_http_complex_value_t        *ssl_certificate_key;
+    ngx_array_t                     *ssl_passwords;
+
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        enc_certificate;
+    ngx_str_t                        enc_certificate_key;
+    ngx_str_t                        sign_certificate;
+    ngx_str_t                        sign_certificate_key;
+#endif
+#endif
+
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        ssl_ciphers;
+    const SSL_METHOD                *tls_method;
+    ngx_http_complex_value_t        *enable_ntls;
 #endif
 
     ngx_str_t                        module;
@@ -423,6 +440,7 @@ struct ngx_http_upstream_s {
     unsigned                         buffering:1;
     unsigned                         keepalive:1;
     unsigned                         upgrade:1;
+    unsigned                         error:1;
 
     unsigned                         request_sent:1;
     unsigned                         request_body_sent:1;
@@ -454,6 +472,8 @@ typedef struct {
 
 ngx_int_t ngx_http_upstream_create(ngx_http_request_t *r);
 void ngx_http_upstream_init(ngx_http_request_t *r);
+ngx_int_t ngx_http_upstream_non_buffered_filter_init(void *data);
+ngx_int_t ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes);
 ngx_http_upstream_srv_conf_t *ngx_http_upstream_add(ngx_conf_t *cf,
     ngx_url_t *u, ngx_uint_t flags);
 char *ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,

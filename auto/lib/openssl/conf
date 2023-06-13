@@ -177,3 +177,21 @@ END
     exit 1
 fi
 
+
+ngx_feature="OpenSSL DTLS support"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs="#include <openssl/ssl.h>"
+if [ $OPENSSL = NONE ]; then
+    ngx_feature_path=
+else
+    ngx_feature_path=$CORE_INCS
+fi
+ngx_feature_libs="-lssl -lcrypto"
+ngx_feature_test="SSL_CTX_set_cookie_generate_cb(NULL, NULL)"
+
+. auto/feature
+
+if [ $ngx_found = yes ]; then
+    have=T_NGX_HAVE_DTLS . auto/have
+fi

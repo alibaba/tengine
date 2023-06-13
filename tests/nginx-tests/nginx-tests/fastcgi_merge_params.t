@@ -120,9 +120,9 @@ sub fastcgi_daemon {
 	while( $request->Accept() >= 0 ) {
 		$count++;
 
-		my $ims = $ENV{HTTP_IF_MODIFIED_SINCE};
-		my $iums = $ENV{HTTP_IF_UNMODIFIED_SINCE};
-		my $blah = $ENV{HTTP_X_BLAH};
+		my $ims = $ENV{HTTP_IF_MODIFIED_SINCE} || '';
+		my $iums = $ENV{HTTP_IF_UNMODIFIED_SINCE} || '';
+		my $blah = $ENV{HTTP_X_BLAH} || '';
 
 		print <<EOF;
 Location: http://localhost/redirect

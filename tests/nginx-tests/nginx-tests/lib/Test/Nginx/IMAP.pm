@@ -10,6 +10,7 @@ use warnings;
 use strict;
 
 use Test::More qw//;
+use IO::Select;
 use IO::Socket;
 use Socket qw/ CRLF /;
 
@@ -21,7 +22,7 @@ sub new {
 
 	$self->{_socket} = IO::Socket::INET->new(
 		Proto => "tcp",
-		PeerAddr => "127.0.0.1:8143",
+		PeerAddr => "127.0.0.1:" . port(8143),
 		@_
 	)
 		or die "Can't connect to nginx: $!\n";
@@ -33,6 +34,7 @@ sub new {
 	}
 
 	$self->{_socket}->autoflush(1);
+	$self->{_read_buffer} = '';
 
 	return $self;
 }
@@ -54,25 +56,39 @@ sub send {
 	$self->{_socket}->print($cmd . CRLF);
 }
 
+sub getline {
+	my ($self) = @_;
+	my $socket = $self->{_socket};
+
+	if ($self->{_read_buffer} =~ /^(.*?\x0a)(.*)/ms) {
+		$self->{_read_buffer} = $2;
+		return $1;
+	}
+
+	while (IO::Select->new($socket)->can_read(8)) {
+	        $socket->blocking(0);
+		my $n = $socket->sysread(my $buf, 1024);
+	        $socket->blocking(1);
+		last unless $n;
+
+		$self->{_read_buffer} .= $buf;
+
+		if ($self->{_read_buffer} =~ /^(.*?\x0a)(.*)/ms) {
+			$self->{_read_buffer} = $2;
+			return $1;
+		}
+	};
+}
+
 sub read {
 	my ($self) = @_;
 	my $socket = $self->{_socket};
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		alarm(3);
-		while (<$socket>) {
-			log_in($_);
-			# XXX
-			next if m/^\d\d\d-/;
-			last;
-		}
-		alarm(0);
-	};
-	alarm(0);
-	if ($@) {
-		log_in("died: $@");
-		return undef;
+
+	while (defined($_ = $self->getline())) {
+		log_in($_);
+		last;
 	}
+
 	return $_;
 }
 
@@ -86,12 +102,19 @@ sub ok {
 	Test::More->builder->like($self->read(), qr/^\S+ OK/, @_);
 }
 
+sub can_read {
+	my ($self, $timo) = @_;
+	IO::Select->new($self->{_socket})->can_read($timo || 3);
+}
+
 ###############################################################################
 
 sub imap_test_daemon {
+	my ($port) = @_;
+
 	my $server = IO::Socket::INET->new(
 		Proto => 'tcp',
-		LocalAddr => '127.0.0.1:8144',
+		LocalAddr => '127.0.0.1:' . ($port || port(8144)),
 		Listen => 5,
 		Reuse => 1
 	)
@@ -102,6 +125,17 @@ sub imap_test_daemon {
 		print $client "* OK fake imap server ready" . CRLF;
 
 		while (<$client>) {
+			Test::Nginx::log_core('||', $_);
+
+			while (m/{(\d+)}\x0d?$/) {
+				print $client '+ ' . CRLF;
+				$client->sysread(my $buf, $1);
+				Test::Nginx::log_core('||', $buf);
+				$buf = <$client>;
+				Test::Nginx::log_core('||', $buf);
+				$_ .= $buf;
+			}
+
 			my $tag = '';
 
 			$tag = $1 if m/^(\S+)/;

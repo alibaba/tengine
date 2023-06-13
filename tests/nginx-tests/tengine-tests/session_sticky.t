@@ -15,7 +15,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->plan(38);
+my $t = Test::Nginx->new()->has(qw/http_ssl session_sticky/)->plan(63);
 $t->write_file_expand('9000', '9000');
 $t->write_file_expand('9001', '9001');
 $t->write_file_expand('9002', '9002');
@@ -424,6 +424,447 @@ $r = my_http_get('/test_hash', $cookie);
 like($r, qr/$res/, 'hash=plain, the same real server');
 $t->stop();
 #####################################################################################
+
+$t->write_file('openssl.conf', <<EOF);
+[ req ]
+default_bits = 2048
+encrypt_key = no
+distinguished_name = req_distinguished_name
+[ req_distinguished_name ]
+EOF
+
+my $d = $t->testdir();
+
+foreach my $name ('localhost') {
+    system('openssl req -x509 -new '
+        . "-config '$d/openssl.conf' -subj '/CN=$name/' "
+        . "-out '$d/$name.crt' -keyout '$d/$name.key' "
+        . ">>$d/openssl.out 2>&1") == 0
+        or die "Can't create certificate for $name: $!\n";
+}
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+worker_processes  1;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    upstream insert_indirect {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert option=indirect fallback=on;
+
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream rewrite {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=rewrite fallback=on;
+        server          127.0.0.1:9001;
+        server          127.0.0.1:9000;
+    }
+
+    upstream rewrite_no_setcookie {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=rewrite fallback=on;
+        server          127.0.0.1:9002;
+        server          127.0.0.1:9003;
+    }
+
+    upstream prefix {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=prefix fallback=on;
+        server          127.0.0.1:9001;
+        server          127.0.0.1:9000;
+    }
+
+    upstream prefix_no_setcookie {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=prefix fallback=on;
+        server          127.0.0.1:9002;
+        server          127.0.0.1:9003;
+    }
+
+    upstream insert_indirect_off {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert option=indirect fallback=off;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert_off {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=off;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream rewrite_off {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=rewrite fallback=off;
+        server          127.0.0.1:9001;
+        server          127.0.0.1:9000;
+    }
+
+    upstream prefix_off {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=prefix fallback=off;
+        server          127.0.0.1:9001;
+        server          127.0.0.1:9000;
+    }
+
+    upstream insert_nodomain {
+        session_sticky cookie=test path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert_nopath {
+        session_sticky cookie=test maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert_nomaxage {
+        session_sticky cookie=test maxidle=40 maxlife=60 mode=insert fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert_nomaxlife {
+        session_sticky cookie=test mode=insert option=indirect maxidle=400 fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream insert_nomaxidle {
+        session_sticky cookie=test mode=insert  fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream nothing {
+        session_sticky cookie=test;
+        server         127.0.0.1:9002;
+        server         127.0.0.1:9003;
+    }
+
+    upstream insert_nocookie {
+        session_sticky mode=insert fallback=on;
+        server          127.0.0.1:9000;
+        server          127.0.0.1:9001;
+    }
+
+    upstream nocookie {
+        session_sticky cookie=test option=indirect;
+        server 127.0.0.1:9004;
+    }
+
+    upstream havecookie {
+        session_sticky cookie=test;
+        server 127.0.0.1:9004;
+    }
+
+    upstream hash {
+        session_sticky cookie=test domain=.taobao.com path=/ maxage=120 maxidle=40 maxlife=60 mode=insert fallback=on hash=plain;
+        server          127.0.0.1:9002 id=9002;
+        server          127.0.0.1:9003 id=9003;
+    }
+
+    ssl_certificate_key localhost.key;
+    ssl_certificate localhost.crt;
+
+    server {
+        listen     127.0.0.1:9000 ssl;
+        location / {
+            add_header  Set-Cookie test=test1234;
+            add_header  X-Session $ssl_session_reused;
+            index       9000;
+        }
+    }
+
+    server {
+        listen     127.0.0.1:9001 ssl;
+        location / {
+            add_header Set-Cookie test=test1234;
+            add_header X-Session $ssl_session_reused;
+            index       9001;
+        }
+    }
+
+    server {
+        listen     127.0.0.1:9002 ssl;
+        location / {
+            add_header  X-Session $ssl_session_reused;
+            index       9002;
+        }
+    }
+
+    server {
+        listen     127.0.0.1:9003 ssl;
+        location / {
+            add_header  X-Session $ssl_session_reused;
+            index       9003;
+        }
+    }
+
+    server {
+        listen    127.0.0.1:9004 ssl;
+        location / {
+            add_header  X-Session $ssl_session_reused;
+
+            if ($cookie_test != "") {
+                return 401;
+            }
+
+            return 200;
+        }
+    }
+
+    server {
+        listen      127.0.0.1:8080;
+        server_name localhost;
+
+
+        location /test_insert_indirect {
+            session_sticky_hide_cookie upstream=insert_indirect;
+            proxy_pass  https://insert_indirect/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_hash {
+            session_sticky_hide_cookie upstream=hash;
+            proxy_pass https://hash/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert {
+            session_sticky_hide_cookie upstream=insert;
+            proxy_pass  https://insert/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_rewrite {
+            session_sticky_hide_cookie upstream=rewrite;
+            proxy_pass  https://rewrite/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_rewrite_no_setcookie {
+            session_sticky_hide_cookie upstream=rewrite_no_setcookie;
+            proxy_pass https://rewrite_no_setcookie/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_prefix {
+            session_sticky_hide_cookie upstream=prefix;
+            proxy_pass  https://prefix/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_prefix_no_setcookie {
+            session_sticky_hide_cookie upstream=prefix_no_setcookie;
+            proxy_pass https://prefix_no_setcookie/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_indirect_off {
+            session_sticky_hide_cookie upstream=insert_indirect_off;
+            proxy_pass https://insert_indirect_off/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_off {
+            session_sticky_hide_cookie upstream=insert_off;
+            proxy_pass https://insert_off/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+        location /test_rewrite_off {
+            session_sticky_hide_cookie upstream=rewrite_off;
+            proxy_pass https://rewrite_off/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_prefix_off {
+            session_sticky_hide_cookie upstream=prefix_off;
+            proxy_pass https://prefix_off/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nodomain {
+            session_sticky_hide_cookie upstream=insert_nodomain;
+            proxy_pass https://insert_nodomain/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nopath {
+            session_sticky_hide_cookie upstream=insert_nopath;
+            proxy_pass https://insert_nopath/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nomaxage {
+            session_sticky_hide_cookie upstream=insert_nomaxage;
+            proxy_pass https://insert_nomaxage/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nomalife {
+            session_sticky_hide_cookie upstream=insert_nomaxlife;
+            proxy_pass https://insert_nomaxlife/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+        location /test_insert_nomaxidle {
+            session_sticky_hide_cookie upstream=insert_nomaxidle;
+            proxy_pass https://insert_nomaxidle/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nocookie {
+            session_sticky_hide_cookie upstream=insert_nocookie;
+            proxy_pass https://insert_nocookie/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_insert_nocookie_notfound {
+            session_sticky_hide_cookie upstream=insert_nocookie;
+            proxy_pass https://insert_nocookie;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_rewrite_no_header {
+            proxy_pass https://rewrite/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_cookie {
+            session_sticky_hide_cookie upstream=nocookie;
+            proxy_pass https://nocookie/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_havecookie {
+            session_sticky_hide_cookie upstream=havecookie;
+            proxy_pass https://havecookie/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+
+        location /test_nothing {
+            proxy_pass https://nothing/;
+            proxy_set_header Connection close;
+            proxy_ssl_session_reuse on;
+        }
+    }
+}
+
+EOF
+
+
+$t->run();
+my $r = http_get('/test_insert_indirect');
+#1
+like($r, qr/200 OK/, 'test insert frist seen');
+like($r, qr/X-Session: \./, 'ssl session not reused');
+
+my $cookie = getcookie($r);
+my $res = getres($r);
+my $now = time();
+my $sid = getsid($cookie);
+#2
+$r = my_http_get('/test_insert_indirect', "$sid\|$now\|$now");
+like($r, qr/$res/, 'insert with cookie');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+$r = http_get('/test_insert');
+like($r, qr/X-Session: \./, 'ssl session not reused');
+$cookie = getcookie($r);
+$res = getres($r);
+$sid = getsid($cookie);
+$now = $now - 1000;
+if ($res eq 9000) {
+    $res = 9001;
+} else {
+    $res = 9000;
+}
+#3
+$r = my_http_get('/test_insert', "$sid\|$now\|$now");
+like($r, qr/$res/, 'insert with cookie, maxidle timeout');
+like($r, qr/X-Session: \./, 'ssl session not reused');
+
+#6
+$r = http_get('/test_rewrite');
+$cookie = getcookie($r);
+$res = getres($r);
+like($r, qr/set-cookie:[^\w]*test=\w{32}/i, 'rewrite -- upstream set cookie');
+unlike($r, qr/set-cookie:[^\w]*test=\w{32};[^\w]*domain/i, 'rewrite -- upstream set cookie and session_sticky modify the value only');
+$r = my_http_get('/test_rewrite', "$cookie");
+like($r, qr/$res/, 'rewrite -- with cookie in request');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+#8
+$r = http_get('/test_prefix');
+like($r, qr/set-cookie:[^\w]*test=\w{32}\~\w*/i, 'prefix -- upstream set cookie');
+$cookie = getcookie($r);
+$res = getres($r);
+$r = my_http_get('/test_prefix', $cookie);
+like($r, qr/$res/, 'prefix -- with cookie in request');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+#25
+$r = http_get('/test_rewrite_no_header');
+$cookie = getcookie($r);
+$res = getres($r);
+like($r = my_http_get('/test_rewrite_no_header', $cookie), qr/$res/, 'not config session_sticky_hide_cookie');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+$r = http_get('/test_insert_nomalife');
+$cookie=getcookie($r);
+$res=getres($r);
+like($r, qr/set-cookie: test=\w{32}/i, 'no maxlife');
+like($r = my_http_get('/test_insert_nomalife', $cookie), qr/$res/, 'nomaxlif with cookie');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+$r = http_get('/test_nothing');
+$cookie = getcookie($r);
+$res = getres($r);
+like($r, qr/200/, 'prefix--without maxidle or maxlife');
+like($r = my_http_get('/test_nothing', $cookie), qr/$res/, 'prefix--without maxidle or maxlife');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+$r = http_get('/test_hash');
+like($r, qr/set-cookie: test=\d{4}/i, "hash=plain");
+$cookie = getcookie($r);
+$res = getres($r);
+$r = my_http_get('/test_hash', $cookie);
+like($r, qr/$res/, 'hash=plain, the same real server');
+like($r, qr/X-Session: r/, 'ssl session reused');
+
+$t->stop();
+
+
 #####################################################################################
 
 

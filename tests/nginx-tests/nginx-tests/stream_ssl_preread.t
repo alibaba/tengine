@@ -35,6 +35,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     log_format status $status;
 
     map $ssl_preread_server_name $name {
@@ -126,7 +128,7 @@ $t->plan(13);
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]

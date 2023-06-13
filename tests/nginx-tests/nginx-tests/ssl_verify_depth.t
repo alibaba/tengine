@@ -27,10 +27,11 @@ plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
 plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)
-	->has_daemon('openssl')->plan(2);
+my $t = Test::Nginx->new()->has(qw/http http_ssl/)->has_daemon('openssl');
 
-$t->write_file_expand('nginx.conf', <<'EOF');
+plan(skip_all => 'LibreSSL') if $t->has_module('LibreSSL');
+
+$t->plan(9)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -42,18 +43,31 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    ssl_certificate_key  localhost.key;
     ssl_certificate localhost.crt;
+    ssl_certificate_key localhost.key;
 
     ssl_verify_client on;
-    ssl_client_certificate int-root.crt;
+    ssl_client_certificate root-int.crt;
 
-    add_header X-Verify $ssl_client_verify;
+    add_header X-Client $ssl_client_s_dn always;
+    add_header X-Verify $ssl_client_verify always;
 
     server {
         listen       127.0.0.1:8080 ssl;
         server_name  localhost;
         ssl_verify_depth 0;
+    }
+
+    server {
+        listen       127.0.0.1:8081 ssl;
+        server_name  localhost;
+        ssl_verify_depth 1;
+    }
+
+    server {
+        listen       127.0.0.1:8082 ssl;
+        server_name  localhost;
+        ssl_verify_depth 2;
     }
 }
 
@@ -63,7 +77,7 @@ my $d = $t->testdir();
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -76,13 +90,17 @@ default_ca = myca
 [ myca ]
 new_certs_dir = $d
 database = $d/certindex
-default_md = sha1
+default_md = sha256
 policy = myca_policy
 serial = $d/certserial
 default_days = 1
+x509_extensions = myca_extensions
 
 [ myca_policy ]
 commonName = supplied
+
+[ myca_extensions ]
+basicConstraints = critical,CA:TRUE
 EOF
 
 foreach my $name ('root', 'localhost') {
@@ -116,23 +134,50 @@ system("openssl ca -batch -config $d/ca.conf "
 	. ">>$d/openssl.out 2>&1") == 0
 	or die "Can't sign certificate for end: $!\n";
 
-$t->write_file('int-root.crt',
-	$t->read_file('int.crt') . $t->read_file('root.crt'));
+$t->write_file('root-int.crt', $t->read_file('root.crt')
+	. $t->read_file('int.crt'));
 
 $t->write_file('t', '');
 $t->run();
 
 ###############################################################################
 
-like(get(8080, 'root'), qr/SUCCESS/, 'verify depth');
-like(get(8080, 'end'), qr/400 Bad Request/, 'verify depth limited');
+# with verify depth 0, only self-signed certificates should
+# be allowed
+
+# OpenSSL 1.1.0+ instead limits the number of intermediate certs allowed;
+# as a result, it is not possible to limit certificate checking
+# to self-signed certificates only when using OpenSSL 1.1.0+
+
+like(get(8080, 'root'), qr/SUCCESS/, 'verify depth 0 - root');
+like(get(8080, 'int'),  qr/FAI|SUC/, 'verify depth 0 - no int');
+like(get(8080, 'end'),  qr/FAILED/,  'verify depth 0 - no end');
+
+# with verify depth 1 (the default), one signature is
+# expected to be checked, so certificates directly signed
+# by the root cert are allowed, but nothing more
+
+# OpenSSL 1.1.0+ instead limits the number of intermediate certs allowed;
+# so with depth 1 it is possible to validate not only directly signed
+# certificates, but also chains with one intermediate certificate
+
+like(get(8081, 'root'), qr/SUCCESS/, 'verify depth 1 - root');
+like(get(8081, 'int'),  qr/SUCCESS/, 'verify depth 1 - int');
+like(get(8081, 'end'),  qr/FAI|SUC/, 'verify depth 1 - no end');
+
+# with verify depth 2 it is also possible to validate up to two signatures,
+# so chains with one intermediate certificate are allowed
+
+like(get(8082, 'root'), qr/SUCCESS/, 'verify depth 2 - root');
+like(get(8082, 'int'),  qr/SUCCESS/, 'verify depth 2 - int');
+like(get(8082, 'end'),  qr/SUCCESS/, 'verify depth 2 - end');
 
 ###############################################################################
 
 sub get {
 	my ($port, $cert) = @_;
 	my $s = get_ssl_socket($port, $cert) or return;
-	http_get('/t', socket => $s);
+	http_get("/t?$cert", socket => $s);
 }
 
 sub get_ssl_socket {

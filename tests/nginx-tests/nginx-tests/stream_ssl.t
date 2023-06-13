@@ -13,7 +13,7 @@ use strict;
 use Test::More;
 
 use POSIX qw/ mkfifo /;
-use Socket qw/ :DEFAULT $CRLF /;
+use Socket qw/ $CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -48,6 +48,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     ssl_certificate_key localhost.key;
     ssl_certificate localhost.crt;
     ssl_session_tickets off;
@@ -93,7 +95,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -104,7 +106,7 @@ mkfifo("$d/password_fifo", 0700);
 
 foreach my $name ('localhost', 'inherits') {
 	system("openssl genrsa -out $d/$name.key -passout pass:$name "
-		. "-aes128 1024 >>$d/openssl.out 2>&1") == 0
+		. "-aes128 2048 >>$d/openssl.out 2>&1") == 0
 		or die "Can't create private key: $!\n";
 	system('openssl req -x509 -new '
 		. "-config $d/openssl.conf -subj /CN=$name/ "
@@ -181,14 +183,8 @@ like(Net::SSLeay::dump_peer_certificate($ssl), qr/CN=inherits/, 'CN inner');
 
 sub get_ssl_socket {
 	my ($port, $ses) = @_;
-	my $s;
 
-	my $dest_ip = inet_aton('127.0.0.1');
-	my $dest_serv_params = sockaddr_in($port, $dest_ip);
-
-	socket($s, &AF_INET, &SOCK_STREAM, 0) or die "socket: $!";
-	connect($s, $dest_serv_params) or die "connect: $!";
-
+	my $s = IO::Socket::INET->new('127.0.0.1:' . $port);
 	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
 	Net::SSLeay::set_session($ssl, $ses) if defined $ses;
 	Net::SSLeay::set_fd($ssl, fileno($s));

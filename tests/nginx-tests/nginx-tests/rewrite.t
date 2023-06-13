@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(22)
+my $t = Test::Nginx->new()->has(qw/http rewrite proxy/)->plan(23)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -130,6 +130,12 @@ http {
             rewrite ^(.*) $1?c=$1;
             return 200 "uri:$uri args:$args";
         }
+
+        location /break {
+            rewrite ^ /return200;
+            break;
+            proxy_pass http://127.0.0.1:8080/return204;
+        }
     }
 }
 
@@ -161,12 +167,7 @@ like(http_get('/return405'), qr!HTTP/1.1 405.*body!ms, 'return 405');
 # this used to result in 404, but was changed in 1.15.4
 # to respond with 405 instead, much like a real error would do
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.4');
-
 like(http_get('/error404return405'), qr!HTTP/1.1 405!, 'error 404 return 405');
-
-}
 
 # status code should be 405, and entity body is expected (vs. normal 204
 # replies which doesn't expect to have body); use HTTP/1.1 for test
@@ -235,5 +236,9 @@ like(http_get('/capture/%25?a=b'),
 like(http_get('/capturedup/%25?a=b'),
 	qr!^uri:/capturedup/% args:c=/capturedup/%25&a=b$!ms,
 	'escape with added args');
+
+# break
+
+like(http_get('/break'), qr/200/, 'valid_location reset');
 
 ###############################################################################

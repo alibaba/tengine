@@ -1,5 +1,5 @@
 
-Introduction [![Build Status](https://travis-ci.org/alibaba/tengine.svg?branch=master)](https://travis-ci.org/alibaba/tengine)
+Introduction [![Build Status](https://github.com/alibaba/tengine/actions/workflows/ci.yml/badge.svg)](https://github.com/alibaba/tengine/actions/workflows/ci.yml)
 ============
 
 Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on the [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
@@ -9,7 +9,7 @@ Tengine has been an open source project since December 2011. It is being activel
 Features
 ========
 
-* All features of nginx-1.18.0 are inherited, i.e., it is 100% compatible with nginx.
+* All features of nginx-1.22.1 are inherited, i.e., it is 100% compatible with nginx.
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
@@ -28,7 +28,6 @@ Features
 * Enhanced diagnostic information makes it easier to troubleshoot errors.
 * More user-friendly command lines, e.g., showing all compiled-in modules and supported directives.
 * Expiration times can be specified for certain MIME types.
-* Error pages can be reset to 'default'.
 * ...
 
 Installation

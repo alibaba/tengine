@@ -30,6 +30,8 @@ struct ngx_http_upstream_vnswrr_srv_conf_s {
     ngx_uint_t                            vnumber;
     ngx_uint_t                            last_number;
     ngx_uint_t                            init_number;
+    ngx_uint_t                            max_init;
+    ngx_uint_t                            gcd;
     ngx_http_upstream_rr_peer_t          *last_peer;
     ngx_http_upstream_rr_vpeers_t        *vpeers;
     ngx_http_upstream_vnswrr_srv_conf_t  *next;
@@ -62,11 +64,12 @@ static void ngx_http_upstream_init_virtual_peers(
     ngx_http_upstream_vnswrr_srv_conf_t *uvnscf,
     ngx_uint_t s, ngx_uint_t e);
 
+static ngx_uint_t ngx_http_upstream_gcd(ngx_uint_t a, ngx_uint_t b);
 
 static ngx_command_t  ngx_http_upstream_vnswrr_commands[] = {
 
     { ngx_string("vnswrr"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_NOARGS,
+      NGX_HTTP_UPS_CONF|NGX_CONF_NOARGS|NGX_CONF_TAKE1,
       ngx_http_upstream_vnswrr,
       0,
       0,
@@ -136,7 +139,10 @@ ngx_http_upstream_vnswrr_create_srv_conf(ngx_conf_t *cf)
 static char *
 ngx_http_upstream_vnswrr(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_upstream_srv_conf_t  *uscf;
+    ngx_http_upstream_srv_conf_t            *uscf;
+    ngx_http_upstream_vnswrr_srv_conf_t     *uvnscf;
+    ngx_str_t                               *value;
+    ngx_int_t                                max_init;
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
 
@@ -157,6 +163,31 @@ ngx_http_upstream_vnswrr(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
                   |NGX_HTTP_UPSTREAM_DOWN;
 
+    uvnscf = ngx_http_conf_upstream_srv_conf(uscf,
+                                ngx_http_upstream_vnswrr_module);
+
+    value = cf->args->elts;
+
+    max_init = 0;
+
+    if (cf->args->nelts > 1) {
+
+        if (ngx_strncmp(value[1].data, "max_init=", 9) == 0) {
+
+            max_init = ngx_atoi(&value[1].data[9], value[1].len - 9);
+
+            if (max_init == NGX_ERROR) {
+
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid parameter \"%V\"", &value[1]);
+
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+    uvnscf->max_init = max_init;
+
     return NGX_CONF_OK;
 }
 
@@ -167,12 +198,33 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
 {
     ngx_http_upstream_rr_peers_t           *peers, *backup;
     ngx_http_upstream_vnswrr_srv_conf_t    *uvnscf, *ubvnscf;
-
+    ngx_http_upstream_server_t             *server;
+    ngx_uint_t                              i, g, bg, max_init;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, cf->log, 0, "init vnswrr");
 
     if (ngx_http_upstream_init_round_robin(cf, us) != NGX_OK) {
         return NGX_ERROR;
+    }
+
+    g = 0;
+    bg = 0;
+    if (us->servers) {
+        server = us->servers->elts;
+
+        for (i = 0; i < us->servers->nelts; i++) {
+            if (server[i].backup) {
+                bg = ngx_http_upstream_gcd(bg, server[i].weight);
+            } else {
+                g = ngx_http_upstream_gcd(g , server[i].weight);
+            }
+        }
+    }
+    if (g == 0) {
+        g = 1;
+    }
+    if (bg == 0) {
+        bg = 1;
     }
 
     uvnscf = ngx_http_conf_upstream_srv_conf(us,
@@ -181,23 +233,34 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
         return NGX_ERROR;
     }
 
+    peers = (ngx_http_upstream_rr_peers_t *) us->peer.data;
+
+    max_init = uvnscf->max_init;
+
     uvnscf->init_number = NGX_CONF_UNSET_UINT;
     uvnscf->last_number = NGX_CONF_UNSET_UINT;
     uvnscf->last_peer = NULL;
     uvnscf->next = NULL;
+    uvnscf->gcd = g;
+
+    if (!max_init) {
+        uvnscf->max_init = peers->number;
+
+    } else if (max_init > peers->total_weight) {
+        uvnscf->max_init = peers->total_weight;
+    }
 
     us->peer.init = ngx_http_upstream_init_vnswrr_peer;
 
-    peers = (ngx_http_upstream_rr_peers_t *) us->peer.data;
     if (peers->weighted) {
         uvnscf->vpeers = ngx_pcalloc(cf->pool,
                                     sizeof(ngx_http_upstream_rr_vpeers_t)
-                                    * peers->total_weight);
+                                    * peers->total_weight / uvnscf->gcd);
         if (uvnscf->vpeers == NULL) {
             return NGX_ERROR;
         }
 
-        ngx_http_upstream_init_virtual_peers(peers, uvnscf, 0, peers->number);
+        ngx_http_upstream_init_virtual_peers(peers, uvnscf, 0, uvnscf->max_init);
 
     }
 
@@ -213,6 +276,16 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
         ubvnscf->init_number = NGX_CONF_UNSET_UINT;
         ubvnscf->last_number = NGX_CONF_UNSET_UINT;
         ubvnscf->last_peer = NULL;
+        ubvnscf->gcd = bg;
+        
+        ubvnscf->max_init = max_init;
+
+        if (!max_init) {
+            ubvnscf->max_init = backup->number;
+
+        } else if (max_init > backup->total_weight) {
+            ubvnscf->max_init = backup->total_weight;
+        }
 
         uvnscf->next = ubvnscf;
 
@@ -222,12 +295,12 @@ ngx_http_upstream_init_vnswrr(ngx_conf_t *cf,
 
         ubvnscf->vpeers = ngx_pcalloc(cf->pool,
                                       sizeof(ngx_http_upstream_rr_vpeers_t)
-                                      * backup->total_weight);
+                                      * backup->total_weight / ubvnscf->gcd);
         if (ubvnscf->vpeers == NULL) {
             return NGX_ERROR;
         }
 
-        ngx_http_upstream_init_virtual_peers(backup, ubvnscf, 0, backup->number);
+        ngx_http_upstream_init_virtual_peers(backup, ubvnscf, 0, ubvnscf->max_init);
     }
 
     return NGX_OK;
@@ -443,12 +516,12 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
 
     if (peers->weighted) {
         /* batch initialization vpeers at runtime. */
-        if (uvnscf->vnumber != peers->total_weight
+        if (uvnscf->vnumber != peers->total_weight / uvnscf->gcd
             && (uvnscf->last_number + 1 == uvnscf->vnumber))
         {
-            n = peers->total_weight - uvnscf->vnumber;
-            if (n > peers->number) {
-                n = peers->number;
+            n = peers->total_weight / uvnscf->gcd - uvnscf->vnumber;
+            if (n > uvnscf->max_init) {
+                n = uvnscf->max_init;
             }
 
             ngx_http_upstream_init_virtual_peers(peers, uvnscf, uvnscf->vnumber,
@@ -480,13 +553,15 @@ ngx_http_upstream_get_vnswrr(ngx_http_upstream_vnswrr_peer_data_t  *vnsp)
         flag = 0;
         if (peers->weighted) {
 
-            n = peers->total_weight - uvnscf->vnumber;
-            if (n > peers->number) {
-                n = peers->number;
+            n = peers->total_weight / uvnscf->gcd - uvnscf->vnumber;
+            if (n > uvnscf->max_init) {
+                n = uvnscf->max_init;
             }
 
-            ngx_http_upstream_init_virtual_peers(peers, uvnscf, uvnscf->vnumber,
-			                         n + uvnscf->vnumber);
+            if (n > 0) {
+                ngx_http_upstream_init_virtual_peers(peers, uvnscf, uvnscf->vnumber,
+                                        n + uvnscf->vnumber);
+            }
 
             n = vpeers[i].rindex / (8 * sizeof(uintptr_t));
             m = (uintptr_t) 1 << vpeers[i].rindex % (8 * sizeof(uintptr_t));
@@ -591,4 +666,15 @@ ngx_http_upstream_init_virtual_peers(ngx_http_upstream_rr_peers_t *peers,
     uvnscf->vnumber = i;
 
     return;
+}
+
+ngx_uint_t ngx_http_upstream_gcd(ngx_uint_t a, ngx_uint_t b)
+{
+    ngx_uint_t r;
+    while (b) {
+        r = a % b;
+        a = b;
+        b = r;
+    }
+    return a;
 }

@@ -245,34 +245,34 @@ like(http_get('/t6?b=123'), qr/^HTTP.*200/,
 
 ###############################################################################
 
-like(http_get('/t1?a=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t1?a=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t2?a=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t2?a=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t3?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t3?a=123456 &b=1&foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t3?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t3?a=1&b=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t4?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t4?a=123456 &b=1&foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t4?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t4?a=1&b=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t5?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t5?a=123456 &b=1&foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t5?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t5?a=1&b=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t6?a=123456 &b=1&foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t6?a=123456 &b=1&foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
-like(http_get('/t6?a=1&b=123456 &foo=bar'), qr/^HTTP.*200/,
+like(http_get('/t6?a=1&b=123456 &foo=bar'), qr/^HTTP.*400/,
     "ngx_atoi error due to space, get false");
 
 

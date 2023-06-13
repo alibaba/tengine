@@ -1,0 +1,98 @@
+name: test tengine
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+   runs-on: "ubuntu-20.04"
+   strategy:
+     fail-fast: false
+     matrix:
+       compiler:
+         - { compiler: GNU,  CC: gcc,  CXX: g++}
+         - { compiler: LLVM, CC: clang, CXX: clang++}
+   steps:
+     - uses: actions/checkout@v3
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx libgd3
+         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+     - name: 'checkout luajit2'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/luajit2
+         path: luajit2
+     - name: 'build luajit2'
+       working-directory: luajit2
+       run: |
+         make
+         sudo make install
+
+# TODO: fix tests so they don't depend on /usr/local/nginx/logs/
+#       so we can run `make`, `make test`, `make install`.
+
+     - name: build
+       env:
+         CC: ${{ matrix.compiler.CC }}
+         CXX: ${{ matrix.compiler.CXX }}
+         LUAJIT_LIB: /usr/local/lib
+         LUAJIT_INC: /usr/local/include/luajit-2.1
+       run: |
+         ./configure \
+            --with-debug \
+            --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
+            --with-ipv6 \
+            --with-openssl-async \
+            --with-http_ssl_module \
+            --with-http_v2_module \
+            --with-http_addition_module \
+            --with-stream \
+            --with-stream_ssl_module \
+            --with-stream_realip_module \
+            --with-stream_geoip_module \
+            --with-stream_ssl_preread_module \
+            --with-stream_sni \
+            --add-module=./modules/ngx_backtrace_module \
+            --add-module=./modules/ngx_debug_pool \
+            --add-module=./modules/ngx_debug_timer \
+            --add-module=./modules/ngx_http_concat_module \
+            --add-module=./modules/ngx_http_footer_filter_module \
+            --add-module=./modules/ngx_http_lua_module \
+            --add-module=./modules/ngx_http_proxy_connect_module \
+            --add-module=./modules/ngx_http_reqstat_module \
+            --add-module=./modules/ngx_http_slice_module \
+            --add-module=./modules/ngx_http_sysguard_module \
+            --add-module=./modules/ngx_http_trim_filter_module \
+            --add-module=./modules/ngx_http_upstream_check_module \
+            --add-module=./modules/ngx_http_upstream_consistent_hash_module \
+            --add-module=./modules/ngx_http_upstream_dynamic_module \
+            --add-module=./modules/ngx_http_upstream_dyups_module \
+            --add-module=./modules/ngx_http_upstream_keepalive_module \
+            --add-module=./modules/ngx_http_upstream_session_sticky_module \
+            --add-module=./modules/ngx_http_upstream_vnswrr_module \
+            --add-module=./modules/ngx_http_user_agent_module \
+            --add-module=./modules/ngx_multi_upstream_module \
+            --add-module=./modules/ngx_slab_stat \
+            --without-http_upstream_keepalive_module
+         make -j2
+         sudo make install
+     - name: tengine test cases using nginx-tests lib
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+       run: |
+         sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
+         prove -v -Inginx-tests/lib tengine-tests/
+         prove -v -Inginx-tests/lib ../../modules/ngx_http_proxy_connect_module/t
+     - name: tengine test cases using test-nginx lib
+       working-directory: tests/test-nginx
+       run: |
+         sudo cpanm --notest Shell Test::Base Test::LongString List::MoreUtils LWP::UserAgent HTTP::Response  > build.log 2>&1 || (cat build.log && exit 1)
+         mkdir t
+         PATH=/usr/local/nginx/sbin:$PATH \
+         prove -v -Itest-nginx/lib cases/

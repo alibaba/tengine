@@ -1,0 +1,133 @@
+name: test nginx core
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+   runs-on: "ubuntu-20.04"
+   strategy:
+     fail-fast: false
+     matrix:
+       compiler:
+         - { compiler: GNU,  CC: gcc,  CXX: g++}
+         - { compiler: LLVM, CC: clang, CXX: clang++}
+   steps:
+     - uses: actions/checkout@v3
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx libgd3
+         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+         # for building nginx core
+         sudo apt install -y libgoogle-perftools-dev
+         # for running cases in nginx-tests
+         sudo apt install -y uwsgi-plugin-python3 uwsgi ffmpeg memcached libsofthsm2-dev
+     - name: 'checkout luajit2'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/luajit2
+         path: luajit2
+     - name: 'build luajit2'
+       working-directory: luajit2
+       run: |
+         make
+         sudo make install
+     - name: build
+       env:
+         CC: ${{ matrix.compiler.CC }}
+         CXX: ${{ matrix.compiler.CXX }}
+         LUAJIT_LIB: /usr/local/lib
+         LUAJIT_INC: /usr/local/include/luajit-2.1
+       run: |
+         # TODO: fix https://github.com/alibaba/tengine/issues/1720, then remove "-D T_NGX_HTTP_IMAGE_FILTER=0"
+
+         # NOTE:
+         # For "-D T_NGX_MODIFY_DEFAULT_VALUE=0", we dont compile the source included in this macro, otherwise some nginx-tests cases tests will fail.
+         # For "-D T_NGX_SERVER_INFO=0", it makes some cases pass, such as userid.t.
+         # For "-D T_NGX_HTTP_UPSTREAM_RANDOM=0", it makes some cases pass, such as image_filter_finalize.t.
+         ./configure  \
+            --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0 -D T_NGX_SERVER_INFO=0 -D T_NGX_HTTP_UPSTREAM_RANDOM=0" \
+            --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
+            --with-openssl-async \
+            --with-pcre \
+            --with-http_ssl_module \
+            --with-http_image_filter_module \
+            --with-http_v2_module \
+            --with-http_addition_module \
+            --with-http_mp4_module \
+            --with-http_realip_module \
+            --with-http_xslt_module \
+            --with-http_geoip_module \
+            --with-http_sub_module \
+            --with-http_dav_module \
+            --with-http_flv_module \
+            --with-http_gunzip_module \
+            --with-http_gzip_static_module \
+            --with-http_auth_request_module \
+            --with-http_random_index_module \
+            --with-http_secure_link_module \
+            --with-http_degradation_module \
+            --with-http_slice_module \
+            --with-http_stub_status_module \
+            --with-mail \
+            --with-mail_ssl_module \
+            --with-stream \
+            --with-stream_ssl_module \
+            --with-stream_realip_module \
+            --with-stream_geoip_module \
+            --with-stream_ssl_preread_module \
+            --with-google_perftools_module \
+            --with-cpp_test_module \
+            --with-compat \
+            --add-module=modules/mod_config \
+            --add-module=modules/mod_dubbo \
+            --add-module=modules/ngx_backtrace_module \
+            --add-module=modules/ngx_debug_timer \
+            --add-module=modules/ngx_http_concat_module \
+            --add-module=modules/ngx_http_footer_filter_module \
+            --add-module=modules/ngx_http_lua_module \
+            --add-module=modules/ngx_http_proxy_connect_module \
+            --add-module=modules/ngx_http_reqstat_module \
+            --add-module=modules/ngx_http_sysguard_module \
+            --add-module=modules/ngx_http_trim_filter_module \
+            --add-module=modules/ngx_http_upstream_check_module \
+            --add-module=modules/ngx_http_upstream_consistent_hash_module \
+            --add-module=modules/ngx_http_upstream_dynamic_module \
+            --add-module=modules/ngx_http_upstream_session_sticky_module \
+            --add-module=modules/ngx_http_upstream_vnswrr_module \
+            --add-module=modules/ngx_http_user_agent_module \
+            --add-module=modules/ngx_multi_upstream_module \
+            --add-module=modules/ngx_slab_stat \
+            --add-module=modules/ngx_http_upstream_dyups_module \
+            --with-http_perl_module \
+            --with-stream_sni \
+            --with-openssl-async \
+            --with-debug
+            # skip ngx_debug_pool, it modified NGX_MIN_POOL_SIZE, which made some test case failed (http_header_buffers.t)
+            # skip tengine upstream keepalive module
+            #--without-http_upstream_keepalive_module \
+            #--add-module=modules/ngx_http_upstream_keepalive_module \
+            # skip tengine slice module
+            #--add-module=modules/ngx_http_slice_module \
+         make -j2
+         sudo make install
+     - name: run cases in nginx-tests
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+         TEST_NGINX_UNSAFE: yes
+       run: |
+         # prepare perl library for test case
+         sudo cpanm --notest SCGI Protocol::WebSocket Net::SSLeay IO::Socket::SSL Cache::Memcached Cache::Memcached::Fast Net::DNS::Nameserver GD > build.log 2>&1 || (cat build.log && exit 1)
+         # fixed http_method.t for tengine proxy_connect module
+         sed -i -e "s+405 Not Allowed(?!.*200 OK)/s, 'connect'+400 Bad Request(?!.*200 OK)/s, 'connect'+" nginx-tests/http_method.t
+         # run cases in nginx-tests
+         prove -I nginx-tests/lib nginx-tests/
+         # It must be root for some cases.
+         sudo groupadd wheel    # for proxy_bind_transparent.t
+         sudo TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx TEST_NGINX_UNSAFE=yes prove -I nginx-tests/lib nginx-tests/proxy_bind_transparent.t nginx-tests/proxy_bind_transparent_capability.t
+

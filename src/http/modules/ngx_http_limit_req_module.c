@@ -9,6 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+
 #define NGX_HTTP_LIMIT_REQ_PASSED            1
 #define NGX_HTTP_LIMIT_REQ_DELAYED           2
 #define NGX_HTTP_LIMIT_REQ_REJECTED          3
@@ -87,6 +88,8 @@ static ngx_int_t ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit,
     ngx_uint_t hash, ngx_str_t *key, ngx_uint_t *ep, ngx_uint_t account);
 static ngx_msec_t ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits,
     ngx_uint_t n, ngx_uint_t *ep, ngx_http_limit_req_limit_t **limit);
+static void ngx_http_limit_req_unlock(ngx_http_limit_req_limit_t *limits,
+    ngx_uint_t n);
 static void ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx,
     ngx_uint_t n);
 
@@ -358,6 +361,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 #endif
 
         if (ngx_http_complex_value(r, &ctx->key, &key) != NGX_OK) {
+            ngx_http_limit_req_unlock(limits, n);
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -405,21 +409,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
                         &limit->shm_zone->shm.name);
         }
 
-        while (n--) {
-            ctx = limits[n].shm_zone->data;
-
-            if (ctx->node == NULL) {
-                continue;
-            }
-
-            ngx_shmtx_lock(&ctx->shpool->mutex);
-
-            ctx->node->count--;
-
-            ngx_shmtx_unlock(&ctx->shpool->mutex);
-
-            ctx->node = NULL;
-        }
+        ngx_http_limit_req_unlock(limits, n);
 
         if (lrcf->dry_run) {
             r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED_DRY_RUN;
@@ -428,6 +418,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
 #if (T_LIMIT_REQ)
         if (rc == NGX_ERROR || limit->forbid_action.len == 0) {
+            r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED;
+
             return lrcf->status_code;
 
         } else if (limit->forbid_action.data[0] == '@') {
@@ -451,7 +443,8 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
         return NGX_DONE;
 #else
         r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_REJECTED;
-		return lrcf->status_code;
+
+        return lrcf->status_code;
 #endif
     }
 
@@ -480,8 +473,13 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
 
     r->main->limit_req_status = NGX_HTTP_LIMIT_REQ_DELAYED;
 
-    if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    if (r->connection->read->ready) {
+        ngx_post_event(r->connection->read, &ngx_posted_events);
+
+    } else {
+        if (ngx_handle_read_event(r->connection->read, 0) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
     }
 
     r->read_event_handler = ngx_http_test_reading;
@@ -768,6 +766,29 @@ ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits, ngx_uint_t n,
     }
 
     return max_delay;
+}
+
+
+static void
+ngx_http_limit_req_unlock(ngx_http_limit_req_limit_t *limits, ngx_uint_t n)
+{
+    ngx_http_limit_req_ctx_t  *ctx;
+
+    while (n--) {
+        ctx = limits[n].shm_zone->data;
+
+        if (ctx->node == NULL) {
+            continue;
+        }
+
+        ngx_shmtx_lock(&ctx->shpool->mutex);
+
+        ctx->node->count--;
+
+        ngx_shmtx_unlock(&ctx->shpool->mutex);
+
+        ctx->node = NULL;
+    }
 }
 
 

@@ -21,7 +21,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(7);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite/)->plan(8);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -46,6 +46,11 @@ http {
         server 127.0.0.1:8082;
     }
 
+    upstream u3 {
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082 down;
+    }
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
@@ -64,6 +69,11 @@ http {
 
         location /all/404 {
             return 200 "$upstream_addr\n";
+        }
+
+        location /down {
+            proxy_pass http://u3;
+            proxy_next_upstream http_404;
         }
     }
 
@@ -133,5 +143,10 @@ unlike(http_get('/ok') . http_get('/ok'), qr/AND-THIS/, 'down after 500');
 like(http_get('/all/rr'),
 	qr/^127.0.0.1:($p1, 127.0.0.1:$p2|$p2, 127.0.0.1:$p1)$/mi,
 	'all tried once');
+
+# make sure backend marked as down doesn't count towards "no live upstreams"
+# after all backends are tried with http_404
+
+like(http_get('/down/'), qr/Not Found/, 'all tried with down');
 
 ###############################################################################

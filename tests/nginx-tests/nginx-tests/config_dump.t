@@ -25,14 +25,13 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http map/);
 
-plan(skip_all => 'no config dump') unless $t->has_version('1.9.2');
-
-$t->plan(10)->write_file_expand('nginx.conf', <<'EOF');
+$t->plan(13)->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
 daemon off;
 
+include %%TESTDIR%%/inc.conf;
 include %%TESTDIR%%/inc.conf;
 
 events {
@@ -44,6 +43,7 @@ http {
     map $args $x {
         default  0;
         foo      bar;
+        include  map.conf;
         include  map.conf;
     }
 
@@ -77,6 +77,10 @@ like($dump, qr!^# configuration file $d/inc.conf:$!m, 'inc.conf found');
 like($dump, qr!^# configuration file $d/inc2.conf:$!m, 'inc2.conf found');
 like($dump, qr!^# configuration file $d/map.conf:$!m, 'map.conf found');
 
+unlike($dump, qr!(# configuration file $d/inc.conf:).*\1!s, 'inc.conf uniq');
+unlike($dump, qr!(# configuration file $d/inc2.conf:).*\1!s, 'inc2.conf uniq');
+unlike($dump, qr!(# configuration file $d/map.conf:).*\1!s, 'map.conf uniq');
+
 is(getconf($t, $dump, 'nginx.conf'), $t->read_file('nginx.conf'), 'content');
 is(getconf($t, $dump, 'inc.conf'), $t->read_file('inc.conf'), 'content inc');
 is(getconf($t, $dump, 'map.conf'), $t->read_file('map.conf'), 'content inc 2');
@@ -104,3 +108,5 @@ sub getconf {
 	$s =~ tr/\r//d;
 	return $s;
 }
+
+###############################################################################

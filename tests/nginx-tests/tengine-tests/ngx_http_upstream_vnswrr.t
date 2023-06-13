@@ -66,6 +66,41 @@ http {
         server 127.0.0.1:8084 down;
     }
 
+    upstream g {
+        vnswrr;
+        server 127.0.0.1:8081 weight=2;
+        server 127.0.0.1:8082 weight=4;
+        server 127.0.0.1:8083 weight=8;
+    }
+
+    upstream h {
+        vnswrr max_init=2;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
+    upstream i {
+        vnswrr max_init=1;
+        server 127.0.0.1:8081 down;
+        server 127.0.0.1:8082 backup;
+        server 127.0.0.1:8083 backup;
+    }
+
+    upstream j {
+        vnswrr max_init=0;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
+    upstream k {
+        vnswrr max_init=10;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
     server {
         listen       127.0.0.1:8081;
         listen       127.0.0.1:8082;
@@ -100,12 +135,32 @@ http {
         location /d {
             proxy_pass http://d;
         }
+
+        location /g {
+            proxy_pass http://g;
+        }
+
+        location /h {
+            proxy_pass http://h;
+        }
+
+        location /i {
+            proxy_pass http://i;
+        }
+
+        location /j {
+            proxy_pass http://j;
+        }
+
+        location /k {
+            proxy_pass http://k;
+        }
     }
 }
 
 EOF
 
-$t->try_run('no upstream vnswrr')->plan(10);
+$t->try_run('no upstream vnswrr')->plan(24);
 
 ###############################################################################
 my $r;
@@ -147,6 +202,61 @@ $list{http_get_body('/d')} += 1;
 is($list{'8081'}, 1, 'weight 1');
 is($list{'8082'}, 1, 'weight 1');
 is($list{'8083'}, 2, 'weight 2');
+
+%list = ();
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+$list{http_get_body('/g')} += 1;
+
+is($list{'8081'}, 2, 'weight 2');
+is($list{'8082'}, 4, 'weight 4');
+is($list{'8083'}, 8, 'weight 8');
+
+%list = ();
+$list{http_get_body('/h')} += 1;
+$list{http_get_body('/h')} += 1;
+$list{http_get_body('/h')} += 1;
+
+is($list{'8081'}, 1, 'weight 1');
+is($list{'8082'}, 1, 'weight 1');
+is($list{'8083'}, 1, 'weight 1');
+
+%list = ();
+$list{http_get_body('/i')} += 1;
+$list{http_get_body('/i')} += 1;
+
+is($list{'8082'}, 1, 'weight 1');
+is($list{'8083'}, 1, 'weight 1');
+
+%list = ();
+$list{http_get_body('/j')} += 1;
+$list{http_get_body('/j')} += 1;
+$list{http_get_body('/j')} += 1;
+
+is($list{'8081'}, 1, 'weight 1');
+is($list{'8082'}, 1, 'weight 1');
+is($list{'8083'}, 1, 'weight 1');
+
+%list = ();
+$list{http_get_body('/k')} += 1;
+$list{http_get_body('/k')} += 1;
+$list{http_get_body('/k')} += 1;
+
+is($list{'8081'}, 1, 'weight 1');
+is($list{'8082'}, 1, 'weight 1');
+is($list{'8083'}, 1, 'weight 1');
+
 ###############################################################################
 
 sub http_get_body {

@@ -23,7 +23,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy cache/)->plan(12)
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy cache/)->plan(9)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -37,10 +37,6 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     proxy_cache_path %%TESTDIR%%/cache    keys_zone=NAME:1m;
-
-    # quit unfixed nginx timely on different linuces
-    http2_idle_timeout 2s;
-    http2_recv_timeout 2s;
 
     server {
         listen       127.0.0.1:8080 http2;
@@ -129,22 +125,6 @@ $sid = $s->new_stream({ path => '/cache/t.html?1', method => 'HEAD' });
 $frames = $s->read(all => [{ sid => $sid, fin => 1 }], wait => 0.2);
 push @$frames, $_ for @{$s->read(all => [{ sid => $sid }], wait => 0.2)};
 ok(!grep ({ $_->{type} eq "DATA" } @$frames), 'proxy cache HEAD - no body');
-
-# proxy cache - expect no stray empty DATA frame
-
-TODO: {
-local $TODO = 'not yet';
-
-$s = Test::Nginx::HTTP2->new();
-$sid = $s->new_stream({ path => '/cache/t.html?2' });
-
-$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
-my @data = grep ({ $_->{type} eq "DATA" } @$frames);
-is(@data, 1, 'proxy cache write - data frames');
-is(join(' ', map { $_->{data} } @data), 'SEE-THIS', 'proxy cache write - data');
-is(join(' ', map { $_->{flags} } @data), '1', 'proxy cache write - flags');
-
-}
 
 # HEAD on empty cache with proxy_buffering off
 

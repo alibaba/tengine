@@ -39,6 +39,8 @@ events {
 worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     upstream u_unlim {
         server 127.0.0.1:8081 max_conns=0;
         server 127.0.0.1:8082;

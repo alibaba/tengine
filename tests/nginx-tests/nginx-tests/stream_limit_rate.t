@@ -25,7 +25,7 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/stream/)->plan(8)
+my $t = Test::Nginx->new()->has(qw/stream/)->plan(9)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -36,6 +36,8 @@ events {
 }
 
 stream {
+    %%TEST_GLOBALS_STREAM%%
+
     # download and upload rates are set equal to the maximum
     # number of bytes transmitted
 
@@ -98,14 +100,17 @@ my $str = '1234567890' x 100;
 my %r = response($str, peer => '127.0.0.1:' . port(8081));
 is($r{'data'}, $str, 'exact limit');
 
-%r = response($str, peer => '127.0.0.1:' . port(8082));
-is($r{'data'}, $str, 'unlimited');
+%r = response($str . 'extra', peer => '127.0.0.1:' . port(8082));
+is($r{'data'}, $str . 'extra', 'unlimited');
 
 SKIP: {
-skip 'unsafe on VM', 2 unless $ENV{TEST_NGINX_UNSAFE};
+skip 'unsafe on VM', 3 unless $ENV{TEST_NGINX_UNSAFE};
 
 # if interaction between backend and client is slow then proxy can add extra
 # bytes to upload/download data
+
+%r = response($str . 'extra', peer => '127.0.0.1:' . port(8081));
+is($r{'data'}, $str, 'limited');
 
 %r = response($str, peer => '127.0.0.1:' . port(8083), readonce => 1);
 is($r{'data'}, '1', 'download - one byte');

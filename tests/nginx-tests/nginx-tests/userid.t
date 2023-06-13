@@ -194,10 +194,7 @@ is(get_cookie('/expires_off', 'expires'), undef, 'expires off');
 
 # redefinition
 
-SKIP: {
-skip 'the page include req url to cause the error match, when the request returns 4xx';
 unlike(http_get('/expires_max/off'), qr/expires/, 'redefine expires');
-}
 like(http_get('/path/r'), qr!/9876543210!, 'redefine path');
 
 # requests
@@ -230,12 +227,7 @@ is(substr(uid_set(http_get('/service')), 0, 8), $addr, 'service custom');
 $addr = $bigendian ? "00000001" : "01000000";
 is(substr(uid_set(http_get('/ip6')), 0, 8), $addr, 'service ipv6');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.15.8');
-
 is(substr(uid_set(http_get('/unix')), 0, 8), "00000000", 'service unix');
-
-}
 
 # reset log
 
