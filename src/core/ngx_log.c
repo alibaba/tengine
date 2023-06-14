@@ -47,7 +47,7 @@ static ngx_command_t  ngx_errlog_commands[] = {
       NULL },
 
 #if (T_NGX_XQUIC)
-        { ngx_string("xquic_log"),
+    { ngx_string("xquic_log"),
       NGX_MAIN_CONF|NGX_CONF_1MORE,
       ngx_xquic_log,
       0,

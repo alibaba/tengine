@@ -34,6 +34,8 @@ struct ngx_http_xquic_connection_s {
     ngx_connection_t               *connection;
     ngx_http_connection_t          *http_connection;
 
+    ngx_ssl_conn_t                 *ssl_conn;
+
     ngx_connection_t               *free_fake_connections;
 
     ngx_http_v3_stream_t           *free_streams;
