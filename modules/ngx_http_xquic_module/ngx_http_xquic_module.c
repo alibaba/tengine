@@ -18,6 +18,10 @@
 #define NGX_XQUIC_LOG_DEBUG     6
 
 
+typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(SSL *ssl,
+    ngx_pool_t *pool, ngx_str_t *s);
+
+
 static ngx_str_t ngx_xquic_log_levels[] = {
     ngx_string("report"),  
     ngx_string("fatal"),
@@ -39,6 +43,10 @@ static ngx_int_t ngx_http_xquic_off_get_variable(ngx_http_request_t *r,
 static ngx_int_t ngx_http_xquic_connection_id_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_xquic_stream_id_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_xquic_ssl_static_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_xquic_ssl_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_xquic_add_variables(ngx_conf_t *cf);
 static char * ngx_http_xquic_streams_index_mask(ngx_conf_t *cf, void *post, void *data);
@@ -286,6 +294,15 @@ static ngx_http_variable_t  ngx_http_xquic_vars[] = {
 
     { ngx_string("xquic_stream_id"), NULL,
       ngx_http_xquic_stream_id_variable, 0, 0, 0 },
+
+    { ngx_string("xquic_ssl_protocol"), NULL, ngx_xquic_ssl_static_variable,
+      (uintptr_t) ngx_xquic_ssl_get_protocol, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("xquic_ssl_cipher"), NULL, ngx_xquic_ssl_static_variable,
+      (uintptr_t) ngx_xquic_ssl_get_cipher_name, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("xquic_ssl_session_reused"), NULL, ngx_xquic_ssl_variable,
+      (uintptr_t) ngx_xquic_ssl_get_session_reused, NGX_HTTP_VAR_CHANGEABLE, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
 };
@@ -863,5 +880,92 @@ ngx_http_set_xquic_status(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+static ngx_int_t
+ngx_xquic_ssl_static_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_ssl_variable_handler_pt   handler = (ngx_ssl_variable_handler_pt) data;
+    size_t                        len;
+    ngx_str_t                     s;
+    ngx_http_xquic_connection_t  *qc;
+
+    if (r->xqstream && r->xqstream->connection)  {
+        qc = r->xqstream->connection;
+        if (qc->ssl_conn) {
+            (void) handler(qc->ssl_conn, NULL, &s);
+            v->data = s.data;
+            for (len = 0; v->data[len]; len++) { /* void */ }
+            v->len = len;
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+
+            return NGX_OK;
+        }
+    }
+
+    v->not_found = 1;
+
+    return NGX_OK;
+}
 
 
+static ngx_int_t
+ngx_xquic_ssl_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
+    uintptr_t data)
+{
+    ngx_ssl_variable_handler_pt   handler = (ngx_ssl_variable_handler_pt) data;
+    ngx_str_t                     s;
+    ngx_http_xquic_connection_t  *qc;
+
+    if (r->xqstream && r->xqstream->connection)  {
+        qc = r->xqstream->connection;
+        if (qc->ssl_conn) {
+            if (handler(qc->ssl_conn, r->pool, &s) != NGX_OK) {            
+                return NGX_ERROR;
+            }
+
+            v->len = s.len;
+            v->data = s.data;
+
+            if (v->len) {
+                v->valid = 1;
+                v->no_cacheable = 0;
+                v->not_found = 0;
+
+                return NGX_OK;
+            }
+        }
+    }
+
+    v->not_found = 1;
+
+    return NGX_OK;
+}
+
+ngx_int_t
+ngx_xquic_ssl_get_protocol(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s)
+{
+    s->data = (u_char *) SSL_get_version(ssl);
+    return NGX_OK;
+}
+
+ngx_int_t
+ngx_xquic_ssl_get_cipher_name(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s)
+{
+    s->data = (u_char *) SSL_get_cipher_name(ssl);
+    return NGX_OK;
+}
+
+ngx_int_t
+ngx_xquic_ssl_get_session_reused(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s)
+{
+    if (SSL_session_reused(ssl)) {
+        ngx_str_set(s, "r");
+
+    } else {
+        ngx_str_set(s, ".");
+    }
+
+    return NGX_OK;
+}

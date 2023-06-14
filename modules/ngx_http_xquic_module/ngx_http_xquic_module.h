@@ -112,6 +112,12 @@ extern ngx_http_xquic_main_conf_t *ngx_http_xquic_main_conf;
 ngx_int_t ngx_xquic_init_cid_route(ngx_cycle_t *, ngx_http_xquic_main_conf_t *qmcf);
 #endif
 
+ngx_int_t ngx_xquic_ssl_get_protocol(SSL *ssl, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_xquic_ssl_get_cipher_name(SSL *ssl, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_xquic_ssl_get_session_reused(SSL *ssl, ngx_pool_t *pool,
+    ngx_str_t *s);
 
 #endif /* _NGX_HTTP_XQUIC_MODULE_H_INCLUDED_ */
 

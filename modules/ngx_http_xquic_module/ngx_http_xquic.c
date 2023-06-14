@@ -258,6 +258,7 @@ ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn,
 {
     /* we set alp user_data when accept connection */
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) user_data;
+    user_conn->ssl_conn = xqc_h3_conn_get_ssl(h3_conn);
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
                     "|xquic|ngx_http_v3_conn_create_notify|%p|", user_conn->engine);
