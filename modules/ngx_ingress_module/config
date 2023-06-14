@@ -1,0 +1,17 @@
+
+ngx_addon_name=ngx_ingress_module
+HTTP_MODULES="$HTTP_MODULES ngx_ingress_module"
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_ingress_module.c $ngx_addon_dir/ngx_ingress_protobuf.c $ngx_addon_dir/ingress.pb-c.c"
+
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir"
+
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS                                     \
+                     $ngx_addon_dir/ngx_ingress_module.h            \
+                     $ngx_addon_dir/ngx_ingress_protobuf.h"
+
+
+CORE_LIBS="$CORE_LIBS -lrt -lprotobuf-c"
+
+have=T_INGRESS_SHARED_MEMORY_PB . auto/have
+

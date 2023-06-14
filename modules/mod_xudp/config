@@ -1,0 +1,49 @@
+ngx_addon_name=ngx_xudp_module
+
+ngx_feature="xudp"
+ngx_feature_name="T_NGX_HAVE_XUDP"
+ngx_feature_run=no
+ngx_feature_incs="#include <xudp.h>
+    #include <xquic_xdp.h>"
+ngx_feature_path=
+ngx_feature_libs='-L$XUDP_LIB -lxudp'
+ngx_feature_test="xudp * r ;
+                r = xudp_init(NULL,0) ;
+                if (XUDP_VERSION < 2002001) { exit(-1); }
+                if (r == NULL) { exit(-1); }
+                if (r != NULL) { xudp_free(r); }
+                return 1;"
+CC_TEST_FLAGS="-I$XUDP_INC -I$XQUIC_XDP_INC"
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    cat << END
+    $0: error: xudp library not found.
+END
+else
+
+    CORE_MODULES="$CORE_MODULES \
+                ngx_xudp_core_module"
+
+    HTTP_MODULES="$HTTP_MODULES \
+                ngx_xudp_module"
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS \
+                    $ngx_addon_dir/ngx_xudp_module.h \
+                    $ngx_addon_dir/ngx_xudp_inc.h   \
+                    $ngx_addon_dir/ngx_xudp.h"
+
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
+                    $ngx_addon_dir/ngx_xudp_module.c \
+                    $ngx_addon_dir/ngx_xudp.c"
+
+    CORE_INCS="$CORE_INCS \
+           $ngx_addon_dir \
+           $XUDP_INC \
+           $XQUIC_XDP_INC"
+
+    CORE_LIBS="$CORE_LIBS \
+           -L$XUDP_LIB -lxudp"
+fi
+
+have=T_NGX_UDPV2 . auto/have

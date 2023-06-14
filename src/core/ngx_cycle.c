@@ -455,6 +455,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 #endif
     }
 
+#if (T_NGX_XQUIC)
+    cycle->x_log = &cycle->xquic_log;
+#endif
     cycle->log = &cycle->new_log;
     pool->log = &cycle->new_log;
 

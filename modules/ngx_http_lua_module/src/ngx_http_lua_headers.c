@@ -117,6 +117,12 @@ ngx_http_lua_ngx_req_raw_header(lua_State *L)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (mr->xqstream) {
+        return luaL_error(L, "http3 requests not supported yet");
+    }
+#endif
+
 #if 1
     dd("hc->nbusy: %d", (int) hc->nbusy);
 

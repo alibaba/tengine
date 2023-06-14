@@ -20,6 +20,9 @@ typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 typedef struct ngx_http_v2_stream_s   ngx_http_v2_stream_t;
+#if (T_NGX_XQUIC)
+typedef struct ngx_http_v3_stream_s  ngx_http_v3_stream_t;
+#endif
 
 typedef ngx_int_t (*ngx_http_header_handler_pt)(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
@@ -35,6 +38,9 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_upstream_round_robin.h>
 #include <ngx_http_core_module.h>
 
+#if (T_NGX_XQUIC)
+#include <ngx_http_xquic.h>
+#endif
 #if (NGX_HTTP_V2)
 #include <ngx_http_v2.h>
 #endif
@@ -114,6 +120,12 @@ void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
 ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_http_chunked_t *ctx);
 
+#if (T_HTTP_HEADER)
+ngx_int_t ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+#endif
 
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
 ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);

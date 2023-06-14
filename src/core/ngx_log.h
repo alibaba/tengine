@@ -92,6 +92,14 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     if ((log)->log_level & level)                                             \
         ngx_log_error_core(NGX_LOG_DEBUG, log, __VA_ARGS__)
 
+#if (T_NGX_XQUIC)
+#define ngx_log_xquic(level, log, ...)                                        \
+    if ((log)->log_level >= level) ngx_log_xquic_core(level, log, __VA_ARGS__)
+
+void ngx_log_xquic_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...);
+#endif
+
 /*********************************/
 
 #elif (NGX_HAVE_GCC_VARIADIC_MACROS)
@@ -108,6 +116,14 @@ void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     if ((log)->log_level & level)                                             \
         ngx_log_error_core(NGX_LOG_DEBUG, log, args)
 
+#if (T_NGX_XQUIC)
+#define ngx_log_xquic(level, log, args...)                                    \
+    if ((log)->log_level >= level) ngx_log_xquic_core(level, log, args)
+
+void ngx_log_xquic_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...);
+#endif
+
 /*********************************/
 
 #else /* no variadic macros */
@@ -118,6 +134,12 @@ void ngx_cdecl ngx_log_error(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
 void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     const char *fmt, va_list args);
+#if (T_NGX_XQUIC)
+void ngx_cdecl ngx_log_xquic(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...);
+void ngx_log_xquic_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, va_list args);
+#endif
 void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
     const char *fmt, ...);
 
@@ -236,7 +258,7 @@ ngx_int_t ngx_log_open_default(ngx_cycle_t *cycle);
 ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle);
 ngx_log_t *ngx_log_get_file_log(ngx_log_t *head);
 char *ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head);
-
+ngx_int_t ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_open_file_t **file);
 
 /*
  * ngx_write_stderr() cannot be implemented as macro, since

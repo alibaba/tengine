@@ -26,6 +26,21 @@ typedef struct {
 
 #endif
 
+#if (T_NGX_XQUIC)
+
+extern ngx_atomic_t  *ngx_stat_quic_conns;
+extern ngx_atomic_t  *ngx_stat_quic_cps_nexttime;
+extern ngx_atomic_t  *ngx_stat_quic_cps;
+extern ngx_atomic_t  *ngx_stat_quic_conns_refused;
+
+extern ngx_atomic_t  *ngx_stat_quic_queries;
+extern ngx_atomic_t  *ngx_stat_quic_qps_nexttime;
+extern ngx_atomic_t  *ngx_stat_quic_qps;
+extern ngx_atomic_t  *ngx_stat_quic_queries_refused;
+
+extern ngx_atomic_t  *ngx_stat_quic_concurrent_conns;
+
+#endif
 
 struct ngx_event_s {
     void            *data;
@@ -558,5 +573,8 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 #include <ngx_iocp_module.h>
 #endif
 
+#if (T_NGX_UDPV2)
+#include <ngx_event_udpv2.h>
+#endif
 
 #endif /* _NGX_EVENT_H_INCLUDED_ */

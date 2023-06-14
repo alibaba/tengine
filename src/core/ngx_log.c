@@ -13,6 +13,12 @@ static char *ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log);
 static void ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log);
 
+#if (T_NGX_XQUIC)
+
+static char *ngx_xquic_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+ngx_str_t ngx_log_xquic_backup = ngx_string("logs/xquic.log");
+
+#endif
 
 #if (NGX_DEBUG)
 
@@ -39,6 +45,15 @@ static ngx_command_t  ngx_errlog_commands[] = {
       0,
       0,
       NULL },
+
+#if (T_NGX_XQUIC)
+    { ngx_string("xquic_log"),
+      NGX_MAIN_CONF|NGX_CONF_1MORE,
+      ngx_xquic_log,
+      0,
+      0,
+      NULL },
+#endif
 
       ngx_null_command
 };
@@ -209,6 +224,62 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     (void) ngx_write_console(ngx_stderr, msg, p - msg);
 }
 
+#if (T_NGX_XQUIC)
+void
+ngx_log_xquic_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...)
+{
+    va_list  args;
+    u_char  *p, *last, *msg;
+    u_char   errstr[NGX_MAX_ERROR_STR];
+
+    if (log->file->fd == NGX_INVALID_FILE) {
+        return;
+    }
+
+    last = errstr + NGX_MAX_ERROR_STR;
+
+    ngx_memcpy(errstr, ngx_cached_xquic_log_time.data,
+               ngx_cached_xquic_log_time.len);
+
+    p = errstr + ngx_cached_xquic_log_time.len;
+
+    msg = p;
+
+    va_start(args, fmt);
+    p = ngx_vslprintf(p, last, fmt, args);
+    va_end(args);
+
+    if (err) {
+        p = ngx_log_errno(p, last, err);
+    }
+
+    if (level != NGX_LOG_DEBUG && log->handler) {
+        p = log->handler(log, p, last - p);
+    }
+
+    if (p > last - NGX_LINEFEED_SIZE) {
+        p = last - NGX_LINEFEED_SIZE;
+    }
+
+    ngx_linefeed(p);
+
+    (void) ngx_write_fd(log->file->fd, errstr, p - errstr);
+
+    if (!ngx_use_stderr
+        || level > NGX_LOG_WARN
+        || log->file->fd == ngx_stderr)
+    {
+        return;
+    }
+
+    msg -= (7 + err_levels[level].len + 3);
+
+    (void) ngx_sprintf(msg, "nginx: [%V] ", &err_levels[level]);
+
+    (void) ngx_write_console(ngx_stderr, msg, p - msg);
+}
+#endif
 
 #if !(NGX_HAVE_VARIADIC_MACROS)
 
@@ -779,3 +850,99 @@ ngx_log_memory_cleanup(void *data)
 }
 
 #endif
+
+#if (T_NGX_XQUIC)
+static char *
+ngx_xquic_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_int_t   rc;
+    ngx_str_t  *value, name;
+
+    if (cf->cycle->xquic_log.file) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    rc = ngx_log_target(cf->cycle, &value[1], &cf->cycle->xquic_log.file);
+
+    if (rc == NGX_ERROR) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid logger \"%V\"", &value[1]);
+        return NGX_CONF_ERROR;
+
+    } else if (rc == NGX_OK) {
+        if (cf->cycle->xquic_log.file != NULL) {
+            name = ngx_log_xquic_backup;
+            if (ngx_conf_full_name(cf->cycle, &name, 0) != NGX_OK) {
+                return "fail to set backup";
+            }
+
+            cf->cycle->xquic_log.file->name = name;
+        }
+    } else {
+        if (ngx_strcmp(value[1].data, "stderr") == 0) {
+            ngx_str_null(&name);
+
+        } else {
+            name = value[1];
+        }
+
+        cf->cycle->xquic_log.file = ngx_conf_open_file(cf->cycle, &name);
+        if (cf->cycle->xquic_log.file == NULL) {
+            return NULL;
+        }
+    }
+
+    if (cf->args->nelts == 2) {
+        cf->cycle->xquic_log.log_level = NGX_LOG_ERR;
+        return NGX_CONF_OK;
+    }
+
+    cf->cycle->xquic_log.log_level = 0;
+
+    return ngx_log_set_levels(cf, &cf->cycle->xquic_log);
+}
+#endif
+
+ngx_int_t
+ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_open_file_t **file)
+{
+#if (T_PIPES)
+    ngx_open_pipe_t *pipe_conf;
+#endif
+
+    if (ngx_strncmp(value->data, "file:", 5) == 0) {
+        if (value->len == 5) {
+            return NGX_ERROR;
+        }
+
+        value->len -= 5;
+        value->data += 5;
+    } else if (ngx_strncmp(value->data, "pipe:", 5) == 0) {
+
+#if !(NGX_WIN32) && (T_PIPES)
+        if (value->len == 5) {
+            return NGX_ERROR;
+        }
+
+        value->len -= 5;
+        value->data += 5;
+
+        pipe_conf = ngx_conf_open_pipe(cycle, value, "w");
+        if (pipe_conf == NULL) {
+            return NGX_ERROR;
+        }
+
+        *file = pipe_conf->open_fd;
+
+        return NGX_OK;
+
+#else
+        return NGX_ERROR;
+#endif
+
+    }
+
+    return NGX_DECLINED;
+}
