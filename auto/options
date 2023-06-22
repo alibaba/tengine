@@ -171,6 +171,13 @@ LUAJIT_LIB=$LUAJIT_LIB
 LUA_INC=$LUA_INC
 LUA_LIB=$LUA_LIB
 
+XUDP_INC=$XUDP_INC
+XUDP_LIB=$XUDP_LIB
+XQUIC_XDP_INC=$XQUIC_XDP_INC
+
+XQUIC_INC=$XQUIC_INC
+XQUIC_LIB=$XQUIC_LIB
+
 USE_LIBXSLT=NO
 USE_LIBGD=NO
 USE_GEOIP=NO
@@ -305,6 +312,13 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-http_perl_module=dynamic) HTTP_PERL=DYNAMIC          ;;
         --with-perl_modules_path=*)      NGX_PERL_MODULES="$value"  ;;
         --with-perl=*)                   NGX_PERL="$value"          ;;
+
+        --with-xudp-inc=*)               XUDP_INC="$value"          ;;
+        --with-xudp-lib=*)               XUDP_LIB="$value"          ;;
+        --with-xquic_xdp-inc=*)          XQUIC_XDP_INC="$value"     ;;
+
+        --with-xquic-inc=*)              XQUIC_INC="$value"         ;;
+        --with-xquic-lib=*)              XQUIC_LIB="$value"         ;;
 
         # LUA
         --with-http_lua_module)          HTTP_LUA=YES               ;;
@@ -572,6 +586,10 @@ cat << END
   --without-mail_pop3_module         disable ngx_mail_pop3_module
   --without-mail_imap_module         disable ngx_mail_imap_module
   --without-mail_smtp_module         disable ngx_mail_smtp_module
+
+  --with-xquic-inc=PATH              set XQUIC headers path
+  --with-xquic-lib=PATH              set XQUIC library path (where libxquic.so is located)
+  --with-xquic-link=PATH             set XQUIC headers link path
 
   --with-stream                      enable TCP/UDP proxy module
   --with-stream=dynamic              enable dynamic TCP/UDP proxy module

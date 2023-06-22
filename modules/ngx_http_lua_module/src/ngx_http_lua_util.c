@@ -3392,6 +3392,12 @@ ngx_http_lua_check_broken_connection(ngx_http_request_t *r, ngx_event_t *ev)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        return NGX_OK;
+    }
+#endif
+
 #if (NGX_HAVE_KQUEUE)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {

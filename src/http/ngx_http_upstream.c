@@ -554,6 +554,13 @@ ngx_http_upstream_init(ngx_http_request_t *r)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        ngx_http_upstream_init_request(r);
+        return;
+    }
+#endif
+
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
     }
@@ -1431,6 +1438,12 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        return;
+    }
+#endif
+
 #if (NGX_HAVE_KQUEUE)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
@@ -1671,7 +1684,13 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
         if (rc == NGX_AGAIN) { //first real connect
             c->read->handler = ngx_http_multi_upstream_connect_handler;
             c->write->handler = ngx_http_multi_upstream_connect_handler;
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+            ngx_add_timer(c->write, (r->connect_time == NGX_CONF_UNSET_MSEC)
+                          ? u->conf->connect_timeout : r->connect_time);
+#else
             ngx_add_timer(c->write, u->conf->connect_timeout);
+#endif
+
             ngx_log_error(NGX_LOG_INFO, c->log, 0,
                           "multi: connect new to backend %p", c);
         } else if (rc == NGX_DONE) { //use exist connection
@@ -1781,7 +1800,12 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->request_body_blocked = 0;
 
     if (rc == NGX_AGAIN) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+        ngx_add_timer(c->write, (r->connect_time == NGX_CONF_UNSET_MSEC)
+                      ? u->conf->connect_timeout : r->connect_time);
+#else
         ngx_add_timer(c->write, u->conf->connect_timeout);
+#endif
         return;
     }
 
@@ -1892,7 +1916,12 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
     if (rc == NGX_AGAIN) {
 
         if (!c->write->timer_set) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+            ngx_add_timer(c->write, (r->connect_time == NGX_CONF_UNSET_MSEC)
+                          ? u->conf->connect_timeout : r->connect_time);
+#else
             ngx_add_timer(c->write, u->conf->connect_timeout);
+#endif
         }
 
         c->ssl->handler = ngx_http_upstream_ssl_handshake_handler;
@@ -2262,7 +2291,12 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     if (rc == NGX_AGAIN) {
         if (!c->write->ready || u->request_body_blocked) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+            ngx_add_timer(c->write, (r->send_time == NGX_CONF_UNSET_MSEC)
+                          ? u->conf->send_timeout : r->send_time);
+#else
             ngx_add_timer(c->write, u->conf->send_timeout);
+#endif
 
         } else if (c->write->timer_set) {
             ngx_del_timer(c->write);
@@ -2336,7 +2370,12 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
             return;
         }
 
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+        ngx_add_timer(c->read, (r->read_time == NGX_CONF_UNSET_MSEC)
+                      ? u->conf->read_timeout : r->read_time);
+#else
         ngx_add_timer(c->read, u->conf->read_timeout);
+#endif
 
         if (c->read->ready) {
 #if (T_NGX_MULTI_UPSTREAM)
@@ -3477,7 +3516,13 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
         p->cyclic_temp_file = 0;
     }
 
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    p->read_timeout = (r->read_time == NGX_CONF_UNSET_MSEC)
+                       ? u->conf->read_timeout : r->read_time;
+#else
     p->read_timeout = u->conf->read_timeout;
+#endif
+
     p->send_timeout = clcf->send_timeout;
     p->send_lowat = clcf->send_lowat;
 
@@ -3723,7 +3768,12 @@ ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
     }
 
     if (upstream->write->active && !upstream->write->ready) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+        ngx_add_timer(upstream->write, (r->send_time == NGX_CONF_UNSET_MSEC)
+                      ? u->conf->send_timeout : r->send_time);
+#else
         ngx_add_timer(upstream->write, u->conf->send_timeout);
+#endif
 
     } else if (upstream->write->timer_set) {
         ngx_del_timer(upstream->write);
@@ -3742,7 +3792,12 @@ ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
     }
 
     if (upstream->read->active && !upstream->read->ready) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+        ngx_add_timer(upstream->read, (r->read_time == NGX_CONF_UNSET_MSEC)
+                      ? u->conf->read_timeout : r->read_time);
+#else
         ngx_add_timer(upstream->read, u->conf->read_timeout);
+#endif
 
     } else if (upstream->read->timer_set) {
         ngx_del_timer(upstream->read);
@@ -3958,7 +4013,12 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     }
 
     if (upstream->read->active && !upstream->read->ready) {
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+        ngx_add_timer(upstream->read, (r->read_time == NGX_CONF_UNSET_MSEC)
+                      ? u->conf->read_timeout : r->read_time);
+#else
         ngx_add_timer(upstream->read, u->conf->read_timeout);
+#endif
 
     } else if (upstream->read->timer_set) {
         ngx_del_timer(upstream->read);

@@ -23,7 +23,7 @@ use Net::DNS::Nameserver;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/); #->plan(12);
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(14);
 
 ###############################################################################
 
@@ -38,9 +38,6 @@ print("+ test_enable_rewrite_phase: $test_enable_rewrite_phase\n");
 plan(skip_all => 'No rewrite phase enabled') if ($test_enable_rewrite_phase == 0);
 
 # --- init DNS server ---
-
-my $bind_pid;
-my $bind_server_port = 18085;
 
 # SRV record, not used
 my %route_map;
@@ -59,10 +56,6 @@ my %aaaaroute_map;
 #     #'www.test-a.com' => [[300, "127.0.0.1"]],
 #     #'www.test-b.com' => [[300, "127.0.0.1"]],
 # );
-
-start_bind();
-
-# --- end ---
 
 ###############################################################################
 
@@ -95,7 +88,7 @@ http {
     access_log %%TESTDIR%%/connect.log connect;
     error_log %%TESTDIR%%/connect_error.log info;
 
-    resolver 127.0.0.1:18085 ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
+    resolver 127.0.0.1:%%PORT_8981_UDP%% ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
     server {
         listen       127.0.0.1:8080;
@@ -182,6 +175,9 @@ EOF
 
 $t->write_file_expand('nginx.conf', $nginx_conf);
 
+$t->run_daemon(\&dns_daemon, port(8981), $t);
+$t->waitforfile($t->testdir . '/' . port(8981));
+
 eval {
     $t->run();
 };
@@ -267,15 +263,7 @@ like($t->read_file('connect_error.log'),
 
 $t->stop();
 
-
-# --- stop DNS server ---
-
-stop_bind();
-
-done_testing();
-
 ###############################################################################
-
 
 sub http_connect_request {
     my ($host, $port, $url) = @_;
@@ -328,112 +316,147 @@ EOF
     return $reply;
 }
 
-# --- DNS Server ---
+###############################################################################
 
 sub reply_handler {
-    my ($qname, $qclass, $qtype, $peerhost, $query, $conn) = @_;
-    my ($rcode, @ans, @auth, @add);
-    # print("DNS reply: receive query=$qname, $qclass, $qtype, $peerhost, $query, $conn\n");
+	my ($recv_data, $port, $state, %extra) = @_;
 
-    if ($qtype eq "SRV" && exists($route_map{$qname})) {
-        my @records = @{$route_map{$qname}};
-        for (my $i = 0; $i < scalar(@records); $i++) {
-            my ($ttl, $weight, $priority, $port, $origin_addr) = @{$records[$i]};
-            my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $priority $weight $port $origin_addr");
-            push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
+	my (@name, @rdata);
+
+	use constant NOERROR	=> 0;
+	use constant FORMERR	=> 1;
+	use constant SERVFAIL	=> 2;
+	use constant NXDOMAIN	=> 3;
+
+	use constant A		=> 1;
+	use constant CNAME	=> 5;
+	use constant DNAME	=> 39;
+
+	use constant IN		=> 1;
+
+	# default values
+
+	my ($hdr, $rcode, $ttl) = (0x8180, NOERROR, 3600);
+
+	# decode name
+
+	my ($len, $offset) = (undef, 12);
+	while (1) {
+		$len = unpack("\@$offset C", $recv_data);
+		last if $len == 0;
+		$offset++;
+		push @name, unpack("\@$offset A$len", $recv_data);
+		$offset += $len;
+	}
+
+	$offset -= 1;
+	my ($id, $type, $class) = unpack("n x$offset n2", $recv_data);
+
+	my $name = join('.', @name);
+
+        if (($type == A) && exists($aroute_map{$name})) {
+
+            my @records = @{$aroute_map{$name}};
+
+            for (my $i = 0; $i < scalar(@records); $i++) {
+                my ($ttl, $origin_addr) = @{$records[$i]};
+                push @rdata, rd_addr($ttl, $origin_addr);
+
+                #print("dns reply: $name $ttl $class $type $origin_addr\n");
+            }
         }
 
-        $rcode = "NOERROR";
-    } elsif (($qtype eq "A") && exists($aroute_map{$qname})) {
-        my @records = @{$aroute_map{$qname}};
-        for (my $i = 0; $i < scalar(@records); $i++) {
-            my ($ttl, $origin_addr) = @{$records[$i]};
-            my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $origin_addr");
-            push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
-        }
-
-        $rcode = "NOERROR";
-    } elsif (($qtype eq "AAAA") && exists($aaaaroute_map{$qname})) {
-        my @records = @{$aaaaroute_map{$qname}};
-        for (my $i = 0; $i < scalar(@records); $i++) {
-            my ($ttl, $origin_addr) = @{$records[$i]};
-            my $rr = new Net::DNS::RR("$qname $ttl $qclass $qtype $origin_addr");
-            push @ans, $rr;
-            # print("DNS reply: $qname $ttl $qclass $qtype $origin_addr\n");
-        }
-
-        $rcode = "NOERROR";
-    } else {
-        #$rcode = "NXDOMAIN";
-        $rcode = "NOERROR";
-    }
-
-    # mark the answer as authoritative (by setting the 'aa' flag)
-    my $headermask = { ra => 1 };
-
-    # specify EDNS options  { option => value }
-    my $optionmask = { };
-
-    return ($rcode, \@ans, \@auth, \@add, $headermask, $optionmask);
+	$len = @name;
+	pack("n6 (C/a*)$len x n2", $id, $hdr | $rcode, 1, scalar @rdata,
+		0, 0, @name, $type, $class) . join('', @rdata);
 }
 
-sub bind_daemon {
-    my $ns = new Net::DNS::Nameserver(
-        LocalAddr        => ['127.0.0.1'],
-        LocalPort        => $bind_server_port,
-        ReplyHandler     => \&reply_handler,
-        Verbose          => 0, # Verbose = 1 to print debug info
-        Truncate         => 0
-    ) || die "[D] DNS server: couldn't create nameserver object\n";
+sub rd_addr {
+	my ($ttl, $addr) = @_;
 
-    $ns->main_loop;
+	my $code = 'split(/\./, $addr)';
+
+	return pack 'n3N', 0xc00c, A, IN, $ttl if $addr eq '';
+
+	pack 'n3N nC4', 0xc00c, A, IN, $ttl, eval "scalar $code", eval($code);
 }
 
-sub start_bind {
-    if (defined $bind_server_port) {
+sub dns_daemon {
+	my ($port, $t, %extra) = @_;
 
-        print "+ DNS server: try to bind server port: $bind_server_port\n";
+        print("+ dns daemon: try to listen on 127.0.0.1:$port\n");
 
-        $t->run_daemon(\&bind_daemon);
-        $bind_pid = pop @{$t->{_daemons}};
+	my ($data, $recv_data);
+	my $socket = IO::Socket::INET->new(
+		LocalAddr => '127.0.0.1',
+		LocalPort => $port,
+		Proto => 'udp',
+	)
+		or die "Can't create listening socket: $!\n";
 
-        print "+ DNS server: daemon pid: $bind_pid\n";
+	my $sel = IO::Select->new($socket);
+	my $tcp = 0;
 
-        my $s;
-        my $i = 1;
-        while (not $s) {
-            $s = IO::Socket::INET->new(
-                 Proto    => 'tcp',
-                 PeerAddr => "127.0.0.1",
-                 PeerPort => $bind_server_port
-            );
-            sleep 0.1;
-            $i++ > 20 and last;
-        }
-        sleep 0.1;
-        $s or die "cannot connect to DNS server";
-        close($s) or die 'can not connect to DNS server';
+	if ($extra{tcp}) {
+		$tcp = port(8983, socket => 1);
+		$sel->add($tcp);
+	}
 
-        print "+ DNS server: working\n";
+	local $SIG{PIPE} = 'IGNORE';
 
-        END {
-            print("+ try to stop\n");
-            stop_bind();
-        }
-    }
-}
+	# track number of relevant queries
 
-sub stop_bind {
-    if (defined $bind_pid) {
-        # kill dns daemon
-        kill $^O eq 'MSWin32' ? 15 : 'TERM', $bind_pid;
-        wait;
+	my %state = (
+		cnamecnt	=> 0,
+		twocnt		=> 0,
+		ttlcnt		=> 0,
+		ttl0cnt		=> 0,
+		cttlcnt		=> 0,
+		cttl2cnt	=> 0,
+		manycnt		=> 0,
+		casecnt		=> 0,
+		idcnt		=> 0,
+		fecnt		=> 0,
+	);
 
-        $bind_pid = undef;
-        print ("+ DNS server: stop\n");
-    }
+	# signal we are ready
+
+	open my $fh, '>', $t->testdir() . '/' . $port;
+	close $fh;
+
+	while (my @ready = $sel->can_read) {
+		foreach my $fh (@ready) {
+			if ($tcp == $fh) {
+				my $new = $fh->accept;
+				$new->autoflush(1);
+				$sel->add($new);
+
+			} elsif ($socket == $fh) {
+				$fh->recv($recv_data, 65536);
+				$data = reply_handler($recv_data, $port,
+					\%state);
+				$fh->send($data);
+
+			} else {
+				$fh->recv($recv_data, 65536);
+				unless (length $recv_data) {
+					$sel->remove($fh);
+					$fh->close;
+					next;
+				}
+
+again:
+				my $len = unpack("n", $recv_data);
+				$data = substr $recv_data, 2, $len;
+				$data = reply_handler($data, $port, \%state,
+					tcp => 1);
+				$data = pack("n", length $data) . $data;
+				$fh->send($data);
+				$recv_data = substr $recv_data, 2 + $len;
+				goto again if length $recv_data;
+			}
+		}
+	}
 }
 
 ###############################################################################

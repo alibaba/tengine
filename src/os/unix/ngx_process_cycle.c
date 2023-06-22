@@ -493,6 +493,12 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
         ch.command = NGX_CMD_REOPEN;
         break;
 
+#if (T_NGX_HAVE_XUDP)
+    case ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL):
+        ch.command = NGX_CMD_UNBIND_XDP;
+        break;
+#endif
+
     default:
         ch.command = 0;
     }
@@ -534,7 +540,11 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
                                   &ch, sizeof(ngx_channel_t), cycle->log)
                 == NGX_OK)
             {
-                if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)) {
+                if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)
+#if (T_NGX_HAVE_XUDP)
+                    && (signo != ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL))
+#endif
+                    ) {
                     ngx_processes[i].exiting = 1;
                 }
 
@@ -856,6 +866,13 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         }
     }
 
+#if (T_NGX_HAVE_XUDP)
+    if (ngx_xudp_open_listening_sockets(cycle) != NGX_OK) {
+        /* fatal */
+        exit(2);
+    }
+#endif
+
     if (geteuid() == 0) {
         if (setgid(ccf->group) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -1163,6 +1180,11 @@ ngx_channel_handler(ngx_event_t *ev)
             ngx_pipe_broken_action(ev->log, ch.pid, 0);
             break;
 #endif
+#if (T_NGX_HAVE_XUDP)
+        case NGX_CMD_UNBIND_XDP:
+            ngx_xudp_terminate_xudp_binding((ngx_cycle_t *) ngx_cycle);
+            break;
+#endif
         }
     }
 }
@@ -1272,3 +1294,9 @@ ngx_cache_loader_process_handler(ngx_event_t *ev)
 
     exit(0);
 }
+
+#if (T_NGX_HAVE_XUDP)
+void ngx_xudp_signal_worker_process(ngx_cycle_t *cycle) {
+    ngx_signal_worker_processes(cycle, ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL));
+}
+#endif

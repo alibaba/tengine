@@ -2536,6 +2536,11 @@ ngx_http_subrequest(ngx_http_request_t *r,
 
     c = r->connection;
     sr->connection = c;
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    sr->connect_time = NGX_CONF_UNSET_MSEC;
+    sr->read_time = NGX_CONF_UNSET_MSEC;
+    sr->send_time = NGX_CONF_UNSET_MSEC;
+#endif
 
     sr->ctx = ngx_pcalloc(r->pool, sizeof(void *) * ngx_http_max_module);
     if (sr->ctx == NULL) {
@@ -2573,6 +2578,10 @@ ngx_http_subrequest(ngx_http_request_t *r,
 
 #if (NGX_HTTP_V2)
     sr->stream = r->stream;
+#endif
+
+#if (T_NGX_XQUIC)
+    sr->xqstream = r->xqstream;
 #endif
 
     sr->method = NGX_HTTP_GET;
@@ -4380,6 +4389,30 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                                "on this platform, ignored");
 #endif
             continue;
+        }
+
+        if (ngx_strcmp(value[n].data, "xquic") == 0) {
+#if (T_NGX_XQUIC)
+            lsopt.xquic = 1;
+            continue;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the \"xquic\" parameter requires "
+                               "ngx_http_xquic_module");
+            return NGX_CONF_ERROR;
+#endif
+        }
+
+        if (ngx_strcmp(value[n].data, "xudp") == 0) {
+#if (T_NGX_HAVE_XUDP)
+            lsopt.xudp = 1;
+            continue;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the \"xudp\" parameter requires "
+                               "mod_xudp");
+            return NGX_CONF_ERROR;
+#endif
         }
 
         if (ngx_strcmp(value[n].data, "ssl") == 0) {

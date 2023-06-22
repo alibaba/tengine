@@ -606,6 +606,12 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->srv_conf = hc->conf_ctx->srv_conf;
     r->loc_conf = hc->conf_ctx->loc_conf;
 
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    r->connect_time = NGX_CONF_UNSET_MSEC;
+    r->read_time = NGX_CONF_UNSET_MSEC;
+    r->send_time = NGX_CONF_UNSET_MSEC;
+#endif
+
     r->read_event_handler = ngx_http_block_reading;
 
     r->header_in = hc->busy ? hc->busy->buf : c->buffer;
@@ -2919,6 +2925,13 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        ngx_http_close_request(r, 0);
+        return;
+    }
+#endif
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (r->main->count != 1) {
@@ -3123,6 +3136,19 @@ ngx_http_test_reading(ngx_http_request_t *r)
 #if (NGX_HTTP_V2)
 
     if (r->stream) {
+        if (c->error) {
+            err = 0;
+            goto closed;
+        }
+
+        return;
+    }
+
+#endif
+
+#if (T_NGX_XQUIC)
+
+    if (r->xqstream) {
         if (c->error) {
             err = 0;
             goto closed;
@@ -3560,14 +3586,14 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
         if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
         {
 #endif
-        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+            if (ngx_pfree(c->pool, b->start) == NGX_OK) {
 
-            /*
-             * the special note that c->buffer's memory was freed
-             */
+                /*
+                 * the special note that c->buffer's memory was freed
+                 */
 
-            b->pos = NULL;
-        }
+                b->pos = NULL;
+            }
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
 #endif
@@ -3876,6 +3902,13 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        ngx_http_v3_close_stream(r->xqstream, rc);
+        return;
+    }
+#endif
+
     ngx_http_free_request(r, rc);
     ngx_http_close_connection(c);
 }
@@ -4126,3 +4159,15 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
 
     return buf;
 }
+
+#if (T_NGX_XQUIC)
+
+ngx_int_t
+ngx_http_find_virtual_server_inner(ngx_connection_t *c,
+    ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
+    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp)
+{
+    return ngx_http_find_virtual_server(c, virtual_names, host, r, cscfp);
+}
+
+#endif

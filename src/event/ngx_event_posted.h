@@ -45,6 +45,8 @@ void ngx_event_move_posted_next(ngx_cycle_t *cycle);
 extern ngx_queue_t  ngx_posted_accept_events;
 extern ngx_queue_t  ngx_posted_next_events;
 extern ngx_queue_t  ngx_posted_events;
-
+#if (T_NGX_HAVE_XUDP)
+extern ngx_queue_t  ngx_posted_commit;
+#endif
 
 #endif /* _NGX_EVENT_POSTED_H_INCLUDED_ */
