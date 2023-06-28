@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(22);
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(23);
 
 ###############################################################################
 
@@ -47,6 +47,7 @@ my %aroute_map = (
     'get-default-response.com' => [[300, "127.0.0.1"]],
     'set-response-header.com' => [[300, "127.0.0.1"]],
     'set-response-status.com' => [[300, "127.0.0.1"]],
+    'skip-this-server.com' => [[300, "127.0.0.1"]],
 );
 
 ###############################################################################
@@ -126,15 +127,6 @@ http {
             root %%TESTDIR%%/;
         }
     }
-
-    server {
-        listen       127.0.0.1:8080;
-        server_name  forbidden.example.com;
-
-        # It will forbid CONNECT request without proxy_connect command enabled.
-
-        return 200;
-    }
 }
 
 EOF
@@ -163,7 +155,6 @@ like(http_connect_request('www.no-dns-reply.com', '80', '/'), qr/502/, '200 Conn
 like(http_connect_request('127.0.0.1', '9999', '/'), qr/403/, '200 Connection Established not allowed port');
 like(http_get('/'), qr/backend server/, 'Get method: proxy_pass');
 like(http_get('/hello'), qr/world/, 'Get method: return 200');
-like(http_connect_request('forbidden.example.com', '8080', '/'), qr/405 Not Allowed/, 'forbid CONNECT request without proxy_connect command enabled');
 
 # proxy_remote_address directive supports dynamic domain resolving.
 like(http_connect_request('proxy-remote-address-resolve-domain.com', '8081', '/'),
@@ -367,6 +358,47 @@ http {
 
     access_log off;
 
+    server {
+        listen       127.0.0.1:8080;
+        server_name  forbidden.example.com;
+
+        # It will forbid CONNECT request without proxy_connect command enabled.
+
+        return 200;
+    }
+}
+
+EOF
+
+# test proxy_connect_response directive
+
+$t->run();
+
+like(http_connect_request('forbidden.example.com', '8080', '/'), qr/405 Not Allowed/, 'forbid CONNECT request without proxy_connect command enabled');
+
+$t->stop();
+
+
+###############################################################################
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon         off;
+
+events {
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    #LUA_PACKAGE_PATH
+    # If you build nginx with lua-nginx-module, please enable           # directive "lua_package_path". For more details, see:              #  https://github.com/openresty/lua-nginx-module#installation
+    #lua_package_path "/path/to/lib/lua/?.lua;;";
+
+    access_log off;
+
     resolver 127.0.0.1:%%PORT_8981_UDP%% ipv6=off;      # NOTE: cannot connect ipv6 address ::1 in mac os x.
 
     server {
@@ -383,6 +415,18 @@ http {
             return 200 "backend";
         }
     }
+
+    # test logic that CONNECT requests should skip ngx_http_set_virtual_server()
+    server {
+        listen       127.0.0.1:8080;
+
+        server_name  skip-this-server.com;
+
+        proxy_connect;
+        proxy_connect_allow all;
+
+        return 500;
+    }
 }
 
 EOF
@@ -393,6 +437,7 @@ $t->run();
 
 if ($test_enable_rewrite_phase) {
     like(http_connect_request('set-response-header.com', '8081', '/'), qr/X-Proxy-Connected-Addr: 127.0.0.1:8081\r/, 'added header "Foo: bar" to CONNECT response');
+    unlike(http_connect_request('skip-this-server.com', '8081', '/'), qr/500 Internal Server Error/, 'skip ngx_http_set_virtual_server()');
 }
 
 $t->stop();
