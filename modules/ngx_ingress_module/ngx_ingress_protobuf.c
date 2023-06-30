@@ -2,15 +2,15 @@
  * Copyright (C) 2020-2023 Alibaba Group Holding Limited
  */
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
-
-#include <sys/file.h>
-
 #include "ngx_ingress_protobuf.h"
 
 #include <ngx_comm_serialize.h>
 #include <ngx_ingress_module.h>
+
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#include <sys/file.h>
 
 ngx_int_t
 ngx_ingress_shared_memory_init(ngx_ingress_shared_memory_t * shared, ngx_str_t *shm_name, ngx_uint_t shm_size, ngx_str_t *lock_file)
