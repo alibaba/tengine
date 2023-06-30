@@ -689,6 +689,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 
     fc->send_chain = ngx_http_v2_send_chain;
     fc->need_last_buf = 1;
+    fc->need_flush_buf = 1;
 
     return ngx_http_v2_filter_send(fc, stream);
 }
@@ -697,14 +698,14 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_v2_push_resources(ngx_http_request_t *r)
 {
-    u_char                     *start, *end, *last;
-    ngx_int_t                   rc;
-    ngx_str_t                   path;
-    ngx_uint_t                  i, push;
-    ngx_table_elt_t           **h;
-    ngx_http_v2_loc_conf_t     *h2lcf;
-    ngx_http_complex_value_t   *pushes;
-    ngx_str_t                   binary[NGX_HTTP_V2_PUSH_HEADERS];
+    u_char                    *start, *end, *last;
+    ngx_int_t                  rc;
+    ngx_str_t                  path;
+    ngx_uint_t                 i, push;
+    ngx_table_elt_t           *h;
+    ngx_http_v2_loc_conf_t    *h2lcf;
+    ngx_http_complex_value_t  *pushes;
+    ngx_str_t                  binary[NGX_HTTP_V2_PUSH_HEADERS];
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http2 push resources");
@@ -748,15 +749,13 @@ ngx_http_v2_push_resources(ngx_http_request_t *r)
         return NGX_OK;
     }
 
-    h = r->headers_out.link.elts;
-
-    for (i = 0; i < r->headers_out.link.nelts; i++) {
+    for (h = r->headers_out.link; h; h = h->next) {
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http2 parse link: \"%V\"", &h[i]->value);
+                       "http2 parse link: \"%V\"", &h->value);
 
-        start = h[i]->value.data;
-        end = h[i]->value.data + h[i]->value.len;
+        start = h->value.data;
+        end = h->value.data + h->value.len;
 
     next_link:
 
@@ -1839,7 +1838,11 @@ ngx_http_v2_waiting_queue(ngx_http_v2_connection_t *h2c,
 static ngx_inline ngx_int_t
 ngx_http_v2_filter_send(ngx_connection_t *fc, ngx_http_v2_stream_t *stream)
 {
-    if (stream->queued == 0) {
+    ngx_connection_t  *c;
+
+    c = stream->connection->connection;
+
+    if (stream->queued == 0 && !c->buffered) {
         fc->buffered &= ~NGX_HTTP_V2_BUFFERED;
         return NGX_OK;
     }

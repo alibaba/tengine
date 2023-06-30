@@ -72,6 +72,7 @@ static u_char            cached_http_log_iso8601[NGX_TIME_SLOTS]
 static u_char            cached_syslog_time[NGX_TIME_SLOTS]
                                     [sizeof("Sep 28 12:00:00")];
 
+
 static char  *week[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 static char  *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
