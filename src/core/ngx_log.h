@@ -258,7 +258,7 @@ ngx_int_t ngx_log_open_default(ngx_cycle_t *cycle);
 ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle);
 ngx_log_t *ngx_log_get_file_log(ngx_log_t *head);
 char *ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head);
-
+ngx_int_t ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_open_file_t **file);
 
 /*
  * ngx_write_stderr() cannot be implemented as macro, since
