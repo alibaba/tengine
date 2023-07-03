@@ -51,7 +51,7 @@ jobs:
          # For "-D T_NGX_HTTP_UPSTREAM_RANDOM=0", it makes some cases pass, such as image_filter_finalize.t.
          ./configure  \
             --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0 -D T_NGX_SERVER_INFO=0 -D T_NGX_HTTP_UPSTREAM_RANDOM=0" \
-            --with-ld-opt="-Wl,-rpath,-lpcre,/usr/local/lib" \
+            --with-ld-opt="-Wl,-lpcre,-rpath,/usr/local/lib" \
             --with-openssl-async \
             --with-pcre \
             --with-http_ssl_module \
