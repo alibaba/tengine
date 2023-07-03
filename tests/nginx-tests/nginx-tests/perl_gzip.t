@@ -37,6 +37,8 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    lua_package_path "/usr/local/lib/lua/?.lua;;";
+
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
