@@ -1,0 +1,18 @@
+{
+  "CA": {
+    "expiry": "175200h",
+    "pathlen": 0
+  },
+  "CN": "OpenResty Testing Root CA",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+  {
+    "C": "US",
+    "O": "OpenResty",
+    "ST": "California"
+  }
+ ]
+}

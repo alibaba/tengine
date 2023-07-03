@@ -34,7 +34,7 @@ __DATA__
 --- request
 GET /test
 --- response_body
-ngx: 117
+ngx: 116
 --- no_error_log
 [error]
 
@@ -55,7 +55,7 @@ ngx: 117
 --- request
 GET /test
 --- response_body
-117
+116
 --- no_error_log
 [error]
 
@@ -83,7 +83,7 @@ GET /test
 --- request
 GET /test
 --- response_body
-n = 117
+n = 116
 --- no_error_log
 [error]
 
@@ -123,7 +123,7 @@ n = 1
 --- request
 GET /test
 --- response_body
-n = 24
+n = 23
 --- no_error_log
 [error]
 
@@ -145,7 +145,7 @@ n = 24
 --- request
 GET /test
 --- response_body
-n = 24
+n = 23
 --- no_error_log
 [error]
 
@@ -172,7 +172,7 @@ n = 24
 --- request
 GET /test
 --- response_body
-n = 24
+n = 23
 --- no_error_log
 [error]
 
@@ -259,7 +259,7 @@ n = 10
 POST /test
 hello world
 --- response_body
-n = 5
+n = 6
 --- no_error_log
 [error]
 
@@ -283,7 +283,7 @@ n = 5
 --- request
 GET /test
 --- response_body
-n = 18
+n = 22
 --- no_error_log
 [error]
 
@@ -305,7 +305,7 @@ GET /t
 --- response_body_like: 404 Not Found
 --- error_code: 404
 --- error_log
-ngx. entry count: 117
+ngx. entry count: 116
 
 
 
@@ -391,7 +391,7 @@ probe process("$LIBLUA_PATH").function("rehashtab") {
 --- stap_out2
 3
 --- response_body
-coroutine: 14
+coroutine: 16
 --- no_error_log
 [error]
 
@@ -438,7 +438,7 @@ thread: 3
 --- request
 GET /test
 --- response_body
-worker: 4
+worker: 5
 --- no_error_log
 [error]
 
@@ -459,7 +459,7 @@ worker: 4
 --- request
 GET /test
 --- response_body
-n = 13
+n = 16
 --- no_error_log
 [error]
 
@@ -512,7 +512,7 @@ n = 6
 --- request
 GET /test
 --- response_body
-n = 6
+n = 7
 --- no_error_log
 [error]
 

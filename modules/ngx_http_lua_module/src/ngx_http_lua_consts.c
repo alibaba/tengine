@@ -119,10 +119,8 @@ ngx_http_lua_inject_http_consts(lua_State *L)
     lua_pushinteger(L, NGX_HTTP_MOVED_TEMPORARILY);
     lua_setfield(L, -2, "HTTP_MOVED_TEMPORARILY");
 
-#if defined(nginx_version) && nginx_version >= 8042
     lua_pushinteger(L, NGX_HTTP_SEE_OTHER);
     lua_setfield(L, -2, "HTTP_SEE_OTHER");
-#endif
 
     lua_pushinteger(L, NGX_HTTP_PERMANENT_REDIRECT);
     lua_setfield(L, -2, "HTTP_PERMANENT_REDIRECT");
@@ -178,6 +176,10 @@ ngx_http_lua_inject_http_consts(lua_State *L)
     lua_pushinteger(L, NGX_HTTP_INTERNAL_SERVER_ERROR);
     lua_setfield(L, -2, "HTTP_INTERNAL_SERVER_ERROR");
 
+    lua_pushinteger(L, NGX_HTTP_NOT_IMPLEMENTED);
+    lua_setfield(L, -2, "HTTP_NOT_IMPLEMENTED");
+
+    /* keep for backward compatibility */
     lua_pushinteger(L, NGX_HTTP_NOT_IMPLEMENTED);
     lua_setfield(L, -2, "HTTP_METHOD_NOT_IMPLEMENTED");
 

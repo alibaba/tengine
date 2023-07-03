@@ -19,17 +19,23 @@ typedef struct {
     ngx_http_request_t      *request;    /* fake request */
     ngx_pool_cleanup_pt     *cleanup;
 
-    ngx_ssl_session_t       *session;    /* retrurn value for openssl's
+    ngx_ssl_session_t       *session;    /* return value for openssl's
                                           * session_get_cb */
 
     ngx_str_t                session_id;
 
     int                      exit_code;  /* exit code for openssl's
+                                            set_client_hello_cb or
                                             set_cert_cb callback */
+
+    int                      ctx_ref;  /*  reference to anchor
+                                           request ctx data in lua
+                                           registry */
 
     unsigned                 done:1;
     unsigned                 aborted:1;
 
+    unsigned                 entered_client_hello_handler:1;
     unsigned                 entered_cert_handler:1;
     unsigned                 entered_sess_fetch_handler:1;
 } ngx_http_lua_ssl_ctx_t;

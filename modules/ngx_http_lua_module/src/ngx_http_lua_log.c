@@ -14,6 +14,7 @@
 #include "ngx_http_lua_log.h"
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_log_ringbuf.h"
+#include "ngx_http_lua_output.h"
 
 
 static int ngx_http_lua_print(lua_State *L);
@@ -121,6 +122,7 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
             if (*p == '/' || *p == '\\') {
                 name.data = p + 1;
             }
+
             p++;
         }
 
@@ -142,6 +144,9 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
         type = lua_type(L, i);
         switch (type) {
             case LUA_TNUMBER:
+                size += ngx_http_lua_get_num_len(L, i);
+                break;
+
             case LUA_TSTRING:
                 lua_tolstring(L, i, &len);
                 size += len;
@@ -194,7 +199,7 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
     *p++ = ':';
 
     p = ngx_snprintf(p, NGX_INT_T_LEN, "%d",
-                     ar.currentline ? ar.currentline : ar.linedefined);
+                     ar.currentline > 0 ? ar.currentline : ar.linedefined);
 
     *p++ = ':'; *p++ = ' ';
 
@@ -210,6 +215,9 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
         type = lua_type(L, i);
         switch (type) {
             case LUA_TNUMBER:
+                p = ngx_http_lua_write_num(L, i, p);
+                break;
+
             case LUA_TSTRING:
                 q = (u_char *) lua_tolstring(L, i, &len);
                 p = ngx_copy(p, q, len);
@@ -340,7 +348,6 @@ ngx_http_lua_capture_log_handler(ngx_log_t *log,
 #endif
 
 
-#ifndef NGX_LUA_NO_FFI_API
 int
 ngx_http_lua_ffi_errlog_set_filter_level(int level, u_char *err, size_t *errlen)
 {
@@ -451,6 +458,5 @@ ngx_http_lua_ffi_raw_log(ngx_http_request_t *r, int level, u_char *s,
     return NGX_OK;
 }
 
-#endif
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

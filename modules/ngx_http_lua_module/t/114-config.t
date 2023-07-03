@@ -33,7 +33,7 @@ GET /t
 
 
 
-=== TEST 2: ngx.config.subystem
+=== TEST 2: ngx.config.subsystem
 --- config
     location /t {
         content_by_lua '

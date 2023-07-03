@@ -541,7 +541,7 @@ end
 --
 --  memcache:set_hash(hashfunc)
 --     Sets a custom hash function for key values. The default is a CRC32 hashing function.
---     'hashfunc' should be defined receiving a single string parameter and returing a single integer value.
+--     'hashfunc' should be defined receiving a single string parameter and returning a single integer value.
 --
 --  memcache:set_encode(func)
 --     Sets a custom encode function for serialising table values. 'func' should be defined receiving a single

@@ -1,0 +1,17 @@
+{
+  "CN": "example.com",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+  {
+    "C": "US",
+    "O": "OpenResty",
+    "ST": "California"
+  }
+  ],
+  "hosts": [
+    "example.com"
+  ]
+}

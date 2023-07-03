@@ -54,8 +54,8 @@ static ngx_int_t ngx_http_lua_balancer_get_peer(ngx_peer_connection_t *pc,
     void *data);
 static ngx_int_t ngx_http_lua_balancer_by_chunk(lua_State *L,
     ngx_http_request_t *r);
-void ngx_http_lua_balancer_free_peer(ngx_peer_connection_t *pc, void *data,
-    ngx_uint_t state);
+static void ngx_http_lua_balancer_free_peer(ngx_peer_connection_t *pc,
+    void *data, ngx_uint_t state);
 
 
 ngx_int_t
@@ -66,6 +66,7 @@ ngx_http_lua_balancer_handler_file(ngx_http_request_t *r,
 
     rc = ngx_http_lua_cache_loadfile(r->connection->log, L,
                                      lscf->balancer.src.data,
+                                     &lscf->balancer.src_ref,
                                      lscf->balancer.src_key);
     if (rc != NGX_OK) {
         return rc;
@@ -87,8 +88,9 @@ ngx_http_lua_balancer_handler_inline(ngx_http_request_t *r,
     rc = ngx_http_lua_cache_loadbuffer(r->connection->log, L,
                                        lscf->balancer.src.data,
                                        lscf->balancer.src.len,
+                                       &lscf->balancer.src_ref,
                                        lscf->balancer.src_key,
-                                       "=balancer_by_lua");
+                                       (const char *) lscf->balancer.chunkname);
     if (rc != NGX_OK) {
         return rc;
     }
@@ -123,7 +125,9 @@ char *
 ngx_http_lua_balancer_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf)
 {
-    u_char                      *p;
+    size_t                       chunkname_len;
+    u_char                      *chunkname;
+    u_char                      *cache_key = NULL;
     u_char                      *name;
     ngx_str_t                   *value;
     ngx_http_lua_srv_conf_t     *lscf = conf;
@@ -147,45 +151,42 @@ ngx_http_lua_balancer_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
 
     if (cmd->post == ngx_http_lua_balancer_handler_file) {
         /* Lua code in an external file */
-
         name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
                                         value[1].len);
         if (name == NULL) {
             return NGX_CONF_ERROR;
         }
 
+        cache_key = ngx_http_lua_gen_file_cache_key(cf, value[1].data,
+                                                    value[1].len);
+        if (cache_key == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
         lscf->balancer.src.data = name;
         lscf->balancer.src.len = ngx_strlen(name);
 
-        p = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
-        if (p == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        lscf->balancer.src_key = p;
-
-        p = ngx_copy(p, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
-        p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
-        *p = '\0';
-
     } else {
-        /* inlined Lua code */
-
-        lscf->balancer.src = value[1];
-
-        p = ngx_palloc(cf->pool,
-                       sizeof("balancer_by_lua") + NGX_HTTP_LUA_INLINE_KEY_LEN);
-        if (p == NULL) {
+        cache_key = ngx_http_lua_gen_chunk_cache_key(cf, "balancer_by_lua",
+                                                     value[1].data,
+                                                     value[1].len);
+        if (cache_key == NULL) {
             return NGX_CONF_ERROR;
         }
 
-        lscf->balancer.src_key = p;
+        chunkname = ngx_http_lua_gen_chunk_name(cf, "balancer_by_lua",
+                                                sizeof("balancer_by_lua") - 1,
+                                                &chunkname_len);
+        if (chunkname == NULL) {
+            return NGX_CONF_ERROR;
+        }
 
-        p = ngx_copy(p, "balancer_by_lua", sizeof("balancer_by_lua") - 1);
-        p = ngx_copy(p, NGX_HTTP_LUA_INLINE_TAG, NGX_HTTP_LUA_INLINE_TAG_LEN);
-        p = ngx_http_lua_digest_hex(p, value[1].data, value[1].len);
-        *p = '\0';
+        /* Don't eval nginx variables for inline lua code */
+        lscf->balancer.src = value[1];
+        lscf->balancer.chunkname = chunkname;
     }
+
+    lscf->balancer.src_key = cache_key;
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
 
@@ -408,7 +409,7 @@ ngx_http_lua_balancer_by_chunk(lua_State *L, ngx_http_request_t *r)
 }
 
 
-void
+static void
 ngx_http_lua_balancer_free_peer(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state)
 {
@@ -465,8 +466,6 @@ ngx_http_lua_balancer_save_session(ngx_peer_connection_t *pc, void *data)
 
 #endif
 
-
-#ifndef NGX_LUA_NO_FFI_API
 
 int
 ngx_http_lua_ffi_balancer_set_current_peer(ngx_http_request_t *r,
@@ -763,4 +762,51 @@ ngx_http_lua_ffi_balancer_get_last_failure(ngx_http_request_t *r,
     return bp->last_peer_state;
 }
 
-#endif  /* NGX_LUA_NO_FFI_API */
+
+int
+ngx_http_lua_ffi_balancer_recreate_request(ngx_http_request_t *r,
+    char **err)
+{
+    ngx_http_lua_ctx_t    *ctx;
+    ngx_http_upstream_t   *u;
+
+    if (r == NULL) {
+        *err = "no request found";
+        return NGX_ERROR;
+    }
+
+    u = r->upstream;
+
+    if (u == NULL) {
+        *err = "no upstream found";
+        return NGX_ERROR;
+    }
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        *err = "no ctx found";
+        return NGX_ERROR;
+    }
+
+    if ((ctx->context & NGX_HTTP_LUA_CONTEXT_BALANCER) == 0) {
+        *err = "API disabled in the current context";
+        return NGX_ERROR;
+    }
+
+    /* u->create_request can not be NULL since we are in balancer phase */
+    ngx_http_lua_assert(u->create_request != NULL);
+
+    *err = NULL;
+
+    if (u->request_bufs != NULL && u->request_bufs != r->request_body->bufs) {
+        /* u->request_bufs already contains a valid request buffer
+         * remove it from chain first
+         */
+        u->request_bufs = u->request_bufs->next;
+    }
+
+    return u->create_request(r);
+}
+
+
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

@@ -12,6 +12,9 @@ my $http_config = <<_EOC_;
         function set_up_ngx_tmp_conf(conf)
             if conf == nil then
                 conf = [[
+                    # to prevent the test process from overwriting the
+                    # original pid file
+                    pid logs/test_nginx.pid;
                     events {
                         worker_connections 64;
                     }
@@ -33,6 +36,7 @@ my $http_config = <<_EOC_;
             end
 
             assert(f:write(conf))
+            f:close()
 
             return conf_file
         end
@@ -85,6 +89,8 @@ __DATA__
             else
                 ngx.log(ngx.WARN, out)
             end
+            p:close()
+            collectgarbage("collect")
         }
     }
 --- error_log
@@ -115,6 +121,7 @@ qr/\[error\] .*? init_by_lua:\d+: run init_by_lua/
             else
                 ngx.log(ngx.WARN, out)
             end
+            p:close()
 
             local cmd = nginx .. " -p $TEST_NGINX_HTML_DIR -c " .. conf_file .. " -T"
             local p, err = io.popen(cmd)
@@ -130,6 +137,8 @@ qr/\[error\] .*? init_by_lua:\d+: run init_by_lua/
             else
                 ngx.log(ngx.WARN, out)
             end
+            p:close()
+            collectgarbage("collect")
         }
     }
 --- error_log
@@ -144,6 +153,7 @@ qr/\[error\] .*? init_by_lua:\d+: run init_by_lua/
     location = /t {
         content_by_lua_block {
             local conf = [[
+                pid logs/test_nginx.pid;
                 events {
                     worker_connections 64;
                 }
@@ -171,6 +181,7 @@ qr/\[error\] .*? init_by_lua:\d+: run init_by_lua/
             else
                 ngx.log(ngx.WARN, out)
             end
+            p:close()
 
             local cmd = nginx .. " -p $TEST_NGINX_HTML_DIR -c " .. conf_file .. " -T"
             local p, err = io.popen(cmd)
@@ -186,6 +197,8 @@ qr/\[error\] .*? init_by_lua:\d+: run init_by_lua/
             else
                 ngx.log(ngx.WARN, out)
             end
+            p:close()
+            collectgarbage("collect")
         }
     }
 --- error_log

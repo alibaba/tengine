@@ -106,7 +106,7 @@ static ngx_http_lua_set_header_t  ngx_http_lua_set_handlers[] = {
                  offsetof(ngx_http_headers_out_t, cache_control),
                  ngx_http_set_builtin_multi_header },
 
-#if defined(nginx_version) && nginx_version >= 1013009
+#if (nginx_version >= 1013009)
     { ngx_string("Link"),
                  offsetof(ngx_http_headers_out_t, link),
                  ngx_http_set_builtin_multi_header },
@@ -311,6 +311,69 @@ static ngx_int_t
 ngx_http_set_builtin_multi_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value)
 {
+#if defined(nginx_version) && nginx_version >= 1023000
+    ngx_table_elt_t  **headers, *h, *ho, **ph;
+
+    headers = (ngx_table_elt_t **) ((char *) &r->headers_out + hv->offset);
+
+    if (hv->no_override) {
+        for (h = *headers; h; h = h->next) {
+            if (!h->hash) {
+                h->value = *value;
+                h->hash = hv->hash;
+                return NGX_OK;
+            }
+        }
+
+        goto create;
+    }
+
+    /* override old values (if any) */
+
+    if (*headers) {
+        for (h = (*headers)->next; h; h = h->next) {
+            h->hash = 0;
+            h->value.len = 0;
+        }
+
+        h = *headers;
+
+        h->value = *value;
+
+        if (value->len == 0) {
+            h->hash = 0;
+
+        } else {
+            h->hash = hv->hash;
+        }
+
+        return NGX_OK;
+    }
+
+create:
+
+    for (ph = headers; *ph; ph = &(*ph)->next) { /* void */ }
+
+    ho = ngx_list_push(&r->headers_out.headers);
+    if (ho == NULL) {
+        return NGX_ERROR;
+    }
+
+    ho->value = *value;
+
+    if (value->len == 0) {
+        ho->hash = 0;
+
+    } else {
+        ho->hash = hv->hash;
+    }
+
+    ho->key = hv->key;
+    ho->next = NULL;
+    *ph = ho;
+
+    return NGX_OK;
+#else
     ngx_array_t      *pa;
     ngx_table_elt_t  *ho, **ph;
     ngx_uint_t        i;
@@ -384,6 +447,7 @@ create:
     *ph = ho;
 
     return NGX_OK;
+#endif
 }
 
 
@@ -450,7 +514,7 @@ ngx_http_set_content_length_header(ngx_http_request_t *r,
         return ngx_http_clear_content_length_header(r, hv, value);
     }
 
-    len = ngx_atosz(value->data, value->len);
+    len = ngx_atoof(value->data, value->len);
     if (len == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -486,51 +550,38 @@ ngx_http_lua_set_output_header(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
     ngx_str_t key, ngx_str_t value, unsigned override)
 {
     ngx_http_lua_header_val_t         hv;
-    ngx_http_lua_set_header_t        *handlers = ngx_http_lua_set_handlers;
-    ngx_uint_t                        i;
+    ngx_http_lua_main_conf_t         *lmcf;
+    ngx_http_lua_set_header_t        *lsh;
+    ngx_hash_t                       *hash;
 
     dd("set header value: %.*s", (int) value.len, value.data);
+
+    if (ngx_http_lua_copy_escaped_header(r, &key, 1) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_lua_copy_escaped_header(r, &value, 0) != NGX_OK) {
+        return NGX_ERROR;
+    }
 
     hv.hash = ngx_hash_key_lc(key.data, key.len);
     hv.key = key;
 
     hv.offset = 0;
     hv.no_override = !override;
-    hv.handler = NULL;
+    hv.handler = ngx_http_set_header;
 
-    for (i = 0; handlers[i].name.len; i++) {
-        if (hv.key.len != handlers[i].name.len
-            || ngx_strncasecmp(hv.key.data, handlers[i].name.data,
-                               handlers[i].name.len) != 0)
-        {
-            dd("hv key comparison: %s <> %s", handlers[i].name.data,
-               hv.key.data);
-
-            continue;
-        }
-
-        dd("Matched handler: %s %s", handlers[i].name.data, hv.key.data);
-
-        hv.offset = handlers[i].offset;
-        hv.handler = handlers[i].handler;
-
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+    hash = &lmcf->builtin_headers_out;
+    lsh = ngx_http_lua_hash_find_lc(hash, hv.hash, hv.key.data, hv.key.len);
+    if (lsh) {
+        dd("Matched handler: %s %s", lsh->name.data, hv.key.data);
+        hv.offset = lsh->offset;
+        hv.handler = lsh->handler;
         if (hv.handler == ngx_http_set_content_type_header) {
             ctx->mime_set = 1;
         }
-
-        break;
     }
-
-    if (handlers[i].name.len == 0 && handlers[i].handler) {
-        hv.offset = handlers[i].offset;
-        hv.handler = handlers[i].handler;
-    }
-
-#if 1
-    if (hv.handler == NULL) {
-        return NGX_ERROR;
-    }
-#endif
 
     return hv.handler(r, &hv, &value);
 }
@@ -642,6 +693,50 @@ ngx_http_lua_get_output_header(lua_State *L, ngx_http_request_t *r,
 
     lua_pushnil(L);
     return 1;
+}
+
+
+ngx_int_t
+ngx_http_lua_init_builtin_headers_out(ngx_conf_t *cf,
+    ngx_http_lua_main_conf_t *lmcf)
+{
+    ngx_array_t                   headers;
+    ngx_hash_key_t               *hk;
+    ngx_hash_init_t               hash;
+    ngx_http_lua_set_header_t    *handlers = ngx_http_lua_set_handlers;
+    ngx_uint_t                    count;
+
+    count = sizeof(ngx_http_lua_set_handlers)
+            / sizeof(ngx_http_lua_set_header_t);
+
+    if (ngx_array_init(&headers, cf->temp_pool, count, sizeof(ngx_hash_key_t))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    while (handlers->name.data) {
+        hk = ngx_array_push(&headers);
+        if (hk == NULL) {
+            return NGX_ERROR;
+        }
+
+        hk->key = handlers->name;
+        hk->key_hash = ngx_hash_key_lc(handlers->name.data, handlers->name.len);
+        hk->value = (void *) handlers;
+
+        handlers++;
+    }
+
+    hash.hash = &lmcf->builtin_headers_out;
+    hash.key = ngx_hash_key_lc;
+    hash.max_size = 512;
+    hash.bucket_size = ngx_align(64, ngx_cacheline_size);
+    hash.name = "builtin_headers_out_hash";
+    hash.pool = cf->pool;
+    hash.temp_pool = NULL;
+
+    return ngx_hash_init(&hash, headers.elts, headers.nelts);
 }
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */
