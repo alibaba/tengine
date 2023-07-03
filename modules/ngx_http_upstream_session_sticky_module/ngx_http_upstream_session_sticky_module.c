@@ -313,7 +313,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         }
     }
 
-    if (cookies == NULL) {
+    if (cookies == NULL || cookie.len == 0) {
         goto not_found;
     }
 
