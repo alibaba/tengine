@@ -1,8 +1,9 @@
-Tengine 3.0.0 [2023-06-30]
+Tengine 3.0.0 [2023-07-06]
 * Feature: 支持域名，证书，路由的动态无损生效 [tengine-ingress] (drawing, lianglli)
 * Feature: 支持HTTP/3 (QUIC v1和draft-29)[XQUIC] (lurker-Chen, Kulsk, lianglli)
 * Feature: 支持bypass内核的用户态高性能UDP转发 [XUDP] (D-Wythe, fengidri)
-* Change: 升级core代码版本到Nginx-1.25.1 (lianglli)
+* Change: 升级core代码到Nginx-1.24.0稳定版本 (lianglli)
+* Bugfix: 修复ssl_async开启时ngx_ssl_shutdown导致的coredump问题 (foxriver1025)
 
 
 Tengine 2.4.1 [2023-06-08]

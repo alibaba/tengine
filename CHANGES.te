@@ -1,4 +1,4 @@
-Changes with Tengine 3.0.0                                         30 Jun 2023
+Changes with Tengine 3.0.0                                         06 Jul 2023
 
     *) Feature: dynamically reconfigure the servers, locations and upstreams without reloading or restarting worker processes [tengine-ingress] (drawing, lianglli)
 
@@ -6,7 +6,9 @@ Changes with Tengine 3.0.0                                         30 Jun 2023
 
     *) Feature: high-speed UDP transmission with kernel-bypass [XUDP] (D-Wythe, fengidri)
 
-    *) Change: update core to Nginx-1.25.1 (lianglli)
+    *) Change: update core to stable version Nginx-1.24.0 (lianglli)
+
+    *) Bugfix: fixed coredump caused by ngx_ssl_shutdown() with ssl_async enabled (foxriver1025)
 
 
 Changes with Tengine 2.4.1                                         08 Jun 2023
