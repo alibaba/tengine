@@ -44,6 +44,7 @@ jobs:
      - name: 'build lua-resty-core'
        working-directory: lua-resty-core
        run: |
+         make
          sudo make install
      - name: build
        env:

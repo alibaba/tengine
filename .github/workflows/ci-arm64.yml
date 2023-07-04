@@ -52,6 +52,7 @@ jobs:
             cd ..
             echo "Build lua-resty-core"
             cd lua-resty-core
+            make -j2
             make install
             cd ..
             echo "Build tengine"
