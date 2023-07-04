@@ -70,6 +70,8 @@ jobs:
           LUAJIT_INC: /usr/local/include/luajit-2.1
         run: |
           ./configure \
+            --with-ld-opt="-Wl,-lpcre,-rpath,/usr/local/lib" \
+            --with-pcre \
             --add-module=modules/ngx_tongsuo_ntls \
             --add-module=modules/ngx_http_lua_module \
             --with-openssl=../Tongsuo \
