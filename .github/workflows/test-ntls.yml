@@ -66,6 +66,8 @@ jobs:
         env:
           CC: ${{ matrix.compiler.CC }}
           CXX: ${{ matrix.compiler.CXX }}
+          LUAJIT_LIB: /usr/local/lib
+          LUAJIT_INC: /usr/local/include/luajit-2.1
         run: |
           ./configure \
             --add-module=modules/ngx_tongsuo_ntls \
