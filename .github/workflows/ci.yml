@@ -32,6 +32,15 @@ jobs:
        run: |
          make
          sudo make install
+     - name: 'checkout lua-resty-core'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/lua-resty-core
+         path: lua-resty-core
+     - name: 'build lua-resty-core'
+       working-directory: lua-resty-core
+       run: |
+         sudo make install
 
 # TODO: fix tests so they don't depend on /usr/local/nginx/logs/
 #       so we can run `make`, `make test`, `make install`.

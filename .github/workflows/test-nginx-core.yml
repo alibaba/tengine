@@ -36,6 +36,15 @@ jobs:
        run: |
          make
          sudo make install
+     - name: 'checkout lua-resty-core'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/lua-resty-core
+         path: lua-resty-core
+     - name: 'build lua-resty-core'
+       working-directory: lua-resty-core
+       run: |
+         sudo make install
      - name: build
        env:
          CC: ${{ matrix.compiler.CC }}
