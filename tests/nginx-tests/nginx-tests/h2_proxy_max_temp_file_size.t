@@ -66,7 +66,10 @@ http {
 EOF
 
 $t->write_file('1', 'X' x (1024 * 1024));
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

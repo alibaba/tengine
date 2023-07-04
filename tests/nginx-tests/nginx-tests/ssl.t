@@ -14,6 +14,7 @@ use strict;
 use Test::More;
 
 use Socket qw/ CRLF /;
+use IO::Select;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -25,13 +26,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite proxy/)
-	->has_daemon('openssl')->plan(28);
+my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite proxy socket_ssl/)
+	->has_daemon('openssl')->plan(21);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -42,14 +39,12 @@ daemon off;
 events {
 }
 
-worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
 
 http {
     %%TEST_GLOBALS_HTTP%%
 
     ssl_certificate_key localhost.key;
     ssl_certificate localhost.crt;
-    ssl_session_tickets off;
 
     log_format ssl $ssl_protocol;
 
@@ -61,6 +56,7 @@ http {
         ssl_certificate_key inner.key;
         ssl_certificate inner.crt;
         ssl_session_cache shared:SSL:1m;
+        ssl_session_tickets on;
         ssl_verify_client optional_no_ca;
 
         keepalive_requests 1000;
@@ -102,57 +98,24 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081;
-        server_name  localhost;
 
-        # Special case for enabled "ssl" directive.
 
-        ssl on;
-        ssl_session_cache builtin;
 
-        location / {
-            return 200 "body $ssl_session_reused";
-        }
-    }
 
-    server {
-        listen       127.0.0.1:8082 ssl;
-        server_name  localhost;
 
-        ssl_session_cache builtin:1000;
 
-        location / {
-            return 200 "body $ssl_session_reused";
-        }
-    }
 
-    server {
-        listen       127.0.0.1:8083 ssl;
-        server_name  localhost;
 
-        ssl_session_cache none;
 
-        location / {
-            return 200 "body $ssl_session_reused";
-        }
-    }
 
-    server {
-        listen       127.0.0.1:8084 ssl;
-        server_name  localhost;
 
-        ssl_session_cache off;
 
-        location / {
-            return 200 "body $ssl_session_reused";
-        }
-    }
 
-    server {
         listen       127.0.0.1:8086 ssl;
         server_name  localhost;
 
         ssl_session_cache shared:SSL:1m;
+        ssl_session_tickets on;
         ssl_session_timeout 1;
 
         location / {
@@ -218,58 +181,43 @@ foreach my $name ('localhost', 'inner') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-# suppress deprecation warning
 
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
-my $ctx;
+# ssl session reuse
 
-SKIP: {
-skip 'no TLS 1.3 sessions', 6 if get('/protocol', 8085) =~ /TLSv1.3/
-	&& ($Net::SSLeay::VERSION < 1.88 || $IO::Socket::SSL::VERSION < 2.061);
 
-$ctx = get_ssl_context();
+my $ctx = get_ssl_context();
 
-like(get('/', 8085, $ctx), qr/^body \.$/m, 'cache shared');
-like(get('/', 8085, $ctx), qr/^body r$/m, 'cache shared reused');
+like(get('/', 8085, $ctx), qr/^body \.$/m, 'session');
 
-$ctx = get_ssl_context();
+TODO: {
+local $TODO = 'no TLSv1.3 sessions, old Net::SSLeay'
+	if $Net::SSLeay::VERSION < 1.88 && test_tls13();
+local $TODO = 'no TLSv1.3 sessions, old IO::Socket::SSL'
+	if $IO::Socket::SSL::VERSION < 2.061 && test_tls13();
+local $TODO = 'no TLSv1.3 sessions in LibreSSL'
+	if $t->has_module('LibreSSL') && test_tls13();
 
-like(get('/', 8081, $ctx), qr/^body \.$/m, 'cache builtin');
-like(get('/', 8081, $ctx), qr/^body r$/m, 'cache builtin reused');
-
-$ctx = get_ssl_context();
-
-like(get('/', 8082, $ctx), qr/^body \.$/m, 'cache builtin size');
-like(get('/', 8082, $ctx), qr/^body r$/m, 'cache builtin size reused');
+like(get('/', 8085, $ctx), qr/^body r$/m, 'session reused');
 
 }
 
-$ctx = get_ssl_context();
 
-like(get('/', 8083, $ctx), qr/^body \.$/m, 'cache none');
-like(get('/', 8083, $ctx), qr/^body \.$/m, 'cache none not reused');
 
-$ctx = get_ssl_context();
 
-like(get('/', 8084, $ctx), qr/^body \.$/m, 'cache off');
-like(get('/', 8084, $ctx), qr/^body \.$/m, 'cache off not reused');
 
 # ssl certificate inheritance
 
-my $s = get_ssl_socket(8081);
+my $s = get_ssl_socket(8086);
 like($s->dump_peer_certificate(), qr/CN=localhost/, 'CN');
 
-$s->close();
 
 $s = get_ssl_socket(8085);
 like($s->dump_peer_certificate(), qr/CN=inner/, 'CN inner');
 
-$s->close();
 
 # session timeout
 
@@ -282,7 +230,15 @@ like(get('/', 8086, $ctx), qr/^body \.$/m, 'session timeout');
 
 # embedded variables
 
-like(get('/id', 8085), qr/^body \w{64}$/m, 'session id');
+$ctx = get_ssl_context();
+like(get('/id', 8085, $ctx), qr/^body (\w{64})?$/m, 'session id');
+TODO: {
+local $TODO = 'no TLSv1.3 sessions in LibreSSL'
+	if $t->has_module('LibreSSL') && test_tls13();
+local $TODO = 'no TLSv1.3 sessions ids in BoringSSL'
+	if $t->has_module('BoringSSL') && test_tls13();
+like(get('/id', 8085, $ctx), qr/^body \w{64}$/m, 'session id reused');
+}
 unlike(http_get('/id'), qr/body \w/, 'session id no ssl');
 like(get('/cipher', 8085), qr/^body [\w-]+$/m, 'cipher');
 
@@ -316,6 +272,7 @@ EOF
 $req x= 1000;
 
 my $r = http($req, socket => $s) || "";
+$s = undef;
 is(() = $r =~ /(200 OK)/g, 1000, 'pipelined requests');
 
 # OpenSSL 3.0 error "unexpected eof while reading" seen as a critical error
@@ -335,12 +292,13 @@ like(`grep -F '[crit]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no crit');
 
 ###############################################################################
 
+sub test_tls13 {
+	return get('/protocol', 8085) =~ /TLSv1.3/;
+}
 sub get {
-	my ($uri, $port, $ctx) = @_;
-	my $s = get_ssl_socket($port, $ctx) or return;
-	my $r = http_get($uri, socket => $s);
-	$s->close();
-	return $r;
+	my ($uri, $port, $ctx, %extra) = @_;
+	my $s = get_ssl_socket($port, $ctx, %extra) or return;
+	return http_get($uri, socket => $s);
 }
 
 sub get_body {
@@ -355,16 +313,16 @@ sub get_body {
 	http($chs . CRLF . $body x $len . CRLF, socket => $s, start => 1)
 		for 1 .. $n;
 	my $r = http("0" . CRLF . CRLF, socket => $s);
-	$s->close();
 	return $r;
 }
 
 sub cert {
 	my ($uri, $port) = @_;
-	my $s = get_ssl_socket($port, undef,
+	return get(
+		$uri, $port, undef,
 		SSL_cert_file => "$d/subject.crt",
-		SSL_key_file => "$d/subject.key") or return;
-	http_get($uri, socket => $s);
+		SSL_key_file => "$d/subject.key"
+	);
 }
 
 sub get_ssl_context {
@@ -376,45 +334,33 @@ sub get_ssl_context {
 
 sub get_ssl_socket {
 	my ($port, $ctx, %extra) = @_;
-	my $s;
+	return http(
 
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		$s = IO::Socket::SSL->new(
-			Proto => 'tcp',
-			PeerAddr => '127.0.0.1',
-			PeerPort => port($port),
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+		'', PeerAddr => '127.0.0.1:' . port($port), start => 1,
+		SSL => 1,
 			SSL_reuse_ctx => $ctx,
-			SSL_error_trap => sub { die $_[1] },
 			%extra
 		);
-		alarm(0);
-	};
-	alarm(0);
 
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
 
-	return $s;
 }
 
 sub get_ssl_shutdown {
 	my ($port) = @_;
 
-	my $s = IO::Socket::INET->new('127.0.0.1:' . port($port));
-	my $ctx = Net::SSLeay::CTX_new() or die("Failed to create SSL_CTX $!");
-	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
-	Net::SSLeay::set_fd($ssl, fileno($s));
-	Net::SSLeay::connect($ssl) or die("ssl connect");
-	Net::SSLeay::write($ssl, 'GET /' . CRLF . 'extra');
-	Net::SSLeay::read($ssl);
-	Net::SSLeay::set_shutdown($ssl, 1);
-	Net::SSLeay::shutdown($ssl);
+	my $s = http(
+		'GET /' . CRLF . 'extra',
+		PeerAddr => '127.0.0.1:' . port($port), start => 1,
+		SSL => 1
+	);
+	$s->blocking(0);
+	while (IO::Select->new($s)->can_read(8)) {
+                my $n = $s->sysread(my $buf, 16384);
+                next if !defined $n && $!{EWOULDBLOCK};
+                last;
+	}
+	$s->blocking(1);
+	return $s->stop_SSL();
 }
 
 ###############################################################################

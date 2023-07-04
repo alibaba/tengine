@@ -150,7 +150,9 @@ sub lines {
 	my ($t, $file, $pattern) = @_;
 
 	if ($file eq 'stderr') {
-		return map { $_ =~ /\Q$pattern\E/ } (<$stderr>);
+		my $value = map { $_ =~ /\Q$pattern\E/ } (<$stderr>);
+		$stderr->clearerr();
+		return $value;
 	}
 
 	my $path = $t->testdir() . '/' . $file;

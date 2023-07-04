@@ -77,7 +77,10 @@ EOF
 $t->write_file('index.html', '');
 $t->write_file('t.html', 'SEE-THIS');
 $t->write_file('slow.html', 'SEE-THIS');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

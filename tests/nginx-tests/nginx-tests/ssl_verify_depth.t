@@ -22,12 +22,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)->has_daemon('openssl');
+my $t = Test::Nginx->new()->has(qw/http http_ssl socket_ssl/)
+	->has_daemon('openssl');
 
 plan(skip_all => 'LibreSSL') if $t->has_module('LibreSSL');
 
@@ -176,37 +173,16 @@ like(get(8082, 'end'),  qr/SUCCESS/, 'verify depth 2 - end');
 
 sub get {
 	my ($port, $cert) = @_;
-	my $s = get_ssl_socket($port, $cert) or return;
-	http_get("/t?$cert", socket => $s);
-}
+	http_get(
+		"/t?$cert",
 
-sub get_ssl_socket {
-	my ($port, $cert) = @_;
-	my ($s);
-
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		$s = IO::Socket::SSL->new(
-			Proto => 'tcp',
-			PeerAddr => '127.0.0.1',
-			PeerPort => port($port),
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
+		PeerAddr => '127.0.0.1:' . port($port),
+		SSL => 1,
 			SSL_cert_file => "$d/$cert.crt",
-			SSL_key_file => "$d/$cert.key",
-			SSL_error_trap => sub { die $_[1] }
+		SSL_key_file => "$d/$cert.key"
 		);
-		alarm(0);
-	};
-	alarm(0);
 
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
 
-	return $s;
 }
 
 ###############################################################################

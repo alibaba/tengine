@@ -64,7 +64,10 @@ EOF
 
 $t->write_file('index.html', '');
 $t->write_file('t.html', 'SEE-THIS');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -101,9 +104,8 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 200, 'request body - limit req - empty');
 
-# predict send windows
+# request body sent along with request
 
-$sid = $s->new_stream();
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ path => '/proxy_limit_req/', body => 'TEST2' });
 select undef, undef, undef, 1.1;

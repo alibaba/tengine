@@ -38,9 +38,8 @@ http {
 
     server {
         listen       127.0.0.1:8080;
-        listen       127.0.0.1:%%PORT_8082%%-%%PORT_8083%%;
-        listen       %%PORT_8085%%-%%PORT_8086%%;
-        listen       [::1]:%%PORT_8085%%-%%PORT_8086%%;
+        listen       127.0.0.1:%%PORT_8182%%-%%PORT_8183%%;
+        listen       [::1]:%%PORT_8182%%-%%PORT_8183%%;
         server_name  localhost;
 
         location / {
@@ -55,28 +54,25 @@ http {
     # catch out of range
 
     server {
-        listen       127.0.0.1:8081;
-        listen       127.0.0.1:8084;
-        listen       127.0.0.1:8087;
-        listen       [::1]:%%PORT_8084%%;
-        listen       [::1]:%%PORT_8087%%;
+        listen       127.0.0.1:8181;
+        listen       127.0.0.1:8184;
+        listen       [::1]:%%PORT_8181%%;
+        listen       [::1]:%%PORT_8184%%;
         server_name  localhost;
     }
 }
 
 EOF
 
-my $p0 = port(8080); my $p3 = port(8083); my $p6 = port(8086);
-my $p1 = port(8081); my $p4 = port(8084); my $p7 = port(8087);
-my $p2 = port(8082); my $p5 = port(8085);
+my $p0 = port(8080); my $p3 = port(8183);
+my $p1 = port(8181); my $p4 = port(8184);
+my $p2 = port(8182);
 
-plan(skip_all => 'listen on wildcard address')
-	unless $ENV{TEST_NGINX_UNSAFE};
 
 plan(skip_all => 'no requested ranges')
-	if "$p0$p1$p2$p3$p4$p5$p6$p7" ne "80808081808280838084808580868087";
+	if "$p2$p3" ne "81828183";
 
-$t->run()->plan(12);
+$t->run()->plan(9);
 
 ###############################################################################
 
@@ -84,14 +80,11 @@ like(http_get("/?b=127.0.0.1:$p0"), qr/127.0.0.1:$p0/, 'single');
 unlike(http_get("/?b=127.0.0.1:$p1"), qr/127.0.0.1:$p1/, 'out of range 1');
 like(http_get("/?b=127.0.0.1:$p2"), qr/127.0.0.1:$p2/, 'range 1');
 like(http_get("/?b=127.0.0.1:$p3"), qr/127.0.0.1:$p3/, 'range 2');
-unlike(http_get("/?b=127.0.0.1:$p4"), qr/127.0.0.$p4/, 'out of range 2');
-like(http_get("/?b=127.0.0.1:$p5"), qr/127.0.0.1:$p5/, 'wildcard range 1');
-like(http_get("/?b=127.0.0.1:$p6"), qr/127.0.0.1:$p6/, 'wildcard range 2');
-unlike(http_get("/?b=127.0.0.1:$p7"), qr/127.0.0.1:$p7/, 'out of range 3');
+unlike(http_get("/?b=127.0.0.1:$p4"), qr/127.0.0.1:$p4/, 'out of range 2');
 
-unlike(http_get("/?b=[::1]:$p4"), qr/::1:$p4/, 'out of range 4');
-like(http_get("/?b=[::1]:$p5"), qr/::1:$p5/, 'ipv6 range 1');
-like(http_get("/?b=[::1]:$p6"), qr/::1:$p6/, 'ipv6 range 2');
-unlike(http_get("/?b=[::1]:$p7"), qr/::1:$p7/, 'out of range 5');
+unlike(http_get("/?b=[::1]:$p1"), qr/::1:$p1/, 'inet6 out of range 1');
+like(http_get("/?b=[::1]:$p2"), qr/::1:$p2/, 'inet6 range 1');
+like(http_get("/?b=[::1]:$p3"), qr/::1:$p3/, 'inet6 range 2');
+unlike(http_get("/?b=[::1]:$p4"), qr/::1:$p4/, 'inet6 out of range 2');
 
 ###############################################################################

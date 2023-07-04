@@ -51,7 +51,11 @@ http {
 EOF
 
 $t->run_daemon(\&http_silent_daemon);
-$t->run()->waitforsocket('127.0.0.1:' . port(8081));
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
+$t->run();
+open STDERR, ">&", \*OLDERR;
+$t->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 

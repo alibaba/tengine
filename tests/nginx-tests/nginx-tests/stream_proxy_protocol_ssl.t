@@ -24,11 +24,9 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
 
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl/)->has_daemon('openssl')
-	->plan(2);
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl socket_ssl/)
+	->has_daemon('openssl')->plan(2);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 

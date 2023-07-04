@@ -24,12 +24,10 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http rewrite http_v2 grpc/)
-	->has(qw/upstream_keepalive http_ssl/)->has_daemon('openssl');
+	->has(qw/upstream_keepalive http_ssl openssl:1.0.2/)
+	->has_daemon('openssl')
 
-$t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
-plan(skip_all => 'OpenSSL too old') unless defined $1 and $1 ge '1.0.2';
-
-$t->write_file_expand('nginx.conf', <<'EOF')->plan(38);
+	->write_file_expand('nginx.conf', <<'EOF')->plan(38);
 
 %%TEST_GLOBALS%%
 
@@ -131,7 +129,10 @@ sleep 1 if $^O eq 'MSWin32';
 
 $t->write_file('password', 'client');
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
