@@ -32,6 +32,15 @@ jobs:
        run: |
          make
          sudo make install
+     - name: 'checkout lua-resty-lrucache'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/lua-resty-lrucache
+         path: lua-resty-lrucache
+     - name: 'build lua-resty-lrucache'
+       working-directory: lua-resty-lrucache
+       run: |
+         sudo make install
      - name: 'checkout lua-resty-core'
        uses: actions/checkout@v3
        with:
@@ -40,7 +49,6 @@ jobs:
      - name: 'build lua-resty-core'
        working-directory: lua-resty-core
        run: |
-         make
          sudo make install
 
 # TODO: fix tests so they don't depend on /usr/local/nginx/logs/
