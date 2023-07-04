@@ -30,6 +30,7 @@ my $cf_1 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     root %%TESTDIR%%;
 
@@ -117,6 +118,7 @@ my $cf_2 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     root %%TESTDIR%%;
 
@@ -281,6 +283,7 @@ my $cf_3 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     root %%TESTDIR%%;
 
@@ -346,6 +349,7 @@ my $cf_4 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     root %%TESTDIR%%;
 
@@ -396,6 +400,7 @@ my $cf_5 = <<'EOF';
 worker_rlimit_core   10000M;
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     root %%TESTDIR%%;
 

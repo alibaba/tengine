@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: "ubuntu-latest"
+    runs-on: "ubuntu-20.04"
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +19,24 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: tengine
+      - name: 'checkout lua-resty-lrucache'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/lua-resty-lrucache
+          path: lua-resty-lrucache
+      - name: 'build lua-resty-lrucache'
+        working-directory: lua-resty-lrucache
+        run: |
+          sudo make install
+      - name: 'checkout lua-resty-core'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/lua-resty-core
+          path: lua-resty-core
+      - name: 'build lua-resty-core'
+        working-directory: lua-resty-core
+        run: |
+          sudo make install
       - name: checkout Tongsuo
         uses: actions/checkout@v3
         with:

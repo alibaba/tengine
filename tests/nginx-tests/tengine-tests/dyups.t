@@ -97,6 +97,7 @@ events {
 }
 
 http {
+    %%TEST_GLOBALS_HTTP%%
 
     # Must be less than 2s (mhttp_get->mhttp->alarm(2)).
     # If upstream (e.g. "dyhost") is deleted by dyups api,
@@ -324,6 +325,8 @@ events {
 }
 
 http {
+    %%TEST_GLOBALS_HTTP%%
+    
     resolver_timeout 500ms;
 
     upstream host1 {
@@ -493,6 +496,8 @@ events {
 }
 
 http {
+    %%TEST_GLOBALS_HTTP%%
+    
     resolver_timeout 500ms;
 
     server {
@@ -582,6 +587,8 @@ events {
 error_log %%TESTDIR%%/error_ssl.log debug;
 
 http {
+    %%TEST_GLOBALS_HTTP%%
+    
     resolver_timeout 500ms;
 
     server {
