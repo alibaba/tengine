@@ -706,6 +706,7 @@ sub test_globals_http() {
 	$s .= "root $self->{_testdir};\n";
 	$s .= "access_log $self->{_testdir}/access.log;\n";
 	$s .= "client_body_temp_path $self->{_testdir}/client_body_temp;\n";
+	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n";
 
 	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n"
 		if $self->has_module('fastcgi');
