@@ -59,6 +59,7 @@ jobs:
         run: |
           ./configure \
             --add-module=modules/ngx_tongsuo_ntls \
+            --add-module=modules/ngx_http_lua_module \
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
