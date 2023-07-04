@@ -24,6 +24,12 @@ jobs:
           repository: openresty/luajit2
           path: luajit2
 
+      - name: 'checkout lua-resty-core'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/lua-resty-core
+          path: lua-resty-core
+
       - name: Compile with ${{ matrix.compiler.compiler }}
         uses: uraimo/run-on-arch-action@v2
         with:
@@ -42,6 +48,10 @@ jobs:
             echo "Build luajit2"
             cd luajit2
             make -j2
+            make install
+            cd ..
+            echo "Build lua-resty-core"
+            cd lua-resty-core
             make install
             cd ..
             echo "Build tengine"
