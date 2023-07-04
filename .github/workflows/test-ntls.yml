@@ -19,6 +19,16 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: tengine
+      - name: 'checkout luajit2'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/luajit2
+          path: luajit2
+      - name: 'build luajit2'
+        working-directory: luajit2
+        run: |
+          make
+          sudo make install
       - name: 'checkout lua-resty-lrucache'
         uses: actions/checkout@v3
         with:
