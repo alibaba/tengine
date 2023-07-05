@@ -6,6 +6,10 @@ Changes with Tengine 3.0.0                                         06 Jul 2023
 
     *) Feature: high-speed UDP transmission with kernel-bypass [XUDP] (D-Wythe, fengidri)
 
+    *) Feature: dynamically reconfigure canary routing based on standard and custom HTTP headers, header value, and weights [tengine-ingress] (drawing, lianglli)
+    
+    *) Feature: dynamically reconfigure timeout setting, SSL Redirects, CORS and enabling/disabling robots for the ingress/path [tengine-ingress] (drawing, lianglli)
+
     *) Change: update core to stable version Nginx-1.24.0 (lianglli)
 
     *) Bugfix: fixed coredump caused by ngx_ssl_shutdown() with ssl_async enabled (foxriver1025)
