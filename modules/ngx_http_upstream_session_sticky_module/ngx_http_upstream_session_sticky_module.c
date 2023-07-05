@@ -281,7 +281,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     time_t                           now;
     u_char                          *p, *v, *vv, *st, *last, *end;
     ngx_int_t                        diff, delimiter, legal;
-    ngx_str_t                       *cookie;
+    ngx_str_t                       *cookie = NULL;
     ngx_http_ss_ctx_t               *ctx;
     ngx_http_upstream_ss_srv_conf_t *sscf;
     ngx_table_elt_t                 *cookies;
@@ -313,7 +313,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         }
     }
 
-    if (cookies == NULL || cookie->len == 0) {
+    if (cookies == NULL || cookie == NULL || cookie->len == 0) {
         goto not_found;
     }
 
