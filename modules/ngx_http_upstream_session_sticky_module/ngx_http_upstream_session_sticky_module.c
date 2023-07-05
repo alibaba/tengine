@@ -281,7 +281,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     time_t                           now;
     u_char                          *p, *v, *vv, *st, *last, *end;
     ngx_int_t                        diff, delimiter, legal;
-    ngx_str_t                        cookie;
+    ngx_str_t                       *cookie;
     ngx_http_ss_ctx_t               *ctx;
     ngx_http_upstream_ss_srv_conf_t *sscf;
     ngx_table_elt_t                 *cookies;
@@ -302,8 +302,8 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
     now = ngx_time();
 
     for (cookies = r->headers_in.cookie; cookies; cookies = cookies->next) {
-        cookie = cookies->value;
-        p = ngx_strnstr(cookie.data, (char *) sscf->cookie.data, cookie.len);
+        cookie = &cookies->value;
+        p = ngx_strnstr(cookie->data, (char *) sscf->cookie.data, cookie->len);
         if (p == NULL) {
             continue;
         }
@@ -313,7 +313,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
         }
     }
 
-    if (cookies == NULL || cookie.len == 0) {
+    if (cookies == NULL || cookie->len == 0) {
         goto not_found;
     }
 
@@ -321,7 +321,7 @@ ngx_http_session_sticky_get_cookie(ngx_http_request_t *r)
                    "session sticky cookie: \"%V\"", cookie);
     st = p;
     v = p + sscf->cookie.len + 1;
-    last = cookie.data + cookie.len;
+    last = cookie->data + cookie->len;
 
     state = 0;
     while (p < last) {
@@ -511,9 +511,9 @@ finish:
     if (sscf->flag
         & (NGX_HTTP_SESSION_STICKY_PREFIX | NGX_HTTP_SESSION_STICKY_INDIRECT))
     {
-        cookie.len -= (end - st);
+        cookie->len -= (end - st);
 
-        if (cookie.len == 0) {
+        if (cookie->len == 0) {
             cookies->hash = 0;
             return NGX_OK;
         }
