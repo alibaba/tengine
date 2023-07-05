@@ -107,7 +107,10 @@ EOF
 mkdir($t->testdir() . '/dir');
 mkdir($t->testdir() . '/dir sp');
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run()->plan(23);
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

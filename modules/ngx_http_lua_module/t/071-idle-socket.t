@@ -367,7 +367,7 @@ Transfer-Encoding: chunked\r
 Connection: close\r
 \r
 6\r
-failed to set keepalive: (?:unread data in buffer|connection in dubious state)
+failed to set keepalive: (?:unread data in buffer|closed|connection in dubious state)
 }
 --- no_error_log
 [error]

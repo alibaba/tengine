@@ -1,0 +1,43 @@
+---
+pull_request_rules:
+  - name: warn on conflicts
+    conditions:
+      - conflict
+    actions:
+      comment:
+        message: This pull request is now in conflict :(
+      label:
+        add:
+          - conflict
+  - name: remove conflict label if not needed
+    conditions:
+      - -conflict
+    actions:
+      label:
+        remove:
+          - conflict
+  - name: add label needs-test-cases
+    conditions:
+      - files~=^src/
+      - -files~=^t/
+    actions:
+      label:
+        add:
+          - needs-test-cases
+  - name: remove label needs-test-cases
+    conditions:
+      - label=needs-test-cases
+      - files~=^src/
+      - files~=^t/
+    actions:
+      label:
+        remove:
+          - needs-test-cases
+  - name: add label could-be-merged
+    conditions:
+      - "#approved-reviews-by>=2"
+      - status-success=Travis CI - Pull Request
+    actions:
+      label:
+        add:
+          - could-be-merged

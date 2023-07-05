@@ -1,0 +1,18 @@
+{
+  "CN": "foo@example.com",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+  {
+    "C": "US",
+    "O": "OpenResty",
+    "ST": "California"
+  }
+  ],
+  "hosts": [
+    "foo@example.com",
+    "bar@example.com"
+  ]
+}

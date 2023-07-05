@@ -57,6 +57,8 @@ struct ngx_http_lua_pipe_s {
     ngx_http_lua_pipe_ctx_t            *stdout_ctx;
     ngx_http_lua_pipe_ctx_t            *stderr_ctx;
     ngx_http_lua_pipe_retval_handler    retval_handler;
+    ngx_http_cleanup_pt                *cleanup;
+    ngx_http_request_t                 *r;
     size_t                              buffer_size;
     unsigned                            closed:1;
     unsigned                            dead:1;
@@ -80,8 +82,7 @@ typedef struct {
 } ngx_http_lua_pipe_signal_t;
 
 
-#if !(NGX_WIN32) && !defined(NGX_LUA_NO_FFI_API)                             \
-    && defined(HAVE_SOCKET_CLOEXEC_PATCH)
+#if !(NGX_WIN32) && defined(HAVE_SOCKET_CLOEXEC_PATCH)
 #define HAVE_NGX_LUA_PIPE   1
 
 

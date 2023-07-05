@@ -19,6 +19,10 @@
 #include "ngx_http_lua_util.h"
 
 
+static u_char *ngx_http_lua_gen_file_cache_key_helper(u_char *out,
+    const u_char *src, size_t src_len);
+
+
 /**
  * Find code chunk associated with the given key in code cache,
  * and push it to the top of Lua stack if found.
@@ -33,7 +37,7 @@
  * */
 static ngx_int_t
 ngx_http_lua_cache_load_code(ngx_log_t *log, lua_State *L,
-    const char *key)
+    int *ref, const char *key)
 {
 #ifndef OPENRESTY_LUAJIT
     int          rc;
@@ -45,16 +49,45 @@ ngx_http_lua_cache_load_code(ngx_log_t *log, lua_State *L,
                           code_cache_key));
     lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
 
-    dd("Code cache table to load: %p", lua_topointer(L, -1));
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                   "code cache lookup (key='%s', ref=%d)", key, *ref);
+
+    dd("code cache table to load: %p", lua_topointer(L, -1));
 
     if (!lua_istable(L, -1)) {
         dd("Error: code cache table to load did not exist!!");
         return NGX_ERROR;
     }
 
-    lua_getfield(L, -1, key);    /*  sp++ */
+    ngx_http_lua_assert(key != NULL);
+
+    if (*ref == LUA_NOREF) {
+        lua_getfield(L, -1, key); /* cache closure */
+
+    } else {
+        if (*ref == LUA_REFNIL) {
+            lua_getfield(L, -1, key); /* cache ref */
+
+            if (!lua_isnumber(L, -1)) {
+                goto not_found;
+            }
+
+            *ref = lua_tonumber(L, -1);
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                           "code cache setting ref (key='%s', ref=%d)",
+                           key, *ref);
+
+            lua_pop(L, 1); /* cache */
+        }
+
+        lua_rawgeti(L, -1, *ref); /* cache closure */
+    }
 
     if (lua_isfunction(L, -1)) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                       "code cache hit (key='%s', ref=%d)", key, *ref);
+
 #ifdef OPENRESTY_LUAJIT
         lua_remove(L, -2);   /*  sp-- */
         return NGX_OK;
@@ -83,12 +116,17 @@ ngx_http_lua_cache_load_code(ngx_log_t *log, lua_State *L,
 #endif /* OPENRESTY_LUAJIT */
     }
 
+not_found:
+
     dd("Value associated with given key in code cache table is not code "
        "chunk: stack top=%d, top value type=%s\n",
-       lua_gettop(L), lua_typename(L, -1));
+       lua_gettop(L), luaL_typename(L, -1));
 
     /*  remove cache table and value from stack */
     lua_pop(L, 2);                                /*  sp-=2 */
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                   "code cache miss (key='%s', ref=%d)", key, *ref);
 
     return NGX_DECLINED;
 }
@@ -108,7 +146,7 @@ ngx_http_lua_cache_load_code(ngx_log_t *log, lua_State *L,
  *
  * */
 static ngx_int_t
-ngx_http_lua_cache_store_code(lua_State *L, const char *key)
+ngx_http_lua_cache_store_code(lua_State *L, int *ref, const char *key)
 {
 #ifndef OPENRESTY_LUAJIT
     int rc;
@@ -126,8 +164,22 @@ ngx_http_lua_cache_store_code(lua_State *L, const char *key)
         return NGX_ERROR;
     }
 
+    ngx_http_lua_assert(key != NULL);
+
     lua_pushvalue(L, -2); /* closure cache closure */
-    lua_setfield(L, -2, key); /* closure cache */
+
+    if (*ref == LUA_NOREF) {
+        /*  cache closure by cache key */
+        lua_setfield(L, -2, key); /* closure cache */
+
+    } else {
+        /*  cache closure with reference */
+        *ref = luaL_ref(L, -2); /* closure cache */
+
+        /*  cache reference by cache key */
+        lua_pushnumber(L, *ref); /* closure cache ref */
+        lua_setfield(L, -2, key); /* closure cache */
+    }
 
     /*  remove cache table, leave closure factory at top of stack */
     lua_pop(L, 1); /* closure */
@@ -147,7 +199,7 @@ ngx_http_lua_cache_store_code(lua_State *L, const char *key)
 
 ngx_int_t
 ngx_http_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
-    const u_char *src, size_t src_len, const u_char *cache_key,
+    const u_char *src, size_t src_len, int *cache_ref, const u_char *cache_key,
     const char *name)
 {
     int          n;
@@ -156,14 +208,8 @@ ngx_http_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
 
     n = lua_gettop(L);
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "looking up Lua code cache with key '%s'", cache_key);
-
-    rc = ngx_http_lua_cache_load_code(log, L, (char *) cache_key);
+    rc = ngx_http_lua_cache_load_code(log, L, cache_ref, (char *) cache_key);
     if (rc == NGX_OK) {
-        /*  code chunk loaded from cache, sp++ */
-        dd("Code cache hit! cache key='%s', stack top=%d, script='%.*s'",
-           cache_key, lua_gettop(L), (int) src_len, src);
         return NGX_OK;
     }
 
@@ -172,9 +218,6 @@ ngx_http_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
     }
 
     /* rc == NGX_DECLINED */
-
-    dd("Code cache missed! cache key='%s', stack top=%d, script='%.*s'",
-       cache_key, lua_gettop(L), (int) src_len, src);
 
     /* load closure factory of inline script to the top of lua stack, sp++ */
     rc = ngx_http_lua_clfactory_loadbuffer(L, (char *) src, src_len, name);
@@ -198,7 +241,7 @@ ngx_http_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
 
     /*  store closure factory and gen new closure at the top of lua stack to
      *  code cache */
-    rc = ngx_http_lua_cache_store_code(L, (char *) cache_key);
+    rc = ngx_http_lua_cache_store_code(L, cache_ref, (char *) cache_key);
     if (rc != NGX_OK) {
         err = "fail to generate new closure from the closure factory";
         goto error;
@@ -217,11 +260,10 @@ error:
 
 ngx_int_t
 ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
-    const u_char *script, const u_char *cache_key)
+    const u_char *script, int *cache_ref, const u_char *cache_key)
 {
     int              n;
     ngx_int_t        rc, errcode = NGX_ERROR;
-    u_char          *p;
     u_char           buf[NGX_HTTP_LUA_FILE_KEY_LEN + 1];
     const char      *err = NULL;
 
@@ -230,25 +272,19 @@ ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
     /*  calculate digest of script file path */
     if (cache_key == NULL) {
         dd("CACHE file key not pre-calculated...calculating");
-        p = ngx_copy(buf, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
 
-        p = ngx_http_lua_digest_hex(p, script, ngx_strlen(script));
-
-        *p = '\0';
-        cache_key = buf;
+        cache_key = ngx_http_lua_gen_file_cache_key_helper(buf, script,
+                                                           ngx_strlen(script));
+        *cache_ref = LUA_NOREF;
 
     } else {
         dd("CACHE file key already pre-calculated");
+
+        ngx_http_lua_assert(cache_ref != NULL && *cache_ref != LUA_NOREF);
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "looking up Lua code cache with key '%s'", cache_key);
-
-    rc = ngx_http_lua_cache_load_code(log, L, (char *) cache_key);
+    rc = ngx_http_lua_cache_load_code(log, L, cache_ref, (char *) cache_key);
     if (rc == NGX_OK) {
-        /*  code chunk loaded from cache, sp++ */
-        dd("Code cache hit! cache key='%s', stack top=%d, file path='%s'",
-           cache_key, lua_gettop(L), script);
         return NGX_OK;
     }
 
@@ -257,9 +293,6 @@ ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
     }
 
     /* rc == NGX_DECLINED */
-
-    dd("Code cache missed! cache key='%s', stack top=%d, file path='%s'",
-       cache_key, lua_gettop(L), script);
 
     /*  load closure factory of script file to the top of lua stack, sp++ */
     rc = ngx_http_lua_clfactory_loadfile(L, (char *) script);
@@ -274,7 +307,13 @@ ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
             break;
 
         case LUA_ERRFILE:
-            errcode = NGX_HTTP_NOT_FOUND;
+            if (errno == ENOENT) {
+                errcode = NGX_HTTP_NOT_FOUND;
+
+            } else {
+                errcode = NGX_HTTP_SERVICE_UNAVAILABLE;
+            }
+
             /* fall through */
 
         default:
@@ -291,7 +330,7 @@ ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
 
     /*  store closure factory and gen new closure at the top of lua stack
      *  to code cache */
-    rc = ngx_http_lua_cache_store_code(L, (char *) cache_key);
+    rc = ngx_http_lua_cache_store_code(L, cache_ref, (char *) cache_key);
     if (rc != NGX_OK) {
         err = "fail to generate new closure from the closure factory";
         goto error;
@@ -307,5 +346,65 @@ error:
     lua_settop(L, n);
     return errcode;
 }
+
+
+u_char *
+ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+    const u_char *src, size_t src_len)
+{
+    u_char      *p, *out;
+    size_t       tag_len;
+
+    tag_len = ngx_strlen(tag);
+
+    out = ngx_palloc(cf->pool, tag_len + NGX_HTTP_LUA_INLINE_KEY_LEN + 2);
+    if (out == NULL) {
+        return NULL;
+    }
+
+    p = ngx_copy(out, tag, tag_len);
+    p = ngx_copy(p, "_", 1);
+    p = ngx_copy(p, NGX_HTTP_LUA_INLINE_TAG, NGX_HTTP_LUA_INLINE_TAG_LEN);
+    p = ngx_http_lua_digest_hex(p, src, src_len);
+    *p = '\0';
+
+    return out;
+}
+
+
+static u_char *
+ngx_http_lua_gen_file_cache_key_helper(u_char *out, const u_char *src,
+    size_t src_len)
+{
+    u_char      *p;
+
+    ngx_http_lua_assert(out != NULL);
+
+    if (out == NULL) {
+        return NULL;
+    }
+
+    p = ngx_copy(out, NGX_HTTP_LUA_FILE_TAG, NGX_HTTP_LUA_FILE_TAG_LEN);
+    p = ngx_http_lua_digest_hex(p, src, src_len);
+    *p = '\0';
+
+    return out;
+}
+
+
+u_char *
+ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+    size_t src_len)
+{
+    u_char      *out;
+
+    out = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+    if (out == NULL) {
+        return NULL;
+    }
+
+    return ngx_http_lua_gen_file_cache_key_helper(out, src, src_len);
+}
+
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

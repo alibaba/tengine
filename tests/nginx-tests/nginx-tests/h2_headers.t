@@ -23,7 +23,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/)->plan(107)
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/)->plan(103)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -122,7 +122,11 @@ http {
 EOF
 
 $t->run_daemon(\&http_daemon);
-$t->run()->waitforsocket('127.0.0.1:' . port(8083));
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
+$t->run();
+open STDERR, ">&", \*OLDERR;
+$t->waitforsocket('127.0.0.1:' . port(8083));
 
 # file size is slightly beyond initial window size: 2**16 + 80 bytes
 
@@ -943,7 +947,7 @@ $sid = $s->new_stream({ headers => [
 	{ name => ':path', value => '/proxy2/', mode => 1 },
 	{ name => ':authority', value => 'localhost', mode => 1 },
 	{ name => 'x-foo', value => "x-bar\r\nreferer:see-this", mode => 2 }]});
-$frames = $s->read(all => [{ type => 'RST_STREAM' }]);
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 # 10.3.  Intermediary Encapsulation Attacks
 #   An intermediary therefore cannot translate an HTTP/2 request or response
@@ -952,15 +956,12 @@ $frames = $s->read(all => [{ type => 'RST_STREAM' }]);
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 isnt($frame->{headers}->{'x-referer'}, 'see-this', 'newline in request header');
 
-# 8.1.2.6.  Malformed Requests and Responses
-#   Malformed requests or responses that are detected MUST be treated
-#   as a stream error (Section 5.4.2) of type PROTOCOL_ERROR.
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.23.4');
 
-($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
-is($frame->{sid}, $sid, 'newline in request header - RST_STREAM sid');
-is($frame->{length}, 4, 'newline in request header - RST_STREAM length');
-is($frame->{flags}, 0, 'newline in request header - RST_STREAM flags');
-is($frame->{code}, 1, 'newline in request header - RST_STREAM code');
+is($frame->{headers}->{':status'}, 400, 'newline in request header - bad request');
+
+}
 
 # invalid header name as seen with underscore should not lead to ignoring rest
 
@@ -977,7 +978,9 @@ $frames = $s->read(all => [{ type => 'HEADERS' }]);
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{'x-referer'}, 'see-this', 'after invalid header name');
 
-# other invalid header name characters as seen with ':' result in RST_STREAM
+# other invalid header name characters as seen with ':'
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.23.4');
 
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
@@ -987,14 +990,11 @@ $sid = $s->new_stream({ headers => [
 	{ name => ':authority', value => 'localhost', mode => 1 },
 	{ name => 'x:foo', value => "x-bar", mode => 2 },
 	{ name => 'referer', value => "see-this", mode => 1 }]});
-$frames = $s->read(all => [{ type => 'RST_STREAM' }]);
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
-($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
-is($frame->{sid}, $sid, 'colon in header name - RST_STREAM sid');
-is($frame->{code}, 1, 'colon in header name - RST_STREAM code');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400, 'colon in header name');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
 
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
@@ -1003,10 +1003,10 @@ $sid = $s->new_stream({ headers => [
 	{ name => ':path', value => '/', mode => 0 },
 	{ name => ':authority', value => 'localhost', mode => 1 },
 	{ name => 'x foo', value => "bar", mode => 2 }]});
-$frames = $s->read(all => [{ type => 'RST_STREAM' }]);
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
-($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
-ok($frame, 'space in header name - RST_STREAM sid');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400, 'space in header name');
 
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
@@ -1015,10 +1015,10 @@ $sid = $s->new_stream({ headers => [
 	{ name => ':path', value => '/', mode => 0 },
 	{ name => ':authority', value => 'localhost', mode => 1 },
 	{ name => "foo\x02", value => "bar", mode => 2 }]});
-$frames = $s->read(all => [{ type => 'RST_STREAM' }]);
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
-($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;
-ok($frame, 'control in header name - RST_STREAM sid');
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400, 'control in header name');
 
 }
 

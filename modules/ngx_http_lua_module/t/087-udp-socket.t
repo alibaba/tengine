@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (3 * blocks() + 14);
+plan tests => repeat_each() * (3 * blocks() + 15);
 
 our $HtmlDir = html_dir;
 
@@ -69,7 +69,7 @@ GET /t
 [error]
 --- log_level: debug
 --- error_log
-lua udp socket receive buffer size: 8192
+lua udp socket receive buffer size: 65536
 
 
 
@@ -595,7 +595,7 @@ received a good response.
 [error]
 --- log_level: debug
 --- error_log
-lua udp socket receive buffer size: 8192
+lua udp socket receive buffer size: 65536
 --- no_check_leak
 
 
@@ -662,7 +662,7 @@ received a good response.
 [error]
 --- log_level: debug
 --- error_log
-lua udp socket receive buffer size: 8192
+lua udp socket receive buffer size: 65536
 --- no_check_leak
 
 
@@ -824,7 +824,7 @@ probe syscall.socket.return, syscall.connect.return {
 
 === TEST 15: bad request tries to setpeer
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -881,7 +881,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 16: bad request tries to send
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -938,7 +938,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 17: bad request tries to receive
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -995,64 +995,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 18: bad request tries to close
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
---- config
-    server_tokens off;
-    location = /main {
-        echo_location /t?reset=1;
-        echo_location /t;
-    }
-    location /t {
-        #set $port 5000;
-        set $port $TEST_NGINX_MEMCACHED_PORT;
-
-        content_by_lua '
-            local test = require "test"
-            if ngx.var.arg_reset then
-                local sock = test.new_sock()
-                local ok, err = sock:setpeername("127.0.0.1", ngx.var.port)
-                if not ok then
-                    ngx.say("failed to set peer: ", err)
-                else
-                    ngx.say("peer set")
-                end
-                return
-            end
-            local sock = test.get_sock()
-            sock:send("a")
-        ';
-    }
---- user_files
->>> test.lua
-module("test", package.seeall)
-
-local sock
-
-function new_sock()
-    sock = ngx.socket.udp()
-    return sock
-end
-
-function get_sock()
-    return sock
-end
---- request
-GET /main
---- response_body_like eval
-qr/^peer set
-<html.*?500 Internal Server Error/ms
-
---- error_log eval
-qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
-
---- no_error_log
-[alert]
-
-
-
-=== TEST 19: bad request tries to receive
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -1107,7 +1050,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 
 
-=== TEST 20: the upper bound of port range should be 2^16 - 1
+=== TEST 19: the upper bound of port range should be 2^16 - 1
 --- config
     location /t {
         content_by_lua_block {
@@ -1127,7 +1070,7 @@ failed to connect: bad port number: 65536
 
 
 
-=== TEST 21: send boolean and nil
+=== TEST 20: send boolean and nil
 --- config
     server_tokens off;
     location /t {
@@ -1173,4 +1116,106 @@ qr/send: fd:\d+ \d+ of \d+/
 qr/send: fd:\d+ 4 of 4
 send: fd:\d+ 5 of 5
 send: fd:\d+ 3 of 3/
+--- log_level: debug
+
+
+
+=== TEST 21: send numbers
+Note: maximum number of digits after the decimal-point character is 13
+--- config
+    server_tokens off;
+    location /t {
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+
+        content_by_lua_block {
+            local socket = ngx.socket
+            local udp = socket.udp()
+            local port = ngx.var.port
+            udp:settimeout(1000) -- 1 sec
+
+            local ok, err = udp:setpeername("127.0.0.1", ngx.var.port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local function send(data)
+                local bytes, err = udp:send(data)
+                if not bytes then
+                    ngx.say("failed to send: ", err)
+                    return
+                end
+                ngx.say("sent ok")
+            end
+
+            send(123456)
+            send(3.141926)
+            send(3.141592653579397238)
+        }
+    }
+--- request
+GET /t
+--- response_body
+sent ok
+sent ok
+sent ok
+--- no_error_log
+[error]
+--- grep_error_log eval
+qr/send: fd:\d+ \d+ of \d+/
+--- grep_error_log_out eval
+qr/send: fd:\d+ 6 of 6
+send: fd:\d+ 8 of 8
+send: fd:\d+ 15 of 15/
+--- log_level: debug
+
+
+
+=== TEST 22: send tables of string fragments (with numbers too)
+the maximum number of significant digits is 14 in lua
+--- config
+    server_tokens off;
+    location /t {
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+
+        content_by_lua_block {
+            local socket = ngx.socket
+            local udp = socket.udp()
+            local port = ngx.var.port
+            udp:settimeout(1000) -- 1 sec
+
+            local ok, err = udp:setpeername("127.0.0.1", ngx.var.port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local function send(data)
+                local bytes, err = udp:send(data)
+                if not bytes then
+                    ngx.say("failed to send: ", err)
+                    return
+                end
+                ngx.say("sent ok")
+            end
+
+            send({"integer: ", 1234567890123})
+            send({"float: ", 3.1419265})
+            send({"float: ", 3.141592653579397238})
+        }
+    }
+--- request
+GET /t
+--- response_body
+sent ok
+sent ok
+sent ok
+--- no_error_log
+[error]
+--- grep_error_log eval
+qr/send: fd:\d+ \d+ of \d+/
+--- grep_error_log_out eval
+qr/send: fd:\d+ 22 of 22
+send: fd:\d+ 16 of 16
+send: fd:\d+ 22 of 22/
 --- log_level: debug

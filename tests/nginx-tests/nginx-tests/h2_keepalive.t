@@ -25,7 +25,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2/)
+my $t = Test::Nginx->new()->has(qw/http http_v2/)->plan(19)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -73,7 +73,10 @@ EOF
 $t->write_file('index.html', 'SEE-THAT' x 50000);
 $t->write_file('t.html', 'SEE-THAT');
 
-$t->run()->plan(19);
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
+$t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

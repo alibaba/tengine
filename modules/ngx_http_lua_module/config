@@ -1,15 +1,11 @@
-ngx_feature="Lua library"
-ngx_feature_libs="-llua -lm"
-ngx_feature_name=
-ngx_feature_run=no
-ngx_feature_incs="#include <lauxlib.h>"
-ngx_feature_path=
-ngx_feature_test="#if LUA_VERSION_NUM != 501
-#   error unsupported Lua language version
-#endif
-(void) luaL_newstate();"
 ngx_lua_opt_I=
 ngx_lua_opt_L=
+luajit_ld_opt=
+
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_test=
 
 if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
     # explicitly set LuaJIT paths
@@ -20,7 +16,7 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
         ngx_lua_opt_I="-I$LUAJIT_INC"
         ngx_lua_opt_L="-L$LUAJIT_LIB"
 
-        # ensure that our -I$LUAJIT_INC and -L$LUAJIT_LIB is at the first.
+        # ensure that -I$LUAJIT_INC and -L$LUAJIT_LIB come first
         SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
         CC_TEST_FLAGS="$ngx_lua_opt_I $CC_TEST_FLAGS"
         SAVED_NGX_TEST_LD_OPT="$NGX_TEST_LD_OPT"
@@ -35,23 +31,23 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
         CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
         NGX_TEST_LD_OPT="$SAVED_NGX_TEST_LD_OPT"
     else
-
         # attempt to link with -ldl, static linking on Linux requires it.
         ngx_feature="LuaJIT library in $LUAJIT_LIB and $LUAJIT_INC (specified by the LUAJIT_LIB and LUAJIT_INC env, with -ldl)"
         ngx_feature_path="$LUAJIT_INC"
         ngx_lua_opt_I="-I$LUAJIT_INC"
         ngx_lua_opt_L="-L$LUAJIT_LIB"
+        luajit_ld_opt="-lm -ldl"
 
-        # ensure that our -I$LUAJIT_INC and -L$LUAJIT_LIB is at the first.
+        # ensure that -I$LUAJIT_INC and -L$LUAJIT_LIB come first
         SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
         CC_TEST_FLAGS="$ngx_lua_opt_I $CC_TEST_FLAGS"
         SAVED_NGX_TEST_LD_OPT="$NGX_TEST_LD_OPT"
         NGX_TEST_LD_OPT="$ngx_lua_opt_L $NGX_TEST_LD_OPT"
 
         if [ $NGX_RPATH = YES ]; then
-            ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 -lm -ldl"
+            ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 $luajit_ld_opt"
         else
-            ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 -lm -ldl"
+            ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 $luajit_ld_opt"
         fi
 
         . auto/feature
@@ -66,17 +62,18 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
             ngx_feature_path="$LUAJIT_INC"
             ngx_lua_opt_I="-I$LUAJIT_INC"
             ngx_lua_opt_L="-L$LUAJIT_LIB"
+            luajit_ld_opt="-lm"
 
-            # ensure that our -I$LUAJIT_INC and -L$LUAJIT_LIB is at the first.
+            # ensure that -I$LUAJIT_INC and -L$LUAJIT_LIB come first
             SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
             CC_TEST_FLAGS="$ngx_lua_opt_I $CC_TEST_FLAGS"
             SAVED_NGX_TEST_LD_OPT="$NGX_TEST_LD_OPT"
             NGX_TEST_LD_OPT="$ngx_lua_opt_L $NGX_TEST_LD_OPT"
 
             if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 -lm"
+                ngx_feature_libs="-R$LUAJIT_LIB $ngx_lua_opt_L -lluajit-5.1 $luajit_ld_opt"
             else
-                ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 -lm"
+                ngx_feature_libs="$ngx_lua_opt_L -lluajit-5.1 $luajit_ld_opt"
             fi
 
             . auto/feature
@@ -89,7 +86,7 @@ if [ -n "$LUAJIT_INC" -o -n "$LUAJIT_LIB" ]; then
 
     if [ $ngx_found = no ]; then
         cat << END
-        $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUAJIT_LIB is defined as $LUAJIT_LIB and LUAJIT_INC (path for lua.h) $LUAJIT_INC, but we cannot find LuaJIT there.
+        $0: error: ngx_http_lua_module requires the LuaJIT library, but it could not be found where specified (LUAJIT_LIB=$LUAJIT_LIB, LUAJIT_INC=$LUAJIT_INC).
 END
         exit 1
     fi
@@ -98,7 +95,8 @@ END
         Darwin:*)
             case "$NGX_MACHINE" in
                 amd64 | x86_64 | i386)
-                    echo "adding extra linking options needed by LuaJIT"
+                    echo "adding extra linking options needed by LuaJIT on $NGX_MACHINE"
+                    luajit_ld_opt="$luajit_ld_opt -pagezero_size 10000 -image_base 100000000"
                     ngx_feature_libs="$ngx_feature_libs -pagezero_size 10000 -image_base 100000000"
                 ;;
 
@@ -111,176 +109,47 @@ END
         ;;
     esac
 else
-    if [ -n "$LUA_INC" -o -n "$LUA_LIB" ]; then
-        # explicitly set Lua paths
-        ngx_feature="Lua library in $LUA_LIB and $LUA_INC (specified by the LUA_LIB and LUA_INC env)"
-        ngx_feature_path="$LUA_INC"
-        ngx_lua_opt_I="-I$LUA_INC"
-        ngx_lua_opt_L="-L$LUA_LIB"
-
-        # ensure that our -I$LUA_INC and -L$LUA_LIB is at the first.
-        SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
-        CC_TEST_FLAGS="$ngx_lua_opt_I $CC_TEST_FLAGS"
-        SAVED_NGX_TEST_LD_OPT="$NGX_TEST_LD_OPT"
-        NGX_TEST_LD_OPT="$ngx_lua_opt_L $NGX_TEST_LD_OPT"
-
+    # auto-discovery
+    if [ $ngx_found = no ]; then
+        # FreeBSD with luajit-2.0 from ports collection
+        ngx_feature="LuaJIT library in /usr/local/"
+        ngx_feature_path="/usr/local/include/luajit-2.0"
+        luajit_ld_opt="-lm"
+        LUAJIT_LIB="/usr/local/lib"
         if [ $NGX_RPATH = YES ]; then
-            ngx_feature_libs="-R$LUA_LIB $ngx_lua_opt_L -llua -lm -ldl"
+            ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -lluajit-5.1 -lm"
         else
-            ngx_feature_libs="$ngx_lua_opt_L -llua -lm -ldl"
+            ngx_feature_libs="-L/usr/local/lib -lluajit-5.1 -lm"
         fi
-
         . auto/feature
+    fi
 
-        # clean up
-        CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
-        NGX_TEST_LD_OPT="$SAVED_NGX_TEST_LD_OPT"
-
-        if [ $ngx_found = no ]; then
-            # retry without -ldl
-
-            ngx_feature_path="$LUA_INC"
-            ngx_lua_opt_I="-I$LUA_INC"
-            ngx_lua_opt_L="-L$LUA_LIB"
-
-            # ensure that our -I$LUA_INC and -L$LUA_LIB is at the first.
-            SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
-            CC_TEST_FLAGS="$ngx_lua_opt_I $CC_TEST_FLAGS"
-            SAVED_NGX_TEST_LD_OPT="$NGX_TEST_LD_OPT"
-            NGX_TEST_LD_OPT="$ngx_lua_opt_L $NGX_TEST_LD_OPT"
-
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R$LUA_LIB $ngx_lua_opt_L -llua -lm"
-            else
-                ngx_feature_libs="$ngx_lua_opt_L -llua -lm"
-            fi
-
-            . auto/feature
-
-            # clean up
-            CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
-            NGX_TEST_LD_OPT="$SAVED_NGX_TEST_LD_OPT"
+    if [ $ngx_found = no ]; then
+        # Gentoo with LuaJIT-2.0, try with -ldl
+        ngx_feature="LuaJIT library in /usr/"
+        ngx_feature_path="/usr/include/luajit-2.0"
+        luajit_ld_opt="-lm -ldl"
+        LUAJIT_LIB="/usr/lib"
+        if [ $NGX_RPATH = YES ]; then
+            ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1 -ldl"
+        else
+            ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1 -ldl"
         fi
-
-        if [ $ngx_found = no ]; then
-            cat << END
-            $0: error: ngx_http_lua_module requires the Lua or LuaJIT library and LUA_LIB is defined as $LUA_LIB and LUA_INC (path for lua.h) is $LUA_INC, but we cannot find standard Lua there.
-END
-            exit 1
-        fi
-    else
-        # auto-discovery
-        ngx_feature="Lua library"
-        ngx_feature_libs="-llua -lm"
         . auto/feature
+    fi
 
-        if [ $ngx_found = no ]; then
-            # OpenBSD-5.2
-            ngx_feature="Lua library in /usr/local/"
-            ngx_feature_path="/usr/local/include/lua-5.1"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -llua -lm"
-            else
-                ngx_feature_libs="-L/usr/local/lib -llua5.1 -lm"
-            fi
-            . auto/feature
+    if [ $ngx_found = no ]; then
+        # Gentoo with LuaJIT 2.0
+        ngx_feature="LuaJIT library in /usr/"
+        ngx_feature_path="/usr/include/luajit-2.0"
+        luajit_ld_opt="-lm"
+        LUAJIT_LIB="/usr/lib"
+        if [ $NGX_RPATH = YES ]; then
+            ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1"
+        else
+            ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1"
         fi
-
-        if [ $ngx_found = no ]; then
-            # OpenBSD < 5.2
-            ngx_feature="Lua library in /usr/local/"
-            ngx_feature_path="/usr/local/include"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -llua -lm"
-            else
-                ngx_feature_libs="-L/usr/local/lib -llua -lm"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # NetBSD
-            ngx_feature="Lua library in /usr/pkg/"
-            ngx_feature_path="/usr/pkg/include/"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/pkg/lib -L/usr/pkg/lib -lm -llua"
-            else
-                ngx_feature_libs="-L/usr/pkg/lib -lm -llua"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # MacPorts
-            ngx_feature="Lua library in /opt/local/"
-            ngx_feature_path="/opt/local/include"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/opt/local/lib -L/opt/local/lib -lm -llua"
-            else
-                ngx_feature_libs="-L/opt/local/lib -lm -llua"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # FreeBSD
-            ngx_feature="Lua library in /usr/local/*/lua51/"
-            ngx_feature_path="/usr/local/include/lua51"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/local/lib/lua51 -L/usr/local/lib/lua51 -llua -lm"
-            else
-                ngx_feature_libs="-L/usr/local/lib/lua51 -llua -lm"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # Debian
-            ngx_feature="Lua library in /usr/"
-            ngx_feature_path="/usr/include/lua5.1"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -llua5.1"
-            else
-                ngx_feature_libs="-L/usr/lib -lm -llua5.1"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # FreeBSD with luajit-2.0 from ports collection
-            ngx_feature="LuaJIT library in /usr/local/"
-            ngx_feature_path="/usr/local/include/luajit-2.0"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/local/lib -L/usr/local/lib -lluajit-5.1 -lm"
-            else
-                ngx_feature_libs="-L/usr/local/lib -lluajit-5.1 -lm"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # Gentoo with LuaJIT-2.0, try with -ldl
-            ngx_feature="LuaJIT library in /usr/"
-            ngx_feature_path="/usr/include/luajit-2.0"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1 -ldl"
-            else
-                ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1 -ldl"
-            fi
-            . auto/feature
-        fi
-
-        if [ $ngx_found = no ]; then
-            # Gentoo with LuaJIT 2.0
-            ngx_feature="LuaJIT library in /usr/"
-            ngx_feature_path="/usr/include/luajit-2.0"
-            if [ $NGX_RPATH = YES ]; then
-                ngx_feature_libs="-R/usr/lib -L/usr/lib -lm -lluajit-5.1"
-            else
-                ngx_feature_libs="-L/usr/lib -lm -lluajit-5.1"
-            fi
-            . auto/feature
-        fi
+        . auto/feature
     fi
 fi
 
@@ -289,18 +158,81 @@ ngx_module_libs=
 
 if [ $ngx_found = yes ]; then
     # this is a hack to persuade nginx's build system to favor
-    # the paths set by our user environments:
+    # the paths set by our user environment
     CFLAGS="$ngx_lua_opt_I $CFLAGS"
     NGX_LD_OPT="$ngx_lua_opt_L $NGX_LD_OPT"
 
     ngx_module_incs="$ngx_module_incs $ngx_feature_path"
     ngx_module_libs="$ngx_module_libs $ngx_feature_libs"
 else
- cat << END
- $0: error: ngx_http_lua_module requires the Lua library.
+    cat << END
+    $0: error: ngx_http_lua_module requires the LuaJIT library.
 END
- exit 1
+    exit 1
 fi
+
+# ----------------------------------------
+
+ngx_feature="LuaJIT 2.x"
+ngx_feature_run=no
+ngx_feature_incs="#include <luajit.h>"
+ngx_feature_test="#if !defined(LUAJIT_VERSION_NUM) || LUAJIT_VERSION_NUM < 20000
+                  #    error unsupported LuaJIT version
+                  #endif
+                  "
+
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    cat << END
+    $0: error: unsupported LuaJIT version; ngx_http_lua_module requires LuaJIT 2.x.
+END
+    exit 1
+fi
+
+# ----------------------------------------
+
+ngx_feature="Lua language 5.1"
+ngx_feature_run=no
+ngx_feature_incs="#include <lua.h>"
+ngx_feature_test="#if !defined(LUA_VERSION_NUM) || LUA_VERSION_NUM != 501
+                  #   error unsupported Lua language version
+                  #endif
+                  "
+
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    cat << END
+    $0: error: unsupported Lua language version; ngx_http_lua_module requires Lua 5.1.
+END
+    exit 1
+fi
+
+# ----------------------------------------
+
+ngx_feature="LuaJIT has FFI"
+ngx_feature_libs="$ngx_module_libs"
+ngx_feature_run=no
+ngx_feature_incs="#include <lualib.h>
+                  #include <lauxlib.h>
+                  #include <assert.h>
+                  "
+ngx_feature_test="lua_State *L = luaL_newstate();
+                  assert(L != NULL);
+                  luaopen_ffi(L);
+                  "
+
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    cat << END
+    $0: error: unsupported LuaJIT build; ngx_http_lua_module requires LuaJIT with FFI enabled.
+END
+    exit 1
+fi
+
+# ----------------------------------------
 
 ngx_addon_name=ngx_http_lua_module
 HTTP_LUA_SRCS=" \
@@ -329,6 +261,7 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_util.c \
             $ngx_addon_dir/src/ngx_http_lua_cache.c \
             $ngx_addon_dir/src/ngx_http_lua_contentby.c \
+            $ngx_addon_dir/src/ngx_http_lua_server_rewriteby.c \
             $ngx_addon_dir/src/ngx_http_lua_rewriteby.c \
             $ngx_addon_dir/src/ngx_http_lua_accessby.c \
             $ngx_addon_dir/src/ngx_http_lua_setby.c \
@@ -346,6 +279,7 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_bodyfilterby.c \
             $ngx_addon_dir/src/ngx_http_lua_initby.c \
             $ngx_addon_dir/src/ngx_http_lua_initworkerby.c \
+            $ngx_addon_dir/src/ngx_http_lua_exitworkerby.c \
             $ngx_addon_dir/src/ngx_http_lua_socket_udp.c \
             $ngx_addon_dir/src/ngx_http_lua_req_method.c \
             $ngx_addon_dir/src/ngx_http_lua_phase.c \
@@ -353,6 +287,7 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_timer.c \
             $ngx_addon_dir/src/ngx_http_lua_config.c \
             $ngx_addon_dir/src/ngx_http_lua_worker.c \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_client_helloby.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_certby.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_ocsp.c \
             $ngx_addon_dir/src/ngx_http_lua_lex.c \
@@ -363,26 +298,25 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.c \
             $ngx_addon_dir/src/ngx_http_lua_input_filters.c \
             $ngx_addon_dir/src/ngx_http_lua_pipe.c \
+            $ngx_addon_dir/src/ngx_http_lua_worker_thread.c \
             "
 
 HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ddebug.h \
+            $ngx_addon_dir/src/ngx_http_lua_autoconf.h \
             $ngx_addon_dir/src/ngx_http_lua_script.h \
             $ngx_addon_dir/src/ngx_http_lua_log.h \
             $ngx_addon_dir/src/ngx_http_lua_subrequest.h \
             $ngx_addon_dir/src/ngx_http_lua_ndk.h \
             $ngx_addon_dir/src/ngx_http_lua_control.h \
-            $ngx_addon_dir/src/ngx_http_lua_time.h \
             $ngx_addon_dir/src/ngx_http_lua_string.h \
             $ngx_addon_dir/src/ngx_http_lua_misc.h \
-            $ngx_addon_dir/src/ngx_http_lua_variable.h \
             $ngx_addon_dir/src/ngx_http_lua_output.h \
             $ngx_addon_dir/src/ngx_http_lua_headers.h \
             $ngx_addon_dir/src/ngx_http_lua_uri.h \
             $ngx_addon_dir/src/ngx_http_lua_req_body.h \
             $ngx_addon_dir/src/ngx_http_lua_args.h \
             $ngx_addon_dir/src/ngx_http_lua_ctx.h \
-            $ngx_addon_dir/src/ngx_http_lua_regex.h \
             $ngx_addon_dir/src/ngx_http_lua_common.h \
             $ngx_addon_dir/src/ngx_http_lua_directive.h \
             $ngx_addon_dir/src/ngx_http_lua_headers_out.h \
@@ -392,6 +326,7 @@ HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ngx_http_lua_util.h \
             $ngx_addon_dir/src/ngx_http_lua_cache.h \
             $ngx_addon_dir/src/ngx_http_lua_contentby.h \
+            $ngx_addon_dir/src/ngx_http_lua_server_rewriteby.c \
             $ngx_addon_dir/src/ngx_http_lua_rewriteby.h \
             $ngx_addon_dir/src/ngx_http_lua_accessby.h \
             $ngx_addon_dir/src/ngx_http_lua_setby.h \
@@ -409,14 +344,13 @@ HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ngx_http_lua_bodyfilterby.h \
             $ngx_addon_dir/src/ngx_http_lua_initby.h \
             $ngx_addon_dir/src/ngx_http_lua_initworkerby.h \
+            $ngx_addon_dir/src/ngx_http_lua_exitworkerby.h \
             $ngx_addon_dir/src/ngx_http_lua_socket_udp.h \
-            $ngx_addon_dir/src/ngx_http_lua_req_method.h \
-            $ngx_addon_dir/src/ngx_http_lua_phase.h \
             $ngx_addon_dir/src/ngx_http_lua_probe.h \
             $ngx_addon_dir/src/ngx_http_lua_uthread.h \
             $ngx_addon_dir/src/ngx_http_lua_timer.h \
             $ngx_addon_dir/src/ngx_http_lua_config.h \
-            $ngx_addon_dir/src/ngx_http_lua_worker.h \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_client_helloby.h \
             $ngx_addon_dir/src/ngx_http_lua_ssl_certby.h \
             $ngx_addon_dir/src/ngx_http_lua_lex.h \
             $ngx_addon_dir/src/ngx_http_lua_balancer.h \
@@ -426,9 +360,10 @@ HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.h \
             $ngx_addon_dir/src/ngx_http_lua_input_filters.h \
             $ngx_addon_dir/src/ngx_http_lua_pipe.h \
+            $ngx_addon_dir/src/ngx_http_lua_worker_thread.h \
             "
 
-CFLAGS="$CFLAGS -DNDK_SET_VAR"
+# ----------------------------------------
 
 ngx_feature="export symbols by default (-E)"
 ngx_feature_libs="-Wl,-E"
@@ -443,6 +378,8 @@ ngx_feature_test='printf("hello");'
 if [ $ngx_found = yes ]; then
     CORE_LIBS="-Wl,-E $CORE_LIBS"
 fi
+
+# ----------------------------------------
 
 # for Cygwin
 ngx_feature="export symbols by default (--export-all-symbols)"
@@ -459,13 +396,7 @@ if [ $ngx_found = yes ]; then
     CORE_LIBS="-Wl,--export-all-symbols $CORE_LIBS"
 fi
 
-NGX_DTRACE_PROVIDERS="$NGX_DTRACE_PROVIDERS $ngx_addon_dir/dtrace/ngx_lua_provider.d"
-NGX_TAPSET_SRCS="$NGX_TAPSET_SRCS $ngx_addon_dir/tapset/ngx_lua.stp"
-
-USE_MD5=YES
-USE_SHA1=YES
-
-CORE_INCS="$CORE_INCS $ngx_addon_dir/src/api"
+# ----------------------------------------
 
 ngx_feature="SO_PASSCRED"
 ngx_feature_libs=
@@ -478,6 +409,8 @@ ngx_feature_test='setsockopt(1, SOL_SOCKET, SO_PASSCRED, NULL, 0);'
 
 . auto/feature
 
+# ----------------------------------------
+
 ngx_feature="SA_RESTART"
 ngx_feature_libs=
 ngx_feature_name="NGX_HTTP_LUA_HAVE_SA_RESTART"
@@ -488,26 +421,6 @@ ngx_feature_test='struct sigaction act;
                   act.sa_flags |= SA_RESTART;'
 
 . auto/feature
-
-ngx_feature="__attribute__(constructor)"
-ngx_feature_libs=
-ngx_feature_name="NGX_HTTP_LUA_HAVE_CONSTRUCTOR"
-ngx_feature_run=yes
-ngx_feature_incs="#include <stdlib.h>
-int a = 2;
-__attribute__((constructor))
-static void foo(void)
-{
-    a = 0;
-}
-"
-ngx_feature_test="exit(a);"
-SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
-CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
-
-. auto/feature
-
-CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
 
 # ----------------------------------------
 
@@ -557,7 +470,22 @@ CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
 
 # ----------------------------------------
 
-if test -n "$ngx_module_link"; then
+ngx_feature="execvpe"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_EXECVPE"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_test='char* argv[] = {"/bin/sh"};execvpe("/bin/sh", argv, NULL);'
+SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
+CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+
+. auto/feature
+
+CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
+
+# ----------------------------------------
+
+if [ -n "$ngx_module_link" ]; then
     ngx_module_type=HTTP_AUX_FILTER
     ngx_module_name=$ngx_addon_name
     ngx_module_deps="$HTTP_LUA_DEPS"
@@ -573,5 +501,16 @@ else
     CORE_LIBS="$CORE_LIBS $ngx_module_libs"
 fi
 
-#CFLAGS=$"$CFLAGS -DLUA_DEFAULT_PATH='\"/usr/local/openresty/lualib/?.lua\"'"
-#CFLAGS=$"$CFLAGS -DLUA_DEFAULT_CPATH='\"/usr/local/openresty/lualib/?.so\"'"
+# ----------------------------------------
+
+USE_MD5=YES
+USE_SHA1=YES
+
+NGX_DTRACE_PROVIDERS="$NGX_DTRACE_PROVIDERS $ngx_addon_dir/dtrace/ngx_lua_provider.d"
+NGX_TAPSET_SRCS="$NGX_TAPSET_SRCS $ngx_addon_dir/tapset/ngx_lua.stp"
+
+CORE_INCS="$CORE_INCS $ngx_addon_dir/src/api"
+
+CFLAGS="$CFLAGS -DNDK_SET_VAR"
+
+echo "/* DO NOT EDIT! This file was automatically generated by config */" > "$ngx_addon_dir/src/ngx_http_lua_autoconf.h"

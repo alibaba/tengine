@@ -25,6 +25,7 @@ use Test::Nginx::SMTP;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+local $SIG{PIPE} = 'IGNORE';
 my $t = Test::Nginx->new()->has(qw/mail mail_ssl imap pop3 smtp/)
 	->has_daemon('openssl')->plan(17);
 

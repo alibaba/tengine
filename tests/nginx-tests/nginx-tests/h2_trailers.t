@@ -60,7 +60,10 @@ EOF
 $t->write_file('index.html', 'SEE-THIS');
 $t->write_file('empty', '');
 $t->write_file('continuation', 'SEE-THIS');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

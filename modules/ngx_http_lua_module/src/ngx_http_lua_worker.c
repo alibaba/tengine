@@ -9,94 +9,53 @@
 #endif
 #include "ddebug.h"
 
-
-#include "ngx_http_lua_worker.h"
+#if !(NGX_WIN32)
+#include <ngx_channel.h>
+#endif
 
 
 #define NGX_PROCESS_PRIVILEGED_AGENT    99
 
 
-static int ngx_http_lua_ngx_worker_exiting(lua_State *L);
-static int ngx_http_lua_ngx_worker_pid(lua_State *L);
-static int ngx_http_lua_ngx_worker_id(lua_State *L);
-static int ngx_http_lua_ngx_worker_count(lua_State *L);
-
-
-void
-ngx_http_lua_inject_worker_api(lua_State *L)
-{
-    lua_createtable(L, 0 /* narr */, 4 /* nrec */);    /* ngx.worker. */
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_worker_exiting);
-    lua_setfield(L, -2, "exiting");
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_worker_pid);
-    lua_setfield(L, -2, "pid");
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_worker_id);
-    lua_setfield(L, -2, "id");
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_worker_count);
-    lua_setfield(L, -2, "count");
-
-    lua_setfield(L, -2, "worker");
-}
-
-
-static int
-ngx_http_lua_ngx_worker_exiting(lua_State *L)
-{
-    lua_pushboolean(L, ngx_exiting);
-    return 1;
-}
-
-
-static int
-ngx_http_lua_ngx_worker_pid(lua_State *L)
-{
-    lua_pushinteger(L, (lua_Integer) ngx_pid);
-    return 1;
-}
-
-
-static int
-ngx_http_lua_ngx_worker_id(lua_State *L)
-{
-#if (nginx_version >= 1009001)
-    if (ngx_process != NGX_PROCESS_WORKER
-        && ngx_process != NGX_PROCESS_SINGLE)
-    {
-        lua_pushnil(L);
-        return 1;
-    }
-
-    lua_pushinteger(L, (lua_Integer) ngx_worker);
-#else
-    lua_pushnil(L);
-#endif
-    return 1;
-}
-
-
-static int
-ngx_http_lua_ngx_worker_count(lua_State *L)
-{
-    ngx_core_conf_t   *ccf;
-
-    ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
-                                           ngx_core_module);
-
-    lua_pushinteger(L, (lua_Integer) ccf->worker_processes);
-    return 1;
-}
-
-
-#ifndef NGX_LUA_NO_FFI_API
 int
 ngx_http_lua_ffi_worker_pid(void)
 {
     return (int) ngx_pid;
 }
+
+
+#if !(NGX_WIN32)
+int
+ngx_http_lua_ffi_worker_pids(int *pids, size_t *pids_len)
+{
+    size_t    n;
+    ngx_int_t i;
+
+    n = 0;
+    for (i = 0; n < *pids_len && i < NGX_MAX_PROCESSES; i++) {
+        if (i != ngx_process_slot && ngx_processes[i].pid == 0) {
+            break;
+        }
+
+        /* The current process */
+        if (i == ngx_process_slot) {
+            pids[n++] = ngx_pid;
+        }
+
+        if (ngx_processes[i].channel[0] > 0 && ngx_processes[i].pid > 0) {
+            pids[n++] = ngx_processes[i].pid;
+        }
+    }
+
+    if (n == 0) {
+        return NGX_ERROR;
+    }
+
+    *pids_len = n;
+
+    return NGX_OK;
+}
+#endif
 
 
 int
@@ -175,9 +134,13 @@ ngx_http_lua_ffi_get_process_type(void)
     return ngx_process;
 }
 
-
+#if defined(nginx_version) && nginx_version >= 1019003
+int
+ngx_http_lua_ffi_enable_privileged_agent(char **err, unsigned int connections)
+#else
 int
 ngx_http_lua_ffi_enable_privileged_agent(char **err)
+#endif
 {
 #ifdef HAVE_PRIVILEGED_PROCESS_PATCH
     ngx_core_conf_t   *ccf;
@@ -186,6 +149,9 @@ ngx_http_lua_ffi_enable_privileged_agent(char **err)
                                            ngx_core_module);
 
     ccf->privileged_agent = 1;
+#if defined(nginx_version) && nginx_version >= 1019003
+    ccf->privileged_agent_connections = connections;
+#endif
 
     return NGX_OK;
 
@@ -201,4 +167,6 @@ ngx_http_lua_ffi_process_signal_graceful_exit(void)
 {
     ngx_quit = 1;
 }
-#endif
+
+
+/* vi:set ft=c ts=4 sw=4 et fdm=marker: */

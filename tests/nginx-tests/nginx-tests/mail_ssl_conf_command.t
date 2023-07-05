@@ -16,25 +16,19 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
+use Test::Nginx::IMAP;
 
 ###############################################################################
 
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval {
-	require Net::SSLeay;
-	Net::SSLeay::load_error_strings();
-	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::randomize();
-};
-plan(skip_all => 'Net::SSLeay not installed') if $@;
+local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()->has(qw/mail mail_ssl imap/)
+my $t = Test::Nginx->new()
+	->has(qw/mail mail_ssl imap openssl:1.0.2 socket_ssl_reused/)
 	->has_daemon('openssl');
 
-$t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
-plan(skip_all => 'OpenSSL too old') unless defined $1 and $1 ge '1.0.2';
 plan(skip_all => 'no ssl_conf_command') if $t->has_module('BoringSSL');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -50,7 +44,7 @@ mail {
     auth_http  http://127.0.0.1:8080;   # unused
 
     server {
-        listen       127.0.0.1:8443 ssl;
+        listen       127.0.0.1:8993 ssl;
         protocol     imap;
 
         ssl_protocols TLSv1.2;
@@ -93,32 +87,30 @@ $t->run()->plan(3);
 
 ###############################################################################
 
-my $ctx = Net::SSLeay::CTX_new() or die("Failed to create SSL_CTX $!");
+my $s;
 
-my ($s, $ssl) = get_ssl_socket();
-like(Net::SSLeay::dump_peer_certificate($ssl), qr/CN=override/, 'Certificate');
+$s = Test::Nginx::IMAP->new(
+	SSL => 1,
+	SSL_session_cache_size => 100
+);
+$s->read();
+like($s->socket()->dump_peer_certificate(), qr/CN=override/, 'Certificate');
 
-my $ses = Net::SSLeay::get_session($ssl);
-($s, $ssl) = get_ssl_socket(ses => $ses);
-ok(Net::SSLeay::session_reused($ssl), 'SessionTicket');
+$s = Test::Nginx::IMAP->new(
+	SSL => 1,
+	SSL_reuse_ctx => $s->socket()
+);
+ok($s->socket()->get_session_reused(), 'SessionTicket');
 
-($s, $ssl) = get_ssl_socket(ciphers =>
-	'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384');
-is(Net::SSLeay::get_cipher($ssl),
+$s = Test::Nginx::IMAP->new(
+	SSL => 1,
+	SSL_cipher_list =>
+		'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384'
+);
+is($s->socket()->get_cipher(),
 	'ECDHE-RSA-AES128-GCM-SHA256', 'ServerPreference');
 
 ###############################################################################
 
-sub get_ssl_socket {
-	my (%extra) = @_;
 
-	my $s = IO::Socket::INET->new('127.0.0.1:' . port(8443));
-	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
-	Net::SSLeay::set_session($ssl, $extra{ses}) if $extra{ses};
-	Net::SSLeay::set_cipher_list($ssl, $extra{ciphers}) if $extra{ciphers};
-	Net::SSLeay::set_fd($ssl, fileno($s));
-	Net::SSLeay::connect($ssl) or die("ssl connect");
-	return ($s, $ssl);
-}
 
-###############################################################################

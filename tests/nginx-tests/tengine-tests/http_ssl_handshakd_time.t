@@ -38,6 +38,8 @@ events {
 }
 
 http {
+    %%TEST_GLOBALS_HTTP%%
+    
     #log_format status '-';
     log_format status '$ssl_handshakd_time';
     access_log  %%TESTDIR%%/time.log status;

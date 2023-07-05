@@ -30,8 +30,7 @@ my $cf_1 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
-
-    root %%TESTDIR%%;
+    %%TEST_GLOBALS_HTTP%%
 
     req_status_zone server "$host,$server_addr:$server_port" 40M;
     req_status_zone test   "$uri"   40M;
@@ -117,8 +116,7 @@ my $cf_2 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
-
-    root %%TESTDIR%%;
+    %%TEST_GLOBALS_HTTP%%
 
     req_status_zone server "$host,$server_addr:$server_port error" 40M;
 
@@ -281,8 +279,7 @@ my $cf_3 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
-
-    root %%TESTDIR%%;
+    %%TEST_GLOBALS_HTTP%%
 
     req_status_zone         test3   "$uri"   1M;
     req_status_zone_recycle test3   1  1;
@@ -346,8 +343,7 @@ my $cf_4 = <<'EOF';
 %%TEST_GLOBALS%%
 
 http {
-
-    root %%TESTDIR%%;
+    %%TEST_GLOBALS_HTTP%%
 
     req_status_zone                    test3   "$uri"   1M;
     req_status_zone_recycle            test3   1  1;
@@ -396,8 +392,7 @@ my $cf_5 = <<'EOF';
 worker_rlimit_core   10000M;
 
 http {
-
-    root %%TESTDIR%%;
+    %%TEST_GLOBALS_HTTP%%
 
     req_status_zone server "$host,$server_addr:$server_port" 40M;
     req_status_zone server1 "$server_port" 10M;

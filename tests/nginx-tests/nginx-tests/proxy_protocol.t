@@ -26,7 +26,7 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http access realip/);
 
-$t->write_file_expand('nginx.conf', <<'EOF')->plan(20);
+$t->write_file_expand('nginx.conf', <<'EOF')->plan(24);
 
 %%TEST_GLOBALS%%
 
@@ -40,13 +40,14 @@ http {
 
     log_format pp $remote_addr:$remote_port;
 
+    add_header X-IP $remote_addr!$remote_port;
+    add_header X-PP $proxy_protocol_addr!$proxy_protocol_port;
+    add_header X-PPS $proxy_protocol_server_addr!$proxy_protocol_server_port;
     server {
         listen       127.0.0.1:8080 proxy_protocol;
         server_name  localhost;
 
         set_real_ip_from  127.0.0.1/32;
-        add_header X-IP $remote_addr!$remote_port;
-        add_header X-PP $proxy_protocol_addr!$proxy_protocol_port;
 
         location /pp {
             real_ip_header proxy_protocol;
@@ -85,20 +86,24 @@ my $r;
 $r = pp_get('/t1', $tcp4);
 like($r, qr/SEE-THIS/, 'tcp4 request');
 like($r, qr/X-PP: 192.0.2.1!123\x0d/, 'tcp4 proxy');
+like($r, qr/X-PPS: 192.0.2.2!5678\x0d/, 'tcp4 proxy server');
 unlike($r, qr/X-IP: (192.0.2.1|[^!]+!123\x0d)/, 'tcp4 client');
 
 $r = pp_get('/t1', $tcp6);
 like($r, qr/SEE-THIS/, 'tcp6 request');
 like($r, qr/X-PP: 2001:DB8::1!123\x0d/i, 'tcp6 proxy');
+like($r, qr/X-PPS: 2001:DB8::2!5678\x0d/i, 'tcp6 proxy server');
 unlike($r, qr/X-IP: (2001:DB8::1|[^!]+!123\x0d)/i, 'tcp6 client');
 
 $r = pp_get('/t1', $unk1);
 like($r, qr/SEE-THIS/, 'unknown request 1');
 like($r, qr/X-PP: !\x0d/, 'unknown proxy 1');
+like($r, qr/X-PPS: !\x0d/, 'unknown proxy server 1');
 
 $r = pp_get('/t1', $unk2);
 like($r, qr/SEE-THIS/, 'unknown request 2');
 like($r, qr/X-PP: !\x0d/, 'unknown proxy 2');
+like($r, qr/X-PPS: !\x0d/, 'unknown proxy server 2');
 
 # realip
 

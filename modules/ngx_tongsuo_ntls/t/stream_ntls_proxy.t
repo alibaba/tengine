@@ -215,12 +215,12 @@ like($ret4, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECDHE-SM2-SM4-CBC-SM3/m, 'cli
 like($ret5, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECDHE-SM2-SM4-CBC-SM3/m, 'client -----(TLSv1.2 ECC-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> origin');
 like($ret6, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECDHE-SM2-SM4-CBC-SM3/m, 'client -----(TLSv1.2 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> origin');
 
-like($ret7, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES128-GCM-SHA256/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(proxy_enable_ntls=off) -----(TLSv1.2 AES128-GCM-SHA256)-----> origin');
-like($ret8, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES128-GCM-SHA256/m, 'client -----(TLSv1.2 ECC-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.2 AES128-GCM-SHA256)-----> origin');
-like($ret9, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES128-GCM-SHA256/m, 'client -----(TLSv1.2 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.2 AES128-GCM-SHA256)-----> origin');
+like($ret7, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 AES128-GCM-SHA256)-----> server(proxy_enable_ntls=off) -----(TLSv1.3 AES128-GCM-SHA256)-----> origin');
+like($ret8, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 ECC-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.3 AES128-GCM-SHA256)-----> origin');
+like($ret9, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.3 AES128-GCM-SHA256)-----> origin');
 
-like($ret10, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES256-GCM-SHA384/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(no proxy_enable_ntls) -----(TLSv1.2 AES256-GCM-SHA384)-----> origin');
-like($ret11, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES256-GCM-SHA384/m, 'client -----(TLSv1.2 ECC-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.2 AES256-GCM-SHA384)-----> origin');
-like($ret12, qr/^ssl_protocol=TLSv1\.2, ssl_cipher=AES256-GCM-SHA384/m, 'client -----(TLSv1.2 ECDHE-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.2 AES256-GCM-SHA384)-----> origin');
+like($ret10, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 AES128-GCM-SHA256)-----> server(no proxy_enable_ntls) -----(TLSv1.3 AES256-GCM-SHA384)-----> origin');
+like($ret11, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 ECC-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.3 AES256-GCM-SHA384)-----> origin');
+like($ret12, qr/^ssl_protocol=TLSv1\.3, ssl_cipher=TLS_AES_256_GCM_SHA384/m, 'client -----(TLSv1.3 ECDHE-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.3 AES256-GCM-SHA384)-----> origin');
 
 $t->stop();

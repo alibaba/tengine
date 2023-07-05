@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 40;
+plan tests => repeat_each() * 43;
 
 our $HtmlDir = html_dir;
 
@@ -876,3 +876,96 @@ request body: hey, hello world
 --- no_error_log
 [error]
 [alert]
+
+
+
+=== TEST 16: receiveany
+--- config
+    server_tokens off;
+    location = /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_SERVER_PORT;
+
+        content_by_lua_block {
+            local sock = ngx.socket.tcp()
+            local port = ngx.var.port
+            local ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local req = "GET /mysock HTTP/1.1\r\nUpgrade: mysock\r\nHost: localhost\r\nConnection: close\r\n\r\nhello"
+            -- req = "OK"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            -- Will return to I/O loop, causing receiveany() in /mysock location to be called
+            ngx.sleep(1)
+
+            local bytes, err = sock:send(", world")
+            if not bytes then
+                ngx.say("failed to send packet 1: ", err)
+                return
+            end
+
+            local reader = sock:receiveuntil("\r\n\r\n")
+            local data, err, partial = reader()
+            if not data then
+                ngx.say("no response header found")
+                return
+            end
+
+            local msg, err = sock:receive()
+            if not msg then
+                ngx.say("failed to receive: ", err)
+                return
+            end
+
+            ngx.say("msg: ", msg)
+
+            ok, err = sock:close()
+            if not ok then
+                ngx.say("failed to close socket: ", err)
+                return
+            end
+        }
+    }
+
+    location = /mysock {
+        content_by_lua_block {
+            ngx.status = 101
+            ngx.send_headers()
+            ngx.flush(true)
+            ngx.req.read_body()
+            local sock, err = ngx.req.socket(true)
+            if not sock then
+                ngx.log(ngx.ERR, "server: failed to get raw req socket: ", err)
+                return
+            end
+
+            local data, err = sock:receiveany(1024)
+            if not data then
+                ngx.log(ngx.ERR, "server: failed to receive: ", err)
+                return
+            end
+
+            local bytes, err = sock:send("1: received: " .. data .. "\n")
+            if not bytes then
+                ngx.log(ngx.ERR, "server: failed to send: ", err)
+                return
+            end
+        }
+        more_clear_headers Date;
+    }
+
+--- request
+GET /t
+--- response_body
+msg: 1: received: hello
+--- no_error_log
+[error]

@@ -126,7 +126,7 @@
  * | at [p[i]]         |
  * ---------------------
  * | Vector            | Debug lineinfo vector
- * | [lineinfo]        | Empty vector here if dubug info is stripped
+ * | [lineinfo]        | Empty vector here if debug info is stripped
  * ---------------------
  * | Int               | Number of local variable in this function
  * | [sizelocvars]     | 0 if debug info is stripped
@@ -136,7 +136,7 @@
  * |  .varname]        |                                    |
  * ---------------------                                    |
  * | Int               |  instruction counter               |
- * | [locvars[i]]      |  where lcoal var i start to be     |-> repeat for i in
+ * | [locvars[i]]      |  where local var i start to be     |-> repeat for i in
  * |  .startpc]        |  referenced                        |  [0..sizelocvars]
  * ---------------------                                    |
  * | Int               |  instruction counter, where local  |
@@ -288,12 +288,12 @@
 typedef enum {
     NGX_LUA_TEXT_FILE,
     NGX_LUA_BT_LUA,
-    NGX_LUA_BT_LJ
+    NGX_LUA_BT_LJ,
 } ngx_http_lua_clfactory_file_type_e;
 
 
 enum {
-    NGX_LUA_READER_BUFSIZE = 4096
+    NGX_LUA_READER_BUFSIZE = 4096,
 };
 
 
@@ -380,12 +380,12 @@ ngx_http_lua_clfactory_bytecode_prepare(lua_State *L,
 
 #if defined(DDEBUG) && (DDEBUG)
         {
-        dd("==LJ_BT_HEADER==");
-        size_t i;
-        for (i = 0; i < LJ_HEADERSIZE; i++) {
-            dd("%ld: 0x%02X", i, (unsigned)(u_char) lf->begin_code.str[i]);
-        }
-        dd("==LJ_BT_HEADER_END==");
+            dd("==LJ_BT_HEADER==");
+            size_t i;
+            for (i = 0; i < LJ_HEADERSIZE; i++) {
+                dd("%ld: 0x%02X", i, (unsigned)(u_char) lf->begin_code.str[i]);
+            }
+            dd("==LJ_BT_HEADER_END==");
         }
 #endif
 

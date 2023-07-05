@@ -1,12 +1,16 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
 use Test::Nginx::Socket::Lua;
+use Cwd qw(abs_path realpath);
+use File::Basename;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 163;
+plan tests => repeat_each() * 198;
 
 #$ENV{LUA_PATH} = $ENV{HOME} . '/work/JSON4Lua-0.9.30/json/?.lua';
+$ENV{TEST_NGINX_HTML_DIR} ||= html_dir();
+$ENV{TEST_NGINX_CERT_DIR} ||= dirname(realpath(abs_path(__FILE__)));
 
 no_long_string();
 
@@ -193,7 +197,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 6: code cache explicitly off (affects require) + content_by_lua
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /lua {
         lua_code_cache off;
@@ -231,7 +235,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 7: code cache explicitly off (affects require) + content_by_lua_file
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /lua {
         lua_code_cache off;
@@ -269,7 +273,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 8: code cache explicitly off (affects require) + set_by_lua_file
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /lua {
         lua_code_cache off;
@@ -308,7 +312,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 9: code cache explicitly on (affects require) + set_by_lua_file
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /lua {
         lua_code_cache on;
@@ -468,7 +472,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 14: no clear builtin lib "string"
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     lua_code_cache off;
     location /lua {
@@ -504,7 +508,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 15: do not skip luarocks
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
      lua_code_cache off;"
 --- config
     location /main {
@@ -554,7 +558,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 16: do not skip luarocks*
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
      lua_code_cache off;"
 --- config
     location /main {
@@ -604,7 +608,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/
 
 === TEST 17: clear _G table
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     lua_code_cache off;
     location /t {
@@ -1050,7 +1054,7 @@ qr/\[alert\] \S+ lua_code_cache is off; this will hurt performance/,
 
 === TEST 29: cosocket connection pool timeout (after Lua VM destroys)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     lua_code_cache off;
     location = /t {
@@ -1092,7 +1096,7 @@ function go(port)
         ngx.say("failed to receive a line: ", err, " [", part, "]")
     end
 
-    local ok, err = sock:setkeepalive(1)
+    local ok, err = sock:setkeepalive(10)
     if not ok then
         ngx.say("failed to set reusable: ", err)
     end
@@ -1118,7 +1122,7 @@ qr/\blua tcp socket keepalive: free connection pool [0-9A-F]+ for "127.0.0.1:/,
 
 === TEST 30: cosocket connection pool timeout (before Lua VM destroys)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     lua_code_cache off;
     location = /t {
@@ -1284,22 +1288,36 @@ GET /t
 /b/ is called
 /a/ is called
 /b/ is called
---- grep_error_log eval: qr/looking up Lua code cache with key '.*?'/
+--- grep_error_log eval: qr/code cache .*/
 --- grep_error_log_out eval
 [
-"looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+"code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=-1)
+code cache miss (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=-1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache miss (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache hit (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache setting ref (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache hit (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
 ",
-"looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_3c7137b8371d10bc148c8f8bb3042ee6'
-looking up Lua code cache with key '=content_by_lua(proxy.conf:2)nhli_1dfe09105792ef65c8d576cc486d5e04'
+"code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=-1)
+code cache miss (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=-1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache miss (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache hit (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=-1)
+code cache setting ref (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache hit (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache hit (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache hit (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache lookup (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache hit (key='content_by_lua_nhli_3c7137b8371d10bc148c8f8bb3042ee6', ref=1)
+code cache lookup (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
+code cache hit (key='content_by_lua_nhli_1dfe09105792ef65c8d576cc486d5e04', ref=2)
 "]
 --- log_level: debug
 --- no_error_log
@@ -1353,23 +1371,508 @@ GET /t
 /b/ is called
 /a/ is called
 /b/ is called
---- grep_error_log eval: qr/looking up Lua code cache with key '.*?'/
+--- grep_error_log eval: qr/code cache .*/
 --- grep_error_log_out eval
 [
-"looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
-looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
+"code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=-1)
+code cache miss (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=-1)
+code cache lookup (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=-1)
+code cache miss (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=-1)
+code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache hit (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache lookup (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=-1)
+code cache miss (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=-1)
 ",
-"looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
-looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
-looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_68f5f4e946c3efd1cc206452b807e8b6'
-looking up Lua code cache with key 'nhlf_48a9a7def61143c003a7de1644e026e4'
-looking up Lua code cache with key 'nhlf_042c9b3a136fbacbbd0e4b9ad10896b7'
+"code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=-1)
+code cache miss (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=-1)
+code cache lookup (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=-1)
+code cache miss (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=-1)
+code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache hit (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache lookup (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=-1)
+code cache miss (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=-1)
+code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache hit (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache lookup (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=2)
+code cache hit (key='nhlf_68f5f4e946c3efd1cc206452b807e8b6', ref=2)
+code cache lookup (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache hit (key='nhlf_48a9a7def61143c003a7de1644e026e4', ref=1)
+code cache lookup (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=3)
+code cache hit (key='nhlf_042c9b3a136fbacbbd0e4b9ad10896b7', ref=3)
 "
+]
+--- log_level: debug
+--- no_error_log
+[error]
+
+
+
+=== TEST 34: variables in set_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        set_by_lua_file $res html/$1.lua;
+        echo $res;
+    }
+
+    location /main {
+        echo_location /lua/a;
+        echo_location /lua/b;
+        echo_location /lua/a;
+        echo_location /lua/a;
+        echo_location /lua/b;
+    }
+--- user_files
+>>> a.lua
+return "a"
+>>> b.lua
+return "b"
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 35: variables in rewrite_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        rewrite_by_lua_file html/$1.lua;
+    }
+
+    location /main {
+        echo_location /lua/a;
+        echo_location /lua/b;
+        echo_location /lua/a;
+        echo_location /lua/a;
+        echo_location /lua/b;
+    }
+--- user_files
+>>> a.lua
+ngx.say("a")
+>>> b.lua
+ngx.say("b")
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 36: variables in access_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        access_by_lua_file html/$1.lua;
+
+        content_by_lua_block {
+            return
+        }
+    }
+
+    location ~ ^/proxy/(.+)$ {
+        proxy_pass http://127.0.0.1:$server_port/lua/$1;
+    }
+
+    location /main {
+        content_by_lua_block {
+            local res1, res2, res3, res4, res5 = ngx.location.capture_multi{
+                { "/proxy/a" },
+                { "/proxy/b" },
+                { "/proxy/a" },
+                { "/proxy/a" },
+                { "/proxy/b" },
+            }
+
+            ngx.say(res1.body)
+            ngx.say(res2.body)
+            ngx.say(res3.body)
+            ngx.say(res4.body)
+            ngx.say(res5.body)
+        }
+    }
+--- user_files
+>>> a.lua
+ngx.print("a")
+>>> b.lua
+ngx.print("b")
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 37: variables in content_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        content_by_lua_file html/$1.lua;
+    }
+
+    location /main {
+        echo_location /lua/a;
+        echo_location /lua/b;
+        echo_location /lua/a;
+        echo_location /lua/a;
+        echo_location /lua/b;
+    }
+--- user_files
+>>> a.lua
+ngx.say("a")
+>>> b.lua
+ngx.say("b")
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 38: variables in header_filter_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        return 200;
+
+        header_filter_by_lua_file html/$1.lua;
+    }
+
+    location ~ ^/proxy/(.+)$ {
+        proxy_pass http://127.0.0.1:$server_port/lua/$1;
+    }
+
+    location /main {
+        content_by_lua_block {
+            local res1, res2, res3, res4, res5 = ngx.location.capture_multi{
+                { "/proxy/a" },
+                { "/proxy/b" },
+                { "/proxy/a" },
+                { "/proxy/a" },
+                { "/proxy/b" },
+            }
+
+            ngx.say(res1.header.match)
+            ngx.say(res2.header.match)
+            ngx.say(res3.header.match)
+            ngx.say(res4.header.match)
+            ngx.say(res5.header.match)
+        }
+    }
+--- user_files
+>>> a.lua
+ngx.header.match = "a"
+>>> b.lua
+ngx.header.match = "b"
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 39: variables in body_filter_by_lua_file's file path
+--- config
+    location ~ ^/lua/(.+)$ {
+        echo hello;
+
+        body_filter_by_lua_file html/$1.lua;
+    }
+
+    location /main {
+        echo_location /lua/a;
+        echo_location /lua/b;
+        echo_location /lua/a;
+        echo_location /lua/a;
+        echo_location /lua/b;
+    }
+--- user_files
+>>> a.lua
+ngx.arg[1] = "a\n"
+ngx.arg[2] = true
+>>> b.lua
+ngx.arg[1] = "b\n"
+ngx.arg[2] = true
+--- request
+GET /main
+--- response_body
+a
+b
+a
+a
+b
+--- no_error_log
+[error]
+
+
+
+=== TEST 40: variables in log_by_lua_file's file path
+--- config
+    log_subrequest on;
+
+    location ~ ^/lua/(.+)$ {
+        echo hello;
+
+        log_by_lua_file html/$1.lua;
+    }
+
+    location /main {
+        echo_location /lua/a;
+        echo_location /lua/b;
+        echo_location /lua/a;
+        echo_location /lua/a;
+        echo_location /lua/b;
+    }
+--- user_files
+>>> a.lua
+ngx.log(ngx.NOTICE, "grep me: a")
+>>> b.lua
+ngx.log(ngx.NOTICE, "grep me: b")
+--- request
+GET /main
+--- ignore_response_body
+--- grep_error_log eval: qr/grep me: ([ab])/
+--- grep_error_log_out eval
+[
+"grep me: a
+grep me: b
+grep me: a
+grep me: a
+grep me: b
+",
+"grep me: a
+grep me: b
+grep me: a
+grep me: a
+grep me: b
+grep me: a
+grep me: b
+grep me: a
+grep me: a
+grep me: b
+"]
+--- no_error_log
+[error]
+
+
+
+=== TEST 41: same chunk from different directives produces different closures
+--- http_config
+    ssl_session_fetch_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+    ssl_session_store_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+    upstream backend {
+        server unix:$TEST_NGINX_HTML_DIR/nginx.sock;
+        balancer_by_lua_block { ngx.log(ngx.INFO, "hello") }
+    }
+
+    server {
+        server_name test.com;
+        listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+        ssl_certificate $TEST_NGINX_CERT_DIR/cert/test.crt;
+        ssl_certificate_key $TEST_NGINX_CERT_DIR/cert/test.key;
+        ssl_session_tickets off;
+
+        ssl_certificate_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+        location /lua {
+            set_by_lua_block $res { ngx.log(ngx.INFO, "hello") }
+
+            rewrite_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+            access_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+            content_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+            header_filter_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+            body_filter_by_lua_block { ngx.log(ngx.INFO, "hello") }
+
+            log_by_lua_block { ngx.log(ngx.INFO, "hello") }
+        }
+    }
+--- config
+    lua_ssl_trusted_certificate $TEST_NGINX_CERT_DIR/cert/test.crt;
+
+    location = /proxy {
+        proxy_pass http://backend;
+    }
+
+    location = /t {
+        set $html_dir $TEST_NGINX_HTML_DIR;
+
+        content_by_lua_block {
+            ngx.location.capture("/proxy")
+
+            local sock = ngx.socket.tcp()
+            sock:settimeout(2000)
+
+            local ok, err = sock:connect("unix:" .. ngx.var.html_dir .. "/nginx.sock")
+            if not ok then
+                ngx.log(ngx.ERR, "failed to connect: ", err)
+                return
+            end
+
+            local sess, err = sock:sslhandshake(nil, "test.com", true)
+            if not sess then
+                ngx.log(ngx.ERR, "failed to do SSL handshake: ", err)
+                return
+            end
+            package.loaded.session = sess
+            sock:close()
+
+            local ok, err = sock:connect("unix:" .. ngx.var.html_dir .. "/nginx.sock")
+            if not ok then
+                ngx.log(ngx.ERR, "failed to connect: ", err)
+                return
+            end
+
+            local sess, err = sock:sslhandshake(package.loaded.session, "test.com", true)
+            if not sess then
+                ngx.log(ngx.ERR, "failed to do SSL handshake: ", err)
+                return
+            end
+
+            local req = "GET /lua HTTP/1.0\r\nHost: test.com\r\nConnection: close\r\n\r\n"
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.log(ngx.ERR, "failed to send http request: ", err)
+                return
+            end
+        }
+    }
+--- request
+GET /t
+--- ignore_response_body
+--- grep_error_log eval: qr/code cache .*/
+--- grep_error_log_out eval
+[
+"code cache lookup (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=-1)
+code cache miss (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=-1)
+code cache lookup (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache hit (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache hit (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache lookup (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+",
+"code cache lookup (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=-1)
+code cache miss (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=-1)
+code cache lookup (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache hit (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache hit (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache lookup (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache miss (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=-1)
+code cache lookup (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=1)
+code cache hit (key='content_by_lua_nhli_56ca4388611109b6ecfdeada050c8024', ref=1)
+code cache lookup (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=2)
+code cache hit (key='balancer_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=2)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache hit (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache hit (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache lookup (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=5)
+code cache hit (key='ssl_session_fetch_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=5)
+code cache lookup (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache hit (key='ssl_certificate_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=3)
+code cache lookup (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache hit (key='ssl_session_store_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=4)
+code cache lookup (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=6)
+code cache hit (key='set_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=6)
+code cache lookup (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=7)
+code cache hit (key='rewrite_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=7)
+code cache lookup (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=8)
+code cache hit (key='access_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=8)
+code cache lookup (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=9)
+code cache hit (key='content_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=9)
+code cache lookup (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=10)
+code cache hit (key='header_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=10)
+code cache lookup (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=11)
+code cache hit (key='body_filter_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=11)
+code cache lookup (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=12)
+code cache hit (key='log_by_lua_nhli_8a9441d0a30531ba8bb34ab11c55cfc3', ref=12)
+"]
+--- error_log eval
+[
+qr/balancer_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/ssl_session_fetch_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/ssl_certificate_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/ssl_session_store_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/set_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/rewrite_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/access_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/content_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/header_filter_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/body_filter_by_lua\(nginx\.conf:\d+\):\d+: hello/,
+qr/log_by_lua\(nginx.conf:\d+\):\d+: hello/,
 ]
 --- log_level: debug
 --- no_error_log
