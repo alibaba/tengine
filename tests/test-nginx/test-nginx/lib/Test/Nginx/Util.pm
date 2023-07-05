@@ -818,6 +818,8 @@ env DYLD_INSERT_LIBRARIES;
 $main_config
 
 http {
+    lua_package_path "/usr/local/lib/lua/?.lua;;";
+    
     access_log $AccLogFile;
     #access_log off;
 
