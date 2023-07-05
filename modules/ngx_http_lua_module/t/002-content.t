@@ -10,7 +10,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 2 + 23);
+plan tests => repeat_each() * (blocks() * 2 + 32);
 
 #no_diff();
 #no_long_string();
@@ -36,6 +36,14 @@ GET /lua
 Hello, Lua!
 --- no_error_log
 [error]
+--- grep_error_log eval: qr/lua caching unused lua thread|lua reusing cached lua thread/
+--- grep_error_log_out eval
+[
+    "lua caching unused lua thread\n",
+    "lua reusing cached lua thread
+lua caching unused lua thread
+",
+]
 
 
 
@@ -841,4 +849,252 @@ GET /lua
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
 --- error_log eval
-qr/failed to load inlined Lua code: /
+qr/failed to load inlined Lua code: content_by_lua\(nginx.conf:40\)/
+
+
+
+=== TEST 43: syntax error in content_by_lua_block
+--- config
+    location /lua {
+
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log eval
+qr/failed to load inlined Lua code: content_by_lua\(nginx.conf:41\)/
+
+
+
+=== TEST 44: syntax error in second content_by_lua_block
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log eval
+qr/failed to load inlined Lua code: content_by_lua\(nginx.conf:46\)/
+
+
+
+=== TEST 45: syntax error in thrid content_by_lua_block
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log eval
+qr/failed to load inlined Lua code: content_by_lua\(nginx.conf:52\)/
+
+
+
+=== TEST 46: syntax error in included file
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    include ../html/lua.conf;
+--- user_files
+>>> lua.conf
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to load inlined Lua code: content_by_lua(../html/lua.conf:2):2: unexpected symbol near ''for end''
+
+
+
+=== TEST 47: syntax error with very long filename
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    include ../html/1234567890123456789012345678901234.conf;
+--- user_files
+>>> 1234567890123456789012345678901234.conf
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to load inlined Lua code: content_by_lua(...234567890123456789012345678901234.conf:2)
+
+
+
+=== TEST 48: syntax error in /tmp/lua.conf
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    include /tmp/lua.conf;
+--- user_files
+>>> /tmp/lua.conf
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to load inlined Lua code: content_by_lua(/tmp/lua.conf:2)
+
+
+
+=== TEST 49: syntax error in /tmp/12345678901234567890123456789012345.conf
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    include /tmp/12345678901234567890123456789012345.conf;
+
+--- user_files
+>>> /tmp/12345678901234567890123456789012345.conf
+    location /lua {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to load inlined Lua code: content_by_lua(...345678901234567890123456789012345.conf:2)
+
+
+
+=== TEST 50: the error line number greater than 9
+--- config
+    location /foo {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    location /bar {
+        content_by_lua_block {
+            'for end';
+        }
+    }
+
+    include /tmp/12345678901234567890123456789012345.conf;
+
+--- user_files
+>>> /tmp/12345678901234567890123456789012345.conf
+    location /lua {
+
+
+
+
+
+
+
+
+
+
+
+
+        content_by_lua_block {
+            'for end';
+        }
+    }
+--- request
+GET /lua
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log
+failed to load inlined Lua code: content_by_lua(...45678901234567890123456789012345.conf:14)
+
+
+
+=== TEST 51: Lua file permission denied
+--- config
+    location /lua {
+        content_by_lua_file /etc/shadow;
+    }
+--- request
+GET /lua
+--- response_body_like: 503 Service Temporarily Unavailable
+--- error_code: 503

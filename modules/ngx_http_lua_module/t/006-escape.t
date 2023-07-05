@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 2);
+plan tests => repeat_each() * (blocks() * 2 + 4);
 
 no_long_string();
 
@@ -197,3 +197,134 @@ GET /lua
 %2C%24%40%7C%60
 --- no_error_log
 [error]
+
+
+
+=== TEST 15: escape type argument
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.escape_uri("https://www.google.com", 0))
+            ngx.say(ngx.escape_uri("https://www.google.com/query?q=test", 0))
+            ngx.say(ngx.escape_uri("https://www.google.com/query?\r\nq=test", 0))
+            ngx.say(ngx.escape_uri("-_.~!*'();:@&=+$,/?#", 0))
+            ngx.say(ngx.escape_uri("<>[]{}\\\" ", 0))
+        }
+    }
+--- request
+GET /lua
+--- response_body
+https://www.google.com
+https://www.google.com/query%3Fq=test
+https://www.google.com/query%3F%0D%0Aq=test
+-_.~!*'();:@&=+$,/%3F%23
+<>[]{}\"%20
+--- no_error_log
+[error]
+
+
+
+=== TEST 16: escape type argument
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 0))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 1))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 2))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 3))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 4))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 5))
+            ngx.say(ngx.escape_uri("https://www.google.com/?t=abc@ :", 6))
+        }
+    }
+--- request
+GET /lua
+--- response_body
+https://www.google.com/%3Ft=abc@%20:
+https://www.google.com/%3Ft=abc@%20:
+https%3A%2F%2Fwww.google.com%2F%3Ft%3Dabc%40%20%3A
+https://www.google.com/?t=abc@%20:
+https://www.google.com/?t=abc@%20:
+https://www.google.com/?t=abc@%20:
+https://www.google.com/?t=abc@%20:
+--- no_error_log
+[error]
+
+
+
+=== TEST 17: escape type out of range
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.escape_uri("https://www.google.com", -1))
+        }
+    }
+--- request
+GET /lua
+--- error_code: 500
+--- error_log eval
+qr/\[error\] \d+#\d+: \*\d+ lua entry thread aborted: runtime error: "type" \-1 out of range/
+
+
+
+=== TEST 18: escape type out of range
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.escape_uri("https://www.google.com", 10))
+        }
+    }
+--- request
+GET /lua
+--- error_code: 500
+--- error_log eval
+qr/\[error\] \d+#\d+: \*\d+ lua entry thread aborted: runtime error: "type" 10 out of range/
+
+
+
+=== TEST 19: escape type not integer
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.escape_uri("https://www.google.com", true))
+        }
+    }
+--- request
+GET /lua
+--- error_code: 500
+--- error_log eval
+qr/\[error\] \d+#\d+: \*\d+ lua entry thread aborted: runtime error: "type" is not a number/
+
+
+
+=== TEST 20: invalid unescape sequences
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.unescape_uri("%ua%%20%au"))
+        }
+    }
+--- request
+GET /lua
+--- response_body
+%ua% %au
+
+
+
+=== TEST 21: invalid unescape sequences where remain length less than 2
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.say(ngx.unescape_uri("%a")) -- first character is good
+            ngx.say(ngx.unescape_uri("%u")) -- first character is bad
+            ngx.say(ngx.unescape_uri("%"))
+            ngx.say(ngx.unescape_uri("good%20job%"))
+        }
+    }
+--- request
+GET /lua
+--- response_body
+%a
+%u
+%
+good job%

@@ -36,6 +36,24 @@ jobs:
        run: |
          make
          sudo make install
+     - name: 'checkout lua-resty-lrucache'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/lua-resty-lrucache
+         path: lua-resty-lrucache
+     - name: 'build lua-resty-lrucache'
+       working-directory: lua-resty-lrucache
+       run: |
+         sudo make install
+     - name: 'checkout lua-resty-core'
+       uses: actions/checkout@v3
+       with:
+         repository: openresty/lua-resty-core
+         path: lua-resty-core
+     - name: 'build lua-resty-core'
+       working-directory: lua-resty-core
+       run: |
+         sudo make install
      - name: build
        env:
          CC: ${{ matrix.compiler.CC }}
@@ -51,7 +69,7 @@ jobs:
          # For "-D T_NGX_HTTP_UPSTREAM_RANDOM=0", it makes some cases pass, such as image_filter_finalize.t.
          ./configure  \
             --with-cc-opt="-D T_NGX_MODIFY_DEFAULT_VALUE=0 -D T_NGX_HTTP_IMAGE_FILTER=0 -D T_NGX_SERVER_INFO=0 -D T_NGX_HTTP_UPSTREAM_RANDOM=0" \
-            --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
+            --with-ld-opt="-Wl,-lpcre,-rpath,/usr/local/lib" \
             --with-openssl-async \
             --with-pcre \
             --with-http_ssl_module \

@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 #repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 4 + 31);
+plan tests => repeat_each() * (blocks() * 4 + 34);
 
 our $HtmlDir = html_dir;
 
@@ -30,7 +30,7 @@ __DATA__
 
 === TEST 1: sanity
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -98,7 +98,7 @@ lua tcp socket keepalive create connection pool for key "127.0.0.1:$ENV{TEST_NGI
 
 === TEST 2: free up the whole connection pool if no active connections
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -169,7 +169,7 @@ received: OK
 
 === TEST 3: upstream sockets close prematurely
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
    server_tokens off;
    keepalive_timeout 100ms;
@@ -244,7 +244,7 @@ done
 
 === TEST 4: http keepalive
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
    server_tokens off;
    location /t {
@@ -808,7 +808,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 === TEST 12: sanity (uds)
 --- http_config eval
 "
-    lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
     server {
         listen unix:$::HtmlDir/nginx.sock;
         default_type 'text/plain';
@@ -887,7 +887,7 @@ received response of 119 bytes
 
 
 
-=== TEST 13: github issue #108: ngx.locaiton.capture + redis.set_keepalive
+=== TEST 13: github issue #108: ngx.location.capture + redis.set_keepalive
 --- http_config eval
     qq{
         lua_package_path "$::HtmlDir/?.lua;;";
@@ -936,7 +936,7 @@ lua tcp socket get keepalive peer: using connection
 
 === TEST 14: github issue #110: ngx.exit with HTTP_NOT_FOUND causes worker process to exit
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     error_page 404 /404.html;
     location /t {
@@ -995,7 +995,7 @@ Not found, dear...
 
 === TEST 15: custom pools (different pool for the same host:port) - tcp
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1043,7 +1043,7 @@ lua tcp socket keepalive create connection pool for key "B"
 
 === TEST 16: custom pools (same pool for different host:port) - tcp
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1091,7 +1091,7 @@ lua tcp socket get keepalive peer: using connection
 === TEST 17: custom pools (different pool for the same host:port) - unix
 --- http_config eval
 "
-    lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
     server {
         listen unix:$::HtmlDir/nginx.sock;
         default_type 'text/plain';
@@ -1151,7 +1151,7 @@ lua tcp socket keepalive create connection pool for key "B"
 === TEST 18: custom pools (same pool for the same path) - unix
 --- http_config eval
 "
-    lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
     server {
         listen unix:$::HtmlDir/nginx.sock;
         default_type 'text/plain';
@@ -1205,7 +1205,7 @@ lua tcp socket get keepalive peer: using connection
 
 === TEST 19: numeric pool option value
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1252,7 +1252,7 @@ lua tcp socket get keepalive peer: using connection
 
 === TEST 20: nil pool option value
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1295,7 +1295,7 @@ connected: 1, reused: 0
 
 === TEST 21: (bad) table pool option value
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1336,7 +1336,7 @@ bad argument #3 to 'connect' (bad "pool" option type: table)
 
 === TEST 22: (bad) boolean pool option value
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -1394,7 +1394,7 @@ bad argument #3 to 'connect' (bad "pool" option type: boolean)
 
 === TEST 24: bug in send(): clear the chain writer ctx
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         set $port $TEST_NGINX_REDIS_PORT;
@@ -2956,3 +2956,63 @@ GET /t
 lua tcp socket abort queueing
 --- response_body
 ok
+
+
+
+=== TEST 53: custom pools in third parameters for unix domain socket
+--- http_config eval
+"
+    lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
+    server {
+        listen unix:$::HtmlDir/nginx.sock;
+        default_type 'text/plain';
+
+        server_tokens off;
+        location /foo {
+            echo foo;
+            more_clear_headers Date;
+        }
+    }
+"
+--- config
+    location /t {
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+        content_by_lua '
+            local test = require "test"
+            local path = "$TEST_NGINX_HTML_DIR/nginx.sock";
+            test.go(path, "A")
+            test.go(path, "B")
+        ';
+    }
+--- user_files
+>>> test.lua
+module("test", package.seeall)
+
+function go(path, pool)
+    local sock = ngx.socket.tcp()
+    local ok, err = sock:connect("unix:" .. path, nil, {pool = pool})
+    if not ok then
+        ngx.say("failed to connect: ", err)
+        return
+    end
+
+    ngx.say("connected: ", ok, ", reused: ", sock:getreusedtimes())
+
+    local ok, err = sock:setkeepalive()
+    if not ok then
+        ngx.say("failed to set reusable: ", err)
+    end
+end
+--- request
+GET /t
+--- response_body
+connected: 1, reused: 0
+connected: 1, reused: 0
+--- no_error_log eval
+["[error]",
+"lua tcp socket keepalive: free connection pool for ",
+"lua tcp socket get keepalive peer: using connection"
+]
+--- error_log
+lua tcp socket keepalive create connection pool for key "A"
+lua tcp socket keepalive create connection pool for key "B"

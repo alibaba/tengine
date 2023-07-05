@@ -317,7 +317,7 @@ hiya globe
 GET /t
 --- ignore_response
 --- error_log
-failed to run body_filter_by_lua*: body_filter_by_lua:4: something bad happened!
+failed to run body_filter_by_lua*: body_filter_by_lua(nginx.conf:49):4: something bad happened!
 
 
 
@@ -838,3 +838,55 @@ GET /lua
 --- ignore_response
 --- error_log
 API disabled in the context of body_filter_by_lua*
+
+
+
+=== TEST 27: syntax error in body_filter_by_lua_block
+--- config
+    location /lua {
+
+        body_filter_by_lua_block {
+            'for end';
+        }
+        content_by_lua_block {
+            ngx.say("Hello world")
+        }
+    }
+--- request
+GET /lua
+--- ignore_response
+--- error_log
+failed to load inlined Lua code: body_filter_by_lua(nginx.conf:41):2: unexpected symbol near ''for end''
+--- no_error_log
+no_such_error1
+no_such_error2
+
+
+
+=== TEST 28: syntax error in second body_by_lua_block
+--- config
+    location /foo {
+        body_filter_by_lua_block {
+            'for end';
+        }
+        content_by_lua_block {
+            ngx.say("Hello world")
+        }
+    }
+
+    location /lua {
+        body_filter_by_lua_block {
+            'for end';
+        }
+        content_by_lua_block {
+            ngx.say("Hello world")
+        }
+    }
+--- request
+GET /lua
+--- ignore_response
+--- error_log
+failed to load inlined Lua code: body_filter_by_lua(nginx.conf:49):2: unexpected symbol near ''for end''
+--- no_error_log
+no_such_error1
+no_such_error2

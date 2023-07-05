@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 3 + 2);
+plan tests => repeat_each() * (blocks() * 3 + 9);
 
 #no_diff();
 #no_long_string();
@@ -320,3 +320,100 @@ GET /read
 --- response_headers
 Location: http://agentzh.org/foo?a=b&c=d
 --- error_code: 308
+
+
+
+=== TEST 18: unsafe uri (with '\r')
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.redirect("http://agentzh.org/foo\rfoo:bar\nbar:foo");
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_headers
+Location:
+foo:
+bar:
+--- error_log
+unsafe byte "0x0d" in redirect uri "http://agentzh.org/foo\x0Dfoo:bar\x0Abar:foo"
+
+
+
+=== TEST 19: unsafe uri (with '\n')
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.redirect("http://agentzh.org/foo\nfoo:bar\rbar:foo");
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_headers
+Location:
+foo:
+bar:
+--- error_log
+unsafe byte "0x0a" in redirect uri "http://agentzh.org/foo\x0Afoo:bar\x0Dbar:foo"
+
+
+
+=== TEST 20: unsafe uri (with prefix '\n')
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.redirect("\nfoo:http://agentzh.org/foo");
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_headers
+Location:
+foo:
+--- error_log
+unsafe byte "0x0a" in redirect uri "\x0Afoo:http://agentzh.org/foo"
+
+
+
+=== TEST 21: unsafe uri (with prefix '\r')
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.redirect("\rfoo:http://agentzh.org/foo");
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_headers
+Location:
+foo:
+--- error_log
+unsafe byte "0x0d" in redirect uri "\x0Dfoo:http://agentzh.org/foo"
+
+
+
+=== TEST 22: unsafe uri logging escapes '"' and '\' characters
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.redirect("\rhttp\\://\"agentzh.org\"/foo");
+            ngx.say("hi")
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_headers
+Location:
+foo:
+--- error_log
+unsafe byte "0x0d" in redirect uri "\x0Dhttp\x5C://\x22agentzh.org\x22/foo"

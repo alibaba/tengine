@@ -90,7 +90,10 @@ EOF
 plan(skip_all => 'not yet') unless $t->has_version('1.21.2');
 $t->plan(50);
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

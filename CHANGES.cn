@@ -1,11 +1,21 @@
+Tengine 3.0.0 [2023-07-06]
+* Feature: 支持域名，证书，路由的动态无损生效 [tengine-ingress] (drawing, lianglli)
+* Feature: 支持HTTP/3 (QUIC v1和draft-29)[XQUIC] (lurker-Chen, Kulsk, lianglli)
+* Feature: 支持bypass内核的用户态高性能UDP转发 [XUDP] (D-Wythe, fengidri)
+* Change: 升级core代码到Nginx-1.24.0稳定版本 (lianglli)
+* Bugfix: 修复ssl_async开启时ngx_ssl_shutdown导致的coredump问题 (foxriver1025)
+
+
 Tengine 2.4.1 [2023-06-08]
 * Change: 更新ngx_http_proxy_connect_module模块到v0.0.4 (chobits)
 * Bugfix: 修复stream_set模块编译错误 (chobits)
 * Bugfix: 修复NTLS证书检测，将sign/enc证书移到upstream，增加ngx_tongsuo_ntls模块 (dongbeiouba)
 * Bugfix: 修复当开启ssl_async功能后，客户端无法接受到正确数据包的问题 (oyaya)
 
+
 Tengine 2.4.0 [2023-02-08]
 * Feature: 更新到nginx官方1.22.1版本 (jiuzhoucui)
+
 
 Tengine 2.3.4 [2022-10-18]
 * Feature: 增加新模块ngx_openssl_ntls，以支持NTLS协议 (dongbeiouba)
@@ -14,6 +24,7 @@ Tengine 2.3.4 [2022-10-18]
 * Bugfix: 修复upstream check模块在upstream配置块中使用zone指令时导致的死锁 (zjd87)
 * Bugfix：修复upstream check编译错误 (RocFang)
 * Bugfix: 修复dubbo编译报错 (MengqiWu)
+
 
 Tengine 2.3.3 [2021-03-25]
 * Feature: 支持dtlsv1和dtlsv1.2 (mrpre)

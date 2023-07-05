@@ -12,8 +12,6 @@
 #include "ngx_http_lua_common.h"
 
 
-void ngx_http_lua_inject_misc_api(lua_State *L);
-
 void ngx_http_lua_inject_req_misc_api(lua_State *L);
 
 

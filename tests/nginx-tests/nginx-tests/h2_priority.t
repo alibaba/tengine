@@ -44,7 +44,10 @@ http {
 
 EOF
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 # file size is slightly beyond initial window size: 2**16 + 80 bytes
 

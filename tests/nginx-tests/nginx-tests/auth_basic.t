@@ -64,8 +64,8 @@ $t->write_file('index.html', 'SEETHIS');
 
 $t->write_file(
 	'htpasswd',
-	'crypt:' . crypt('password', 'salt') . "\n" .
-	'crypt1:' . crypt('password', '$1$salt$') . "\n" .
+	'crypt:' . (crypt('password', 'salt') || '') . "\n" .
+	'crypt1:' . (crypt('password', '$1$salt$') || '') . "\n" .
 	'crypt2:' . '$1$' . "\n" .
 	'apr1:' . '$apr1$salt$Xxd1irWT9ycqoYxGFn4cb.' . "\n" .
 	'apr12:' . '$apr1$' . "\n" .

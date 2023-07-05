@@ -24,12 +24,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl access realip/)
+my $t = Test::Nginx->new()->has(qw/http http_ssl access realip socket_ssl/)
 	->has_daemon('openssl');
 
 $t->write_file_expand('nginx.conf', <<'EOF')->plan(18);
@@ -153,24 +149,9 @@ sub pp_get {
 
 	my $s = http($proxy, start => 1);
 
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		IO::Socket::SSL->start_SSL($s,
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
-			SSL_error_trap => sub { die $_[1] }
-		);
-		alarm(0);
-	};
-	alarm(0);
 
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
 
-	return http(<<EOF, socket => $s);
+	return http(<<EOF, socket => $s, SSL => 1);
 GET $url HTTP/1.0
 Host: localhost
 

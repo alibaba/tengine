@@ -8,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (4 * blocks());
+plan tests => repeat_each() * (3 * blocks() + 6);
 
 #no_diff();
 no_long_string();
@@ -245,5 +245,28 @@ Cookie baz:
 Cookie boo: 123
 Cookie: boo=123; foo=bar
 
+--- no_error_log
+[error]
+
+
+
+=== TEST 7: set multiple custom cookies with unsafe values (with '\n' and 'r')
+--- config
+    location /t {
+        rewrite_by_lua_block {
+           ngx.req.set_header("Cookie", {"boo=123\nfoo", "foo=bar\rbar"})
+        }
+        echo "Cookie foo: $cookie_foo";
+        echo "Cookie baz: $cookie_baz";
+        echo "Cookie boo: $cookie_boo";
+        echo "Cookie: $http_cookie";
+    }
+--- request
+GET /t
+--- response_body
+Cookie foo: bar%0Dbar
+Cookie baz: 
+Cookie boo: 123%0Afoo
+Cookie: boo=123%0Afoo; foo=bar%0Dbar
 --- no_error_log
 [error]

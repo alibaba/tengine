@@ -22,16 +22,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval {
-	require Net::SSLeay;
-	Net::SSLeay::load_error_strings();
-	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::randomize();
-	Net::SSLeay::SSLeay();
-};
-plan(skip_all => 'Net::SSLeay not installed or too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)->has_daemon('openssl');
+my $t = Test::Nginx->new()->has(qw/http http_ssl socket_ssl/)
+	->has_daemon('openssl');
 
 plan(skip_all => 'no multiple certificates') if $t->has_module('BoringSSL');
 
@@ -51,8 +44,9 @@ http {
     ssl_certificate rsa.crt;
     ssl_ciphers DEFAULT:ECCdraft;
 
+    add_header X-SSL-Protocol $ssl_protocol;
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:8443 ssl;
         server_name  localhost;
 
         ssl_certificate_key ec.key;
@@ -91,65 +85,54 @@ foreach my $name ('ec', 'rsa') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
+$t->write_file('index.html', '');
 $t->run()->plan(2);
 
 ###############################################################################
 
-like(get_cert('RSA'), qr/CN=rsa/, 'ssl cert RSA');
-like(get_cert('ECDSA'), qr/CN=ec/, 'ssl cert ECDSA');
+TODO: {
+local $TODO = 'broken TLSv1.3 sigalgs in LibreSSL'
+	if $t->has_module('LibreSSL') && test_tls13();
+like(cert('RSA'), qr/CN=rsa/, 'ssl cert RSA');
+}
+like(cert('ECDSA'), qr/CN=ec/, 'ssl cert ECDSA');
 
 ###############################################################################
 
-sub get_version {
-	my ($s, $ssl) = get_ssl_socket();
-	return Net::SSLeay::version($ssl);
+sub test_tls13 {
+	return http_get('/', SSL => 1) =~ /TLSv1.3/;
 }
 
-sub get_cert {
-	my ($type) = @_;
-	$type = 'PSS' if $type eq 'RSA' && get_version() > 0x0303;
-	my ($s, $ssl) = get_ssl_socket($type);
-	my $cipher = Net::SSLeay::get_cipher($ssl);
-	Test::Nginx::log_core('||', "cipher: $cipher");
-	return Net::SSLeay::dump_peer_certificate($ssl);
+sub cert {
+	my $s = get_socket(@_) || return;
+	return $s->dump_peer_certificate();
 }
 
-sub get_ssl_socket {
+sub get_socket {
 	my ($type) = @_;
-	my $s;
 
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		$s = IO::Socket::INET->new('127.0.0.1:' . port(8080));
-		alarm(0);
-	};
-	alarm(0);
+	my $ctx_cb = sub {
+		my $ctx = shift;
 
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
+		return unless defined $type;
 
-	my $ctx = Net::SSLeay::CTX_new() or die("Failed to create SSL_CTX $!");
 
-	if (defined $type) {
 		my $ssleay = Net::SSLeay::SSLeay();
-		if ($ssleay < 0x1000200f || $ssleay == 0x20000000) {
-			Net::SSLeay::CTX_set_cipher_list($ctx, $type)
-				or die("Failed to set cipher list");
-		} else {
+		return if ($ssleay < 0x1000200f || $ssleay == 0x20000000);
+		my @sigalgs = ('RSA+SHA256:PSS+SHA256', 'RSA+SHA256');
+		@sigalgs = ($type . '+SHA256') unless $type eq 'RSA';
 			# SSL_CTRL_SET_SIGALGS_LIST
-			Net::SSLeay::CTX_ctrl($ctx, 98, 0, $type . '+SHA256')
+		Net::SSLeay::CTX_ctrl($ctx, 98, 0, $sigalgs[0])
+			or Net::SSLeay::CTX_ctrl($ctx, 98, 0, $sigalgs[1])
 				or die("Failed to set sigalgs");
-		}
-	}
+	};
 
-	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
-	Net::SSLeay::set_fd($ssl, fileno($s));
-	Net::SSLeay::connect($ssl) or die("ssl connect");
-	return ($s, $ssl);
+	return http_get(
+		'/', start => 1,
+		SSL => 1,
+		SSL_cipher_list => $type,
+		SSL_create_ctx_callback => $ctx_cb
+	);
 }
 
 ###############################################################################

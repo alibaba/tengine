@@ -127,14 +127,14 @@ my $ret7 = `/bin/echo -e "GET /ecdhe HTTP/1.0\r\n\r\n" | $openssl s_client -conn
 my $ret8 = `/bin/echo -e "GET /ecdhe?enable_ntls=on HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9023 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
 my $ret9 = `/bin/echo -e "GET /ecdhe?enable_ntls=off HTTP/1.0\r\n\r\n" | $openssl s_client -connect localhost:9023 -cipher ECDHE-SM2-SM4-GCM-SM3 -quiet -ign_eof -enc_cert $d/client_enc.crt -enc_key $d/client_enc.key -sign_cert $d/client_sign.crt -sign_key $d/client_sign.key -enable_ntls -ntls 2>&1`;
 
-like($ret1, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(no proxy_enable_ntls) -----(TLSv1.2)-----> origin');
-like($ret2, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.2)-----> origin');
+like($ret1, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(no proxy_enable_ntls) -----(TLSv1.3)-----> origin');
+like($ret2, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.3)-----> origin');
 like($ret3, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECC-SM2-SM4-CBC-SM3/m, 'client -----(TLSv1.2 AES128-GCM-SHA256)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> origin');
 like($ret4, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECC-SM2-SM4-CBC-SM3/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECC-SM2-SM4-CBC-SM3)-----> origin');
-like($ret5, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-GCM-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.2)-----> origin');
-like($ret6, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-GCM-SM3)-----> server(proxy_enable_ntls=xxxxx) -----(TLSv1.2)-----> origin');
-like($ret7, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.2)-----> origin');
+like($ret5, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-GCM-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.3)-----> origin');
+like($ret6, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(NTLSv1.1 ECC-SM2-SM4-GCM-SM3)-----> server(proxy_enable_ntls=xxxxx) -----(TLSv1.3)-----> origin');
+like($ret7, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> server(no proxy_enable_ntls) -----(TLSv1.3)-----> origin');
 like($ret8, qr/^ssl_protocol=NTLSv1\.1, ssl_cipher=ECDHE-SM2-SM4-GCM-SM3/m, 'client -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=on) -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> origin');
-like($ret9, qr/^ssl_protocol=TLSv1\.2.*$/m, 'client -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.2)-----> origin');
+like($ret9, qr/^ssl_protocol=TLSv1\.3.*$/m, 'client -----(NTLSv1.1 ECDHE-SM2-SM4-CBC-SM3)-----> server(proxy_enable_ntls=off) -----(TLSv1.3)-----> origin');
 
 $t->stop();

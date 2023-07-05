@@ -440,7 +440,7 @@ b.txt exists: yes
 
 
 
-=== TEST 17: read buffered body to memoary and reset it to a new file (auto-clean)
+=== TEST 17: read buffered body to memory and reset it to a new file (auto-clean)
 --- config
     client_body_in_file_only off;
 
@@ -476,7 +476,7 @@ qr/500 Internal Server Error/]
 
 
 
-=== TEST 18: read buffered body to memoary and reset it to a new file (no auto-clean)
+=== TEST 18: read buffered body to memory and reset it to a new file (no auto-clean)
 --- config
     client_body_in_file_only off;
 

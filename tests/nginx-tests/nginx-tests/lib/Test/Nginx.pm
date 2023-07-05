@@ -243,6 +243,60 @@ sub has_feature($) {
 		return $^O ne 'MSWin32';
 	}
 
+	if ($feature =~ /^socket_ssl/) {
+		eval { require IO::Socket::SSL; };
+		return 0 if $@;
+		eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
+		return 0 if $@;
+		if ($feature eq 'socket_ssl') {
+			return 1;
+		}
+		if ($feature eq 'socket_ssl_sni') {
+			eval { IO::Socket::SSL->can_client_sni() or die; };
+			return !$@;
+		}
+		if ($feature eq 'socket_ssl_alpn') {
+			eval { IO::Socket::SSL->can_alpn() or die; };
+			return !$@;
+		}
+		if ($feature eq 'socket_ssl_sslversion') {
+			return IO::Socket::SSL->can('get_sslversion');
+		}
+		if ($feature eq 'socket_ssl_reused') {
+			return IO::Socket::SSL->can('get_session_reused');
+		}
+		return 0;
+	}
+
+	if ($feature =~ /^(openssl|libressl):([0-9.]+)/) {
+		my $library = $1;
+		my $need = $2;
+
+		$self->{_configure_args} = `$NGINX -V 2>&1`
+			if !defined $self->{_configure_args};
+
+		return 0 unless
+			$self->{_configure_args} =~ /with $library ([0-9.]+)/i;
+
+		my @v = split(/\./, $1);
+		my ($n, $v);
+
+		for $n (split(/\./, $need)) {
+			$v = shift @v || 0;
+			return 0 if $n > $v;
+			return 1 if $v > $n;
+		}
+
+		return 1;
+	}
+
+	if ($feature eq 'cryptx') {
+		eval { require Crypt::Misc; };
+		return 0 if $@;
+		eval { die if $Crypt::Misc::VERSION < 0.067; };
+		return !$@;
+	}
+
 	return 0;
 }
 
@@ -706,6 +760,7 @@ sub test_globals_http() {
 	$s .= "root $self->{_testdir};\n";
 	$s .= "access_log $self->{_testdir}/access.log;\n";
 	$s .= "client_body_temp_path $self->{_testdir}/client_body_temp;\n";
+	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n";
 
 	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n"
 		if $self->has_module('fastcgi');
@@ -793,13 +848,14 @@ sub http($;%) {
 	my $s = http_start($request, %extra);
 
 	return $s if $extra{start} or !defined $s;
-	return http_end($s);
+	return http_end($s, %extra);
 }
 
 sub http_start($;%) {
 	my ($request, %extra) = @_;
 	my $s;
 
+	my $port = $extra{SSL} ? 8443 : 8080;
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
@@ -807,9 +863,22 @@ sub http_start($;%) {
 
 		$s = $extra{socket} || IO::Socket::INET->new(
 			Proto => 'tcp',
-			PeerAddr => '127.0.0.1:' . port(8080)
+			PeerAddr => '127.0.0.1:' . port($port),
+			%extra
 		)
 			or die "Can't connect to nginx: $!\n";
+		if ($extra{SSL}) {
+			require IO::Socket::SSL;
+			IO::Socket::SSL->start_SSL(
+				$s,
+				SSL_verify_mode =>
+					IO::Socket::SSL::SSL_VERIFY_NONE(),
+				%extra
+			)
+				or die $IO::Socket::SSL::SSL_ERROR . "\n";
+			log_in("ssl cipher: " . $s->get_cipher());
+			log_in("ssl cert: " . $s->peer_certificate('issuer'));
+		}
 
 		log_out($request);
 		$s->print($request);
@@ -844,6 +913,7 @@ sub http_end($;%) {
 
 		local $/;
 		$reply = $s->getline();
+		$s->close();
 
 		alarm(0);
 	};

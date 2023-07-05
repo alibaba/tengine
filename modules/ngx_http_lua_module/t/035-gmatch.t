@@ -482,9 +482,9 @@ end
     GET /main
 --- response_body
 matched
-sr failed: 500
---- error_log
-attempt to use ngx.re.gmatch iterator in a request that did not create it
+matched
+--- no_error_log
+[error]
 
 
 

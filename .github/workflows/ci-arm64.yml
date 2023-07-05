@@ -50,7 +50,7 @@ jobs:
             export LUAJIT_LIB=/usr/local/lib
             export LUAJIT_INC=/usr/local/include/luajit-2.1
             ./configure \
-              --with-ld-opt="-Wl,-rpath,/usr/local/lib" \
+              --with-ld-opt="-Wl,-lpcre,-rpath,/usr/local/lib" \
               --with-ipv6 \
               --with-http_ssl_module \
               --with-http_v2_module \
