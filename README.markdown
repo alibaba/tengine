@@ -11,8 +11,10 @@ Features
 
 * All features of nginx-1.24.0 are inherited, i.e., it is 100% compatible with nginx.
 * Dynamically reconfigure the servers, locations and upstreams without reloading or restarting worker processes with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
-* HTTP/3 support (QUIC v1 and draft-29) with [XQUIC](https://github.com/alibaba/xquic)
+* HTTP/3 support (QUIC v1 and draft-29) with [xquic](https://github.com/alibaba/xquic).
 * High-speed UDP transmission with kernel-bypass.
+* Dynamically reconfigure routing based on standard and custom HTTP headers, header value, and weights with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically reconfigure timeout setting, SSL Redirects, CORS and enabling/disabling robots for the server and location with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
