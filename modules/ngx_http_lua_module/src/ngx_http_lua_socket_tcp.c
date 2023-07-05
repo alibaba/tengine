@@ -4998,6 +4998,12 @@ ngx_http_lua_req_socket(lua_State *L)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
+        return luaL_error(L, "http3 not supported yet");
+    }
+#endif
+
     if (!raw && r->headers_in.chunked) {
         lua_pushnil(L);
         lua_pushliteral(L, "chunked request bodies not supported yet");

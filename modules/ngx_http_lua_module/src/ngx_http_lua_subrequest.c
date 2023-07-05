@@ -176,6 +176,12 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
     }
 #endif
 
+#if (T_NGX_XQUIC)
+    if (r->main->xqstream) {
+        return luaL_error(L, "http3 requests not supported yet");
+    }
+#endif
+
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
     if (ctx == NULL) {
         return luaL_error(L, "no ctx found");
@@ -1424,6 +1430,10 @@ ngx_http_lua_subrequest(ngx_http_request_t *r,
     sr->stream = r->stream;
 #endif
 
+#if (T_NGX_XQUIC)
+    sr->xqstream = r->xqstream;
+#endif
+
 #ifdef HAVE_ALLOW_REQUEST_BODY_UPDATING_PATCH
     sr->content_length_n = -1;
 #endif
@@ -1443,6 +1453,10 @@ ngx_http_lua_subrequest(ngx_http_request_t *r,
 
     sr->subrequest_in_memory = (flags & NGX_HTTP_SUBREQUEST_IN_MEMORY) != 0;
     sr->waited = (flags & NGX_HTTP_SUBREQUEST_WAITED) != 0;
+
+#if (T_NGX_VARS)
+    sr->raw_uri = r->raw_uri;
+#endif
 
     sr->unparsed_uri = r->unparsed_uri;
     sr->method_name = ngx_http_core_get_method;
