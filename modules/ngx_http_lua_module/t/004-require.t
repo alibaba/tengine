@@ -24,7 +24,7 @@ __DATA__
 
 === TEST 1: sanity
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /main {
         echo_location /load;

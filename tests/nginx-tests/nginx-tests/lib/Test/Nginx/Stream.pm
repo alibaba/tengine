@@ -38,6 +38,11 @@ sub new {
 
 	unshift(@_, "PeerAddr") if @_ == 1;
 
+	eval {
+		local $SIG{ALRM} = sub { die "timeout\n" };
+		local $SIG{PIPE} = sub { die "sigpipe\n" };
+		alarm(8);
+
 	$self->{_socket} = IO::Socket::INET->new(
 		Proto => "tcp",
 		PeerAddr => '127.0.0.1',
@@ -47,13 +52,31 @@ sub new {
 
 	if ({@_}->{'SSL'}) {
 		require IO::Socket::SSL;
-		IO::Socket::SSL->start_SSL($self->{_socket}, @_)
+			IO::Socket::SSL->start_SSL(
+				$self->{_socket},
+				SSL_verify_mode =>
+					IO::Socket::SSL::SSL_VERIFY_NONE(),
+				@_
+			)
 			or die $IO::Socket::SSL::SSL_ERROR . "\n";
+			my $s = $self->{_socket};
+			log_in("ssl cipher: " . $s->get_cipher());
+			log_in("ssl cert: " . $s->peer_certificate('issuer'));
+		}
+		alarm(0);
+	};
+	alarm(0);
+	if ($@) {
+		log_in("died: $@");
 	}
 
 	$self->{_socket}->autoflush(1);
 
 	return $self;
+}
+sub DESTROY {
+	my $self = shift;
+	$self->{_socket}->close();
 }
 
 sub write {
@@ -65,8 +88,8 @@ sub write {
 	$s->blocking(0);
 	while (IO::Select->new($s)->can_write($extra{write_timeout} || 1.5)) {
 		my $n = $s->syswrite($message);
-		log_out(substr($message, 0, $n));
 		last unless $n;
+		log_out(substr($message, 0, $n));
 
 		$message = substr($message, $n);
 		last unless length $message;
@@ -84,9 +107,11 @@ sub read {
 	$s = $self->{_socket};
 
 	$s->blocking(0);
-	if (IO::Select->new($s)->can_read($extra{read_timeout} || 8)) {
-		$s->sysread($buf, 1024);
-	};
+	while (IO::Select->new($s)->can_read($extra{read_timeout} || 8)) {
+		my $n = $s->sysread($buf, 1024);
+		next if !defined $n && $!{EWOULDBLOCK};
+		last;
+	}
 
 	log_in($buf);
 	return $buf;
@@ -133,6 +158,10 @@ sub sockport {
 	return $self->{_socket}->sockport();
 }
 
+sub socket {
+	my ($self) = @_;
+	$self->{_socket};
+}
 ###############################################################################
 
 1;

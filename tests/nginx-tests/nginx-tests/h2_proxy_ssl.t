@@ -74,7 +74,10 @@ foreach my $name ('localhost') {
 }
 
 $t->write_file('index.html', '');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

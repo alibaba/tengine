@@ -26,6 +26,10 @@ typedef struct ngx_http_lua_socket_tcp_upstream_s
         ngx_http_lua_socket_tcp_upstream_t;
 
 
+typedef struct ngx_http_lua_socket_udata_queue_s
+        ngx_http_lua_socket_udata_queue_t;
+
+
 typedef
     int (*ngx_http_lua_socket_tcp_retval_handler)(ngx_http_request_t *r,
         ngx_http_lua_socket_tcp_upstream_t *u, lua_State *L);
@@ -79,6 +83,8 @@ struct ngx_http_lua_socket_tcp_upstream_s {
     ngx_http_lua_socket_tcp_upstream_handler_pt     read_event_handler;
     ngx_http_lua_socket_tcp_upstream_handler_pt     write_event_handler;
 
+    ngx_http_lua_socket_udata_queue_t              *udata_queue;
+
     ngx_http_lua_socket_pool_t      *socket_pool;
 
     ngx_http_lua_loc_conf_t         *conf;
@@ -114,7 +120,12 @@ struct ngx_http_lua_socket_tcp_upstream_s {
 
 #if (NGX_HTTP_SSL)
     ngx_str_t                        ssl_name;
+    ngx_ssl_session_t               *ssl_session_ret;
+    const char                      *error_ret;
+    int                              openssl_error_code_ret;
 #endif
+
+    ngx_chain_t                     *busy_bufs;
 
     unsigned                         ft_type:16;
     unsigned                         no_close:1;
@@ -166,7 +177,24 @@ typedef struct {
 
     ngx_uint_t                       reused;
 
+    ngx_http_lua_socket_udata_queue_t   *udata_queue;
 } ngx_http_lua_socket_pool_item_t;
+
+
+struct ngx_http_lua_socket_udata_queue_s {
+    ngx_pool_t                      *pool;
+    ngx_queue_t                      queue;
+    ngx_queue_t                      free;
+    int                              len;
+    int                              capacity;
+};
+
+
+typedef struct {
+    ngx_queue_t                  queue;
+    uint64_t                     key;
+    uint64_t                     value;
+} ngx_http_lua_socket_node_t;
 
 
 void ngx_http_lua_inject_socket_tcp_api(ngx_log_t *log, lua_State *L);

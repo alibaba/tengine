@@ -163,11 +163,11 @@ http_get('/varlog?logname=0');
 http_get('/varlog?logname=filename');
 
 my $s = http('', start => 1);
-http_get('/addr', socket => $s);
 my $addr = $s->sockhost();
 my $port = $s->sockport();
 my $saddr = $s->peerhost();
 my $sport = $s->peerport();
+http_get('/addr', socket => $s);
 
 http_get('/binary');
 

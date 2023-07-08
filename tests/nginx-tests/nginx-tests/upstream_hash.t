@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite upstream_hash/)->plan(13);
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite upstream_hash/)->plan(15);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -166,7 +166,7 @@ $t->run();
 
 ###############################################################################
 
-my ($p1, $p2, $p3) = (port(8081), port(8082), port(8083));
+my @ports = my ($p1, $p2, $p3) = (port(8081), port(8082), port(8083));
 
 # Only requests for absent peer are moved to other peers if hash is consistent.
 # Check this by comparing two upstreams with different number of peers.
@@ -177,6 +177,9 @@ ok(cmp_peers([iter('/cw', 20)], [iter('/cw2', 20)], $p2), 'consistent weight');
 
 like(many('/?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash');
 like(many('/c?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash - consistent');
+# fallback to round-robin
+like(many('/?a=', 6), qr/$p1: 2, $p2: 2, $p3: 2/, 'empty key');
+like(many('/c?a=', 6), qr/$p1: 2, $p2: 2, $p3: 2/, 'empty key - consistent');
 
 my @res = iter('/', 10);
 
@@ -244,7 +247,8 @@ sub many {
 		}
 	}
 
-	return join ', ', map { $_ . ": " . $ports{$_} } sort keys %ports;
+	my @keys = map { my $p = $_; grep { $p == $_ } keys %ports } @ports;
+	return join ', ', map { $_ . ": " . $ports{$_} } @keys;
 }
 
 ###############################################################################

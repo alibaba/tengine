@@ -7,7 +7,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 7);
+plan tests => repeat_each() * (blocks() * 2 + 9);
 
 #no_diff();
 #no_long_string();
@@ -228,3 +228,53 @@ GET /test?hello
 --- error_log
 variable "query_string" not changeable
 --- error_code: 500
+
+
+
+=== TEST 12: get a variable in balancer_by_lua_block
+--- http_config
+    upstream balancer {
+        server 127.0.0.1;
+        balancer_by_lua_block {
+            local balancer = require "ngx.balancer"
+            local host = "127.0.0.1"
+            local port = ngx.var.port;
+            local ok, err = balancer.set_current_peer(host, port)
+            if not ok then
+                ngx.log(ngx.ERR, "failed to set the current peer: ", err)
+                return ngx.exit(500)
+            end
+        }
+    }
+    server {
+        # this is the real entry point
+        listen 8091;
+        location / {
+            content_by_lua_block{
+                ngx.print("this is backend peer 8091")
+            }
+        }
+    }
+    server {
+        # this is the real entry point
+        listen 8092;
+        location / {
+            content_by_lua_block{
+                ngx.print("this is backend peer 8092")
+            }
+        }
+    }
+--- config
+    location =/balancer {
+        set $port '';
+        set_by_lua_block $port {
+            local args, _ = ngx.req.get_uri_args()
+            local port = args['port']
+            return port
+        }
+        proxy_pass http://balancer;
+    }
+--- pipelined_requests eval
+["GET /balancer?port=8091", "GET /balancer?port=8092"]
+--- response_body eval
+["this is backend peer 8091", "this is backend peer 8092"]

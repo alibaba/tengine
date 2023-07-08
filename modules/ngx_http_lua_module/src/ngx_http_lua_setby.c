@@ -15,10 +15,7 @@
 #include "ngx_http_lua_exception.h"
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_pcrefix.h"
-#include "ngx_http_lua_time.h"
 #include "ngx_http_lua_log.h"
-#include "ngx_http_lua_regex.h"
-#include "ngx_http_lua_variable.h"
 #include "ngx_http_lua_string.h"
 #include "ngx_http_lua_misc.h"
 #include "ngx_http_lua_consts.h"
@@ -126,16 +123,15 @@ ngx_http_lua_set_by_chunk(lua_State *L, ngx_http_request_t *r, ngx_str_t *val,
 }
 
 
-int
-ngx_http_lua_setby_param_get(lua_State *L, ngx_http_request_t *r)
+void
+ngx_http_lua_ffi_get_setby_param(ngx_http_request_t *r, int idx,
+    u_char **data_p, size_t *len_p)
 {
-    int         idx;
     int         n;
 
     ngx_http_variable_value_t       *v;
     ngx_http_lua_main_conf_t        *lmcf;
 
-    idx = luaL_checkint(L, 2);
     idx--;
 
     lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
@@ -147,13 +143,12 @@ ngx_http_lua_setby_param_get(lua_State *L, ngx_http_request_t *r)
     v = lmcf->setby_args;
 
     if (idx < 0 || idx > n - 1) {
-        lua_pushnil(L);
+        *len_p = 0;
 
     } else {
-        lua_pushlstring(L, (const char *) (v[idx].data), v[idx].len);
+        *data_p = v[idx].data;
+        *len_p = v[idx].len;
     }
-
-    return 1;
 }
 
 

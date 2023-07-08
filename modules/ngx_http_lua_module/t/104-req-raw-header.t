@@ -331,6 +331,8 @@ Foo: bar baz\r
 }
 --- no_error_log
 [error]
+--- skip_nginx
+3: >= 1.21.1
 
 
 
@@ -362,6 +364,8 @@ Connection: close\r
 --- no_error_log
 [error]
 --- timeout: 5
+--- skip_nginx
+3: >= 1.21.1
 
 
 
@@ -988,3 +992,61 @@ Connection: close
 --- no_error_log
 [error]
 --- timeout: 5
+
+
+
+=== TEST 34: multi-line header is invalid (nginx >= 1.21.1)
+--- config
+    location /t {
+        content_by_lua '
+            ngx.print(ngx.req.raw_header())
+        ';
+    }
+--- raw_request eval
+"GET /t HTTP/1.1\r
+Host: localhost\r
+Connection: close\r
+Foo: bar baz\r
+  blah\r
+\r
+"
+--- error_code: 400
+--- error_log
+client sent invalid header line: "\x20..." while reading client request headers
+--- no_error_log
+[error]
+--- skip_nginx
+3: < 1.21.1
+
+
+
+=== TEST 35: bugfix: invalid http request
+--- log_level: error
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;;";
+--- config
+    location /t {
+        content_by_lua_block {
+            local sock = ngx.socket.tcp()
+            local ok, err = sock:connect("127.0.0.1", $TEST_NGINX_SERVER_PORT)
+            if not ok then
+                ngx.log(ngx.ERR, "failed to connect to memc: ", err)
+                return
+            end
+            sock:send("\n")
+            sock:close()
+
+            ngx.say("OK")
+        }
+    }
+
+    log_by_lua_block {
+        local h = ngx.req.raw_header()
+    }
+
+--- request
+GET /t
+--- response_body
+OK
+--- no_error_log
+[error]

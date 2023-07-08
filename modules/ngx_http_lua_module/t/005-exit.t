@@ -3,6 +3,7 @@
 use Test::Nginx::Socket::Lua;
 
 #repeat_each(20000);
+#repeat_each(200);
 repeat_each(2);
 #master_on();
 #workers(1);
@@ -723,3 +724,98 @@ GET /t
 --- response_body
 --- no_error_log
 [error]
+
+
+
+=== TEST 25: 501 Method Not Implemented
+--- config
+    location /lua {
+        content_by_lua '
+            ngx.exit(ngx.HTTP_NOT_IMPLEMENTED)
+        ';
+    }
+--- request
+GET /lua
+--- error_code: 501
+--- response_body_like: 501 (?:Method )?Not Implemented
+--- no_error_log
+[error]
+
+
+
+=== TEST 26: accepts NGX_OK
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.exit(ngx.OK)
+        }
+    }
+--- request
+GET /t
+--- response_body
+--- no_error_log
+[error]
+
+
+
+=== TEST 27: accepts NGX_ERROR
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.exit(ngx.ERROR)
+        }
+    }
+--- request
+GET /t
+--- error_code:
+--- response_body
+--- no_error_log
+[error]
+
+
+
+=== TEST 28: accepts NGX_DECLINED
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.exit(ngx.DECLINED)
+        }
+    }
+--- request
+GET /t
+--- error_code:
+--- response_body
+--- no_error_log
+[error]
+
+
+
+=== TEST 29: refuses NGX_AGAIN
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.exit(ngx.AGAIN)
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_body_like: 500 Internal Server Error
+--- error_log eval
+qr/\[error\] .*? bad argument to 'ngx.exit': does not accept NGX_AGAIN or NGX_DONE/
+
+
+
+=== TEST 30: refuses NGX_DONE
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.exit(ngx.DONE)
+        }
+    }
+--- request
+GET /t
+--- error_code: 500
+--- response_body_like: 500 Internal Server Error
+--- error_log eval
+qr/\[error\] .*? bad argument to 'ngx.exit': does not accept NGX_AGAIN or NGX_DONE/

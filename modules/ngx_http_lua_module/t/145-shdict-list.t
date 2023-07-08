@@ -743,3 +743,111 @@ GET /test
 done
 --- no_error_log
 [error]
+
+
+
+=== TEST 20: push to an expired list
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua_block {
+            local dogs = ngx.shared.dogs
+            local len, err = dogs:lpush("cc", "1") --add another list to avoid key"aa" be cleaned (run ‘ngx_http_lua_shdict_expire(ctx, 1)’ may clean key ,ensure key'aa' not clean ,just expired))
+            if not len then
+                ngx.say("push cc  err: ", err)
+            end
+            local len, err = dogs:lpush("aa", "1")
+            if not len then
+                ngx.say("push1 err: ", err)
+            end
+            local succ, err = dogs:expire("aa", 0.2)
+            if not succ then
+                ngx.say("expire err: ",err)
+            end
+            ngx.sleep(0.3) -- list aa expired
+            local len, err = dogs:lpush("aa", "2") --push to an expired list may set as a new list
+            if not len then
+                ngx.say("push2 err: ", err)
+            end
+            local len, err = dogs:llen("aa") -- new list len is 1
+            if not len then
+                ngx.say("llen err: ", err)
+            else
+            ngx.say("aa:len :", dogs:llen("aa"))
+            end
+        }
+    }
+
+--- request
+GET /test
+--- response_body
+aa:len :1
+--- no_error_log
+[error]
+
+
+
+=== TEST 21: push to an expired list then pop many time (more then list len )
+--- http_config
+    lua_shared_dict dogs 1m;
+--- config
+    location = /test {
+        content_by_lua_block {
+            local dogs = ngx.shared.dogs
+            local len, err = dogs:lpush("cc", "1") --add another list to avoid key"aa" be cleaned (run ‘ngx_http_lua_shdict_expire(ctx, 1)’ may clean key ,ensure key'aa' not clean ,just expired))
+            if not len then
+                ngx.say("push cc  err: ", err)
+            end
+            local len, err = dogs:lpush("aa", "1")
+            if not len then
+                ngx.say("push1 err: ", err)
+            end
+            local succ, err = dogs:expire("aa", 0.2)
+            if not succ then
+            ngx.say("expire err: ",err)
+            end
+            ngx.sleep(0.3) -- list aa expired
+            local len, err = dogs:lpush("aa", "2") --push to an expired list may set as a new list
+            if not len then
+                ngx.say("push2 err: ", err)
+            end
+            local val, err = dogs:lpop("aa") 
+            if not val then
+                ngx.say("llen err: ", err)
+            end
+            local val, err = dogs:lpop("aa")  -- val == nil
+            ngx.say("aa list value: ", val)
+        }
+    }
+
+--- request
+GET /test
+--- response_body
+aa list value: nil
+--- no_error_log
+[error]
+
+
+
+=== TEST 22: lpush return nil
+--- http_config
+    lua_shared_dict dogs 100k;
+--- config
+    location = /test {
+        content_by_lua_block {
+            local dogs = ngx.shared.dogs
+            for i = 1, 2920
+            do
+                local len, err = dogs:lpush("foo", "bar")
+            end
+            local len, err = dogs:lpush("foo", "bar")
+            ngx.say(len)
+        }
+    }
+--- request
+GET /test
+--- response_body
+nil
+--- no_error_log
+[error]

@@ -175,7 +175,7 @@ ngx_http_lua_shared_memory_init(ngx_shm_zone_t *shm_zone, void *data)
     }
 
     zone->shm = shm_zone->shm;
-#if defined(nginx_version) && nginx_version >= 1009000
+#if (nginx_version >= 1009000)
     zone->noreuse = shm_zone->noreuse;
 #endif
 
@@ -212,5 +212,133 @@ ngx_http_lua_shared_memory_init(ngx_shm_zone_t *shm_zone, void *data)
 
     return NGX_OK;
 }
+
+
+ngx_http_lua_co_ctx_t *
+ngx_http_lua_get_cur_co_ctx(ngx_http_request_t *r)
+{
+    ngx_http_lua_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+
+    return ctx->cur_co_ctx;
+}
+
+
+void
+ngx_http_lua_set_cur_co_ctx(ngx_http_request_t *r, ngx_http_lua_co_ctx_t *coctx)
+{
+    ngx_http_lua_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+
+    coctx->data = r;
+
+    ctx->cur_co_ctx = coctx;
+}
+
+
+lua_State *
+ngx_http_lua_get_co_ctx_vm(ngx_http_lua_co_ctx_t *coctx)
+{
+    return coctx->co;
+}
+
+
+static ngx_int_t
+ngx_http_lua_co_ctx_resume(ngx_http_request_t *r)
+{
+    lua_State                   *vm;
+    ngx_connection_t            *c;
+    ngx_int_t                    rc;
+    ngx_uint_t                   nreqs;
+    ngx_http_lua_ctx_t          *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ctx->resume_handler = ngx_http_lua_wev_handler;
+
+    c = r->connection;
+    vm = ngx_http_lua_get_lua_vm(r, ctx);
+    nreqs = c->requests;
+
+    rc = ngx_http_lua_run_thread(vm, r, ctx, ctx->cur_co_ctx->nrets);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua run thread returned %d", rc);
+
+    if (rc == NGX_AGAIN) {
+        return ngx_http_lua_run_posted_threads(c, vm, r, ctx, nreqs);
+    }
+
+    if (rc == NGX_DONE) {
+        ngx_http_lua_finalize_request(r, NGX_DONE);
+        return ngx_http_lua_run_posted_threads(c, vm, r, ctx, nreqs);
+    }
+
+    if (ctx->entered_content_phase) {
+        ngx_http_lua_finalize_request(r, rc);
+        return NGX_DONE;
+    }
+
+    return rc;
+}
+
+
+void
+ngx_http_lua_co_ctx_resume_helper(ngx_http_lua_co_ctx_t *coctx, int nrets)
+{
+    ngx_connection_t        *c;
+    ngx_http_request_t      *r;
+    ngx_http_lua_ctx_t      *ctx;
+    ngx_http_log_ctx_t      *log_ctx;
+
+    r = coctx->data;
+    c = r->connection;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    if (c->fd != (ngx_socket_t) -1) {  /* not a fake connection */
+        log_ctx = c->log->data;
+        log_ctx->current_request = r;
+    }
+
+    coctx->nrets = nrets;
+    coctx->cleanup = NULL;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "lua coctx resume handler: \"%V?%V\"", &r->uri, &r->args);
+
+    ctx->cur_co_ctx = coctx;
+
+    if (ctx->entered_content_phase) {
+        (void) ngx_http_lua_co_ctx_resume(r);
+
+    } else {
+        ctx->resume_handler = ngx_http_lua_co_ctx_resume;
+        ngx_http_core_run_phases(r);
+    }
+
+    ngx_http_run_posted_requests(c);
+}
+
+
+int
+ngx_http_lua_get_lua_http10_buffering(ngx_http_request_t *r)
+{
+    ngx_http_lua_loc_conf_t      *llcf;
+
+    llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
+
+    return llcf->http10_buffering;
+}
+
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

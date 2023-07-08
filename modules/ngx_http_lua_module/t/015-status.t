@@ -272,7 +272,7 @@ ngx.status = 502
 
 
 
-=== TEST 16: ngx.status assignmnt should clear r->err_status
+=== TEST 16: ngx.status assignment should clear r->err_status
 --- config
 location = /t {
     return 502;

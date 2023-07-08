@@ -25,7 +25,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2/)
+my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 socket_ssl_alpn/)
 	->has_daemon('openssl');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -55,14 +55,8 @@ http {
 
 EOF
 
-eval { require IO::Socket::SSL; die if $IO::Socket::SSL::VERSION < 1.56; };
-plan(skip_all => 'IO::Socket::SSL version >= 1.56 required') if $@;
 
-eval { IO::Socket::SSL->can_alpn() or die; };
-plan(skip_all => 'IO::Socket::SSL with OpenSSL ALPN support required') if $@;
 
-eval { exists &Net::SSLeay::P_alpn_selected or die; };
-plan(skip_all => 'Net::SSLeay with OpenSSL ALPN support required') if $@;
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
@@ -91,15 +85,17 @@ $t->run();
 open STDERR, ">&", \*OLDERR;
 
 plan(skip_all => 'no ALPN negotiation') unless defined getconn();
-$t->plan(3);
+$t->plan(4);
 
 ###############################################################################
 
 SKIP: {
-$t->{_configure_args} =~ /LibreSSL ([\d\.]+)/;
-skip 'LibreSSL too old', 1 if defined $1 and $1 lt '3.4.0';
-$t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
-skip 'OpenSSL too old', 1 if defined $1 and $1 lt '1.1.0';
+skip 'LibreSSL too old', 1
+	if $t->has_module('LibreSSL')
+	and not $t->has_feature('libressl:3.4.0');
+skip 'OpenSSL too old', 1
+	if $t->has_module('OpenSSL')
+	and not $t->has_feature('openssl:1.1.0');
 
 TODO: {
 local $TODO = 'not yet' unless $t->has_version('1.21.4');
@@ -118,6 +114,10 @@ my $sid = $s->new_stream();
 my $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 my ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 200, 'alpn to HTTP/2');
+# h2c preface on ssl-enabled socket is rejected as invalid HTTP/1.x request,
+# ensure that HTTP/2 auto-detection doesn't kick in
+like(http("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"), qr/Bad Request/,
+	'no h2c on ssl socket');
 
 # client cancels last stream after HEADERS has been created,
 # while some unsent data was left in the SSL buffer

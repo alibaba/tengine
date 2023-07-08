@@ -18,9 +18,18 @@ ngx_http_lua_init_by_inline(ngx_log_t *log, ngx_http_lua_main_conf_t *lmcf,
     lua_State *L)
 {
     int         status;
+    const char *chunkname;
+
+
+    if (lmcf->init_chunkname == NULL) {
+        chunkname = "=init_by_lua";
+
+    } else {
+        chunkname = (const char *) lmcf->init_chunkname;
+    }
 
     status = luaL_loadbuffer(L, (char *) lmcf->init_src.data,
-                             lmcf->init_src.len, "=init_by_lua")
+                             lmcf->init_src.len, chunkname)
              || ngx_http_lua_do_call(log, L);
 
     return ngx_http_lua_report(log, L, status, "init_by_lua");

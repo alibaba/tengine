@@ -616,20 +616,6 @@ ngx_xquic_generate_route_cid(unsigned char *buf, size_t len, const uint8_t *curr
     /* fill with random data */
     ngx_xquic_random_buf(buf, qmcf->cid_len);
 
-    /* keep server id */
-    if (current_cid_buf) {
-
-        if (XQC_UNLIKELY(current_cid_buflen < qmcf->cid_server_id_offset + qmcf->cid_server_id_length)) {
-            /* just return 0 to force xquic generate random cid */
-            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|not enough buffer for server id space %d (required at least %d)",
-                current_cid_buflen, qmcf->cid_server_id_offset + qmcf->cid_server_id_length);
-            return 0;
-        }
-
-        /* copy server id */
-        ngx_memcpy(buf + qmcf->cid_server_id_offset, current_cid_buf + qmcf->cid_server_id_offset, qmcf->cid_server_id_length);
-    }
-
     /* calculate salt */
     salt = ngx_murmur_hash2(buf, qmcf->cid_worker_id_salt_range);
 

@@ -917,3 +917,35 @@ to: 4
 pos: 5
 --- no_error_log
 [error]
+
+
+
+=== TEST 32: ignore match limit in DFA mode
+--- http_config
+    lua_regex_match_limit 1;
+--- config
+    location /re {
+        content_by_lua_block {
+            local s = "This is <something> <something else> <something further> no more"
+            local from, to, err = ngx.re.find(s, "<.*>", "d")
+            if from then
+                ngx.say("from: ", from)
+                ngx.say("to: ", to)
+                ngx.say("matched: ", string.sub(s, from, to))
+            else
+                if err then
+                    ngx.say("error: ", err)
+                    return
+                end
+                ngx.say("not matched!")
+            end
+        }
+    }
+--- request
+    GET /re
+--- response_body
+from: 9
+to: 56
+matched: <something> <something else> <something further>
+--- no_error_log
+[error]

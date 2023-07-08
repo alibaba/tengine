@@ -7,6 +7,9 @@ use Test::Nginx::Socket::Lua;
 #workers(2);
 #log_level('warn');
 
+#connect 0.0.0.1 on newer kernel won't return EINVAL
+#so add an route with cmd: sudo ip route add prohibit 0.0.0.1/32
+
 repeat_each(2);
 
 plan tests => repeat_each() * (blocks() * 4 + 9);
@@ -35,7 +38,7 @@ __DATA__
 --- error_code: 502
 --- error_log eval
 [
-'[lua] balancer_by_lua:2: hello from balancer by lua! while connecting to upstream,',
+'[lua] balancer_by_lua(nginx.conf:27):2: hello from balancer by lua! while connecting to upstream,',
 qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\.0\.1:80/t"},
 ]
 --- no_error_log
@@ -61,7 +64,7 @@ qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\
 --- response_body_like: 403 Forbidden
 --- error_code: 403
 --- error_log
-[lua] balancer_by_lua:2: hello from balancer by lua! while connecting to upstream,
+[lua] balancer_by_lua(nginx.conf:27):2: hello from balancer by lua! while connecting to upstream,
 --- no_error_log eval
 [
 '[warn]',
@@ -89,7 +92,7 @@ qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\
 --- error_code: 502
 --- error_log eval
 [
-'[lua] balancer_by_lua:2: hello from balancer by lua! while connecting to upstream,',
+'[lua] balancer_by_lua(nginx.conf:27):2: hello from balancer by lua! while connecting to upstream,',
 qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\.0\.1:80/t"},
 ]
 --- no_error_log
@@ -254,7 +257,7 @@ qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
 --- error_log eval
-qr/\[error\] .*? failed to run balancer_by_lua\*: balancer_by_lua:2: API disabled in the context of balancer_by_lua\*/
+qr/\[error\] .*? failed to run balancer_by_lua\*: balancer_by_lua\(nginx\.conf:27\):2: API disabled in the context of balancer_by_lua\*/
 
 
 
@@ -275,7 +278,7 @@ qr/\[error\] .*? failed to run balancer_by_lua\*: balancer_by_lua:2: API disable
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
 --- error_log eval
-qr/\[error\] .*? failed to run balancer_by_lua\*: balancer_by_lua:2: API disabled in the context of balancer_by_lua\*/
+qr/\[error\] .*? failed to run balancer_by_lua\*: balancer_by_lua\(nginx\.conf:27\):2: API disabled in the context of balancer_by_lua\*/
 
 
 
@@ -424,7 +427,7 @@ ctx counter: nil
 --- error_code: 502
 --- error_log eval
 [
-'[lua] balancer_by_lua:2: hello from balancer by lua! while connecting to upstream,',
+'[lua] balancer_by_lua(nginx.conf:27):2: hello from balancer by lua! while connecting to upstream,',
 qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\.0\.1:80/t"},
 ]
 --- no_error_log
@@ -432,7 +435,7 @@ qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\
 
 
 
-=== TEST 15: test if execeed proxy_next_upstream_limit
+=== TEST 15: test if exceed proxy_next_upstream_limit
 --- http_config
     lua_package_path "../lua-resty-core/lib/?.lua;;";
 
@@ -524,3 +527,66 @@ http next upstream, 2
 --- no_error_log
 failed to set more tries: reduced tries due to limit
 [alert]
+
+
+
+=== TEST 17: recreate_request buffer bugfix
+--- http_config
+    lua_package_path "../lua-resty-core/lib/?.lua;;";
+
+    server {
+        listen 127.0.0.1:$TEST_NGINX_RAND_PORT_1;
+
+        location / {
+            return 200 "it works";
+        }
+    }
+
+    upstream foo {
+        server 127.0.0.1:$TEST_NGINX_RAND_PORT_1 max_fails=0;
+        server 127.0.0.1:$TEST_NGINX_RAND_PORT_2 max_fails=0 weight=9999;
+
+        balancer_by_lua_block {
+            local bal = require "ngx.balancer"
+
+            assert(bal.recreate_request())
+        }
+    }
+
+--- config
+    location = /t {
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_pass http://foo;
+    }
+--- request
+GET /t
+--- error_code: 200
+--- error_log
+connect() failed (111: Connection refused) while connecting to upstream
+--- no_error_log
+upstream sent more data than specified in "Content-Length" header while reading upstream
+[alert]
+
+
+
+=== TEST 18: error in balancer_by_llua_block
+--- http_config
+    upstream backend {
+        server 0.0.0.1;
+        balancer_by_lua_block {
+            ngx.say("hello"
+        }
+    }
+--- config
+    location = /t {
+        proxy_pass http://backend;
+    }
+--- request
+    GET /t
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+--- error_log eval
+ "failed to load inlined Lua code: balancer_by_lua(nginx.conf:27):3: ')' expected (to close '(' at line 2) near '<eof>'",
+--- no_error_log
+[warn]
