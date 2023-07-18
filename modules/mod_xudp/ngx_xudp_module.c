@@ -308,6 +308,10 @@ ngx_xudp_get_address_from_http_core_module(ngx_xudp_conf_t *xcf, ngx_http_core_m
     ngx_http_conf_addr_t        *addr;
     ngx_sockaddr_t               wildcard;
 
+    if (cmcf->ports == NULL) {
+        return NGX_OK;
+    }
+
     port = (ngx_http_conf_port_t*) cmcf->ports->elts;
 
     for(i = 0; i < cmcf->ports->nelts; i++) {
