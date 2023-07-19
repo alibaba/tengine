@@ -1,14 +1,156 @@
-Changes with nginx 1.22.1                                        19 Oct 2022
+Changes with nginx 1.24.0                                        11 Apr 2023
+
+    *) 1.24.x stable branch.
+
+
+Changes with nginx 1.23.4                                        28 Mar 2023
+
+    *) Change: now TLSv1.3 protocol is enabled by default.
+
+    *) Change: now nginx issues a warning if protocol parameters of a
+       listening socket are redefined.
+
+    *) Change: now nginx closes connections with lingering if pipelining was
+       used by the client.
+
+    *) Feature: byte ranges support in the ngx_http_gzip_static_module.
+
+    *) Bugfix: port ranges in the "listen" directive did not work; the bug
+       had appeared in 1.23.3.
+       Thanks to Valentin Bartenev.
+
+    *) Bugfix: incorrect location might be chosen to process a request if a
+       prefix location longer than 255 characters was used in the
+       configuration.
+
+    *) Bugfix: non-ASCII characters in file names on Windows were not
+       supported by the ngx_http_autoindex_module, the ngx_http_dav_module,
+       and the "include" directive.
+
+    *) Change: the logging level of the "data length too long", "length too
+       short", "bad legacy version", "no shared signature algorithms", "bad
+       digest length", "missing sigalgs extension", "encrypted length too
+       long", "bad length", "bad key update", "mixed handshake and non
+       handshake data", "ccs received early", "data between ccs and
+       finished", "packet length too long", "too many warn alerts", "record
+       too small", and "got a fin before a ccs" SSL errors has been lowered
+       from "crit" to "info".
+
+    *) Bugfix: a socket leak might occur when using HTTP/2 and the
+       "error_page" directive to redirect errors with code 400.
+
+    *) Bugfix: messages about logging to syslog errors did not contain
+       information that the errors happened while logging to syslog.
+       Thanks to Safar Safarly.
+
+    *) Workaround: "gzip filter failed to use preallocated memory" alerts
+       appeared in logs when using zlib-ng.
+
+    *) Bugfix: in the mail proxy server.
+
+
+Changes with nginx 1.23.3                                        13 Dec 2022
+
+    *) Bugfix: an error might occur when reading PROXY protocol version 2
+       header with large number of TLVs.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if SSI
+       was used to process subrequests created by other modules.
+       Thanks to Ciel Zhao.
+
+    *) Workaround: when a hostname used in the "listen" directive resolves
+       to multiple addresses, nginx now ignores duplicates within these
+       addresses.
+
+    *) Bugfix: nginx might hog CPU during unbuffered proxying if SSL
+       connections to backends were used.
+
+
+Changes with nginx 1.23.2                                        19 Oct 2022
 
     *) Security: processing of a specially crafted mp4 file by the
        ngx_http_mp4_module might cause a worker process crash, worker
        process memory disclosure, or might have potential other impact
        (CVE-2022-41741, CVE-2022-41742).
 
+    *) Feature: the "$proxy_protocol_tlv_..." variables.
 
-Changes with nginx 1.22.0                                        24 May 2022
+    *) Feature: TLS session tickets encryption keys are now automatically
+       rotated when using shared memory in the "ssl_session_cache"
+       directive.
 
-    *) 1.22.x stable branch.
+    *) Change: the logging level of the "bad record type" SSL errors has
+       been lowered from "crit" to "info".
+       Thanks to Murilo Andrade.
+
+    *) Change: now when using shared memory in the "ssl_session_cache"
+       directive the "could not allocate new session" errors are logged at
+       the "warn" level instead of "alert" and not more often than once per
+       second.
+
+    *) Bugfix: nginx/Windows could not be built with OpenSSL 3.0.x.
+
+    *) Bugfix: in logging of the PROXY protocol errors.
+       Thanks to Sergey Brester.
+
+    *) Workaround: shared memory from the "ssl_session_cache" directive was
+       spent on sessions using TLS session tickets when using TLSv1.3 with
+       OpenSSL.
+
+    *) Workaround: timeout specified with the "ssl_session_timeout"
+       directive did not work when using TLSv1.3 with OpenSSL or BoringSSL.
+
+
+Changes with nginx 1.23.1                                        19 Jul 2022
+
+    *) Feature: memory usage optimization in configurations with SSL
+       proxying.
+
+    *) Feature: looking up of IPv4 addresses while resolving now can be
+       disabled with the "ipv4=off" parameter of the "resolver" directive.
+
+    *) Change: the logging level of the "bad key share", "bad extension",
+       "bad cipher", and "bad ecpoint" SSL errors has been lowered from
+       "crit" to "info".
+
+    *) Bugfix: while returning byte ranges nginx did not remove the
+       "Content-Range" header line if it was present in the original backend
+       response.
+
+    *) Bugfix: a proxied response might be truncated during reconfiguration
+       on Linux; the bug had appeared in 1.17.5.
+
+
+Changes with nginx 1.23.0                                        21 Jun 2022
+
+    *) Change in internal API: now header lines are represented as linked
+       lists.
+
+    *) Change: now nginx combines arbitrary header lines with identical
+       names when sending to FastCGI, SCGI, and uwsgi backends, in the
+       $r->header_in() method of the ngx_http_perl_module, and during lookup
+       of the "$http_...", "$sent_http_...", "$sent_trailer_...",
+       "$upstream_http_...", and "$upstream_trailer_..." variables.
+
+    *) Bugfix: if there were multiple "Vary" header lines in the backend
+       response, nginx only used the last of them when caching.
+
+    *) Bugfix: if there were multiple "WWW-Authenticate" header lines in the
+       backend response and errors with code 401 were intercepted or the
+       "auth_request" directive was used, nginx only sent the first of the
+       header lines to the client.
+
+    *) Change: the logging level of the "application data after close
+       notify" SSL errors has been lowered from "crit" to "info".
+
+    *) Bugfix: connections might hang if nginx was built on Linux 2.6.17 or
+       newer, but was used on systems without EPOLLRDHUP support, notably
+       with epoll emulation layers; the bug had appeared in 1.17.5.
+       Thanks to Marcus Ball.
+
+    *) Bugfix: nginx did not cache the response if the "Expires" response
+       header line disabled caching, but following "Cache-Control" header
+       line enabled caching.
 
 
 Changes with nginx 1.21.6                                        25 Jan 2022
@@ -398,11 +540,6 @@ Changes with nginx 1.19.0                                        26 May 2020
     *) Bugfix: connections with incorrect HTTP/2 preface were not logged.
 
 
-Changes with nginx 1.18.0                                        21 Apr 2020
-
-    *) 1.18.x stable branch.
-
-
 Changes with nginx 1.17.10                                       14 Apr 2020
 
     *) Feature: the "auth_delay" directive.
@@ -592,16 +729,12 @@ Changes with nginx 1.17.0                                        21 May 2019
 
     *) Bugfix: in byte ranges processing.
 
-Changes with nginx 1.16.0                                        23 Apr 2019
-
-    *) 1.16.x stable branch.
-
 
 Changes with nginx 1.15.12                                       16 Apr 2019
 
     *) Bugfix: a segmentation fault might occur in a worker process if
-variables were used in the "ssl_certificate" or "ssl_certificate_key"
-directives and OCSP stapling was enabled.
+       variables were used in the "ssl_certificate" or "ssl_certificate_key"
+       directives and OCSP stapling was enabled.
 
 
 Changes with nginx 1.15.11                                       09 Apr 2019
@@ -612,18 +745,19 @@ Changes with nginx 1.15.11                                       09 Apr 2019
 Changes with nginx 1.15.10                                       26 Mar 2019
 
     *) Change: when using a hostname in the "listen" directive nginx now
-creates listening sockets for all addresses the hostname resolves to
-(previously, only the first address was used).
+       creates listening sockets for all addresses the hostname resolves to
+       (previously, only the first address was used).
 
     *) Feature: port ranges in the "listen" directive.
 
     *) Feature: loading of SSL certificates and secret keys from variables.
 
     *) Workaround: the $ssl_server_name variable might be empty when using
-OpenSSL 1.1.1.
+       OpenSSL 1.1.1.
 
     *) Bugfix: nginx/Windows could not be built with Visual Studio 2015 or
-newer; the bug had appeared in 1.15.9.
+       newer; the bug had appeared in 1.15.9.
+
 
 Changes with nginx 1.15.9                                        26 Feb 2019
 
@@ -8907,4 +9041,3 @@ Changes with nginx 0.1.1                                         11 Oct 2004
 Changes with nginx 0.1.0                                         04 Oct 2004
 
     *) The first public version.
-
