@@ -1,5 +1,20 @@
+<h1 align="center" style="border-bottom: none">
+    <br>Tengine
+</h1>
 
-Introduction [![Build Status](https://github.com/alibaba/tengine/actions/workflows/ci.yml/badge.svg)](https://github.com/alibaba/tengine/actions/workflows/ci.yml)
+<p align="center">Visit <a href="https://tengine.taobao.org" target="_blank">tengine.taobao.org</a> for the full documentation,
+examples and guides.</p>
+
+<div align="center">
+
+[![GitHub license](https://img.shields.io/github/license/alibaba/tengine.svg)](https://github.com/alibaba/tengine/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/badge/contributions-welcome-orange.svg)](https://github.com/alibaba/tengine/blob/main/CONTRIBUTING.md)
+[![Build Status](https://github.com/alibaba/tengine/actions/workflows/ci.yml/badge.svg)](https://github.com/alibaba/tengine/actions/workflows/ci.yml)
+
+</div>
+
+
+Introduction
 ============
 
 Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on the [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
@@ -61,3 +76,7 @@ Contact
 [https://github.com/alibaba/tengine/issues](https://github.com/alibaba/tengine/issues)
 
 Dingtalk user group: 23394285
+
+<h1 align="center" style="border-bottom: none">
+    <a href="https://tengine.taobao.org" target="_blank"><img alt="Tengine" src="/docs/image/tengine-logo.png"></a>
+</h1>
