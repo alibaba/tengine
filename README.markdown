@@ -52,9 +52,9 @@ Tengine can be downloaded at [http://tengine.taobao.org/download/tengine.tar.gz]
 
 To install Tengine, just follow these three steps:
 ```bash
-    $ ./configure
-    $ make
-    # make install
+./configure
+make
+sudo make install
 ```
 
 By default, it will be installed to _/usr/local/nginx_. You can use the __'--prefix'__ option to specify the root directory.
