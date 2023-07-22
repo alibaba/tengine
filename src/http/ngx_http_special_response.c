@@ -28,6 +28,7 @@ static u_char ngx_http_error_full_tail[] =
 "</html>" CRLF
 ;
 
+
 static u_char ngx_http_error_build_tail[] =
 "<hr><center>" NGINX_VER_BUILD "</center>" CRLF
 "</body>" CRLF
@@ -722,6 +723,7 @@ ngx_http_send_error_page(ngx_http_request_t *r, ngx_http_err_page_t *err_page)
     }
 
     location->hash = 1;
+    location->next = NULL;
     ngx_str_set(&location->key, "Location");
     location->value = uri;
 

@@ -16,8 +16,69 @@
 
 
 static int ngx_http_lua_ngx_req_set_uri_args(lua_State *L);
-static int ngx_http_lua_ngx_req_get_uri_args(lua_State *L);
 static int ngx_http_lua_ngx_req_get_post_args(lua_State *L);
+
+
+uintptr_t
+ngx_http_lua_escape_args(u_char *dst, u_char *src, size_t size)
+{
+    ngx_uint_t      n;
+    static u_char   hex[] = "0123456789ABCDEF";
+
+                    /* %00-%20 %7F*/
+
+    static uint32_t   escape[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000001, /* 0000 0000 0000 0000  0000 0000 0000 0001 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    };
+
+    if (dst == NULL) {
+
+        /* find the number of the characters to be escaped */
+
+        n = 0;
+
+        while (size) {
+            if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
+                n++;
+            }
+
+            src++;
+            size--;
+        }
+
+        return (uintptr_t) n;
+    }
+
+    while (size) {
+        if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
+            *dst++ = '%';
+            *dst++ = hex[*src >> 4];
+            *dst++ = hex[*src & 0xf];
+            src++;
+
+        } else {
+            *dst++ = *src++;
+        }
+
+        size--;
+    }
+
+    return (uintptr_t) dst;
+}
 
 
 static int
@@ -28,6 +89,7 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L)
     const char                  *msg;
     size_t                       len;
     u_char                      *p;
+    uintptr_t                    escape;
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "expecting 1 argument but seen %d",
@@ -43,7 +105,6 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L)
 
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER:
-    case LUA_TSTRING:
         p = (u_char *) lua_tolstring(L, 1, &len);
 
         args.data = ngx_palloc(r->pool, len);
@@ -56,6 +117,32 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L)
         args.len = len;
         break;
 
+    case LUA_TSTRING:
+        p = (u_char *) lua_tolstring(L, 1, &len);
+
+        escape = ngx_http_lua_escape_args(NULL, p, len);
+        if (escape > 0) {
+            args.len = len + 2 * escape;
+            args.data = ngx_palloc(r->pool, args.len);
+            if (args.data == NULL) {
+                return NGX_ERROR;
+            }
+
+            ngx_http_lua_escape_args(args.data, p, len);
+
+        } else {
+            args.data = ngx_palloc(r->pool, len);
+            if (args.data == NULL) {
+                return luaL_error(L, "no memory");
+            }
+
+            ngx_memcpy(args.data, p, len);
+
+            args.len = len;
+        }
+
+        break;
+
     case LUA_TTABLE:
         ngx_http_lua_process_args_option(r, L, 1, &args);
 
@@ -65,7 +152,7 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L)
 
     default:
         msg = lua_pushfstring(L, "string, number, or table expected, "
-                              "but got %s", luaL_typename(L, 2));
+                              "but got %s", luaL_typename(L, 1));
         return luaL_argerror(L, 1, msg);
     }
 
@@ -77,64 +164,6 @@ ngx_http_lua_ngx_req_set_uri_args(lua_State *L)
     r->valid_unparsed_uri = 0;
 
     return 0;
-}
-
-
-static int
-ngx_http_lua_ngx_req_get_uri_args(lua_State *L)
-{
-    ngx_http_request_t          *r;
-    u_char                      *buf;
-    u_char                      *last;
-    int                          retval;
-    int                          n;
-    int                          max;
-
-    n = lua_gettop(L);
-
-    if (n != 0 && n != 1) {
-        return luaL_error(L, "expecting 0 or 1 arguments but seen %d", n);
-    }
-
-    if (n == 1) {
-        max = luaL_checkinteger(L, 1);
-        lua_pop(L, 1);
-
-    } else {
-        max = NGX_HTTP_LUA_MAX_ARGS;
-    }
-
-    r = ngx_http_lua_get_req(L);
-    if (r == NULL) {
-        return luaL_error(L, "no request object found");
-    }
-
-    ngx_http_lua_check_fake_request(L, r);
-
-    if (r->args.len == 0) {
-        lua_createtable(L, 0, 0);
-        return 1;
-    }
-
-    /* we copy r->args over to buf to simplify
-     * unescaping query arg keys and values */
-
-    buf = ngx_palloc(r->pool, r->args.len);
-    if (buf == NULL) {
-        return luaL_error(L, "no memory");
-    }
-
-    lua_createtable(L, 0, 4);
-
-    ngx_memcpy(buf, r->args.data, r->args.len);
-
-    last = buf + r->args.len;
-
-    retval = ngx_http_lua_parse_args(L, buf, last, max);
-
-    ngx_pfree(r->pool, buf);
-
-    return retval;
 }
 
 
@@ -368,18 +397,11 @@ ngx_http_lua_inject_req_args_api(lua_State *L)
     lua_pushcfunction(L, ngx_http_lua_ngx_req_set_uri_args);
     lua_setfield(L, -2, "set_uri_args");
 
-    lua_pushcfunction(L, ngx_http_lua_ngx_req_get_uri_args);
-    lua_setfield(L, -2, "get_uri_args");
-
-    lua_pushcfunction(L, ngx_http_lua_ngx_req_get_uri_args);
-    lua_setfield(L, -2, "get_query_args"); /* deprecated */
-
     lua_pushcfunction(L, ngx_http_lua_ngx_req_get_post_args);
     lua_setfield(L, -2, "get_post_args");
 }
 
 
-#ifndef NGX_LUA_NO_FFI_API
 size_t
 ngx_http_lua_ffi_req_get_querystring_len(ngx_http_request_t *r)
 {
@@ -549,7 +571,6 @@ ngx_http_lua_ffi_req_get_uri_args(ngx_http_request_t *r, u_char *buf,
 
     return i;
 }
-#endif /* NGX_LUA_NO_FFI_API */
 
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

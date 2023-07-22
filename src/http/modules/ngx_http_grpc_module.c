@@ -209,6 +209,8 @@ static char *ngx_http_grpc_ssl_password_file(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_grpc_ssl_conf_command_check(ngx_conf_t *cf, void *post,
     void *data);
+static ngx_int_t ngx_http_grpc_merge_ssl(ngx_conf_t *cf,
+    ngx_http_grpc_loc_conf_t *conf, ngx_http_grpc_loc_conf_t *prev);
 static ngx_int_t ngx_http_grpc_set_ssl(ngx_conf_t *cf,
     ngx_http_grpc_loc_conf_t *glcf);
 #endif
@@ -599,7 +601,7 @@ ngx_http_grpc_handler(ngx_http_request_t *r)
         ctx->host = glcf->host;
 
 #if (NGX_HTTP_SSL)
-        u->ssl = (glcf->upstream.ssl != NULL);
+        u->ssl = glcf->ssl;
 
         if (u->ssl) {
             ngx_str_set(&u->schema, "grpcs://");
@@ -1928,8 +1930,12 @@ ngx_http_grpc_process_header(ngx_http_request_t *r)
                 hh = ngx_hash_find(&umcf->headers_in_hash, h->hash,
                                    h->lowcase_key, h->key.len);
 
-                if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
-                    return NGX_ERROR;
+                if (hh) {
+                    rc = hh->handler(r, h, hh->offset);
+
+                    if (rc != NGX_OK) {
+                        return rc;
+                    }
                 }
 
                 continue;
@@ -4501,12 +4507,17 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (NGX_HTTP_SSL)
 
+    if (ngx_http_grpc_merge_ssl(cf, conf, prev) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     ngx_conf_merge_value(conf->upstream.ssl_session_reuse,
                               prev->upstream.ssl_session_reuse, 1);
 
     ngx_conf_merge_bitmask_value(conf->ssl_protocols, prev->ssl_protocols,
-                                 (NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1
-                                  |NGX_SSL_TLSv1_1|NGX_SSL_TLSv1_2));
+                                 (NGX_CONF_BITMASK_SET
+                                  |NGX_SSL_TLSv1|NGX_SSL_TLSv1_1
+                                  |NGX_SSL_TLSv1_2|NGX_SSL_TLSv1_3));
 
     ngx_conf_merge_str_value(conf->ssl_ciphers, prev->ssl_ciphers,
                              "DEFAULT");
@@ -4576,7 +4587,7 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->grpc_values = prev->grpc_values;
 
 #if (NGX_HTTP_SSL)
-        conf->upstream.ssl = prev->upstream.ssl;
+        conf->ssl = prev->ssl;
 #endif
     }
 
@@ -4926,16 +4937,62 @@ ngx_http_grpc_ssl_conf_command_check(ngx_conf_t *cf, void *post, void *data)
 
 
 static ngx_int_t
+ngx_http_grpc_merge_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *conf,
+    ngx_http_grpc_loc_conf_t *prev)
+{
+    ngx_uint_t  preserve;
+
+    if (conf->ssl_protocols == 0
+        && conf->ssl_ciphers.data == NULL
+        && conf->upstream.ssl_certificate == NGX_CONF_UNSET_PTR
+        && conf->upstream.ssl_certificate_key == NGX_CONF_UNSET_PTR
+        && conf->upstream.ssl_passwords == NGX_CONF_UNSET_PTR
+        && conf->upstream.ssl_verify == NGX_CONF_UNSET
+        && conf->ssl_verify_depth == NGX_CONF_UNSET_UINT
+        && conf->ssl_trusted_certificate.data == NULL
+        && conf->ssl_crl.data == NULL
+        && conf->upstream.ssl_session_reuse == NGX_CONF_UNSET
+        && conf->ssl_conf_commands == NGX_CONF_UNSET_PTR)
+    {
+        if (prev->upstream.ssl) {
+            conf->upstream.ssl = prev->upstream.ssl;
+            return NGX_OK;
+        }
+
+        preserve = 1;
+
+    } else {
+        preserve = 0;
+    }
+
+    conf->upstream.ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
+    if (conf->upstream.ssl == NULL) {
+        return NGX_ERROR;
+    }
+
+    conf->upstream.ssl->log = cf->log;
+
+    /*
+     * special handling to preserve conf->upstream.ssl
+     * in the "http" section to inherit it to all servers
+     */
+
+    if (preserve) {
+        prev->upstream.ssl = conf->upstream.ssl;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
 {
     ngx_pool_cleanup_t  *cln;
 
-    glcf->upstream.ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
-    if (glcf->upstream.ssl == NULL) {
-        return NGX_ERROR;
+    if (glcf->upstream.ssl->ctx) {
+        return NGX_OK;
     }
-
-    glcf->upstream.ssl->log = cf->log;
 
     if (ngx_ssl_create(glcf->upstream.ssl, glcf->ssl_protocols, NULL)
         != NGX_OK)
@@ -4958,8 +5015,9 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
         return NGX_ERROR;
     }
 
-    if (glcf->upstream.ssl_certificate) {
-
+    if (glcf->upstream.ssl_certificate
+        && glcf->upstream.ssl_certificate->value.len)
+    {
         if (glcf->upstream.ssl_certificate_key == NULL) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"grpc_ssl_certificate_key\" is defined "

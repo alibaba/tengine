@@ -25,7 +25,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 realip/)->plan(4)
+my $t = Test::Nginx->new()->has(qw/http http_v2 realip/)->plan(3)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -54,7 +54,10 @@ http {
 EOF
 
 $t->write_file('t.html', 'SEE-THIS');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -69,12 +72,11 @@ is($frame->{headers}->{'x-pp'}, '192.0.2.1', 'PROXY remote addr');
 
 # invalid PROXY protocol string
 
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.25.1');
 $proxy = 'BOGUS TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
-$s = Test::Nginx::HTTP2->new(port(8080), preface => $proxy, pure => 1);
-$frames = $s->read(all => [{ type => 'GOAWAY' }]);
+ok(!http($proxy), 'PROXY invalid protocol');
 
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-ok($frame, 'invalid PROXY - GOAWAY frame');
-is($frame->{code}, 1, 'invalid PROXY - error code');
+}
 
 ###############################################################################

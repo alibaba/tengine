@@ -26,7 +26,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite charset gzip/)
-	->plan(144);
+	->plan(142);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -132,7 +132,10 @@ http {
 
 EOF
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 # file size is slightly beyond initial window size: 2**16 + 80 bytes
 
@@ -1017,20 +1020,14 @@ is($frame->{headers}->{':status'}, 200, 'http2_max_concurrent_streams 3');
 
 # invalid connection preface
 
-$s = Test::Nginx::HTTP2->new(port(8080), preface => 'x' x 16, pure => 1);
-$frames = $s->read(all => [{ type => 'GOAWAY' }]);
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.25.1');
 
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-ok($frame, 'invalid preface - GOAWAY frame');
-is($frame->{code}, 1, 'invalid preface - error code');
+like(http('x' x 16), qr/400 Bad Request/, 'invalid preface');
+like(http('PRI * HTTP/2.0' . CRLF . CRLF . 'x' x 8), qr/400 Bad Request/,
+	'invalid preface 2');
 
-my $preface = 'PRI * HTTP/2.0' . CRLF . CRLF . 'x' x 8;
-$s = Test::Nginx::HTTP2->new(port(8080), preface => $preface, pure => 1);
-$frames = $s->read(all => [{ type => 'GOAWAY' }]);
-
-($frame) = grep { $_->{type} eq "GOAWAY" } @$frames;
-ok($frame, 'invalid preface 2 - GOAWAY frame');
-is($frame->{code}, 1, 'invalid preface 2 - error code');
+}
 
 # GOAWAY on SYN_STREAM with even StreamID
 

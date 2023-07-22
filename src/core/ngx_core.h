@@ -30,6 +30,16 @@ typedef struct ngx_proxy_protocol_s  ngx_proxy_protocol_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 typedef struct ngx_udp_connection_s  ngx_udp_connection_t;
 
+#if (T_NGX_UDPV2)
+typedef struct ngx_udpv2_packet_st                          ngx_udpv2_packet_t;
+typedef struct ngx_udpv2_packets_hdr_st                     ngx_udpv2_packets_hdr_t;
+typedef struct ngx_udpv2_traffic_filter_st                  ngx_udpv2_traffic_filter_t;
+#endif
+
+#if (T_NGX_HAVE_XUDP)
+#include <ngx_xudp_inc.h>
+#endif
+
 typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
 typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 

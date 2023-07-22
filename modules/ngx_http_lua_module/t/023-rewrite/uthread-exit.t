@@ -298,7 +298,7 @@ exiting the user thread
 === TEST 5: exit in user thread (entry thread is still pending on the DNS resolver for ngx.socket.tcp)
 --- config
     location /lua {
-        resolver agentzh.org;
+        resolver 127.0.0.2:12345;
         resolver_timeout 12s;
         rewrite_by_lua '
             local function f()
@@ -403,7 +403,7 @@ after
 === TEST 6: exit in user thread (entry thread is still pending on the DNS resolver for ngx.socket.udp)
 --- config
     location /lua {
-        resolver agentzh.org;
+        resolver 127.0.0.2:12345;
         #resolver 127.0.0.1;
         resolver_timeout 12s;
         rewrite_by_lua '

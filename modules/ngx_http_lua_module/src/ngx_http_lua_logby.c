@@ -15,18 +15,13 @@
 #include "ngx_http_lua_exception.h"
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_pcrefix.h"
-#include "ngx_http_lua_time.h"
 #include "ngx_http_lua_log.h"
-#include "ngx_http_lua_regex.h"
 #include "ngx_http_lua_cache.h"
 #include "ngx_http_lua_headers.h"
-#include "ngx_http_lua_variable.h"
 #include "ngx_http_lua_string.h"
 #include "ngx_http_lua_misc.h"
 #include "ngx_http_lua_consts.h"
 #include "ngx_http_lua_shdict.h"
-#include "ngx_http_lua_util.h"
-#include "ngx_http_lua_exception.h"
 #if (NGX_HTTP_LUA_HAVE_MALLOC_TRIM)
 #include <malloc.h>
 #endif
@@ -76,7 +71,7 @@ ngx_http_lua_log_handler(ngx_http_request_t *r)
     ngx_http_lua_main_conf_t    *lmcf;
 #if (NGX_DEBUG)
     ngx_int_t                    trim_ret;
-#endif    
+#endif
 #endif
     ngx_http_lua_loc_conf_t     *llcf;
     ngx_http_lua_ctx_t          *ctx;
@@ -158,6 +153,7 @@ ngx_http_lua_log_handler_inline(ngx_http_request_t *r)
     rc = ngx_http_lua_cache_loadbuffer(r->connection->log, L,
                                        llcf->log_src.value.data,
                                        llcf->log_src.value.len,
+                                       &llcf->log_src_ref,
                                        llcf->log_src_key,
                                        (const char *) llcf->log_chunkname);
     if (rc != NGX_OK) {
@@ -194,6 +190,7 @@ ngx_http_lua_log_handler_file(ngx_http_request_t *r)
 
     /*  load Lua script file (w/ cache)        sp = 1 */
     rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
+                                     &llcf->log_src_ref,
                                      llcf->log_src_key);
     if (rc != NGX_OK) {
         return NGX_ERROR;

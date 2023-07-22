@@ -8,7 +8,8 @@ log_level('debug');
 
 repeat_each(3);
 
-plan tests => repeat_each() * (blocks() * 2 + 30);
+# NB: the shutdown_error_log block is independent from repeat times
+plan tests => repeat_each() * (blocks() * 2 + 33) + 1;
 
 our $HtmlDir = html_dir;
 #warn $html_dir;
@@ -43,7 +44,7 @@ __DATA__
 
 === TEST 1: sanity
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /load {
         content_by_lua '
@@ -69,7 +70,7 @@ end
 
 === TEST 2: sanity
 --- http_config
-lua_package_path '/home/agentz/rpm/BUILD/lua-yajl-1.1/build/?.so;/home/lz/luax/?.so;./?.so';
+lua_package_cpath '/home/agentz/rpm/BUILD/lua-yajl-1.1/build/?.so;/home/lz/luax/?.so;./?.so';
 --- config
     location = '/report/listBidwordPrices4lzExtra.htm' {
         content_by_lua '
@@ -847,7 +848,7 @@ ok
 
 === TEST 37: resolving names with a trailing dot
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         resolver $TEST_NGINX_RESOLVER ipv6=off;
@@ -865,7 +866,7 @@ GET /t
 
 === TEST 38: resolving names with a trailing dot
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';
     server {
         listen 12354;
 
@@ -892,7 +893,7 @@ args: foo=1&bar=2
 
 === TEST 39: lua_code_cache off + setkeepalive
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     lua_code_cache off;
     location = /t {
@@ -1019,3 +1020,315 @@ write timer set: 1
 --- no_error_log
 [error]
 [alert]
+
+
+
+=== TEST 42: tcp: nginx crash when resolve an not exist domain in ngx.thread.spawn
+https://github.com/openresty/lua-nginx-module/issues/1915
+--- config
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    location = /t {
+        content_by_lua_block {
+            local function tcp(host, port)
+                local sock = ngx.socket.tcp()
+                local ok,err = sock:connect(host, port)
+                if not ok then
+                    ngx.log(ngx.WARN, "failed: ", err)
+                    sock:close()
+                    return false
+                end
+
+                sock:close()
+                return true
+            end
+
+            local host = "nonexistent.openresty.org"
+            local port = 80
+
+            local threads = {}
+            for i = 1, 3 do
+                threads[i] = ngx.thread.spawn(tcp, host, port)
+            end
+
+            local ok, res = ngx.thread.wait(threads[1],threads[2],threads[3])
+            if not ok then
+                ngx.say("failed to wait thread")
+                return
+            end
+
+            ngx.say("res: ", res)
+
+            for i = 1, 3 do
+                ngx.thread.kill(threads[i])
+            end
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+res: false
+--- error_log
+nonexistent.openresty.org could not be resolved
+
+
+
+=== TEST 43: domain exists with tcp socket
+https://github.com/openresty/lua-nginx-module/issues/1915
+--- config
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    location = /t {
+        content_by_lua_block {
+            local function tcp(host, port)
+                local sock = ngx.socket.tcp()
+                local ok,err = sock:connect(host, port)
+                if not ok then
+                    ngx.log(ngx.WARN, "failed: ", err)
+                    sock:close()
+                    return false
+                end
+
+                sock:close()
+                return true
+            end
+
+            local host = "www.openresty.org"
+            local port = 80
+
+            local threads = {}
+            for i = 1, 3 do
+                threads[i] = ngx.thread.spawn(tcp, host, port)
+            end
+
+            local ok, res = ngx.thread.wait(threads[1],threads[2],threads[3])
+            if not ok then
+                ngx.say("failed to wait thread")
+                return
+            end
+
+            ngx.say("res: ", res)
+
+            for i = 1, 3 do
+                ngx.thread.kill(threads[i])
+            end
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+res: true
+
+
+
+=== TEST 44: domain exists with udp socket
+https://github.com/openresty/lua-nginx-module/issues/1915
+--- config
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    location = /t {
+        content_by_lua_block {
+            local function udp(host, port)
+                local sock = ngx.socket.udp()
+                local ok,err = sock:setpeername(host, port)
+                if not ok then
+                    ngx.log(ngx.WARN, "failed: ", err)
+                    sock:close()
+                    return false
+                end
+
+                sock:close()
+                return true
+            end
+
+            local host = "nonexistent.openresty.org"
+            local port = 80
+
+            local threads = {}
+            for i = 1, 3 do
+                threads[i] = ngx.thread.spawn(udp, host, port)
+            end
+
+            local ok, res = ngx.thread.wait(threads[1],threads[2],threads[3])
+            if not ok then
+                ngx.say("failed to wait thread")
+                return
+            end
+
+            ngx.say("res: ", res)
+
+            for i = 1, 3 do
+                ngx.thread.kill(threads[i])
+            end
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+res: false
+--- error_log
+nonexistent.openresty.org could not be resolved
+
+
+
+=== TEST 45: udp: nginx crash when resolve an not exist domain in ngx.thread.spawn
+https://github.com/openresty/lua-nginx-module/issues/1915
+--- config
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
+    location = /t {
+        content_by_lua_block {
+            local function udp(host, port)
+                local sock = ngx.socket.udp()
+                local ok,err = sock:setpeername(host, port)
+                if not ok then
+                    ngx.log(ngx.WARN, "failed: ", err)
+                    sock:close()
+                    return false
+                end
+
+                sock:close()
+                return true
+            end
+
+            local host = "www.openresty.org"
+            local port = 80
+
+            local threads = {}
+            for i = 1, 3 do
+                threads[i] = ngx.thread.spawn(udp, host, port)
+            end
+
+            local ok, res = ngx.thread.wait(threads[1],threads[2],threads[3])
+            if not ok then
+                ngx.say("failed to wait thread")
+                return
+            end
+
+            ngx.say("res: ", res)
+
+            for i = 1, 3 do
+                ngx.thread.kill(threads[i])
+            end
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+res: true
+
+
+
+=== TEST 46: nginx crash when parsing a word or a single configuration item that is too long
+https://github.com/openresty/lua-nginx-module/issues/1938
+--- http_config
+    init_worker_by_lua '
+        err_big_str = 'A NA<document><ghjnxnpnaryyhzyfehuyjxzoilebgazuifhn foo=bar><other_tag foo=bar><ahziqttu foo=bar><a foo=bar><other_tag foo=bar><other_tag foo=bar><other_tag foo=bar><nzzpftierhdtdeippzlyjrmkbtljunmkxhohxmbdmgeeazpb foo=bar></nzzpftierhdtdeippzlyjrmkbtljunmkxhohxmbdmgeeazpb><qai foo=bar></qai></other_tag></other_tag><other_tag foo=bar></other_tag><other_tag foo=bar></other_tag></other_tag><some_tag foo=bar></some_tag><some_tag foo=bar><mdbrjkon foo=bar><other_tag foo=bar></other_tag></mdbrjkon><mttiqvw foo=bar></mttiqvw></some_tag><some_tag foo=bar></some_tag></a><lae foo=bar></lae><ds foo=bar></ds><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag><other_tag foo=bar></other_tag></ahziqttu></other_tag><a foo=bar><some_tag foo=bar></some_tag><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag></a><other_tag foo=bar><cxfpg foo=bar></cxfpg><some_tag foo=bar></some_tag></other_tag></ghjnxnpnaryyhzyfehuyjxzoilebgazuifhn><some_tag foo=bar><other_tag foo=bar><other_tag foo=bar><some_tag foo=bar><some_tag foo=bar></some_tag><other_tag foo=bar></other_tag></some_tag><some_tag foo=bar></some_tag><some_tag foo=bar><a foo=bar></a></some_tag><a foo=bar></a></other_tag><a foo=bar></a></other_tag><a foo=bar><wblh foo=bar><jyfzglfbaxfjvhtaiysmsexwusvrvzu foo=bar><other_tag foo=bar></other_tag></jyfzglfbaxfjvrtaiysmsexwusvrvzu><a foo=bar><other_tag foo=bar></other_tag></a></wblh><ycnivdryxanudpgzmgugzyjrnacandijqitfosjrxjuosiwhxxgwgqpwzjcyelstgzveugtmjilnkydyktoqywjyydtcgtabowmbxnjpttkxqjpazdsgzeutjfzgvafnovu@zgccxvypzbkbbsizllwitznecdbyiynopkzsyazlhyslqlwkqqnzuvvdlavwvspwzpivmmreycogbinpvhvfscjmwwwllppjholetfvcbezdwrfczqbdrogr foo=bar></ycnivdryxanudpgzmgugzyjrnacandijqitfosjrxjuosiwhxxgwgqpwzjcyelstgzveugtmjilnkydyktoqywjyydtcgtabowmbxnjpttkxqjpazdsgzeutjfzgvafnovumzgccxvypzbkbbsizllwitznecdbyiynopkzsyazlhyslqlwkqqnzuvvdlavwvspwzpivmmreycogbinpvhvfscjmwwwllppjholetfvcbezdwrfczqbdrogr></a><s foo=bar></s><some_tag foo=bar></some_tag><some_tag foo=bar></some_tag></some_tag><oin foo=bar><other_tag foo=bar><other_tag foo=bar></other_tag></other_tag><other_tag foo=bar></other_tag><other_tag foo=bar></other_tag></oin><other_tag foo=bar><other_tag foo=bar><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag><other_tag foo=bar><some_tag foo=bar><some_tag foo=bar><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag><xg foo=bar></xg></some_tag><ibsolavsdhkcovsbqddq foo=bar><bjodqvqtcgizzbefemdqiljssgxibmprzhxifaciftbl foo=bar></bjodqvqtcgizzbefemdqiljssgxibmprzhxifaciftbl></ibsolavsdhkcovsbqddq><s foo=bar><j foo=bar><other_tag foo=bar></other_tag></j></s><other_tag foo=bar><zte foo=bar></zte><other_tag foo=bar><a foo=bar></a></other_tag></other_tag></some_tag><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag></other_tag><other_tag foo=bar><some_tag foo=bar><other_tag foo=bar></other_tag><other_tag foo=bar><other_tag foo=bar><some_tag foo=bar></some_tag></other_tag></other_tag><some_tag foo=bar></some_tag></some_tag><other_tag foo=bar></other_tag></other_tag><some_tag foo=bar></some_tag></other_tag><ynorkudnfqlyozuf foo=bar><some_tag foo=bar><some_tag foo=bar></some_tag></some_tag><some_tag foo=bar><a foo=bar></a></some_tag><some_tag foo=bar><some_tag foo=bar></some_tag></some_tag><other_tag foo=bar><some_tag foo=bar><gywpe foo=bar></gywpe></some_tag><some_tag foo=bar></some_tag><some_tag foo=bar></some_tag></other_tag><some_tag foo=bar><ycbfctvudqzhnasdtgwsylenjzo foo=bar></ycbfctvudqzhnasdtgwsylenjzo></some_tag></ynorkudnfqlyozuf><some_tag foo=bar></some_tag><other_tag foo=bar></other_tag><bpxlcvo foo=bar></bpxlcvo></other_tag><other_tag foo=bar><some_tag foo=bar><some_tag foo=bar><bsgabtkeonafnvroqlmlprxxhlkayhlmxmanhomgrweqevvqowuvnrvfazckbpxihviccqvfeciafjuxpiukkyfmirugowshqyxuvkzxjwfyl foo=bar><bujx foo=bar><other_tag foo=bar></other_tag></bujx></bsgabtkeonafnvroqlmlprxxhlkayhlmxmanhomgrweqevvqowuvnrvfazckbpxihviccqvfeciafjuxpiukkyfmirugowshqyxuvkzxjwfyl></some_tag><some_tag foo=bar></some_tag><other_tag foo=bar><other_tag foo=bar></other_tag></other_tag></some_tag><other_tag foo=bar></other_tag><yn foo=bar></yn><some_tag foo=bar></some_tag></other_tag><some_tag foo=bar><some_tag foo=bar><yjfgivoaqys foo=bar><some_tag foo=bar></some_tag></yjfgivoaqys><some_tag foo=bar></some_tag></some_tag><some_tag foo=bar><some_tag foo=bar></some_tag></some_tag><other_tag foo=bar><some_tag foo=bar><other_tag foo=bar></other_tag></some_tag></other_tag><some_tag foo=bar><other_tag foo=bar><q foo=bar></q></other_tag><some_tag foo=bar><some_tag foo=bar><some_tag foo=bar><fimlcfqpgrfgmqlvy foo=bar><some_tag foo=bar><other_tag foo=bar><other_tag foo=bar><other_tag foo=bar></other_tag></other_tag><ozbxovtd foo=bar></ozbxovtd></other_tag><a foo=bar><vhilkxdosukumkwuryepsspwraoqcetjpnmplka foo=bar></vhilkxdosukumkwuryepsspwraoqcetjpnmplka><other_tag foo=bar></other_tag></a><other_tag foo=bar><a foo=bar></a></other_tag><some_tag foo=bar></some_tag></some_tag><other_tag foo=bar><other_tag foo=bar></other_tag></other_tag></fimlcfqpgrfgmqlvy></some_tag><some_tag foo=bar><some_tag foo=bar><eslmjazk foo=bar></eslmjazk><some_tag foo=bar><some_tag foo=bar></some_tag><i foo=bar></i><some_tag foo=bar></some_tag><tpwkibjgpffwateypjezqgaomneab foo=bar></tpwkibjgpffwateypjezqgaomneab></some_tag><a foo=bar></a><okpozscqucclyrbjantdwptdyxhqhfitkjmeduuagzhfontbgjkwbaocccreequtrdwoatikmalucrlffnustjdgeaskfekewxpwtgmgtmdhhbyvgafbyjfjtlwmiyfoetprbfmpasmdobxylzshferaxicajxawnxdxkpszeqeyqziglwbczzhbhzkpphemgqghwfbrlqhczjffzefstydpnufvoknbpvszxfrqtqhuybtayd foo=bar></okpozscqucclyrbjantdwptdyxhqhfitkjmeduuagzhfontbgjkwbaocccreequtrdwoatikmalucrlffnustjdgeaskfekewxpwtgmgtmdhhbyvgafbyjfjtlwmiyfoetprbfmpasmdobxylzshferaxicajxawnxdxkpszeqeyqziglwbczzhbhzkpphemgqghwfbrlqhczjffzefstydpnufvoknbpvszxfrqtqhuybtayd></some_tag><some_tag foo=bar></some_tag></some_tag><a foo=bar><other_tag foo=bar></other_tag></a><some_tag foo=bar></some_tag><other_tag foo=bar></other_tag></some_tag><pu foo=bar><a foo=bar><some_tag foo=bar></some_tag><some_tag foo=bar><dswgxeosxelilaawqnqeqdagheheqomtuisiwcneaoetifviqqgtkawqapggjmoadxhwxokszbrfvxzedyzeplkkceleiwkjvzzatawfaqkjuogpvocrkpzbcrqandfrxrrwkidpfoseyhjkapbnwenzvprrsmstcrwwgvzprbngzfsolnuoxltbazguzolvqkahdwqgosbrzxzaiozletuhqimihu foo=bar></dswgxeosxelilaawqnqeqdagheheqomtuisiwcneaoetifviqqgtkawqapggjmoadxhwxokszbrfvxzedyzeplkkceleiwkjvzzatawfaqkjuogpvocrkpzbcrqandfrxrrwkidpfoseyhjkapbnwenzvprrsmstcrwwgvzprbngzfsolnuoxltbazguzolvqkahdwqgosbrzxzaiozletuhqimihu></some_tag><qozyyy foo=bar></qozyyy></a><other_tag foo=bar><other_tag foo=bar></other_tag></other_tag><a foo=bar><some_tag foo=bar></some_tag></a><auwvp foo=bar><pdwznxmyechrdlyirpz foo=bar><some_tag foo=bar></some_tag></pdwznxmyechrdlyirpz><some_tag foo=bar><hetkrhunm foo=bar></hetkrhunm><ivaxkibutldrsmqncviihdarsmhezhijyculvmkefbsnxfbxdfzizxkediuvjpplcyhallsjvnrxjkmrjinexelrqirrixajcpqsdtdkvajlktotwzxawuterepyyvtoywpcbiwihdkrirrgbbwguqrgcybhxxyraobyyui foo=bar></ivaxkibutldrsmqncviihdarsmhezhijyculvmkefbsnxfbxdfzizxkediuvjpplcyhallsjvnrxjkmrjinexelrqirrixajcpqsdtdkvajlktotwzxawuterepyyvtoywpcbiwihdkrirrgbbwguqrgcybhxxyraobyyui></some_tag></auwvp><other_tag foo=bar></other_tag><other_tag foo=bar></other_tag></pu><tjntyubedfylkigrecanowgsmvxguybllkyrdfntpodukwzojuztpwmqijrltm foo=bar></tjntyubedfylkigrecanowgsmvxguybllkyrdfntpodukwzojuztpwmqijrltm></some_tag><ztnairlelhvuujacjepxegwehtrfkawgggwbanfwheyjdmqlxicwvbtel foo=bar></ztnairlelhvuujacjepxegwehtrfkawgggwbanfwheyjdmqlxicwvbtel><othe>'
+    ';
+--- config
+    location /t {
+        content_by_lua '
+            ngx.say("hello world")
+        ';
+    }
+--- request
+GET /t
+--- response_body
+res: true
+--- no_error_log
+[error]
+--- must_die
+--- error_log eval
+qr/\[emerg\] \d+#\d+: unexpected "A" in/
+
+
+
+=== TEST 47: cosocket does not exit on worker_shutdown_timeout
+--- main_config
+worker_shutdown_timeout 1;
+--- config
+location /t {
+    content_by_lua_block {
+        local function thread_func()
+            local sock = ngx.socket.tcp()
+            local ok, err = sock:connect("127.0.0.1", 65110)
+            local bytes, err = sock:send("hello")
+            if bytes ~= 5 then
+                sock:close()
+                return ngx.exit(500)
+            end
+
+            local data, err = sock:receive(20)
+            local line, err, partial = sock:receive()
+            if not line then
+                ngx.log(ngx.ERR, "failed to read a line: ", err)
+                return
+            end
+
+            ngx.log(ngx.ERR, "successfully read a line: ", line)
+        end
+
+        local function timer_func()
+            ngx.thread.spawn(thread_func)
+        end
+
+        ngx.timer.at(1, timer_func)
+        ngx.say("Hello world")
+    }
+}
+--- request
+    GET /t
+--- response_body
+Hello world
+--- shutdown_error_log eval
+qr|failed to read a line: closed|
+--- timeout: 1.2
+
+
+
+=== TEST 48: nginx crashes when encountering an illegal http if header
+crash with ngx.send_headers()
+--- main_config
+--- config
+error_page 412 /my_error_handler_412;
+
+location /t {
+    rewrite_by_lua_block {
+        ngx.send_headers()
+        -- ngx.print() -- this also triggers the bug
+    }
+}
+location = /my_error_handler_412 {
+    return 412 "hello";
+}
+--- request
+    GET /t
+--- more_headers
+If-Match: 1
+--- error_code: 412
+--- response_body eval
+qr/\Ahello\z/
+
+
+
+=== TEST 49: nginx crashes when encountering an illegal http if header
+crash with ngx.print()
+--- main_config
+--- config
+error_page 412 /my_error_handler_412;
+
+location /t {
+    rewrite_by_lua_block {
+        ngx.print()
+    }
+}
+location = /my_error_handler_412 {
+    return 412 "hello";
+}
+--- request
+    GET /t
+--- more_headers
+If-Match: 1
+--- error_code: 412
+--- response_body eval
+qr/\Ahello\z/

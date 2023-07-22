@@ -14,6 +14,9 @@ ngx_queue_t  ngx_posted_accept_events;
 ngx_queue_t  ngx_posted_next_events;
 ngx_queue_t  ngx_posted_events;
 
+#if (T_NGX_HAVE_XUDP)
+ngx_queue_t  ngx_posted_commit;
+#endif
 
 void
 ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted)

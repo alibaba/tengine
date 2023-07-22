@@ -19,6 +19,34 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: tengine
+      - name: 'checkout luajit2'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/luajit2
+          path: luajit2
+      - name: 'build luajit2'
+        working-directory: luajit2
+        run: |
+          make
+          sudo make install
+      - name: 'checkout lua-resty-lrucache'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/lua-resty-lrucache
+          path: lua-resty-lrucache
+      - name: 'build lua-resty-lrucache'
+        working-directory: lua-resty-lrucache
+        run: |
+          sudo make install
+      - name: 'checkout lua-resty-core'
+        uses: actions/checkout@v3
+        with:
+          repository: openresty/lua-resty-core
+          path: lua-resty-core
+      - name: 'build lua-resty-core'
+        working-directory: lua-resty-core
+        run: |
+          sudo make install
       - name: checkout Tongsuo
         uses: actions/checkout@v3
         with:
@@ -38,9 +66,14 @@ jobs:
         env:
           CC: ${{ matrix.compiler.CC }}
           CXX: ${{ matrix.compiler.CXX }}
+          LUAJIT_LIB: /usr/local/lib
+          LUAJIT_INC: /usr/local/include/luajit-2.1
         run: |
           ./configure \
+            --with-ld-opt="-Wl,-lpcre,-rpath,/usr/local/lib" \
+            --with-pcre \
             --add-module=modules/ngx_tongsuo_ntls \
+            --add-module=modules/ngx_http_lua_module \
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \

@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3);
+plan tests => repeat_each() * (blocks() * 4 - 4);
 
 #no_diff();
 no_long_string();
@@ -70,6 +70,36 @@ worker pid is correct\.
             else
                 ngx.say("worker pid is correct.")
             end
+        ';
+    }
+--- request
+GET /lua
+--- response_body_like
+worker pid: \d+
+worker pid is correct\.
+--- no_error_log
+[error]
+
+
+
+=== TEST 4: content_by_lua + ngx.worker.pids
+--- config
+    location /lua {
+        content_by_lua '
+            local pids = ngx.worker.pids()
+            local pid = ngx.worker.pid()
+            ngx.say("worker pid: ", pid)
+            local count = ngx.worker.count()
+            if count ~= #pids then
+                ngx.say("worker pids is wrong.")
+            end
+            for i = 1, count do
+                if pids[i] == pid then
+                    ngx.say("worker pid is correct.")
+                    return
+                end
+            end
+            ngx.say("worker pid is wrong.")
         ';
     }
 --- request

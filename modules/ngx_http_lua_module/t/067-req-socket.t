@@ -320,7 +320,7 @@ found the end of the stream
 
 === TEST 4: attempt to use the req socket across request boundary
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         content_by_lua '
@@ -369,7 +369,7 @@ hello world
 === TEST 5: receive until on request_body - receiveuntil(1) on the last byte of the body
 See https://groups.google.com/group/openresty/browse_thread/thread/43cf01da3c681aba for details
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         content_by_lua '
@@ -431,7 +431,7 @@ done
 
 === TEST 6: pipelined POST requests
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     location /t {
         content_by_lua '
@@ -1096,3 +1096,73 @@ done
 --- grep_error_log_out
 lua finalize socket
 GC cycle done
+
+
+
+=== TEST 18: receiveany
+--- config
+    location = /t {
+        content_by_lua_block {
+            local sock = ngx.socket.tcp()
+            local ok, err = sock:connect("127.0.0.1", ngx.var.server_port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            local bytes, err = sock:send("POST /back HTTP/1.0\r\nHost: localhost\r\nContent-Length: 1024\r\n\r\nabc")
+            if not bytes then
+                ngx.say("failed to send: ", err)
+            end
+
+            ngx.sleep(0.2)
+
+            local bytes, err = sock:send("hello world\n")
+            if not bytes then
+                ngx.say("failed to send: ", err)
+            end
+
+            local reader = sock:receiveuntil("\r\n\r\n")
+            local header, err = reader()
+            if not header then
+                ngx.say("failed to receive header: ", err)
+                return
+            end
+
+            local line, err = sock:receive()
+            if not line then
+                ngx.say("failed to receive line: ", err)
+                return
+            end
+            ngx.say("received: ", line)
+        }
+    }
+
+    location = /back {
+        content_by_lua_block {
+            ngx.send_headers()
+            ngx.flush(true)
+
+            local sock, err = ngx.req.socket()
+
+            if not sock then
+               ngx.say("failed to get socket: ", err)
+               return nil
+            end
+
+            local data, err = sock:receiveany(4096)
+            if not data then
+               ngx.say("err: ", err)
+               return nil
+            end
+
+            ngx.say("received: ", data)
+        }
+    }
+
+--- request
+GET /t
+--- response_body
+received: received: abc
+--- no_error_log
+[error]

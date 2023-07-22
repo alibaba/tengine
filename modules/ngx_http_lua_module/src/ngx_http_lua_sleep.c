@@ -52,12 +52,7 @@ ngx_http_lua_ngx_sleep(lua_State *L)
         return luaL_error(L, "no request ctx found");
     }
 
-    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_REWRITE
-                               | NGX_HTTP_LUA_CONTEXT_ACCESS
-                               | NGX_HTTP_LUA_CONTEXT_CONTENT
-                               | NGX_HTTP_LUA_CONTEXT_TIMER
-                               | NGX_HTTP_LUA_CONTEXT_SSL_CERT
-                               | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH);
+    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_YIELDABLE);
 
     coctx = ctx->cur_co_ctx;
     if (coctx == NULL) {
@@ -164,11 +159,20 @@ ngx_http_lua_sleep_cleanup(void *data)
     }
 
 #ifdef HAVE_POSTED_DELAYED_EVENTS_PATCH
+#if (nginx_version >= 1007005)
     if (coctx->sleep.posted) {
+#else
+    if (coctx->sleep.prev) {
+#endif
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                        "lua clean up the posted event for pending ngx.sleep");
 
-        ngx_delete_posted_event(&coctx->sleep);
+        /*
+        * We need the extra parentheses around the argument
+        * of ngx_delete_posted_event() just to work around macro issues in
+        * nginx cores older than 1.7.5 (exclusive).
+        */
+        ngx_delete_posted_event((&coctx->sleep));
     }
 #endif
 }

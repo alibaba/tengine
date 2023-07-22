@@ -1,0 +1,146 @@
+dist: bionic
+
+branches:
+  only:
+    - "master"
+
+os: linux
+
+language: c
+
+compiler:
+  - gcc
+
+addons:
+  apt:
+    packages:
+      - ack
+      - axel
+      - cpanminus
+      - libtest-base-perl
+      - libtext-diff-perl
+      - liburi-perl
+      - libwww-perl
+      - libtest-longstring-perl
+      - liblist-moreutils-perl
+      - libgd-dev
+
+cache:
+  directories:
+    - download-cache
+
+env:
+  global:
+    - JOBS=3
+    - NGX_BUILD_JOBS=$JOBS
+    - LUAJIT_PREFIX=/opt/luajit21
+    - LUAJIT_LIB=$LUAJIT_PREFIX/lib
+    - LUAJIT_INC=$LUAJIT_PREFIX/include/luajit-2.1
+    - LUA_INCLUDE_DIR=$LUAJIT_INC
+    - PCRE_VER=8.45
+    - PCRE_PREFIX=/opt/pcre
+    - PCRE_LIB=$PCRE_PREFIX/lib
+    - PCRE_INC=$PCRE_PREFIX/include
+    - OPENSSL_PREFIX=/opt/ssl
+    - OPENSSL_LIB=$OPENSSL_PREFIX/lib
+    - OPENSSL_INC=$OPENSSL_PREFIX/include
+    - LIBDRIZZLE_PREFIX=/opt/drizzle
+    - LIBDRIZZLE_INC=$LIBDRIZZLE_PREFIX/include/libdrizzle-1.0
+    - LIBDRIZZLE_LIB=$LIBDRIZZLE_PREFIX/lib
+    - LD_LIBRARY_PATH=$LUAJIT_LIB:$LD_LIBRARY_PATH
+    - DRIZZLE_VER=2011.07.21
+    - TEST_NGINX_SLEEP=0.006
+  jobs:
+    - NGINX_VERSION=1.21.4 OPENSSL_VER=1.1.0l OPENSSL_PATCH_VER=1.1.0d
+    - NGINX_VERSION=1.21.4 OPENSSL_VER=1.1.1s OPENSSL_PATCH_VER=1.1.1f
+
+services:
+  - memcached
+  - redis
+  - mysql
+
+before_install:
+  - sudo apt update
+  - sudo apt install --only-upgrade ca-certificates
+  - '! grep -n -P ''(?<=.{80}).+'' --color `find src -name ''*.c''` `find . -name ''*.h''` || (echo "ERROR: Found C source lines exceeding 80 columns." > /dev/stderr; exit 1)'
+  - '! grep -n -P ''\t+'' --color `find src -name ''*.c''` `find . -name ''*.h''` || (echo "ERROR: Cannot use tabs." > /dev/stderr; exit 1)'
+  - /usr/bin/env perl $(command -v cpanm) --sudo --notest Test::Nginx IPC::Run > build.log 2>&1 || (cat build.log && exit 1)
+  - pyenv global 2.7
+install:
+  - if [ ! -f download-cache/drizzle7-$DRIZZLE_VER.tar.gz ]; then wget -P download-cache http://openresty.org/download/drizzle7-$DRIZZLE_VER.tar.gz; fi
+  - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache https://downloads.sourceforge.net/project/pcre/pcre/${PCRE_VER}/pcre-${PCRE_VER}.tar.gz; fi
+  - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz || wget -P download-cache https://www.openssl.org/source/old/${OPENSSL_VER//[a-z]/}/openssl-$OPENSSL_VER.tar.gz; fi
+  - git clone https://github.com/openresty/test-nginx.git
+  - git clone https://github.com/openresty/openresty.git ../openresty
+  - git clone https://github.com/openresty/no-pool-nginx.git ../no-pool-nginx
+  - git clone https://github.com/openresty/openresty-devel-utils.git
+  - git clone https://github.com/openresty/mockeagain.git
+  - git clone https://github.com/openresty/lua-cjson.git lua-cjson
+  - git clone https://github.com/openresty/lua-upstream-nginx-module.git ../lua-upstream-nginx-module
+  - git clone https://github.com/openresty/echo-nginx-module.git ../echo-nginx-module
+  - git clone https://github.com/openresty/nginx-eval-module.git ../nginx-eval-module
+  - git clone https://github.com/simpl/ngx_devel_kit.git ../ndk-nginx-module
+  - git clone https://github.com/FRiCKLE/ngx_coolkit.git ../coolkit-nginx-module
+  - git clone https://github.com/openresty/headers-more-nginx-module.git ../headers-more-nginx-module
+  - git clone https://github.com/openresty/drizzle-nginx-module.git ../drizzle-nginx-module
+  - git clone https://github.com/openresty/set-misc-nginx-module.git ../set-misc-nginx-module
+  - git clone https://github.com/openresty/memc-nginx-module.git ../memc-nginx-module
+  - git clone https://github.com/openresty/rds-json-nginx-module.git ../rds-json-nginx-module
+  - git clone https://github.com/openresty/srcache-nginx-module.git ../srcache-nginx-module
+  - git clone https://github.com/openresty/redis2-nginx-module.git ../redis2-nginx-module
+  - git clone https://github.com/openresty/lua-resty-core.git ../lua-resty-core
+  - git clone https://github.com/openresty/lua-resty-lrucache.git ../lua-resty-lrucache
+  - git clone https://github.com/openresty/lua-resty-mysql.git ../lua-resty-mysql
+  - git clone https://github.com/openresty/lua-resty-string.git ../lua-resty-string
+  - git clone https://github.com/openresty/stream-lua-nginx-module.git ../stream-lua-nginx-module
+  - git clone -b v2.1-agentzh https://github.com/openresty/luajit2.git luajit2
+
+before_script:
+  - mysql -uroot -e 'create database ngx_test; grant all on ngx_test.* to "ngx_test"@"%" identified by "ngx_test"; flush privileges;'
+
+script:
+  - export PATH=$PWD/work/nginx/sbin:$PWD/openresty-devel-utils:$PATH
+  - ngx-releng > check.txt || true
+  - lines=`wc -l check.txt | awk '{print $1}'`; if [ $lines -gt 5 ]; then cat check.txt; exit 1; fi
+  - sudo iptables -I OUTPUT 1 -p udp --dport 10086 -j REJECT
+  - sudo iptables -I OUTPUT -p tcp --dst 127.0.0.2 --dport 12345 -j DROP
+  - sudo iptables -I OUTPUT -p udp --dst 127.0.0.2 --dport 12345 -j DROP
+  - sudo ip route add prohibit 0.0.0.1/32
+  - cd luajit2/
+  - make -j$JOBS CCDEBUG=-g Q= PREFIX=$LUAJIT_PREFIX CC=$CC XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT -msse4.2' > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo make install PREFIX=$LUAJIT_PREFIX > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ..
+  - tar xzf download-cache/drizzle7-$DRIZZLE_VER.tar.gz && cd drizzle7-$DRIZZLE_VER
+  - ./configure --prefix=$LIBDRIZZLE_PREFIX --without-server > build.log 2>&1 || (cat build.log && exit 1)
+  - make libdrizzle-1.0 -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo make install-libdrizzle-1.0 > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ../mockeagain/ && make CC=$CC -j$JOBS && cd ..
+  - cd lua-cjson/ && make -j$JOBS && sudo make install && cd ..
+  - tar zxf download-cache/pcre-$PCRE_VER.tar.gz
+  - cd pcre-$PCRE_VER/
+  - ./configure --prefix=$PCRE_PREFIX --enable-jit --enable-utf --enable-unicode-properties > build.log 2>&1 || (cat build.log && exit 1)
+  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo PATH=$PATH make install > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ..
+  - tar zxf download-cache/openssl-$OPENSSL_VER.tar.gz
+  - cd openssl-$OPENSSL_VER/
+  - patch -p1 < ../../openresty/patches/openssl-$OPENSSL_PATCH_VER-sess_set_get_cb_yield.patch
+  - ./config shared enable-ssl3 enable-ssl3-method -g --prefix=$OPENSSL_PREFIX -DPURIFY > build.log 2>&1 || (cat build.log && exit 1)
+  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo make PATH=$PATH install_sw > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ..
+  - export NGX_BUILD_CC=$CC
+  - sh util/build-without-ssl.sh $NGINX_VERSION > build.log 2>&1 || (cat build.log && exit 1)
+  - sh util/build-with-dd.sh $NGINX_VERSION > build.log 2>&1 || (cat build.log && exit 1)
+  - rm -fr buildroot
+  - sh util/build.sh $NGINX_VERSION > build.log 2>&1 || (cat build.log && exit 1)
+  - nginx -V
+  - python3 ./util/nc_server.py &
+  - ldd `which nginx`|grep -E 'luajit|ssl|pcre'
+  - export LD_PRELOAD=$PWD/mockeagain/mockeagain.so
+  - export LD_LIBRARY_PATH=$PWD/mockeagain:$LD_LIBRARY_PATH
+  - export TEST_NGINX_RESOLVER=8.8.4.4
+  - dig +short myip.opendns.com @resolver1.opendns.com || exit 0
+  - dig +short @$TEST_NGINX_RESOLVER openresty.org || exit 0
+  - dig +short @$TEST_NGINX_RESOLVER agentzh.org || exit 0
+  - /usr/bin/env perl $(command -v prove) -I. -Itest-nginx/lib -r t/

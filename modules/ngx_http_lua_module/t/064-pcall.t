@@ -22,7 +22,7 @@ __DATA__
 
 === TEST 1: pcall works
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
         location = /test {
             content_by_lua '
@@ -58,7 +58,7 @@ $/s
 
 === TEST 2: xpcall works
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
         location = /test {
             content_by_lua '

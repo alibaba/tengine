@@ -26,6 +26,7 @@ use Test::Nginx::IMAP;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+local $SIG{PIPE} = 'IGNORE';
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/mail imap http rewrite/);
@@ -142,7 +143,9 @@ sub lines {
 	my ($t, $file, $pattern) = @_;
 
 	if ($file eq 'stderr') {
-		return map { $_ =~ /\Q$pattern\E/ } (<$stderr>);
+		my $value = map { $_ =~ /\Q$pattern\E/ } (<$stderr>);
+		$stderr->clearerr();
+		return $value;
 	}
 
 	my $path = $t->testdir() . '/' . $file;

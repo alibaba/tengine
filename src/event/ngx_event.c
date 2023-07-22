@@ -87,7 +87,30 @@ ngx_atomic_t         *ngx_stat_request_time = &ngx_stat_request_time0;
 
 #endif
 
+#if (T_NGX_XQUIC)
 
+ngx_atomic_t   ngx_stat_quic_conns0;
+ngx_atomic_t  *ngx_stat_quic_conns = &ngx_stat_quic_conns0;
+ngx_atomic_t   ngx_stat_quic_cps_nexttime0;
+ngx_atomic_t  *ngx_stat_quic_cps_nexttime = &ngx_stat_quic_cps_nexttime0;
+ngx_atomic_t   ngx_stat_quic_cps0;
+ngx_atomic_t  *ngx_stat_quic_cps = &ngx_stat_quic_cps0;
+ngx_atomic_t   ngx_stat_quic_conns_refused0;
+ngx_atomic_t  *ngx_stat_quic_conns_refused = &ngx_stat_quic_conns_refused0;
+
+ngx_atomic_t   ngx_stat_quic_queries0;
+ngx_atomic_t  *ngx_stat_quic_queries = &ngx_stat_quic_queries0;
+ngx_atomic_t   ngx_stat_quic_qps_nexttime0;
+ngx_atomic_t  *ngx_stat_quic_qps_nexttime = &ngx_stat_quic_qps_nexttime0;
+ngx_atomic_t   ngx_stat_quic_qps0;
+ngx_atomic_t  *ngx_stat_quic_qps = &ngx_stat_quic_qps0;
+ngx_atomic_t   ngx_stat_quic_queries_refused0;
+ngx_atomic_t  *ngx_stat_quic_queries_refused = &ngx_stat_quic_queries_refused0;
+
+ngx_atomic_t   ngx_stat_quic_concurrent_conns0;
+ngx_atomic_t  *ngx_stat_quic_concurrent_conns = &ngx_stat_quic_concurrent_conns0;
+
+#endif
 
 static ngx_command_t  ngx_events_commands[] = {
 
@@ -274,6 +297,9 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     ngx_event_expire_timers();
 
     ngx_event_process_posted(cycle, &ngx_posted_events);
+#if (T_NGX_HAVE_XUDP)
+    ngx_event_process_posted(cycle, &ngx_posted_commit);
+#endif
 }
 
 
@@ -429,6 +455,7 @@ ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 {
 #if (NGX_HAVE_REUSEPORT)
     ngx_uint_t        i;
+    ngx_core_conf_t  *ccf;
     ngx_listening_t  *ls;
 #endif
 
@@ -455,7 +482,9 @@ ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
 
 #if (NGX_HAVE_REUSEPORT)
 
-    if (!ngx_test_config) {
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    if (!ngx_test_config && ccf->master) {
 
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
@@ -563,6 +592,20 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
 #endif
 
+#if (T_NGX_XQUIC)
+
+    size += cl          /* ngx_stat_quic_conns */
+            + cl        /* ngx_stat_quic_cps_nexttime */
+            + cl        /* ngx_stat_quic_cps */
+            + cl        /* ngx_stat_quic_conns_refused */
+            + cl        /* ngx_stat_quic_queries */
+            + cl        /* ngx_stat_quic_qps_nexttime */
+            + cl        /* ngx_stat_quic_qps */
+            + cl        /* ngx_stat_quic_queries_refused */
+            + cl;       /* ngx_stat_quic_concurrent_conns */
+
+#endif
+
     shm.size = size;
     ngx_str_set(&shm.name, "nginx_shared_zone");
     shm.log = cycle->log;
@@ -593,6 +636,8 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     ngx_temp_number = (ngx_atomic_t *) (shared + 2 * cl);
 
+    size_t n = 2;
+
     tp = ngx_timeofday();
 
     ngx_random_number = (tp->msec << 16) + ngx_pid;
@@ -607,10 +652,28 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_stat_writing = (ngx_atomic_t *) (shared + 8 * cl);
     ngx_stat_waiting = (ngx_atomic_t *) (shared + 9 * cl);
 
-#if (T_NGX_HTTP_STUB_STATUS)
-    ngx_stat_request_time = (ngx_atomic_t *) (shared + 10 * cl);
+    n += 7;
 #endif
 
+#if (T_NGX_HTTP_STUB_STATUS)
+    ngx_stat_request_time = (ngx_atomic_t *) (shared + (n + 1) * cl);
+	
+	n += 1;
+#endif
+
+#if (T_NGX_XQUIC)
+
+    ngx_stat_quic_conns = (ngx_atomic_t *) (shared + (n + 1) * cl);
+    ngx_stat_quic_cps_nexttime = (ngx_atomic_t *) (shared + (n + 2) * cl);
+    ngx_stat_quic_cps = (ngx_atomic_t *) (shared + (n + 3) * cl);
+    ngx_stat_quic_conns_refused = (ngx_atomic_t *) (shared + (n + 4) * cl);
+    ngx_stat_quic_queries = (ngx_atomic_t *) (shared + (n + 5) * cl);
+    ngx_stat_quic_qps_nexttime = (ngx_atomic_t *) (shared + (n + 6) * cl);
+    ngx_stat_quic_qps = (ngx_atomic_t *) (shared + (n + 7) * cl);
+    ngx_stat_quic_queries_refused = (ngx_atomic_t *) (shared + (n + 8) * cl);
+    ngx_stat_quic_concurrent_conns = (ngx_atomic_t * ) (shared + (n + 9) * cl);
+
+    n += 9;
 #endif
 
     return NGX_OK;
@@ -674,6 +737,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_next_events);
     ngx_queue_init(&ngx_posted_events);
+#if (T_NGX_HAVE_XUDP)
+    ngx_queue_init(&ngx_posted_commit);
+#endif
+#if (T_NGX_UDPV2)
+    ngx_queue_init(&ngx_udpv2_posted_event);
+#endif
 
     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
         return NGX_ERROR;
@@ -825,6 +894,12 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
+#if (T_NGX_HAVE_XUDP)
+        if (ls[i].for_xudp && ls[i].worker != ngx_worker) {
+            continue;
+        }
+#endif
+
 #if (NGX_HAVE_REUSEPORT)
         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
             continue;
@@ -836,6 +911,13 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         if (c == NULL) {
             return NGX_ERROR;
         }
+
+#if (T_NGX_UDPV2)
+        if (ls[i].type == SOCK_DGRAM) {
+            ngx_queue_init(&ls[i].writable_queue);
+            ngx_event_udpv2_init_listening(&ls[i]);
+        }
+#endif
 
         c->type = ls[i].type;
         c->log = &ls[i].log;
@@ -852,7 +934,9 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         rev->deferred_accept = ls[i].deferred_accept;
 #endif
 
-        if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+        if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)
+            && cycle->old_cycle)
+        {
             if (ls[i].previous) {
 
                 /*

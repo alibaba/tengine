@@ -24,6 +24,9 @@
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
 #define NGX_HTTP_VERSION_20                2000
+#if (T_NGX_XQUIC)
+#define NGX_HTTP_VERSION_30                3000
+#endif
 
 #define NGX_HTTP_UNKNOWN                   0x00000001
 #define NGX_HTTP_GET                       0x00000002
@@ -101,6 +104,7 @@
 #define NGX_HTTP_REQUEST_URI_TOO_LARGE     414
 #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
 #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
+#define NGX_HTTP_REQUEST_LIMITED           420
 #define NGX_HTTP_MISDIRECTED_REQUEST       421
 #define NGX_HTTP_TOO_MANY_REQUESTS         429
 
@@ -212,7 +216,7 @@ typedef struct {
     ngx_table_elt_t                  *keep_alive;
 
 #if (NGX_HTTP_X_FORWARDED_FOR)
-    ngx_array_t                       x_forwarded_for;
+    ngx_table_elt_t                  *x_forwarded_for;
 #endif
 
 #if (NGX_HTTP_REALIP)
@@ -231,10 +235,10 @@ typedef struct {
     ngx_table_elt_t                  *date;
 #endif
 
+    ngx_table_elt_t                  *cookie;
+
     ngx_str_t                         user;
     ngx_str_t                         passwd;
-
-    ngx_array_t                       cookies;
 
     ngx_str_t                         server;
     off_t                             content_length_n;
@@ -242,6 +246,8 @@ typedef struct {
 
     unsigned                          connection_type:2;
     unsigned                          chunked:1;
+    unsigned                          multi:1;
+    unsigned                          multi_linked:1;
     unsigned                          msie:1;
     unsigned                          msie6:1;
     unsigned                          opera:1;
@@ -272,6 +278,9 @@ typedef struct {
     ngx_table_elt_t                  *expires;
     ngx_table_elt_t                  *etag;
 
+    ngx_table_elt_t                  *cache_control;
+    ngx_table_elt_t                  *link;
+
     ngx_str_t                        *override_charset;
 
     size_t                            content_type_len;
@@ -279,9 +288,6 @@ typedef struct {
     ngx_str_t                         charset;
     u_char                           *content_type_lowcase;
     ngx_uint_t                        content_type_hash;
-
-    ngx_array_t                       cache_control;
-    ngx_array_t                       link;
 
     off_t                             content_length_n;
     off_t                             content_offset;
@@ -404,6 +410,13 @@ struct ngx_http_request_s {
     time_t                            lingering_time;
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
+
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    ngx_msec_t                        connect_time;
+    ngx_msec_t                        read_time;
+    ngx_msec_t                        send_time;
+#endif
+
 #if (T_NGX_RET_CACHE)
     ngx_usec_t                        start_usec;
 #endif
@@ -464,6 +477,9 @@ struct ngx_http_request_s {
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
+#if (T_NGX_XQUIC)
+    ngx_http_v3_stream_t             *xqstream;
+#endif
 
     ngx_http_log_handler_pt           log_handler;
 

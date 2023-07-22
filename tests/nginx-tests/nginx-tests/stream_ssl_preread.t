@@ -24,7 +24,8 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/stream stream_map stream_ssl_preread/)
-	->has(qw/stream_ssl stream_return/)->has_daemon('openssl')
+	->has(qw/stream_ssl stream_return socket_ssl_sni/)
+	->has_daemon('openssl')->plan(13)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -107,24 +108,9 @@ stream {
 
 EOF
 
-eval { require IO::Socket::SSL; die if $IO::Socket::SSL::VERSION < 1.56; };
-plan(skip_all => 'IO::Socket::SSL version >= 1.56 required') if $@;
 
-eval {
-	if (IO::Socket::SSL->can('can_client_sni')) {
-		IO::Socket::SSL->can_client_sni() or die;
-	}
-};
-plan(skip_all => 'IO::Socket::SSL with OpenSSL SNI support required') if $@;
 
-eval {
-	my $ctx = Net::SSLeay::CTX_new() or die;
-	my $ssl = Net::SSLeay::new($ctx) or die;
-	Net::SSLeay::set_tlsext_host_name($ssl, 'example.org') == 1 or die;
-};
-plan(skip_all => 'Net::SSLeay with OpenSSL SNI support required') if $@;
 
-$t->plan(13);
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
@@ -160,7 +146,7 @@ is(get_ssl('bar', 8081), $p2, 'sni 2 again');
 
 is(get_ssl('', 8081), $p3, 'no sni');
 is(get_ssl('foo', 8082), $p3, 'preread off');
-is(get_ssl('foo', 8083), undef, 'preread buffer full');
+is(get_ssl('foo', 8083), '', 'preread buffer full');
 is(stream('127.0.0.1:' . port(8080))->io('x' x 1000), "127.0.0.1:$p3",
 	'not a handshake');
 
@@ -220,25 +206,12 @@ sub get_oldver {
 
 sub get_ssl {
 	my ($host, $port) = @_;
-	my $s = stream('127.0.0.1:' . port($port));
-
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		IO::Socket::SSL->start_SSL($s->{_socket},
-			SSL_hostname => $host,
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
-			SSL_error_trap => sub { die $_[1] }
+	my $s = stream(
+		PeerAddr => '127.0.0.1:' . port($port),
+		SSL => 1,
+		SSL_hostname => $host
 		);
-		alarm(0);
-	};
-	alarm(0);
 
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
 
 	return $s->read();
 }

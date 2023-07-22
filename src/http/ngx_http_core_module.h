@@ -89,6 +89,12 @@ typedef struct {
     unsigned                   reuseport:1;
     unsigned                   so_keepalive:2;
     unsigned                   proxy_protocol:1;
+#if (T_NGX_XQUIC)
+    unsigned                   xquic:1;
+#endif
+#if (T_NGX_HAVE_XUDP)
+    unsigned                   xudp:1;
+#endif
 
     int                        backlog;
     int                        rcvbuf;
@@ -244,7 +250,12 @@ struct ngx_http_addr_conf_s {
     ngx_http_core_srv_conf_t  *default_server;
 
     ngx_http_virtual_names_t  *virtual_names;
-
+#if (T_NGX_XQUIC)
+    unsigned                   xquic:1;
+#endif
+#if (T_NGX_HAVE_XUDP)
+    unsigned                   xudp:1;
+#endif
     unsigned                   ssl:1;
     unsigned                   http2:1;
     unsigned                   proxy_protocol:1;
@@ -278,11 +289,25 @@ typedef struct {
     ngx_int_t                  family;
     in_port_t                  port;
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
+#if (T_NGX_XQUIC)
+    unsigned                   udp:1;
+#endif
+#if (T_NGX_HAVE_XUDP)
+    /**
+     *  the value will be 1 for xudp on
+     *  if xudp on, all the ngx_http_conf_addr_t will be xudp
+     * */
+    unsigned                   xudp:1;
+#endif
 } ngx_http_conf_port_t;
 
 
 typedef struct {
     ngx_http_listen_opt_t      opt;
+
+    unsigned                   protocols:3;
+    unsigned                   protocols_set:1;
+    unsigned                   protocols_changed:1;
 
     ngx_hash_t                 hash;
     ngx_hash_wildcard_t       *wc_head;
@@ -492,8 +517,8 @@ struct ngx_http_location_tree_node_s {
     ngx_http_core_loc_conf_t        *exact;
     ngx_http_core_loc_conf_t        *inclusive;
 
+    u_short                          len;
     u_char                           auto_redirect;
-    u_char                           len;
     u_char                           name[1];
 };
 
@@ -563,8 +588,10 @@ ngx_int_t ngx_http_set_disable_symlinks(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_str_t *path, ngx_open_file_info_t *of);
 
 ngx_int_t ngx_http_get_forwarded_addr(ngx_http_request_t *r, ngx_addr_t *addr,
-    ngx_array_t *headers, ngx_str_t *value, ngx_array_t *proxies,
+    ngx_table_elt_t *headers, ngx_str_t *value, ngx_array_t *proxies,
     int recursive);
+
+ngx_int_t ngx_http_link_multi_headers(ngx_http_request_t *r);
 
 
 extern ngx_module_t  ngx_http_core_module;

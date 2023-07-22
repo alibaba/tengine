@@ -22,25 +22,11 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval {
-	require Net::SSLeay;
-	Net::SSLeay::load_error_strings();
-	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::randomize();
-};
-plan(skip_all => 'Net::SSLeay not installed') if $@;
 
-eval {
-	my $ctx = Net::SSLeay::CTX_new() or die;
-	my $ssl = Net::SSLeay::new($ctx) or die;
-	Net::SSLeay::set_tlsext_host_name($ssl, 'example.org') == 1 or die;
-};
-plan(skip_all => 'Net::SSLeay with OpenSSL SNI support required') if $@;
+my $t = Test::Nginx->new()
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl perl/)->has_daemon('openssl');
-
-$t->{_configure_args} =~ /OpenSSL ([\d\.]+)/;
-plan(skip_all => 'OpenSSL too old') unless defined $1 and $1 ge '1.0.2';
+	->has(qw/http http_ssl perl openssl:1.0.2 socket_ssl_sni/)
+	->has_daemon('openssl');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -67,7 +53,7 @@ http {
     ';
 
     server {
-        listen       127.0.0.1:8080 ssl;
+        listen       127.0.0.1:8443 ssl;
         server_name  localhost;
 
         ssl_certificate data:$pem;
@@ -99,27 +85,19 @@ $t->run()->plan(2);
 
 ###############################################################################
 
-like(cert('one', 8080), qr/CN=one/, 'certificate');
-like(cert('two', 8080), qr/CN=two/, 'certificate 2');
+like(cert('one'), qr/CN=one/, 'certificate');
+like(cert('two'), qr/CN=two/, 'certificate 2');
 
 ###############################################################################
 
 sub cert {
-	my ($host, $port) = @_;
-	my ($s, $ssl) = get_ssl_socket($host, $port) or return;
-	Net::SSLeay::dump_peer_certificate($ssl);
+	my $s = get_socket(@_) || return;
+	return $s->dump_peer_certificate();
 }
 
-sub get_ssl_socket {
-	my ($host, $port) = @_;
-
-	my $s = IO::Socket::INET->new('127.0.0.1:' . port($port));
-	my $ctx = Net::SSLeay::CTX_new() or die("Failed to create SSL_CTX $!");
-	my $ssl = Net::SSLeay::new($ctx) or die("Failed to create SSL $!");
-	Net::SSLeay::set_tlsext_host_name($ssl, $host);
-	Net::SSLeay::set_fd($ssl, fileno($s));
-	Net::SSLeay::connect($ssl) or die("ssl connect");
-	return ($s, $ssl);
+sub get_socket {
+	my $host = shift;
+	return http_get('/', start => 1, SSL => 1, SSL_hostname => $host);
 }
 
 ###############################################################################

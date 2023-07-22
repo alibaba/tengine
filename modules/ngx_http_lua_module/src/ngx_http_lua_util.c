@@ -16,22 +16,18 @@
 #include "ngx_http_lua_util.h"
 #include "ngx_http_lua_exception.h"
 #include "ngx_http_lua_pcrefix.h"
-#include "ngx_http_lua_regex.h"
 #include "ngx_http_lua_args.h"
 #include "ngx_http_lua_uri.h"
 #include "ngx_http_lua_req_body.h"
 #include "ngx_http_lua_headers.h"
 #include "ngx_http_lua_output.h"
-#include "ngx_http_lua_time.h"
 #include "ngx_http_lua_control.h"
 #include "ngx_http_lua_ndk.h"
 #include "ngx_http_lua_subrequest.h"
 #include "ngx_http_lua_log.h"
-#include "ngx_http_lua_variable.h"
 #include "ngx_http_lua_string.h"
 #include "ngx_http_lua_misc.h"
 #include "ngx_http_lua_consts.h"
-#include "ngx_http_lua_req_method.h"
 #include "ngx_http_lua_shdict.h"
 #include "ngx_http_lua_coroutine.h"
 #include "ngx_http_lua_socket_tcp.h"
@@ -41,17 +37,18 @@
 #include "ngx_http_lua_headerfilterby.h"
 #include "ngx_http_lua_bodyfilterby.h"
 #include "ngx_http_lua_logby.h"
-#include "ngx_http_lua_phase.h"
 #include "ngx_http_lua_probe.h"
 #include "ngx_http_lua_uthread.h"
 #include "ngx_http_lua_contentby.h"
 #include "ngx_http_lua_timer.h"
 #include "ngx_http_lua_config.h"
-#include "ngx_http_lua_worker.h"
 #include "ngx_http_lua_socket_tcp.h"
 #include "ngx_http_lua_ssl_certby.h"
 #include "ngx_http_lua_ssl.h"
 #include "ngx_http_lua_log_ringbuf.h"
+#if (NGX_THREADS)
+#include "ngx_http_lua_worker_thread.h"
+#endif
 
 
 #if 1
@@ -90,7 +87,6 @@
 
 
 char ngx_http_lua_code_cache_key;
-char ngx_http_lua_regex_cache_key;
 char ngx_http_lua_socket_pool_key;
 char ngx_http_lua_coroutines_key;
 char ngx_http_lua_headers_metatable_key;
@@ -105,6 +101,10 @@ static ngx_int_t ngx_http_lua_send_http10_headers(ngx_http_request_t *r,
 static void ngx_http_lua_init_registry(lua_State *L, ngx_log_t *log);
 static void ngx_http_lua_init_globals(lua_State *L, ngx_cycle_t *cycle,
     ngx_http_lua_main_conf_t *lmcf, ngx_log_t *log);
+#ifdef OPENRESTY_LUAJIT
+static void ngx_http_lua_inject_global_write_guard(lua_State *L,
+    ngx_log_t *log);
+#endif
 static void ngx_http_lua_set_path(ngx_cycle_t *cycle, lua_State *L, int tab_idx,
     const char *fieldname, const char *path, const char *default_path,
     ngx_log_t *log);
@@ -119,7 +119,6 @@ static int ngx_http_lua_thread_traceback(lua_State *L, lua_State *co,
 static void ngx_http_lua_inject_ngx_api(lua_State *L,
     ngx_http_lua_main_conf_t *lmcf, ngx_log_t *log);
 static void ngx_http_lua_inject_arg_api(lua_State *L);
-static int ngx_http_lua_param_get(lua_State *L);
 static int ngx_http_lua_param_set(lua_State *L);
 static ngx_int_t ngx_http_lua_output_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
@@ -146,6 +145,13 @@ static int ngx_http_lua_get_raw_phase_context(lua_State *L);
 #ifndef LUA_PATH_SEP
 #define LUA_PATH_SEP ";"
 #endif
+
+
+#if !defined(LUA_DEFAULT_PATH) && (NGX_DEBUG)
+#define LUA_DEFAULT_PATH "../lua-resty-core/lib/?.lua;"                      \
+                         "../lua-resty-lrucache/lib/?.lua"
+#endif
+
 
 #define AUX_MARK "\1"
 
@@ -262,7 +268,6 @@ ngx_http_lua_new_state(lua_State *parent_vm, ngx_cycle_t *cycle,
 
         lua_pushliteral(L, LUA_DEFAULT_PATH ";"); /* package default */
         lua_getfield(L, -2, "path"); /* package default old */
-        old_path = lua_tolstring(L, -1, &old_path_len);
         lua_concat(L, 2); /* package new */
         lua_setfield(L, -2, "path"); /* package */
 #endif
@@ -275,7 +280,6 @@ ngx_http_lua_new_state(lua_State *parent_vm, ngx_cycle_t *cycle,
 
         lua_pushliteral(L, LUA_DEFAULT_CPATH ";"); /* package default */
         lua_getfield(L, -2, "cpath"); /* package default old */
-        old_cpath = lua_tolstring(L, -1, &old_cpath_len);
         lua_concat(L, 2); /* package new */
         lua_setfield(L, -2, "cpath"); /* package */
 #endif
@@ -329,42 +333,101 @@ ngx_http_lua_new_thread(ngx_http_request_t *r, lua_State *L, int *ref)
     int              base;
     lua_State       *co;
 
+#ifdef HAVE_LUA_RESETTHREAD
+    ngx_queue_t     *q;
+
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_thread_ref_t   *tref;
+
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "lua creating new thread");
 
-    base = lua_gettop(L);
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
 
-    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                          coroutines_key));
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    if (L == lmcf->lua && !ngx_queue_empty(&lmcf->cached_lua_threads)) {
+        q = ngx_queue_head(&lmcf->cached_lua_threads);
+        tref = ngx_queue_data(q, ngx_http_lua_thread_ref_t, queue);
 
-    co = lua_newthread(L);
+        ngx_http_lua_assert(tref->ref != LUA_NOREF);
+        ngx_http_lua_assert(tref->co != NULL);
+
+        co = tref->co;
+        *ref = tref->ref;
+
+        tref->co = NULL;
+        tref->ref = LUA_NOREF;
+
+        ngx_queue_remove(q);
+        ngx_queue_insert_head(&lmcf->free_lua_threads, q);
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "lua reusing cached lua thread %p (ref %d)", co, *ref);
+
+#if 0
+        {
+            int n = 0;
+            lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                                  coroutines_key));
+            lua_rawget(L, LUA_REGISTRYINDEX);
+            lua_pushnil(L);  /* first key */
+            while (lua_next(L, -2) != 0) {
+                if (!lua_isnil(L, -1) && !lua_isnil(L, -2)) {
+                    n++;
+                }
+
+                lua_pop(L, 1);
+            }
+
+            lua_pop(L, 1);
+
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "! lua reusing cached lua thread %p (ref %d, n %d)",
+                           co, *ref, n);
+        }
+#endif
+
+    } else
+#endif
+    {
+        base = lua_gettop(L);
+
+        lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                              coroutines_key));
+        lua_rawget(L, LUA_REGISTRYINDEX);
+
+        co = lua_newthread(L);
 
 #ifndef OPENRESTY_LUAJIT
-    /*  {{{ inherit coroutine's globals to main thread's globals table
-     *  for print() function will try to find tostring() in current
-     *  globals table.
-     */
-    /*  new globals table for coroutine */
-    ngx_http_lua_create_new_globals_table(co, 0, 0);
+        /*  {{{ inherit coroutine's globals to main thread's globals table
+         *  for print() function will try to find tostring() in current
+         *  globals table.
+         */
+        /*  new globals table for coroutine */
+        ngx_http_lua_create_new_globals_table(co, 0, 0);
 
-    lua_createtable(co, 0, 1);
-    ngx_http_lua_get_globals_table(co);
-    lua_setfield(co, -2, "__index");
-    lua_setmetatable(co, -2);
+        lua_createtable(co, 0, 1);
+        ngx_http_lua_get_globals_table(co);
+        lua_setfield(co, -2, "__index");
+        lua_setmetatable(co, -2);
 
-    ngx_http_lua_set_globals_table(co);
-    /*  }}} */
+        ngx_http_lua_set_globals_table(co);
+        /*  }}} */
 #endif /* OPENRESTY_LUAJIT */
 
-    *ref = luaL_ref(L, -2);
+        *ref = luaL_ref(L, -2);
 
-    if (*ref == LUA_NOREF) {
-        lua_settop(L, base);  /* restore main thread stack */
-        return NULL;
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP,
+                       ngx_cycle->log, 0, "lua ref lua thread %p (ref %d)", co,
+                       *ref);
+
+        if (*ref == LUA_NOREF) {
+            lua_settop(L, base);  /* restore main thread stack */
+            return NULL;
+        }
+
+        lua_settop(L, base);
     }
 
-    lua_settop(L, base);
     return co;
 }
 
@@ -373,24 +436,63 @@ void
 ngx_http_lua_del_thread(ngx_http_request_t *r, lua_State *L,
     ngx_http_lua_ctx_t *ctx, ngx_http_lua_co_ctx_t *coctx)
 {
+#ifdef HAVE_LUA_RESETTHREAD
+    ngx_queue_t                 *q;
+    ngx_http_lua_main_conf_t    *lmcf;
+    ngx_http_lua_thread_ref_t   *tref;
+#endif
+
     if (coctx->co_ref == LUA_NOREF) {
         return;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "lua deleting light thread");
-
-    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                          coroutines_key));
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua deleting light thread %p (ref %d)", coctx->co,
+                   coctx->co_ref);
 
     ngx_http_lua_probe_thread_delete(r, coctx->co, ctx);
 
-    luaL_unref(L, -1, coctx->co_ref);
+#ifdef HAVE_LUA_RESETTHREAD
+    lmcf = ngx_http_get_module_main_conf(r, ngx_http_lua_module);
+
+    if (ctx != NULL
+        && coctx->co == ctx->entry_co_ctx.co
+        && L == lmcf->lua && !ngx_queue_empty(&lmcf->free_lua_threads))
+    {
+        lua_resetthread(L, coctx->co);
+        q = ngx_queue_head(&lmcf->free_lua_threads);
+        tref = ngx_queue_data(q, ngx_http_lua_thread_ref_t, queue);
+
+        ngx_http_lua_assert(tref->ref == LUA_NOREF);
+        ngx_http_lua_assert(tref->co == NULL);
+
+        tref->ref = coctx->co_ref;
+        tref->co = coctx->co;
+
+        ngx_queue_remove(q);
+        ngx_queue_insert_head(&lmcf->cached_lua_threads, q);
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "lua caching unused lua thread %p (ref %d)", coctx->co,
+                       coctx->co_ref);
+
+    } else {
+#endif
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http lua unref thread %p: %d", coctx->co,
+                       coctx->co_ref);
+
+        lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
+                              coroutines_key));
+        lua_rawget(L, LUA_REGISTRYINDEX);
+        luaL_unref(L, -1, coctx->co_ref);
+        lua_pop(L, 1);
+#ifdef HAVE_LUA_RESETTHREAD
+    }
+#endif
+
     coctx->co_ref = LUA_NOREF;
     coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
-
-    lua_pop(L, 1);
 }
 
 
@@ -533,16 +635,6 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
             }
         }
 
-#if defined(nginx_version) && nginx_version <= 8004
-
-        /* earlier versions of nginx does not allow subrequests
-           to send last_buf themselves */
-        if (r != r->main) {
-            return NGX_OK;
-        }
-
-#endif
-
         ctx->eof = 1;
 
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -625,11 +717,11 @@ ngx_http_lua_output_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
-#if nginx_version >= 1001004
+    if (ctx == NULL) {
+        return rc;
+    }
+
     ngx_chain_update_chains(r->pool,
-#else
-    ngx_chain_update_chains(
-#endif
                             &ctx->free_bufs, &ctx->busy_bufs, &in,
                             (ngx_buf_tag_t) &ngx_http_lua_module);
 
@@ -690,24 +782,19 @@ ngx_http_lua_init_registry(lua_State *L, ngx_log_t *log)
     lua_rawset(L, LUA_REGISTRYINDEX);
     /* }}} */
 
-    /* create the registry entry for the Lua request ctx data table */
-    lua_pushliteral(L, ngx_http_lua_ctx_tables_key);
-    lua_createtable(L, 0, 32 /* nrec */);
-    lua_rawset(L, LUA_REGISTRYINDEX);
+    /*
+     * the the Lua request ctx data table will create in resty.core.ctx,
+     * just equivalent to the following code:
+     *    lua_pushliteral(L, ngx_http_lua_ctx_tables_key);
+     *    lua_createtable(L, 0, 0);
+     *    lua_rawset(L, LUA_REGISTRYINDEX);
+     */
 
     /* create the registry entry for the Lua socket connection pool table */
     lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
                           socket_pool_key));
     lua_createtable(L, 0, 8 /* nrec */);
     lua_rawset(L, LUA_REGISTRYINDEX);
-
-#if (NGX_PCRE)
-    /* create the registry entry for the Lua precompiled regex object cache */
-    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                          regex_cache_key));
-    lua_createtable(L, 0, 16 /* nrec */);
-    lua_rawset(L, LUA_REGISTRYINDEX);
-#endif
 
     /* {{{ register table to cache user code:
      * { [(string)cache_key] = <code closure> } */
@@ -738,7 +825,7 @@ static void
 ngx_http_lua_inject_ngx_api(lua_State *L, ngx_http_lua_main_conf_t *lmcf,
     ngx_log_t *log)
 {
-    lua_createtable(L, 0 /* narr */, 117 /* nrec */);    /* ngx.* */
+    lua_createtable(L, 0 /* narr */, 115 /* nrec */);    /* ngx.* */
 
     lua_pushcfunction(L, ngx_http_lua_get_raw_phase_context);
     lua_setfield(L, -2, "_phase_ctx");
@@ -750,30 +837,23 @@ ngx_http_lua_inject_ngx_api(lua_State *L, ngx_http_lua_main_conf_t *lmcf,
 
     ngx_http_lua_inject_log_api(L);
     ngx_http_lua_inject_output_api(L);
-    ngx_http_lua_inject_time_api(L);
     ngx_http_lua_inject_string_api(L);
     ngx_http_lua_inject_control_api(log, L);
     ngx_http_lua_inject_subrequest_api(L);
     ngx_http_lua_inject_sleep_api(L);
-    ngx_http_lua_inject_phase_api(L);
-
-#if (NGX_PCRE)
-    ngx_http_lua_inject_regex_api(L);
-#endif
 
     ngx_http_lua_inject_req_api(log, L);
     ngx_http_lua_inject_resp_header_api(L);
     ngx_http_lua_create_headers_metatable(log, L);
-    ngx_http_lua_inject_variable_api(L);
     ngx_http_lua_inject_shdict_api(lmcf, L);
     ngx_http_lua_inject_socket_tcp_api(log, L);
     ngx_http_lua_inject_socket_udp_api(log, L);
     ngx_http_lua_inject_uthread_api(log, L);
     ngx_http_lua_inject_timer_api(L);
     ngx_http_lua_inject_config_api(L);
-    ngx_http_lua_inject_worker_api(L);
-
-    ngx_http_lua_inject_misc_api(L);
+#if (NGX_THREADS)
+    ngx_http_lua_inject_worker_thread_api(log, L);
+#endif
 
     lua_getglobal(L, "package"); /* ngx package */
     lua_getfield(L, -1, "loaded"); /* ngx package loaded */
@@ -784,53 +864,56 @@ ngx_http_lua_inject_ngx_api(lua_State *L, ngx_http_lua_main_conf_t *lmcf,
     lua_setglobal(L, "ngx");
 
     ngx_http_lua_inject_coroutine_api(log, L);
+}
+
 
 #ifdef OPENRESTY_LUAJIT
-    {
-        int         rc;
+static void
+ngx_http_lua_inject_global_write_guard(lua_State *L, ngx_log_t *log)
+{
+    int         rc;
 
-        const char buf[] =
-            "local ngx_log = ngx.log\n"
-            "local ngx_WARN = ngx.WARN\n"
-            "local tostring = tostring\n"
-            "local ngx_get_phase = ngx.get_phase\n"
-            "local traceback = require 'debug'.traceback\n"
-            "local function newindex(table, key, value)\n"
-                "rawset(table, key, value)\n"
-                "local phase = ngx_get_phase()\n"
-                "if phase == 'init_worker' or phase == 'init' then\n"
-                    "return\n"
-                "end\n"
-                "ngx_log(ngx_WARN, 'writing a global lua variable "
-                         "(\\'', tostring(key), '\\') which may lead to "
-                         "race conditions between concurrent requests, so "
-                         "prefer the use of \\'local\\' variables', "
-                         "traceback('', 2))\n"
+    const char buf[] =
+        "local ngx_log = ngx.log\n"
+        "local ngx_WARN = ngx.WARN\n"
+        "local tostring = tostring\n"
+        "local ngx_get_phase = ngx.get_phase\n"
+        "local traceback = require 'debug'.traceback\n"
+        "local function newindex(table, key, value)\n"
+            "rawset(table, key, value)\n"
+            "local phase = ngx_get_phase()\n"
+            "if phase == 'init_worker' or phase == 'init' then\n"
+                "return\n"
             "end\n"
-            "setmetatable(_G, { __newindex = newindex })\n"
-            ;
+            "ngx_log(ngx_WARN, 'writing a global Lua variable "
+                     "(\\'', tostring(key), '\\') which may lead to "
+                     "race conditions between concurrent requests, so "
+                     "prefer the use of \\'local\\' variables', "
+                     "traceback('', 2))\n"
+        "end\n"
+        "setmetatable(_G, { __newindex = newindex })\n"
+        ;
 
-        rc = luaL_loadbuffer(L, buf, sizeof(buf) - 1, "=_G write guard");
+    rc = luaL_loadbuffer(L, buf, sizeof(buf) - 1, "=_G write guard");
 
-        if (rc != 0) {
-            ngx_log_error(NGX_LOG_ERR, log, 0,
-                          "failed to load Lua code (%i): %s",
-                          rc, lua_tostring(L, -1));
+    if (rc != 0) {
+        ngx_log_error(NGX_LOG_ERR, log, 0,
+                      "failed to load Lua code (%i): %s",
+                      rc, lua_tostring(L, -1));
 
-            lua_pop(L, 1);
-            return;
-        }
-
-        rc = lua_pcall(L, 0, 0, 0);
-        if (rc != 0) {
-            ngx_log_error(NGX_LOG_ERR, log, 0,
-                          "failed to run Lua code (%i): %s",
-                          rc, lua_tostring(L, -1));
-            lua_pop(L, 1);
-        }
+        lua_pop(L, 1);
+        return;
     }
-#endif
+
+    rc = lua_pcall(L, 0, 0, 0);
+    if (rc != 0) {
+        ngx_log_error(NGX_LOG_ERR, log, 0,
+                      "failed to run Lua code (%i): %s",
+                      rc, lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
 }
+#endif
 
 
 void
@@ -915,8 +998,12 @@ ngx_http_lua_reset_ctx(ngx_http_request_t *r, lua_State *L,
 
     ngx_memzero(&ctx->entry_co_ctx, sizeof(ngx_http_lua_co_ctx_t));
 
+    ctx->entry_co_ctx.next_zombie_child_thread =
+        &ctx->entry_co_ctx.zombie_child_threads;
+
     ctx->entry_co_ctx.co_ref = LUA_NOREF;
 
+    ctx->entered_server_rewrite_phase = 0;
     ctx->entered_rewrite_phase = 0;
     ctx->entered_access_phase = 0;
     ctx->entered_content_phase = 0;
@@ -943,11 +1030,13 @@ ngx_http_lua_generic_phase_post_read(ngx_http_request_t *r)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
-    ctx->read_body_done = 1;
-
-#if defined(nginx_version) && nginx_version >= 8011
     r->main->count--;
-#endif
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    ctx->read_body_done = 1;
 
     if (ctx->waiting_more_body) {
         ctx->waiting_more_body = 0;
@@ -1037,9 +1126,15 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
     /* set Lua VM panic handler */
     lua_atpanic(L, ngx_http_lua_atpanic);
 
-    dd("ctx = %p", ctx);
-
     NGX_LUA_EXCEPTION_TRY {
+
+        /*
+         * silence a -Werror=clobbered warning with gcc 5.4
+         * due to above setjmp
+         */
+        err = NULL;
+        msg = NULL;
+        trace = NULL;
 
         if (ctx->cur_co_ctx->thread_spawn_yielded) {
             ngx_http_lua_probe_info("thread spawn yielded");
@@ -1050,18 +1145,14 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
 
         for ( ;; ) {
 
-            dd("calling lua_resume: vm %p, nret %d", ctx->cur_co_ctx->co,
-               (int) nrets);
+            dd("ctx: %p, co: %p, co status: %d, co is_wrap: %d",
+               ctx, ctx->cur_co_ctx->co, ctx->cur_co_ctx->co_status,
+               ctx->cur_co_ctx->is_wrap);
 
 #if (NGX_PCRE)
             /* XXX: work-around to nginx regex subsystem */
             old_pool = ngx_http_lua_pcre_malloc_init(r->pool);
 #endif
-
-            /*  run code */
-            dd("ctx: %p", ctx);
-            dd("cur co: %p", ctx->cur_co_ctx->co);
-            dd("cur co status: %d", ctx->cur_co_ctx->co_status);
 
             orig_coctx = ctx->cur_co_ctx;
 
@@ -1074,9 +1165,18 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
 
 #if DDEBUG
             if (lua_gettop(orig_coctx->co) > 0) {
-                dd("top elem: %s", luaL_typename(orig_coctx->co, -1));
+                dd("co top elem: %s", luaL_typename(orig_coctx->co, -1));
+            }
+
+            if (orig_coctx->propagate_error) {
+                dd("co propagate_error: %d", orig_coctx->propagate_error);
             }
 #endif
+
+            if (orig_coctx->propagate_error) {
+                orig_coctx->propagate_error = 0;
+                goto propagate_error;
+            }
 
             ngx_http_lua_assert(orig_coctx->co_top + nrets
                                 == lua_gettop(orig_coctx->co));
@@ -1222,12 +1322,6 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
                     next_coctx = ctx->cur_co_ctx->parent_co_ctx;
                     next_co = next_coctx->co;
 
-                    /*
-                     * prepare return values for coroutine.resume
-                     * (true plus any retvals)
-                     */
-                    lua_pushboolean(next_co, 1);
-
                     if (nrets) {
                         dd("moving %d return values to next co", nrets);
                         lua_xmove(ctx->cur_co_ctx->co, next_co, nrets);
@@ -1236,7 +1330,15 @@ ngx_http_lua_run_thread(lua_State *L, ngx_http_request_t *r,
 #endif
                     }
 
-                    nrets++;  /* add the true boolean value */
+                    if (!ctx->cur_co_ctx->is_wrap) {
+                        /*
+                         * prepare return values for coroutine.resume
+                         * (true plus any retvals)
+                         */
+                        lua_pushboolean(next_co, 1);
+                        lua_insert(next_co, 1);
+                        nrets++;  /* add the true boolean value */
+                    }
 
                     ctx->cur_co_ctx = next_coctx;
 
@@ -1347,12 +1449,6 @@ user_co_done:
 
                 next_co = next_coctx->co;
 
-                /*
-                 * ended successful, coroutine.resume returns true plus
-                 * any return values
-                 */
-                lua_pushboolean(next_co, success);
-
                 if (nrets) {
                     lua_xmove(ctx->cur_co_ctx->co, next_co, nrets);
                 }
@@ -1362,7 +1458,16 @@ user_co_done:
                     ctx->uthreads--;
                 }
 
-                nrets++;
+                if (!ctx->cur_co_ctx->is_wrap) {
+                    /*
+                     * ended successfully, coroutine.resume returns true plus
+                     * any return values
+                     */
+                    lua_pushboolean(next_co, success);
+                    lua_insert(next_co, 1);
+                    nrets++;
+                }
+
                 ctx->cur_co_ctx = next_coctx;
 
                 ngx_http_lua_probe_info("set parent running");
@@ -1383,8 +1488,9 @@ user_co_done:
                 break;
 
             case LUA_ERRMEM:
-                err = "memory allocation error";
-                ngx_quit = 1;
+                err = "[lua] memory allocation error";
+                ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0, err);
+                abort();
                 break;
 
             case LUA_ERRERR:
@@ -1400,25 +1506,33 @@ user_co_done:
                 ctx->cur_co_ctx = orig_coctx;
             }
 
-            if (lua_isstring(ctx->cur_co_ctx->co, -1)) {
-                dd("user custom error msg");
-                msg = lua_tostring(ctx->cur_co_ctx->co, -1);
-
-            } else {
-                msg = "unknown reason";
-            }
-
             ngx_http_lua_cleanup_pending_operation(ctx->cur_co_ctx);
 
             ngx_http_lua_probe_coroutine_done(r, ctx->cur_co_ctx->co, 0);
 
             ctx->cur_co_ctx->co_status = NGX_HTTP_LUA_CO_DEAD;
 
-            ngx_http_lua_thread_traceback(L, ctx->cur_co_ctx->co,
-                                          ctx->cur_co_ctx);
-            trace = lua_tostring(L, -1);
+            if (orig_coctx->is_uthread
+                || orig_coctx->is_wrap
+                || ngx_http_lua_is_entry_thread(ctx))
+            {
+                ngx_http_lua_thread_traceback(L, orig_coctx->co, orig_coctx);
+                trace = lua_tostring(L, -1);
+
+                if (lua_isstring(orig_coctx->co, -1)) {
+                    msg = lua_tostring(orig_coctx->co, -1);
+                    dd("user custom error msg: %s", msg);
+
+                } else {
+                    msg = "unknown reason";
+                }
+            }
+
+propagate_error:
 
             if (ctx->cur_co_ctx->is_uthread) {
+                ngx_http_lua_assert(err != NULL && msg != NULL
+                                    && trace != NULL);
 
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                               "lua user thread aborted: %s: %s\n%s",
@@ -1469,6 +1583,9 @@ user_co_done:
             }
 
             if (ngx_http_lua_is_entry_thread(ctx)) {
+                ngx_http_lua_assert(err != NULL && msg != NULL
+                                    && trace != NULL);
+
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                               "lua entry thread aborted: %s: %s\n%s",
                               err, msg, trace);
@@ -1507,18 +1624,24 @@ user_co_done:
 
             next_coctx->co_status = NGX_HTTP_LUA_CO_RUNNING;
 
+            ctx->cur_co_ctx = next_coctx;
+
+            if (orig_coctx->is_wrap) {
+                /*
+                 * coroutine.wrap propagates errors
+                 * to its parent coroutine
+                 */
+                next_coctx->propagate_error = 1;
+                continue;
+            }
+
             /*
              * ended with error, coroutine.resume returns false plus
              * err msg
              */
             lua_pushboolean(next_co, 0);
-            lua_xmove(ctx->cur_co_ctx->co, next_co, 1);
+            lua_xmove(orig_coctx->co, next_co, 1);
             nrets = 2;
-
-            ctx->cur_co_ctx = next_coctx;
-
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "lua coroutine: %s: %s\n%s", err, msg, trace);
 
             /* try resuming on the new coroutine again */
             continue;
@@ -1631,7 +1754,7 @@ ngx_http_lua_wev_handler(ngx_http_request_t *r)
         return NGX_DONE;
     }
 
-    if (c->buffered & NGX_HTTP_LOWLEVEL_BUFFERED) {
+    if (c->buffered & (NGX_HTTP_LOWLEVEL_BUFFERED | NGX_LOWLEVEL_BUFFERED)) {
         rc = ngx_http_lua_flush_pending_output(r, ctx);
 
         dd("flush pending output returned %d, c->error: %d", (int) rc,
@@ -1783,7 +1906,7 @@ ngx_http_lua_flush_pending_output(ngx_http_request_t *r,
         return rc;
     }
 
-    if (c->buffered & NGX_HTTP_LOWLEVEL_BUFFERED) {
+    if (c->buffered & (NGX_HTTP_LOWLEVEL_BUFFERED | NGX_LOWLEVEL_BUFFERED)) {
 
         clcf = ngx_http_get_module_loc_conf(r->main, ngx_http_core_module);
 
@@ -1887,13 +2010,13 @@ ngx_http_lua_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
 
                     /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
-        0xfc00886d, /* 1111 1100 0000 0000  1000 1000 0110 1101 */
+        0x80000029, /* 1000 0000 0000 0000  0000 0000 0010 1001 */
 
                     /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
-        0x78000000, /* 0111 1000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
 
                     /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
-        0xa8000000, /* 1010 1000 0000 0000  0000 0000 0000 0000 */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
 
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
@@ -2003,8 +2126,52 @@ ngx_http_lua_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
 
                     /* mail_auth is the same as memcached */
 
+                    /* " ", """, "(", ")", ",", "/", ":", ";", "?",
+                     * "<", "=", ">", "?", "@", "[", "]", "\", "{",
+                     * "}", %00-%1F, %7F-%FF
+                     */
+
+    static uint32_t   header_name[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0xfc009305, /* 1111 1100 0000 0000  1001 0011 0000 0101 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x38000001, /* 0011 1000 0000 0000  0000 0000 0000 0001 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xa8000000, /* 1010 1000 0000 0000  0000 0000 0000 0000 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* "%00-%08, %0A-%0F, %7F */
+
+    static uint32_t   header_value[] = {
+        0xfffffdff, /* 1111 1111 1111 1111  1111 1101 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    };
+
     static uint32_t  *map[] =
-        { uri, args, uri_component, html, refresh, memcached, memcached };
+        { uri, args, uri_component, html, refresh, memcached, memcached,
+          header_name, header_value };
 
     escape = map[type];
 
@@ -2018,6 +2185,7 @@ ngx_http_lua_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
             if (escape[*src >> 5] & (1 << (*src & 0x1f))) {
                 n++;
             }
+
             src++;
             size--;
         }
@@ -2035,10 +2203,27 @@ ngx_http_lua_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
         } else {
             *dst++ = *src++;
         }
+
         size--;
     }
 
     return (uintptr_t) dst;
+}
+
+
+static int
+ngx_http_lua_util_hex2int(char xdigit)
+{
+    if (isdigit(xdigit)) {
+        return xdigit - '0';
+    }
+
+    xdigit = tolower(xdigit);
+    if (xdigit <= 'f' && xdigit >= 'a') {
+        return xdigit - 'a' + 10;
+    }
+
+    return -1;
 }
 
 
@@ -2047,131 +2232,55 @@ void
 ngx_http_lua_unescape_uri(u_char **dst, u_char **src, size_t size,
     ngx_uint_t type)
 {
-    u_char  *d, *s, ch, c, decoded;
-    enum {
-        sw_usual = 0,
-        sw_quoted,
-        sw_quoted_second
-    } state;
-
-    d = *dst;
-    s = *src;
-
-    state = 0;
-    decoded = 0;
+    u_char *d = *dst, *s = *src, *de = (*dst + size);
+    int     isuri = type & NGX_UNESCAPE_URI;
+    int     isredirect = type & NGX_UNESCAPE_REDIRECT;
 
     while (size--) {
+        u_char curr = *s++;
 
-        ch = *s++;
+        if (curr == '?' &&
+            (type & (NGX_UNESCAPE_URI | NGX_UNESCAPE_REDIRECT)))
+        {
+            *d++ = '?';
+            break;
 
-        switch (state) {
-        case sw_usual:
-            if (ch == '?'
-                && (type & (NGX_UNESCAPE_URI|NGX_UNESCAPE_REDIRECT)))
-            {
+        } else if (curr == '%') {
+            u_char ch;
+            if (size < 2 || !(isxdigit(s[0]) && isxdigit(s[1]))) {
+                *d++ = '%';
+                continue;
+            }
+            /* we can be sure here they must be hex digits */
+            ch = ngx_http_lua_util_hex2int(s[0]) * 16 +
+                 ngx_http_lua_util_hex2int(s[1]);
+
+            if ((isuri || isredirect) && ch == '?') {
                 *d++ = ch;
-                goto done;
-            }
-
-            if (ch == '%') {
-                state = sw_quoted;
                 break;
-            }
 
-            if (ch == '+') {
-                *d++ = ' ';
-                break;
+            } else if (isredirect && (ch <= '%' || ch >= 0x7f)) {
+                *d++ = '%';
+                continue;
             }
 
             *d++ = ch;
-            break;
+            s += 2;
+            size -= 2;
 
-        case sw_quoted:
+        } else if (curr == '+') {
+            *d++ = ' ';
+            continue;
 
-            if (ch >= '0' && ch <= '9') {
-                decoded = (u_char) (ch - '0');
-                state = sw_quoted_second;
-                break;
-            }
-
-            c = (u_char) (ch | 0x20);
-            if (c >= 'a' && c <= 'f') {
-                decoded = (u_char) (c - 'a' + 10);
-                state = sw_quoted_second;
-                break;
-            }
-
-            /* the invalid quoted character */
-
-            state = sw_usual;
-
-            *d++ = ch;
-
-            break;
-
-        case sw_quoted_second:
-
-            state = sw_usual;
-
-            if (ch >= '0' && ch <= '9') {
-                ch = (u_char) ((decoded << 4) + ch - '0');
-
-                if (type & NGX_UNESCAPE_REDIRECT) {
-                    if (ch > '%' && ch < 0x7f) {
-                        *d++ = ch;
-                        break;
-                    }
-
-                    *d++ = '%'; *d++ = *(s - 2); *d++ = *(s - 1);
-                    break;
-                }
-
-                *d++ = ch;
-
-                break;
-            }
-
-            c = (u_char) (ch | 0x20);
-            if (c >= 'a' && c <= 'f') {
-                ch = (u_char) ((decoded << 4) + c - 'a' + 10);
-
-                if (type & NGX_UNESCAPE_URI) {
-                    if (ch == '?') {
-                        *d++ = ch;
-                        goto done;
-                    }
-
-                    *d++ = ch;
-                    break;
-                }
-
-                if (type & NGX_UNESCAPE_REDIRECT) {
-                    if (ch == '?') {
-                        *d++ = ch;
-                        goto done;
-                    }
-
-                    if (ch > '%' && ch < 0x7f) {
-                        *d++ = ch;
-                        break;
-                    }
-
-                    *d++ = '%'; *d++ = *(s - 2); *d++ = *(s - 1);
-                    break;
-                }
-
-                *d++ = ch;
-
-                break;
-            }
-
-            /* the invalid quoted character */
-
-            break;
+        } else {
+            *d++ = curr;
         }
     }
 
-done:
+    /* a safe guard if dst need to be null-terminated */
+    if (d != de) {
+        *d = '\0';
+    }
 
     *dst = d;
     *src = s;
@@ -2183,15 +2292,13 @@ ngx_http_lua_inject_req_api(ngx_log_t *log, lua_State *L)
 {
     /* ngx.req table */
 
-    lua_createtable(L, 0 /* narr */, 24 /* nrec */);    /* .req */
+    lua_createtable(L, 0 /* narr */, 23 /* nrec */);    /* .req */
 
     ngx_http_lua_inject_req_header_api(L);
     ngx_http_lua_inject_req_uri_api(log, L);
     ngx_http_lua_inject_req_args_api(L);
     ngx_http_lua_inject_req_body_api(L);
     ngx_http_lua_inject_req_socket_api(L);
-    ngx_http_lua_inject_req_method_api(L);
-    ngx_http_lua_inject_req_time_api(L);
     ngx_http_lua_inject_req_misc_api(L);
 
     lua_setfield(L, -2, "req");
@@ -2582,9 +2689,9 @@ ngx_http_lua_process_args_option(ngx_http_request_t *r, lua_State *L,
                 if (lua_isboolean(L, -1)) {
                     if (lua_toboolean(L, -1)) {
                         if (total_escape) {
-                            p = (u_char *) ngx_http_lua_escape_uri(p, key,
-    key_len,
-    NGX_ESCAPE_URI_COMPONENT);
+                            p = (u_char *)
+                                    ngx_http_lua_escape_uri(p, key, key_len,
+                                                      NGX_ESCAPE_URI_COMPONENT);
 
                         } else {
                             dd("shortcut: no escape required");
@@ -2772,9 +2879,7 @@ done:
     of->uniq = ngx_file_uniq(&fi);
     of->mtime = ngx_file_mtime(&fi);
     of->size = ngx_file_size(&fi);
-#if defined(nginx_version) && nginx_version >= 1000001
     of->fs_size = ngx_file_fs_size(&fi);
-#endif
     of->is_dir = ngx_is_dir(&fi);
     of->is_file = ngx_is_file(&fi);
     of->is_link = ngx_is_link(&fi);
@@ -2994,9 +3099,6 @@ ngx_http_lua_inject_arg_api(lua_State *L)
 
     lua_createtable(L, 0 /* narr */, 2 /* nrec */);    /*  the metatable */
 
-    lua_pushcfunction(L, ngx_http_lua_param_get);
-    lua_setfield(L, -2, "__index");
-
     lua_pushcfunction(L, ngx_http_lua_param_set);
     lua_setfield(L, -2, "__newindex");
 
@@ -3005,35 +3107,6 @@ ngx_http_lua_inject_arg_api(lua_State *L)
     dd("top: %d, type -1: %s", lua_gettop(L), luaL_typename(L, -1));
 
     lua_rawset(L, -3);    /*  set ngx.arg table */
-}
-
-
-static int
-ngx_http_lua_param_get(lua_State *L)
-{
-    ngx_http_lua_ctx_t          *ctx;
-    ngx_http_request_t          *r;
-
-    r = ngx_http_lua_get_req(L);
-    if (r == NULL) {
-        return 0;
-    }
-
-    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
-    if (ctx == NULL) {
-        return luaL_error(L, "ctx not found");
-    }
-
-    ngx_http_lua_check_context(L, ctx, NGX_HTTP_LUA_CONTEXT_SET
-                               | NGX_HTTP_LUA_CONTEXT_BODY_FILTER);
-
-    if (ctx->context & (NGX_HTTP_LUA_CONTEXT_SET)) {
-        return ngx_http_lua_setby_param_get(L, r);
-    }
-
-    /* ctx->context & (NGX_HTTP_LUA_CONTEXT_BODY_FILTER) */
-
-    return ngx_http_lua_body_filter_param_get(L, r);
 }
 
 
@@ -3062,6 +3135,9 @@ ngx_http_lua_param_set(lua_State *L)
 ngx_http_lua_co_ctx_t *
 ngx_http_lua_get_co_ctx(lua_State *L, ngx_http_lua_ctx_t *ctx)
 {
+#ifdef HAVE_LUA_EXDATA2
+    return (ngx_http_lua_co_ctx_t *) lua_getexdata2(L);
+#else
     ngx_uint_t                   i;
     ngx_list_part_t             *part;
     ngx_http_lua_co_ctx_t       *coctx;
@@ -3097,6 +3173,7 @@ ngx_http_lua_get_co_ctx(lua_State *L, ngx_http_lua_ctx_t *ctx)
     }
 
     return NULL;
+#endif
 }
 
 
@@ -3120,6 +3197,7 @@ ngx_http_lua_create_co_ctx(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx)
 
     ngx_memzero(coctx, sizeof(ngx_http_lua_co_ctx_t));
 
+    coctx->next_zombie_child_thread = &coctx->zombie_child_threads;
     coctx->co_ref = LUA_NOREF;
 
     return coctx;
@@ -3206,17 +3284,13 @@ static void
 ngx_http_lua_finalize_threads(ngx_http_request_t *r,
     ngx_http_lua_ctx_t *ctx, lua_State *L)
 {
-#ifdef NGX_LUA_USE_ASSERT
-    int                              top;
-#endif
-    int                              inited = 0, ref;
+    int                              ref;
     ngx_uint_t                       i;
     ngx_list_part_t                 *part;
     ngx_http_lua_co_ctx_t           *cc, *coctx;
 
-#ifdef NGX_LUA_USE_ASSERT
-    top = lua_gettop(L);
-#endif
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http lua finalize threads");
 
 #if 1
     coctx = ctx->on_abort_co_ctx;
@@ -3228,17 +3302,7 @@ ngx_http_lua_finalize_threads(ngx_http_request_t *r,
             ctx->uthreads--;
         }
 
-        ngx_http_lua_probe_thread_delete(r, coctx->co, ctx);
-
-        lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                              coroutines_key));
-        lua_rawget(L, LUA_REGISTRYINDEX);
-        inited = 1;
-
-        luaL_unref(L, -1, coctx->co_ref);
-        coctx->co_ref = LUA_NOREF;
-
-        coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
+        ngx_http_lua_del_thread(r, L, ctx, coctx);
         ctx->on_abort_co_ctx = NULL;
     }
 #endif
@@ -3266,21 +3330,8 @@ ngx_http_lua_finalize_threads(ngx_http_request_t *r,
             if (ref != LUA_NOREF) {
                 ngx_http_lua_cleanup_pending_operation(coctx);
 
-                ngx_http_lua_probe_thread_delete(r, coctx->co, ctx);
+                ngx_http_lua_del_thread(r, L, ctx, coctx);
 
-                if (!inited) {
-                    lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                                          coroutines_key));
-                    lua_rawget(L, LUA_REGISTRYINDEX);
-                    inited = 1;
-                }
-
-                ngx_http_lua_assert(lua_gettop(L) - top == 1);
-
-                luaL_unref(L, -1, ref);
-                coctx->co_ref = LUA_NOREF;
-
-                coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
                 ctx->uthreads--;
             }
         }
@@ -3295,25 +3346,7 @@ ngx_http_lua_finalize_threads(ngx_http_request_t *r,
     ref = coctx->co_ref;
     if (ref != LUA_NOREF) {
         ngx_http_lua_cleanup_pending_operation(coctx);
-
-        ngx_http_lua_probe_thread_delete(r, coctx->co, ctx);
-
-        if (!inited) {
-            lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
-                                  coroutines_key));
-            lua_rawget(L, LUA_REGISTRYINDEX);
-            inited = 1;
-        }
-
-        ngx_http_lua_assert(lua_gettop(L) - top == 1);
-
-        luaL_unref(L, -1, coctx->co_ref);
-        coctx->co_ref = LUA_NOREF;
-        coctx->co_status = NGX_HTTP_LUA_CO_DEAD;
-    }
-
-    if (inited) {
-        lua_pop(L, 1);
+        ngx_http_lua_del_thread(r, L, ctx, coctx);
     }
 }
 
@@ -3322,7 +3355,6 @@ static ngx_int_t
 ngx_http_lua_post_zombie_thread(ngx_http_request_t *r,
     ngx_http_lua_co_ctx_t *parent, ngx_http_lua_co_ctx_t *thread)
 {
-    ngx_http_lua_posted_thread_t  **p;
     ngx_http_lua_posted_thread_t   *pt;
 
     pt = ngx_palloc(r->pool, sizeof(ngx_http_lua_posted_thread_t));
@@ -3333,9 +3365,10 @@ ngx_http_lua_post_zombie_thread(ngx_http_request_t *r,
     pt->co_ctx = thread;
     pt->next = NULL;
 
-    for (p = &parent->zombie_child_threads; *p; p = &(*p)->next) { /* void */ }
+    ngx_http_lua_assert(parent->next_zombie_child_thread != NULL);
 
-    *p = pt;
+    *parent->next_zombie_child_thread = pt;
+    parent->next_zombie_child_thread = &pt->next;
 
     return NGX_OK;
 }
@@ -3355,6 +3388,7 @@ ngx_http_lua_cleanup_zombie_child_uthreads(ngx_http_request_t *r,
     }
 
     coctx->zombie_child_threads = NULL;
+    coctx->next_zombie_child_thread = &coctx->zombie_child_threads;
 }
 
 
@@ -3365,7 +3399,7 @@ ngx_http_lua_check_broken_connection(ngx_http_request_t *r, ngx_event_t *ev)
     char                 buf[1];
     ngx_err_t            err;
     ngx_int_t            event;
-    ngx_connection_t     *c;
+    ngx_connection_t    *c;
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ev->log, 0,
                    "http lua check client, write event:%d, \"%V\"",
@@ -3388,6 +3422,12 @@ ngx_http_lua_check_broken_connection(ngx_http_request_t *r, ngx_event_t *ev)
 
 #if (NGX_HTTP_V2)
     if (r->stream) {
+        return NGX_OK;
+    }
+#endif
+
+#if (T_NGX_XQUIC)
+    if (r->xqstream) {
         return NGX_OK;
     }
 #endif
@@ -3808,11 +3848,12 @@ ngx_http_lua_close_fake_connection(ngx_connection_t *c)
 }
 
 
-lua_State *
-ngx_http_lua_init_vm(lua_State *parent_vm, ngx_cycle_t *cycle,
-    ngx_pool_t *pool, ngx_http_lua_main_conf_t *lmcf, ngx_log_t *log,
-    ngx_pool_cleanup_t **pcln)
+ngx_int_t
+ngx_http_lua_init_vm(lua_State **new_vm, lua_State *parent_vm,
+    ngx_cycle_t *cycle, ngx_pool_t *pool, ngx_http_lua_main_conf_t *lmcf,
+    ngx_log_t *log, ngx_pool_cleanup_t **pcln)
 {
+    int                              rc;
     lua_State                       *L;
     ngx_uint_t                       i;
     ngx_pool_cleanup_t              *cln;
@@ -3821,13 +3862,13 @@ ngx_http_lua_init_vm(lua_State *parent_vm, ngx_cycle_t *cycle,
 
     cln = ngx_pool_cleanup_add(pool, 0);
     if (cln == NULL) {
-        return NULL;
+        return NGX_ERROR;
     }
 
     /* create new Lua VM instance */
     L = ngx_http_lua_new_state(parent_vm, cycle, lmcf, log);
     if (L == NULL) {
-        return NULL;
+        return NGX_ERROR;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "lua initialize the "
@@ -3838,8 +3879,9 @@ ngx_http_lua_init_vm(lua_State *parent_vm, ngx_cycle_t *cycle,
 
     state = ngx_alloc(sizeof(ngx_http_lua_vm_state_t), log);
     if (state == NULL) {
-        return NULL;
+        return NGX_ERROR;
     }
+
     state->vm = L;
     state->count = 1;
 
@@ -3871,7 +3913,8 @@ ngx_http_lua_init_vm(lua_State *parent_vm, ngx_cycle_t *cycle,
 
         for (i = 0; i < lmcf->preload_hooks->nelts; i++) {
 
-            ngx_http_lua_probe_register_preload_package(L, hook[i].package);
+            ngx_http_lua_probe_register_preload_package(L,
+                                                        hook[i].package);
 
             lua_pushcfunction(L, hook[i].loader);
             lua_setfield(L, -2, (char *) hook[i].package);
@@ -3880,7 +3923,21 @@ ngx_http_lua_init_vm(lua_State *parent_vm, ngx_cycle_t *cycle,
         lua_pop(L, 2);
     }
 
-    return L;
+    *new_vm = L;
+
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "resty.core");
+
+    rc = lua_pcall(L, 1, 1, 0);
+    if (rc != 0) {
+        return NGX_DECLINED;
+    }
+
+#ifdef OPENRESTY_LUAJIT
+    ngx_http_lua_inject_global_write_guard(L, log);
+#endif
+
+    return NGX_OK;
 }
 
 
@@ -4242,6 +4299,180 @@ ngx_http_lua_set_sa_restart(ngx_log_t *log)
     }
 }
 #endif
+
+
+size_t
+ngx_http_lua_escape_log(u_char *dst, u_char *src, size_t size)
+{
+    size_t          n;
+    u_char          c;
+    static u_char   hex[] = "0123456789ABCDEF";
+
+    static uint32_t escape[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000004, /* 0000 0000 0000 0000  0000 0000 0000 0100 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x10000000, /* 0001 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+    if (dst == NULL) {
+
+        /* find the number of characters to be escaped */
+
+        n = 0;
+
+        while (size) {
+            c = *src;
+            if (escape[c >> 5] & (1 << (c & 0x1f))) {
+                n += 4;
+
+            } else {
+                n++;
+            }
+
+            src++;
+            size--;
+        }
+
+        return n;
+    }
+
+    while (size) {
+        c = *src;
+        if (escape[c >> 5] & (1 << (c & 0x1f))) {
+            *dst++ = '\\';
+            *dst++ = 'x';
+            *dst++ = hex[*src >> 4];
+            *dst++ = hex[*src & 0xf];
+            src++;
+
+        } else {
+            *dst++ = *src++;
+        }
+
+        size--;
+    }
+
+    return 0;
+}
+
+
+ngx_int_t
+ngx_http_lua_copy_escaped_header(ngx_http_request_t *r,
+    ngx_str_t *dst, int is_name)
+{
+    size_t       escape;
+    size_t       len;
+    u_char      *data;
+    int          type;
+
+    type = is_name
+        ? NGX_HTTP_LUA_ESCAPE_HEADER_NAME : NGX_HTTP_LUA_ESCAPE_HEADER_VALUE;
+
+    data = dst->data;
+    len = dst->len;
+
+    escape = ngx_http_lua_escape_uri(NULL, data, len, type);
+    if (escape > 0) {
+        /*
+         * we allocate space for the trailing '\0' char here because nginx
+         * header values must be null-terminated
+         */
+        dst->data = ngx_palloc(r->pool, len + 2 * escape + 1);
+        if (dst->data == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_http_lua_escape_uri(dst->data, data, len, type);
+        dst->len = len + 2 * escape;
+        dst->data[dst->len] = '\0';
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_addr_t *
+ngx_http_lua_parse_addr(lua_State *L, u_char *text, size_t len)
+{
+    ngx_addr_t           *addr;
+    size_t                socklen;
+    in_addr_t             inaddr;
+    ngx_uint_t            family;
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    struct in6_addr       inaddr6;
+    struct sockaddr_in6  *sin6;
+
+    /*
+     * prevent MSVC8 warning:
+     *    potentially uninitialized local variable 'inaddr6' used
+     */
+    ngx_memzero(&inaddr6, sizeof(struct in6_addr));
+#endif
+
+    inaddr = ngx_inet_addr(text, len);
+
+    if (inaddr != INADDR_NONE) {
+        family = AF_INET;
+        socklen = sizeof(struct sockaddr_in);
+
+#if (NGX_HAVE_INET6)
+
+    } else if (ngx_inet6_addr(text, len, inaddr6.s6_addr) == NGX_OK) {
+        family = AF_INET6;
+        socklen = sizeof(struct sockaddr_in6);
+#endif
+
+    } else {
+        return NULL;
+    }
+
+    addr = lua_newuserdata(L, sizeof(ngx_addr_t) + socklen + len);
+    if (addr == NULL) {
+        luaL_error(L, "no memory");
+        return NULL;
+    }
+
+    addr->sockaddr = (struct sockaddr *) ((u_char *) addr + sizeof(ngx_addr_t));
+
+    ngx_memzero(addr->sockaddr, socklen);
+
+    addr->sockaddr->sa_family = (u_char) family;
+    addr->socklen = socklen;
+
+    switch (family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        sin6 = (struct sockaddr_in6 *) addr->sockaddr;
+        ngx_memcpy(sin6->sin6_addr.s6_addr, inaddr6.s6_addr, 16);
+        break;
+#endif
+
+    default: /* AF_INET */
+        sin = (struct sockaddr_in *) addr->sockaddr;
+        sin->sin_addr.s_addr = inaddr;
+        break;
+    }
+
+    addr->name.data = (u_char *) addr->sockaddr + socklen;
+    addr->name.len = len;
+    ngx_memcpy(addr->name.data, text, len);
+
+    return addr;
+}
 
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

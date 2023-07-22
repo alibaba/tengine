@@ -23,14 +23,10 @@ use Test::Nginx::SMTP;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
 local $SIG{PIPE} = 'IGNORE';
 
-my $t = Test::Nginx->new()->has(qw/mail mail_ssl smtp http rewrite/)
+my $t = Test::Nginx->new()->has(qw/mail mail_ssl smtp http rewrite socket_ssl/)
 	->has_daemon('openssl')->plan(11)
 	->write_file_expand('nginx.conf', <<'EOF');
 
