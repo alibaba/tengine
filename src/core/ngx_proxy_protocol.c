@@ -115,7 +115,7 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
     }
 
     if (len < 8 || ngx_strncmp(p, "PROXY ", 6) != 0) {
-        goto invalid;
+        return p;
     }
 
     p += 6;
