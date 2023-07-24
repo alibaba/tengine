@@ -127,6 +127,8 @@ http {
         listen 443 default_server reuseport backlog=4096 ssl http2;
         listen 443 default_server reuseport backlog=4096 xquic;
 
+        server_name s1.test.com;
+
         add_header Alt-Svc 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000' always;
 
         ssl_certificate     /etc/ingress-controller/ssl/s1.crt;
@@ -137,6 +139,8 @@ http {
         listen 80;
         listen 443 ssl http2;
         listen 443 xquic;
+
+        server_name s2.test.com;
 
         add_header Alt-Svc 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000' always;
 
