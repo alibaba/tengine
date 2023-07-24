@@ -77,6 +77,7 @@ jobs:
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
+            --with-http_v2_module \
             --with-stream \
             --with-stream_ssl_module \
             --with-stream_sni
