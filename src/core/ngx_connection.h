@@ -264,6 +264,10 @@ struct ngx_connection_s {
 #if (T_NGX_HAVE_XUDP)
     unsigned            xudp_tx:1;
 #endif
+
+#if (T_NGX_XQUIC)
+    unsigned            xquic_conn:1;
+#endif
 };
 
 
