@@ -20,6 +20,10 @@
 #endif
 
 
+#ifdef T_NGX_HTTP_HAVE_LUA_MODULE
+#include <ngx_http_lua_ssl_certby.h>
+extern ngx_module_t ngx_http_lua_module;
+#endif
 
 ngx_int_t
 ngx_http_v3_conn_check_concurrent_cnt(ngx_http_xquic_main_conf_t *qmcf)
@@ -187,6 +191,22 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     hc = qc->http_connection;
     c = qc->connection;
 
+#ifdef T_NGX_HTTP_HAVE_LUA_MODULE
+    ngx_http_lua_srv_conf_t *lscf = NULL;
+
+    lscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_lua_module);
+    if (lscf != NULL && lscf->srv.ssl_cert_src.len)  {
+        ngx_ssl_conn_t *ssl_conn = qc->ssl_conn;
+        
+        ngx_http_lua_ssl_cert_handler(ssl_conn, NULL);
+        *chain = NULL;
+        *cert = NULL;
+        *key = NULL;
+
+        return XQC_OK;
+    }
+#endif
+
     /*
      * get the server core conf by sni, this is useful when multiple server
      * block listen on the same port. but useless when there is noly a single
@@ -256,6 +276,8 @@ int
 ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn, 
     const xqc_cid_t *cid, void *user_data)
 {
+    ngx_connection_t               *c;
+
     /* we set alp user_data when accept connection */
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) user_data;
     user_conn->ssl_conn = (ngx_ssl_conn_t *) xqc_h3_conn_get_ssl(h3_conn);
@@ -264,6 +286,24 @@ ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn,
                     "|xquic|ngx_http_v3_conn_create_notify|%p|", user_conn->engine);
 
     xqc_h3_conn_set_user_data(h3_conn, user_conn);
+
+    c = user_conn->connection;
+
+    if (SSL_set_ex_data(user_conn->ssl_conn, ngx_ssl_connection_index, c) == 0)
+    {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|SSL_set_ex_data() failed|");
+        return XQC_ERROR;
+    }
+    
+    c->xquic_conn = 1;
+
+    ngx_ssl_connection_t *p_ssl = ngx_pcalloc(c->pool, sizeof(ngx_ssl_connection_t));
+    if (p_ssl ==  NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|alloc ngx_ssl_connection_t failed|");
+        return XQC_ERROR;
+    }
+    p_ssl->connection = user_conn->ssl_conn;
+    c->ssl = p_ssl;
 
     return NGX_OK;
 }

@@ -465,8 +465,18 @@ ngx_http_xquic_header_filter(ngx_http_request_t *r)
 
         h->hash = 1;
         ngx_str_set(&h->key, NGX_HTTP_XQUIC_NAME_SERVER);
-        if (clcf->server_tokens) {
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+#if (T_NGX_SERVER_INFO)
+            ngx_str_set(&h->value, TENGINE_VER);
+#else
             ngx_str_set(&h->value, NGINX_VER);
+#endif
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+#if (T_NGX_SERVER_INFO)
+            ngx_str_set(&h->value, TENGINE_VER_BUILD);
+#else
+            ngx_str_set(&h->value, NGINX_VER_BUILD);
+#endif
         } else {
             ngx_str_set(&h->value, TENGINE);
         }
