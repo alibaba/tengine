@@ -65,6 +65,8 @@ make install
 ```nginx
 worker_processes  1;
 
+error_log  logs/error.log debug;
+
 events {
     worker_connections  1024;
 }
@@ -106,6 +108,10 @@ http {
 
 ```nginx
 worker_processes  1;
+
+user root;
+
+error_log  logs/error.log debug;
 
 events {
     worker_connections  1024;
