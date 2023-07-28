@@ -109,6 +109,8 @@ http {
 ```nginx
 worker_processes  1;
 
+user root;
+
 error_log  logs/error.log debug;
 
 events {
