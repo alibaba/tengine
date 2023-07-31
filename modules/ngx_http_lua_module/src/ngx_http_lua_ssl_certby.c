@@ -231,6 +231,13 @@ ngx_http_lua_ssl_cert_handler(ngx_ssl_conn_t *ssl_conn, void *data)
 
     hc = c->data;
 
+#if (T_NGX_XQUIC)
+    if (c->xquic_conn) {
+        ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)c->data;
+        hc = qc->http_connection;
+    }
+#endif
+
     fc = ngx_http_lua_create_fake_connection(NULL);
     if (fc == NULL) {
         goto failed;
@@ -254,6 +261,10 @@ ngx_http_lua_ssl_cert_handler(ngx_ssl_conn_t *ssl_conn, void *data)
     fc->log->file = c->log->file;
     fc->log->log_level = c->log->log_level;
     fc->ssl = c->ssl;
+
+#if (T_NGX_XQUIC)
+    fc->xquic_conn = c->xquic_conn;
+#endif
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 

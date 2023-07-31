@@ -5057,18 +5057,19 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
 
 #if (T_NGX_SSL_NTLS)
     glcf->upstream.tls_method = SSL_CTX_get_ssl_method(glcf->upstream.ssl->ctx);
-    if (glcf->enc_certificate.len) {
+    if (glcf->upstream.enc_certificate.len) {
 
-        if (glcf->enc_certificate_key.len == 0) {
+        if (glcf->upstream.enc_certificate_key.len == 0) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"grpc_ssl_enc_certificate_key\" is defined "
-                          "for certificate \"%V\"", &glcf->enc_certificate);
+                          "for certificate \"%V\"",
+                          &glcf->upstream.enc_certificate);
             return NGX_ERROR;
         }
 
         if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                &glcf->upstream.enc_certificate->value,
-                                &glcf->upstream.enc_certificate_key->value,
+                                &glcf->upstream.enc_certificate,
+                                &glcf->upstream.enc_certificate_key,
                                 glcf->upstream.ssl_passwords,
                                 SSL_ENC_CERT)
             != NGX_OK)
@@ -5077,12 +5078,13 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
         }
     }
 
-    if (glcf->sign_certificate.len) {
+    if (glcf->upstream.sign_certificate.len) {
 
-        if (glcf->sign_certificate_key.len == 0) {
+        if (glcf->upstream.sign_certificate_key.len == 0) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no \"grpc_ssl_sign_certificate_key\" is defined "
-                          "for certificate \"%V\"", &glcf->sign_certificate);
+                          "for certificate \"%V\"",
+                          &glcf->upstream.sign_certificate);
             return NGX_ERROR;
         }
 
