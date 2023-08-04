@@ -78,6 +78,7 @@ jobs:
             --add-module=./modules/ngx_backtrace_module \
             --add-module=./modules/ngx_debug_pool \
             --add-module=./modules/ngx_debug_timer \
+            --add-module=./modules/ngx_debug_conn \
             --add-module=./modules/ngx_http_concat_module \
             --add-module=./modules/ngx_http_footer_filter_module \
             --add-module=./modules/ngx_http_lua_module \
@@ -107,6 +108,9 @@ jobs:
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
          prove -v -Inginx-tests/lib tengine-tests/
          prove -v -Inginx-tests/lib ../../modules/ngx_http_proxy_connect_module/t
+         prove -v -Inginx-tests/lib ../../modules/ngx_debug_timer/t
+         prove -v -Inginx-tests/lib ../../modules/ngx_debug_conn/t
+         prove -v -Inginx-tests/lib ../../modules/ngx_slab_stat/t
      - name: tengine test cases using test-nginx lib
        working-directory: tests/test-nginx
        run: |
