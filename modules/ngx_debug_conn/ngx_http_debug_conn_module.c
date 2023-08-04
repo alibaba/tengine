@@ -10,7 +10,7 @@
 
 
 #if (NGX_DEBUG_POOL)
-extern size_t ngx_pool_size(ngx_pool_t *);
+#define ngx_pool_size(p) ((p)->size)
 #else
 #define ngx_pool_size(p) ((size_t) 0)
 #endif
