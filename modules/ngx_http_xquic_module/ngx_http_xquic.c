@@ -207,6 +207,9 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     }
 #endif
 
+    /* The ngx_http_find_virtual_server() function requires ngx_http_connection_t in c->data */
+    c->data = hc;
+
     /*
      * get the server core conf by sni, this is useful when multiple server
      * block listen on the same port. but useless when there is noly a single
@@ -214,6 +217,8 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     */
    ret = ngx_http_find_virtual_server_inner(c,
             hc->addr_conf->virtual_names, &host, NULL, &cscf);
+   c->data = qc;
+
     if (ret == NGX_OK) {
         hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
         if (hc->ssl_servername == NULL) {
