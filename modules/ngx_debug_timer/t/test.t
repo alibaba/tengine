@@ -28,6 +28,7 @@ events {
 }
 
 http {
+    %%TEST_GLOBALS_HTTP%%
     server {
         listen       127.0.0.1:8080;
 
