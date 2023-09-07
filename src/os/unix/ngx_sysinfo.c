@@ -270,7 +270,7 @@ ngx_getcpuinfo(ngx_str_t *cpunumber, ngx_cpuinfo_t *cpuinfo, ngx_log_t *log)
         if (fd == NGX_INVALID_FILE) {
             ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
                           ngx_open_file_n " \"%s\" failed",
-                          NGX_MEMINFO_FILE);
+                          NGX_CPUINFO_FILE);
 
             return NGX_ERROR;
         }
@@ -286,7 +286,7 @@ ngx_getcpuinfo(ngx_str_t *cpunumber, ngx_cpuinfo_t *cpuinfo, ngx_log_t *log)
     if (n == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
                       ngx_read_file_n " \"%s\" failed",
-                      NGX_MEMINFO_FILE);
+                      NGX_CPUINFO_FILE);
 
         return NGX_ERROR;
     }
