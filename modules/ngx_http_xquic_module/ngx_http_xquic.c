@@ -191,22 +191,6 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     hc = qc->http_connection;
     c = qc->connection;
 
-#ifdef T_NGX_HTTP_HAVE_LUA_MODULE
-    ngx_http_lua_srv_conf_t *lscf = NULL;
-
-    lscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_lua_module);
-    if (lscf != NULL && lscf->srv.ssl_cert_src.len)  {
-        ngx_ssl_conn_t *ssl_conn = qc->ssl_conn;
-        
-        ngx_http_lua_ssl_cert_handler(ssl_conn, NULL);
-        *chain = NULL;
-        *cert = NULL;
-        *key = NULL;
-
-        return XQC_OK;
-    }
-#endif
-
     /* The ngx_http_find_virtual_server() function requires ngx_http_connection_t in c->data */
     c->data = hc;
 
@@ -237,6 +221,22 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
                      "|xquic|can't find virtual server, use default server|");
     }
+
+#ifdef T_NGX_HTTP_HAVE_LUA_MODULE
+    ngx_http_lua_srv_conf_t *lscf = NULL;
+
+    lscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_lua_module);
+    if (lscf != NULL && lscf->srv.ssl_cert_src.len)  {
+        ngx_ssl_conn_t *ssl_conn = qc->ssl_conn;
+
+        ngx_http_lua_ssl_cert_handler(ssl_conn, NULL);
+        *chain = NULL;
+        *cert = NULL;
+        *key = NULL;
+
+        return XQC_OK;
+    }
+#endif
 
     /* get http ssl config */
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
