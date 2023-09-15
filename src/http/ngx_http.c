@@ -1299,6 +1299,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #if (T_NGX_HAVE_XUDP)
     ngx_uint_t             xudp;
 #endif
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+    ngx_uint_t             https_allow_http;
+#endif
 
     /*
      * we cannot compare whole sockaddr struct's as kernel
@@ -1349,6 +1352,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
         xudp = lsopt->xudp || addr[i].opt.xudp || port->xudp;
         protocols |= lsopt->xudp << 4;
         protocols_prev |= addr[i].opt.xudp << 4;
+#endif
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        https_allow_http = lsopt->https_allow_http || addr[i].opt.https_allow_http;
 #endif
 
         if (lsopt->set) {
@@ -1442,6 +1448,9 @@ ngx_http_add_addresses(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
 #endif
 #if (T_NGX_HAVE_XUDP)
         addr[i].opt.xudp = xudp;
+#endif
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        addr[i].opt.https_allow_http = https_allow_http;
 #endif
 
         return NGX_OK;
@@ -2020,6 +2029,9 @@ ngx_http_add_addrs(ngx_conf_t *cf, ngx_http_port_t *hport,
 #if (NGX_HTTP_V2)
         addrs[i].conf.http2 = addr[i].opt.http2;
 #endif
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        addrs[i].conf.https_allow_http = addr[i].opt.https_allow_http;
+#endif
         addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 #if (T_NGX_XQUIC)
         addrs[i].conf.xquic = addr[i].opt.xquic;
@@ -2089,6 +2101,9 @@ ngx_http_add_addrs6(ngx_conf_t *cf, ngx_http_port_t *hport,
 #endif
 #if (NGX_HTTP_V2)
         addrs6[i].conf.http2 = addr[i].opt.http2;
+#endif
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        addrs6[i].conf.https_allow_http = addr[i].opt.https_allow_http;
 #endif
         addrs6[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 #if (T_NGX_XQUIC)

@@ -1483,3 +1483,4 @@ have=T_NGX_SHOW_INFO . auto/have
 have=T_NGX_HTTP_IMAGE_FILTER . auto/have
 have=T_HTTP_HEADER . auto/have
 have=T_HTTP_UPSTREAM_TIMEOUT_VAR . auto/have
+have=T_NGX_HTTPS_ALLOW_HTTP . auto/have
