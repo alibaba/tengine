@@ -716,7 +716,6 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
             sk_X509_pop_free(chain, X509_free);
             return NGX_ERROR;
         }
-
     } else if (cert_tag == SSL_SIGN_CERT) {
         if (SSL_CTX_use_sign_certificate(ssl->ctx, x509) == 0) {
             ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
@@ -726,7 +725,6 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
             sk_X509_pop_free(chain, X509_free);
             return NGX_ERROR;
         }
-
     } else
 #endif
     if (SSL_CTX_use_certificate(ssl->ctx, x509) == 0) {
@@ -826,7 +824,6 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
             EVP_PKEY_free(pkey);
             return NGX_ERROR;
         }
-
     } else if (cert_tag == SSL_SIGN_CERT) {
         if (SSL_CTX_use_sign_PrivateKey(ssl->ctx, pkey) == 0) {
             ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
@@ -835,7 +832,6 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
             EVP_PKEY_free(pkey);
             return NGX_ERROR;
         }
-
     } else
 #endif
     if (SSL_CTX_use_PrivateKey(ssl->ctx, pkey) == 0) {
@@ -2279,6 +2275,28 @@ ngx_ssl_handshake(ngx_connection_t *c)
                        "SSL ASYNC WANT recieved: \"%s\"", __func__);
 
         if (ngx_ssl_async_process_fds(c) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+
+        return NGX_AGAIN;
+    }
+#endif
+
+#ifdef T_INGRESS_SHARED_MEMORY_PB
+if (0
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+            || sslerr == SSL_ERROR_WANT_CLIENT_HELLO_CB
+#endif
+   )
+    {
+        c->read->handler = ngx_ssl_handshake_handler;
+        c->write->handler = ngx_ssl_handshake_handler;
+
+        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
             return NGX_ERROR;
         }
 
