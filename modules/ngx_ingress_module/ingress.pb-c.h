@@ -15,6 +15,8 @@ PROTOBUF_C__BEGIN_DECLS
 #endif
 
 
+typedef struct _Ingress__TagValueStrList Ingress__TagValueStrList;
+typedef struct _Ingress__TagItemCondition Ingress__TagItemCondition;
 typedef struct _Ingress__TagItem Ingress__TagItem;
 typedef struct _Ingress__TagRule Ingress__TagRule;
 typedef struct _Ingress__TagRouter Ingress__TagRouter;
@@ -26,6 +28,7 @@ typedef struct _Ingress__Router Ingress__Router;
 typedef struct _Ingress__Timeout Ingress__Timeout;
 typedef struct _Ingress__Upstream Ingress__Upstream;
 typedef struct _Ingress__Metadata Ingress__Metadata;
+typedef struct _Ingress__Action Ingress__Action;
 typedef struct _Ingress__VirtualService Ingress__VirtualService;
 typedef struct _Ingress__Config Ingress__Config;
 
@@ -34,44 +37,167 @@ typedef struct _Ingress__Config Ingress__Config;
 
 typedef enum _Ingress__LocationType {
   /*
+   * first element must be zero
+   */
+  INGRESS__LOCATION_TYPE__LocUnDefined = 0,
+  /*
    * Tag from http header
    */
-  INGRESS__LOCATION_TYPE__LocHttpHeader = 0,
+  INGRESS__LOCATION_TYPE__LocHttpHeader = 1,
   /*
-   * Tag from http query (not supported yet)
+   * Tag from http query 
    */
-  INGRESS__LOCATION_TYPE__LocHttpQuery = 1,
+  INGRESS__LOCATION_TYPE__LocHttpQuery = 2,
   /*
-   * Tag from nginx var (not supported yet)
+   * Tag from nginx var 
    */
-  INGRESS__LOCATION_TYPE__LocNginxVar = 2,
+  INGRESS__LOCATION_TYPE__LocNginxVar = 3,
   /*
-   * Tag from x-biz-info (not supported yet)
+   * Tag from x-biz-info 
    */
-  INGRESS__LOCATION_TYPE__LocXBizInfo = 3
+  INGRESS__LOCATION_TYPE__LocXBizInfo = 4,
+  /*
+   * Tag from http cookie
+   */
+  INGRESS__LOCATION_TYPE__LocHttpCookie = 5
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(INGRESS__LOCATION_TYPE)
 } Ingress__LocationType;
 typedef enum _Ingress__MatchType {
   /*
+   * first element must be zero
+   */
+  INGRESS__MATCH_TYPE__MatchUnDefined = 0,
+  /*
    * String matches exactly
    */
-  INGRESS__MATCH_TYPE__WholeMatch = 0,
+  INGRESS__MATCH_TYPE__WholeMatch = 1,
   /*
-   * Prefix matching (not supported yet)
+   * String list match
    */
-  INGRESS__MATCH_TYPE__PrefixMatch = 1,
+  INGRESS__MATCH_TYPE__StrListInMatch = 2,
   /*
-   * Suffix matching (not supported yet)
+   * mod result compare value
    */
-  INGRESS__MATCH_TYPE__SuffixMatch = 2,
-  /*
-   * Regex matching (not supported yet)
-   */
-  INGRESS__MATCH_TYPE__RegMatch = 3
+  INGRESS__MATCH_TYPE__ModCompare = 3
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(INGRESS__MATCH_TYPE)
 } Ingress__MatchType;
+typedef enum _Ingress__OperatorType {
+  /*
+   * first element must be zero
+   */
+  INGRESS__OPERATOR_TYPE__OperatorUnDefined = 0,
+  /*
+   * equal operation
+   */
+  INGRESS__OPERATOR_TYPE__OperatorEqual = 1,
+  /*
+   * greater operation
+   */
+  INGRESS__OPERATOR_TYPE__OperatorGreater = 2,
+  /*
+   * less operation
+   */
+  INGRESS__OPERATOR_TYPE__OperatorLess = 3,
+  /*
+   * greater or equal 
+   */
+  INGRESS__OPERATOR_TYPE__OperatorGreaterEqual = 4,
+  /*
+   * less or equal
+   */
+  INGRESS__OPERATOR_TYPE__OperatorLessEqual = 5
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(INGRESS__OPERATOR_TYPE)
+} Ingress__OperatorType;
+typedef enum _Ingress__ActionType {
+  /*
+   * first element must be zero
+   */
+  INGRESS__ACTION_TYPE__ActionUnDefined = 0,
+  /*
+   * Action add http request header, add action do not care about duplicate
+   */
+  INGRESS__ACTION_TYPE__ActionAddReqHeader = 1,
+  /*
+   * Action append http request header
+   */
+  INGRESS__ACTION_TYPE__ActionAppendReqHeader = 2,
+  /*
+   * Action add http response header
+   */
+  INGRESS__ACTION_TYPE__ActionAddRespHeader = 3,
+  /*
+   * Action append http response header
+   */
+  INGRESS__ACTION_TYPE__ActionAppendRespHeader = 4,
+  /*
+   * Action add http request query param
+   */
+  INGRESS__ACTION_TYPE__ActionAddParam = 5
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(INGRESS__ACTION_TYPE)
+} Ingress__ActionType;
+typedef enum _Ingress__ActionValueType {
+  /*
+   *first element must be zero
+   */
+  INGRESS__ACTION_VALUE_TYPE__ActionValueUnDefined = 0,
+  /*
+   * value from configure
+   */
+  INGRESS__ACTION_VALUE_TYPE__ActionStaticValue = 1,
+  /*
+   * value from nginx var
+   */
+  INGRESS__ACTION_VALUE_TYPE__ActionDynamicValue = 2
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(INGRESS__ACTION_VALUE_TYPE)
+} Ingress__ActionValueType;
 
 /* --- messages --- */
+
+struct  _Ingress__TagValueStrList
+{
+  ProtobufCMessage base;
+  /*
+   * string list  
+   */
+  size_t n_value;
+  char **value;
+};
+#define INGRESS__TAG_VALUE_STR_LIST__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&ingress__tag_value_str_list__descriptor) \
+    , 0,NULL }
+
+
+struct  _Ingress__TagItemCondition
+{
+  ProtobufCMessage base;
+  /*
+   * string match value, for WholeMatch,PrefixMatch,SuffixMatch, and RegMatch
+   */
+  char *value_str;
+  /*
+   * string list for match, for StrListInMatch
+   */
+  Ingress__TagValueStrList *value_list;
+  /*
+   * mode divisor, for ModCompare
+   */
+  protobuf_c_boolean has_divisor;
+  uint64_t divisor;
+  /*
+   * compare remainder, for ModCompare
+   */
+  protobuf_c_boolean has_remainder;
+  uint64_t remainder;
+  /*
+   * >, <, =, >=, <=, for ModCompare
+   */
+  protobuf_c_boolean has_operator_;
+  Ingress__OperatorType operator_;
+};
+#define INGRESS__TAG_ITEM_CONDITION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&ingress__tag_item_condition__descriptor) \
+    , NULL, NULL, 0, 0, 0, 0, 0, INGRESS__OPERATOR_TYPE__OperatorUnDefined }
+
 
 struct  _Ingress__TagItem
 {
@@ -88,7 +214,7 @@ struct  _Ingress__TagItem
   /*
    * The name of the value to be parsed
    */
-  char *value;
+  Ingress__TagItemCondition *condition;
   /*
    * matching method
    */
@@ -97,7 +223,7 @@ struct  _Ingress__TagItem
 };
 #define INGRESS__TAG_ITEM__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ingress__tag_item__descriptor) \
-    , 0, INGRESS__LOCATION_TYPE__LocHttpHeader, NULL, NULL, 0, INGRESS__MATCH_TYPE__WholeMatch }
+    , 0, INGRESS__LOCATION_TYPE__LocUnDefined, NULL, NULL, 0, INGRESS__MATCH_TYPE__MatchUnDefined }
 
 
 struct  _Ingress__TagRule
@@ -233,6 +359,31 @@ struct  _Ingress__Metadata
     , NULL, NULL }
 
 
+struct  _Ingress__Action
+{
+  ProtobufCMessage base;
+  /*
+   * action type 
+   */
+  protobuf_c_boolean has_action_type;
+  Ingress__ActionType action_type;
+  /*
+   * action value type
+   */
+  protobuf_c_boolean has_value_type;
+  Ingress__ActionValueType value_type;
+  /*
+   * action key
+   */
+  char *key;
+  /*
+   * action value
+   */
+  char *value;
+};
+#define INGRESS__ACTION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&ingress__action__descriptor) \
+    , 0, INGRESS__ACTION_TYPE__ActionUnDefined, 0, INGRESS__ACTION_VALUE_TYPE__ActionValueUnDefined, NULL, NULL }
 struct  _Ingress__VirtualService
 {
   ProtobufCMessage base;
@@ -244,10 +395,12 @@ struct  _Ingress__VirtualService
   protobuf_c_boolean force_https;
   size_t n_metadata;
   Ingress__Metadata **metadata;
+  size_t n_action;
+  Ingress__Action **action;
 };
 #define INGRESS__VIRTUAL_SERVICE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ingress__virtual_service__descriptor) \
-    , NULL, 0,NULL, NULL, 0, 0, 0,NULL }
+    , NULL, 0,NULL, NULL, 0, 0, 0,NULL, 0,NULL }
 
 
 struct  _Ingress__Config
@@ -263,6 +416,44 @@ struct  _Ingress__Config
     , 0,NULL, 0,NULL }
 
 
+/* Ingress__TagValueStrList methods */
+void   ingress__tag_value_str_list__init
+                     (Ingress__TagValueStrList         *message);
+size_t ingress__tag_value_str_list__get_packed_size
+                     (const Ingress__TagValueStrList   *message);
+size_t ingress__tag_value_str_list__pack
+                     (const Ingress__TagValueStrList   *message,
+                      uint8_t             *out);
+size_t ingress__tag_value_str_list__pack_to_buffer
+                     (const Ingress__TagValueStrList   *message,
+                      ProtobufCBuffer     *buffer);
+Ingress__TagValueStrList *
+       ingress__tag_value_str_list__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   ingress__tag_value_str_list__free_unpacked
+                     (Ingress__TagValueStrList *message,
+                      ProtobufCAllocator *allocator);
+/* Ingress__TagItemCondition methods */
+void   ingress__tag_item_condition__init
+                     (Ingress__TagItemCondition         *message);
+size_t ingress__tag_item_condition__get_packed_size
+                     (const Ingress__TagItemCondition   *message);
+size_t ingress__tag_item_condition__pack
+                     (const Ingress__TagItemCondition   *message,
+                      uint8_t             *out);
+size_t ingress__tag_item_condition__pack_to_buffer
+                     (const Ingress__TagItemCondition   *message,
+                      ProtobufCBuffer     *buffer);
+Ingress__TagItemCondition *
+       ingress__tag_item_condition__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   ingress__tag_item_condition__free_unpacked
+                     (Ingress__TagItemCondition *message,
+                      ProtobufCAllocator *allocator);
 /* Ingress__TagItem methods */
 void   ingress__tag_item__init
                      (Ingress__TagItem         *message);
@@ -472,6 +663,25 @@ Ingress__Metadata *
 void   ingress__metadata__free_unpacked
                      (Ingress__Metadata *message,
                       ProtobufCAllocator *allocator);
+/* Ingress__Action methods */
+void   ingress__action__init
+                     (Ingress__Action         *message);
+size_t ingress__action__get_packed_size
+                     (const Ingress__Action   *message);
+size_t ingress__action__pack
+                     (const Ingress__Action   *message,
+                      uint8_t             *out);
+size_t ingress__action__pack_to_buffer
+                     (const Ingress__Action   *message,
+                      ProtobufCBuffer     *buffer);
+Ingress__Action *
+       ingress__action__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   ingress__action__free_unpacked
+                     (Ingress__Action *message,
+                      ProtobufCAllocator *allocator);
 /* Ingress__VirtualService methods */
 void   ingress__virtual_service__init
                      (Ingress__VirtualService         *message);
@@ -512,6 +722,12 @@ void   ingress__config__free_unpacked
                       ProtobufCAllocator *allocator);
 /* --- per-message closures --- */
 
+typedef void (*Ingress__TagValueStrList_Closure)
+                 (const Ingress__TagValueStrList *message,
+                  void *closure_data);
+typedef void (*Ingress__TagItemCondition_Closure)
+                 (const Ingress__TagItemCondition *message,
+                  void *closure_data);
 typedef void (*Ingress__TagItem_Closure)
                  (const Ingress__TagItem *message,
                   void *closure_data);
@@ -545,6 +761,9 @@ typedef void (*Ingress__Upstream_Closure)
 typedef void (*Ingress__Metadata_Closure)
                  (const Ingress__Metadata *message,
                   void *closure_data);
+typedef void (*Ingress__Action_Closure)
+                 (const Ingress__Action *message,
+                  void *closure_data);
 typedef void (*Ingress__VirtualService_Closure)
                  (const Ingress__VirtualService *message,
                   void *closure_data);
@@ -559,6 +778,11 @@ typedef void (*Ingress__Config_Closure)
 
 extern const ProtobufCEnumDescriptor    ingress__location_type__descriptor;
 extern const ProtobufCEnumDescriptor    ingress__match_type__descriptor;
+extern const ProtobufCEnumDescriptor    ingress__operator_type__descriptor;
+extern const ProtobufCEnumDescriptor    ingress__action_type__descriptor;
+extern const ProtobufCEnumDescriptor    ingress__action_value_type__descriptor;
+extern const ProtobufCMessageDescriptor ingress__tag_value_str_list__descriptor;
+extern const ProtobufCMessageDescriptor ingress__tag_item_condition__descriptor;
 extern const ProtobufCMessageDescriptor ingress__tag_item__descriptor;
 extern const ProtobufCMessageDescriptor ingress__tag_rule__descriptor;
 extern const ProtobufCMessageDescriptor ingress__tag_router__descriptor;
@@ -570,6 +794,7 @@ extern const ProtobufCMessageDescriptor ingress__router__descriptor;
 extern const ProtobufCMessageDescriptor ingress__timeout__descriptor;
 extern const ProtobufCMessageDescriptor ingress__upstream__descriptor;
 extern const ProtobufCMessageDescriptor ingress__metadata__descriptor;
+extern const ProtobufCMessageDescriptor ingress__action__descriptor;
 extern const ProtobufCMessageDescriptor ingress__virtual_service__descriptor;
 extern const ProtobufCMessageDescriptor ingress__config__descriptor;
 
