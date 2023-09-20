@@ -236,7 +236,7 @@ ngx_ingress_init_main_conf(ngx_conf_t *cf, void *conf)
 
         ngx_log_error(NGX_LOG_DEBUG, cf->log, 0, 
                     "|ingress|register strategy %V successfully|", 
-                    gateway[i].name.data);
+                    &gateway[i].name);
     }
 
     ngx_str_t ngx_ingress_ctx_name = ngx_string(NGX_INGRESS_CTX_VAR);
