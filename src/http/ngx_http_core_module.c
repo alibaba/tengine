@@ -4624,6 +4624,20 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        if (ngx_strcmp(value[n].data, "https_allow_http") == 0) {
+#if (NGX_HTTP_SSL)
+            lsopt.https_allow_http = 1;
+            continue;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the \"https_allow_http\" parameter requires "
+                               "ngx_http_ssl_module");
+            return NGX_CONF_ERROR;
+#endif
+        }
+#endif
+
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid parameter \"%V\"", &value[n]);
         return NGX_CONF_ERROR;

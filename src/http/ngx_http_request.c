@@ -852,6 +852,11 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0, "plain http");
 
         c->log->action = "waiting for request";
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        if (hc->addr_conf->https_allow_http) {
+            hc->ssl = 0;
+        }
+#endif
 
         rev->handler = ngx_http_wait_request_handler;
         ngx_http_wait_request_handler(rev);
