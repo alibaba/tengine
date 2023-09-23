@@ -12,9 +12,16 @@
 #include "ngx_http_lua_common.h"
 
 
-#if (NGX_PCRE)
+#if (NGX_PCRE || NGX_PCRE2)
+
 ngx_pool_t *ngx_http_lua_pcre_malloc_init(ngx_pool_t *pool);
 void ngx_http_lua_pcre_malloc_done(ngx_pool_t *old_pool);
+
+#if NGX_PCRE2
+void *ngx_http_lua_pcre_malloc(size_t size, void *data);
+void ngx_http_lua_pcre_free(void *ptr, void *data);
+#endif
+
 #endif
 
 
