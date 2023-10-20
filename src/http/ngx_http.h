@@ -98,6 +98,9 @@ int ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
 int ngx_http_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg);
 #endif
 
+#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+int ngx_http_ssl_client_hello_callback(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
+#endif
 
 ngx_int_t ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b);
 ngx_int_t ngx_http_parse_uri(ngx_http_request_t *r);
