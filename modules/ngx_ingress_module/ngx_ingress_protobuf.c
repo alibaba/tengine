@@ -327,6 +327,84 @@ ngx_ingress_metadata_compare(const void *c1, const void *c2)
     return ngx_comm_str_compare(&meta1->key, &meta2->key);
 }
 
+static ngx_int_t 
+ngx_ingress_service_action_data_check(ngx_ingress_action_t *action) 
+{
+    ngx_int_t rc = NGX_ERROR;
+    switch (action->action_type) {
+    case INGRESS__ACTION_TYPE__ActionAddReqHeader:
+    case INGRESS__ACTION_TYPE__ActionAppendReqHeader:
+    case INGRESS__ACTION_TYPE__ActionAddRespHeader:
+    case INGRESS__ACTION_TYPE__ActionAppendRespHeader:
+    case INGRESS__ACTION_TYPE__ActionAddParam:
+        switch (action->value_type) {
+        case INGRESS__ACTION_VALUE_TYPE__ActionStaticValue:
+        case INGRESS__ACTION_VALUE_TYPE__ActionDynamicValue:
+            if (action->key.data != NULL && action->value.data != NULL) {
+                rc = NGX_OK;
+            } else {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|service action value or key NULL|");
+            }
+            break;
+        case INGRESS__ACTION_VALUE_TYPE__ActionValueUnDefined:
+        default:
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|ingress|service action value type error|");
+            break;
+        }
+        break;
+    case INGRESS__ACTION_TYPE__ActionUnDefined:
+    default:
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|ingress|service action type error|");
+        break;
+    }
+    return rc;
+}
+
+static ngx_int_t
+ngx_ingress_service_parse_action(ngx_ingress_t *ingress, 
+    ngx_ingress_action_t *shm_action, Ingress__Action *pb_action)
+{
+    ngx_memset(shm_action, 0, sizeof(ngx_ingress_action_t));
+    shm_action->action_type = pb_action->action_type;
+    if (pb_action->has_value_type) {
+        shm_action->value_type = pb_action->value_type;
+    } 
+    if (pb_action->key != NULL && ngx_strlen(pb_action->key) != 0) {
+        shm_action->key.len = ngx_strlen(pb_action->key);
+        shm_action->key.data
+            = ngx_shm_pool_calloc(ingress->pool, shm_action->key.len);
+        if (shm_action->key.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|alloc action key error, len:%d|", shm_action->key.len);
+            return NGX_ERROR;
+        }
+        ngx_memcpy(shm_action->key.data, pb_action->key, shm_action->key.len);
+    }
+
+    if (pb_action->value != NULL && ngx_strlen(pb_action->value) != 0) {
+        shm_action->value.len = ngx_strlen(pb_action->value);
+        shm_action->value.data =
+            ngx_shm_pool_calloc(ingress->pool, shm_action->value.len);
+        
+        if (shm_action->value.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|alloc action value error, len:%d|",
+                    shm_action->value.len);
+            return NGX_ERROR;
+        }
+        ngx_memcpy(shm_action->value.data, pb_action->value, shm_action->value.len);
+    }
+    
+    if (ngx_ingress_service_action_data_check(shm_action) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|ingress|action data check error|");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
 static ngx_int_t
 ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
     ngx_ingress_service_t *shm_service,
@@ -356,10 +434,13 @@ ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
     /* force https */
     if (pbservice->has_force_https) {
         shm_service->force_https = pbservice->force_https;
+    } else {
+        shm_service->force_https = NGX_INGRESS_FORCE_HTTPS_UNSET; 
     }
-    
+
     /* timeout */
     if (pbservice->timeout_ms != NULL) {
+        shm_service->timeout.set_flag = NGX_INGRESS_TIMEOUT_SET; 
         if (pbservice->timeout_ms->has_connect_timeout) {
             shm_service->timeout.connect_timeout = pbservice->timeout_ms->connect_timeout;
         } else {
@@ -377,6 +458,8 @@ ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
         } else {
             shm_service->timeout.write_timeout = NGX_CONF_UNSET_MSEC;
         }
+    } else {
+        shm_service->timeout.set_flag = NGX_INGRESS_TIMEOUT_UNSET;
     }
 
     /* upstreams */
@@ -477,6 +560,37 @@ ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
         ngx_memcpy(metadata->value.data, pb_metadata[i]->value, len);
     }
 
+    shm_service->action_a = ngx_shm_array_create(ingress->pool,
+            pbservice->n_action, sizeof(ngx_ingress_action_t));
+    if (shm_service->action_a == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|alloc action_a failed|service=%V|", &shm_service->name);
+        return NGX_ERROR;
+    }
+
+    Ingress__Action **pb_action_a = pbservice->action;
+    for (i = 0; i < pbservice->n_action; i++) {
+        ngx_ingress_action_t *shm_action = ngx_shm_array_push(shm_service->action_a);
+        if (shm_action == NULL) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|push action_a failed|service=%V|", &shm_service->name);
+            return NGX_ERROR;
+        }
+        if (pb_action_a[i]->has_action_type) {
+            if (ngx_ingress_service_parse_action(ingress, shm_action, pb_action_a[i]) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                        "|ingress|parse action error|service=%V|", &shm_service->name);
+                return NGX_ERROR;
+            }
+        } else {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|action type null|service=%V|", &shm_service->name);
+        
+            return NGX_ERROR;
+        }
+
+    }
+
     ngx_shm_sort_array(shm_service->metadata, ngx_ingress_metadata_compare);
 
     return NGX_OK;
@@ -498,6 +612,157 @@ ngx_path_prefix_compare(const void *c1, const void *c2)
     return ngx_comm_str_compare(&router1->prefix, &router2->prefix);
 }
 
+
+/* 
+ * this function check the tag item's data when reading configuration.
+ */
+static ngx_int_t
+ngx_ingress_pb_tag_item_data_check(ngx_ingress_tag_item_t *item)
+{
+    ngx_int_t ret = NGX_ERROR;
+    switch (item->match_type) {
+        case INGRESS__MATCH_TYPE__MatchUnDefined:
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|ingress|tag item match type invalid|");
+            break;
+        case INGRESS__MATCH_TYPE__WholeMatch:
+            if (item->condition.value_str.data == NULL || item->condition.value_str.len == 0) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag item condition value_str invalid|");
+                break;
+            }
+            ret = NGX_OK;
+            break;
+        case INGRESS__MATCH_TYPE__StrListInMatch:
+            if (item->condition.value_a == NULL || item->condition.value_a->nelts == 0) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag item condition value_a invalid|");
+                break;
+            }
+            ret = NGX_OK;
+            break;
+        case INGRESS__MATCH_TYPE__ModCompare:
+            if (item->condition.divisor == 0
+                || item->condition.op == INGRESS__OPERATOR_TYPE__OperatorUnDefined) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag item condition divisor or operator invalid|");
+                break;
+            }
+            ret = NGX_OK;
+            break;
+        default:
+            break;
+    }  
+
+    return ret;
+}
+
+static ngx_int_t
+ngx_ingress_pb_parse_tag_condition(ngx_ingress_t *ingress,
+    ngx_ingress_tag_condition_t *cond, Ingress__TagItemCondition *pb_cond)
+{
+    ngx_uint_t i = 0;
+    if (pb_cond->value_str != NULL && strlen(pb_cond->value_str) > 0) {
+        cond->value_str.len = strlen(pb_cond->value_str);
+        cond->value_str.data = ngx_shm_pool_calloc(ingress->pool, cond->value_str.len);
+        if (cond->value_str.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|ingress|tag condition value_str alloc error, len:%d|", cond->value_str.len);
+            return NGX_ERROR;
+        }
+        ngx_memcpy(cond->value_str.data, pb_cond->value_str, cond->value_str.len);
+    }
+    
+    if (pb_cond->value_list != NULL && pb_cond->value_list->n_value > 0) {
+        cond->value_a = ngx_shm_array_create(ingress->pool,
+                pb_cond->value_list->n_value, sizeof(ngx_str_t));
+        if (cond->value_a == NULL) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|ingress|tag condition value_a alloc error, n_value:%d", pb_cond->value_list->n_value);
+            return NGX_ERROR;
+        }
+        for (i = 0; i < pb_cond->value_list->n_value; i++) {
+            char *p_v = pb_cond->value_list->value[i];
+            if (p_v == NULL || strlen(p_v) == 0) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag condition value_list str NULL|");
+                return NGX_ERROR;
+            }
+         
+            ngx_str_t *v_str = ngx_shm_array_push(cond->value_a); 
+            if (v_str == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag condition value_a push error|");
+                return NGX_ERROR;
+            }
+            v_str->len = strlen(p_v);
+            v_str->data = ngx_shm_pool_calloc(ingress->pool, v_str->len);
+            if (v_str->data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|tag condition value alloc error, len:%d|", v_str->len);
+                return NGX_ERROR;
+            }
+            ngx_memcpy(v_str->data, p_v, v_str->len);
+        }
+        ngx_shm_sort_array(cond->value_a, (ngx_shm_compar_func)ngx_ingress_tag_value_compar);
+    }
+
+    if (pb_cond->has_divisor) {
+        cond->divisor = pb_cond->divisor;
+    }
+
+    if (pb_cond->has_remainder) {
+        cond->remainder = pb_cond->remainder;
+    }
+
+    if (pb_cond->has_operator_) {
+        cond->op = pb_cond->operator_;
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_ingress_pb_parse_tag_item(ngx_ingress_t *ingress,
+    ngx_ingress_tag_item_t *shm_item, Ingress__TagItem *pb_item)
+{
+    shm_item->location = pb_item->location;
+    shm_item->match_type = pb_item->match_type;
+    
+    /* parse key from pb */
+    if (pb_item->key == NULL || ngx_strlen(pb_item->key) == 0) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "|ingress|tag itme key NULL|");
+        return NGX_ERROR;
+    }
+    shm_item->key.len = ngx_strlen(pb_item->key);
+    shm_item->key.data = ngx_shm_pool_calloc(ingress->pool, shm_item->key.len);
+    if (shm_item->key.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "|ingress|tag item key alloc error, key len:%d|", shm_item->key.len);
+        return NGX_ERROR;
+    }
+    ngx_memcpy(shm_item->key.data, pb_item->key, shm_item->key.len);
+    
+    /* parse condition from pb */
+    if (pb_item->condition == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "|ingress|tag itme condition NULL|");
+        return NGX_ERROR; 
+    }
+    
+    if (ngx_ingress_pb_parse_tag_condition(ingress, &shm_item->condition,
+            pb_item->condition) != NGX_OK) {
+        return NGX_ERROR;
+    } 
+   
+    if (ngx_ingress_pb_tag_item_data_check(shm_item) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
 static ngx_int_t
 ngx_ingress_update_shm_tag_routers(ngx_ingress_t *ingress,
     size_t n_tags, Ingress__TagRouter **pb_tag_routers,
@@ -505,7 +770,6 @@ ngx_ingress_update_shm_tag_routers(ngx_ingress_t *ingress,
 {
     size_t                  i, j, k;
     ngx_shm_array_t        *ptags = NULL;
-    ngx_int_t               key_len, value_len;
 
 #if 0
 
@@ -626,31 +890,13 @@ ngx_ingress_update_shm_tag_routers(ngx_ingress_t *ingress,
                                 "|ingress|tag item alloc failed|");
                         return NGX_ERROR;
                     }
+                    ngx_memset(shm_item, 0, sizeof(ngx_ingress_tag_item_t));
 
                     if (pb_items[k]->has_location && pb_items[k]->has_match_type) {
-
-                        shm_item->location = pb_items[k]->location;
-                        shm_item->match_type = pb_items[k]->match_type;
-
-                        key_len = strlen(pb_items[k]->key);
-                        value_len = strlen(pb_items[k]->value);
-
-                        shm_item->key.data = ngx_shm_pool_calloc(ingress->pool, key_len);
-                        shm_item->value.data = ngx_shm_pool_calloc(ingress->pool, value_len);
-                        if ((shm_item->key.data == NULL)
-                            || (shm_item->value.data == NULL))
-                        {
+                        if (ngx_ingress_pb_parse_tag_item(ingress, shm_item, pb_items[k]) != NGX_OK) {
                             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                                            "|ingress|k-v alloc failed|");
-                            return NGX_ERROR;
+                                    "|ingress|pb parse tag item error|");
                         }
-
-                        shm_item->key.len = key_len;
-                        shm_item->value.len = value_len;
-
-                        ngx_memcpy(shm_item->key.data, pb_items[k]->key, key_len);
-                        ngx_memcpy(shm_item->value.data, pb_items[k]->value, value_len);
-
                     } else {
                         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                                 "|ingress|miss loc type or match type|");
