@@ -311,6 +311,16 @@ ngx_feature_test="cpu_set_t mask;
                   sched_setaffinity(0, sizeof(cpu_set_t), &mask)"
 . auto/feature
 
+ngx_feature="sched_getaffinity()"
+ngx_feature_name="NGX_HAVE_SCHED_GETAFFINITY"
+ngx_feature_run=no
+ngx_feature_incs="#include <sched.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="cpu_set_t mask;
+                  CPU_ZERO(&mask);
+                  sched_getaffinity(0, sizeof(cpu_set_t), &mask)"
+. auto/feature
 
 ngx_feature="SO_SETFIB"
 ngx_feature_name="NGX_HAVE_SETFIB"
@@ -963,6 +973,15 @@ ngx_feature_incs=
 ngx_feature_path=
 ngx_feature_libs=
 ngx_feature_test="sysconf(_SC_NPROCESSORS_ONLN)"
+. auto/feature
+
+ngx_feature="sysconf(_SC_NPROCESSORS_CONF)"
+ngx_feature_name="NGX_HAVE_SC_NPROCESSORS_CONF"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="sysconf(_SC_NPROCESSORS_CONF)"
 . auto/feature
 
 
