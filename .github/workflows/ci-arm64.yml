@@ -68,6 +68,7 @@ jobs:
               --add-module=./modules/ngx_http_concat_module \
               --add-module=./modules/ngx_http_footer_filter_module \
               --add-module=./modules/ngx_http_lua_module \
+              --add-module=./modules/ngx_http_lua_upstream \
               --add-module=./modules/ngx_http_proxy_connect_module \
               --add-module=./modules/ngx_http_reqstat_module \
               --add-module=./modules/ngx_http_slice_module \
