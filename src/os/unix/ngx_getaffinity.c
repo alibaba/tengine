@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) Nginx, Inc.
+ * Copyright (C) lhanjian (lhjay1@gmail.com)
  */
 
 
@@ -8,7 +8,7 @@
 #include <ngx_core.h>
 
 
-#if (NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
 
 void
 ngx_getaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)

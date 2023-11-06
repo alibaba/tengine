@@ -312,7 +312,7 @@ ngx_feature_test="cpu_set_t mask;
 . auto/feature
 
 ngx_feature="sched_getaffinity()"
-ngx_feature_name="NGX_HAVE_SCHED_GETAFFINITY"
+ngx_feature_name="T_NGX_HAVE_SCHED_GETAFFINITY"
 ngx_feature_run=no
 ngx_feature_incs="#include <sched.h>"
 ngx_feature_path=

@@ -1462,8 +1462,8 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         n = 2;
 
-#if (NGX_HAVE_SCHED_GETAFFINITY)
-    } elseif (ngx_strcmp(value[1].data, "auto_online_cpu") == 0) {
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+    } else if (ngx_strcmp(value[1].data, "auto_online_cpu") == 0) {
 
         if (cf->args->nelts > 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -1495,7 +1495,7 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
-#if (NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
         if (ccf->cpu_affinity_auto == 2) {
             continue;
         }
@@ -1551,7 +1551,7 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     ngx_cpuset_t     *mask;
     ngx_core_conf_t  *ccf;
 
-#if (NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
     ngx_int_t         worker_i, machine_core, all_machine_cores;
 #endif
 
@@ -1567,7 +1567,7 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     if (ccf->cpu_affinity_auto) {
         mask = &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
 
-#if (NGX_HAVE_SCHED_GETAFFINITY && NGX_HAVE_SC_NPROCESSORS_ONLN)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && NGX_HAVE_SC_NPROCESSORS_ONLN && NGX_HAVE_SC_NPROCESSORS_CONF)
         if (ccf->cpu_affinity_auto == 2) {
             all_machine_cores = sysconf(_SC_NPROCESSORS_CONF);
 
