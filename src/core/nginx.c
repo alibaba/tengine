@@ -1551,7 +1551,7 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     ngx_cpuset_t     *mask;
     ngx_core_conf_t  *ccf;
 
-#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && NGX_HAVE_SC_NPROCESSORS_ONLN && NGX_HAVE_SC_NPROCESSORS_CONF)
     ngx_int_t         worker_i, machine_core, all_machine_cores;
 #endif
 

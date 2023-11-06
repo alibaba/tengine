@@ -3,21 +3,19 @@
  * Copyright (C) lhanjian (lhjay1@gmail.com)
  */
 
-#ifndef _NGX_SETAFFINITY_H_INCLUDED_
-#define _NGX_SETAFFINITY_H_INCLUDED_
+#ifndef _NGX_GETAFFINITY_H_INCLUDED_
+#define _NGX_GETAFFINITY_H_INCLUDED_
 
 
-#if (NGX_HAVE_SCHED_SETAFFINITY)
-
-#define NGX_HAVE_CPU_AFFINITY 1
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
 
 typedef cpu_set_t  ngx_cpuset_t;
 
-void ngx_setaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log);
+void ngx_getaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log);
 
 #else
 
-#define ngx_setaffinity(cpu_affinity, log)
+#define ngx_getaffinity(cpu_affinity, log)
 
 typedef uint64_t  ngx_cpuset_t;
 
