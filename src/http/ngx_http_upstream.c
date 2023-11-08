@@ -209,10 +209,6 @@ static ngx_int_t ngx_http_upstream_ssl_certificate(ngx_http_request_t *r,
 #if (NGX_HTTP_UPSTREAM_RBTREE)
 static void ngx_http_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
-
-static ngx_http_upstream_srv_conf_t *
-ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
-    ngx_str_t *host);
 #endif
 
 static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
@@ -6847,7 +6843,7 @@ ngx_http_upstream_rbtree_insert_value(ngx_rbtree_node_t *temp,
 }
 
 
-static ngx_http_upstream_srv_conf_t *
+ngx_http_upstream_srv_conf_t *
 ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
     ngx_str_t *host)
 {

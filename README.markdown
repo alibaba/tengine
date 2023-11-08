@@ -22,11 +22,15 @@ Tengine has been an open source project since December 2011. It is being activel
 
 ## Features
 * All features of nginx-1.24.0 are inherited, i.e., it is 100% compatible with nginx.
-* Dynamically reconfigure the servers, locations and upstreams without reloading or restarting worker processes with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure the servers, locations and upstreams without reloading or restarting worker processes with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * HTTP/3 support (QUIC v1 and draft-29) with [xquic](https://github.com/alibaba/xquic).
 * High-speed UDP transmission with kernel-bypass.
-* Dynamically reconfigure routing based on standard and custom HTTP headers, header value, and weights with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
-* Dynamically reconfigure timeout setting, SSL Redirects, CORS and enabling/disabling robots for the server and location with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure different TLS protocols for different server names with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure timeout setting, SSL Redirects, CORS and enabling/disabling robots for the server and location with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure HTTP routing based on multiple values of a specific header, cookie or query parameter with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure HTTP routing based on multiple upstream according to weight with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure HTTP routing to add/append custom header or add query parameter in the HTTP request to the upstream with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure HTTP routing to add custom header in the HTTP response to the client with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
@@ -45,6 +49,8 @@ Tengine has been an open source project since December 2011. It is being activel
 * Enhanced diagnostic information makes it easier to troubleshoot errors.
 * More user-friendly command lines, e.g., showing all compiled-in modules and supported directives.
 * Expiration times can be specified for certain MIME types.
+* Receives HTTP traffic on the TLS listener with option.
+* Debugging HTTP connection usage.
 * ...
 
 ## Installation

@@ -7,6 +7,96 @@
 #endif
 
 #include "ingress.pb-c.h"
+void   ingress__tag_value_str_list__init
+                     (Ingress__TagValueStrList         *message)
+{
+  static const Ingress__TagValueStrList init_value = INGRESS__TAG_VALUE_STR_LIST__INIT;
+  *message = init_value;
+}
+size_t ingress__tag_value_str_list__get_packed_size
+                     (const Ingress__TagValueStrList *message)
+{
+  assert(message->base.descriptor == &ingress__tag_value_str_list__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__tag_value_str_list__pack
+                     (const Ingress__TagValueStrList *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__tag_value_str_list__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__tag_value_str_list__pack_to_buffer
+                     (const Ingress__TagValueStrList *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__tag_value_str_list__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__TagValueStrList *
+       ingress__tag_value_str_list__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__TagValueStrList *)
+     protobuf_c_message_unpack (&ingress__tag_value_str_list__descriptor,
+                                allocator, len, data);
+}
+void   ingress__tag_value_str_list__free_unpacked
+                     (Ingress__TagValueStrList *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__tag_value_str_list__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__tag_item_condition__init
+                     (Ingress__TagItemCondition         *message)
+{
+  static const Ingress__TagItemCondition init_value = INGRESS__TAG_ITEM_CONDITION__INIT;
+  *message = init_value;
+}
+size_t ingress__tag_item_condition__get_packed_size
+                     (const Ingress__TagItemCondition *message)
+{
+  assert(message->base.descriptor == &ingress__tag_item_condition__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__tag_item_condition__pack
+                     (const Ingress__TagItemCondition *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__tag_item_condition__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__tag_item_condition__pack_to_buffer
+                     (const Ingress__TagItemCondition *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__tag_item_condition__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__TagItemCondition *
+       ingress__tag_item_condition__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__TagItemCondition *)
+     protobuf_c_message_unpack (&ingress__tag_item_condition__descriptor,
+                                allocator, len, data);
+}
+void   ingress__tag_item_condition__free_unpacked
+                     (Ingress__TagItemCondition *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__tag_item_condition__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   ingress__tag_item__init
                      (Ingress__TagItem         *message)
 {
@@ -502,6 +592,51 @@ void   ingress__metadata__free_unpacked
   assert(message->base.descriptor == &ingress__metadata__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   ingress__action__init
+                     (Ingress__Action         *message)
+{
+  static const Ingress__Action init_value = INGRESS__ACTION__INIT;
+  *message = init_value;
+}
+size_t ingress__action__get_packed_size
+                     (const Ingress__Action *message)
+{
+  assert(message->base.descriptor == &ingress__action__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__action__pack
+                     (const Ingress__Action *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__action__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__action__pack_to_buffer
+                     (const Ingress__Action *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__action__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__Action *
+       ingress__action__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__Action *)
+     protobuf_c_message_unpack (&ingress__action__descriptor,
+                                allocator, len, data);
+}
+void   ingress__action__free_unpacked
+                     (Ingress__Action *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__action__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   ingress__virtual_service__init
                      (Ingress__VirtualService         *message)
 {
@@ -592,6 +727,134 @@ void   ingress__config__free_unpacked
   assert(message->base.descriptor == &ingress__config__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+static const ProtobufCFieldDescriptor ingress__tag_value_str_list__field_descriptors[1] =
+{
+  {
+    "value",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_STRING,
+    offsetof(Ingress__TagValueStrList, n_value),
+    offsetof(Ingress__TagValueStrList, value),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__tag_value_str_list__field_indices_by_name[] = {
+  0,   /* field[0] = value */
+};
+static const ProtobufCIntRange ingress__tag_value_str_list__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor ingress__tag_value_str_list__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.TagValueStrList",
+  "TagValueStrList",
+  "Ingress__TagValueStrList",
+  "Ingress",
+  sizeof(Ingress__TagValueStrList),
+  1,
+  ingress__tag_value_str_list__field_descriptors,
+  ingress__tag_value_str_list__field_indices_by_name,
+  1,  ingress__tag_value_str_list__number_ranges,
+  (ProtobufCMessageInit) ingress__tag_value_str_list__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__tag_item_condition__field_descriptors[5] =
+{
+  {
+    "value_str",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__TagItemCondition, value_str),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "value_list",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__TagItemCondition, value_list),
+    &ingress__tag_value_str_list__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "divisor",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_UINT64,
+    offsetof(Ingress__TagItemCondition, has_divisor),
+    offsetof(Ingress__TagItemCondition, divisor),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "remainder",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_UINT64,
+    offsetof(Ingress__TagItemCondition, has_remainder),
+    offsetof(Ingress__TagItemCondition, remainder),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "operator",
+    5,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_ENUM,
+    offsetof(Ingress__TagItemCondition, has_operator_),
+    offsetof(Ingress__TagItemCondition, operator_),
+    &ingress__operator_type__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__tag_item_condition__field_indices_by_name[] = {
+  2,   /* field[2] = divisor */
+  4,   /* field[4] = operator */
+  3,   /* field[3] = remainder */
+  1,   /* field[1] = value_list */
+  0,   /* field[0] = value_str */
+};
+static const ProtobufCIntRange ingress__tag_item_condition__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 5 }
+};
+const ProtobufCMessageDescriptor ingress__tag_item_condition__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.TagItemCondition",
+  "TagItemCondition",
+  "Ingress__TagItemCondition",
+  "Ingress",
+  sizeof(Ingress__TagItemCondition),
+  5,
+  ingress__tag_item_condition__field_descriptors,
+  ingress__tag_item_condition__field_indices_by_name,
+  1,  ingress__tag_item_condition__number_ranges,
+  (ProtobufCMessageInit) ingress__tag_item_condition__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
 static const ProtobufCFieldDescriptor ingress__tag_item__field_descriptors[4] =
 {
   {
@@ -619,13 +882,13 @@ static const ProtobufCFieldDescriptor ingress__tag_item__field_descriptors[4] =
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "value",
+    "condition",
     3,
     PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_STRING,
+    PROTOBUF_C_TYPE_MESSAGE,
     0,   /* quantifier_offset */
-    offsetof(Ingress__TagItem, value),
-    NULL,
+    offsetof(Ingress__TagItem, condition),
+    &ingress__tag_item_condition__descriptor,
     NULL,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
@@ -644,10 +907,10 @@ static const ProtobufCFieldDescriptor ingress__tag_item__field_descriptors[4] =
   },
 };
 static const unsigned ingress__tag_item__field_indices_by_name[] = {
+  2,   /* field[2] = condition */
   1,   /* field[1] = key */
   0,   /* field[0] = location */
   3,   /* field[3] = match_type */
-  2,   /* field[2] = value */
 };
 static const ProtobufCIntRange ingress__tag_item__number_ranges[1 + 1] =
 {
@@ -1257,7 +1520,84 @@ const ProtobufCMessageDescriptor ingress__metadata__descriptor =
   (ProtobufCMessageInit) ingress__metadata__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptors[5] =
+static const ProtobufCFieldDescriptor ingress__action__field_descriptors[4] =
+{
+  {
+    "action_type",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_ENUM,
+    offsetof(Ingress__Action, has_action_type),
+    offsetof(Ingress__Action, action_type),
+    &ingress__action_type__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "value_type",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_ENUM,
+    offsetof(Ingress__Action, has_value_type),
+    offsetof(Ingress__Action, value_type),
+    &ingress__action_value_type__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "key",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__Action, key),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "value",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__Action, value),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__action__field_indices_by_name[] = {
+  0,   /* field[0] = action_type */
+  2,   /* field[2] = key */
+  3,   /* field[3] = value */
+  1,   /* field[1] = value_type */
+};
+static const ProtobufCIntRange ingress__action__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 4 }
+};
+const ProtobufCMessageDescriptor ingress__action__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.Action",
+  "Action",
+  "Ingress__Action",
+  "Ingress",
+  sizeof(Ingress__Action),
+  4,
+  ingress__action__field_descriptors,
+  ingress__action__field_indices_by_name,
+  1,  ingress__action__number_ranges,
+  (ProtobufCMessageInit) ingress__action__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptors[6] =
 {
   {
     "service_name",
@@ -1319,8 +1659,21 @@ static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptor
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "action",
+    6,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__VirtualService, n_action),
+    offsetof(Ingress__VirtualService, action),
+    &ingress__action__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned ingress__virtual_service__field_indices_by_name[] = {
+  5,   /* field[5] = action */
   3,   /* field[3] = force_https */
   4,   /* field[4] = metadata */
   0,   /* field[0] = service_name */
@@ -1330,7 +1683,7 @@ static const unsigned ingress__virtual_service__field_indices_by_name[] = {
 static const ProtobufCIntRange ingress__virtual_service__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 5 }
+  { 0, 6 }
 };
 const ProtobufCMessageDescriptor ingress__virtual_service__descriptor =
 {
@@ -1340,7 +1693,7 @@ const ProtobufCMessageDescriptor ingress__virtual_service__descriptor =
   "Ingress__VirtualService",
   "Ingress",
   sizeof(Ingress__VirtualService),
-  5,
+  6,
   ingress__virtual_service__field_descriptors,
   ingress__virtual_service__field_indices_by_name,
   1,  ingress__virtual_service__number_ranges,
@@ -1398,22 +1751,26 @@ const ProtobufCMessageDescriptor ingress__config__descriptor =
   (ProtobufCMessageInit) ingress__config__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCEnumValue ingress__location_type__enum_values_by_number[4] =
+static const ProtobufCEnumValue ingress__location_type__enum_values_by_number[6] =
 {
-  { "LocHttpHeader", "INGRESS__LOCATION_TYPE__LocHttpHeader", 0 },
-  { "LocHttpQuery", "INGRESS__LOCATION_TYPE__LocHttpQuery", 1 },
-  { "LocNginxVar", "INGRESS__LOCATION_TYPE__LocNginxVar", 2 },
-  { "LocXBizInfo", "INGRESS__LOCATION_TYPE__LocXBizInfo", 3 },
+  { "LocUnDefined", "INGRESS__LOCATION_TYPE__LocUnDefined", 0 },
+  { "LocHttpHeader", "INGRESS__LOCATION_TYPE__LocHttpHeader", 1 },
+  { "LocHttpQuery", "INGRESS__LOCATION_TYPE__LocHttpQuery", 2 },
+  { "LocNginxVar", "INGRESS__LOCATION_TYPE__LocNginxVar", 3 },
+  { "LocXBizInfo", "INGRESS__LOCATION_TYPE__LocXBizInfo", 4 },
+  { "LocHttpCookie", "INGRESS__LOCATION_TYPE__LocHttpCookie", 5 },
 };
 static const ProtobufCIntRange ingress__location_type__value_ranges[] = {
-{0, 0},{0, 4}
+{0, 0},{0, 6}
 };
-static const ProtobufCEnumValueIndex ingress__location_type__enum_values_by_name[4] =
+static const ProtobufCEnumValueIndex ingress__location_type__enum_values_by_name[6] =
 {
-  { "LocHttpHeader", 0 },
-  { "LocHttpQuery", 1 },
-  { "LocNginxVar", 2 },
-  { "LocXBizInfo", 3 },
+  { "LocHttpCookie", 5 },
+  { "LocHttpHeader", 1 },
+  { "LocHttpQuery", 2 },
+  { "LocNginxVar", 3 },
+  { "LocUnDefined", 0 },
+  { "LocXBizInfo", 4 },
 };
 const ProtobufCEnumDescriptor ingress__location_type__descriptor =
 {
@@ -1422,9 +1779,9 @@ const ProtobufCEnumDescriptor ingress__location_type__descriptor =
   "LocationType",
   "Ingress__LocationType",
   "Ingress",
-  4,
+  6,
   ingress__location_type__enum_values_by_number,
-  4,
+  6,
   ingress__location_type__enum_values_by_name,
   1,
   ingress__location_type__value_ranges,
@@ -1432,20 +1789,20 @@ const ProtobufCEnumDescriptor ingress__location_type__descriptor =
 };
 static const ProtobufCEnumValue ingress__match_type__enum_values_by_number[4] =
 {
-  { "WholeMatch", "INGRESS__MATCH_TYPE__WholeMatch", 0 },
-  { "PrefixMatch", "INGRESS__MATCH_TYPE__PrefixMatch", 1 },
-  { "SuffixMatch", "INGRESS__MATCH_TYPE__SuffixMatch", 2 },
-  { "RegMatch", "INGRESS__MATCH_TYPE__RegMatch", 3 },
+  { "MatchUnDefined", "INGRESS__MATCH_TYPE__MatchUnDefined", 0 },
+  { "WholeMatch", "INGRESS__MATCH_TYPE__WholeMatch", 1 },
+  { "StrListInMatch", "INGRESS__MATCH_TYPE__StrListInMatch", 2 },
+  { "ModCompare", "INGRESS__MATCH_TYPE__ModCompare", 3 },
 };
 static const ProtobufCIntRange ingress__match_type__value_ranges[] = {
 {0, 0},{0, 4}
 };
 static const ProtobufCEnumValueIndex ingress__match_type__enum_values_by_name[4] =
 {
-  { "PrefixMatch", 1 },
-  { "RegMatch", 3 },
-  { "SuffixMatch", 2 },
-  { "WholeMatch", 0 },
+  { "MatchUnDefined", 0 },
+  { "ModCompare", 3 },
+  { "StrListInMatch", 2 },
+  { "WholeMatch", 1 },
 };
 const ProtobufCEnumDescriptor ingress__match_type__descriptor =
 {
@@ -1460,5 +1817,107 @@ const ProtobufCEnumDescriptor ingress__match_type__descriptor =
   ingress__match_type__enum_values_by_name,
   1,
   ingress__match_type__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+static const ProtobufCEnumValue ingress__operator_type__enum_values_by_number[6] =
+{
+  { "OperatorUnDefined", "INGRESS__OPERATOR_TYPE__OperatorUnDefined", 0 },
+  { "OperatorEqual", "INGRESS__OPERATOR_TYPE__OperatorEqual", 1 },
+  { "OperatorGreater", "INGRESS__OPERATOR_TYPE__OperatorGreater", 2 },
+  { "OperatorLess", "INGRESS__OPERATOR_TYPE__OperatorLess", 3 },
+  { "OperatorGreaterEqual", "INGRESS__OPERATOR_TYPE__OperatorGreaterEqual", 4 },
+  { "OperatorLessEqual", "INGRESS__OPERATOR_TYPE__OperatorLessEqual", 5 },
+};
+static const ProtobufCIntRange ingress__operator_type__value_ranges[] = {
+{0, 0},{0, 6}
+};
+static const ProtobufCEnumValueIndex ingress__operator_type__enum_values_by_name[6] =
+{
+  { "OperatorEqual", 1 },
+  { "OperatorGreater", 2 },
+  { "OperatorGreaterEqual", 4 },
+  { "OperatorLess", 3 },
+  { "OperatorLessEqual", 5 },
+  { "OperatorUnDefined", 0 },
+};
+const ProtobufCEnumDescriptor ingress__operator_type__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "Ingress.OperatorType",
+  "OperatorType",
+  "Ingress__OperatorType",
+  "Ingress",
+  6,
+  ingress__operator_type__enum_values_by_number,
+  6,
+  ingress__operator_type__enum_values_by_name,
+  1,
+  ingress__operator_type__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+static const ProtobufCEnumValue ingress__action_type__enum_values_by_number[6] =
+{
+  { "ActionUnDefined", "INGRESS__ACTION_TYPE__ActionUnDefined", 0 },
+  { "ActionAddReqHeader", "INGRESS__ACTION_TYPE__ActionAddReqHeader", 1 },
+  { "ActionAppendReqHeader", "INGRESS__ACTION_TYPE__ActionAppendReqHeader", 2 },
+  { "ActionAddRespHeader", "INGRESS__ACTION_TYPE__ActionAddRespHeader", 3 },
+  { "ActionAppendRespHeader", "INGRESS__ACTION_TYPE__ActionAppendRespHeader", 4 },
+  { "ActionAddParam", "INGRESS__ACTION_TYPE__ActionAddParam", 5 },
+};
+static const ProtobufCIntRange ingress__action_type__value_ranges[] = {
+{0, 0},{0, 6}
+};
+static const ProtobufCEnumValueIndex ingress__action_type__enum_values_by_name[6] =
+{
+  { "ActionAddParam", 5 },
+  { "ActionAddReqHeader", 1 },
+  { "ActionAddRespHeader", 3 },
+  { "ActionAppendReqHeader", 2 },
+  { "ActionAppendRespHeader", 4 },
+  { "ActionUnDefined", 0 },
+};
+const ProtobufCEnumDescriptor ingress__action_type__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "Ingress.ActionType",
+  "ActionType",
+  "Ingress__ActionType",
+  "Ingress",
+  6,
+  ingress__action_type__enum_values_by_number,
+  6,
+  ingress__action_type__enum_values_by_name,
+  1,
+  ingress__action_type__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+static const ProtobufCEnumValue ingress__action_value_type__enum_values_by_number[3] =
+{
+  { "ActionValueUnDefined", "INGRESS__ACTION_VALUE_TYPE__ActionValueUnDefined", 0 },
+  { "ActionStaticValue", "INGRESS__ACTION_VALUE_TYPE__ActionStaticValue", 1 },
+  { "ActionDynamicValue", "INGRESS__ACTION_VALUE_TYPE__ActionDynamicValue", 2 },
+};
+static const ProtobufCIntRange ingress__action_value_type__value_ranges[] = {
+{0, 0},{0, 3}
+};
+static const ProtobufCEnumValueIndex ingress__action_value_type__enum_values_by_name[3] =
+{
+  { "ActionDynamicValue", 2 },
+  { "ActionStaticValue", 1 },
+  { "ActionValueUnDefined", 0 },
+};
+const ProtobufCEnumDescriptor ingress__action_value_type__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "Ingress.ActionValueType",
+  "ActionValueType",
+  "Ingress__ActionValueType",
+  "Ingress",
+  3,
+  ingress__action_value_type__enum_values_by_number,
+  3,
+  ingress__action_value_type__enum_values_by_name,
+  1,
+  ingress__action_value_type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };

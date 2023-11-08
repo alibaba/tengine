@@ -129,6 +129,10 @@ struct ngx_ssl_connection_s {
     unsigned                    early_preread:1;
     unsigned                    write_blocked:1;
 
+#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+    unsigned                    client_hello_retry:1;
+#endif
+
 #if (T_NGX_HAVE_DTLS)
     unsigned                    bio_changed:1;
     unsigned                    dtls_send:1;

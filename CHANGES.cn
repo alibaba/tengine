@@ -1,3 +1,28 @@
+Tengine 3.1.0 [2023-10-27]
+* Security: 修复HTTP2安全漏洞CVE-2023-44487 (lianglli) 
+* Feature: 基于tengine-ingress，允许动态配置不同域名的多个TLS协议版本 (lianglli)
+* Feature: 基于tengine-ingress，允许动态配置基于多个Header值的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许动态配置基于多个Cookie值的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许动态配置基于多个Query参数值的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许动态配置基于Header取模的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许动态配置基于Cookie取模的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许动态配置基于Query取模的高级路由 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Header (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息追加Header (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Query参数 (lianglli, dreamwind1985)
+* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，响应消息增加Header (lianglli, dreamwind1985)
+* Feature: 新增listen选项https_allow_http，允许TLS端口处理HTTP请求 (drawing)
+* Feature: 新增ngx_http_debug_conn_module模块，调试连接信息 (hongxiaolong)
+* Bugfix: 修复HTTP/3 Lua模块证书回调问题 (drawing)
+* Bugfix: 修复HTTP/3 XQUIC模块连接句柄泄漏问题 (dreamwind1985)
+* Bugfix: 修复HTTP/3 XQUIC模块静态证书匹配问题 (lurker-Chen)
+* Bugfix: 修复HTTP/3 XQUIC模块调用ngx_http_find_virtual_server的crash问题 (morf)
+* Bugfix: 修复异步SSL模块使用thread_pool的crash问题 (zhsnew)
+* Bugfix: 修复ngx_http_grpc_module模块使用ngx_tongsuo_ntls的编译问题 (dongbeiouba)
+* Bugfix: 修复ngx_http_debug_conn_module模块的单元测试问题 (chobits)
+* Bugfix: 修复ngx_getcpuinfo的日志问题 (fuchencong)
+
+
 Tengine 3.0.0 [2023-07-06]
 * Feature: 支持域名，证书，路由的动态无损生效 [tengine-ingress] (drawing, lianglli)
 * Feature: 支持HTTP/3 (QUIC v1和draft-29)[XQUIC] (lurker-Chen, Kulsk, lianglli)

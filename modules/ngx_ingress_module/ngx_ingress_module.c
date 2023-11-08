@@ -15,10 +15,6 @@
 
 #include <ngx_ingress_module.h>
 
-#ifdef T_HTTP_VIPSERVER_MODULE
-#include <ngx_http_vipserver.h>
-#endif
-
 #define NGX_INGRESS_UPDATE_INTERVAL             (30 * 1000)
 #define NGX_INGRESS_SHM_POOL_SIZE               (32 * 1024 * 1024)
 #define NGX_INGRESS_HASH_SIZE                   1323323
@@ -26,6 +22,13 @@
 #define NGX_INGRESS_DEFAULT_GATEWAY_NUM         10
 
 #define NGX_INGRESS_CTX_VAR          "__ingress_ctx__"
+
+#define NGX_INGRESS_TAG_MATCH_SUCCESS           NGX_OK
+#define NGX_INGRESS_TAG_MATCH_FAIL              NGX_DONE
+#define NGX_INGRESS_TAG_MATCH_ERROR             NGX_ERROR
+
+#define NGX_INGRESS_TAG_ACTION_APPEND_SEPARATOR ","
+#define NGX_INGRESS_TAG_EAGLEEYE_APPEND_SEPARATOR "&"
 
 static ngx_int_t ngx_ingress_add_variables(ngx_conf_t *cf);
 static ngx_int_t ngx_ingress_ctx_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
@@ -40,6 +43,7 @@ static ngx_int_t ngx_ingress_route_target_variable(ngx_http_request_t *r, ngx_ht
 static ngx_int_t ngx_ingress_force_https_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_ingress_get_time_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static char *ngx_ingress_gateway_metadata(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+extern int ngx_ingress_metadata_compare(const void *c1, const void *c2);
 
 typedef struct {
     ngx_int_t   initialized;
@@ -51,7 +55,8 @@ typedef struct {
     ngx_msec_t  read_timeout;
     ngx_msec_t  write_timeout;
 
-    ngx_array_t metadata;      /* ngx_ingress_metadata_t */
+    ngx_array_t metadata;       /* ngx_ingress_metadata_t */
+    ngx_array_t action_a;       /* ngx_ingress_action_t */
 } ngx_ingress_ctx_t;
 
 /* function declare */
@@ -66,7 +71,7 @@ ngx_int_t ngx_ingress_update(ngx_cycle_t *cycle, void * context, ngx_shm_pool_t 
 
 static ngx_command_t ngx_ingress_commands[] = {
     { ngx_string("ingress_gateway"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_ingress_gateway,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -178,7 +183,6 @@ ngx_ingress_init_main_conf(ngx_conf_t *cf, void *conf)
     u_char                      name_buf[NGX_INGRESS_GATEWAY_MAX_NAME_BUF_LEN];
     size_t                      name_len;
 
-
     ngx_ingress_gateway_t *gateway = (ngx_ingress_gateway_t *)imcf->gateways.elts;
     for (i = 0; i < imcf->gateways.nelts; i++) {
         /* check config valid */
@@ -229,6 +233,10 @@ ngx_ingress_init_main_conf(ngx_conf_t *cf, void *conf)
                     "|ingress|register strategy ingress_app failed");
             return NGX_CONF_ERROR;
         }
+
+        ngx_log_error(NGX_LOG_DEBUG, cf->log, 0, 
+                    "|ingress|register strategy %V successfully|", 
+                    &gateway[i].name);
     }
 
     ngx_str_t ngx_ingress_ctx_name = ngx_string(NGX_INGRESS_CTX_VAR);
@@ -279,94 +287,146 @@ ngx_ingress_check_upstream_enable(ngx_ingress_service_t *service)
         return enable;
     }
 
-#ifdef T_HTTP_VIPSERVER_MODULE
-    ngx_uint_t  i;
-    ngx_ingress_upstream_t *ups = service->upstreams->elts;
-    for (i = 0; i < service->upstreams->nelts; i++) {
-        if (ngx_http_vipserver_check_dynamic_enable(ngx_cycle, &ups[i].target) == NGX_OK) {
-            /* If there is a successful one, return success */
-            enable = 1;
-            break;
-        }
-    }
-#else
     enable = 1;
-#endif
-
     return enable;
 }
 
-static ngx_inline ngx_int_t
-ngx_ingress_cmp_tag_value(Ingress__MatchType match_type,
-    ngx_str_t *value1, ngx_str_t *value2)
+ngx_int_t 
+ngx_ingress_tag_value_compar(const void *v1, const void *v2) 
 {
-    /* full string match */
-    if (INGRESS__MATCH_TYPE__WholeMatch == match_type) {
-
-        if ((value1->len == value2->len)
-            && (0 == ngx_strncasecmp(value1->data, value2->data, value1->len)))
-        {
-            return NGX_OK;
-
-        } else {
-            return NGX_ERROR;
-        }
-
-    /* prefix match TODO */
-    } else if (INGRESS__MATCH_TYPE__PrefixMatch == match_type) {
-        // TODO
-
-    /* suffix match TODO */
-    } else if (INGRESS__MATCH_TYPE__SuffixMatch == match_type) {
-        // TODO
-
-    /* regular match TODO */
-    } else if (INGRESS__MATCH_TYPE__RegMatch == match_type) {
-        // TODO
-
-    } else {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-            "|ingress|invalid match type|%d|", match_type);
-        return NGX_ERROR;
-    }
-
-    return NGX_ERROR;
+    ngx_str_t *s1 = (ngx_str_t *)v1;
+    ngx_str_t *s2 = (ngx_str_t *)v2;
+    return ngx_comm_strcasecmp(s1, s2);
 }
 
+ngx_int_t
+ngx_ingress_tag_mod_compar(ngx_str_t *tag_value, ngx_int_t divisor,
+    ngx_int_t remainder, ngx_ingress_tag_operator_e op) 
+{
+    ngx_int_t ret = NGX_INGRESS_TAG_MATCH_FAIL;
+    ngx_int_t mod_value = ngx_atoi(tag_value->data, tag_value->len);
+
+    if (mod_value == NGX_ERROR || divisor == 0) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|ingress|mod_value atoi error|"); 
+        return NGX_INGRESS_TAG_MATCH_ERROR;
+    }
+    
+    ngx_int_t mod_r = mod_value % divisor;
+
+    switch (op) {
+    case INGRESS__OPERATOR_TYPE__OperatorEqual:
+        if (mod_r == remainder) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__OPERATOR_TYPE__OperatorGreater:
+        if (mod_r > remainder) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__OPERATOR_TYPE__OperatorLess:
+        if (mod_r < remainder) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__OPERATOR_TYPE__OperatorGreaterEqual:
+        if (mod_r >= remainder) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__OPERATOR_TYPE__OperatorLessEqual:
+        if (mod_r <= remainder) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__OPERATOR_TYPE__OperatorUnDefined:
+    default:
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|ingress|invalid op value:%d|", op); 
+        ret = NGX_INGRESS_TAG_MATCH_ERROR;
+        break;
+    }
+
+    return ret;
+}
+
+/*
+ *  return value:
+ *  NGX_INGRESS_TAG_MATCH_SUCCESS means the value matched successfully
+ *  NGX_INGRESS_TAG_MATCH_ERROR means an error occurred 
+ *  NGX_INGRESS_TAG_MATCH_FAIL means the value failed to match
+ */
 static ngx_inline ngx_int_t
-ngx_ingress_get_req_tag_value(ngx_http_request_t *r, Ingress__LocationType location,
+ngx_ingress_cmp_tag_value(ngx_ingress_tag_match_type_e match_type,
+    ngx_ingress_tag_condition_t *p_cond, ngx_str_t *tag_value)
+{
+    ngx_int_t ret = NGX_INGRESS_TAG_MATCH_FAIL;
+    void *s_result = NULL;
+    switch (match_type) {
+    case INGRESS__MATCH_TYPE__WholeMatch:
+        if (ngx_comm_strcasecmp(tag_value, &p_cond->value_str) == 0) {    
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__MATCH_TYPE__StrListInMatch:
+        s_result = ngx_shm_search_array(p_cond->value_a, tag_value, (ngx_shm_compar_func)ngx_ingress_tag_value_compar);
+        if (s_result != NULL) {
+            ret = NGX_INGRESS_TAG_MATCH_SUCCESS;
+        }
+        break;
+    case INGRESS__MATCH_TYPE__ModCompare:
+        ret = ngx_ingress_tag_mod_compar(tag_value, p_cond->divisor, p_cond->remainder, p_cond->op);
+        break;
+    case INGRESS__MATCH_TYPE__MatchUnDefined:
+    default:
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+            "|ingress|invalid match type|%d|", match_type);
+        ret = NGX_INGRESS_TAG_MATCH_ERROR;
+        break;
+    }
+
+    return ret;
+}
+
+/*
+ * function: get tag rule value from http request
+ * return: NGX_OK means that the tag rule's value has found
+ * other value means that the tag rule's value hasn't found, or there is an error
+ */
+static ngx_inline ngx_int_t
+ngx_ingress_get_req_tag_value(ngx_http_request_t *r, ngx_ingress_tag_value_location_e location,
     ngx_str_t *tag_key, ngx_str_t *tag_value)
 {
     ngx_int_t               ret = NGX_ERROR;
-
-    /* Tag from HttpHeader */
-    if (INGRESS__LOCATION_TYPE__LocHttpHeader == location) {
-
+    ngx_table_elt_t        *cookie;
+    tag_value->data = NULL;
+    tag_value->len = 0;
+    switch (location) {
+    case INGRESS__LOCATION_TYPE__LocHttpHeader:
         ret = ngx_http_header_in(r, (u_char *)tag_key->data, tag_key->len, tag_value);
-
-    /* Tag from HttpQuery TODO */
-    } else if (INGRESS__LOCATION_TYPE__LocHttpQuery == location) {
-        // TODO
-
-    /* Tag from nginx var TODO */
-    } else if (INGRESS__LOCATION_TYPE__LocNginxVar == location) {
-        // TODO
-
-    /* Tag from x-biz-info TODO */
-    } else if (INGRESS__LOCATION_TYPE__LocXBizInfo == location) {
-        // TODO
-
-    } else {
+        break;
+    case INGRESS__LOCATION_TYPE__LocHttpQuery:
+        ret = ngx_http_arg(r, (u_char *)tag_key->data, tag_key->len, tag_value); 
+        break;
+    case INGRESS__LOCATION_TYPE__LocNginxVar:
+        ret = NGX_ABORT; 
+        break;
+    case INGRESS__LOCATION_TYPE__LocXBizInfo:
+        ret = NGX_ABORT;
+        break;
+    case INGRESS__LOCATION_TYPE__LocHttpCookie:
+        cookie = ngx_http_parse_multi_header_lines(r, r->headers_in.cookie, tag_key, tag_value);
+        if (cookie != NULL && tag_value->data != NULL) {
+            ret = NGX_OK;
+        }
+        break;
+    case INGRESS__LOCATION_TYPE__LocUnDefined:
+    default:
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
             "|ingress|invalid loc type|%d|", location);
+        ret = NGX_ERROR; 
+        break;
     }
-
-    if (ret != NGX_OK) {
-        tag_value->data = NULL;
-        tag_value->len = 0;
-    }
-
-    return NGX_OK;
+    return ret;
 }
 
 static ngx_ingress_service_t *
@@ -387,9 +447,12 @@ ngx_http_request_t *r, ngx_shm_array_t *tags)
 
         /* Traversing each tag rule (sorted in the array by priority), the first match is returned */
         for (j = 0; j < tag_router[i].rules->nelts; j++) {
+            if (tag_rule[j].items->nelts == 0) { /* no items */
+                continue;
+            }
 
             ngx_ingress_tag_item_t *tag_item = tag_rule[j].items->elts;
-
+            
             /* Traversing each tag item, each item must match before returning */
             for (k = 0; k < tag_rule[j].items->nelts; k++) {
 
@@ -397,10 +460,9 @@ ngx_http_request_t *r, ngx_shm_array_t *tags)
                 /* The request does not carry the target parameter */
                 if (ret != NGX_OK) {
                     break;
-
                 } else {
-                    ret = ngx_ingress_cmp_tag_value(tag_item[k].match_type, &tag_item[k].value, &value);
-                    if (ret != NGX_OK) {
+                    ret = ngx_ingress_cmp_tag_value(tag_item[k].match_type, &tag_item[k].condition, &value);
+                    if (ret != NGX_INGRESS_TAG_MATCH_SUCCESS) {
                         break;
                     }
                 }
@@ -418,23 +480,42 @@ ngx_http_request_t *r, ngx_shm_array_t *tags)
     return service;
 }
 
-static ngx_ingress_service_t *
-ngx_ingress_match_service(ngx_ingress_gateway_t *gateway, ngx_http_request_t* r)
+ngx_int_t
+ngx_ingress_service_queue_head_insert(ngx_http_request_t *r, ngx_queue_t *head, ngx_ingress_service_t *service)
+{
+    ngx_ingress_service_queue_t *service_queue = ngx_pcalloc(r->pool, sizeof(ngx_ingress_service_queue_t));
+    if (service_queue == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|ingress|ingress alloc service queue error|");
+        return NGX_ERROR;
+    }
+    service_queue->service = service;
+    ngx_queue_insert_head(head, &service_queue->queue_node); 
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_ingress_match_service(ngx_ingress_gateway_t *gateway, ngx_http_request_t* r, ngx_queue_t *head)
 {
     ngx_uint_t i;
     ngx_ingress_t *current;
     ngx_ingress_service_t *service = NULL;
     ngx_ingress_host_router_t host_key;
     ngx_ingress_host_router_t *host_router;
+    ngx_int_t rc;
 
     current = ngx_strategy_get_current_slot(gateway->ingress_app);
     if (current == NULL) {
-        return NULL;
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|get ingress_app failed|");
+        return NGX_ERROR;
     }
 
     /* request no host */
     if (r->headers_in.server.len == 0) {
-        return NULL;
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|request no host|");
+        return NGX_ERROR;
     }
 
     host_key.host = r->headers_in.server;
@@ -452,9 +533,32 @@ ngx_ingress_match_service(ngx_ingress_gateway_t *gateway, ngx_http_request_t* r)
     }
 
     if (host_router == NULL) {
-        ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                     "|ingress|ingress host router not found|%V|", &host_key.host);
-        return NULL;
+        return NGX_ERROR;
+    }
+    
+    if (host_router->service) {
+        rc = ngx_ingress_service_queue_head_insert(r, head, host_router->service);
+        if (rc != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                    "|ingress|host service insert service queue failed|");
+            return NGX_ERROR;
+        }
+    }
+
+
+    /* if host route has tag router, match */
+    if (host_router->tags) {
+        service = ngx_ingress_get_tag_match_service(gateway, r, host_router->tags);
+        if (service) {
+            rc = ngx_ingress_service_queue_head_insert(r, head, service);
+            if (rc != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                        "|ingress|host tag service insert service queue failed|");
+                return NGX_ERROR;
+            }
+        }
     }
 
     /* match path */
@@ -462,36 +566,40 @@ ngx_ingress_match_service(ngx_ingress_gateway_t *gateway, ngx_http_request_t* r)
     for (i = 0; i < host_router->paths->nelts; i++) {
         if (ngx_comm_prefix_casecmp(&r->uri, &path_router[i].prefix) == 0) {
             ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                          "|ingress|match prefix prefix|%V|%V|",
-                          &host_key.host,
-                          &r->uri);
+                    "|ingress|match prefix prefix|%V|%V|",
+                    &host_key.host,
+                    &r->uri);
             
+            if (ngx_ingress_check_upstream_enable(path_router[i].service)) {
+                rc = ngx_ingress_service_queue_head_insert(r, head, path_router[i].service);
+                if (rc != NGX_OK) {
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                            "|ingress|path service insert service queue failed|");
+                    return NGX_ERROR;
+                }
+            }
+
             /* if path route has tag router, match first */
             if (path_router[i].tags) {
                 service = ngx_ingress_get_tag_match_service(gateway, r, path_router[i].tags);
                 if (service) {
-                    return service;
+                    rc = ngx_ingress_service_queue_head_insert(r, head, service);
+                    if (rc != NGX_OK) {
+                        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                                "|ingress|path service with tag insert service queue failed|");
+                        return NGX_ERROR;
+                    }
                 }
             }
-
-            if (ngx_ingress_check_upstream_enable(path_router[i].service)) {
-                return path_router[i].service;
-            }
-        }
-    }
-
-    /* if host route has tag router, match first */
-    if (host_router->tags) {
-        service = ngx_ingress_get_tag_match_service(gateway, r, host_router->tags);
-        if (service) {
-            return service;
+            
+            break;
         }
     }
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                   "|ingress|match host|%V|%V|", &host_key.host, &r->uri);
     
-    return host_router->service;
+    return NGX_OK;
 }
 
 
@@ -904,45 +1012,336 @@ ngx_ingress_gateway_shm_config(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 static ngx_int_t
-ngx_ingress_init_ctx(ngx_ingress_ctx_t *ctx, ngx_http_request_t *r)
+ngx_ingress_service_get_value_from_nginx_var(ngx_http_request_t *r, ngx_str_t *key,
+    ngx_str_t *var_value)
 {
-    ngx_ingress_loc_conf_t              *ilcf = NULL;
-    ngx_ingress_upstream_t              *ups;
-    ngx_int_t                            ups_index;
-    ngx_int_t                            rc;
-    ngx_uint_t                           i;
-
-    ilcf = ngx_http_get_module_loc_conf(r, ngx_ingress_module);
-    if (ilcf->gateway == NULL) {
-        return NGX_DECLINED;
+    ngx_str_t var_name;
+    u_char *p_strlow = ngx_pnalloc(r->pool, key->len);
+    if (p_strlow == NULL) {
+        return NGX_ERROR;
     }
+    ngx_uint_t hash = ngx_hash_strlow(p_strlow, key->data, key->len);
+    var_name.data = p_strlow;
+    var_name.len = key->len;
+    ngx_http_variable_value_t *vv = ngx_http_get_variable(r, &var_name, hash);
 
-    ngx_ingress_service_t *service = ngx_ingress_match_service(ilcf->gateway, r);
-    if (service == NULL) {
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                    "|ingress|route service not found|");
-        return NGX_DECLINED;
-    }
-
-    /* assign target */
-    if (service->upstreams == NULL || service->upstreams->nelts == 0) {
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                    "|ingress|route service no upstream|");
+    if (vv == NULL || vv->not_found || vv->len == 0) {
         return NGX_ERROR;
     }
 
-    ups = service->upstreams->elts;
-    ups_index = 0;
-    if (service->upstream_weight != 0) {
-        ngx_int_t  offset = ngx_random() % service->upstream_weight;
-        ngx_uint_t i;
+    var_value->len = vv->len;
+    var_value->data = vv->data;
+    return NGX_OK;
+}
 
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                      "|ingress|weight target|%i|%i|%i|", service->upstream_weight, offset, service->upstreams->nelts);
-        for (i = 0; i < service->upstreams->nelts; i++) {
+/*
+ * add header, if header key which add already exists in request,
+ * this fuction will add a new header with the same key
+ */
+static ngx_int_t
+ngx_ingress_service_request_add_header(ngx_http_request_t *r, ngx_str_t *key,
+    ngx_str_t *value)
+{
+    ngx_table_elt_t             *h;
+    h = ngx_list_push(&r->headers_in.headers);
+    if (h == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            "|ingress|ingress add header push headers error|");
+        return NGX_ERROR;
+    }
+
+    h->key.len = key->len;
+    h->key.data = key->data;
+    h->hash = ngx_hash_key_lc(h->key.data, h->key.len);
+    
+    h->lowcase_key = ngx_pnalloc(r->pool, h->key.len);
+    if (h->lowcase_key == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            "|ingress|ingress add header alloc error|");
+        ngx_list_delete(&r->headers_in.headers, h);
+        return NGX_ERROR;
+    }
+    ngx_strlow(h->lowcase_key, key->data, key->len);
+
+    h->value.data = value->data;
+    h->value.len = value->len;
+
+    return NGX_OK;
+}
+
+/*
+ * If header key exists in the request, value will be appended
+ * otherwise, new header will be added to the request
+ * Based on RFC2616, the multiple message-header fields with the same field-name 
+ * MAY be present in a message if and only if the entire field-value for that
+ * header field is defined as a comma-separated list [i.e., #(values)].
+ * For the header Eagleeye-UserData, the APPEND_SEPARATOR will use '&' specifically.
+ */
+static ngx_int_t
+ngx_ingress_service_request_append_header(ngx_http_request_t *r, ngx_str_t *key,
+    ngx_str_t *value)
+{
+    ngx_uint_t                   i, hash, tag_len;
+    ngx_table_elt_t             *h;
+    ngx_list_part_t             *part;
+    ngx_str_t                    new_value = ngx_null_string;
+    u_char                      *p = NULL;
+    ngx_int_t                    rc; 
+
+    if (value->len == 0) {
+        return NGX_OK;
+    }
+
+    part = &r->headers_in.headers.part;
+    h = part->elts;
+    hash = ngx_hash_key_lc(key->data, key->len);
+
+    for (i = 0; /* void */; i++) {
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            h = part->elts;
+            i = 0;
+        }
+
+        if (hash == h[i].hash 
+            && key->len == h[i].key.len
+            && ngx_strncasecmp(key->data, h[i].lowcase_key, key->len) == 0)
+        {
+            tag_len = sizeof(NGX_INGRESS_TAG_ACTION_APPEND_SEPARATOR) - 1;
+            new_value.len = h[i].value.len + value->len + tag_len;
+            new_value.data = ngx_pnalloc(r->pool, new_value.len);
+            if (new_value.data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|ingress append header alloc error|");
+                return NGX_ERROR;
+            }
+
+            p = ngx_copy(new_value.data, h[i].value.data, h[i].value.len);
+            p = ngx_copy(p, NGX_INGRESS_TAG_ACTION_APPEND_SEPARATOR, tag_len);
+            p = ngx_copy(p, value->data, value->len);
+            h[i].value.data = new_value.data;
+            h[i].value.len = new_value.len;
+            return NGX_OK;
+        }
+    }
+
+    /* match failed */
+    rc = ngx_ingress_service_request_add_header(r, key, value);
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress append header do add error|");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_ingress_service_response_add_header(ngx_http_request_t *r, ngx_str_t *key,
+    ngx_str_t *value)
+{
+    ngx_table_elt_t  *h;
+    h = ngx_list_push(&r->headers_out.headers);
+    if (h == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress do action push headers_out error|");
+        return NGX_ERROR;
+    }
+    
+    h->hash = 1;
+    h->key = *key;
+    h->value = *value;
+
+    return NGX_OK;
+}
+
+/*
+ * add param: no matter the key is exist in the query or not
+ * add action append 'key=value' at the end of the query
+ *
+ */
+static ngx_int_t
+ngx_ingress_service_query_add_param(ngx_http_request_t *r, ngx_str_t *key, ngx_str_t *value)
+{
+    u_char *p;
+    ngx_str_t new_unparsed_uri = ngx_null_string;
+    new_unparsed_uri.len = r->unparsed_uri.len + key->len + value->len + 2;
+    new_unparsed_uri.data = ngx_pnalloc(r->pool, new_unparsed_uri.len);
+    if (new_unparsed_uri.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress action add param alloc error|");
+        return NGX_ERROR;
+    }
+
+    if (r->args.len == 0) {
+        p = ngx_copy(new_unparsed_uri.data, r->unparsed_uri.data, r->unparsed_uri.len);
+        p = ngx_copy(p, "?", 1);
+        p = ngx_copy(p, key->data, key->len);
+        p = ngx_copy(p, "=", 1);
+        p = ngx_copy(p, value->data, value->len);
+    } else {
+        p = ngx_copy(new_unparsed_uri.data, r->unparsed_uri.data, r->unparsed_uri.len);
+        p = ngx_copy(p, "&", 1);
+        p = ngx_copy(p, key->data, key->len);
+        p = ngx_copy(p, "=", 1);
+        p = ngx_copy(p, value->data, value->len);
+    }
+
+    r->unparsed_uri.data = new_unparsed_uri.data;
+    r->unparsed_uri.len = new_unparsed_uri.len;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_ingress_service_do_action(ngx_http_request_t *r, ngx_ingress_action_t *action)
+{
+    ngx_int_t rc = NGX_ERROR;
+    ngx_str_t value = ngx_null_string, key = ngx_null_string;
+    
+    if (action->key.data == NULL || action->key.len == 0 
+        || action->value.len == 0 || action->value.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress action key or value NULL|");
+        return NGX_ERROR;
+    }
+
+    key.data = action->key.data;
+    key.len = action->key.len;
+
+    switch (action->value_type) {
+    case INGRESS__ACTION_VALUE_TYPE__ActionValueUnDefined:
+        /* action value type not defined */
+        break;
+    case INGRESS__ACTION_VALUE_TYPE__ActionStaticValue:
+        value.data = action->value.data;
+        value.len = action->value.len;
+        break;
+    case INGRESS__ACTION_VALUE_TYPE__ActionDynamicValue:
+        rc = ngx_ingress_service_get_value_from_nginx_var(r, &action->value, &value);
+        if (rc != NGX_OK || value.len == 0 || value.data == NULL ) {
+            ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                    "|ingress|ingress find nginx var failed, %V|", &action->value);
+            return NGX_OK; /* nginx var not found is not error */
+        }
+        break;
+    default:
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress action value type error|");
+        return NGX_ERROR; 
+    }
+
+    switch (action->action_type) {
+    case INGRESS__ACTION_TYPE__ActionAddReqHeader:
+        if (value.len == 0 || value.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "|ingress|ingress action add req header value invalid|");
+            return NGX_ERROR;;
+        }
+        
+        rc = ngx_ingress_service_request_add_header(r, &key, &value);
+        break;
+    case INGRESS__ACTION_TYPE__ActionAppendReqHeader:
+        if (value.len == 0 || value.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "|ingress|ingress action append req header value invalid|");
+            return NGX_ERROR;
+        }
+ 
+        rc = ngx_ingress_service_request_append_header(r, &key, &value);
+        break;
+    case INGRESS__ACTION_TYPE__ActionAddRespHeader:
+        if (value.len == 0 || value.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "|ingress|ingress action add resp header value invalid|");
+            break;
+        }
+ 
+        rc = ngx_ingress_service_response_add_header(r, &key, &value); 
+        break;
+    case INGRESS__ACTION_TYPE__ActionAddParam:
+        if (value.len == 0 || value.data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "|ingress|ingress action add param value invalid|");
+            break;
+        }
+
+        rc = ngx_ingress_service_query_add_param(r, &key, &value);
+        break;
+    case INGRESS__ACTION_TYPE__ActionUnDefined:
+    default:
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|ingress action type invalid|");
+        return NGX_ERROR;
+    }
+   
+    return rc;
+}
+
+ngx_int_t 
+ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
+    ngx_http_request_t *r, ngx_queue_t *head)
+
+{
+    ngx_ingress_service_t *target_service = NULL;
+    ngx_ingress_service_t *timeout_service = NULL;
+    ngx_ingress_service_t *force_https_service = NULL;
+    ngx_ingress_service_t *action_service = NULL;
+    ngx_int_t   action_num = 0;
+    ngx_int_t   metadata_num = 0;
+    ngx_int_t   rc;
+    ngx_queue_t *node;
+    for (node = ngx_queue_head(head); node != ngx_queue_sentinel(head); node = ngx_queue_next(node)) {
+        ngx_ingress_service_queue_t *service_queue =
+            ngx_queue_data(node, ngx_ingress_service_queue_t, queue_node);
+        if (service_queue->service == NULL) {
+            continue;
+        }
+        if (service_queue->service->metadata->nelts > 0) {
+            metadata_num += service_queue->service->metadata->nelts; 
+        }
+        
+        if (service_queue->service->upstreams != NULL
+            && service_queue->service->upstreams->nelts > 0
+            && target_service == NULL) {
+            target_service = service_queue->service;
+        }
+
+        if (service_queue->service->timeout.set_flag == NGX_INGRESS_TIMEOUT_SET
+            && timeout_service == NULL) {
+            timeout_service = service_queue->service;
+        }
+
+        if (service_queue->service->force_https != NGX_INGRESS_FORCE_HTTPS_UNSET
+            && force_https_service == NULL) {
+            force_https_service = service_queue->service;
+        }
+
+        if (service_queue->service->action_a != NULL
+            && service_queue->service->action_a->nelts > 0
+            && action_service == NULL) {
+            action_num += service_queue->service->action_a->nelts;
+            action_service = service_queue->service;
+        }
+    }
+
+    if (target_service == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|get target from service queue error|");
+        /* some api may match host service without target, no need match again, so return declined */
+        return NGX_DECLINED;
+    }
+
+    ngx_ingress_upstream_t *ups = target_service->upstreams->elts;
+    ngx_int_t ups_index = 0;
+    if (target_service->upstream_weight != 0) {
+        ngx_int_t  offset = ngx_random() % target_service->upstream_weight;
+        for (ngx_uint_t i = 0; i < target_service->upstreams->nelts; i++) {
             if (ups[i].start <= offset && ups[i].end > offset) {
                 ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                              "|ingress|hit weight target|%i|%V|", ups_index, &ups[ups_index].target);
+                        "|ingress|hit weight target|%i|%V|", ups_index, &ups[ups_index].target);
                 ups_index = i;
                 break;
             }
@@ -958,46 +1357,145 @@ ngx_ingress_init_ctx(ngx_ingress_ctx_t *ctx, ngx_http_request_t *r)
     }
     ngx_memcpy(ctx->target.data, ups[ups_index].target.data, ctx->target.len);
 
-    /* assign force https */
-    ctx->force_https = service->force_https;
+    if (timeout_service != NULL) {
+        ctx->connect_timeout = timeout_service->timeout.connect_timeout;
+        ctx->write_timeout = timeout_service->timeout.write_timeout;
+        ctx->read_timeout = timeout_service->timeout.read_timeout;
+    } else { /* timeout unset, default value 0 */
+        ctx->connect_timeout = 0;
+        ctx->write_timeout = 0;
+        ctx->read_timeout = 0;
+    }
     
-    ctx->connect_timeout = service->timeout.connect_timeout;
-    ctx->write_timeout = service->timeout.write_timeout;
-    ctx->read_timeout = service->timeout.read_timeout;
+    if (force_https_service != NULL) {
+        ctx->force_https = force_https_service->force_https;
+    } else {
+        ctx->force_https = 0;
+    }
 
-    rc = ngx_array_init(&ctx->metadata, r->pool, service->metadata->nelts, sizeof(ngx_ingress_metadata_t));
+    rc = ngx_array_init(&ctx->action_a, r->pool, action_num, 
+            sizeof(ngx_ingress_action_t));
+ 
     if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|init ctx metadata array failed|");
+                "|ingress|init ctx alloc action array failed|");
         return NGX_ERROR;
     }
 
-    ngx_ingress_metadata_t *shm_metas = service->metadata->elts;
-    for (i = 0; i < service->metadata->nelts; i++) {
-        ngx_ingress_metadata_t *metadata = ngx_array_push(&ctx->metadata);
-        if (metadata == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "|ingress|init ctx push metadata failed|");
-            return NGX_ERROR;
+    if (action_service != NULL) {
+        ngx_ingress_action_t *shm_action = action_service->action_a->elts;
+        for (ngx_uint_t i = 0; i < action_service->action_a->nelts; i++) {
+            ngx_ingress_action_t *action = ngx_array_push(&ctx->action_a);
+            if (action == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx alloc action failed|");
+                return NGX_ERROR;
+            }
+           
+            action->action_type = shm_action[i].action_type;
+            action->value_type = shm_action[i].value_type;
+            
+            action->key.data = ngx_palloc(r->pool, shm_action[i].key.len);
+            if (action->key.data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx alloc action key failed:%d|", shm_action[i].key.len);
+                return NGX_ERROR;
+            }
+            ngx_memcpy(action->key.data, shm_action[i].key.data, shm_action[i].key.len);
+            action->key.len = shm_action[i].key.len;
+            
+            action->value.data = ngx_palloc(r->pool, shm_action[i].value.len);
+            if (action->value.data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx alloc action value failed:%d|", shm_action[i].value.len);
+                return NGX_ERROR;
+            }
+            ngx_memcpy(action->value.data, shm_action[i].value.data, shm_action[i].value.len);
+            action->value.len = shm_action[i].value.len;
         }
+    }
 
-        metadata->key.data = ngx_palloc(r->pool, shm_metas[i].key.len);
-        if (metadata->key.data == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "|ingress|init ctx alloc meta key failed|");
-            return NGX_ERROR;
+    rc = ngx_array_init(&ctx->metadata, r->pool, metadata_num, sizeof(ngx_ingress_metadata_t));
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "|ingress|init ctx metadata array failed|");
+        return NGX_ERROR;
+    }
+ 
+    for (node = ngx_queue_head(head); node != ngx_queue_sentinel(head); node = ngx_queue_next(node)) {
+        ngx_ingress_service_queue_t *service_queue =
+            ngx_queue_data(node, ngx_ingress_service_queue_t, queue_node);
+        if (service_queue->service == NULL) {
+            continue;
         }
-        ngx_memcpy(metadata->key.data, shm_metas[i].key.data, shm_metas[i].key.len);
-        metadata->key.len = shm_metas[i].key.len;
+        ngx_ingress_metadata_t *shm_metas = service_queue->service->metadata->elts;
+        for (ngx_uint_t i = 0; i < service_queue->service->metadata->nelts; i++) {
+            ngx_ingress_metadata_t *metadata = ngx_array_push(&ctx->metadata);
+            if (metadata == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx push metadata failed|");
+                return NGX_ERROR;
+            }
 
-        metadata->value.data = ngx_palloc(r->pool, shm_metas[i].value.len);
-        if (metadata->value.data == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "|ingress|init ctx alloc meta value failed|");
-            return NGX_ERROR;
+            metadata->key.data = ngx_palloc(r->pool, shm_metas[i].key.len);
+            if (metadata->key.data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx alloc meta key failed|");
+                return NGX_ERROR;
+            }
+            ngx_memcpy(metadata->key.data, shm_metas[i].key.data, shm_metas[i].key.len);
+            metadata->key.len = shm_metas[i].key.len;
+
+            metadata->value.data = ngx_palloc(r->pool, shm_metas[i].value.len);
+            if (metadata->value.data == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "|ingress|init ctx alloc meta value failed|");
+                return NGX_ERROR;
+            }
+            ngx_memcpy(metadata->value.data, shm_metas[i].value.data, shm_metas[i].value.len);
+            metadata->value.len = shm_metas[i].value.len;
         }
-        ngx_memcpy(metadata->value.data, shm_metas[i].value.data, shm_metas[i].value.len);
-        metadata->value.len = shm_metas[i].value.len;
+    }
+    if (metadata_num > 0) {
+        qsort(ctx->metadata.elts, ctx->metadata.nelts, ctx->metadata.size, ngx_ingress_metadata_compare); 
+    }
+
+    return NGX_OK;
+}
+
+/* 
+ * return NGX_ERROR: may match again
+ * return NGX_DECLINED: no need to match again
+ */
+ 
+static ngx_int_t
+ngx_ingress_init_ctx(ngx_ingress_ctx_t *ctx, ngx_http_request_t *r)
+{
+    ngx_ingress_loc_conf_t              *ilcf = NULL;
+    ngx_int_t                            rc;
+
+    ilcf = ngx_http_get_module_loc_conf(r, ngx_ingress_module);
+    if (ilcf->gateway == NULL) {
+        return NGX_DECLINED;
+    }
+
+    ngx_queue_t service_head;
+    ngx_queue_init(&service_head);
+
+    rc = ngx_ingress_match_service(ilcf->gateway, r, &service_head);
+    if (rc != NGX_OK || ngx_queue_empty(&service_head)) {
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                "|ingress|route service not found|");
+        
+        /* not found probably, no need to match again  */
+        return NGX_DECLINED;
+    }
+    
+    rc = ngx_ingress_read_value_from_service_queue(ctx, r, &service_head);
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                "|ingress|read value from service queue failed|");
+        return rc;
     }
 
     return NGX_OK;
@@ -1010,6 +1508,7 @@ ngx_ingress_get_ctx(ngx_ingress_main_conf_t *imcf,
     ngx_ingress_ctx_t               *ctx = NULL;
     ngx_http_variable_value_t       *vv;
     ngx_int_t                        rc;
+    ngx_uint_t                       i;
 
     ctx = ngx_http_get_module_ctx(r, ngx_ingress_module);
     if (ctx != NULL) {
@@ -1034,8 +1533,24 @@ ret:
                       "|ingress|init ctx failed|");
             return NULL;
         }
+        ctx->initialized = 1; /* initialized flag 1 indicates no need to match again */
 
-        ctx->initialized = 1;
+        if (rc == NGX_OK && ctx->action_a.nelts > 0) {
+            /* 
+             * action should do while ctx->initialized equal 1,
+             * so it can avoid to do action duplicately
+             */
+            ngx_ingress_action_t *action = ctx->action_a.elts;     
+            for (i = 0; i < ctx->action_a.nelts; i++) {
+                rc = ngx_ingress_service_do_action(r, &action[i]);
+                if (rc != NGX_OK) {
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                            "|ingress|ingress service do action error|");
+                    /* just log error */
+                }
+            }
+        }  
+        
     }
 
     return ctx;
@@ -1150,7 +1665,6 @@ typedef struct {
     ngx_str_t key;
 } ngx_ingress_metadata_ctx_t;
 
-extern int ngx_ingress_metadata_compare(const void *c1, const void *c2);
 
 static ngx_int_t
 ngx_ingress_gateway_metadata_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
