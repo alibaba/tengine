@@ -15,7 +15,7 @@ ngx_getaffinity(ngx_cpuset_t *cpu_affinity, ngx_log_t *log)
 {
     if (sched_getaffinity(0, sizeof(cpu_set_t), cpu_affinity) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
-                      "sched_setaffinity() failed");
+                      "sched_getaffinity() failed");
     }
 }
 
