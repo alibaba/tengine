@@ -1554,7 +1554,7 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     ngx_cpuset_t     *mask;
     ngx_core_conf_t  *ccf;
 
-#if (T_NGX_HAVE_SCHED_GETAFFINITY && NGX_HAVE_SC_NPROCESSORS_CONF)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
     ngx_int_t         worker_i, machine_core, all_machine_cores;
 #endif
 
@@ -1570,7 +1570,7 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     if (ccf->cpu_affinity_auto) {
         mask = &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
 
-#if (T_NGX_HAVE_SCHED_GETAFFINITY && NGX_HAVE_SC_NPROCESSORS_CONF)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
         if (ccf->cpu_affinity_auto == 2) {
             all_machine_cores = sysconf(_SC_NPROCESSORS_CONF);
 

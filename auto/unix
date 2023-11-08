@@ -976,7 +976,7 @@ ngx_feature_test="sysconf(_SC_NPROCESSORS_ONLN)"
 . auto/feature
 
 ngx_feature="sysconf(_SC_NPROCESSORS_CONF)"
-ngx_feature_name="NGX_HAVE_SC_NPROCESSORS_CONF"
+ngx_feature_name="T_NGX_HAVE_SC_NPROCESSORS_CONF"
 ngx_feature_run=no
 ngx_feature_incs=
 ngx_feature_path=
