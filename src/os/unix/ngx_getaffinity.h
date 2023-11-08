@@ -22,4 +22,4 @@ typedef uint64_t  ngx_cpuset_t;
 #endif
 
 
-#endif /* _NGX_SETAFFINITY_H_INCLUDED_ */
+#endif /* _NGX_GETAFFINITY_H_INCLUDED_ */

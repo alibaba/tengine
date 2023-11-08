@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <nginx.h>
 
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+#include <ngx_getaffinity.h>
+#endif
 
 static void ngx_show_version_info(void);
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
