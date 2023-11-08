@@ -1465,7 +1465,7 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         n = 2;
 
-#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
     } else if (ngx_strcmp(value[1].data, "auto_online_cpu") == 0) {
 
         if (cf->args->nelts > 3) {
@@ -1498,7 +1498,7 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
-#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
         if (ccf->cpu_affinity_auto == 2) {
             continue;
         }
