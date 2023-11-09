@@ -29,6 +29,7 @@ Tengine has been an open source project since December 2011. It is being activel
 * Dynamically configure timeout setting, SSL Redirects, CORS and enabling/disabling robots for the server and location with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Dynamically configure HTTP routing based on multiple values of a specific header, cookie or query parameter with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Dynamically configure HTTP routing based on multiple upstream according to weight with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
+* Dynamically configure HTTP routing based on modulo operation for a specific header, cookie or query parameter with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Dynamically configure HTTP routing to add/append custom header or add query parameter in the HTTP request to the upstream with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Dynamically configure HTTP routing to add custom header in the HTTP response to the client with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Support the CONNECT HTTP method for forward proxy.
