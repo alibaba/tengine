@@ -1402,7 +1402,8 @@ ngx_http_variable_request_start_time(ngx_http_request_t *r,
 {
     u_char          *p;
     ngx_time_t      *tp;
-    ngx_tm_t tm;
+    ngx_tm_t         tm;
+
     p = ngx_pnalloc(r->pool, sizeof("28/Sep/1970:12:00:00 +0600") - 1);
     if (p == NULL) {
         return NGX_ERROR;
