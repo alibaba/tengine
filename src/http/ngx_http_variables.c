@@ -77,6 +77,12 @@ static ngx_int_t ngx_http_variable_tcpinfo(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #endif
 
+#if (T_NGX_REQUEST_START_TIME)
+static ngx_int_t
+ngx_http_variable_request_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+#endif
+
 static ngx_int_t ngx_http_variable_content_length(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_host(ngx_http_request_t *r,
@@ -550,6 +556,11 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
     { ngx_string("sent_cookie_"), NULL, ngx_http_variable_sent_cookie,
       0, NGX_HTTP_VAR_PREFIX, 0 },
 
+#endif
+
+#if (T_NGX_REQUEST_START_TIME)
+    { ngx_string("request_start_time"), NULL, ngx_http_variable_request_start_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 #endif
 
       ngx_http_null_variable
@@ -1381,6 +1392,43 @@ ngx_http_variable_tcpinfo(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
 #endif
 
+#if (T_NGX_REQUEST_START_TIME)
+static char  *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+static ngx_int_t
+ngx_http_variable_request_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+    ngx_time_t      *tp;
+    ngx_tm_t         tm;
+
+    p = ngx_pnalloc(r->pool, sizeof("28/Sep/1970:12:00:00 +0600") - 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    tp = ngx_timeofday();
+    ngx_gmtime(r->start_sec + tp->gmtoff * 60, &tm);
+
+    /*The time that the first request pass in*/
+    (void) ngx_sprintf(p, "%02d/%s/%d:%02d:%02d:%02d %c%02i%02i",
+                       tm.ngx_tm_mday, months[tm.ngx_tm_mon - 1],
+                       tm.ngx_tm_year, tm.ngx_tm_hour,
+                       tm.ngx_tm_min, tm.ngx_tm_sec,
+                       tp->gmtoff < 0 ? '-' : '+',
+                       ngx_abs(tp->gmtoff / 60), ngx_abs(tp->gmtoff % 60));
+
+    v->len = sizeof("28/Sep/1970:12:00:00 +0600") - 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+#endif
 
 static ngx_int_t
 ngx_http_variable_content_length(ngx_http_request_t *r,
