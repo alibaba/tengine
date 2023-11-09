@@ -1279,11 +1279,11 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
     fc = h3_stream->request->connection;
     r = h3_stream->request;
 
-//    if (h3_stream->queued) {
-//        fc->write->handler = ngx_http_v3_close_stream_handler;
-//        fc->read->handler = ngx_http_v3_close_stream_handler;
-//        return;
-//    }
+    if (h3_stream->engine_inner_closed == 0 && h3_stream->queued) {
+        fc->write->handler = ngx_http_v3_close_stream_handler;
+        fc->read->handler = ngx_http_v3_close_stream_handler;
+        return;
+    }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, fc->log, 0,
                    "|xquic| close stream %ui, processing %ui|",
