@@ -250,6 +250,21 @@ ngx_open_pipes(ngx_cycle_t *cycle)
                           ngx_pipes[i].cmd);
             return NGX_ERROR;
         }
+#ifdef F_SETPIPE_SZ
+#define _GNU_SOURCE
+        if (fcntl(ngx_pipes[i].open_fd->fd, F_SETPIPE_SZ, 10485760) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          "fcntl(F_SETPIPE_SZ) \"%s\" failed",
+                          ngx_pipes[i].cmd);
+            return NGX_ERROR;
+        } else {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "fcntl(F_SETPIPE_SZ) 10485760 \"%s\" succeed",
+                          ngx_pipes[i].cmd);
+        }
+#endif
+
+        if (fcntl(ngx_pipes[i].open_fd->fd, F_SETPIPE_SZ, 10485760) == -1) {
 
         if (ngx_nonblocking(ngx_pipes[i].open_fd->fd) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
