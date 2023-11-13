@@ -60,6 +60,9 @@ struct ngx_peer_connection_s {
 
     int                              type;
     int                              rcvbuf;
+#if (T_NGX_SOCKET_BUFFER)
+    int                              sndbuf;
+#endif
 
     ngx_log_t                       *log;
 

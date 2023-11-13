@@ -72,6 +72,17 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
             goto failed;
         }
     }
+#if (T_NGX_SOCKET_BUFFER)
+    if (pc->sndbuf) {
+        if (setsockopt(s, SOL_SOCKET, SO_SNDBUF,
+                       (const void *) &pc->sndbuf, sizeof(int)) == -1)
+        {
+            ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
+                          "setsockopt(SO_SNDBUF) failed");
+            goto failed;
+        }
+    }
+#endif
 
     if (pc->so_keepalive) {
         value = 1;

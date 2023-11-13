@@ -111,6 +111,10 @@ typedef struct {
     ngx_http_proxy_vars_t          vars;
 
     ngx_flag_t                     redirect;
+#if (T_NGX_SOCKET_BUFFER)
+    size_t                         sndbuf;
+    size_t                         rcvbuf;
+#endif
 
     ngx_uint_t                     http_version;
 
@@ -780,6 +784,22 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       0,
       NULL },
 
+#if (T_NGX_SOCKET_BUFFER)
+    { ngx_string("proxy_sndbuf_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, sndbuf),
+      NULL },
+
+    { ngx_string("proxy_rcvbuf_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, rcvbuf),
+      NULL },
+#endif
+
     { ngx_string("proxy_ssl_conf_command"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
       ngx_conf_set_keyval_slot,
@@ -1042,6 +1062,11 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
     }
 
     u->buffering = plcf->upstream.buffering;
+
+#if (T_NGX_SOCKET_BUFFER)
+    u->peer.sndbuf = plcf->sndbuf;
+    u->peer.rcvbuf = plcf->rcvbuf;
+#endif
 
     u->pipe = ngx_pcalloc(r->pool, sizeof(ngx_event_pipe_t));
     if (u->pipe == NULL) {
@@ -3484,6 +3509,11 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
 
     ngx_str_set(&conf->upstream.module, "proxy");
 
+#if (T_NGX_SOCKET_BUFFER)
+    conf->sndbuf = NGX_CONF_UNSET_SIZE;
+    conf->rcvbuf = NGX_CONF_UNSET_SIZE;
+#endif
+
     return conf;
 }
 
@@ -3567,6 +3597,11 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_size_value(conf->upstream.limit_rate,
                               prev->upstream.limit_rate, 0);
+
+#if (T_NGX_SOCKET_BUFFER)
+    ngx_conf_merge_size_value(conf->sndbuf, prev->sndbuf, (size_t) 0);
+    ngx_conf_merge_size_value(conf->rcvbuf, prev->rcvbuf, (size_t) 0);
+#endif
 
     ngx_conf_merge_bufs_value(conf->upstream.bufs, prev->upstream.bufs,
                               8, ngx_pagesize);
