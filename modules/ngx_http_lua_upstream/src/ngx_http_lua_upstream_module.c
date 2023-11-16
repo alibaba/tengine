@@ -524,8 +524,7 @@ ngx_http_lua_upstream_find_upstream(lua_State *L, ngx_str_t *host)
 
     uscf = ngx_http_upstream_rbtree_lookup(umcf, host);
 
-    if (uscf != NULL)
-    {
+    if (uscf != NULL) {
         return uscf;
     }
 
@@ -578,8 +577,7 @@ ngx_http_lua_upstream_find_upstream(lua_State *L, ngx_str_t *host)
         addr.data = host->data;
         addr.len = len;
         uscf = ngx_http_upstream_rbtree_lookup(umcf, &addr);
-        if (uscf != NULL && uscf->port
-            && uscf->port == n)
+        if (uscf != NULL && uscf->port && uscf->port == n)
         {
             return uscf;
         }
