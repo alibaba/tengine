@@ -168,6 +168,7 @@ received: OK
 
 
 === TEST 3: upstream sockets close prematurely
+--- no_http3
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -243,6 +244,7 @@ done
 
 
 === TEST 4: http keepalive
+--- quic_max_idle_timeout: 1.2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -318,6 +320,7 @@ done
 
 
 === TEST 5: lua_socket_keepalive_timeout
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -395,6 +398,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 6: lua_socket_pool_size
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -473,6 +477,7 @@ qr/lua tcp socket connection pool size: 1\b/]
 
 
 === TEST 7: "lua_socket_keepalive_timeout 0" means unlimited
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -548,6 +553,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 8: setkeepalive(timeout) overrides lua_socket_keepalive_timeout
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -625,6 +631,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 9: sock:setkeepalive(timeout, size) overrides lua_socket_pool_size
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -731,6 +738,7 @@ bad argument #3 to '?' (bad "pool_size" option value: 0)
 
 
 === TEST 11: sock:keepalive_timeout(0) means unlimited
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -1508,6 +1516,7 @@ done
 
 
 === TEST 25: setkeepalive() with explicit nil args
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -1919,6 +1928,7 @@ too many waiting connect operations
 
 
 === TEST 32: conn queuing: once 'pool_size' is reached and pool has 'backlog'
+--- quic_max_idle_timeout: 1.2
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -2536,6 +2546,8 @@ GET /t
 --- abort
 --- no_error_log
 [error]
+--- curl_error eval
+qr/curl: \(28\) Operation timed out after \d+ milliseconds with 0 bytes received/
 
 
 
@@ -2643,6 +2655,7 @@ lua tcp socket connect timed out, when connecting to
 
 
 === TEST 46: conn queuing: resume connect operation if resumed connect failed (could not be resolved)
+--- quic_max_idle_timeout: 1.2
 --- config
     resolver 127.0.0.2:12345 ipv6=off;
     resolver_timeout 1s;

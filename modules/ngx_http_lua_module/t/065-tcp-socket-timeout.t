@@ -16,6 +16,7 @@ BEGIN {
         $ENV{MOCKEAGAIN} = 'w';
     }
 
+    delete($ENV{TEST_NGINX_USE_HTTP2});
     $ENV{TEST_NGINX_EVENT_TYPE} = 'poll';
     $ENV{MOCKEAGAIN_WRITE_TIMEOUT_PATTERN} = 'get helloworld';
 }
@@ -873,6 +874,7 @@ quitting request now
 --- no_error_log
 lua tcp socket write timed out
 [alert]
+--- skip_eval: 4: $ENV{TEST_NGINX_USE_HTTP3}
 
 
 

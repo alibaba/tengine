@@ -140,7 +140,12 @@ ngx_http_lua_rewrite_handler(ngx_http_request_t *r)
         return NGX_DONE;
     }
 
+/* http2 read body may break http2 stream process */
+#if (NGX_HTTP_V2)
+    if (llcf->force_read_body && !ctx->read_body_done && !r->main->stream) {
+#else
     if (llcf->force_read_body && !ctx->read_body_done) {
+#endif
         r->request_body_in_single_buf = 1;
         r->request_body_in_persistent_file = 1;
         r->request_body_in_clean_file = 1;

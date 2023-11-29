@@ -38,6 +38,8 @@ GET /t
 qr/\[notice\] \d+#\d+: exit$/
 --- no_error_log eval
 qr/\[notice\] \d+#\d+: reconfiguring/
+--- curl_error eval
+qr/curl: \(28\) Operation timed out after \d+ milliseconds with 0 bytes received|curl: \(56\) Recv failure: Connection reset by peer|curl: \(55\) sendmsg\(\) returned -1 \(errno 111\)/
 
 
 

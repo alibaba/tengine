@@ -15,6 +15,7 @@ BEGIN {
     }
 
     $ENV{TEST_NGINX_EVENT_TYPE} = 'poll';
+    delete($ENV{TEST_NGINX_USE_HTTP2});
 }
 
 use Test::Nginx::Socket::Lua;

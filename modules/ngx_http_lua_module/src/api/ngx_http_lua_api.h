@@ -19,7 +19,7 @@
 /* Public API for other Nginx modules */
 
 
-#define ngx_http_lua_version  10025
+#define ngx_http_lua_version  10026
 
 
 typedef struct ngx_http_lua_co_ctx_s  ngx_http_lua_co_ctx_t;

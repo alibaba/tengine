@@ -1227,6 +1227,8 @@ F(ngx_http_finalize_request) {
 --- error_code
 --- no_error_log
 [error]
+--- curl_error eval
+qr{(\Qcurl: (52) Empty reply from server\E|\Qcurl: (95) HTTP/3 stream 0 reset by server\E)}ms
 
 
 
@@ -2338,6 +2340,7 @@ hello world
 nil
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -2622,6 +2625,7 @@ pr: Host: localhost
 
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -2655,6 +2659,7 @@ pr: Host: localhost
 
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

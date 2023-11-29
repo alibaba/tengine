@@ -1,5 +1,7 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 
+our $SkipReason;
+
 BEGIN {
     if (!defined $ENV{LD_PRELOAD}) {
         $ENV{LD_PRELOAD} = '';
@@ -18,9 +20,13 @@ BEGIN {
 
     $ENV{TEST_NGINX_EVENT_TYPE} = 'poll';
     $ENV{MOCKEAGAIN_WRITE_TIMEOUT_PATTERN} = 'slow';
+
+    if ($ENV{TEST_NGINX_USE_HTTP3}) {
+        $SkipReason = "http3 does not support ngx.req.socket()";
+    }
 }
 
-use Test::Nginx::Socket::Lua;
+use Test::Nginx::Socket::Lua $SkipReason ? (skip_all => $SkipReason) : ();
 
 log_level('debug');
 

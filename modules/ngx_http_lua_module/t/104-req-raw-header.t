@@ -1,5 +1,14 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
-use Test::Nginx::Socket::Lua;
+
+our $SkipReason;
+
+BEGIN {
+    if ($ENV{TEST_NGINX_USE_HTTP3}) {
+        $SkipReason = "http3 does not support ngx.req.raw_header()";
+    }
+}
+
+use Test::Nginx::Socket::Lua $SkipReason ? (skip_all => $SkipReason) : ();
 
 #worker_connections(1014);
 #master_on();

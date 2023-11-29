@@ -17,8 +17,8 @@ Production ready.
 = Version =
 
 This document describes ngx_lua
-[https://github.com/openresty/lua-nginx-module/tags v0.10.19], which was released
-on 3 Nov, 2020.
+[https://github.com/openresty/lua-nginx-module/tags v0.10.25], which was released
+on 19 June 2023.
 
 = Videos =
 
@@ -2845,11 +2845,43 @@ The support for the <code>TLSv1.3</code> parameter requires version <code>v0.10.
 
 This directive was first introduced in the <code>v0.9.11</code> release.
 
+== lua_ssl_certificate ==
+
+'''syntax:''' ''lua_ssl_certificate <file>''
+
+'''default:''' ''none''
+
+'''context:''' ''http, server, location''
+
+Specifies the file path to the SSL/TLS certificate in PEM format used for the [[#tcpsock:sslhandshake|tcpsock:sslhandshake]] method.
+
+This directive allows you to specify the SSL/TLS certificate that will be presented to server during the SSL/TLS handshake process.
+
+This directive was first introduced in the <code>v0.10.26</code> release.
+
+See also [[#lua_ssl_certificate_key|lua_ssl_certificate_key]] and [[#lua_ssl_verify_depth|lua_ssl_verify_depth]].
+
+== lua_ssl_certificate_key ==
+
+'''syntax:''' ''lua_ssl_certificate_key <file>''
+
+'''default:''' ''none''
+
+'''context:''' ''http, server, location''
+
+Specifies the file path to the private key associated with the SSL/TLS certificate used in the [[#tcpsock:sslhandshake|tcpsock:sslhandshake]] method.
+
+This directive allows you to specify the private key file corresponding to the SSL/TLS certificate specified by lua_ssl_certificate. The private key should be in PEM format and must match the certificate.
+
+This directive was first introduced in the <code>v0.10.26</code> release.
+
+See also [[#lua_ssl_certificate|lua_ssl_certificate]] and [[#lua_ssl_verify_depth|lua_ssl_verify_depth]].
+
 == lua_ssl_trusted_certificate ==
 
 '''syntax:''' ''lua_ssl_trusted_certificate <file>''
 
-'''default:''' ''no''
+'''default:''' ''none''
 
 '''context:''' ''http, server, location''
 
@@ -2871,7 +2903,7 @@ Sets the verification depth in the server certificates chain.
 
 This directive was first introduced in the <code>v0.9.11</code> release.
 
-See also [[#lua_ssl_trusted_certificate|lua_ssl_trusted_certificate]].
+See also [[#lua_ssl_certificate|lua_ssl_certificate]], [[#lua_ssl_certificate_key|lua_ssl_certificate_key]] and [[#lua_ssl_trusted_certificate|lua_ssl_trusted_certificate]].
 
 == lua_ssl_conf_command ==
 
@@ -4555,11 +4587,13 @@ See also [[#ngx.req.read_body|ngx.req.read_body]].
 
 == ngx.req.get_body_data ==
 
-'''syntax:''' ''data = ngx.req.get_body_data()''
+'''syntax:''' ''data = ngx.req.get_body_data(max_bytes?)''
 
 '''context:''' ''rewrite_by_lua*, access_by_lua*, content_by_lua*, log_by_lua*''
 
 Retrieves in-memory request body data. It returns a Lua string rather than a Lua table holding all the parsed query arguments. Use the [[#ngx.req.get_post_args|ngx.req.get_post_args]] function instead if a Lua table is required.
+
+The optional <code>max_bytes</code> function argument can be used when you don't need the entire body.
 
 This function returns <code>nil</code> if
 
@@ -4706,6 +4740,8 @@ See also [[#ngx.req.init_body|ngx.req.init_body]].
 Returns a read-only cosocket object that wraps the downstream connection. Only [[#tcpsock:receive|receive]], [[#tcpsock:receiveany|receiveany]] and [[#tcpsock:receiveuntil|receiveuntil]] methods are supported on this object.
 
 In case of error, <code>nil</code> will be returned as well as a string describing the error.
+
+Due to the streaming nature of HTTP2 and HTTP3, this API cannot be used when the downstream connection is HTTP2 and HTTP3.
 
 The socket object returned by this method is usually used to read the current request's body in a streaming fashion. Do not turn on the [[#lua_need_request_body|lua_need_request_body]] directive, and do not mix this call with [[#ngx.req.read_body|ngx.req.read_body]] and [[#ngx.req.discard_body|ngx.req.discard_body]].
 

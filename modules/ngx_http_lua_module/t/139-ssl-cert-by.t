@@ -579,7 +579,7 @@ failed to do SSL handshake: handshake failed
 --- error_log eval
 [
 'lua_certificate_by_lua: handler return value: -1, cert cb exit code: 0',
-qr/\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error/,
+qr/(\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error|routines:OPENSSL_internal:CERT_CB_ERROR)/,
 'lua exit with code -1',
 ]
 
@@ -720,7 +720,7 @@ failed to do SSL handshake: handshake failed
 --- error_log eval
 [
 'lua_certificate_by_lua: cert cb exit code: 0',
-qr/\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error/,
+qr/(\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error|routines:OPENSSL_internal:CERT_CB_ERROR)/,
 'lua exit with code -1',
 ]
 
@@ -791,7 +791,7 @@ failed to do SSL handshake: handshake failed
 [
 'runtime error: ssl_certificate_by_lua(nginx.conf:28):2: bad bad bad',
 'lua_certificate_by_lua: handler return value: 500, cert cb exit code: 0',
-qr/\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error/,
+qr/(\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error|routines:OPENSSL_internal:CERT_CB_ERROR)/,
 qr/context: ssl_certificate_by_lua\*, client: \d+\.\d+\.\d+\.\d+, server: \d+\.\d+\.\d+\.\d+:\d+/,
 ]
 
@@ -863,7 +863,7 @@ failed to do SSL handshake: handshake failed
 [
 'runtime error: ssl_certificate_by_lua(nginx.conf:28):3: bad bad bad',
 'lua_certificate_by_lua: cert cb exit code: 0',
-qr/\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error/,
+qr/(\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error|routines:OPENSSL_internal:CERT_CB_ERROR)/,
 ]
 
 --- no_error_log
@@ -1051,7 +1051,7 @@ failed to do SSL handshake: handshake failed
 [
 'lua ssl server name: "test.com"',
 'ssl_certificate_by_lua(nginx.conf:28):1: API disabled in the context of ssl_certificate_by_lua*',
-qr/\[info\] .*?cert cb error/,
+qr/(\[info\] .*? SSL_do_handshake\(\) failed .*?cert cb error|routines:OPENSSL_internal:CERT_CB_ERROR)/,
 ]
 
 --- no_error_log

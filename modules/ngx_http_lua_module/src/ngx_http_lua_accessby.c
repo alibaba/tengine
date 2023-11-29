@@ -137,6 +137,26 @@ ngx_http_lua_access_handler(ngx_http_request_t *r)
     }
 
     if (llcf->force_read_body && !ctx->read_body_done) {
+
+#if (NGX_HTTP_V2)
+        if (r->main->stream && r->headers_in.content_length_n < 0) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "disable lua_need_request_body, since "
+                          "http2 read_body may break http2 stream process");
+            goto done;
+        }
+#endif
+
+#if (NGX_HTTP_V3)
+        if (r->http_version == NGX_HTTP_VERSION_30
+            && r->headers_in.content_length_n < 0)
+        {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "disable lua_need_request_body, since "
+                          "http2 read_body may break http2 stream process");
+            goto done;
+        }
+#endif
         r->request_body_in_single_buf = 1;
         r->request_body_in_persistent_file = 1;
         r->request_body_in_clean_file = 1;
@@ -153,6 +173,12 @@ ngx_http_lua_access_handler(ngx_http_request_t *r)
             return NGX_DONE;
         }
     }
+
+#if defined(NGX_HTTP_V3) || defined(NGX_HTTP_V2)
+
+done:
+
+#endif
 
     dd("calling access handler");
     return llcf->access_handler(r);

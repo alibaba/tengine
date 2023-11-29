@@ -122,7 +122,16 @@ GET /read
     }
 --- request
 GET /read
---- raw_response_headers_like: Location: /echo\r\n
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = "location: /echo\r\n"
+} else {
+    $headers = "Location: /echo\r\n"
+}
+
+$headers;
 --- response_body_like: 302 Found
 --- error_code: 302
 

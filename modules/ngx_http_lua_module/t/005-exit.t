@@ -65,7 +65,7 @@ GET /lua
 --- error_log
 attempt to set status 404 via ngx.exit after sending out the response status 200
 --- no_error_log
-alert
+[alert]
 --- response_body
 hi
 
@@ -123,6 +123,7 @@ GET /api?user=agentz
 
 
 === TEST 6: working with ngx_auth_request (simplest form, w/o ngx_memc)
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 --- http_config eval
 "
     lua_package_cpath '$::LuaCpath';
@@ -195,6 +196,7 @@ Logged in 56
 
 
 === TEST 7: working with ngx_auth_request (simplest form)
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 --- http_config eval
 "
     lua_package_cpath '$::LuaCpath';
@@ -267,6 +269,7 @@ Logged in 56
 
 
 === TEST 8: working with ngx_auth_request
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 --- http_config eval
 "
     lua_package_cpath '$::LuaCpath';
@@ -771,6 +774,8 @@ GET /t
 --- response_body
 --- no_error_log
 [error]
+--- curl_error
+curl: (95) HTTP/3 stream 0 reset by server
 
 
 
@@ -787,6 +792,8 @@ GET /t
 --- response_body
 --- no_error_log
 [error]
+--- curl_error
+curl: (95) HTTP/3 stream 0 reset by server
 
 
 

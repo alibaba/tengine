@@ -143,12 +143,15 @@ GET /t
 
 
 === TEST 3: access a TCP interface
+test-nginx use the same port for tcp(http) and udp(http3)
+so need to change to a port that is not listen by any app.
+default port range:
+net.ipv4.ip_local_port_range = 32768	60999
+choose a port greater than 61000 should be less race.
 --- config
     server_tokens off;
     location /t {
-        #set $port 5000;
-        set $port $TEST_NGINX_SERVER_PORT;
-        #set $port 1234;
+        set $port 65432;
 
         content_by_lua '
             local socket = ngx.socket

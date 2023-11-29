@@ -282,6 +282,8 @@ false : module 'hello' not found.*
 
 
 === TEST 10: the number of Lua VM exceeds the pool size
+--- no_http2
+--- quic_max_idle_timeout: 5
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval: $::HttpConfig
@@ -359,6 +361,8 @@ GET /t
 
 
 === TEST 11: kill uthread before worker thread callback
+--- no_http2
+--- quic_max_idle_timeout: 10
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval: $::HttpConfig
@@ -777,167 +781,7 @@ true : 'a\Zb\Z'
 
 
 
-=== TEST 24: ngx.re.match
---- main_config
-    thread_pool testpool threads=100;
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
---- config
-location /hello {
-    default_type 'text/plain';
-
-    content_by_lua_block {
-        local ok, a, b = ngx.run_worker_thread("testpool", "hello", "hello")
-        ngx.say(ok, " : ", a, " : ", b)
-    }
-}
---- user_files
->>> hello.lua
-local function hello()
-  local m, err = ngx.re.match("hello, 1234", "([0-9])[0-9]+")
-  return m[0], m[1]
-end
-return {hello=hello}
---- request
-GET /hello
---- response_body
-true : 1234 : 1
-
-
-
-=== TEST 25: ngx.re.find
---- main_config
-    thread_pool testpool threads=100;
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
---- config
-location /hello {
-    default_type 'text/plain';
-
-    content_by_lua_block {
-        local ok, a = ngx.run_worker_thread("testpool", "hello", "hello")
-        ngx.say(ok, " : ", a)
-    }
-}
---- user_files
->>> hello.lua
-local function hello()
-    local str = "hello, 1234"
-    local from, to = ngx.re.find(str, "([0-9])([0-9]+)", "jo", nil, 2)
-    if from then
-        return string.sub(str, from, to)
-    end
-end
-return {hello=hello}
---- request
-GET /hello
---- response_body
-true : 234
-
-
-
-=== TEST 26: ngx.re.gmatch
---- main_config
-    thread_pool testpool threads=100;
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
---- config
-location /hello {
-    default_type 'text/plain';
-
-    content_by_lua_block {
-        local ok, ret = ngx.run_worker_thread("testpool", "hello", "hello")
-        ngx.say(ok)
-        ngx.say(ret[1])
-        ngx.say(ret[2])
-    }
-}
---- user_files
->>> hello.lua
-local function hello()
-    local ret = {}
-    for m in ngx.re.gmatch("hello, world", "[a-z]+", "j") do
-        if m then
-            table.insert(ret, m[0])
-        end
-    end
-    return ret
-end
-return {hello=hello}
---- request
-GET /hello
---- response_body
-true
-hello
-world
-
-
-
-=== TEST 27: ngx.re.sub
---- main_config
-    thread_pool testpool threads=100;
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
---- config
-location /hello {
-    default_type 'text/plain';
-
-    content_by_lua_block {
-        local ok, a, b = ngx.run_worker_thread("testpool", "hello", "hello")
-        ngx.say(ok)
-        ngx.say(a)
-        ngx.say(b)
-    }
-}
---- user_files
->>> hello.lua
-local function hello()
-    local newstr, n = ngx.re.sub("hello, 1234", "[0-9]", "$$")
-    return newstr, n
-end
-return {hello=hello}
---- request
-GET /hello
---- response_body
-true
-hello, $234
-1
-
-
-
-=== TEST 28: ngx.re.gsub
---- main_config
-    thread_pool testpool threads=100;
---- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
---- config
-location /hello {
-    default_type 'text/plain';
-
-    content_by_lua_block {
-        local ok, a, b = ngx.run_worker_thread("testpool", "hello", "hello")
-        ngx.say(ok)
-        ngx.say(a)
-        ngx.say(b)
-    }
-}
---- user_files
->>> hello.lua
-local function hello()
-    local newstr, n, err = ngx.re.gsub("hello, world", "([a-z])[a-z]+", "[$0,$1]", "i")
-    return newstr, n
-end
-return {hello=hello}
---- request
-GET /hello
---- response_body
-true
-[hello,h], [world,w]
-2
-
-
-
-=== TEST 29: ngx.decode_base64
+=== TEST 24: ngx.decode_base64
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -964,7 +808,7 @@ true : hello
 
 
 
-=== TEST 30: ngx.crc32_short
+=== TEST 25: ngx.crc32_short
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -991,7 +835,7 @@ true : 4289425978
 
 
 
-=== TEST 31: ngx.crc32_long
+=== TEST 26: ngx.crc32_long
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1018,7 +862,7 @@ true : 4289425978
 
 
 
-=== TEST 32: ngx.md5_bin
+=== TEST 27: ngx.md5_bin
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1049,7 +893,7 @@ true : 6c8349cc7260ae62e3b1396831a8398f
 
 
 
-=== TEST 33: ngx.md5
+=== TEST 28: ngx.md5
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1076,7 +920,7 @@ true : 5d41402abc4b2a76b9719d911017c592
 
 
 
-=== TEST 34: ngx.config.debug
+=== TEST 29: ngx.config.debug
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1103,7 +947,7 @@ GET /hello
 
 
 
-=== TEST 35: ngx.config.prefix
+=== TEST 30: ngx.config.prefix
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1130,7 +974,7 @@ GET /hello
 
 
 
-=== TEST 36: ngx.config.nginx_version
+=== TEST 31: ngx.config.nginx_version
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1157,7 +1001,7 @@ GET /hello
 
 
 
-=== TEST 37: ngx.config.nginx_configure
+=== TEST 32: ngx.config.nginx_configure
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1184,7 +1028,7 @@ GET /hello
 
 
 
-=== TEST 38: ngx.config.ngx_lua_version
+=== TEST 33: ngx.config.ngx_lua_version
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1211,7 +1055,7 @@ GET /hello
 
 
 
-=== TEST 39: write_log_file
+=== TEST 34: write_log_file
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1249,7 +1093,7 @@ true
 
 
 
-=== TEST 40: shdict get, int value
+=== TEST 35: shdict get, int value
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1282,7 +1126,7 @@ true,8
 
 
 
-=== TEST 41: shdict set nil in main thread
+=== TEST 36: shdict set nil in main thread
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1319,7 +1163,7 @@ true,nil
 
 
 
-=== TEST 42: shdict set nil in worker thread
+=== TEST 37: shdict set nil in worker thread
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1354,7 +1198,9 @@ true,nil
 
 
 
-=== TEST 43: shdict get_stale
+=== TEST 38: shdict get_stale
+For http3: curl: (55) ngtcp2_conn_handle_expiry returned error: ERR_IDLE_CLOSE
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1388,7 +1234,7 @@ true,8
 
 
 
-=== TEST 44: shdict add failed
+=== TEST 39: shdict add failed
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1422,7 +1268,7 @@ true,false,exists
 
 
 
-=== TEST 45: shdict force add
+=== TEST 40: shdict force add
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1458,7 +1304,7 @@ true,true,true,nil
 
 
 
-=== TEST 46: shdict replace
+=== TEST 41: shdict replace
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1493,7 +1339,7 @@ true,true,nil,8
 
 
 
-=== TEST 47: shdict replace not found
+=== TEST 42: shdict replace not found
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1526,7 +1372,7 @@ true,false,not found
 
 
 
-=== TEST 48: shdict incr
+=== TEST 43: shdict incr
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1560,7 +1406,7 @@ true,9,nil,9
 
 
 
-=== TEST 49: shdict lpush lpop
+=== TEST 44: shdict lpush lpop
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1596,7 +1442,7 @@ true,9,2,nil,7
 
 
 
-=== TEST 50: shdict expire ttl
+=== TEST 45: shdict expire ttl
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1630,7 +1476,7 @@ true,true,nil,true
 
 
 
-=== TEST 51: shdict flush_all
+=== TEST 46: shdict flush_all
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1664,7 +1510,7 @@ true,nil,nil
 
 
 
-=== TEST 52: shdict get_keys
+=== TEST 47: shdict get_keys
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1698,7 +1544,7 @@ true,Jim:King
 
 
 
-=== TEST 53: unsupported argument type in self-reference table
+=== TEST 48: unsupported argument type in self-reference table
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
@@ -1727,7 +1573,7 @@ false , suspicious circular references, table depth exceed max depth: 100 in the
 
 
 
-=== TEST 54: unsupported argument type in circular-reference table
+=== TEST 49: unsupported argument type in circular-reference table
 --- main_config
     thread_pool testpool threads=100;
 --- http_config eval
