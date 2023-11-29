@@ -482,6 +482,8 @@ stack traceback:
 in function 'error'
 in function 'bar'
 in function 'foo'
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP\/3 stream 0 reset by server#
 
 
 
@@ -524,6 +526,8 @@ GET /lua?a=1&b=2
 --- ignore_response
 --- error_log eval
 qr/failed to load external Lua file ".*?test2\.lua": cannot open .*? No such file or directory/
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP\/3 stream 0 reset by server#
 
 
 
@@ -838,6 +842,8 @@ GET /lua
 --- ignore_response
 --- error_log
 API disabled in the context of body_filter_by_lua*
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP\/3 stream 0 reset by server#
 
 
 
@@ -860,6 +866,8 @@ failed to load inlined Lua code: body_filter_by_lua(nginx.conf:41):2: unexpected
 --- no_error_log
 no_such_error1
 no_such_error2
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP\/3 stream 0 reset by server#
 
 
 
@@ -890,3 +898,5 @@ failed to load inlined Lua code: body_filter_by_lua(nginx.conf:49):2: unexpected
 --- no_error_log
 no_such_error1
 no_such_error2
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP\/3 stream 0 reset by server#

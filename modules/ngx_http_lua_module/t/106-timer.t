@@ -228,6 +228,7 @@ qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.(?:1[4-9]|2[0-6]?)
 
 
 === TEST 5: tcp cosocket in timer handler (short connections)
+--- no_http2
 --- config
     server_tokens off;
 
@@ -1332,6 +1333,7 @@ API disabled
 
 
 === TEST 19: exit in user thread (entry thread is still pending on ngx.sleep)
+--- quic_max_idle_timeout: 1.3
 --- config
     location /t {
         content_by_lua '

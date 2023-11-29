@@ -11,7 +11,7 @@ $ENV{TEST_NGINX_MYSQL_PORT} ||= 3306;
 
 our $http_config = <<'_EOC_';
     # lua-resty-string is required for lua-resty-mysql
-    lua_package_path "../lua-resty-mysql/lib/?.lua;../lua-resty-string/lib/?.lua;;";
+    lua_package_path "../lua-resty-rsa/lib/?.lua;../lua-resty-mysql/lib/?.lua;../lua-resty-string/lib/?.lua;;";
 _EOC_
 
 no_shuffle();

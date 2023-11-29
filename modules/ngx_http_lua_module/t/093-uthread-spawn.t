@@ -1064,6 +1064,8 @@ body: hello world)$
 
 
 === TEST 23: simple user thread with ngx.req.socket()
+ngx.req.socket() does not support in http3
+--- skip_eval: 4:$ENV{TEST_NGINX_USE_HTTP3}
 --- config
     location /lua {
         content_by_lua '

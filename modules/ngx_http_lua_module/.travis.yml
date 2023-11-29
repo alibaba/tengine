@@ -1,4 +1,4 @@
-dist: bionic
+dist: focal
 
 branches:
   only:
@@ -24,6 +24,11 @@ addons:
       - libtest-longstring-perl
       - liblist-moreutils-perl
       - libgd-dev
+      - time
+      - cmake
+      - libunwind-dev
+      - wget
+      - libbrotli1
 
 cache:
   directories:
@@ -38,9 +43,13 @@ env:
     - LUAJIT_INC=$LUAJIT_PREFIX/include/luajit-2.1
     - LUA_INCLUDE_DIR=$LUAJIT_INC
     - PCRE_VER=8.45
+    - PCRE2_VER=10.37
     - PCRE_PREFIX=/opt/pcre
+    - PCRE2_PREFIX=/opt/pcre2
     - PCRE_LIB=$PCRE_PREFIX/lib
+    - PCRE2_LIB=$PCRE2_PREFIX/lib
     - PCRE_INC=$PCRE_PREFIX/include
+    - PCRE2_INC=$PCRE2_PREFIX/include
     - OPENSSL_PREFIX=/opt/ssl
     - OPENSSL_LIB=$OPENSSL_PREFIX/lib
     - OPENSSL_INC=$OPENSSL_PREFIX/include
@@ -50,9 +59,14 @@ env:
     - LD_LIBRARY_PATH=$LUAJIT_LIB:$LD_LIBRARY_PATH
     - DRIZZLE_VER=2011.07.21
     - TEST_NGINX_SLEEP=0.006
+    - MALLOC_PERTURB_=9
   jobs:
-    - NGINX_VERSION=1.21.4 OPENSSL_VER=1.1.0l OPENSSL_PATCH_VER=1.1.0d
+    #- NGINX_VERSION=1.21.4 OPENSSL_VER=1.1.0l OPENSSL_PATCH_VER=1.1.0d
     - NGINX_VERSION=1.21.4 OPENSSL_VER=1.1.1s OPENSSL_PATCH_VER=1.1.1f
+    #- NGINX_VERSION=1.25.1 OPENSSL_VER=1.1.0l OPENSSL_PATCH_VER=1.1.0d
+    - NGINX_VERSION=1.25.1 OPENSSL_VER=1.1.1s OPENSSL_PATCH_VER=1.1.1f USE_PCRE2=Y
+    - NGINX_VERSION=1.25.1 BORINGSSL=1 TEST_NGINX_USE_HTTP3=1 USE_PCRE2=Y
+    #- NGINX_VERSION=1.25.1 OPENSSL_VER=1.1.1s TEST_NGINX_USE_HTTP2=1
 
 services:
   - memcached
@@ -60,16 +74,18 @@ services:
   - mysql
 
 before_install:
-  - sudo apt update
-  - sudo apt install --only-upgrade ca-certificates
   - '! grep -n -P ''(?<=.{80}).+'' --color `find src -name ''*.c''` `find . -name ''*.h''` || (echo "ERROR: Found C source lines exceeding 80 columns." > /dev/stderr; exit 1)'
   - '! grep -n -P ''\t+'' --color `find src -name ''*.c''` `find . -name ''*.h''` || (echo "ERROR: Cannot use tabs." > /dev/stderr; exit 1)'
   - /usr/bin/env perl $(command -v cpanm) --sudo --notest Test::Nginx IPC::Run > build.log 2>&1 || (cat build.log && exit 1)
-  - pyenv global 2.7
+
 install:
-  - if [ ! -f download-cache/drizzle7-$DRIZZLE_VER.tar.gz ]; then wget -P download-cache http://openresty.org/download/drizzle7-$DRIZZLE_VER.tar.gz; fi
-  - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache https://downloads.sourceforge.net/project/pcre/pcre/${PCRE_VER}/pcre-${PCRE_VER}.tar.gz; fi
-  - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz || wget -P download-cache https://www.openssl.org/source/old/${OPENSSL_VER//[a-z]/}/openssl-$OPENSSL_VER.tar.gz; fi
+  - if [ ! -f download-cache/drizzle7-$DRIZZLE_VER.tar.gz ]; then wget -P download-cache https://github.com/openresty/openresty-deps-prebuild/releases/download/v20230902/drizzle7-$DRIZZLE_VER.tar.gz; fi
+  - if [ "$USE_PCRE2" != "Y" ] && [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache https://downloads.sourceforge.net/project/pcre/pcre/${PCRE_VER}/pcre-${PCRE_VER}.tar.gz; fi
+  - if [ "$USE_PCRE2" = "Y" ] && [ ! -f download-cache/pcre2-$PCRE2_VER.tar.gz ]; then wget -P download-cache https://downloads.sourceforge.net/project/pcre/pcre2/${PCRE2_VER}/pcre2-${PCRE2_VER}.tar.gz; fi
+  - if [ -n "$OPENSSL_VER" ] && [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz || wget -P download-cache https://www.openssl.org/source/old/${OPENSSL_VER//[a-z]/}/openssl-$OPENSSL_VER.tar.gz; fi
+  - if [ -n "$OPENSSL_VER" ] && [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz || wget -P download-cache https://www.openssl.org/source/old/${OPENSSL_VER//[a-z]/}/openssl-$OPENSSL_VER.tar.gz; fi
+  - wget https://github.com/openresty/openresty-deps-prebuild/releases/download/v20230902/boringssl-20230902-x64-focal.tar.gz
+  - wget https://github.com/openresty/openresty-deps-prebuild/releases/download/v20230902/curl-h3-x64-focal.tar.gz
   - git clone https://github.com/openresty/test-nginx.git
   - git clone https://github.com/openresty/openresty.git ../openresty
   - git clone https://github.com/openresty/no-pool-nginx.git ../no-pool-nginx
@@ -91,21 +107,24 @@ install:
   - git clone https://github.com/openresty/lua-resty-core.git ../lua-resty-core
   - git clone https://github.com/openresty/lua-resty-lrucache.git ../lua-resty-lrucache
   - git clone https://github.com/openresty/lua-resty-mysql.git ../lua-resty-mysql
+  - git clone https://github.com/spacewander/lua-resty-rsa.git ../lua-resty-rsa
   - git clone https://github.com/openresty/lua-resty-string.git ../lua-resty-string
   - git clone https://github.com/openresty/stream-lua-nginx-module.git ../stream-lua-nginx-module
   - git clone -b v2.1-agentzh https://github.com/openresty/luajit2.git luajit2
 
 before_script:
-  - mysql -uroot -e 'create database ngx_test; grant all on ngx_test.* to "ngx_test"@"%" identified by "ngx_test"; flush privileges;'
+  - mysql -uroot -e "create database ngx_test; CREATE USER 'ngx_test'@'%' IDENTIFIED WITH mysql_native_password BY 'ngx_test'; grant all on ngx_test.* to 'ngx_test'@'%'; flush privileges;"
 
 script:
-  - export PATH=$PWD/work/nginx/sbin:$PWD/openresty-devel-utils:$PATH
+  - sudo tar -C / -xf curl-h3-x64-focal.tar.gz
+  - export PATH=$PWD/work/nginx/sbin:$PWD/openresty-devel-utils:/opt/curl-h3/bin:$PATH
   - ngx-releng > check.txt || true
   - lines=`wc -l check.txt | awk '{print $1}'`; if [ $lines -gt 5 ]; then cat check.txt; exit 1; fi
   - sudo iptables -I OUTPUT 1 -p udp --dport 10086 -j REJECT
   - sudo iptables -I OUTPUT -p tcp --dst 127.0.0.2 --dport 12345 -j DROP
   - sudo iptables -I OUTPUT -p udp --dst 127.0.0.2 --dport 12345 -j DROP
   - sudo ip route add prohibit 0.0.0.1/32
+  - sudo sysctl -w kernel.pid_max=10000
   - cd luajit2/
   - make -j$JOBS CCDEBUG=-g Q= PREFIX=$LUAJIT_PREFIX CC=$CC XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT -msse4.2' > build.log 2>&1 || (cat build.log && exit 1)
   - sudo make install PREFIX=$LUAJIT_PREFIX > build.log 2>&1 || (cat build.log && exit 1)
@@ -116,19 +135,10 @@ script:
   - sudo make install-libdrizzle-1.0 > build.log 2>&1 || (cat build.log && exit 1)
   - cd ../mockeagain/ && make CC=$CC -j$JOBS && cd ..
   - cd lua-cjson/ && make -j$JOBS && sudo make install && cd ..
-  - tar zxf download-cache/pcre-$PCRE_VER.tar.gz
-  - cd pcre-$PCRE_VER/
-  - ./configure --prefix=$PCRE_PREFIX --enable-jit --enable-utf --enable-unicode-properties > build.log 2>&1 || (cat build.log && exit 1)
-  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
-  - sudo PATH=$PATH make install > build.log 2>&1 || (cat build.log && exit 1)
-  - cd ..
-  - tar zxf download-cache/openssl-$OPENSSL_VER.tar.gz
-  - cd openssl-$OPENSSL_VER/
-  - patch -p1 < ../../openresty/patches/openssl-$OPENSSL_PATCH_VER-sess_set_get_cb_yield.patch
-  - ./config shared enable-ssl3 enable-ssl3-method -g --prefix=$OPENSSL_PREFIX -DPURIFY > build.log 2>&1 || (cat build.log && exit 1)
-  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
-  - sudo make PATH=$PATH install_sw > build.log 2>&1 || (cat build.log && exit 1)
-  - cd ..
+  - if [ "$USE_PCRE2" != "Y" ]; then tar zxf download-cache/pcre-$PCRE_VER.tar.gz; cd pcre-$PCRE_VER/; ./configure --prefix=$PCRE_PREFIX --enable-jit --enable-utf --enable-unicode-properties > build.log 2>&1 || (cat build.log && exit 1); make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1); sudo PATH=$PATH make install > build.log 2>&1 || (cat build.log && exit 1); cd ..; fi
+  - if [ "$USE_PCRE2" = "Y" ]; then tar zxf download-cache/pcre2-$PCRE2_VER.tar.gz; cd pcre2-$PCRE2_VER/; ./configure --prefix=$PCRE2_PREFIX --enable-jit --enable-utf > build.log 2>&1 || (cat build.log && exit 1); make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1); sudo PATH=$PATH make install > build.log 2>&1 || (cat build.log && exit 1); cd ..; fi
+  - if [ -n "$OPENSSL_VER" ]; then tar zxf download-cache/openssl-$OPENSSL_VER.tar.gz; cd openssl-$OPENSSL_VER/; patch -p1 < ../../openresty/patches/openssl-$OPENSSL_PATCH_VER-sess_set_get_cb_yield.patch; ./config shared enable-ssl3 enable-ssl3-method -g --prefix=$OPENSSL_PREFIX -DPURIFY > build.log 2>&1 || (cat build.log && exit 1); make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1); sudo make PATH=$PATH install_sw > build.log 2>&1 || (cat build.log && exit 1); cd ..; fi
+  - if [ -n "$BORINGSSL" ]; then sudo mkdir -p /opt/ssl && sudo tar -C /opt/ssl -xf boringssl-20230902-x64-focal.tar.gz --strip-components=1; fi
   - export NGX_BUILD_CC=$CC
   - sh util/build-without-ssl.sh $NGINX_VERSION > build.log 2>&1 || (cat build.log && exit 1)
   - sh util/build-with-dd.sh $NGINX_VERSION > build.log 2>&1 || (cat build.log && exit 1)
@@ -139,6 +149,8 @@ script:
   - ldd `which nginx`|grep -E 'luajit|ssl|pcre'
   - export LD_PRELOAD=$PWD/mockeagain/mockeagain.so
   - export LD_LIBRARY_PATH=$PWD/mockeagain:$LD_LIBRARY_PATH
+  - export TEST_NGINX_HTTP3_CRT=$PWD/t/cert/http3/http3.crt
+  - export TEST_NGINX_HTTP3_KEY=$PWD/t/cert/http3/http3.key
   - export TEST_NGINX_RESOLVER=8.8.4.4
   - dig +short myip.opendns.com @resolver1.opendns.com || exit 0
   - dig +short @$TEST_NGINX_RESOLVER openresty.org || exit 0

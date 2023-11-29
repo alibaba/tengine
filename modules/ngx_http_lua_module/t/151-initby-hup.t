@@ -12,7 +12,7 @@ BEGIN {
     }
 }
 
-use Test::Nginx::Socket::Lua 'no_plan';
+use Test::Nginx::Socket::Lua $SkipReason ? (skip_all => $SkipReason) : ();
 
 #worker_connections(1014);
 #master_on();
@@ -21,7 +21,7 @@ use Test::Nginx::Socket::Lua 'no_plan';
 
 repeat_each(1);
 
-#plan tests => repeat_each() * (blocks() * 3 + 3);
+plan tests => repeat_each() * (blocks() * 3);
 
 #no_diff();
 #no_long_string();

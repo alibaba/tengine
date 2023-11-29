@@ -654,7 +654,7 @@ ngx_http_lua_shared_dict_get(ngx_shm_zone_t *zone, u_char *key_data,
             return NGX_ERROR;
         }
 
-        ngx_memcpy(&value->value.b, data, len);
+        ngx_memcpy(&value->value.n, data, len);
         break;
 
     case SHDICT_TBOOLEAN:

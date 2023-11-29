@@ -2,7 +2,7 @@
 
 use Test::Nginx::Socket::Lua;
 
-#worker_connections(1014);
+worker_connections(1014);
 #master_on();
 #log_level('debug');
 
@@ -28,6 +28,8 @@ run_tests();
 __DATA__
 
 === TEST 1: memory issue in the "args" string option for ngx.location.capture
+the default worker_connections is 64, HTTP3 will keep the connection when curl
+request finished. So need to change the worker_connection.
 --- config
     location /test1 {
         content_by_lua '

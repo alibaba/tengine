@@ -233,6 +233,8 @@ GET /t
 --- error_code: 101
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
