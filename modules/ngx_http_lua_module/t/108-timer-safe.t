@@ -124,6 +124,7 @@ qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.(?:6[4-9]|7[0-6])/
 
 
 === TEST 3: tcp cosocket in timer handler (short connections)
+--- no_http2
 --- config
     server_tokens off;
     location = /t {

@@ -309,6 +309,7 @@ qr{\[crit\] .*? connect\(\) to 0\.0\.0\.1:80 failed .*?, upstream: "http://0\.0\
 
 
 === TEST 12: code cache off
+--- no_http2
 --- http_config
     lua_package_path "$TEST_NGINX_SERVER_ROOT/html/?.lua;;";
 

@@ -108,6 +108,7 @@ a=3&b=4&c
 --- request
 POST /lua
 --- response_body
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
