@@ -1,0 +1,16 @@
+ngx_addon_name=ngx_http_lua_upstream_module
+HTTP_LUA_UPSTREAM_SRCS="$ngx_addon_dir/src/ngx_http_lua_upstream_module.c"
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_srcs="$HTTP_LUA_UPSTREAM_SRCS"
+
+    . auto/module
+else
+    HTTP_MODULES="$HTTP_MODULES $ngx_addon_name"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_LUA_UPSTREAM_SRCS"
+
+    CORE_INCS="$CORE_INCS $ngx_module_incs"
+    CORE_LIBS="$CORE_LIBS $ngx_module_libs"
+fi

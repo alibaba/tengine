@@ -75,6 +75,7 @@ jobs:
             --with-pcre \
             --add-module=modules/ngx_tongsuo_ntls \
             --add-module=modules/ngx_http_lua_module \
+            --add-module=modules/ngx_http_lua_upstream \
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
