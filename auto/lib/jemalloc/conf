@@ -45,7 +45,7 @@ elif [ $USE_JEMALLOC = YES ]; then
 cat << END
 
 $0: error: the --with-jemalloc requires the jemalloc library.
-You can either do not enable this feature, or install the jemalloc 
+You can either disable this feature, or install the jemalloc 
 library into the system, or build the jemalloc library statically from 
 the source with nginx by using --with-jemalloc=<path> option.
 
