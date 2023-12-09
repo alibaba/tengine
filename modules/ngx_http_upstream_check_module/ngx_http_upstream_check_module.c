@@ -1224,7 +1224,7 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
 
     peer_shm[index].socklen = peer_addr->socklen;
     peer_shm[index].sockaddr = ngx_slab_alloc_locked(shpool,
-                                                     peer_shm->socklen);
+                                                     peer_addr->socklen);
     if (peer_shm[index].sockaddr == NULL) {
         goto fail;
     }
