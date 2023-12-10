@@ -112,6 +112,8 @@ ngx_http_slab_stat_buf(ngx_pool_t *pool, ngx_buf_t *b)
 
 #define NGX_SLAB_SHM_SIZE               (sizeof("* shared memory: \n") - 1)
 #define NGX_SLAB_SHM_FORMAT             "* shared memory: %V\n"
+#define NGX_SLAB_NONE                   "NONE\n"
+#define NGX_SLAB_NONE_SIZE              (sizeof(NGX_SLAB_NONE) - 1)
 #define NGX_SLAB_SUMMARY_SIZE           \
     (3 * 12 + sizeof("total:(KB) free:(KB) size:(KB)\n") - 1)
 #define NGX_SLAB_SUMMARY_FORMAT         \
@@ -131,6 +133,26 @@ ngx_http_slab_stat_buf(ngx_pool_t *pool, ngx_buf_t *b)
 
     part = &ngx_cycle->shared_memory.part;
     shm_zone = part->elts;
+
+    /**
+     * Send the NONE message, if no shared memory used by this configuration,
+     * else the client revices the "empty server response" error.
+     */
+    if (part == NULL || part->nelts == 0) {
+
+        p = ngx_palloc(pool, NGX_SLAB_NONE_SIZE);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->pos = p;
+        b->last = ngx_copy(p, NGX_SLAB_NONE, NGX_SLAB_NONE_SIZE);
+
+        b->memory = 1;
+        b->last_buf = 1;
+
+        return NGX_OK;
+    }
 
     for (i = 0; /* void */ ; i++) {
 

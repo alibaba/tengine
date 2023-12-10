@@ -40,6 +40,8 @@ slot:        1024(Bytes) total:           0 used:           0 reqs:           0 
 slot:        2048(Bytes) total:           0 used:           0 reqs:           0 fails:           0
 ```
 
+If no shared memory segments used, then "NONE" will be returned.
+
 Get information of shared memory usage
 -----------------------------------
 
