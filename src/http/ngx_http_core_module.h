@@ -311,7 +311,7 @@ typedef struct {
 typedef struct {
     ngx_http_listen_opt_t      opt;
 
-    unsigned                   protocols:3;
+    unsigned                   protocols:5;
     unsigned                   protocols_set:1;
     unsigned                   protocols_changed:1;
 
