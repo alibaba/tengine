@@ -2095,13 +2095,7 @@ ngx_http_dyups_read_msg(ngx_event_t *ev)
                       count, s_count, d_count, dmcf->dy_upstreams.nelts);
     }
 
-#if (NGX_HTTP_UPSTREAM_CHECK)
-    if (!ngx_shmtx_trylock(&shpool->mutex)) {
-        goto finish;
-    }
-#else
     ngx_shmtx_lock(&shpool->mutex);
-#endif
 
     ngx_http_dyups_read_msg_locked(ev);
 
