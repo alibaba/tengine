@@ -9,7 +9,7 @@
 #endif
 #include "ddebug.h"
 
-#if (NGX_PCRE || NGX_PCRE2)
+#if (NGX_PCRE)
 
 #include "ngx_http_lua_pcrefix.h"
 #include "ngx_http_lua_script.h"
@@ -325,7 +325,7 @@ ngx_int_t
 ngx_http_lua_ffi_set_jit_stack_size(int size, u_char *errstr,
     size_t *errstr_size)
 {
-#if (NGX_PCRE2 || LUA_HAVE_PCRE_JIT)
+#if (LUA_HAVE_PCRE_JIT)
 
     ngx_http_lua_main_conf_t    *lmcf;
     ngx_pool_t                  *pool, *old_pool;
@@ -977,7 +977,7 @@ ngx_http_lua_ffi_pcre_version(void)
 }
 
 
-#endif /* NGX_PCRE || NGX_PCRE2 */
+#endif /* NGX_PCRE */
 
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */
