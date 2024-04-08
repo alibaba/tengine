@@ -3167,7 +3167,7 @@ ngx_http_upstream_check_set_ssl_name(ngx_http_upstream_check_peer_t *peer)
 
     name.data = p;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "upstream check SSL server name: \"%s\"", name.data);
 
     if (SSL_set_tlsext_host_name(c->ssl->connection,
