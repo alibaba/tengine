@@ -634,7 +634,7 @@ ngx_http_v3_filter_request_body(ngx_http_request_t *r)
     ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
                   "|xquic|ngx_http_v3_filter_request_body|size:%O, fin:%O|", buf->last - buf->pos, fin);
 
-    if (buf->pos == buf->last && rb->rest) {
+    if (buf->pos == buf->last && (rb->rest || rb->last_sent)) {
         cl = NULL;
         goto update;
     }
@@ -682,9 +682,10 @@ ngx_http_v3_filter_request_body(ngx_http_request_t *r)
         b->last = buf->last;
         b->start = b->pos;
         b->end = b->last;
+
+        buf->pos = buf->last;
     }
 
-    buf->pos = buf->last = buf->start;
     ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
                   "|xquic|ngx_http_v3_filter_request_body|received:%O|", rb->received);
 
@@ -701,6 +702,7 @@ ngx_http_v3_filter_request_body(ngx_http_request_t *r)
         }
 
         b->last_buf = 1;
+        rb->last_sent = 1;
     }
 
     b->tag = (ngx_buf_tag_t) &ngx_http_v3_filter_request_body;
@@ -979,7 +981,7 @@ ngx_http_xquic_session_process_packet(ngx_http_xquic_connection_t *qc,
 /**
  * used to recv udp packets
  */
-static void
+void
 ngx_http_xquic_read_handler(ngx_event_t *rev)
 {
     ssize_t                        n;
