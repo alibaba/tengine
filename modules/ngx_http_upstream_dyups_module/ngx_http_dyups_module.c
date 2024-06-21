@@ -1790,6 +1790,7 @@ ngx_http_dyups_read_body(ngx_http_request_t *r)
     ngx_buf_t    *buf, *next, *body;
     ngx_chain_t  *cl;
 
+
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "[dyups] interface read post body");
 
@@ -1800,18 +1801,24 @@ ngx_http_dyups_read_body(ngx_http_request_t *r)
 
         return buf;
 
-    } else {
+    }
 
-        next = cl->next->buf;
-        len = (buf->last - buf->pos) + (next->last - next->pos);
+    len = 0;
+    for (/* void */;cl; cl = cl->next) {
+        len += cl->buf->last - cl->buf->pos;
+    }
 
-        body = ngx_create_temp_buf(r->pool, len);
-        if (body == NULL) {
-            return NULL;
-        }
+    if (len == 0) {
+        return NULL;
+    }
 
-        body->last = ngx_cpymem(body->last, buf->pos, buf->last - buf->pos);
-        body->last = ngx_cpymem(body->last, next->pos, next->last - next->pos);
+    body = ngx_create_temp_buf(r->pool, len);
+    if (body == NULL) {
+        return NULL;
+    }
+
+    for (cl = r->request_body->bufs; cl; cl = cl->next) {
+        body->last = ngx_cpymem(body->last, cl->buf->pos, cl->buf->last - cl->buf->pos);
     }
 
     return body;
