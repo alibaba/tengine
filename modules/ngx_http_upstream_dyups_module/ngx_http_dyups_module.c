@@ -1787,7 +1787,7 @@ static ngx_buf_t *
 ngx_http_dyups_read_body(ngx_http_request_t *r)
 {
     size_t        len;
-    ngx_buf_t    *buf, *next, *body;
+    ngx_buf_t    *buf, *body;
     ngx_chain_t  *cl;
 
 
