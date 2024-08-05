@@ -974,7 +974,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
 
     ucscf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_check_module);
 
-    if(ucscf->check_interval == 0) {
+    if (ucscf->check_interval == 0) {
         return NGX_ERROR;
     }
 
@@ -4770,7 +4770,7 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 
         psh->down         = opsh->down;
 
-    } else{
+    } else {
         psh->access_time  = 0;
         psh->access_count = 0;
 
