@@ -4770,7 +4770,7 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
 
         psh->down         = opsh->down;
 
-    } else{
+    } else {
         psh->access_time  = 0;
         psh->access_count = 0;
 
