@@ -114,6 +114,7 @@ jobs:
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_timer/t
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_conn/t
          prove -v -Inginx-tests/lib ../../modules/ngx_slab_stat/t
+         prove -v -Inginx-tests/lib ../../modules/ngx_http_lua_upstream/t
      - name: tengine test cases using test-nginx lib
        working-directory: tests/test-nginx
        run: |
