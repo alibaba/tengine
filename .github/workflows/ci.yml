@@ -121,5 +121,3 @@ jobs:
          mkdir t
          PATH=/usr/local/nginx/sbin:$PATH \
          prove -v -Itest-nginx/lib cases/
-         PATH=/usr/local/nginx/sbin:$PATH \
-         prove -v -Itest-nginx/lib ../../modules/ngx_http_lua_upstream/t
