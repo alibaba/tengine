@@ -127,8 +127,8 @@ foreach my $ip (@server_addrs) {
     $t->run_daemon(\&http_daemon, $ip);
 }
 
-$t->run_daemon(\&dns_server_daemon);
-my $dns_pid = pop @{$t->{_daemons}};
+my $dns = dns_server_daemon();
+$dns->start_server(60);
 
 $t->run();
 
@@ -142,9 +142,7 @@ like(http_get('/'), qr/127\.0\.0\.2/,
 # test variable in proxy_pass argument
 like(http_get('/proxy_pass_var'), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2 for /proxy_pass_var');
-
-# kill dns daemon
-kill $^O eq 'MSWin32' ? 9 : 'TERM', $dns_pid;
+$dns->stop_server();
 wait;
 
 # wait for dns cache to expire
@@ -258,7 +256,7 @@ sub dns_server_daemon {
         Verbose      => 0
     ) or die "couldn't create nameserver object\n";
 
-    $ns->main_loop;
+    return $ns;
 }
 
 ###############################################################################
