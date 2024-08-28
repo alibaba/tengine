@@ -569,6 +569,71 @@ unlike(mhttp_get('/', 'dyhost', 8080), qr/8088/m, '5/ 5 11:04:42 2014');
 $t->stop();
 unlink("/tmp/dyupssocket");
 
+##############################################################################
+
+$t->write_file_expand('nginx.conf', <<'EOF');
+
+%%TEST_GLOBALS%%
+
+daemon off;
+
+worker_processes 1;
+
+events {
+    accept_mutex off;
+}
+
+http {
+    %%TEST_GLOBALS_HTTP%%
+
+    resolver_timeout 500ms;
+
+    server {
+        listen   8080;
+
+        location / {
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://$host;
+        }
+    }
+
+    server {
+        listen 8088;
+        location / {
+            return 200 "8088";
+        }
+    }
+
+    server {
+        listen 8089;
+        location / {
+            return 200 "8089";
+        }
+    }
+
+    server {
+        listen 8081;
+        location / {
+            dyups_interface;
+        }
+    }
+}
+EOF
+
+mrun($t);
+
+like(mhttp_post('/upstream/dyhost', 'keepalive 32; keepalive_timeout 50s; server 127.0.0.1:8088; server 127.0.0.1:8089;', 8081), qr/success/m, '2024-08-28 14:37:20');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:23');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:26');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:29');
+like(mhttp_post('/upstream/dyhost', 'keepalive 32; keepalive_timeout 60s; server 127.0.0.1:8088; server 127.0.0.1:8089;', 8081), qr/success/m, '2024-08-28 14:37:32');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:35');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:38');
+like(mhttp_get('/', 'dyhost', 8080), qr/8088|8089/m, '2024-08-28 14:37:41');
+
+$t->stop();
+
 ###############################################################################
 # test ssl session reuse
 
