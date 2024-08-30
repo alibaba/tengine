@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2010-2015 Alibaba Group Holding Limited
  * Copyright (C) 2010-2013 Weibin Yao (yaoweibin@gmail.com)
