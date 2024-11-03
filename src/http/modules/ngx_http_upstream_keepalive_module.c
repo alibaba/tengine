@@ -289,6 +289,9 @@ found:
     c->read->log = pc->log;
     c->write->log = pc->log;
     c->pool->log = pc->log;
+#if (T_NGX_XQUIC)
+    c->write->data = c;
+#endif
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
