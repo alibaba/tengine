@@ -16,7 +16,6 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-eval { require Net::DNS::Nameserver; };
 plan(skip_all => 'Net::DNS::Nameserver not installed') if $@;
 
 ###############################################################################
@@ -148,7 +147,7 @@ kill $^O eq 'MSWin32' ? 9 : 'TERM', $dns_pid;
 wait;
 
 # wait for dns cache to expire
-sleep(2);
+sleep(3);
 
 unlike(http_get('/stale'), qr/127\.0\.0\.2/,
     'stale http server should be www.taobao.com:8081, using initial result');
@@ -251,6 +250,8 @@ sub reply_handler {
 }
 
 sub dns_server_daemon {
+    eval { require Net::DNS::Nameserver; };
+
     my $ns = new Net::DNS::Nameserver(
         LocalAddr    => '127.0.0.1',
         LocalPort    => 53530,
@@ -258,7 +259,7 @@ sub dns_server_daemon {
         Verbose      => 0
     ) or die "couldn't create nameserver object\n";
 
-    $ns->main_loop;
+    $ns->start_server(1);
 }
 
 ###############################################################################
