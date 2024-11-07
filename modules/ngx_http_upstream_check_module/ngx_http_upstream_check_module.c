@@ -96,6 +96,7 @@ typedef struct {
     ngx_uint_t                               access_count;
 
     ngx_uint_t                               checksum;
+    ngx_uint_t                               check_type;
 
     struct sockaddr                         *sockaddr;
     socklen_t                                socklen;
@@ -368,7 +369,7 @@ static ngx_http_fastcgi_request_start_t  ngx_http_fastcgi_request_start = {
 
 static ngx_uint_t ngx_http_upstream_check_add_dynamic_peer_shm(
     ngx_pool_t *pool, ngx_http_upstream_check_srv_conf_t *ucscf,
-    ngx_addr_t *peer_addr);
+    ngx_addr_t *peer_addr, ngx_str_t *upstream_name);
 static void ngx_http_upstream_check_clear_dynamic_peer_shm(
     ngx_http_upstream_check_peer_shm_t *peer_shm);
 
@@ -519,7 +520,8 @@ static ngx_shm_zone_t *ngx_shared_memory_find(ngx_cycle_t *cycle,
     ngx_str_t *name, void *tag);
 static ngx_http_upstream_check_peer_shm_t *
 ngx_http_upstream_check_find_shm_peer(
-    ngx_http_upstream_check_peers_shm_t *peers_shm, ngx_addr_t *addr);
+    ngx_http_upstream_check_peers_shm_t *peers_shm, ngx_http_upstream_check_srv_conf_t *ucscf,
+    ngx_addr_t *addr, ngx_str_t *upstream_name);
 
 static ngx_int_t ngx_http_upstream_check_init_shm_peer(
     ngx_http_upstream_check_peer_shm_t *peer_shm,
@@ -838,7 +840,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
     }
 
     index = ngx_http_upstream_check_add_dynamic_peer_shm(pool,
-                                                         ucscf, peer_addr);
+                                                         ucscf, peer_addr, &us->host);
     if (index == (ngx_uint_t) NGX_ERROR) {
         return index;
     }
@@ -1163,7 +1165,7 @@ ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
 
 static ngx_uint_t
 ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
-    ngx_http_upstream_check_srv_conf_t *ucscf, ngx_addr_t *peer_addr)
+    ngx_http_upstream_check_srv_conf_t *ucscf, ngx_addr_t *peer_addr, ngx_str_t *upstream_name)
 {
     ngx_int_t                             rc;
     ngx_uint_t                            i, index;
@@ -1196,7 +1198,9 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
             && ngx_memcmp(peer_addr->sockaddr, peer_shm[i].sockaddr,
                           peer_addr->socklen) == 0
             && peer_shm[i].checksum
-               == ngx_murmur_hash2(ucscf->send.data, ucscf->send.len))
+               == ngx_murmur_hash2(ucscf->send.data, ucscf->send.len) +
+               ngx_murmur_hash2(upstream_name->data, upstream_name->len) 
+            && peer_shm[i].check_type == ucscf->check_type_conf->type)
         {
                 ngx_shmtx_unlock(&shpool->mutex);
                 return i;
@@ -1240,7 +1244,9 @@ ngx_http_upstream_check_add_dynamic_peer_shm(ngx_pool_t *pool,
     }
 
     /* Set tag to peer_shm */
-    peer_shm[index].checksum = ngx_murmur_hash2(ucscf->send.data, ucscf->send.len);
+    peer_shm[index].checksum = ngx_murmur_hash2(ucscf->send.data, ucscf->send.len)+ 
+                        ngx_murmur_hash2(upstream_name->data, upstream_name->len);
+    peer_shm[index].check_type = ucscf->check_type_conf->type;
 
     ngx_shmtx_unlock(&shpool->mutex);
     return index;
@@ -4646,8 +4652,8 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
 
         if (opeers_shm) {
 
-            opeer_shm = ngx_http_upstream_check_find_shm_peer(opeers_shm,
-                                                             peer[i].peer_addr);
+            opeer_shm = ngx_http_upstream_check_find_shm_peer(opeers_shm, peer[i].conf,
+                                                             peer[i].peer_addr, peer[i].upstream_name);
             if (opeer_shm) {
                 ngx_log_debug1(NGX_LOG_DEBUG_HTTP, shm_zone->shm.log, 0,
                                "http upstream check, inherit opeer: %V ",
@@ -4670,6 +4676,10 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
         if (rc != NGX_OK) {
             return NGX_ERROR;
         }
+
+        peer_shm->checksum = ngx_murmur_hash2(ucscf->send.data, ucscf->send.len)+ 
+                            ngx_murmur_hash2(peer[i].upstream_name->data, peer[i].upstream_name->len);
+        peer_shm->check_type = ucscf->check_type_conf->type;
     }
 
     peers->shpool = shpool;
@@ -4729,8 +4739,8 @@ ngx_shared_memory_find(ngx_cycle_t *cycle, ngx_str_t *name, void *tag)
 
 
 static ngx_http_upstream_check_peer_shm_t *
-ngx_http_upstream_check_find_shm_peer(ngx_http_upstream_check_peers_shm_t *p,
-    ngx_addr_t *addr)
+ngx_http_upstream_check_find_shm_peer(ngx_http_upstream_check_peers_shm_t *p, ngx_http_upstream_check_srv_conf_t *ucscf,
+    ngx_addr_t *addr, ngx_str_t *upstream_name)
 {
     ngx_uint_t                          i;
     ngx_http_upstream_check_peer_shm_t *peer_shm;
@@ -4743,9 +4753,11 @@ ngx_http_upstream_check_find_shm_peer(ngx_http_upstream_check_peers_shm_t *p,
             continue;
         }
 
-        if (ngx_memcmp(addr->sockaddr, peer_shm->sockaddr,
-                       addr->socklen) == 0) {
-            return peer_shm;
+        if (ngx_memcmp(addr->sockaddr, peer_shm->sockaddr, addr->socklen) == 0
+            && peer_shm->checksum == (ngx_murmur_hash2(ucscf->send.data, ucscf->send.len) + 
+                  ngx_murmur_hash2(upstream_name->data, upstream_name->len))
+            && peer_shm->check_type == ucscf->check_type_conf->type) {
+                return peer_shm;
         }
     }
 
@@ -4769,6 +4781,8 @@ ngx_http_upstream_check_init_shm_peer(ngx_http_upstream_check_peer_shm_t *psh,
         psh->busyness     = opsh->busyness;
 
         psh->down         = opsh->down;
+        psh->check_type   = opsh->check_type;
+        psh->checksum     = opsh->checksum;
 
     } else{
         psh->access_time  = 0;
