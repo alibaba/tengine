@@ -177,6 +177,7 @@ void ngx_http_v3_read_client_request_body_handler(ngx_http_request_t *r);
 xqc_int_t ngx_http_v3_cert_cb(const char *sni, void **chain,
     void **cert, void **key, void *conn_user_data);
 
+void ngx_http_xquic_read_handler(ngx_event_t *rev);
 
 #endif /* _NGX_HTTP_XQUIC_H_INCLUDED_ */
 
