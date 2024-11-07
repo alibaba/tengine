@@ -428,7 +428,7 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     u_char          **argv;
     ngx_pid_t         pid;
     sigset_t          set;
-#ifdef T_PIPE_USE_USER
+#if defined(T_PIPE_USE_USER) || defined(T_PIPE_SET_SIZE)
     ngx_core_conf_t  *ccf;
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
@@ -437,6 +437,16 @@ ngx_open_pipe(ngx_cycle_t *cycle, ngx_open_pipe_t *op)
     if (pipe(op->pfd) < 0) {
         return NGX_ERROR;
     }
+
+#ifdef T_PIPE_SET_SIZE
+    if (ccf->pipe_size != NGX_CONF_UNSET_SIZE && ccf->pipe_size != 0) {
+        if (fcntl(op->pfd[1], F_SETPIPE_SZ, ccf->pipe_size) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          "set pipe size (%d) failed", ccf->pipe_size);
+            goto err;
+        }
+    }
+#endif
 
     argv = op->argv->elts;
 

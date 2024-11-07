@@ -166,6 +166,15 @@ static ngx_command_t  ngx_core_commands[] = {
 
 #endif
 
+#if (T_PIPE_SET_SIZE)
+    { ngx_string("pipe_set_size"),
+      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      0,
+      offsetof(ngx_core_conf_t, pipe_size),
+      NULL },
+#endif
+
       ngx_null_command
 };
 
@@ -1148,6 +1157,10 @@ ngx_core_module_create_conf(ngx_cycle_t *cycle)
         return NULL;
     }
 
+#ifdef T_PIPE_SET_SIZE
+    ccf->pipe_size = NGX_CONF_UNSET_SIZE;
+#endif
+
     return ccf;
 }
 
@@ -1280,6 +1293,16 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
     }
     }
 
+#endif
+
+#ifdef T_PIPE_SET_SIZE
+    if (ccf->pipe_size != NGX_CONF_UNSET_SIZE) {
+        if (ccf->pipe_size < 64 * 1024) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                          "\"pipe_size\" must be at least 64K, ignored");
+            return NGX_CONF_ERROR;
+        }
+    }
 #endif
 
     return NGX_CONF_OK;

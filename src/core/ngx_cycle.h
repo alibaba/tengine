@@ -133,6 +133,11 @@ typedef struct {
     char                    **environment;
 
     ngx_uint_t                transparent;  /* unsigned  transparent:1; */
+
+#if (T_PIPE_SET_SIZE)
+    size_t pipe_size;
+#endif
+
 } ngx_core_conf_t;
 
 
