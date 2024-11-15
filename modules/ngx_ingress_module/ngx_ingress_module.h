@@ -14,10 +14,15 @@
 #include <ngx_comm_shm.h>
 #include <ngx_proc_strategy_module.h>
 
+#define NGX_INGRESS_FORCE_HTTPS_UNSET   -1
+#define NGX_INGRESS_TIMEOUT_UNSET       0
+#define NGX_INGRESS_TIMEOUT_SET         1
+
 typedef struct {
     ngx_msec_t      connect_timeout;
     ngx_msec_t      read_timeout;
     ngx_msec_t      write_timeout;
+    ngx_int_t       set_flag;
 } ngx_ingress_timeout_t;
 
 typedef struct {
@@ -32,6 +37,27 @@ typedef struct {
     ngx_str_t           value;
 } ngx_ingress_metadata_t;
 
+typedef Ingress__LocationType ngx_ingress_tag_value_location_e;
+typedef Ingress__MatchType ngx_ingress_tag_match_type_e;
+typedef Ingress__OperatorType ngx_ingress_tag_operator_e;
+typedef Ingress__ActionType ngx_ingress_action_type_e;
+typedef Ingress__ActionValueType ngx_ingress_action_value_type_e; 
+
+typedef struct {
+    ngx_str_t                   value_str;
+    ngx_shm_array_t            *value_a;        /* ngx_str_t, already sorted */
+    ngx_int_t                   divisor;
+    ngx_int_t                   remainder;
+    ngx_ingress_tag_operator_e  op;
+} ngx_ingress_tag_condition_t;
+
+typedef struct {
+    ngx_ingress_action_type_e       action_type;
+    ngx_ingress_action_value_type_e value_type;
+    ngx_str_t                       key;
+    ngx_str_t                       value;
+} ngx_ingress_action_t;
+
 typedef struct {
     ngx_str_t                   name;
 
@@ -41,14 +67,21 @@ typedef struct {
     ngx_ingress_timeout_t       timeout;
     ngx_int_t                   force_https;
 
+    ngx_shm_array_t            *action_a;         /* ngx_ingress_action_t */
+
     ngx_shm_array_t            *metadata;       /* ngx_ingress_metadata_t */
 } ngx_ingress_service_t;
 
 typedef struct {
-    Ingress__LocationType       location;       /* match field location */
-    ngx_str_t                   key;            /* match field name */
-    ngx_str_t                   value;          /* match field value */
-    Ingress__MatchType          match_type;     /* match field type */
+    ngx_queue_t queue_node;
+    ngx_ingress_service_t *service;
+} ngx_ingress_service_queue_t;
+
+typedef struct {
+    ngx_ingress_tag_value_location_e    location;       /* match field location */
+    ngx_str_t                           key;            /* match field name */
+    ngx_ingress_tag_match_type_e        match_type;     /* match field type */
+    ngx_ingress_tag_condition_t         condition;      /* match condition */ 
 } ngx_ingress_tag_item_t;
 
 typedef struct {
@@ -115,6 +148,6 @@ typedef struct {
 
 
 ngx_int_t ngx_ingress_update_shm_by_pb(ngx_ingress_gateway_t *gateway, ngx_ingress_shared_memory_config_t *shm_pb_config, ngx_ingress_t *ingress);
-
+ngx_int_t ngx_ingress_tag_value_compar(const void *v1, const void *v2);
 
 #endif // NGX_INGRESS_MODULE_H

@@ -42,6 +42,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: openresty/lua-resty-core
+          ref: v0.1.27
           path: lua-resty-core
       - name: 'build lua-resty-core'
         working-directory: lua-resty-core
@@ -77,6 +78,7 @@ jobs:
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
+            --with-http_v2_module \
             --with-stream \
             --with-stream_ssl_module \
             --with-stream_sni

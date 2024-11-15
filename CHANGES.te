@@ -1,3 +1,50 @@
+Changes with Tengine 3.1.0                                         27 Oct 2023
+
+    *) Security: fixed HTTP2 CVE-2023-44487 [lianglli]
+
+    *) Feature: dynamically configure different TLS protocols for different server names without tengine reload based on tengine-ingress [lianglli]
+
+    *) Feature: dynamically configure HTTP routes based on multiple values of a specific header without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes based on multiple values of a specific cookie without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+    
+    *) Feature: dynamically configure HTTP routes based on multiple values of a specific query parameter without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes based on the modulo operation for a specific header without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes based on the modulo operation for a specific cookie without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes based on the modulo operation for a specific query parameter without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes to add custom headers to the HTTP request without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes to append custom headers to the HTTP request without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes to add query parameter to the HTTP request without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: dynamically configure HTTP routes to add custom headers to the HTTP response without tengine reload based on tengine-ingress [lianglli, dreamwind1985]
+
+    *) Feature: add new option https_allow_http of listen for receiving HTTP traffic on the TLS listener (drawing)
+
+    *) Feature: add new module ngx_http_debug_conn_module for debugging connection info (hongxiaolong)
+
+    *) Bugfix: fixed HTTP/3 Lua callback issue (drawing)
+
+    *) Bugfix: fixed FD leak issue in HTTP/3 XQUIC module (dreamwind1985)
+
+    *) Bugfix: fixed certificate matching issue with static configuration file in HTTP/3 XQUIC module (lurker-Chen)
+
+    *) Bugfix: fixed crash for calling ngx_http_find_virtual_server in the HTTP/3 XQUIC module (morf)
+
+    *) Bugfix: fixed crash for using thread_pool in SSL asynchronous mode (zhsnew)
+
+    *) Bugfix: fixed compilation error of ngx_http_grpc_module with ngx_tongsuo_ntls (dongbeiouba)
+
+    *) Bugfix: fixed test case issues of new module ngx_http_debug_conn_module (chobits)
+
+    *) Bugfix: fixed log error of ngx_getcpuinfo (fuchencong)
+
+
 Changes with Tengine 3.0.0                                         06 Jul 2023
 
     *) Feature: dynamically reconfigure the servers, locations and upstreams without reloading or restarting worker processes [tengine-ingress] (drawing, lianglli)

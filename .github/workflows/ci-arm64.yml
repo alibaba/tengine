@@ -64,6 +64,7 @@ jobs:
               --add-module=./modules/ngx_backtrace_module \
               --add-module=./modules/ngx_debug_pool \
               --add-module=./modules/ngx_debug_timer \
+              --add-module=./modules/ngx_debug_conn \
               --add-module=./modules/ngx_http_concat_module \
               --add-module=./modules/ngx_http_footer_filter_module \
               --add-module=./modules/ngx_http_lua_module \
@@ -76,6 +77,7 @@ jobs:
               --add-module=./modules/ngx_http_upstream_consistent_hash_module \
               --add-module=./modules/ngx_http_upstream_dynamic_module \
               --add-module=./modules/ngx_http_upstream_dyups_module \
+              --add-module=./modules/ngx_http_upstream_iwrr_module \
               --add-module=./modules/ngx_http_upstream_keepalive_module \
               --add-module=./modules/ngx_http_upstream_session_sticky_module \
               --add-module=./modules/ngx_http_upstream_vnswrr_module \

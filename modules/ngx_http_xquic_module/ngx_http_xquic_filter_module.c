@@ -72,7 +72,8 @@ ngx_http_xquic_stream_send_header(ngx_http_v3_stream_t *qstream)
                         &(qstream->resp_headers), header_only);
     if (ret < 0) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                    "|xquic|xqc_h3_request_send_headers error %z|", ret);
+                    "|xquic|xqc_h3_request_send_headers error|ret=%z|", ret);
+        qstream->queued--;
         return NGX_ERROR;
     } else {
         ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
@@ -465,8 +466,18 @@ ngx_http_xquic_header_filter(ngx_http_request_t *r)
 
         h->hash = 1;
         ngx_str_set(&h->key, NGX_HTTP_XQUIC_NAME_SERVER);
-        if (clcf->server_tokens) {
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+#if (T_NGX_SERVER_INFO)
+            ngx_str_set(&h->value, TENGINE_VER);
+#else
             ngx_str_set(&h->value, NGINX_VER);
+#endif
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+#if (T_NGX_SERVER_INFO)
+            ngx_str_set(&h->value, TENGINE_VER_BUILD);
+#else
+            ngx_str_set(&h->value, NGINX_VER_BUILD);
+#endif
         } else {
             ngx_str_set(&h->value, TENGINE);
         }
@@ -719,7 +730,9 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                     goto RETURN_EAGAIN;
 
                 } else if (n < 0) {
-
+                    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                            "|xquic|ngx_http_xquic_send_chain|send body fin error|");
+                    r->xqstream->queued--;
                     goto RETURN_ERROR;
                 }
 
@@ -768,6 +781,10 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         if (n < 0) {
             if (n == NGX_AGAIN) {
                 h3_stream->wait_to_write = 1;
+            } else {
+                ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                        "|xquic|ngx_http_xquic_send_chain|send body error, body_sent %ui, size %O, n=%z|last=%i|",
+                        r->xqstream->body_sent, size, n, last_out->buf->last_buf);
             }
         
             break;

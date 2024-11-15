@@ -1454,6 +1454,7 @@ END
 have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
 have=T_NGX_MASTER_ENV . auto/have
 have=T_PIPES . auto/have
+have=T_PIPE_SET_SIZE . auto/have
 have=T_NGX_INPUT_BODY_FILTER . auto/have
 have=T_NGX_GZIP_CLEAR_ETAG . auto/have
 have=T_NGX_RESOLVER_FILE . auto/have
@@ -1483,3 +1484,6 @@ have=T_NGX_SHOW_INFO . auto/have
 have=T_NGX_HTTP_IMAGE_FILTER . auto/have
 have=T_HTTP_HEADER . auto/have
 have=T_HTTP_UPSTREAM_TIMEOUT_VAR . auto/have
+have=T_NGX_HTTPS_ALLOW_HTTP . auto/have
+have=T_NGX_REQUEST_START_TIME . auto/have
+have=T_NGX_SOCKET_BUFFER . auto/have

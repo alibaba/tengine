@@ -42,6 +42,11 @@ typedef struct {
 
     ngx_flag_t                     keep_conn;
 
+#if (T_NGX_SOCKET_BUFFER)
+    size_t                         sndbuf;
+    size_t                         rcvbuf;
+#endif
+
 #if (NGX_HTTP_CACHE)
     ngx_http_complex_value_t       cache_key;
 #endif
@@ -582,6 +587,22 @@ static ngx_command_t  ngx_http_fastcgi_commands[] = {
       offsetof(ngx_http_fastcgi_loc_conf_t, keep_conn),
       NULL },
 
+#if (T_NGX_SOCKET_BUFFER)
+    { ngx_string("fastcgi_sndbuf_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_fastcgi_loc_conf_t, sndbuf),
+      NULL },
+
+    { ngx_string("fastcgi_rcvbuf_size"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_fastcgi_loc_conf_t, rcvbuf),
+      NULL },
+#endif
+
       ngx_null_command
 };
 
@@ -736,6 +757,11 @@ ngx_http_fastcgi_handler(ngx_http_request_t *r)
     u->abort_request = ngx_http_fastcgi_abort_request;
     u->finalize_request = ngx_http_fastcgi_finalize_request;
     r->state = 0;
+
+#if (T_NGX_SOCKET_BUFFER)
+    u->peer.sndbuf = flcf->sndbuf;
+    u->peer.rcvbuf = flcf->rcvbuf;
+#endif
 
     u->buffering = flcf->upstream.buffering;
 
@@ -2943,6 +2969,11 @@ ngx_http_fastcgi_create_loc_conf(ngx_conf_t *cf)
 
     ngx_str_set(&conf->upstream.module, "fastcgi");
 
+#if (T_NGX_SOCKET_BUFFER)
+    conf->sndbuf = NGX_CONF_UNSET_SIZE;
+    conf->rcvbuf = NGX_CONF_UNSET_SIZE;
+#endif
+
     return conf;
 }
 
@@ -3024,6 +3055,10 @@ ngx_http_fastcgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->upstream.limit_rate,
                               prev->upstream.limit_rate, 0);
 
+#if (T_NGX_SOCKET_BUFFER)
+    ngx_conf_merge_size_value(conf->sndbuf, prev->sndbuf, (size_t) 0);
+    ngx_conf_merge_size_value(conf->rcvbuf, prev->rcvbuf, (size_t) 0);
+#endif
 
     ngx_conf_merge_bufs_value(conf->upstream.bufs, prev->upstream.bufs,
                               8, ngx_pagesize);

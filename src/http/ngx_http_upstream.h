@@ -504,6 +504,12 @@ void ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
 
 #endif
 
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+ngx_http_upstream_srv_conf_t *
+ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
+    ngx_str_t *host);
+#endif
+
 extern ngx_module_t        ngx_http_upstream_module;
 extern ngx_conf_bitmask_t  ngx_http_upstream_cache_method_mask[];
 extern ngx_conf_bitmask_t  ngx_http_upstream_ignore_headers_masks[];

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright (C) 2018 Alibaba Group Holding Limited
+# Copyright (C) 2015 Alibaba Group Holding Limited
 
 use warnings;
 use strict;
@@ -32,8 +32,8 @@ http {
     server {
         listen       127.0.0.1:8080;
 
-        location /debug_timer {
-            debug_timer;
+        location /debug_conn {
+            debug_conn;
         }
     }
 }
@@ -44,9 +44,10 @@ EOF
 
 $t->run();
 
-my $status = http_get("/debug_timer");
+my $status = http_get("/debug_conn");
 
-like($status, qr#200 OK#, 'debug_timer returns information of timers and related events');
+like($status, qr#uri: http://localhost/debug_conn#,
+     'debug_conn returns information of ngx_cycle->connections[]');
 
 print "--- debug for verbose mode ---\n",
       "$status",

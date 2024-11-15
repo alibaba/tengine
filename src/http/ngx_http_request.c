@@ -204,6 +204,13 @@ ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_null_string, 0, NULL }
 };
 
+#ifdef T_INGRESS_SHARED_MEMORY_PB
+/* Total number of SSL protocol versions */
+#define NGX_HTTPS_SSL_PROTOCOL_NUM         6
+
+static ngx_str_t ngx_ing_ssl_protocols = ngx_string("metadata_ssl_protocols");
+#endif
+
 
 void
 ngx_http_init_connection(ngx_connection_t *c)
@@ -852,6 +859,11 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0, "plain http");
 
         c->log->action = "waiting for request";
+#if (T_NGX_HTTPS_ALLOW_HTTP)
+        if (hc->addr_conf->https_allow_http) {
+            hc->ssl = 0;
+        }
+#endif
 
         rev->handler = ngx_http_wait_request_handler;
         ngx_http_wait_request_handler(rev);
@@ -952,6 +964,10 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 int
 ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 {
+#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+    return SSL_TLSEXT_ERR_OK;
+#endif
+
     ngx_int_t                  rc;
     ngx_str_t                  host;
     const char                *servername;
@@ -1071,6 +1087,381 @@ error:
 
     *ad = SSL_AD_INTERNAL_ERROR;
     return SSL_TLSEXT_ERR_ALERT_FATAL;
+}
+
+#endif
+
+
+#ifdef T_INGRESS_SHARED_MEMORY_PB
+int
+ngx_http_ssl_ctx_reset(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
+{
+    ngx_int_t                  rc;
+    ngx_str_t                  host;
+    const char                *servername = NULL;
+    ngx_connection_t          *c;
+    ngx_http_connection_t     *hc;
+    ngx_http_ssl_srv_conf_t   *sscf;
+    ngx_http_core_loc_conf_t  *clcf;
+    ngx_http_core_srv_conf_t  *cscf;
+
+    c = ngx_ssl_get_connection(ssl_conn);
+
+    if (c->ssl->handshaked) {
+        *ad = SSL_AD_NO_RENEGOTIATION;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+#ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
+    servername = SSL_get_servername(ssl_conn, TLSEXT_NAMETYPE_host_name);
+#endif
+
+    if (servername == NULL) {
+        return SSL_TLSEXT_ERR_OK;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "SSL server name: \"%s\"", servername);
+
+    host.len = ngx_strlen(servername);
+
+    if (host.len == 0) {
+        return SSL_TLSEXT_ERR_OK;
+    }
+
+    host.data = (u_char *) servername;
+
+    rc = ngx_http_validate_host(&host, c->pool, 1);
+
+    if (rc == NGX_ERROR) {
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    if (rc == NGX_DECLINED) {
+        return SSL_TLSEXT_ERR_OK;
+    }
+
+    hc = c->data;
+
+    rc = ngx_http_find_virtual_server(c, hc->addr_conf->virtual_names, &host,
+                                      NULL, &cscf);
+
+    if (rc == NGX_ERROR) {
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    if (rc == NGX_DECLINED) {
+        return SSL_TLSEXT_ERR_OK;
+    }
+
+    hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
+    if (hc->ssl_servername == NULL) {
+        *ad = SSL_AD_INTERNAL_ERROR;
+        return SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
+
+    *hc->ssl_servername = host;
+
+    hc->conf_ctx = cscf->ctx;
+
+    clcf = ngx_http_get_module_loc_conf(hc->conf_ctx, ngx_http_core_module);
+
+    ngx_set_connection_log(c, clcf->error_log);
+
+    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
+
+    c->ssl->buffer_size = sscf->buffer_size;
+
+    if (sscf->ssl.ctx) {
+        SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);
+
+        /*
+         * SSL_set_SSL_CTX() only changes certs as of 1.0.0d
+         * adjust other things we care about
+         */
+
+#ifdef SSL_set_SESSION_CTX
+        /* babassl api */
+        SSL_set_SESSION_CTX(ssl_conn, sscf->ssl.ctx);
+#endif
+
+        SSL_set_verify(ssl_conn, SSL_CTX_get_verify_mode(sscf->ssl.ctx),
+                       SSL_CTX_get_verify_callback(sscf->ssl.ctx));
+
+        SSL_set_verify_depth(ssl_conn, SSL_CTX_get_verify_depth(sscf->ssl.ctx));
+
+#if OPENSSL_VERSION_NUMBER >= 0x009080dfL
+        /* only in 0.9.8m+ */
+        SSL_clear_options(ssl_conn, SSL_get_options(ssl_conn) &
+                                    ~SSL_CTX_get_options(sscf->ssl.ctx));
+#endif
+
+        SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
+
+#ifdef SSL_OP_NO_RENEGOTIATION
+        SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
+#endif
+    }
+
+    return SSL_TLSEXT_ERR_OK;
+}
+
+static ngx_int_t
+ngx_http_request_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_str_t *value)
+{
+    u_char                      *low;
+    ngx_str_t                    var;
+    ngx_uint_t                   hash;
+    ngx_http_variable_value_t   *vv;
+
+    if (0 >= name->len || NULL == name->data) {
+        return NGX_ERROR;
+    }
+
+    low = ngx_pnalloc(r->pool, name->len);
+    if (low == NULL) {
+        return NGX_ERROR;
+    }
+
+    hash = ngx_hash_strlow(low, name->data, name->len);
+    var.data = low;
+    var.len = name->len;
+
+    vv = ngx_http_get_variable(r, &var, hash);
+
+    if (vv == NULL || vv->not_found || vv->valid == 0) {
+        return NGX_ERROR;
+    }
+
+    value->data = vv->data;
+    value->len = vv->len;
+
+    return NGX_OK;
+}
+
+#endif
+
+
+#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+
+int
+ngx_http_ssl_client_hello_callback(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
+{
+    int                        ret, rv;
+    void                      *cert_cb_arg;
+    size_t                     len, remaining;
+    SSL_CTX                   *ssl_ctx;
+    unsigned char             *servername;
+    unsigned long              options;
+    SSL_cert_cb_fn             cert_cb;
+    ngx_connection_t          *c;
+    const unsigned char       *p;
+    ngx_http_request_t        *r;
+    ngx_uint_t                 i = 0;
+    unsigned int               legacy_version = 0;
+    ngx_str_t                  ssl_protocols = ngx_null_string;
+    char                      *ssl_proto;
+    char                       ssl_protos[4 * NGX_HTTPS_SSL_PROTOCOL_NUM];
+    unsigned int               protos[NGX_HTTPS_SSL_PROTOCOL_NUM];
+    unsigned int               proto_num = 0;
+
+    c = ngx_ssl_get_connection(ssl_conn);
+
+    if (c->ssl && c->ssl->handshaked) {
+        return SSL_CLIENT_HELLO_SUCCESS;
+    }
+
+    if (c->ssl && c->ssl->client_hello_retry) {
+        goto recover;
+    }
+
+    if (SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_status_request, &p,
+        &remaining) == 1)
+    {
+        if (*p == TLSEXT_STATUSTYPE_ocsp) {
+            SSL_set_tlsext_status_type(ssl_conn, TLSEXT_STATUSTYPE_ocsp);
+        }
+    }
+
+    if (!SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_server_name, &p,
+        &remaining))
+    {
+        /* servername is NULL */
+        ngx_http_ssl_ctx_reset(ssl_conn, ad, arg);
+
+        goto end;
+    }
+
+    /* Extract the length of the supplied list of names. */
+    len = (*(p++) << 8);
+    len += *(p++);
+    if (len + 2 != remaining) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+
+    remaining = len;
+    /*
+     * The list in practice only has a single element, so we only consider
+     * the first one.
+     */
+    if (remaining == 0 || *p++ != TLSEXT_NAMETYPE_host_name) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+    remaining--;
+    /* Now we can finally pull out the byte array with the actual hostname. */
+    if (remaining <= 2) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+    len = (*(p++) << 8);
+    len += *(p++);
+    if (len + 2 > remaining) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+
+    remaining = len;
+
+    servername = ngx_pcalloc(c->pool, len + 1); /* remain 1 byte to '\0' */
+    if (servername == NULL) {
+        goto end;
+    }
+
+    ngx_memcpy(servername, p, len);
+
+    if (!SSL_set_tlsext_host_name(ssl_conn, servername)) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+
+    r = ngx_http_alloc_request(c);
+    if (r == NULL) {
+        return SSL_CLIENT_HELLO_ERROR;
+    }
+
+    r->logged = 1;
+
+    r->headers_in.server.len = len;
+    r->headers_in.server.data = ngx_pnalloc(r->pool, len);
+    if (r->headers_in.server.data == NULL) {
+        goto proto_next;
+    }
+
+    ngx_memcpy(r->headers_in.server.data, servername, len);
+
+    if (NGX_OK != ngx_http_request_get_variable(r, &ngx_ing_ssl_protocols, &ssl_protocols) || 
+        0 == ssl_protocols.len) {
+        goto proto_next;
+    }
+
+    if (4 * NGX_HTTPS_SSL_PROTOCOL_NUM <= ssl_protocols.len) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0, 
+                      "variable %s length %d is invalid", 
+                      ngx_ing_ssl_protocols.data, 
+                      ssl_protocols.len);
+        goto proto_next;
+    }
+
+    ngx_memcpy(ssl_protos, ssl_protocols.data, ssl_protocols.len);
+    ssl_protos[ssl_protocols.len] = '\0';
+    ssl_proto = strtok(ssl_protos, " ");
+    while(ssl_proto != NULL) {
+        protos[proto_num++] = strtoul(ssl_proto, NULL, 10);
+        ssl_proto = strtok(NULL, " ");
+    }
+
+    if (!proto_num) {
+        goto proto_next;
+    }
+
+    if (SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_supported_versions, &p,
+        &remaining))
+    {
+        if (remaining < 1) {
+            goto proto_next;
+        }
+        size_t msglen = p[0];
+        if (remaining != msglen + 1) {
+            goto proto_next;
+        }
+
+        unsigned int val;
+        if (msglen % 2) {
+            goto proto_next;
+        }
+        const unsigned char *msg = p + 1;
+        while (msglen) {
+            val = msg[0];
+            val = (val << 8) | msg[1];
+            if (val <= TLS_MAX_VERSION) {
+                ngx_log_error(NGX_LOG_DEBUG, c->log, 0, 
+                              "SNI: %s with supported versions %d", 
+                              servername, val);
+                for (i = 0; i < proto_num; i++) {
+                    if (val == protos[i]) {
+                        goto proto_next;
+                    }
+                }
+            }
+            msg += 2;
+            msglen -= 2;
+        }
+
+        goto proto_invalid;
+    }
+
+    legacy_version = SSL_client_hello_get0_legacy_version(ssl_conn);
+    for (i = 0; i < proto_num; i++) {
+        if (legacy_version == protos[i]) {
+            goto proto_next;
+        }
+    }
+
+proto_invalid:
+    ngx_log_error(NGX_LOG_ERR, c->log, 0, 
+                  "SNI: %s with ssl_protocols \"%V\" does not support version %d", 
+                  servername, &ssl_protocols, legacy_version);
+    ngx_http_free_request(r, 0);
+    c->destroyed = 0;
+    *ad = SSL_AD_PROTOCOL_VERSION;
+    return SSL_CLIENT_HELLO_ERROR;
+proto_next:
+    ngx_http_free_request(r, 0);
+    c->destroyed = 0;
+
+    ret = ngx_http_ssl_ctx_reset(ssl_conn, ad, arg);
+
+    if (ret == SSL_TLSEXT_ERR_OK || ret == SSL_TLSEXT_ERR_NOACK) {
+recover:
+        ssl_ctx = SSL_get_SSL_CTX(ssl_conn);
+        if (c->ssl && c->ssl->client_hello_retry == 0) {
+            options = SSL_get_options(ssl_conn);
+            SSL_clear_options(ssl_conn, options);
+            options = SSL_CTX_get_options(ssl_ctx);
+            SSL_set_options(ssl_conn, options);
+        }
+
+        cert_cb = SSL_CTX_get_cert_cb(ssl_ctx);
+        cert_cb_arg = SSL_CTX_get_cert_cb_arg(ssl_ctx);
+        if (cert_cb != NULL) {
+            rv = cert_cb(ssl_conn, cert_cb_arg);
+            if (rv == 0) {
+                return SSL_CLIENT_HELLO_ERROR;
+            }
+
+            SSL_set_cert_cb(ssl_conn, NULL, NULL);
+
+            if (rv < 0) {
+                c->ssl->client_hello_retry = 1;
+                return SSL_CLIENT_HELLO_RETRY;
+            }
+
+            c->ssl->client_hello_retry = 0;
+        }
+    }
+
+end:
+
+    return SSL_CLIENT_HELLO_SUCCESS;
 }
 
 #endif

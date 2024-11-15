@@ -609,7 +609,7 @@ ngx_http_xquic_init_main_conf(ngx_conf_t *cf, void *conf)
     }
 
     if (qmcf->congestion_control.data == NULL) {
-        ngx_str_set(&(qmcf->congestion_control), "cubic");
+        ngx_str_set(&(qmcf->congestion_control), "bbr");
     }
 
     if (qmcf->pacing_on == NGX_CONF_UNSET) {
