@@ -280,6 +280,9 @@ new_header:
 
     h->key = hv->key;
     h->value = *value;
+#if defined(nginx_version) && nginx_version >= 1023000
+    h->next = NULL;
+#endif
 
     h->lowcase_key = ngx_pnalloc(r->pool, h->key.len);
     if (h->lowcase_key == NULL) {
@@ -588,19 +591,21 @@ ngx_http_set_builtin_multi_header(ngx_http_request_t *r,
 {
 #if defined(nginx_version) && nginx_version >= 1023000
     ngx_table_elt_t  **headers, **ph, *h;
-    int                nelts;
 
     headers = (ngx_table_elt_t **) ((char *) &r->headers_in + hv->offset);
 
     if (!hv->no_override && *headers != NULL) {
-        nelts = 0;
+#if defined(DDEBUG) && (DDEBUG)
+        int  nelts = 0;
+
         for (h = *headers; h; h = h->next) {
             nelts++;
         }
 
-        *headers = NULL;
-
         dd("clear multi-value headers: %d", nelts);
+#endif
+
+        *headers = NULL;
     }
 
     if (ngx_http_set_header_helper(r, hv, value, &h) == NGX_ERROR) {

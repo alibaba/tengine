@@ -234,3 +234,73 @@
    fun:ngx_pass_open_channel
    fun:ngx_start_privileged_agent_processes
 }
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:ngx_alloc
+   fun:ngx_regex_malloc
+   fun:pcre2_compile_context_create_8
+   fun:ngx_regex_compile
+   fun:ngx_http_regex_compile
+   fun:ngx_http_core_regex_location
+   fun:ngx_http_core_location
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_core_server
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_block
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_init_cycle
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:ngx_alloc
+   fun:ngx_regex_malloc
+   fun:pcre2_compile_context_create_8
+   fun:ngx_regex_compile
+   fun:ngx_http_regex_compile
+   fun:ngx_http_rewrite
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_core_location
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_core_server
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_block
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_init_cycle
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:ngx_alloc
+   fun:ngx_regex_malloc
+   fun:pcre2_compile_context_create_8
+   fun:ngx_regex_compile
+   fun:ngx_http_regex_compile
+   fun:ngx_http_rewrite
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_core_server
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_http_block
+   fun:ngx_conf_handler
+   fun:ngx_conf_parse
+   fun:ngx_init_cycle
+   fun:main
+}

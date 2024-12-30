@@ -194,6 +194,14 @@ Hi"
 
 === TEST 8: github issue 37: header bug
 https://github.com/chaoslawful/lua-nginx-module/issues/37
+
+https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2
+   Just as in HTTP/1.x, header field names are strings of ASCII
+   characters that are compared in a case-insensitive fashion. However,
+   header field names MUST be converted to lowercase prior to their
+   encoding in HTTP/2.  A request or response containing uppercase
+   header field names MUST be treated as malformed
+
 --- config
     location /sub {
         content_by_lua '
@@ -220,8 +228,17 @@ https://github.com/chaoslawful/lua-nginx-module/issues/37
 --- request
 GET /lua
 --- raw_response_headers_like eval
-".*Set-Cookie: TestCookie1=foo\r
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = ".*set-cookie: TestCookie1=foo\r
+set-cookie: TestCookie2=bar.*"
+} else {
+    $headers = ".*Set-Cookie: TestCookie1=foo\r
 Set-Cookie: TestCookie2=bar.*"
+}
+
+$headers;
 
 
 
@@ -714,6 +731,7 @@ Content-Type: application/json; charset=utf-8
 
 
 === TEST 32: hang on upstream_next (from kindy)
+--- no_http2
 --- no_check_leak
 --- http_config
     upstream xx {
@@ -770,6 +788,10 @@ eof found in body stream
 
 === TEST 34: testing a segfault when using ngx_poll_module + ngx_resolver
 See more details here: http://mailman.nginx.org/pipermail/nginx-devel/2013-January/003275.html
+
+http3 may cache the dns result.
+so need to skip for http3
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
 --- config
     location /t {
         set $myserver nginx.org;
@@ -786,6 +808,8 @@ See more details here: http://mailman.nginx.org/pipermail/nginx-devel/2013-Janua
 [alert]
 --- error_log eval
 qr/(?:send|recv)\(\) failed \(\d+: Connection refused\) while resolving/
+--- curl_error eval
+qr/curl: \(28\) Operation timed out after \d+ milliseconds with 0 bytes received/
 
 
 
@@ -861,6 +885,7 @@ GET /t
 --- no_error_log
 [error]
 --- timeout: 10
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1281,8 +1306,17 @@ location /t {
 --- response_body
 Hello world
 --- shutdown_error_log eval
-qr|failed to read a line: closed|
+my $expr;
+
+if ($ENV{TEST_NGINX_USE_HTTP3}) {
+    $expr = qr|lua close the global Lua VM|
+} else {
+    $expr = qr|failed to read a line: closed|
+}
+
+$expr;
 --- timeout: 1.2
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

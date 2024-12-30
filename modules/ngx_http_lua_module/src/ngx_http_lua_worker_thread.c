@@ -42,7 +42,7 @@ typedef struct {
     ngx_http_lua_co_ctx_t   *wait_co_ctx;
     int                      n_args;
     int                      rc;
-    int                      is_abort:1;
+    ngx_uint_t               is_abort:1;
 } ngx_http_lua_worker_thread_ctx_t;
 
 
@@ -156,15 +156,6 @@ ngx_http_lua_get_task_ctx(lua_State *L, ngx_http_request_t *r)
         ngx_http_lua_inject_config_api(vm);
         ngx_http_lua_inject_shdict_api(lmcf, vm);
         lua_setglobal(vm, "ngx");
-
-        /* inject API via ffi */
-        lua_getglobal(vm, "require");
-        lua_pushstring(vm, "resty.core.regex");
-        if (lua_pcall(vm, 1, 0, 0) != 0) {
-            lua_close(vm);
-            ngx_free(ctx);
-            return NULL;
-        }
 
         lua_getglobal(vm, "require");
         lua_pushstring(vm, "resty.core.hash");

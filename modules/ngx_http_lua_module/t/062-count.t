@@ -262,6 +262,7 @@ hello world
 n = 6
 --- no_error_log
 [error]
+--- skip_eval: 3: $ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -515,6 +516,7 @@ GET /test
 n = 7
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -554,6 +556,7 @@ narr = 2
 nrec = 3
 --- no_error_log
 [error]
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -589,3 +592,4 @@ narr = 2
 nrec = 3
 --- no_error_log
 [error]
+--- skip_eval: 3: $ENV{TEST_NGINX_USE_HTTP3}

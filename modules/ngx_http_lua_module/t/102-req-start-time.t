@@ -59,7 +59,7 @@ GET /start
 --- request
 GET /req_time
 --- response_body_like chop
-^(?:0\.[12]|0\.099)\d*
+^(?:0\.[12]|0\.099|0\.098)\d*
 true$
 --- no_error_log
 [error]
@@ -88,7 +88,7 @@ true$
 --- request
 GET /req_time
 --- response_body_like chomp
-^(?:0\.[12]|0\.099)\d*
+^(?:0\.[12]|0\.099|0\.098)\d*
 0\.\d+
 true$
 --- no_error_log

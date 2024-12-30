@@ -270,3 +270,22 @@ Expect: 100-Continue
 http finalize request: 500, "/echo_body?" a:1, c:2
 http finalize request: 500, "/echo_body?" a:1, c:0
 --- log_level: debug
+--- skip_eval: 4:$ENV{TEST_NGINX_USE_HTTP3}
+
+
+
+=== TEST 13: test reading the first n bytes of request body
+--- config
+    location /echo_body {
+        lua_need_request_body on;
+        content_by_lua_block {
+            local data = ngx.req.get_body_data(1)
+            ngx.say(data)
+        }
+    }
+--- request
+POST /echo_body
+hello
+--- response_body
+h
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}

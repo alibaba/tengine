@@ -280,6 +280,9 @@ ngx_http_lua_ngx_redirect(lua_State *L)
 
     h->value.len = len;
     h->value.data = uri;
+#if defined(nginx_version) && nginx_version >= 1023000
+    h->next = NULL;
+#endif
     ngx_str_set(&h->key, "Location");
 
     r->headers_out.status = rc;

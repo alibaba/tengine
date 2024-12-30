@@ -170,10 +170,22 @@ invalid referer: 1
     }
 --- request
 GET /t
---- raw_response_headers_like
-Proxy-Host: 127.0.0.1\:\d+\r
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers =
+qr/proxy-host: 127.0.0.1\:\d+\r
+proxy-port: \d+\r
+proxy-add-x-forwarded-for: 127.0.0.1\r/;
+} else {
+    $headers =
+qr/Proxy-Host: 127.0.0.1\:\d+\r
 Proxy-Port: \d+\r
-Proxy-Add-X-Forwarded-For: 127.0.0.1\r
+Proxy-Add-X-Forwarded-For: 127.0.0.1\r/;
+}
+
+$headers;
 --- response_body
 hello
 --- no_error_log
