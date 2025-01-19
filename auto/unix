@@ -175,6 +175,16 @@ if [ $ngx_found = no ]; then
 fi
 
 
+ngx_feature="F_SETPIPE_SZ"
+ngx_feature_name="T_NGX_HAVE_F_SETPIPE_SZ"
+ngx_feature_run=no
+ngx_feature_incs="#define _GNU_SOURCE
+                  #include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="fcntl(0, F_SETPIPE_SZ, 65536)"
+. auto/feature
+
 ngx_feature="F_READAHEAD"
 ngx_feature_name="NGX_HAVE_F_READAHEAD"
 ngx_feature_run=no
