@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <nginx.h>
 
+#if (T_NGX_HAVE_SCHED_GETAFFINITY)
+#include <ngx_getaffinity.h>
+#endif
 
 static void ngx_show_version_info(void);
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
@@ -1485,6 +1488,26 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         n = 2;
 
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
+    } else if (ngx_strcmp(value[1].data, "auto_online_cpu") == 0) {
+
+        if (cf->args->nelts > 3) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid number of arguments in "
+                               "\"worker_cpu_affinity\" directive");
+            return NGX_CONF_ERROR;
+        }
+
+        ccf->cpu_affinity_auto = 2;
+
+        CPU_ZERO(&mask[0]);
+        for (i = 0; i < (ngx_uint_t) ngx_min(ngx_ncpu, CPU_SETSIZE); i++) {
+            CPU_SET(i, &mask[0]);
+        }
+
+        n = 2;
+#endif
+
     } else {
         n = 1;
     }
@@ -1497,6 +1520,12 @@ ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                          CPU_SETSIZE);
             return NGX_CONF_ERROR;
         }
+
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
+        if (ccf->cpu_affinity_auto == 2) {
+            continue;
+        }
+#endif
 
         i = 0;
         CPU_ZERO(&mask[n - 1]);
@@ -1548,6 +1577,10 @@ ngx_get_cpu_affinity(ngx_uint_t n)
     ngx_cpuset_t     *mask;
     ngx_core_conf_t  *ccf;
 
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
+    ngx_int_t         worker_i, machine_core, all_machine_cores;
+#endif
+
     static ngx_cpuset_t  result;
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
@@ -1559,6 +1592,27 @@ ngx_get_cpu_affinity(ngx_uint_t n)
 
     if (ccf->cpu_affinity_auto) {
         mask = &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
+
+#if (T_NGX_HAVE_SCHED_GETAFFINITY && T_NGX_HAVE_SC_NPROCESSORS_CONF)
+        if (ccf->cpu_affinity_auto == 2) {
+            all_machine_cores = sysconf(_SC_NPROCESSORS_CONF);
+
+            (void) ngx_getaffinity(mask, ngx_cycle->log);
+            for (machine_core = 0, worker_i = 0; worker_i < ccf->worker_processes; machine_core++) {
+                if (CPU_ISSET(machine_core, mask)) {
+                    CPU_ZERO(&result);
+                    CPU_SET(machine_core, &result);
+                    worker_i++;
+                }
+
+                if (machine_core == all_machine_cores - 1) {
+                    machine_core = 0;
+                }
+            }
+
+            return &result;
+        }
+#endif
 
         for (i = 0, j = n; /* void */ ; i++) {
 
