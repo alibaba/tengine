@@ -1498,6 +1498,12 @@ ngx_http_lua_subrequest(ngx_http_request_t *r,
     ngx_http_probe_subrequest_start(sr);
 #endif
 
+#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
+    sr->connect_time = NGX_CONF_UNSET_MSEC;
+    sr->read_time = NGX_CONF_UNSET_MSEC;
+    sr->send_time = NGX_CONF_UNSET_MSEC;
+#endif
+
     return ngx_http_post_request(sr, NULL);
 }
 
