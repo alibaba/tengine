@@ -41,7 +41,7 @@ jobs:
             cd /tengine
             echo "Build luajit2"
             cd luajit2
-            make -j2
+            make -j1
             make install
             cd ..
             echo "Build tengine"
