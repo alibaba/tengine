@@ -21,7 +21,7 @@ jobs:
        run: |
          sudo apt update
          sudo apt remove nginx libgd3
-         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
      - name: 'checkout luajit2'
        uses: actions/checkout@v3
        with:
