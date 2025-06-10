@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-arm64:
-    runs-on: "ubuntu-24.04"
+    runs-on: "ubuntu-24.04-arm"
     strategy:
       fail-fast: false
       matrix:
@@ -41,7 +41,7 @@ jobs:
             cd /tengine
             echo "Build luajit2"
             cd luajit2
-            make -j1
+            make -j4
             make install
             cd ..
             echo "Build tengine"
@@ -85,6 +85,6 @@ jobs:
               --add-module=./modules/ngx_multi_upstream_module \
               --add-module=./modules/ngx_slab_stat \
               --without-http_upstream_keepalive_module
-            make -j2
+            make -j4
             make install
             file /usr/local/nginx/sbin/nginx | grep aarch64
