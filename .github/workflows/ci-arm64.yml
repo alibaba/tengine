@@ -25,7 +25,7 @@ jobs:
           path: luajit2
 
       - name: Compile with ${{ matrix.compiler.compiler }}
-        uses: uraimo/run-on-arch-action@v2
+        uses: uraimo/run-on-arch-action@v3
         with:
           arch: aarch64
           distro: ubuntu24.04
