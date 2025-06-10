@@ -28,7 +28,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: aarch64
-          distro: ubuntu-24.04-arm
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           dockerRunArgs: |
             --volume "${PWD}:/tengine"
