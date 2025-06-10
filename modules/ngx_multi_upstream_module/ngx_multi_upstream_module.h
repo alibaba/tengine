@@ -28,7 +28,7 @@ typedef struct {
 
     void                *data_c;
 
-    ngx_flag_t           connected:1;
+    ngx_uint_t           connected:1;
 
     void                *cur;
 } ngx_multi_connection_t;

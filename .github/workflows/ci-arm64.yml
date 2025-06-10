@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-arm64:
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-24.04"
     strategy:
       fail-fast: false
       matrix:
@@ -25,23 +25,23 @@ jobs:
           path: luajit2
 
       - name: Compile with ${{ matrix.compiler.compiler }}
-        uses: uraimo/run-on-arch-action@v2
+        uses: uraimo/run-on-arch-action@v3
         with:
           arch: aarch64
-          distro: ubuntu20.04
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           dockerRunArgs: |
             --volume "${PWD}:/tengine"
           install: |
             set -x
             apt-get update -q -y
-            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
+            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
           run: |
             set -x
             cd /tengine
             echo "Build luajit2"
             cd luajit2
-            make -j2
+            make -j4
             make install
             cd ..
             echo "Build tengine"
@@ -85,6 +85,6 @@ jobs:
               --add-module=./modules/ngx_multi_upstream_module \
               --add-module=./modules/ngx_slab_stat \
               --without-http_upstream_keepalive_module
-            make -j2
+            make -j4
             make install
             file /usr/local/nginx/sbin/nginx | grep aarch64
