@@ -310,6 +310,12 @@ ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn,
     p_ssl->connection = user_conn->ssl_conn;
     c->ssl = p_ssl;
 
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    /* ssl handshake start time */
+    ngx_time_t *tp = ngx_timeofday();
+    c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
+#endif
+
     return NGX_OK;
 }
 
@@ -348,6 +354,14 @@ ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data)
 
 
     /* TODO */
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    ngx_connection_t *c = user_conn->connection;
+    if (c != NULL) {
+        ngx_time_t *tp;
+        tp = ngx_timeofday();
+        c->ssl->handshake_end_msec = tp->sec * 1000 + tp->msec;
+    }
+#endif
 }
 
 
