@@ -27,4 +27,6 @@ extern ngx_flag_t ngx_http_dyups_api_enable;
 extern ngx_dyups_add_upstream_filter_pt ngx_dyups_add_upstream_top_filter;
 extern ngx_dyups_del_upstream_filter_pt ngx_dyups_del_upstream_top_filter;
 
+extern void ngx_http_upstream_keepalive_clear_cache_connections(ngx_http_upstream_srv_conf_t *us);
+
 #endif
