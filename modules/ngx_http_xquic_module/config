@@ -33,6 +33,6 @@ CORE_INCS="$CORE_INCS \
            $XQUIC_INC"
 
 CORE_LIBS="$CORE_LIBS \
-           -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm"
+           -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm -lstdc++"
 
 have=T_NGX_XQUIC . auto/have

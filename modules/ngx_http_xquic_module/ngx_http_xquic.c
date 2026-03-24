@@ -77,11 +77,11 @@ ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn,
     const xqc_cid_t * cid, void * user_data)
 {
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                    "|xquic|ngx_xquic_server_conn_accept|dcid=%s|", xqc_dcid_str(cid));
+                    "|xquic|ngx_xquic_server_conn_accept|dcid=%s|", xqc_dcid_str(engine, cid));
 
     if (user_data == NULL) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, 
-                      "|xquic|ngx_xquic_server_conn_accept|user_data is NULL|dcid=%s|", xqc_dcid_str(cid));
+                      "|xquic|ngx_xquic_server_conn_accept|user_data is NULL|dcid=%s|", xqc_dcid_str(engine, cid));
         return XQC_ERROR;
     }
 
@@ -142,14 +142,14 @@ ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn,
     const xqc_cid_t *cid, void *user_data)
 {
     ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|ngx_xquic_server_conn_refuse|scid=%s|", xqc_dcid_str(cid));
+                    "|xquic|ngx_xquic_server_conn_refuse|scid=%s|", xqc_dcid_str(engine, cid));
 
     uint64_t err = xqc_conn_get_errno(conn);
 
     ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)user_data;
     if (qc == NULL) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|user_data is NULL|cid:%s|", xqc_dcid_str(cid));
+                    "|xquic|user_data is NULL|cid:%s|", xqc_dcid_str(engine, cid));
         return;
     }
 
@@ -220,6 +220,15 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
         /* try to get ssl config from the default connection */
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
                      "|xquic|can't find virtual server, use default server|");
+        
+        /* Use the default server conf context from the listening socket */
+        if (hc->addr_conf && hc->addr_conf->default_server && hc->addr_conf->default_server->ctx) {
+            hc->conf_ctx = hc->addr_conf->default_server->ctx;
+        } else {
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                        "|xquic|no valid server config found||sni:%s|", sni);
+            return XQC_ERROR;
+        }
     }
 
 #ifdef T_NGX_HTTP_HAVE_LUA_MODULE
@@ -350,7 +359,7 @@ ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data)
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
                     "|xquic|ngx_http_v3_conn_handshake_finished|dcid=%s|", 
-                    xqc_dcid_str(&user_conn->dcid));
+                    xqc_dcid_str(user_conn->engine, &user_conn->dcid));
 
 
     /* TODO */
@@ -373,7 +382,7 @@ ngx_http_v3_conn_update_cid_notify(xqc_connection_t *conn, const xqc_cid_t *reti
 
     ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0, 
                 "|xquic|ngx_http_v3_conn_update_cid_notify|old_cid=%s|new_cid:%s|", 
-                xqc_dcid_str(retire_cid), xqc_scid_str(new_cid));
+                xqc_dcid_str(user_conn->engine, retire_cid), xqc_scid_str(user_conn->engine, new_cid));
 
     memcpy(&user_conn->dcid, new_cid, sizeof(xqc_cid_t));
 }
@@ -1051,7 +1060,7 @@ ngx_http_xquic_read_handler(ngx_event_t *rev)
         if (xqc_cid_is_equal(&(qc->dcid), &(packet.xquic.dcid)) != NGX_OK) {
             ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "|xquic|ngx_http_xquic_read_handler: "
                           "packet connectionID %s != %s (qc connection ID), processing: %d|",
-                          xqc_dcid_str(&packet.xquic.dcid), xqc_scid_str(&qc->dcid), qc->processing);
+                          xqc_dcid_str(qc->engine, &packet.xquic.dcid), xqc_scid_str(qc->engine, &qc->dcid), qc->processing);
 
             if (qc->processing == 0) {
                 lc = c->listening->connection;

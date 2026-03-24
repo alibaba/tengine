@@ -220,12 +220,12 @@ ngx_xquic_intercom_recv_handler(ngx_event_t *rev)
 
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, rev->log, 0,
                        "|xquic|ngx_quic_intercom_recv_handler: worker %d recv connection_id %s packet|",
-                       ngx_worker, xqc_dcid_str(&packet.xquic.dcid));
+                       ngx_worker, xqc_dcid_str(ctx->xquic_engine, &packet.xquic.dcid));
 
         if (n != sizeof(ngx_xquic_recv_packet_t)) {
             ngx_log_error(NGX_LOG_ERR, rev->log, ngx_socket_errno,
                           "|xquic|ngx_quic_intercom_recv_handler: worker %d recv connection_id %s packet error %d|",
-                          ngx_worker, xqc_dcid_str(&packet.xquic.dcid), n);
+                          ngx_worker, xqc_dcid_str(ctx->xquic_engine, &packet.xquic.dcid), n);
         } else {
             ngx_xquic_stat_recv_cnt++;
             ngx_xquic_recv_from_intercom(&packet);
@@ -253,7 +253,7 @@ ngx_xquic_intercom_send(ngx_int_t worker_num, ngx_xquic_recv_packet_t *packet)
     ngx_log_debug6(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
                    "|xquic|intercom_send: worker %d -> %d send connection_id %s packet, "
                    "recv(%ul), send(%ul), eagain(%ul)|",
-                   ngx_worker, worker_num, xqc_dcid_str(&packet->xquic.dcid),
+                   ngx_worker, worker_num, xqc_dcid_str(ctx->xquic_engine, &packet->xquic.dcid),
                    ngx_xquic_stat_recv_cnt, ngx_xquic_stat_send_cnt, ngx_xquic_stat_send_eagain_cnt);
 
     if (n < 0) {

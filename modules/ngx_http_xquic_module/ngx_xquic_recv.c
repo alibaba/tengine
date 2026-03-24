@@ -388,7 +388,7 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                     "|xquic|packet_get_cid|dcid=%s|targetWorkerId=%i|ngx_worker=%ui|", 
-                    xqc_dcid_str(&packet->xquic.dcid), worker_num, ngx_worker);
+                    xqc_dcid_str(qmcf->xquic_engine, &packet->xquic.dcid), worker_num, ngx_worker);
 
     if (ngx_worker != (ngx_uint_t) worker_num) {
         ngx_xquic_intercom_send(worker_num, packet);
