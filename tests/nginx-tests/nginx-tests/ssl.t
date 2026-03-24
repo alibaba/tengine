@@ -277,7 +277,7 @@ is(() = $r =~ /(200 OK)/g, 1000, 'pipelined requests');
 
 # OpenSSL 3.0 error "unexpected eof while reading" seen as a critical error
 
-ok(get_ssl_socket(8085), 'ssl unexpected eof');
+ok(!!get_ssl_socket(8085), 'ssl unexpected eof');
 
 # close_notify is sent before lingering close
 
