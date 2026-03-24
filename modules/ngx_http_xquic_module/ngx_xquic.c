@@ -323,7 +323,7 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
         conn_settings.keyupdate_pkt_threshold = qmcf->keyupdate_pkt_threshold;
     }
 
-    xqc_server_set_conn_settings(&conn_settings);
+    xqc_server_set_conn_settings(qmcf->xquic_engine, &conn_settings);
 
     xqc_h3_engine_set_enc_max_dtable_capacity(qmcf->xquic_engine, 
                                         qmcf->qpack_encoder_dynamic_table_capacity);

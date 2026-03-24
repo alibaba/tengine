@@ -396,7 +396,7 @@ ngx_http_xquic_connection_id_variable(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        v->len = ngx_snprintf(p, qc->dcid.cid_len * 2, "%s", xqc_dcid_str(&qc->dcid)) - p;
+        v->len = ngx_snprintf(p, qc->dcid.cid_len * 2, "%s", xqc_dcid_str(qc->engine, &qc->dcid)) - p;
         v->valid = 1;
         v->no_cacheable = 0;
         v->not_found = 0;

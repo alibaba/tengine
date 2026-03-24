@@ -80,7 +80,7 @@ ngx_xquic_server_send(const unsigned char *buf, size_t size,
     ngx_socket_t fd = qc->connection->fd;
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                     "|xquic|xqc_server_send size=%z now=%i|dcid=%s|", 
-                    size, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid));
+                    size, ngx_xquic_get_time(), xqc_dcid_str(qc->engine, &qc->dcid));
     do {
         errno = 0;
         res = sendto(fd, buf, size, 0, peer_addr, peer_addrlen);
@@ -130,7 +130,7 @@ ngx_xquic_server_send_mmsg(const struct iovec *msg_iov, unsigned int vlen,
     ngx_socket_t fd = qc->connection->fd;
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                     "|xquic|ngx_xquic_server_send_mmsg|vlen=%z now=%i|dcid=%s|",
-                    vlen, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid));
+                    vlen, ngx_xquic_get_time(), xqc_dcid_str(qc->engine, &qc->dcid));
 
     wev = qc->connection->write;
 
@@ -177,13 +177,13 @@ degrade:
 
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
             "|xquic|ngx_xquic_server_send_mmsg err|total_len=%z now=%i|dcid=%s|send_len=%z|errno=%s|",
-            vlen, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid), res, strerror(errno));
+            vlen, ngx_xquic_get_time(), xqc_dcid_str(qc->engine, &qc->dcid), res, strerror(errno));
         return XQC_SOCKET_ERROR;
     }
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
             "|xquic|ngx_xquic_server_send_mmsg success|total_len=%z now=%i|dcid=%s|send_len=%z|",
-            vlen, ngx_xquic_get_time(), xqc_dcid_str(&qc->dcid), res);
+            vlen, ngx_xquic_get_time(), xqc_dcid_str(qc->engine, &qc->dcid), res);
 
 
     return res;
