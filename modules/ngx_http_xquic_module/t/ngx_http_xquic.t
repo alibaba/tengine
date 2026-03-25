@@ -13,7 +13,7 @@ use Test::More;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
-use lib 'lib';
+use lib '../../../tests/nginx-tests/nginx-tests/lib';
 use Test::Nginx;
 
 ###############################################################################

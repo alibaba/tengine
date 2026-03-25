@@ -1,3 +1,11 @@
 Makefile
 objs/
 tags
+
+# Test temporary files
+tests/nginx-tests/tengine-tests/ckeys.log
+tests/nginx-tests/tengine-tests/clog
+tests/nginx-tests/tengine-tests/lib
+tests/nginx-tests/tengine-tests/test_session
+tests/nginx-tests/tengine-tests/tp_localhost
+tests/nginx-tests/tengine-tests/xqc_token
