@@ -42,9 +42,8 @@ my $test_count = $has_test_client ? 5 : 4;
 
 my $t = Test::Nginx->new()->has(qw/http/)
     ->has_daemon('openssl')
-    ->plan($test_count);
-
-$t->write_file_expand('nginx.conf', <<'EOF');
+    ->plan($test_count)
+    ->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
