@@ -477,6 +477,10 @@ struct ngx_http_request_s {
 
     unsigned                          http_state:4;
 
+#if (T_NGX_XQUIC)
+    ngx_http_v3_stream_t             *xqstream;
+#endif
+
     /* URI with "/." and on Win32 with "//" */
     unsigned                          complex_uri:1;
 

@@ -37,7 +37,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    connection_pool_size 128;
+    connection_pool_size 144;
     client_header_buffer_size 128;
 
     server {

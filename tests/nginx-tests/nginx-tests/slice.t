@@ -22,8 +22,14 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice rewrite map/)
-	->plan(85);
+my $t = Test::Nginx->new();
+
+# Skip if using Tengine's custom slice module (incompatible with nginx official)
+if ($t->has_module('ngx_http_slice_module')) {
+	$t->plan(skip_all => 'Tengine slice module does not support size parameter');
+}
+
+$t->has(qw/http proxy cache fastcgi slice rewrite map/)->plan(85);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
