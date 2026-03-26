@@ -9,6 +9,10 @@ package Test::Nginx;
 use warnings;
 use strict;
 
+# Ensure lua-resty-core is findable in local installation
+$ENV{LUA_PATH} = '/home/bo.deng/local/lib/lua/?.lua;/home/bo.deng/local/lib/lua/?/init.lua;;'
+    unless defined $ENV{LUA_PATH};
+
 use base qw/ Exporter /;
 
 our @EXPORT = qw/ log_in log_out http http_get http_head port /;
@@ -750,7 +754,8 @@ sub test_globals_perl5lib() {
 	$objs =~ s!\\!/!g if $^O eq 'MSWin32';
 
 	return "env PERL5LIB=$objs/src/http/modules/perl:"
-		. "$objs/src/http/modules/perl/blib/arch;\n";
+		. "$objs/src/http/modules/perl/blib/arch;\n"
+		. "env LUA_PATH=/home/bo.deng/local/lib/lua/?.lua;/home/bo.deng/local/lib/lua/?/init.lua;;\n";
 }
 
 sub test_globals_http() {

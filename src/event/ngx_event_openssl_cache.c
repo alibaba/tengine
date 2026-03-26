@@ -209,6 +209,12 @@ ngx_ssl_cache_fetch(ngx_conf_t *cf, ngx_uint_t index, char **err,
     cache = (ngx_ssl_cache_t *) ngx_get_conf(cf->cycle->conf_ctx,
                                              ngx_openssl_cache_module);
 
+    /* Fallback to direct loading if cache module is not yet initialized */
+    if (cache == NULL || (void*)cache->rbtree.root == (void*)&cache->sentinel) {
+        type = &ngx_ssl_cache_types[index];
+        return type->create(&id, err, data);
+    }
+
     type = &ngx_ssl_cache_types[index];
     hash = ngx_murmur_hash2(id.data, id.len);
 
