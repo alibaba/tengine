@@ -11,10 +11,6 @@
 #include <ngx_channel.h>
 
 
-#if (T_PIPES)
-#define NGX_PIPE_STILL_NEEDED     0x02
-#endif
-
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
 static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
@@ -82,9 +78,6 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     size_t             size;
     ngx_int_t          i;
     ngx_uint_t         sigio;
-#if (T_PIPES)
-    ngx_uint_t         close_old_pipe;
-#endif
     sigset_t           set;
     struct itimerval   itv;
     ngx_uint_t         live;
@@ -138,14 +131,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                                NGX_PROCESS_RESPAWN);
     ngx_start_cache_manager_processes(cycle, 0);
 
-#if (NGX_PROCS)
-    ngx_procs_start(cycle, 0);
-#endif
-
     ngx_new_binary = 0;
-#if (T_PIPES)
-    close_old_pipe = 0;
-#endif
     delay = 0;
     sigio = 0;
     live = 1;
@@ -186,12 +172,6 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
             live = ngx_reap_children(cycle);
-#if (T_PIPES)
-            if (!(live & NGX_PIPE_STILL_NEEDED) && close_old_pipe) {
-                ngx_close_old_pipes();
-                close_old_pipe = 0;
-            }
-#endif
         }
 
         if (!live && (ngx_terminate || ngx_quit)) {
@@ -235,10 +215,6 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                 ngx_start_worker_processes(cycle, ccf->worker_processes,
                                            NGX_PROCESS_RESPAWN);
                 ngx_start_cache_manager_processes(cycle, 0);
-
-#if (NGX_PROCS)
-                ngx_procs_start(cycle, 0);
-#endif
                 ngx_noaccepting = 0;
 
                 continue;
@@ -259,17 +235,10 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
                                        NGX_PROCESS_JUST_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 1);
 
-#if (NGX_PROCS)
-            ngx_procs_start(cycle, 1);
-#endif
-
             /* allow new processes to start */
             ngx_msleep(100);
 
             live = 1;
-#if (T_PIPES)
-            close_old_pipe = 1;
-#endif
             ngx_signal_worker_processes(cycle,
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
@@ -279,11 +248,6 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_start_worker_processes(cycle, ccf->worker_processes,
                                        NGX_PROCESS_RESPAWN);
             ngx_start_cache_manager_processes(cycle, 0);
-
-#if (NGX_PROCS)
-            ngx_procs_start(cycle, 0);
-#endif
-
             live = 1;
         }
 
@@ -493,12 +457,6 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
         ch.command = NGX_CMD_REOPEN;
         break;
 
-#if (T_NGX_HAVE_XUDP)
-    case ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL):
-        ch.command = NGX_CMD_UNBIND_XDP;
-        break;
-#endif
-
     default:
         ch.command = 0;
     }
@@ -540,11 +498,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
                                   &ch, sizeof(ngx_channel_t), cycle->log)
                 == NGX_OK)
             {
-                if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)
-#if (T_NGX_HAVE_XUDP)
-                    && (signo != ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL))
-#endif
-                    ) {
+                if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)) {
                     ngx_processes[i].exiting = 1;
                 }
 
@@ -641,14 +595,6 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 && !ngx_terminate
                 && !ngx_quit)
             {
-
-#if (NGX_SSL && NGX_SSL_ASYNC)
-                /* Delay added to give Quickassist Driver time to cleanup
-                * if worker exit with non-zero code. */
-                if(ngx_processes[i].status != 0) {
-                    usleep(2000000);
-                }
-#endif
                 if (ngx_spawn_process(cycle, ngx_processes[i].proc,
                                       ngx_processes[i].data,
                                       ngx_processes[i].name, i)
@@ -662,11 +608,8 @@ ngx_reap_children(ngx_cycle_t *cycle)
 
 
                 ngx_pass_open_channel(cycle);
-#if (T_PIPES)
-                live |= 1;
-#else
+
                 live = 1;
-#endif
 
                 continue;
             }
@@ -701,15 +644,7 @@ ngx_reap_children(ngx_cycle_t *cycle)
             }
 
         } else if (ngx_processes[i].exiting || !ngx_processes[i].detached) {
-#if (T_PIPES)
-            live |= 1;
-
-            if (ngx_processes[i].exiting) {
-                live |= NGX_PIPE_STILL_NEEDED;
-            }
-#else
             live = 1;
-#endif
         }
     }
 
@@ -755,12 +690,6 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
     ngx_cycle = &ngx_exit_cycle;
 
     ngx_destroy_pool(cycle->pool);
-#if (T_PIPES)
-    /* Terminate all pipe processes */
-
-    ngx_increase_pipe_generation();
-    ngx_close_old_pipes();
-#endif
 
     exit(0);
 }
@@ -866,13 +795,6 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
                           ccf->rlimit_core);
         }
     }
-
-#if (T_NGX_HAVE_XUDP)
-    if (ngx_xudp_open_listening_sockets(cycle) != NGX_OK) {
-        /* fatal */
-        exit(2);
-    }
-#endif
 
     if (geteuid() == 0) {
         if (setgid(ccf->group) == -1) {
@@ -1026,7 +948,7 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
         }
     }
 
-    if (ngx_exiting) {
+    if (ngx_exiting && !ngx_terminate) {
         c = cycle->connections;
         for (i = 0; i < cycle->connection_n; i++) {
             if (c[i].fd != -1
@@ -1041,11 +963,11 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
                 ngx_debug_quit = 1;
             }
         }
+    }
 
-        if (ngx_debug_quit) {
-            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "aborting");
-            ngx_debug_point();
-        }
+    if (ngx_debug_quit) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "aborting");
+        ngx_debug_point();
     }
 
     /*
@@ -1100,14 +1022,6 @@ ngx_channel_handler(ngx_event_t *ev)
         if (n == NGX_ERROR) {
 
             if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-            if (c->async_enable && ngx_del_async_conn) {
-                if (c->num_async_fds) {
-                    ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-                    c->num_async_fds--;
-                }
-            }
-#endif
                 ngx_del_conn(c, 0);
             }
 
@@ -1166,17 +1080,6 @@ ngx_channel_handler(ngx_event_t *ev)
 
             ngx_processes[ch.slot].channel[0] = -1;
             break;
-
-#if (T_PIPES)
-        case NGX_CMD_PIPE_BROKEN:
-            ngx_pipe_broken_action(ev->log, ch.pid, 0);
-            break;
-#endif
-#if (T_NGX_HAVE_XUDP)
-        case NGX_CMD_UNBIND_XDP:
-            ngx_xudp_terminate_xudp_binding((ngx_cycle_t *) ngx_cycle);
-            break;
-#endif
         }
     }
 }
@@ -1286,9 +1189,3 @@ ngx_cache_loader_process_handler(ngx_event_t *ev)
 
     exit(0);
 }
-
-#if (T_NGX_HAVE_XUDP)
-void ngx_xudp_signal_worker_process(ngx_cycle_t *cycle) {
-    ngx_signal_worker_processes(cycle, ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL));
-}
-#endif

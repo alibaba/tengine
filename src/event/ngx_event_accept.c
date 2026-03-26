@@ -247,9 +247,6 @@ ngx_event_accept(ngx_event_t *ev)
 
         rev->log = log;
         wev->log = log;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-        c->async->log = log;
-#endif
 
         /*
          * TODO: MT: - ngx_atomic_fetch_add()
@@ -312,22 +309,6 @@ ngx_event_accept(ngx_event_t *ev)
 
         log->data = NULL;
         log->handler = NULL;
-
-#if (T_NGX_ACCEPT_FILTER)
-        /* accept filter */
-        ngx_int_t          rc;
-        rc = ngx_event_top_accept_filter(c);
-        if (rc == NGX_ERROR) {
-            ngx_close_accepted_connection(c);
-            return;
-        }
-        if (rc == NGX_DECLINED) {
-            if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
-                ev->available--;
-            }
-            continue;
-        }
-#endif
 
         ls->handler(c);
 
@@ -416,16 +397,6 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
-#if (T_NGX_HAVE_XUDP)
-        if (ls[i].for_xudp) {
-            /*
-             * do not disable xudp sockets
-             * closes the xudp sockets, xudp will not process data anymore
-             */
-            continue;
-        }
-#endif
-
         c = ls[i].connection;
 
         if (c == NULL || !c->read->active) {
@@ -445,14 +416,6 @@ ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
 
 #endif
 
-#if (NGX_SSL && NGX_SSL_ASYNC)
-        if (c->async_enable && ngx_del_async_conn) {
-            if (c->num_async_fds) {
-                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-                c->num_async_fds--;
-            }
-        }
-#endif
         if (ngx_del_event(c->read, NGX_READ_EVENT, NGX_DISABLE_EVENT)
             == NGX_ERROR)
         {

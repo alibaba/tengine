@@ -15,14 +15,6 @@ static ngx_int_t ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u);
 static ngx_int_t ngx_inet_add_addr(ngx_pool_t *pool, ngx_url_t *u,
     struct sockaddr *sockaddr, socklen_t socklen, ngx_uint_t total);
 
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-static ngx_int_t ngx_resolve_backup(ngx_pool_t *pool, ngx_url_t **u,
-    ngx_str_t path);
-static ngx_int_t ngx_resolve_using_local(ngx_pool_t *pool, ngx_url_t **u,
-    ngx_str_t path);
-#endif
-
-
 
 in_addr_t
 ngx_inet_addr(u_char *text, size_t len)
@@ -515,7 +507,7 @@ ngx_cidr_match(struct sockaddr *sa, ngx_array_t *cidrs)
 
             p = inaddr6->s6_addr;
 
-            inaddr = p[12] << 24;
+            inaddr = (in_addr_t) p[12] << 24;
             inaddr += p[13] << 16;
             inaddr += p[14] << 8;
             inaddr += p[15];
@@ -647,7 +639,11 @@ ngx_parse_addr_port(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text,
 
         p = ngx_strlchr(text, last, ']');
 
-        if (p == NULL || p == last - 1 || *++p != ':') {
+        if (p == last - 1) {
+            return ngx_parse_addr(pool, addr, text + 1, len - 2);
+        }
+
+        if (p == NULL || *++p != ':') {
             return NGX_DECLINED;
         }
 
@@ -1119,310 +1115,6 @@ ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u)
 }
 
 
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-static ngx_int_t
-ngx_resolve_backup(ngx_pool_t *pool, ngx_url_t **u, ngx_str_t path)
-{
-    u_char                           buf[70], *p, *pos;
-    size_t                           len;
-    ngx_url_t                       *url;
-    ngx_uint_t                       i;
-    ngx_fd_t                         fd;
-    ngx_int_t                        err;
-    ngx_str_t                        tpathf, dpathf, q;
-    static ngx_int_t                 create_dir_flag = 1;
-
-    url = *u;
-    if (path.data && path.data[path.len - 1] != '/') {
-        p = ngx_pcalloc(pool, path.len + 1);
-        if (p == NULL) {
-            return NGX_ERROR;
-        }
-
-        path.len = ngx_sprintf(p, "%V/", &path) - p;
-        path.data = p;
-    }
-
-    if (ngx_conf_full_name((ngx_cycle_t *) ngx_cycle, &path, 0) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    if (create_dir_flag) {
-        err = ngx_create_full_path(path.data, 0755);
-        if (err != 0) {
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                          ngx_create_dir_n " \"%s\" failed",
-                          path.data);
-            return NGX_ERROR;
-        }
-        create_dir_flag = 0;
-    }
-
-    tpathf.len = path.len + url->host.len + NGX_INT_T_LEN + 2;
-    tpathf.data = ngx_pcalloc(pool, tpathf.len);
-    if (tpathf.data == NULL) {
-        return NGX_ERROR;
-    }
-
-    tpathf.len = ngx_snprintf(tpathf.data, tpathf.len, "%V%V.%d%Z", &path,
-                              &url->host, ngx_pid) - tpathf.data;
-
-    dpathf.len = path.len + url->host.len;
-    dpathf.data = ngx_pstrdup(pool, &tpathf);
-    dpathf.data[dpathf.len] = '\0';
-
-    fd = ngx_open_file(tpathf.data, NGX_FILE_WRONLY,
-                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
-    if (fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                      ngx_open_file_n " \"%s\" failed",
-                      tpathf.data);
-
-        return NGX_ERROR;
-    }
-
-    for (i = 0; i < url->naddrs; i++) {
-        if (url->addrs[i].sockaddr->sa_family == AF_INET) {
-            pos = ngx_strlchr(url->addrs[i].name.data, url->addrs[i].name.data
-                              + url->addrs[i].name.len, ':');
-            if (pos == NULL) {
-                pos = url->addrs[i].name.data + url->addrs[i].name.len;
-            }
-
-            q.data = url->addrs[i].name.data;
-            q.len = pos - url->addrs[i].name.data;
-
-        } else if (url->addrs[i].sockaddr->sa_family == AF_INET6) {
-            pos = ngx_strlchr(url->addrs[i].name.data, url->addrs[i].name.data
-                              + url->addrs[i].name.len, ']');
-            if (pos == NULL) {
-                continue;
-            }
-            q.data = url->addrs[i].name.data + 1;
-            q.len = pos - q.data;
-        }
-
-        len = ngx_snprintf(buf, 69, "%V|%d%N", &q,
-                           url->addrs[i].sockaddr->sa_family) - buf;
-        ngx_write_fd(fd, buf, len);
-    }
-
-    ngx_close_file(fd);
-
-    if (ngx_rename_file(tpathf.data, dpathf.data) == NGX_FILE_ERROR) {
-        ngx_log_error(NGX_LOG_EMERG, ngx_cycle->log, ngx_errno,
-                      ngx_rename_file_n" from \"%s\" to \"%s\" failed",
-                      tpathf.data, dpathf.data);
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_resolve_using_local(ngx_pool_t *pool, ngx_url_t **u, ngx_str_t path)
-{
-    u_char                              *buf, *p, *s, *q, *l;
-    size_t                               len;
-    ngx_uint_t                           i;
-    ngx_str_t                            pf;
-    ngx_fd_t                             fd;
-    ngx_uint_t                           size, ip, sin_family;
-    ngx_file_info_t                      info;
-    ngx_url_t                           *url;
-    struct sockaddr_in                  *sin;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6                 *sin6;
-    u_char                              *v6;
-#endif
-
-    url = *u;
-    if (path.data && path.data[path.len - 1] != '/') {
-        p = ngx_pcalloc(pool, path.len + 1);
-        if (p == NULL) {
-            return NGX_ERROR;
-        }
-
-        path.len = ngx_sprintf(p, "%V/", &path) - p;
-        path.data = p;
-    }
-
-    pf.len = path.len + url->host.len;
-    pf.data = ngx_pcalloc(pool, pf.len + 1);
-    if (pf.data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_snprintf(pf.data, pf.len, "%V%*s",
-                 &path, url->host.len, url->host.data);
-
-    if (ngx_conf_full_name((ngx_cycle_t *) ngx_cycle, &pf, 0) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    fd = ngx_open_file(pf.data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
-    if (fd == NGX_INVALID_FILE) {
-        return NGX_ERROR;
-    }
-
-    if (ngx_fd_info(fd, &info) == -1) {
-        ngx_close_file(fd);
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                      ngx_fd_info_n " \"%V\" failed", &pf);
-        return NGX_ERROR;
-    }
-
-    /* fix: maybe disk full */
-    size = ngx_file_size(&info);
-    if (size == 0) {
-        ngx_close_file(fd);
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                      "dns : the cache \"%V\" is empty file", &pf);
-        return NGX_ERROR;
-    }
-
-    buf = ngx_palloc(pool, size);
-    if (buf == NULL) {
-        ngx_close_file(fd);
-        return NGX_ERROR;
-    }
-
-    if (ngx_read_fd(fd, buf, size) == -1) {
-        ngx_close_file(fd);
-        return NGX_ERROR;
-    }
-
-    ngx_close_file(fd);
-
-    for(i = 0, p = buf; p < buf + size; i++) {
-        s = ngx_strlchr(p, buf + size, '\n');
-        if (s == NULL) {
-            break;
-        }
-
-        p = s + 1;
-    }
-
-    url->addrs = ngx_pcalloc(pool, i * sizeof(ngx_addr_t));
-    if (url->addrs == NULL) {
-        return NGX_ERROR;
-    }
-
-    url->naddrs = 0;
-
-    for (i = 0, p = buf; p < buf + size; ) {
-        s = ngx_strlchr(p, buf + size, '\n');
-        if (s == NULL) {
-            s = buf + size + 1;
-        }
-
-        l = ngx_strlchr(p, s, '|');
-        if (l == NULL) {
-            l = s;
-        }
-
-        if (l != s) {
-            sin_family = ngx_atoi(l + 1, s - l - 1);
-            if (sin_family != AF_INET && sin_family != AF_INET6 ) {
-                p = s + 1;
-                continue;
-            }
-
-        } else {
-            p = s + 1;
-            continue;
-        }
-
-        if (sin_family == AF_INET) {
-            ip = ngx_inet_addr(p, l - p);
-            if (ip == INADDR_NONE) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                              "dns: failed to parse ip \"%*s\"",
-                              s - p, p);
-                p = s + 1;
-                continue;
-            }
-
-            sin = ngx_pcalloc(pool, sizeof(struct sockaddr_in));
-            if (sin == NULL) {
-                return NGX_ERROR;
-            }
-
-            sin->sin_family = sin_family;
-            sin->sin_port = htons(url->port);
-            sin->sin_addr.s_addr = ip;
-
-            url->addrs[i].sockaddr = (struct sockaddr *) sin;
-            url->addrs[i].socklen = sizeof(struct sockaddr_in);
-
-            len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
-
-            q = ngx_pnalloc(pool, len);
-            if (q == NULL) {
-                return NGX_ERROR;
-            }
-
-            len = ngx_sock_ntop((struct sockaddr *) sin,
-                                sizeof(struct sockaddr_in), q, len, 1);
-
-            url->addrs[i].name.len = len;
-            url->addrs[i].name.data = q;
-            i++;
-
-        } else if (sin_family == AF_INET6) {
-#if (NGX_HAVE_INET6)
-            v6 = p;
-            len = l - p;
-
-            sin6 = ngx_pcalloc(pool, sizeof(struct sockaddr_in6));
-            if (sin6 == NULL) {
-                return NGX_ERROR;
-            }
-
-            if (ngx_inet6_addr(v6, len, sin6->sin6_addr.s6_addr) != NGX_OK) {
-                p = s + 1;
-                continue;
-            }
-
-            sin6->sin6_family = sin_family;
-            sin6->sin6_port = htons(url->port);
-
-            url->addrs[i].sockaddr = (struct sockaddr *) sin6;
-            url->addrs[i].socklen = sizeof(struct sockaddr_in6);
-
-            len = NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1;
-
-            q = ngx_pnalloc(pool, len);
-            if (q == NULL) {
-                return NGX_ERROR;
-            }
-
-            len = ngx_sock_ntop((struct sockaddr *) sin6,
-                                sizeof(struct sockaddr), q, len, 1);
-
-            url->addrs[i].name.len = len;
-            url->addrs[i].name.data = q;
-            i++;
-#endif
-        }
-
-        p = s + 1;
-
-    }
-
-    if (i == 0) {
-        return NGX_ERROR;
-    }
-
-    url->naddrs = i;
-
-    return NGX_OK;
-
-}
-#endif
-
-
 #if (NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6)
 
 ngx_int_t
@@ -1431,10 +1123,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
     u_char           *host;
     ngx_uint_t        n;
     struct addrinfo   hints, *res, *rp;
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-    u_char           *ph;
-    ngx_str_t         path;
-#endif
 
     host = ngx_alloc(u->host.len + 1, pool->log);
     if (host == NULL) {
@@ -1451,20 +1139,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
 #endif
 
     if (getaddrinfo((char *) host, NULL, &hints, &res) != 0) {
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-        ph = (u_char *) getenv(NGX_DNS_RESOLVE_BACKUP_PATH);
-        if (ph != NULL) {
-            path.data = ph;
-            path.len = ngx_strlen(ph);
-            if (ngx_resolve_using_local(pool, &u, path) == NGX_OK) {
-                ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                              "dom %V using local dns cache successed",
-                              &u->host);
-                ngx_free(host);
-                return NGX_OK;
-            }
-        }
-#endif
         u->err = "host not found";
         ngx_free(host);
         return NGX_ERROR;
@@ -1514,19 +1188,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
     }
 
     freeaddrinfo(res);
-
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-    ph = (u_char *) getenv(NGX_DNS_RESOLVE_BACKUP_PATH);
-    if (ph != NULL) {
-        path.data = ph;
-        path.len = ngx_strlen(ph);
-        if (ngx_resolve_backup(pool, &u, path) != NGX_OK) {
-            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                          "dom %V backup local dns cache failed", &u->host);
-        }
-    }
-#endif
-
     return NGX_OK;
 
 failed:
@@ -1544,10 +1205,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
     ngx_uint_t           i, n;
     struct hostent      *h;
     struct sockaddr_in   sin;
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-    u_char              *ph;
-    ngx_str_t            path;
-#endif
 
     /* AF_INET only */
 
@@ -1565,21 +1222,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
         (void) ngx_cpystrn(host, u->host.data, u->host.len + 1);
 
         h = gethostbyname((char *) host);
-
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-        ph = (u_char *) getenv(NGX_DNS_RESOLVE_BACKUP_PATH);
-        if (h == NULL && ph != NULL) {
-            path.data = ph;
-            path.len = ngx_strlen(ph);
-            if (ngx_resolve_using_local(pool, &u, path) == NGX_OK) {
-                ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                              "dom %V using local dns cache successed",
-                              &u->host);
-                ngx_free(host);
-                return NGX_OK;
-            }
-        }
-#endif
 
         ngx_free(host);
 
@@ -1602,19 +1244,6 @@ ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
                 return NGX_ERROR;
             }
         }
-
-#if (T_NGX_DNS_RESOLVE_BACKUP)
-        ph = (u_char *) getenv(NGX_DNS_RESOLVE_BACKUP_PATH);
-        if (ph != NULL) {
-            path.data = ph;
-            path.len = ngx_strlen(ph);
-            if (ngx_resolve_backup(pool, &u, path) != NGX_OK) {
-                ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                              "dom %V backup local dns cache failed",
-                              &u->host);
-            }
-        }
-#endif
 
     } else {
 

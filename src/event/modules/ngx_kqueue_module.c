@@ -10,6 +10,15 @@
 #include <ngx_event.h>
 
 
+/* NetBSD up to 10.0 incompatibly defines kevent.udata as "intptr_t" */
+
+#if (__NetBSD__ && __NetBSD_Version__ < 1000000000)
+#define NGX_KQUEUE_UDATA_T
+#else
+#define NGX_KQUEUE_UDATA_T  (void *)
+#endif
+
+
 typedef struct {
     ngx_uint_t  changes;
     ngx_uint_t  events;
@@ -92,11 +101,7 @@ static ngx_event_module_t  ngx_kqueue_module_ctx = {
 #endif
         ngx_kqueue_process_events,         /* process the events */
         ngx_kqueue_init,                   /* init the events */
-        ngx_kqueue_done,                   /* done the events */
-#if (NGX_SSL && NGX_SSL_ASYNC)        
-        NULL,                              /* add an async conn */
-        NULL,                              /* del an async conn */
-#endif
+        ngx_kqueue_done                    /* done the events */
     }
 
 };
@@ -195,7 +200,7 @@ ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         kev.flags = EV_ADD|EV_ENABLE;
         kev.fflags = 0;
         kev.data = timer;
-        kev.udata = 0;
+        kev.udata = NGX_KQUEUE_UDATA_T (uintptr_t) 0;
 
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
@@ -241,7 +246,7 @@ ngx_kqueue_notify_init(ngx_log_t *log)
     notify_kev.data = 0;
     notify_kev.flags = EV_ADD|EV_CLEAR;
     notify_kev.fflags = 0;
-    notify_kev.udata = 0;
+    notify_kev.udata = NGX_KQUEUE_UDATA_T (uintptr_t) 0;
 
     if (kevent(ngx_kqueue, &notify_kev, 1, NULL, 0, NULL) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,

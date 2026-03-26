@@ -26,30 +26,11 @@ typedef struct {
 
 #endif
 
-#if (T_NGX_XQUIC)
-
-extern ngx_atomic_t  *ngx_stat_quic_conns;
-extern ngx_atomic_t  *ngx_stat_quic_cps_nexttime;
-extern ngx_atomic_t  *ngx_stat_quic_cps;
-extern ngx_atomic_t  *ngx_stat_quic_conns_refused;
-
-extern ngx_atomic_t  *ngx_stat_quic_queries;
-extern ngx_atomic_t  *ngx_stat_quic_qps_nexttime;
-extern ngx_atomic_t  *ngx_stat_quic_qps;
-extern ngx_atomic_t  *ngx_stat_quic_queries_refused;
-
-extern ngx_atomic_t  *ngx_stat_quic_concurrent_conns;
-
-#endif
 
 struct ngx_event_s {
     void            *data;
 
     unsigned         write:1;
-
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    unsigned         async:1;
-#endif
 
     unsigned         accept:1;
 
@@ -120,10 +101,6 @@ struct ngx_event_s {
     int              available;
 
     ngx_event_handler_pt  handler;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_event_handler_pt  saved_handler;
-#endif
-
 
 
 #if (NGX_HAVE_IOCP)
@@ -203,21 +180,12 @@ typedef struct {
 
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
-
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_int_t  (*add_async_conn)(ngx_connection_t *c);
-    ngx_int_t  (*del_async_conn)(ngx_connection_t *c, ngx_uint_t flags);
-#endif
 } ngx_event_actions_t;
 
 
 extern ngx_event_actions_t   ngx_event_actions;
 #if (NGX_HAVE_EPOLLRDHUP)
 extern ngx_uint_t            ngx_use_epoll_rdhup;
-#endif
-#if (T_NGX_ACCEPT_FILTER)
-typedef ngx_int_t (*ngx_event_accept_filter_pt) (ngx_connection_t *c);
-extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #endif
 
 
@@ -437,11 +405,6 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define ngx_add_conn         ngx_event_actions.add_conn
 #define ngx_del_conn         ngx_event_actions.del_conn
 
-#if (NGX_SSL && NGX_SSL_ASYNC)
-#define ngx_add_async_conn   ngx_event_actions.add_async_conn
-#define ngx_del_async_conn   ngx_event_actions.del_async_conn
-#endif
-
 #define ngx_notify           ngx_event_actions.notify
 
 #define ngx_add_timer        ngx_event_add_timer
@@ -511,9 +474,7 @@ extern ngx_atomic_t  *ngx_stat_active;
 extern ngx_atomic_t  *ngx_stat_reading;
 extern ngx_atomic_t  *ngx_stat_writing;
 extern ngx_atomic_t  *ngx_stat_waiting;
-#if (T_NGX_HTTP_STUB_STATUS)
-extern ngx_atomic_t  *ngx_stat_request_time;
-#endif
+
 #endif
 
 
@@ -568,8 +529,5 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 #include <ngx_iocp_module.h>
 #endif
 
-#if (T_NGX_UDPV2)
-#include <ngx_event_udpv2.h>
-#endif
 
 #endif /* _NGX_EVENT_H_INCLUDED_ */

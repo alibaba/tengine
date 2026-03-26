@@ -9,9 +9,6 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 
-#if (T_NGX_SHOW_INFO)
-extern ngx_uint_t  ngx_modules_n;
-#endif
 
 static void ngx_destroy_cycle_pools(ngx_conf_t *conf);
 static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
@@ -31,10 +28,6 @@ static ngx_event_t     ngx_shutdown_event;
 ngx_uint_t             ngx_test_config;
 ngx_uint_t             ngx_dump_config;
 ngx_uint_t             ngx_quiet_mode;
-#if (T_NGX_SHOW_INFO)
-ngx_uint_t             ngx_show_modules;
-ngx_uint_t             ngx_show_directives;
-#endif
 
 
 /* STUB NAME */
@@ -45,7 +38,7 @@ static ngx_connection_t  dumb;
 ngx_cycle_t *
 ngx_init_cycle(ngx_cycle_t *old_cycle)
 {
-    void                *rv;
+    void                *rv, *data;
     char               **senv;
     ngx_uint_t           i, n;
     ngx_log_t           *log;
@@ -70,9 +63,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     ngx_time_update();
 
-#if (T_PIPES)
-    ngx_increase_pipe_generation();
-#endif
 
     log = old_cycle->log;
 
@@ -91,9 +81,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     cycle->pool = pool;
     cycle->log = log;
     cycle->old_cycle = old_cycle;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    cycle->no_ssl_init = old_cycle->no_ssl_init;
-#endif
 
     cycle->conf_prefix.len = old_cycle->conf_prefix.len;
     cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix);
@@ -283,9 +270,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     conf.log = log;
     conf.module_type = NGX_CORE_MODULE;
     conf.cmd_type = NGX_MAIN_CONF;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    conf.no_ssl_init = cycle->no_ssl_init;
-#endif
 
 #if 0
     log->log_level = NGX_LOG_DEBUG_ALL;
@@ -302,39 +286,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
-
-#if (T_NGX_SHOW_INFO)
-    ngx_command_t     *cmd;
-    if (ngx_show_directives) {
-        ngx_log_stderr(0, "all available directives:");
-
-        for (i = 0; i < cycle->modules_n; i++) {
-            ngx_log_stderr(0, "%s:", cycle->modules[i]->name);
-
-            cmd = cycle->modules[i]->commands;
-            if(cmd == NULL) {
-                continue;
-            }
-
-            for ( /* void */ ; cmd->name.len; cmd++) {
-                ngx_log_stderr(0, "    %V", &cmd->name);
-            }
-        }
-    }
-
-    if (ngx_show_modules) {
-        ngx_log_stderr(0, "loaded modules:");
-
-        for (i = 0; i < cycle->modules_n; i++) {
-            if (cycle->modules[i]->index < ngx_modules_n) {
-                ngx_log_stderr(0, "    %s (static)", cycle->modules[i]->name);
-
-            } else {
-                ngx_log_stderr(0, "    %s (dynamic)", cycle->modules[i]->name);
-            }
-        }
-    }
-#endif
 
     if (ngx_test_config && !ngx_quiet_mode) {
         ngx_log_stderr(0, "the configuration file %s syntax is ok",
@@ -455,9 +406,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 #endif
     }
 
-#if (T_NGX_XQUIC)
-    cycle->x_log = &cycle->xquic_log;
-#endif
     cycle->log = &cycle->new_log;
     pool->log = &cycle->new_log;
 
@@ -490,6 +438,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         opart = &old_cycle->shared_memory.part;
         oshm_zone = opart->elts;
 
+        data = NULL;
+
         for (n = 0; /* void */ ; n++) {
 
             if (n >= opart->nelts) {
@@ -513,9 +463,13 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 continue;
             }
 
+            if (shm_zone[i].tag == oshm_zone[n].tag && shm_zone[i].noreuse) {
+                data = oshm_zone[n].data;
+                break;
+            }
+
             if (shm_zone[i].tag == oshm_zone[n].tag
-                && shm_zone[i].shm.size == oshm_zone[n].shm.size
-                && !shm_zone[i].noreuse)
+                && shm_zone[i].shm.size == oshm_zone[n].shm.size)
             {
                 shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
 #if (NGX_WIN32)
@@ -542,7 +496,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             goto failed;
         }
 
-        if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
+        if (shm_zone[i].init(&shm_zone[i], data) != NGX_OK) {
             goto failed;
         }
 
@@ -788,16 +742,6 @@ old_shm_zone_done:
 #endif
     }
 
-#if (T_PIPES)
-    /* open pipes */
-
-    if (!ngx_is_init_cycle(old_cycle)) {
-        if (ngx_open_pipes(cycle) == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "can not open pipes");
-            goto failed;
-        }
-    }
-#endif
 
     /* close the unnecessary open files */
 
@@ -914,10 +858,6 @@ failed:
                           file[i].name.data);
         }
     }
-
-#if (T_PIPES)
-    ngx_close_pipes();
-#endif
 
     /* free the newly created shared memory */
 

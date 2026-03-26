@@ -70,18 +70,6 @@
 #define NGX_CHANGEBIN_SIGNAL     USR2
 #endif
 
-#if (T_NGX_HAVE_XUDP)
-
-#define SIGXUDP                 __SIGRTMAX - 10
-
-/**
- * register __SIGRTMAX - 1 as the signal-exit of the worker xudp
- * then, xudp module will test validity
- * if check failed, auto downgrade
- */
-#define NGX_XUDP_TERMINATE_SIGNAL   XUDP
-#endif
-
 #define ngx_cdecl
 #define ngx_libc_cdecl
 
@@ -106,7 +94,7 @@ typedef intptr_t        ngx_flag_t;
 
 
 #ifndef NGX_ALIGNMENT
-#define NGX_ALIGNMENT   sizeof(unsigned long)    /* platform word */
+#define NGX_ALIGNMENT   sizeof(uintptr_t)    /* platform word */
 #endif
 
 #define ngx_align(d, a)     (((d) + (a - 1)) & ~(a - 1))

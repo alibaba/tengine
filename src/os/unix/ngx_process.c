@@ -67,13 +67,6 @@ ngx_signal_t  signals[] = {
       "",
       ngx_signal_handler },
 
-#if (T_NGX_HAVE_XUDP)
-    { ngx_signal_value(NGX_XUDP_TERMINATE_SIGNAL),
-      "SIG" ngx_value(NGX_XUDP_TERMINATE_SIGNAL),
-      "",
-      ngx_signal_handler },
-#endif
-
     { SIGALRM, "SIGALRM", "", ngx_signal_handler },
 
     { SIGINT, "SIGINT", "", ngx_signal_handler },
@@ -348,9 +341,6 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
 
     case NGX_PROCESS_MASTER:
     case NGX_PROCESS_SINGLE:
-#if (T_PIPES)
-    case NGX_PROCESS_PIPE:
-#endif
         switch (signo) {
 
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
@@ -417,9 +407,6 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
 
     case NGX_PROCESS_WORKER:
     case NGX_PROCESS_HELPER:
-#if (NGX_PROCS)
-    case NGX_PROCESS_PROC:
-#endif
         switch (signo) {
 
         case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
@@ -542,13 +529,6 @@ ngx_process_get_status(void)
                 break;
             }
         }
-
-#if (T_PIPES)
-        if (i == ngx_last_process) {
-            process = "pipe process";
-            ngx_pipe_broken_action(ngx_cycle->log, pid, 1);
-        }
-#endif
 
         if (WTERMSIG(status)) {
 #ifdef WCOREDUMP

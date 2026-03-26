@@ -129,28 +129,8 @@ if test -z "$NGX_KQUEUE_CHECKED"; then
 fi
 
 
-if [ "$NGX_SYSTEM" = "NetBSD" ]; then
-
-    # NetBSD 2.0 incompatibly defines kevent.udata as "intptr_t"
-
-    cat << END >> $NGX_AUTO_CONFIG_H
-
-#define NGX_KQUEUE_UDATA_T
-
-END
-
-else
-    cat << END >> $NGX_AUTO_CONFIG_H
-
-#define NGX_KQUEUE_UDATA_T  (void *)
-
-END
-
-fi
-
-
 ngx_feature="crypt()"
-ngx_feature_name=
+ngx_feature_name="NGX_HAVE_CRYPT"
 ngx_feature_run=no
 ngx_feature_incs=
 ngx_feature_path=
@@ -162,7 +142,7 @@ ngx_feature_test="crypt(\"test\", \"salt\");"
 if [ $ngx_found = no ]; then
 
     ngx_feature="crypt() in libcrypt"
-    ngx_feature_name=
+    ngx_feature_name="NGX_HAVE_CRYPT"
     ngx_feature_run=no
     ngx_feature_incs=
     ngx_feature_path=
@@ -445,6 +425,54 @@ ngx_feature_incs="#include <sys/socket.h>
 ngx_feature_path=
 ngx_feature_libs=
 ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_RECVPKTINFO, NULL, 0)"
+. auto/feature
+
+
+# IP packet fragmentation
+
+ngx_feature="IP_MTU_DISCOVER"
+ngx_feature_name="NGX_HAVE_IP_MTU_DISCOVER"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="(void) IP_PMTUDISC_DO;
+                  setsockopt(0, IPPROTO_IP, IP_MTU_DISCOVER, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IPV6_MTU_DISCOVER"
+ngx_feature_name="NGX_HAVE_IPV6_MTU_DISCOVER"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="(void) IPV6_PMTUDISC_DO;
+                  setsockopt(0, IPPROTO_IPV6, IPV6_MTU_DISCOVER, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IP_DONTFRAG"
+ngx_feature_name="NGX_HAVE_IP_DONTFRAG"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_DONTFRAG, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IPV6_DONTFRAG"
+ngx_feature_name="NGX_HAVE_IPV6_DONTFRAG"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IP, IPV6_DONTFRAG, NULL, 0)"
 . auto/feature
 
 
@@ -1002,55 +1030,3 @@ ngx_feature_test='struct addrinfo *res;
                   if (getaddrinfo("localhost", NULL, NULL, &res) != 0) return 1;
                   freeaddrinfo(res)'
 . auto/feature
-
-
-# Tengine:
-ngx_feature="sysinfo()"
-ngx_feature_name="NGX_HAVE_SYSINFO"
-ngx_feature_run=no
-ngx_feature_incs="#include <sys/sysinfo.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test="struct sysinfo s;
-                  sysinfo(&s);"
-. auto/feature
-
-
-ngx_feature="getloadavg()"
-ngx_feature_name="NGX_HAVE_GETLOADAVG"
-ngx_feature_run=no
-ngx_feature_incs="#include <stdlib.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test="double loadavg[1];
-                  getloadavg(loadavg, 1);"
-. auto/feature
-
-
-ngx_feature="/proc/meminfo"
-ngx_feature_name="NGX_HAVE_PROC_MEMINFO"
-ngx_feature_run=yes
-ngx_feature_incs="#include <fcntl.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test='int fd;
-                  if (open("/proc/meminfo", O_RDONLY) == -1) return 1;'
-. auto/feature
-
-
-ngx_feature="/proc/stat"
-ngx_feature_name="NGX_HAVE_PROC_STAT"
-ngx_feature_run=yes
-ngx_feature_incs="#include <fcntl.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test='int fd;
-                  if (open("/proc/stat", O_RDONLY) == -1) return 1;'
-. auto/feature
-
-
-# Tengine: auto read nameserver from /etc/resolv.conf.
- if [ -f "/etc/resolv.conf" ]; then
-    have=NGX_RESOLVER_FILE value="\"/etc/resolv.conf\"" . auto/define
-fi
-

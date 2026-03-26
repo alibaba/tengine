@@ -16,12 +16,8 @@ static ngx_int_t ngx_http_send_error_page(ngx_http_request_t *r,
 static ngx_int_t ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err);
 static ngx_int_t ngx_http_send_refresh(ngx_http_request_t *r);
-#if (T_NGX_SERVER_INFO)
-static ngx_buf_t *ngx_http_set_server_info(ngx_http_request_t *r);
-#endif
 
 
-#if (!T_NGX_SERVER_INFO)
 static u_char ngx_http_error_full_tail[] =
 "<hr><center>" NGINX_VER "</center>" CRLF
 "</body>" CRLF
@@ -34,80 +30,10 @@ static u_char ngx_http_error_build_tail[] =
 "</body>" CRLF
 "</html>" CRLF
 ;
-#endif
-
-
-#if (T_NGX_SERVER_INFO)
-static u_char ngx_http_error_doctype[] =
-"<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">" CRLF;
-
-
-static u_char ngx_http_server_info_head[] =
-" Sorry for the inconvenience.<br/>" CRLF
-"Please report this message and include the following information to us.<br/>"
-CRLF
-"Thank you very much!</p>" CRLF
-"<table>" CRLF
-"<tr>" CRLF
-"<td>URL:</td>" CRLF
-"<td>"
-;
-
-
-static u_char ngx_http_server_info_server[] =
-"</td>" CRLF
-"</tr>" CRLF
-"<tr>" CRLF
-"<td>Server:</td>" CRLF
-"<td>"
-;
-
-
-static u_char ngx_http_server_info_admin[] =
-"</td>" CRLF
-"</tr>" CRLF
-"<tr>" CRLF
-"<td>Admin:</td>" CRLF
-"<td>"
-;
-
-
-static u_char ngx_http_server_info_date[] =
-"</td>" CRLF
-"</tr>" CRLF
-"<tr>" CRLF
-"<td>Date:</td>" CRLF
-"<td>"
-;
-
-
-static u_char ngx_http_server_info_tail[] =
-"</td>" CRLF
-"</tr>" CRLF
-"</table>" CRLF
-;
-
-
-static u_char ngx_http_error_banner[] =
-"<hr/>Powered by " TENGINE;
-
-
-static u_char ngx_http_error_full_banner[] =
-"<hr/>Powered by " TENGINE_VER_BUILD;
-
-
-static u_char ngx_http_error_powered_by[] =
-"<hr/>Powered by ";
-#endif
 
 
 static u_char ngx_http_error_tail[] =
-#if (T_NGX_SERVER_INFO)
-"<hr><center>tengine</center>" CRLF
-#else
 "<hr><center>nginx</center>" CRLF
-#endif
-
 "</body>" CRLF
 "</html>" CRLF
 ;
@@ -747,34 +673,13 @@ static ngx_int_t
 ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err)
 {
-#if (!T_NGX_SERVER_INFO)
     u_char       *tail;
     size_t        len;
-#endif    
     ngx_int_t     rc;
     ngx_buf_t    *b;
     ngx_uint_t    msie_padding;
-#if (T_NGX_SERVER_INFO)
-    ngx_chain_t   out[7];
-    ngx_buf_t    *ib;
-    ngx_uint_t    i;
-
-#else 
     ngx_chain_t   out[3];
-#endif
 
-#if (T_NGX_SERVER_INFO)
-    if (clcf->server_info && err >= NGX_HTTP_OFF_4XX) {
-        ib = ngx_http_set_server_info(r);
-        if (ib == NULL) {
-            return NGX_ERROR;
-        }
-
-    } else {
-        ib = NULL;
-    }
-
-#else 
     if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
         len = sizeof(ngx_http_error_full_tail) - 1;
         tail = ngx_http_error_full_tail;
@@ -787,31 +692,11 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         len = sizeof(ngx_http_error_tail) - 1;
         tail = ngx_http_error_tail;
     }
-#endif
 
     msie_padding = 0;
 
     if (ngx_http_error_pages[err].len) {
-#if (T_NGX_SERVER_INFO)
-        r->headers_out.content_length_n = sizeof(ngx_http_error_doctype) - 1
-                                          + ngx_http_error_pages[err].len
-                                          + (ib ? (ib->last - ib->pos) : 0)
-                                          + sizeof(ngx_http_error_tail) - 1;
-
-        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
-            r->headers_out.content_length_n += clcf->server_tokens
-                ? sizeof(ngx_http_error_full_banner) - 1
-                : sizeof(ngx_http_error_banner) - 1;
-
-        } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-            r->headers_out.content_length_n += sizeof(ngx_http_error_powered_by)
-                                               - 1;
-            r->headers_out.content_length_n += clcf->server_tag.len;
-        }
-#else
         r->headers_out.content_length_n = ngx_http_error_pages[err].len + len;
-#endif
-
         if (clcf->msie_padding
             && (r->headers_in.msie || r->headers_in.chrome)
             && r->http_version >= NGX_HTTP_VERSION_10
@@ -849,23 +734,6 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         return ngx_http_send_special(r, NGX_HTTP_LAST);
     }
 
-#if (T_NGX_SERVER_INFO)
-    i = 0;
-
-    b = ngx_calloc_buf(r->pool);
-    if (b == NULL) {
-        return NGX_ERROR;
-    }
-
-    b->memory = 1;
-    b->pos = ngx_http_error_doctype;
-    b->last = ngx_http_error_doctype + sizeof(ngx_http_error_doctype) - 1;
-
-    out[i].buf = b;
-    out[i].next = &out[i + 1];
-    i++;
-#endif
-
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
         return NGX_ERROR;
@@ -875,72 +743,8 @@ ngx_http_send_special_response(ngx_http_request_t *r,
     b->pos = ngx_http_error_pages[err].data;
     b->last = ngx_http_error_pages[err].data + ngx_http_error_pages[err].len;
 
-#if (T_NGX_SERVER_INFO)
-    out[i].buf = b;
-    out[i].next = &out[i + 1];
-    i++;
-
-    if (ib) {
-        out[i].buf = ib;
-        out[i].next = &out[i + 1];
-        i++;
-    }
-
-    if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_ON) {
-        b = ngx_calloc_buf(r->pool);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
-
-        b->memory = 1;
-
-        if (clcf->server_tokens) {
-            b->pos = ngx_http_error_full_banner;
-            b->last = ngx_http_error_full_banner
-                      + sizeof(ngx_http_error_full_banner) - 1;
-
-        } else {
-            b->pos = ngx_http_error_banner;
-            b->last = ngx_http_error_banner + sizeof(ngx_http_error_banner) - 1;
-        }
-
-        out[i].buf = b;
-        out[i].next = &out[i + 1];
-        i++;
-
-    } else if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-        b = ngx_calloc_buf(r->pool);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
-
-        b->memory = 1;
-        b->pos = ngx_http_error_powered_by;
-        b->last = ngx_http_error_powered_by
-                  + sizeof(ngx_http_error_powered_by) - 1;
-
-        out[i].buf = b;
-        out[i].next = &out[i + 1];
-        i++;
-
-        b = ngx_calloc_buf(r->pool);
-        if (b == NULL) {
-            return NGX_ERROR;
-        }
-
-        b->memory = 1;
-        b->pos = clcf->server_tag.data;
-        b->last = clcf->server_tag.data + clcf->server_tag.len;
-
-        out[i].buf = b;
-        out[i].next = &out[i + 1];
-        i++;
-    }
-
-#else
     out[0].buf = b;
     out[0].next = &out[1];
-#endif
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
@@ -949,19 +753,11 @@ ngx_http_send_special_response(ngx_http_request_t *r,
 
     b->memory = 1;
 
-#if (T_NGX_SERVER_INFO)
-    b->pos = ngx_http_error_tail;
-    b->last = ngx_http_error_tail + sizeof(ngx_http_error_tail) - 1;
-
-    out[i].buf = b;
-    out[i].next = NULL;
-#else
     b->pos = tail;
     b->last = tail + len;
 
     out[1].buf = b;
     out[1].next = NULL;
-#endif
 
     if (msie_padding) {
         b = ngx_calloc_buf(r->pool);
@@ -973,16 +769,9 @@ ngx_http_send_special_response(ngx_http_request_t *r,
         b->pos = ngx_http_msie_padding;
         b->last = ngx_http_msie_padding + sizeof(ngx_http_msie_padding) - 1;
 
-#if (T_NGX_SERVER_INFO)
-        out[i].next = &out[i + 1];
-        i++;
-        out[i].buf = b;
-        out[i].next = NULL;
-#else
         out[1].next = &out[2];
         out[2].buf = b;
         out[2].next = NULL;
-#endif
     }
 
     if (r == r->main) {
@@ -1066,140 +855,3 @@ ngx_http_send_refresh(ngx_http_request_t *r)
 
     return ngx_http_output_filter(r, &out);
 }
-
-
-#if (T_NGX_SERVER_INFO)
-static ngx_buf_t *
-ngx_http_set_server_info(ngx_http_request_t *r)
-{
-    size_t                     size;
-    ngx_buf_t                 *b;
-    uintptr_t                  euri, ehost;
-    ngx_str_t                 *host, scheme, port;
-    ngx_uint_t                 p;
-    struct sockaddr_in        *sin;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6       *sin6;
-#endif
-    ngx_http_core_srv_conf_t  *cscf;
-
-    cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
-
-    ngx_str_null(&scheme);
-
-#if (NGX_HTTP_SSL)
-
-    if (r->connection->ssl) {
-        ngx_str_set(&scheme, "https://");
-    }
-
-#endif
-
-    if (scheme.len == 0) {
-        ngx_str_set(&scheme, "http://");
-    }
-
-    if (r->headers_in.server.len) {
-        host = &r->headers_in.server;
-
-    } else {
-        host = &cscf->server_name;
-    }
-
-    if (ngx_connection_local_sockaddr(r->connection, NULL, 0) != NGX_OK) {
-        return NULL;
-    }
-
-    ngx_str_null(&port);
-
-    switch (r->connection->local_sockaddr->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = (struct sockaddr_in6 *) r->connection->local_sockaddr;
-        p = ntohs(sin6->sin6_port);
-        break;
-#endif
-
-    default:
-        sin = (struct sockaddr_in *) r->connection->local_sockaddr;
-        p = ntohs(sin->sin_port);
-        break;
-    }
-
-    if (p > 0 && p < 65536 && p != 80 && p != 443) {
-        port.data = ngx_pnalloc(r->pool, sizeof(":65535") - 1);
-        if (port.data == NULL) {
-            return NULL;
-        }
-
-        port.len = ngx_sprintf(port.data, ":%ui", p) - port.data;
-    }
-
-    ehost = ngx_escape_html(NULL, host->data, host->len);
-    euri = ngx_escape_html(NULL, r->unparsed_uri.data, r->unparsed_uri.len);
-
-    size = sizeof(ngx_http_server_info_head) - 1
-           + scheme.len + host->len + ehost
-           + port.len + r->unparsed_uri.len + euri
-           + sizeof(ngx_http_server_info_server) - 1
-           + ngx_cycle->hostname.len
-           + sizeof(ngx_http_server_info_date) - 1
-           + ngx_cached_err_log_time.len
-           + sizeof(ngx_http_server_info_tail) - 1;
-
-    if (cscf->server_admin.len) {
-        size += sizeof(ngx_http_server_info_admin) - 1 + cscf->server_admin.len;
-    }
-
-    b = ngx_create_temp_buf(r->pool, size);
-    if (b == NULL) {
-        return NULL;
-    }
-
-    b->last = ngx_cpymem(b->last, ngx_http_server_info_head,
-                         sizeof(ngx_http_server_info_head) - 1);
-    b->last = ngx_cpymem(b->last, scheme.data, scheme.len);
-
-    if (ehost == 0) {
-        b->last = ngx_cpymem(b->last, host->data, host->len);
-
-    } else {
-        b->last = (u_char *) ngx_escape_html(b->last, host->data, host->len);
-    }
-
-    if (port.len) {
-        b->last = ngx_cpymem(b->last, port.data, port.len);
-    }
-
-    if (euri == 0) {
-        b->last = ngx_cpymem(b->last, r->unparsed_uri.data,
-                             r->unparsed_uri.len);
-
-    } else {
-        b->last = (u_char *) ngx_escape_html(b->last, r->unparsed_uri.data,
-                                             r->unparsed_uri.len);
-    }
-
-    b->last = ngx_cpymem(b->last, ngx_http_server_info_server,
-                         sizeof(ngx_http_server_info_server) - 1);
-    b->last = ngx_cpymem(b->last, ngx_cycle->hostname.data,
-                         ngx_cycle->hostname.len);
-
-    if (cscf->server_admin.len) {
-        b->last = ngx_cpymem(b->last, ngx_http_server_info_admin,
-                             sizeof(ngx_http_server_info_admin) - 1);
-        b->last = ngx_cpymem(b->last, cscf->server_admin.data,
-                             cscf->server_admin.len);
-    }
-
-    b->last = ngx_cpymem(b->last, ngx_http_server_info_date,
-                         sizeof(ngx_http_server_info_date) - 1);
-    b->last = ngx_cpymem(b->last, ngx_cached_err_log_time.data,
-                         ngx_cached_err_log_time.len);
-    b->last = ngx_cpymem(b->last, ngx_http_server_info_tail,
-                         sizeof(ngx_http_server_info_tail) - 1);
-
-    return b;
-}
-#endif

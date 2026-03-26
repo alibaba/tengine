@@ -30,6 +30,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
     struct sockaddr_in           *sin;
     ngx_stream_in_addr_t         *addr;
     ngx_stream_session_t         *s;
+    ngx_stream_conf_ctx_t        *ctx;
     ngx_stream_addr_conf_t       *addr_conf;
 #if (NGX_HAVE_INET6)
     struct sockaddr_in6          *sin6;
@@ -121,15 +122,12 @@ ngx_stream_init_connection(ngx_connection_t *c)
         return;
     }
 
-    s->signature = NGX_STREAM_MODULE;
-    s->main_conf = addr_conf->ctx->main_conf;
-    s->srv_conf = addr_conf->ctx->srv_conf;
+    ctx = addr_conf->default_server->ctx;
 
-#if (T_NGX_STREAM_SNI)
-    s->addr_conf = addr_conf;
-    s->main_conf = ((ngx_stream_core_srv_conf_t*)addr_conf->default_server)->ctx->main_conf;
-    s->srv_conf = ((ngx_stream_core_srv_conf_t*)addr_conf->default_server)->ctx->srv_conf;
-#endif
+    s->signature = NGX_STREAM_MODULE;
+    s->main_conf = ctx->main_conf;
+    s->srv_conf = ctx->srv_conf;
+    s->virtual_names = addr_conf->virtual_names;
 
 #if (NGX_STREAM_SSL)
     s->ssl = addr_conf->ssl;
@@ -150,7 +148,7 @@ ngx_stream_init_connection(ngx_connection_t *c)
 
     ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%uA %sclient %*s connected to %V",
                   c->number, c->type == SOCK_DGRAM ? "udp " : "",
-                  len, text, &addr_conf->addr_text);
+                  len, text, &c->listening->addr_text);
 
     c->log->connection = c->number;
     c->log->handler = ngx_stream_log_error;

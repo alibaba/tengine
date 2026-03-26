@@ -174,9 +174,6 @@ ngx_int_t ngx_dns_strcmp(u_char *s1, u_char *s2);
 ngx_int_t ngx_filename_cmp(u_char *s1, u_char *s2, size_t n);
 
 ngx_int_t ngx_atoi(u_char *line, size_t n);
-#if (T_NGX_HTTP_IMPROVED_IF)
-long long ngx_atoll(u_char *line, size_t n);
-#endif
 ngx_int_t ngx_atofp(u_char *line, size_t n, size_t point);
 ssize_t ngx_atosz(u_char *line, size_t n);
 off_t ngx_atoof(u_char *line, size_t n);
@@ -206,6 +203,7 @@ u_char *ngx_utf8_cpystrn(u_char *dst, u_char *src, size_t n, size_t len);
 #define NGX_ESCAPE_REFRESH        4
 #define NGX_ESCAPE_MEMCACHED      5
 #define NGX_ESCAPE_MAIL_AUTH      6
+#define NGX_ESCAPE_MAIL_XTEXT     7
 
 #define NGX_UNESCAPE_URI       1
 #define NGX_UNESCAPE_REDIRECT  2

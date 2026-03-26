@@ -34,11 +34,6 @@ static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
 static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 
-#if (T_NGX_ACCEPT_FILTER)
-static ngx_int_t ngx_event_dummy_accept_filter(ngx_connection_t *c);
-ngx_int_t  (*ngx_event_top_accept_filter) (ngx_connection_t *c);
-#endif
-
 
 static ngx_uint_t     ngx_timer_resolution;
 sig_atomic_t          ngx_event_timer_alarm;
@@ -80,37 +75,9 @@ ngx_atomic_t         *ngx_stat_writing = &ngx_stat_writing0;
 static ngx_atomic_t   ngx_stat_waiting0;
 ngx_atomic_t         *ngx_stat_waiting = &ngx_stat_waiting0;
 
-#if (T_NGX_HTTP_STUB_STATUS)
-static ngx_atomic_t   ngx_stat_request_time0;
-ngx_atomic_t         *ngx_stat_request_time = &ngx_stat_request_time0;
 #endif
 
-#endif
 
-#if (T_NGX_XQUIC)
-
-ngx_atomic_t   ngx_stat_quic_conns0;
-ngx_atomic_t  *ngx_stat_quic_conns = &ngx_stat_quic_conns0;
-ngx_atomic_t   ngx_stat_quic_cps_nexttime0;
-ngx_atomic_t  *ngx_stat_quic_cps_nexttime = &ngx_stat_quic_cps_nexttime0;
-ngx_atomic_t   ngx_stat_quic_cps0;
-ngx_atomic_t  *ngx_stat_quic_cps = &ngx_stat_quic_cps0;
-ngx_atomic_t   ngx_stat_quic_conns_refused0;
-ngx_atomic_t  *ngx_stat_quic_conns_refused = &ngx_stat_quic_conns_refused0;
-
-ngx_atomic_t   ngx_stat_quic_queries0;
-ngx_atomic_t  *ngx_stat_quic_queries = &ngx_stat_quic_queries0;
-ngx_atomic_t   ngx_stat_quic_qps_nexttime0;
-ngx_atomic_t  *ngx_stat_quic_qps_nexttime = &ngx_stat_quic_qps_nexttime0;
-ngx_atomic_t   ngx_stat_quic_qps0;
-ngx_atomic_t  *ngx_stat_quic_qps = &ngx_stat_quic_qps0;
-ngx_atomic_t   ngx_stat_quic_queries_refused0;
-ngx_atomic_t  *ngx_stat_quic_queries_refused = &ngx_stat_quic_queries_refused0;
-
-ngx_atomic_t   ngx_stat_quic_concurrent_conns0;
-ngx_atomic_t  *ngx_stat_quic_concurrent_conns = &ngx_stat_quic_concurrent_conns0;
-
-#endif
 
 static ngx_command_t  ngx_events_commands[] = {
 
@@ -203,11 +170,8 @@ static ngx_event_module_t  ngx_event_core_module_ctx = {
     &event_core_name,
     ngx_event_core_create_conf,            /* create configuration */
     ngx_event_core_init_conf,              /* init configuration */
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
-#else
+
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
-#endif
 };
 
 
@@ -297,15 +261,24 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     ngx_event_expire_timers();
 
     ngx_event_process_posted(cycle, &ngx_posted_events);
-#if (T_NGX_HAVE_XUDP)
-    ngx_event_process_posted(cycle, &ngx_posted_commit);
-#endif
 }
 
 
 ngx_int_t
 ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 {
+#if (NGX_QUIC)
+
+    ngx_connection_t  *c;
+
+    c = rev->data;
+
+    if (c->quic) {
+        return NGX_OK;
+    }
+
+#endif
+
     if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
 
         /* kqueue, epoll */
@@ -376,9 +349,15 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 {
     ngx_connection_t  *c;
 
-    if (lowat) {
-        c = wev->data;
+    c = wev->data;
 
+#if (NGX_QUIC)
+    if (c->quic) {
+        return NGX_OK;
+    }
+#endif
+
+    if (lowat) {
         if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
             return NGX_ERROR;
         }
@@ -584,25 +563,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
            + cl          /* ngx_stat_active */
            + cl          /* ngx_stat_reading */
            + cl          /* ngx_stat_writing */
-           + cl          /* ngx_stat_waiting */
-#if (T_NGX_HTTP_STUB_STATUS)
-           + cl         /* ngx_stat_request_time */
-#endif
-           ;
-
-#endif
-
-#if (T_NGX_XQUIC)
-
-    size += cl          /* ngx_stat_quic_conns */
-            + cl        /* ngx_stat_quic_cps_nexttime */
-            + cl        /* ngx_stat_quic_cps */
-            + cl        /* ngx_stat_quic_conns_refused */
-            + cl        /* ngx_stat_quic_queries */
-            + cl        /* ngx_stat_quic_qps_nexttime */
-            + cl        /* ngx_stat_quic_qps */
-            + cl        /* ngx_stat_quic_queries_refused */
-            + cl;       /* ngx_stat_quic_concurrent_conns */
+           + cl;         /* ngx_stat_waiting */
 
 #endif
 
@@ -636,8 +597,6 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     ngx_temp_number = (ngx_atomic_t *) (shared + 2 * cl);
 
-    size_t n = 2;
-
     tp = ngx_timeofday();
 
     ngx_random_number = (tp->msec << 16) + ngx_pid;
@@ -652,28 +611,6 @@ ngx_event_module_init(ngx_cycle_t *cycle)
     ngx_stat_writing = (ngx_atomic_t *) (shared + 8 * cl);
     ngx_stat_waiting = (ngx_atomic_t *) (shared + 9 * cl);
 
-    n += 7;
-#endif
-
-#if (T_NGX_HTTP_STUB_STATUS)
-    ngx_stat_request_time = (ngx_atomic_t *) (shared + (n + 1) * cl);
-	
-	n += 1;
-#endif
-
-#if (T_NGX_XQUIC)
-
-    ngx_stat_quic_conns = (ngx_atomic_t *) (shared + (n + 1) * cl);
-    ngx_stat_quic_cps_nexttime = (ngx_atomic_t *) (shared + (n + 2) * cl);
-    ngx_stat_quic_cps = (ngx_atomic_t *) (shared + (n + 3) * cl);
-    ngx_stat_quic_conns_refused = (ngx_atomic_t *) (shared + (n + 4) * cl);
-    ngx_stat_quic_queries = (ngx_atomic_t *) (shared + (n + 5) * cl);
-    ngx_stat_quic_qps_nexttime = (ngx_atomic_t *) (shared + (n + 6) * cl);
-    ngx_stat_quic_qps = (ngx_atomic_t *) (shared + (n + 7) * cl);
-    ngx_stat_quic_queries_refused = (ngx_atomic_t *) (shared + (n + 8) * cl);
-    ngx_stat_quic_concurrent_conns = (ngx_atomic_t * ) (shared + (n + 9) * cl);
-
-    n += 9;
 #endif
 
     return NGX_OK;
@@ -700,9 +637,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 {
     ngx_uint_t           m, i;
     ngx_event_t         *rev, *wev;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_event_t         *aev;
-#endif
     ngx_listening_t     *ls;
     ngx_connection_t    *c, *next, *old;
     ngx_core_conf_t     *ccf;
@@ -737,12 +671,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_next_events);
     ngx_queue_init(&ngx_posted_events);
-#if (T_NGX_HAVE_XUDP)
-    ngx_queue_init(&ngx_posted_commit);
-#endif
-#if (T_NGX_UDPV2)
-    ngx_queue_init(&ngx_udpv2_posted_event);
-#endif
 
     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
         return NGX_ERROR;
@@ -854,20 +782,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         wev[i].closed = 1;
     }
 
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    cycle->async_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
-                                    cycle->log);
-    if (cycle->async_events == NULL) {
-        return NGX_ERROR;
-    }
-
-    aev = cycle->async_events;
-    for (i = 0; i < cycle->connection_n; i++) {
-        aev[i].closed = 1;
-        aev[i].instance = 1;
-    }
-#endif
-
     i = cycle->connection_n;
     next = NULL;
 
@@ -878,10 +792,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
         c[i].fd = (ngx_socket_t) -1;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-        c[i].async = &cycle->async_events[i];
-        c[i].async_fd = (ngx_socket_t) -1;
-#endif
 
         next = &c[i];
     } while (i);
@@ -894,12 +804,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
-#if (T_NGX_HAVE_XUDP)
-        if (ls[i].for_xudp && ls[i].worker != ngx_worker) {
-            continue;
-        }
-#endif
-
 #if (NGX_HAVE_REUSEPORT)
         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
             continue;
@@ -911,13 +815,6 @@ ngx_event_process_init(ngx_cycle_t *cycle)
         if (c == NULL) {
             return NGX_ERROR;
         }
-
-#if (T_NGX_UDPV2)
-        if (ls[i].type == SOCK_DGRAM) {
-            ngx_queue_init(&ls[i].writable_queue);
-            ngx_event_udpv2_init_listening(&ls[i]);
-        }
-#endif
 
         c->type = ls[i].type;
         c->log = &ls[i].log;
@@ -994,8 +891,16 @@ ngx_event_process_init(ngx_cycle_t *cycle)
 
 #else
 
-        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
-                                                : ngx_event_recvmsg;
+        if (c->type == SOCK_STREAM) {
+            rev->handler = ngx_event_accept;
+
+#if (NGX_QUIC)
+        } else if (ls[i].quic) {
+            rev->handler = ngx_quic_recvmsg;
+#endif
+        } else {
+            rev->handler = ngx_event_recvmsg;
+        }
 
 #if (NGX_HAVE_REUSEPORT)
 
@@ -1122,10 +1027,6 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
         }
     }
-
-#if (T_NGX_ACCEPT_FILTER)
-    ngx_event_top_accept_filter = ngx_event_dummy_accept_filter;
-#endif
 
     pcf = *cf;
     cf->ctx = ctx;
@@ -1466,22 +1367,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
 
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 0);
-    ngx_conf_init_msec_value(ecf->accept_mutex_delay,
-#if (T_NGX_MODIFY_DEFAULT_VALUE)
-                            100);
-#else
-                            500);
-#endif
+    ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
 
     return NGX_CONF_OK;
 }
-
-
-#if (T_NGX_ACCEPT_FILTER)
-static ngx_int_t
-ngx_event_dummy_accept_filter(ngx_connection_t *c)
-{
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0, "event dummy accept filter");
-    return NGX_OK;
-}
-#endif

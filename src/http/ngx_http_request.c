@@ -9,10 +9,6 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
-#include <ngx_http_v2_module.h>
-#endif
-
 
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
 static ngx_http_request_t *ngx_http_alloc_request(ngx_connection_t *c);
@@ -33,10 +29,6 @@ static ngx_int_t ngx_http_process_connection(ngx_http_request_t *r,
 static ngx_int_t ngx_http_process_user_agent(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 
-static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool,
-    ngx_uint_t alloc);
-static ngx_int_t ngx_http_set_virtual_server(ngx_http_request_t *r,
-    ngx_str_t *host);
 static ngx_int_t ngx_http_find_virtual_server(ngx_connection_t *c,
     ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
     ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
@@ -54,7 +46,6 @@ static void ngx_http_keepalive_handler(ngx_event_t *ev);
 static void ngx_http_set_lingering_close(ngx_connection_t *c);
 static void ngx_http_lingering_close_handler(ngx_event_t *ev);
 static ngx_int_t ngx_http_post_action(ngx_http_request_t *r);
-static void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t error);
 static void ngx_http_log_request(ngx_http_request_t *r);
 
 static u_char *ngx_http_log_error(ngx_log_t *log, u_char *buf, size_t len);
@@ -204,13 +195,6 @@ ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_null_string, 0, NULL }
 };
 
-#ifdef T_INGRESS_SHARED_MEMORY_PB
-/* Total number of SSL protocol versions */
-#define NGX_HTTPS_SSL_PROTOCOL_NUM         6
-
-static ngx_str_t ngx_ing_ssl_protocols = ngx_string("metadata_ssl_protocols");
-#endif
-
 
 void
 ngx_http_init_connection(ngx_connection_t *c)
@@ -227,10 +211,6 @@ ngx_http_init_connection(ngx_connection_t *c)
     struct sockaddr_in6       *sin6;
     ngx_http_in6_addr_t       *addr6;
 #endif
-#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
-    ngx_http_v2_srv_conf_t *h2scf;
-#endif
-
 
     hc = ngx_pcalloc(c->pool, sizeof(ngx_http_connection_t));
     if (hc == NULL) {
@@ -338,36 +318,18 @@ ngx_http_init_connection(ngx_connection_t *c)
     rev->handler = ngx_http_wait_request_handler;
     c->write->handler = ngx_http_empty_handler;
 
-#if (NGX_HTTP_V2 && T_NGX_HTTP2_SRV_ENABLE)
-    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
-#endif
-
-#if (NGX_HTTP_V2)
-    if (
-#if (T_NGX_HTTP2_SRV_ENABLE)
-        (
-#endif
-         hc->addr_conf->http2
-#if (T_NGX_HTTP2_SRV_ENABLE)
-         && h2scf->enable != 0) || h2scf->enable == 1
-#endif
-       )
-    {
-        rev->handler = ngx_http_v2_init;
+#if (NGX_HTTP_V3)
+    if (hc->addr_conf->quic) {
+        ngx_http_v3_init_stream(c);
+        return;
     }
 #endif
 
 #if (NGX_HTTP_SSL)
-    {
-    ngx_http_ssl_srv_conf_t  *sscf;
-
-    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
-
-    if (sscf->enable || hc->addr_conf->ssl) {
+    if (hc->addr_conf->ssl) {
         hc->ssl = 1;
         c->log->action = "SSL handshaking";
         rev->handler = ngx_http_ssl_handshake;
-    }
     }
 #endif
 
@@ -409,6 +371,9 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     ngx_buf_t                 *b;
     ngx_connection_t          *c;
     ngx_http_connection_t     *hc;
+#if (NGX_HTTP_V2)
+    ngx_http_v2_srv_conf_t    *h2scf;
+#endif
     ngx_http_core_srv_conf_t  *cscf;
 
     c = rev->data;
@@ -455,6 +420,8 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
         b->end = b->last + size;
     }
 
+    size = b->end - b->last;
+
     n = c->recv(c, b->last, size);
 
     if (n == NGX_AGAIN) {
@@ -469,24 +436,17 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
 
-        /*
-         * We are trying to not hold c->buffer's memory for an idle connection.
-         */
+        if (b->pos == b->last) {
 
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-        /* For the Async implementation we need the same buffer to be used
-         * again on any async calls that have not completed.
-         * As such we need to turn off this optimisation if an async request
-         * is still in progress.
-         */
-        if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable) {
-#endif
+            /*
+             * We are trying to not hold c->buffer's memory for an
+             * idle connection.
+             */
+
             if (ngx_pfree(c->pool, b->start) == NGX_OK) {
                 b->start = NULL;
             }
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
         }
-#endif
 
         return;
     }
@@ -504,9 +464,6 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
     }
 
     b->last += n;
-#if (T_NGX_REQ_STATUS)
-    c->received += n;
-#endif
 
     if (hc->proxy_protocol) {
         hc->proxy_protocol = 0;
@@ -528,6 +485,29 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
             return;
         }
     }
+
+#if (NGX_HTTP_V2)
+
+    h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
+
+    if (!hc->ssl && (h2scf->enable || hc->addr_conf->http2)) {
+
+        size = ngx_min(sizeof(NGX_HTTP_V2_PREFACE) - 1,
+                       (size_t) (b->last - b->pos));
+
+        if (ngx_memcmp(b->pos, NGX_HTTP_V2_PREFACE, size) == 0) {
+
+            if (size == sizeof(NGX_HTTP_V2_PREFACE) - 1) {
+                ngx_http_v2_init(rev);
+                return;
+            }
+
+            ngx_post_event(rev, &ngx_posted_events);
+            return;
+        }
+    }
+
+#endif
 
     c->log->action = "reading client request line";
 
@@ -611,12 +591,6 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->srv_conf = hc->conf_ctx->srv_conf;
     r->loc_conf = hc->conf_ctx->loc_conf;
 
-#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
-    r->connect_time = NGX_CONF_UNSET_MSEC;
-    r->read_time = NGX_CONF_UNSET_MSEC;
-    r->send_time = NGX_CONF_UNSET_MSEC;
-#endif
-
     r->read_event_handler = ngx_http_block_reading;
 
     r->header_in = hc->busy ? hc->busy->buf : c->buffer;
@@ -661,31 +635,9 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->main = r;
     r->count = 1;
 
-#if (T_NGX_RET_CACHE)
-    {
-    struct timeval              tv;
-    ngx_http_core_loc_conf_t   *clcf;
-
-    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
-    if (clcf->request_time_cache) {
-        tp = ngx_timeofday();
-        r->start_sec = tp->sec;
-        r->start_msec = tp->msec;
-        r->start_usec = tp->usec;
-
-    } else {
-        ngx_gettimeofday(&tv);
-        r->start_sec = tv.tv_sec;
-        r->start_msec = tv.tv_usec / 1000;
-        r->start_usec = tv.tv_usec % 1000;
-    }
-    }
-#else
     tp = ngx_timeofday();
     r->start_sec = tp->sec;
     r->start_msec = tp->msec;
-#endif
 
     r->method = NGX_HTTP_UNKNOWN;
     r->http_version = NGX_HTTP_VERSION_10;
@@ -822,19 +774,6 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
                 return;
             }
 
-#if (T_NGX_SSL_HANDSHAKE_TIME)
-            {
-            /* ssl handshake start time */
-            ngx_time_t *tp = ngx_timeofday();
-            c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
-            }
-#endif
-#if (T_NGX_SSL_NTLS)
-            if (sscf->enable_ntls) {
-                SSL_enable_ntls(c->ssl->connection);
-            }
-#endif
-
             ngx_reusable_connection(c, 0);
 
             rc = ngx_ssl_handshake(c);
@@ -859,11 +798,6 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0, "plain http");
 
         c->log->action = "waiting for request";
-#if (T_NGX_HTTPS_ALLOW_HTTP)
-        if (hc->addr_conf->https_allow_http) {
-            hc->ssl = 0;
-        }
-#endif
 
         rev->handler = ngx_http_wait_request_handler;
         ngx_http_wait_request_handler(rev);
@@ -894,42 +828,18 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 #if (NGX_HTTP_V2                                                              \
      && defined TLSEXT_TYPE_application_layer_protocol_negotiation)
         {
-        unsigned int            len;
-        const unsigned char    *data;
-        ngx_http_connection_t  *hc;
+        unsigned int             len;
+        const unsigned char     *data;
+        ngx_http_connection_t   *hc;
+        ngx_http_v2_srv_conf_t  *h2scf;
 
-#if (T_NGX_HTTP2_SRV_ENABLE)
-        ngx_http_v2_srv_conf_t *h2scf;
-#endif
         hc = c->data;
 
-#if (T_NGX_HTTP2_SRV_ENABLE)
         h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
-#endif
 
-        if (
-#if (T_NGX_HTTP2_SRV_ENABLE)
-            (
-#endif
-             hc->addr_conf->http2
-#if (T_NGX_HTTP2_SRV_ENABLE)
-             && h2scf->enable != 0) || h2scf->enable == 1
-#endif
-           )
-        {
+        if (h2scf->enable || hc->addr_conf->http2) {
 
-#ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
             SSL_get0_alpn_selected(c->ssl->connection, &data, &len);
-
-#ifdef TLSEXT_TYPE_next_proto_neg
-            if (len == 0) {
-                SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
-            }
-#endif
-
-#else /* TLSEXT_TYPE_next_proto_neg */
-            SSL_get0_next_proto_negotiated(c->ssl->connection, &data, &len);
-#endif
 
             if (len == 2 && data[0] == 'h' && data[1] == '2') {
                 ngx_http_v2_init(c->read);
@@ -964,10 +874,6 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 int
 ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 {
-#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
-    return SSL_TLSEXT_ERR_OK;
-#endif
-
     ngx_int_t                  rc;
     ngx_str_t                  host;
     const char                *servername;
@@ -1026,6 +932,31 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
         goto done;
     }
 
+    sscf = ngx_http_get_module_srv_conf(cscf->ctx, ngx_http_ssl_module);
+
+#if (defined TLS1_3_VERSION                                                   \
+     && !defined LIBRESSL_VERSION_NUMBER && !defined OPENSSL_IS_BORINGSSL)
+
+    /*
+     * SSL_SESSION_get0_hostname() is only available in OpenSSL 1.1.1+,
+     * but servername being negotiated in every TLSv1.3 handshake
+     * is only returned in OpenSSL 1.1.1+ as well
+     */
+
+    if (sscf->verify) {
+        const char  *hostname;
+
+        hostname = SSL_SESSION_get0_hostname(SSL_get0_session(ssl_conn));
+
+        if (hostname != NULL && ngx_strcmp(hostname, servername) != 0) {
+            c->ssl->handshake_rejected = 1;
+            *ad = SSL_AD_ACCESS_DENIED;
+            return SSL_TLSEXT_ERR_ALERT_FATAL;
+        }
+    }
+
+#endif
+
     hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
     if (hc->ssl_servername == NULL) {
         goto error;
@@ -1038,8 +969,6 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     clcf = ngx_http_get_module_loc_conf(hc->conf_ctx, ngx_http_core_module);
 
     ngx_set_connection_log(c, clcf->error_log);
-
-    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
 
     c->ssl->buffer_size = sscf->buffer_size;
 
@@ -1069,6 +998,14 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
 #endif
+
+#ifdef SSL_OP_ENABLE_MIDDLEBOX_COMPAT
+#if (NGX_HTTP_V3)
+        if (c->listening->quic) {
+            SSL_clear_options(ssl_conn, SSL_OP_ENABLE_MIDDLEBOX_COMPAT);
+        }
+#endif
+#endif
     }
 
 done:
@@ -1087,381 +1024,6 @@ error:
 
     *ad = SSL_AD_INTERNAL_ERROR;
     return SSL_TLSEXT_ERR_ALERT_FATAL;
-}
-
-#endif
-
-
-#ifdef T_INGRESS_SHARED_MEMORY_PB
-int
-ngx_http_ssl_ctx_reset(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
-{
-    ngx_int_t                  rc;
-    ngx_str_t                  host;
-    const char                *servername = NULL;
-    ngx_connection_t          *c;
-    ngx_http_connection_t     *hc;
-    ngx_http_ssl_srv_conf_t   *sscf;
-    ngx_http_core_loc_conf_t  *clcf;
-    ngx_http_core_srv_conf_t  *cscf;
-
-    c = ngx_ssl_get_connection(ssl_conn);
-
-    if (c->ssl->handshaked) {
-        *ad = SSL_AD_NO_RENEGOTIATION;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-    }
-
-#ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
-    servername = SSL_get_servername(ssl_conn, TLSEXT_NAMETYPE_host_name);
-#endif
-
-    if (servername == NULL) {
-        return SSL_TLSEXT_ERR_OK;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "SSL server name: \"%s\"", servername);
-
-    host.len = ngx_strlen(servername);
-
-    if (host.len == 0) {
-        return SSL_TLSEXT_ERR_OK;
-    }
-
-    host.data = (u_char *) servername;
-
-    rc = ngx_http_validate_host(&host, c->pool, 1);
-
-    if (rc == NGX_ERROR) {
-        *ad = SSL_AD_INTERNAL_ERROR;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-    }
-
-    if (rc == NGX_DECLINED) {
-        return SSL_TLSEXT_ERR_OK;
-    }
-
-    hc = c->data;
-
-    rc = ngx_http_find_virtual_server(c, hc->addr_conf->virtual_names, &host,
-                                      NULL, &cscf);
-
-    if (rc == NGX_ERROR) {
-        *ad = SSL_AD_INTERNAL_ERROR;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-    }
-
-    if (rc == NGX_DECLINED) {
-        return SSL_TLSEXT_ERR_OK;
-    }
-
-    hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
-    if (hc->ssl_servername == NULL) {
-        *ad = SSL_AD_INTERNAL_ERROR;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-    }
-
-    *hc->ssl_servername = host;
-
-    hc->conf_ctx = cscf->ctx;
-
-    clcf = ngx_http_get_module_loc_conf(hc->conf_ctx, ngx_http_core_module);
-
-    ngx_set_connection_log(c, clcf->error_log);
-
-    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
-
-    c->ssl->buffer_size = sscf->buffer_size;
-
-    if (sscf->ssl.ctx) {
-        SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);
-
-        /*
-         * SSL_set_SSL_CTX() only changes certs as of 1.0.0d
-         * adjust other things we care about
-         */
-
-#ifdef SSL_set_SESSION_CTX
-        /* babassl api */
-        SSL_set_SESSION_CTX(ssl_conn, sscf->ssl.ctx);
-#endif
-
-        SSL_set_verify(ssl_conn, SSL_CTX_get_verify_mode(sscf->ssl.ctx),
-                       SSL_CTX_get_verify_callback(sscf->ssl.ctx));
-
-        SSL_set_verify_depth(ssl_conn, SSL_CTX_get_verify_depth(sscf->ssl.ctx));
-
-#if OPENSSL_VERSION_NUMBER >= 0x009080dfL
-        /* only in 0.9.8m+ */
-        SSL_clear_options(ssl_conn, SSL_get_options(ssl_conn) &
-                                    ~SSL_CTX_get_options(sscf->ssl.ctx));
-#endif
-
-        SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
-
-#ifdef SSL_OP_NO_RENEGOTIATION
-        SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
-#endif
-    }
-
-    return SSL_TLSEXT_ERR_OK;
-}
-
-static ngx_int_t
-ngx_http_request_get_variable(ngx_http_request_t *r, ngx_str_t *name, ngx_str_t *value)
-{
-    u_char                      *low;
-    ngx_str_t                    var;
-    ngx_uint_t                   hash;
-    ngx_http_variable_value_t   *vv;
-
-    if (0 >= name->len || NULL == name->data) {
-        return NGX_ERROR;
-    }
-
-    low = ngx_pnalloc(r->pool, name->len);
-    if (low == NULL) {
-        return NGX_ERROR;
-    }
-
-    hash = ngx_hash_strlow(low, name->data, name->len);
-    var.data = low;
-    var.len = name->len;
-
-    vv = ngx_http_get_variable(r, &var, hash);
-
-    if (vv == NULL || vv->not_found || vv->valid == 0) {
-        return NGX_ERROR;
-    }
-
-    value->data = vv->data;
-    value->len = vv->len;
-
-    return NGX_OK;
-}
-
-#endif
-
-
-#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
-
-int
-ngx_http_ssl_client_hello_callback(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
-{
-    int                        ret, rv;
-    void                      *cert_cb_arg;
-    size_t                     len, remaining;
-    SSL_CTX                   *ssl_ctx;
-    unsigned char             *servername;
-    unsigned long              options;
-    SSL_cert_cb_fn             cert_cb;
-    ngx_connection_t          *c;
-    const unsigned char       *p;
-    ngx_http_request_t        *r;
-    ngx_uint_t                 i = 0;
-    unsigned int               legacy_version = 0;
-    ngx_str_t                  ssl_protocols = ngx_null_string;
-    char                      *ssl_proto;
-    char                       ssl_protos[4 * NGX_HTTPS_SSL_PROTOCOL_NUM];
-    unsigned int               protos[NGX_HTTPS_SSL_PROTOCOL_NUM];
-    unsigned int               proto_num = 0;
-
-    c = ngx_ssl_get_connection(ssl_conn);
-
-    if (c->ssl && c->ssl->handshaked) {
-        return SSL_CLIENT_HELLO_SUCCESS;
-    }
-
-    if (c->ssl && c->ssl->client_hello_retry) {
-        goto recover;
-    }
-
-    if (SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_status_request, &p,
-        &remaining) == 1)
-    {
-        if (*p == TLSEXT_STATUSTYPE_ocsp) {
-            SSL_set_tlsext_status_type(ssl_conn, TLSEXT_STATUSTYPE_ocsp);
-        }
-    }
-
-    if (!SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_server_name, &p,
-        &remaining))
-    {
-        /* servername is NULL */
-        ngx_http_ssl_ctx_reset(ssl_conn, ad, arg);
-
-        goto end;
-    }
-
-    /* Extract the length of the supplied list of names. */
-    len = (*(p++) << 8);
-    len += *(p++);
-    if (len + 2 != remaining) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-
-    remaining = len;
-    /*
-     * The list in practice only has a single element, so we only consider
-     * the first one.
-     */
-    if (remaining == 0 || *p++ != TLSEXT_NAMETYPE_host_name) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-    remaining--;
-    /* Now we can finally pull out the byte array with the actual hostname. */
-    if (remaining <= 2) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-    len = (*(p++) << 8);
-    len += *(p++);
-    if (len + 2 > remaining) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-
-    remaining = len;
-
-    servername = ngx_pcalloc(c->pool, len + 1); /* remain 1 byte to '\0' */
-    if (servername == NULL) {
-        goto end;
-    }
-
-    ngx_memcpy(servername, p, len);
-
-    if (!SSL_set_tlsext_host_name(ssl_conn, servername)) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-
-    r = ngx_http_alloc_request(c);
-    if (r == NULL) {
-        return SSL_CLIENT_HELLO_ERROR;
-    }
-
-    r->logged = 1;
-
-    r->headers_in.server.len = len;
-    r->headers_in.server.data = ngx_pnalloc(r->pool, len);
-    if (r->headers_in.server.data == NULL) {
-        goto proto_next;
-    }
-
-    ngx_memcpy(r->headers_in.server.data, servername, len);
-
-    if (NGX_OK != ngx_http_request_get_variable(r, &ngx_ing_ssl_protocols, &ssl_protocols) || 
-        0 == ssl_protocols.len) {
-        goto proto_next;
-    }
-
-    if (4 * NGX_HTTPS_SSL_PROTOCOL_NUM <= ssl_protocols.len) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, 
-                      "variable %s length %d is invalid", 
-                      ngx_ing_ssl_protocols.data, 
-                      ssl_protocols.len);
-        goto proto_next;
-    }
-
-    ngx_memcpy(ssl_protos, ssl_protocols.data, ssl_protocols.len);
-    ssl_protos[ssl_protocols.len] = '\0';
-    ssl_proto = strtok(ssl_protos, " ");
-    while(ssl_proto != NULL) {
-        protos[proto_num++] = strtoul(ssl_proto, NULL, 10);
-        ssl_proto = strtok(NULL, " ");
-    }
-
-    if (!proto_num) {
-        goto proto_next;
-    }
-
-    if (SSL_client_hello_get0_ext(ssl_conn, TLSEXT_TYPE_supported_versions, &p,
-        &remaining))
-    {
-        if (remaining < 1) {
-            goto proto_next;
-        }
-        size_t msglen = p[0];
-        if (remaining != msglen + 1) {
-            goto proto_next;
-        }
-
-        unsigned int val;
-        if (msglen % 2) {
-            goto proto_next;
-        }
-        const unsigned char *msg = p + 1;
-        while (msglen) {
-            val = msg[0];
-            val = (val << 8) | msg[1];
-            if (val <= TLS_MAX_VERSION) {
-                ngx_log_error(NGX_LOG_DEBUG, c->log, 0, 
-                              "SNI: %s with supported versions %d", 
-                              servername, val);
-                for (i = 0; i < proto_num; i++) {
-                    if (val == protos[i]) {
-                        goto proto_next;
-                    }
-                }
-            }
-            msg += 2;
-            msglen -= 2;
-        }
-
-        goto proto_invalid;
-    }
-
-    legacy_version = SSL_client_hello_get0_legacy_version(ssl_conn);
-    for (i = 0; i < proto_num; i++) {
-        if (legacy_version == protos[i]) {
-            goto proto_next;
-        }
-    }
-
-proto_invalid:
-    ngx_log_error(NGX_LOG_ERR, c->log, 0, 
-                  "SNI: %s with ssl_protocols \"%V\" does not support version %d", 
-                  servername, &ssl_protocols, legacy_version);
-    ngx_http_free_request(r, 0);
-    c->destroyed = 0;
-    *ad = SSL_AD_PROTOCOL_VERSION;
-    return SSL_CLIENT_HELLO_ERROR;
-proto_next:
-    ngx_http_free_request(r, 0);
-    c->destroyed = 0;
-
-    ret = ngx_http_ssl_ctx_reset(ssl_conn, ad, arg);
-
-    if (ret == SSL_TLSEXT_ERR_OK || ret == SSL_TLSEXT_ERR_NOACK) {
-recover:
-        ssl_ctx = SSL_get_SSL_CTX(ssl_conn);
-        if (c->ssl && c->ssl->client_hello_retry == 0) {
-            options = SSL_get_options(ssl_conn);
-            SSL_clear_options(ssl_conn, options);
-            options = SSL_CTX_get_options(ssl_ctx);
-            SSL_set_options(ssl_conn, options);
-        }
-
-        cert_cb = SSL_CTX_get_cert_cb(ssl_ctx);
-        cert_cb_arg = SSL_CTX_get_cert_cb_arg(ssl_ctx);
-        if (cert_cb != NULL) {
-            rv = cert_cb(ssl_conn, cert_cb_arg);
-            if (rv == 0) {
-                return SSL_CLIENT_HELLO_ERROR;
-            }
-
-            SSL_set_cert_cb(ssl_conn, NULL, NULL);
-
-            if (rv < 0) {
-                c->ssl->client_hello_retry = 1;
-                return SSL_CLIENT_HELLO_RETRY;
-            }
-
-            c->ssl->client_hello_retry = 0;
-        }
-    }
-
-end:
-
-    return SSL_CLIENT_HELLO_SUCCESS;
 }
 
 #endif
@@ -1515,6 +1077,7 @@ ngx_http_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg)
                        "ssl key: \"%s\"", key.data);
 
         if (ngx_ssl_connection_certificate(c, r->pool, &cert, &key,
+                                           sscf->certificate_cache,
                                            sscf->passwords)
             != NGX_OK)
         {
@@ -1593,55 +1156,6 @@ ngx_http_process_request_line(ngx_event_t *rev)
             if (r->http_protocol.data) {
                 r->http_protocol.len = r->request_end - r->http_protocol.data;
             }
-
-#if (NGX_HTTP_PROXY_CONNECT)
-
-            if (r->connect_host_start && r->connect_host_end) {
-
-                host.len = r->connect_host_end - r->connect_host_start;
-                host.data = r->connect_host_start;
-                rc = ngx_http_validate_host(&host, r->pool, 0);
-
-                if (rc == NGX_DECLINED) {
-                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                                  "client sent invalid host in request line");
-                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-                    return;
-                }
-
-                if (rc == NGX_ERROR) {
-                    ngx_http_close_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-                    return;
-                }
-
-                r->connect_host = host;
-
-                if (!r->connect_port_end) {
-                   ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                                  "client sent no port in request line");
-                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-                    return;
-                }
-
-                r->connect_port.data = r->connect_host_end + 1;
-                r->connect_port.len = r->connect_port_end
-                                      - r->connect_host_end - 1;
-
-                ngx_int_t port;
-
-                port = ngx_atoi(r->connect_port.data, r->connect_port.len);
-                if (port == NGX_ERROR || port < 1 || port > 65535) {
-                    ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                                  "client sent invalid port in request line");
-                    ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-                    return;
-                }
-
-                r->connect_port_n = port;
-
-                /* skip processing request uri */
-            } else
-#endif
 
             if (ngx_http_process_request_uri(r) != NGX_OK) {
                 break;
@@ -1789,16 +1303,6 @@ ngx_http_process_request_uri(ngx_http_request_t *r)
     } else {
         r->uri.data = r->uri_start;
     }
-
-#if (T_NGX_VARS)
-    if (r->args_start) {
-        r->raw_uri.len = r->args_start - 1 - r->uri_start;
-
-    } else {
-        r->raw_uri.len = r->uri_end - r->uri_start;
-    }
-    r->raw_uri.data = r->uri_start;
-#endif
 
     r->unparsed_uri.len = r->uri_end - r->uri_start;
     r->unparsed_uri.data = r->uri_start;
@@ -2090,21 +1594,12 @@ ngx_http_read_request_header(ngx_http_request_t *r)
         return n;
     }
 
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-    if(c->async_enable)
+    if (rev->ready) {
         n = c->recv(c, r->header_in->last,
                     r->header_in->end - r->header_in->last);
-    else {
-#endif
-            if (rev->ready) {
-                n = c->recv(c, r->header_in->last,
-                            r->header_in->end - r->header_in->last);
-            } else {
-                 n = NGX_AGAIN;
-            }
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+    } else {
+        n = NGX_AGAIN;
     }
-#endif
 
     if (n == NGX_AGAIN) {
         if (!rev->timer_set) {
@@ -2134,9 +1629,6 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     }
 
     r->header_in->last += n;
-#if (T_NGX_REQ_STATUS)
-    c->received += n;
-#endif
 
     return n;
 }
@@ -2250,39 +1742,30 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
             r->request_end = new + (r->request_end - old);
         }
 
-        r->method_end = new + (r->method_end - old);
+        if (r->method_end) {
+            r->method_end = new + (r->method_end - old);
+        }
 
-        r->uri_start = new + (r->uri_start - old);
-        r->uri_end = new + (r->uri_end - old);
+        if (r->uri_start) {
+            r->uri_start = new + (r->uri_start - old);
+        }
+
+        if (r->uri_end) {
+            r->uri_end = new + (r->uri_end - old);
+        }
 
         if (r->schema_start) {
             r->schema_start = new + (r->schema_start - old);
-            r->schema_end = new + (r->schema_end - old);
-        }
-
-#if (NGX_HTTP_PROXY_CONNECT)
-        if (r->connect_host_start) {
-            r->connect_host_start = new + (r->connect_host_start - old);
-            if (r->connect_host_end) {
-                r->connect_host_end = new + (r->connect_host_end - old);
-            }
-
-            if (r->connect_port_end) {
-                r->connect_port_end = new + (r->connect_port_end - old);
+            if (r->schema_end) {
+                r->schema_end = new + (r->schema_end - old);
             }
         }
-#endif
 
         if (r->host_start) {
             r->host_start = new + (r->host_start - old);
             if (r->host_end) {
                 r->host_end = new + (r->host_end - old);
             }
-        }
-
-        if (r->port_start) {
-            r->port_start = new + (r->port_start - old);
-            r->port_end = new + (r->port_end - old);
         }
 
         if (r->uri_ext) {
@@ -2299,9 +1782,18 @@ ngx_http_alloc_large_header_buffer(ngx_http_request_t *r,
 
     } else {
         r->header_name_start = new;
-        r->header_name_end = new + (r->header_name_end - old);
-        r->header_start = new + (r->header_start - old);
-        r->header_end = new + (r->header_end - old);
+
+        if (r->header_name_end) {
+            r->header_name_end = new + (r->header_name_end - old);
+        }
+
+        if (r->header_start) {
+            r->header_start = new + (r->header_start - old);
+        }
+
+        if (r->header_end) {
+            r->header_end = new + (r->header_end - old);
+        }
     }
 
     r->header_in = b;
@@ -2563,14 +2055,12 @@ ngx_http_process_request_header(ngx_http_request_t *r)
         }
     }
 
-#if !(NGX_HTTP_PROXY_CONNECT)
     if (r->method == NGX_HTTP_CONNECT) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                       "client sent CONNECT method");
         ngx_http_finalize_request(r, NGX_HTTP_NOT_ALLOWED);
         return NGX_ERROR;
     }
-#endif
 
     if (r->method == NGX_HTTP_TRACE) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
@@ -2590,7 +2080,7 @@ ngx_http_process_request(ngx_http_request_t *r)
 
     c = r->connection;
 
-#if (NGX_HTTP_SSL && !T_NGX_HTTP_SSL_VCE)
+#if (NGX_HTTP_SSL)
 
     if (r->http_connection->ssl) {
         long                      rc;
@@ -2675,7 +2165,7 @@ ngx_http_process_request(ngx_http_request_t *r)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 {
     u_char  *h, ch;
@@ -2767,7 +2257,7 @@ ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_http_set_virtual_server(ngx_http_request_t *r, ngx_str_t *host)
 {
     ngx_int_t                  rc;
@@ -3228,6 +2718,8 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http terminate request count:%d", mr->count);
 
+    mr->terminated = 1;
+
     if (rc > 0 && (mr->headers_out.status == 0 || mr->connection->sent == 0)) {
         mr->headers_out.status = rc;
     }
@@ -3250,8 +2742,11 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
     if (mr->write_event_handler) {
 
         if (mr->blocked) {
+            r = r->connection->data;
+
             r->connection->error = 1;
             r->write_event_handler = ngx_http_request_finalizer;
+
             return;
         }
 
@@ -3290,8 +2785,8 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     }
 #endif
 
-#if (T_NGX_XQUIC)
-    if (r->xqstream) {
+#if (NGX_HTTP_V3)
+    if (r->connection->quic) {
         ngx_http_close_request(r, 0);
         return;
     }
@@ -3325,6 +2820,13 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
     if (r->reading_body) {
         r->keepalive = 0;
         r->lingering_close = 1;
+    }
+
+    if (r->keepalive
+        && clcf->keepalive_min_timeout > 0)
+    {
+        ngx_http_set_keepalive(r);
+        return;
     }
 
     if (!ngx_terminate
@@ -3512,10 +3014,11 @@ ngx_http_test_reading(ngx_http_request_t *r)
 
 #endif
 
-#if (T_NGX_XQUIC)
+#if (NGX_HTTP_V3)
 
-    if (r->xqstream) {
-        if (c->error) {
+    if (c->quic) {
+        if (rev->error) {
+            c->error = 1;
             err = 0;
             goto closed;
         }
@@ -3726,11 +3229,6 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         c->destroyed = 0;
         c->pipeline = 1;
 
-#if (T_NGX_REQ_STATUS)
-        /* bytes in the buffer have already been counted */
-        c->received = 0;
-#endif
-
         if (rev->timer_set) {
             ngx_del_timer(rev);
         }
@@ -3747,15 +3245,6 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
      * c->pool and are freed too.
      */
 
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-    /* For the Async implementation we need the same buffer to be used
-     * again on any async calls that have not completed.
-     * As such we need to turn off this optimisation if an async request
-     * is still in progress.
-     */
-    if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
-    {
-#endif
     b = c->buffer;
 
     if (ngx_pfree(c->pool, b->start) == NGX_OK) {
@@ -3800,9 +3289,6 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
         hc->busy = NULL;
         hc->nbusy = 0;
     }
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-    }
-#endif
 
 #if (NGX_HTTP_SSL)
     if (c->ssl) {
@@ -3813,14 +3299,6 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     rev->handler = ngx_http_keepalive_handler;
 
     if (wev->active && (ngx_event_flags & NGX_USE_LEVEL_EVENT)) {
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-        if (c->async_enable && ngx_del_async_conn) {
-            if (c->num_async_fds) {
-                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-                c->num_async_fds--;
-            }
-        }
-#endif
         if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) != NGX_OK) {
             ngx_http_close_connection(c);
             return;
@@ -3853,10 +3331,22 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
     r->http_state = NGX_HTTP_KEEPALIVE_STATE;
 #endif
 
-    c->idle = 1;
-    ngx_reusable_connection(c, 1);
+    if (clcf->keepalive_min_timeout == 0) {
+        c->idle = 1;
+        ngx_reusable_connection(c, 1);
+    }
 
-    ngx_add_timer(rev, clcf->keepalive_timeout);
+    if (clcf->keepalive_min_timeout > 0
+        && clcf->keepalive_timeout > clcf->keepalive_min_timeout)
+    {
+        hc->keepalive_timeout = clcf->keepalive_timeout
+                                - clcf->keepalive_min_timeout;
+
+    } else {
+        hc->keepalive_timeout = 0;
+    }
+
+    ngx_add_timer(rev, clcf->keepalive_timeout - hc->keepalive_timeout);
 
     if (rev->ready) {
         ngx_post_event(rev, &ngx_posted_events);
@@ -3867,14 +3357,31 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
 static void
 ngx_http_keepalive_handler(ngx_event_t *rev)
 {
-    size_t             size;
-    ssize_t            n;
-    ngx_buf_t         *b;
-    ngx_connection_t  *c;
+    size_t                  size;
+    ssize_t                 n;
+    ngx_buf_t              *b;
+    ngx_connection_t       *c;
+    ngx_http_connection_t  *hc;
 
     c = rev->data;
+    hc = c->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http keepalive handler");
+
+    if (!ngx_terminate
+         && !ngx_exiting
+         && rev->timedout
+         && hc->keepalive_timeout > 0)
+    {
+        c->idle = 1;
+        ngx_reusable_connection(c, 1);
+
+        ngx_add_timer(rev, hc->keepalive_timeout);
+
+        hc->keepalive_timeout = 0;
+        rev->timedout = 0;
+        return;
+    }
 
     if (rev->timedout || c->close) {
         ngx_http_close_connection(c);
@@ -3945,25 +3452,14 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
          * c->buffer's memory for a keepalive connection.
          */
 
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-        /* For the Asynch implementation we need the same buffer to be used
-         * on subsequent read requests. As such we need to turn off this optimisation that
-         * frees the buffer between invocations as may end up with a buffer that is at a
-         * different address */
-        if ((c->async_enable && !ngx_ssl_waiting_for_async(c)) || !c->async_enable)
-        {
-#endif
-            if (ngx_pfree(c->pool, b->start) == NGX_OK) {
+        if (ngx_pfree(c->pool, b->start) == NGX_OK) {
 
-                /*
-                 * the special note that c->buffer's memory was freed
-                 */
+            /*
+             * the special note that c->buffer's memory was freed
+             */
 
-                b->pos = NULL;
-            }
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
+            b->pos = NULL;
         }
-#endif
 
         return;
     }
@@ -3998,9 +3494,6 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
 
     c->sent = 0;
     c->destroyed = 0;
-#if (T_NGX_REQ_STATUS)
-    c->received = n;
-#endif
 
     ngx_del_timer(rev);
 
@@ -4056,14 +3549,6 @@ ngx_http_set_lingering_close(ngx_connection_t *c)
     wev->handler = ngx_http_empty_handler;
 
     if (wev->active && (ngx_event_flags & NGX_USE_LEVEL_EVENT)) {
-#if (NGX_HTTP_SSL && NGX_SSL_ASYNC)
-        if (c->async_enable && ngx_del_async_conn) {
-            if (c->num_async_fds) {
-                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-                c->num_async_fds--;
-            }
-        }
-#endif
         if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) != NGX_OK) {
             ngx_http_close_request(r, 0);
             return;
@@ -4128,10 +3613,6 @@ ngx_http_lingering_close_handler(ngx_event_t *rev)
             ngx_http_close_request(r, 0);
             return;
         }
-
-#if (T_NGX_REQ_STATUS)
-        c->received += n;
-#endif
 
     } while (rev->ready);
 
@@ -4241,7 +3722,7 @@ ngx_http_post_action(ngx_http_request_t *r)
 }
 
 
-static void
+void
 ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 {
     ngx_connection_t  *c;
@@ -4265,13 +3746,6 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 #if (NGX_HTTP_V2)
     if (r->stream) {
         ngx_http_v2_close_stream(r->stream, rc);
-        return;
-    }
-#endif
-
-#if (T_NGX_XQUIC)
-    if (r->xqstream) {
-        ngx_http_v3_close_stream(r->xqstream, rc);
         return;
     }
 #endif
@@ -4335,7 +3809,12 @@ ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc)
 
     log->action = "closing request";
 
-    if (r->connection->timedout) {
+    if (r->connection->timedout
+#if (NGX_HTTP_V3)
+        && r->connection->quic == NULL
+#endif
+       )
+    {
         clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
         if (clcf->reset_timedout_connection) {
@@ -4406,6 +3885,12 @@ ngx_http_close_connection(ngx_connection_t *c)
         }
     }
 
+#endif
+
+#if (NGX_HTTP_V3)
+    if (c->quic) {
+        ngx_http_v3_reset_stream(c);
+    }
 #endif
 
 #if (NGX_STAT_STUB)
@@ -4526,15 +4011,3 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
 
     return buf;
 }
-
-#if (T_NGX_XQUIC)
-
-ngx_int_t
-ngx_http_find_virtual_server_inner(ngx_connection_t *c,
-    ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
-    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp)
-{
-    return ngx_http_find_virtual_server(c, virtual_names, host, r, cscfp);
-}
-
-#endif

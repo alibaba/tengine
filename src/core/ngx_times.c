@@ -29,18 +29,10 @@ static ngx_atomic_t      ngx_time_lock;
 volatile ngx_msec_t      ngx_current_msec;
 volatile ngx_time_t     *ngx_cached_time;
 volatile ngx_str_t       ngx_cached_err_log_time;
-
-#if (T_NGX_XQUIC)
-volatile ngx_str_t       ngx_cached_xquic_log_time;
-#endif
-
 volatile ngx_str_t       ngx_cached_http_time;
 volatile ngx_str_t       ngx_cached_http_log_time;
 volatile ngx_str_t       ngx_cached_http_log_iso8601;
 volatile ngx_str_t       ngx_cached_syslog_time;
-#if (T_NGX_RET_CACHE)
-volatile ngx_tm_t       *ngx_cached_tm;
-#endif
 
 #if !(NGX_WIN32)
 
@@ -53,16 +45,9 @@ volatile ngx_tm_t       *ngx_cached_tm;
 static ngx_int_t         cached_gmtoff;
 #endif
 
-#if (T_NGX_RET_CACHE)
-static ngx_tm_t          cached_http_log_tm[NGX_TIME_SLOTS];
-#endif
 static ngx_time_t        cached_time[NGX_TIME_SLOTS];
 static u_char            cached_err_log_time[NGX_TIME_SLOTS]
                                     [sizeof("1970/09/28 12:00:00")];
-#if (T_NGX_XQUIC)
-static u_char            cached_xquic_log_time[NGX_TIME_SLOTS]
-                                    [sizeof("1970/09/28 12:00:00.000|1426141364883")];
-#endif
 static u_char            cached_http_time[NGX_TIME_SLOTS]
                                     [sizeof("Mon, 28 Sep 1970 06:00:00 GMT")];
 static u_char            cached_http_log_time[NGX_TIME_SLOTS]
@@ -81,18 +66,12 @@ void
 ngx_time_init(void)
 {
     ngx_cached_err_log_time.len = sizeof("1970/09/28 12:00:00") - 1;
-#if (T_NGX_XQUIC)
-    ngx_cached_xquic_log_time.len = sizeof("1970/09/28 12:00:00.000|1426141364883") -1;
-#endif
     ngx_cached_http_time.len = sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1;
     ngx_cached_http_log_time.len = sizeof("28/Sep/1970:12:00:00 +0600") - 1;
     ngx_cached_http_log_iso8601.len = sizeof("1970-09-28T12:00:00+06:00") - 1;
     ngx_cached_syslog_time.len = sizeof("Sep 28 12:00:00") - 1;
 
     ngx_cached_time = &cached_time[0];
-#if (T_NGX_RET_CACHE)
-    ngx_cached_tm = &cached_http_log_tm[0];
-#endif
 
     ngx_time_update();
 }
@@ -102,17 +81,11 @@ void
 ngx_time_update(void)
 {
     u_char          *p0, *p1, *p2, *p3, *p4;
-#if (T_NGX_XQUIC)
-    u_char          *p5;
-#endif
     ngx_tm_t         tm, gmt;
     time_t           sec;
     ngx_uint_t       msec;
     ngx_time_t      *tp;
     struct timeval   tv;
-#if (T_NGX_RET_CACHE)
-    ngx_uint_t       usec;
-#endif
 
     if (!ngx_trylock(&ngx_time_lock)) {
         return;
@@ -122,9 +95,6 @@ ngx_time_update(void)
 
     sec = tv.tv_sec;
     msec = tv.tv_usec / 1000;
-#if (T_NGX_RET_CACHE)
-    usec = tv.tv_usec % 1000;
-#endif
 
     ngx_current_msec = ngx_monotonic_time(sec, msec);
 
@@ -132,9 +102,6 @@ ngx_time_update(void)
 
     if (tp->sec == sec) {
         tp->msec = msec;
-#if (T_NGX_RET_CACHE)
-        tp->usec = usec;
-#endif
         ngx_unlock(&ngx_time_lock);
         return;
     }
@@ -149,9 +116,6 @@ ngx_time_update(void)
 
     tp->sec = sec;
     tp->msec = msec;
-#if (T_NGX_RET_CACHE)
-    tp->usec = usec;
-#endif
 
     ngx_gmtime(sec, &gmt);
 
@@ -182,9 +146,6 @@ ngx_time_update(void)
 
 #endif
 
-#if (T_NGX_RET_CACHE)
-    cached_http_log_tm[slot] = tm;
-#endif
 
     p1 = &cached_err_log_time[slot][0];
 
@@ -218,29 +179,15 @@ ngx_time_update(void)
                        months[tm.ngx_tm_mon - 1], tm.ngx_tm_mday,
                        tm.ngx_tm_hour, tm.ngx_tm_min, tm.ngx_tm_sec);
 
-#if (T_NGX_XQUIC)
-    p5 = &cached_xquic_log_time[slot][0];
-
-    (void) ngx_sprintf(p5, "%4d/%02d/%02d %02d:%02d:%02d.%03d|%013ui",
-                       tm.ngx_tm_year, tm.ngx_tm_mon,
-                       tm.ngx_tm_mday, tm.ngx_tm_hour,
-                       tm.ngx_tm_min, tm.ngx_tm_sec, msec, ngx_current_msec);
-#endif
-
     ngx_memory_barrier();
 
-#if (T_NGX_RET_CACHE)
-    ngx_cached_tm = &cached_http_log_tm[slot];
-#endif
     ngx_cached_time = tp;
     ngx_cached_http_time.data = p0;
     ngx_cached_err_log_time.data = p1;
     ngx_cached_http_log_time.data = p2;
     ngx_cached_http_log_iso8601.data = p3;
     ngx_cached_syslog_time.data = p4;
-#if (T_NGX_XQUIC)
-    ngx_cached_xquic_log_time.data = p5;
-#endif
+
     ngx_unlock(&ngx_time_lock);
 }
 

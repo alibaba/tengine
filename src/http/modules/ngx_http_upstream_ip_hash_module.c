@@ -9,9 +9,6 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#if (NGX_HTTP_UPSTREAM_CHECK)
-#include "ngx_http_upstream_check_module.h"
-#endif
 
 typedef struct {
     /* the round robin data must be first */
@@ -166,10 +163,18 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
 
     ngx_http_upstream_rr_peers_rlock(iphp->rrp.peers);
 
-    if (iphp->tries > 20 || iphp->rrp.peers->single) {
+    if (iphp->tries > 20 || iphp->rrp.peers->number < 2) {
         ngx_http_upstream_rr_peers_unlock(iphp->rrp.peers);
         return iphp->get_rr_peer(pc, &iphp->rrp);
     }
+
+#if (NGX_HTTP_UPSTREAM_ZONE)
+    if (iphp->rrp.peers->config && iphp->rrp.config != *iphp->rrp.peers->config)
+    {
+        ngx_http_upstream_rr_peers_unlock(iphp->rrp.peers);
+        return iphp->get_rr_peer(pc, &iphp->rrp);
+    }
+#endif
 
     now = ngx_time();
 
@@ -211,17 +216,6 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
             goto next;
         }
 
-#if (NGX_HTTP_UPSTREAM_CHECK)
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                       "get ip_hash peer, check_index: %ui",
-                       peer->check_index);
-
-        if (ngx_http_upstream_check_peer_down(peer->check_index)) {
-            ngx_http_upstream_rr_peer_unlock(iphp->rrp.peers, peer);
-            goto next;
-        }
-#endif
-
         if (peer->max_fails
             && peer->fails >= peer->max_fails
             && now - peer->checked <= peer->fail_timeout)
@@ -246,13 +240,12 @@ ngx_http_upstream_get_ip_hash_peer(ngx_peer_connection_t *pc, void *data)
     }
 
     iphp->rrp.current = peer;
+    ngx_http_upstream_rr_peer_ref(iphp->rrp.peers, peer);
 
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE) 
-    pc->host = &peer->host;
-#endif
+
     peer->conns++;
 
     if (now - peer->checked > peer->fail_timeout) {
@@ -284,6 +277,7 @@ ngx_http_upstream_ip_hash(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     uscf->peer.init_upstream = ngx_http_upstream_init_ip_hash;
 
     uscf->flags = NGX_HTTP_UPSTREAM_CREATE
+                  |NGX_HTTP_UPSTREAM_MODIFY
                   |NGX_HTTP_UPSTREAM_WEIGHT
                   |NGX_HTTP_UPSTREAM_MAX_CONNS
                   |NGX_HTTP_UPSTREAM_MAX_FAILS

@@ -71,9 +71,6 @@ typedef struct {
     ngx_log_t            *log;
 } ngx_pool_cleanup_file_t;
 
-#if (T_DEPRECATED)
-void *ngx_prealloc(ngx_pool_t *pool, void *p, size_t old_size, size_t new_size);
-#endif
 
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
 void ngx_destroy_pool(ngx_pool_t *pool);

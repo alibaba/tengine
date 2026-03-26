@@ -199,7 +199,7 @@ ngx_http_geo_cidr_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
         p = inaddr6->s6_addr;
 
         if (IN6_IS_ADDR_V4MAPPED(inaddr6)) {
-            inaddr = p[12] << 24;
+            inaddr = (in_addr_t) p[12] << 24;
             inaddr += p[13] << 16;
             inaddr += p[14] << 8;
             inaddr += p[15];
@@ -272,7 +272,7 @@ ngx_http_geo_range_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
             if (IN6_IS_ADDR_V4MAPPED(inaddr6)) {
                 p = inaddr6->s6_addr;
 
-                inaddr = p[12] << 24;
+                inaddr = (in_addr_t) p[12] << 24;
                 inaddr += p[13] << 16;
                 inaddr += p[14] << 8;
                 inaddr += p[15];
@@ -1259,7 +1259,7 @@ ngx_http_geo_value(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
         return gvvn->value;
     }
 
-    val = ngx_palloc(ctx->pool, sizeof(ngx_http_variable_value_t));
+    val = ngx_pcalloc(ctx->pool, sizeof(ngx_http_variable_value_t));
     if (val == NULL) {
         return NULL;
     }
@@ -1271,8 +1271,6 @@ ngx_http_geo_value(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
     }
 
     val->valid = 1;
-    val->no_cacheable = 0;
-    val->not_found = 0;
 
     gvvn = ngx_palloc(ctx->temp_pool,
                       sizeof(ngx_http_geo_variable_value_node_t));

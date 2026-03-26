@@ -24,9 +24,7 @@
 #define NGX_HTTP_VERSION_10                1000
 #define NGX_HTTP_VERSION_11                1001
 #define NGX_HTTP_VERSION_20                2000
-#if (T_NGX_XQUIC)
 #define NGX_HTTP_VERSION_30                3000
-#endif
 
 #define NGX_HTTP_UNKNOWN                   0x00000001
 #define NGX_HTTP_GET                       0x00000002
@@ -104,7 +102,6 @@
 #define NGX_HTTP_REQUEST_URI_TOO_LARGE     414
 #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
 #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
-#define NGX_HTTP_REQUEST_LIMITED           420
 #define NGX_HTTP_MISDIRECTED_REQUEST       421
 #define NGX_HTTP_TOO_MANY_REQUESTS         429
 
@@ -332,6 +329,8 @@ typedef struct {
 
     ngx_chain_t                      *free;
 
+    ngx_msec_t                        keepalive_timeout;
+
     unsigned                          ssl:1;
     unsigned                          proxy_protocol:1;
 } ngx_http_connection_t;
@@ -411,36 +410,14 @@ struct ngx_http_request_s {
     time_t                            start_sec;
     ngx_msec_t                        start_msec;
 
-#if (T_HTTP_UPSTREAM_TIMEOUT_VAR)
-    ngx_msec_t                        connect_time;
-    ngx_msec_t                        read_time;
-    ngx_msec_t                        send_time;
-#endif
-
-#if (T_NGX_RET_CACHE)
-    ngx_usec_t                        start_usec;
-#endif
-
     ngx_uint_t                        method;
     ngx_uint_t                        http_version;
 
     ngx_str_t                         request_line;
-#if (T_NGX_VARS)
-    ngx_str_t                         raw_uri;
-#endif
     ngx_str_t                         uri;
     ngx_str_t                         args;
     ngx_str_t                         exten;
     ngx_str_t                         unparsed_uri;
-
-#if (NGX_HTTP_PROXY_CONNECT)
-    ngx_str_t                         connect_host;
-    ngx_str_t                         connect_port;
-    in_port_t                         connect_port_n;
-    u_char                           *connect_host_start;
-    u_char                           *connect_host_end;
-    u_char                           *connect_port_end;
-#endif
 
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
@@ -477,9 +454,7 @@ struct ngx_http_request_s {
 
     ngx_http_connection_t            *http_connection;
     ngx_http_v2_stream_t             *stream;
-#if (T_NGX_XQUIC)
-    ngx_http_v3_stream_t             *xqstream;
-#endif
+    ngx_http_v3_parse_t              *v3_parse;
 
     ngx_http_log_handler_pt           log_handler;
 
@@ -552,9 +527,6 @@ struct ngx_http_request_s {
 
     unsigned                          limit_rate_set:1;
     unsigned                          limit_rate_after_set:1;
-#if (T_NGX_HTTP_SYSGUARD)
-    unsigned                          sysguard_set:1;
-#endif
 
 #if 0
     unsigned                          cacheable:1;
@@ -575,10 +547,12 @@ struct ngx_http_request_s {
     unsigned                          request_complete:1;
     unsigned                          request_output:1;
     unsigned                          header_sent:1;
+    unsigned                          response_sent:1;
     unsigned                          expect_tested:1;
     unsigned                          root_tested:1;
     unsigned                          done:1;
     unsigned                          logged:1;
+    unsigned                          terminated:1;
 
     unsigned                          buffered:4;
 
@@ -626,18 +600,9 @@ struct ngx_http_request_s {
     u_char                           *schema_end;
     u_char                           *host_start;
     u_char                           *host_end;
-    u_char                           *port_start;
-    u_char                           *port_end;
 
     unsigned                          http_minor:16;
     unsigned                          http_major:16;
-
-#if (T_NGX_MULTI_UPSTREAM)
-    ngx_queue_t                       *multi_item;
-    ngx_queue_t                       *backend_r;
-    ngx_queue_t                        waiting_queue;
-    ngx_flag_t                         waiting;
-#endif
 };
 
 

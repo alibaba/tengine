@@ -15,9 +15,6 @@
 typedef struct {
     ngx_flag_t           enable;
     ngx_flag_t           no_buffer;
-#if (T_NGX_GZIP_CLEAR_ETAG)
-    ngx_flag_t           clear_etag;
-#endif
 
     ngx_hash_t           types;
 
@@ -177,15 +174,6 @@ static ngx_command_t  ngx_http_gzip_filter_commands[] = {
       offsetof(ngx_http_gzip_conf_t, min_length),
       NULL },
 
-#if (T_NGX_GZIP_CLEAR_ETAG)
-    { ngx_string("gzip_clear_etag"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
-      ngx_conf_set_flag_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_gzip_conf_t, clear_etag),
-      NULL },
-#endif
-
       ngx_null_command
 };
 
@@ -302,11 +290,6 @@ ngx_http_gzip_header_filter(ngx_http_request_t *r)
 
     ngx_http_clear_content_length(r);
     ngx_http_clear_accept_ranges(r);
-#if (T_NGX_GZIP_CLEAR_ETAG)
-    if (conf->clear_etag) {
-        ngx_http_clear_etag(r);
-    } else
-#endif
     ngx_http_weak_etag(r);
 
     return ngx_http_next_header_filter(r);
@@ -533,8 +516,10 @@ ngx_http_gzip_filter_memory(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
         /*
          * Another zlib variant, https://github.com/zlib-ng/zlib-ng.
          * It used to force window bits to 13 for fast compression level,
-         * uses (64 + sizeof(void*)) additional space on all allocations
-         * for alignment, 16-byte padding in one of window-sized buffers,
+         * used (64 + sizeof(void*)) additional space on all allocations
+         * for alignment and 16-byte padding in one of window-sized buffers,
+         * uses a single allocation with up to 200 bytes for alignment and
+         * internal pointers, 5/4 times more memory for the pending buffer,
          * and 128K hash.
          */
 
@@ -543,7 +528,7 @@ ngx_http_gzip_filter_memory(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
         }
 
         ctx->allocated = 8192 + 16 + (1 << (wbits + 2))
-                         + 131072 + (1 << (memlevel + 8))
+                         + 131072 + (5 << (memlevel + 6))
                          + 4 * (64 + sizeof(void*));
         ctx->zlib_ng = 1;
     }
@@ -1002,10 +987,14 @@ static void
 ngx_http_gzip_filter_free_copy_buf(ngx_http_request_t *r,
     ngx_http_gzip_ctx_t *ctx)
 {
-    ngx_chain_t  *cl;
+    ngx_chain_t  *cl, *ln;
 
-    for (cl = ctx->copied; cl; cl = cl->next) {
-        ngx_pfree(r->pool, cl->buf->start);
+    for (cl = ctx->copied; cl; /* void */) {
+        ln = cl;
+        cl = cl->next;
+
+        ngx_pfree(r->pool, ln->buf->start);
+        ngx_free_chain(r->pool, ln);
     }
 
     ctx->copied = NULL;
@@ -1092,9 +1081,6 @@ ngx_http_gzip_create_conf(ngx_conf_t *cf)
 
     conf->enable = NGX_CONF_UNSET;
     conf->no_buffer = NGX_CONF_UNSET;
-#if (T_NGX_GZIP_CLEAR_ETAG)
-    conf->clear_etag = NGX_CONF_UNSET;
-#endif
 
     conf->postpone_gzipping = NGX_CONF_UNSET_SIZE;
     conf->level = NGX_CONF_UNSET;
@@ -1114,9 +1100,6 @@ ngx_http_gzip_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_value(conf->no_buffer, prev->no_buffer, 0);
-#if (T_NGX_GZIP_CLEAR_ETAG)
-    ngx_conf_merge_value(conf->clear_etag, prev->clear_etag, 0);
-#endif
 
     ngx_conf_merge_bufs_value(conf->bufs, prev->bufs,
                               (128 * 1024) / ngx_pagesize, ngx_pagesize);
@@ -1132,7 +1115,7 @@ ngx_http_gzip_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_html_default_types)
-        != NGX_OK)
+        != NGX_CONF_OK)
     {
         return NGX_CONF_ERROR;
     }

@@ -51,7 +51,10 @@ ngx_os_init(ngx_log_t *log)
     }
 
     ngx_pagesize = getpagesize();
-    ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+
+    if (ngx_cacheline_size == 0) {
+        ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+    }
 
     for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
 
@@ -99,9 +102,6 @@ void
 ngx_os_status(ngx_log_t *log)
 {
     ngx_log_error(NGX_LOG_NOTICE, log, 0, NGINX_VER_BUILD);
-#if (T_NGX_SERVER_INFO)
-    ngx_log_error(NGX_LOG_NOTICE, log, 0, TENGINE_VER_BUILD);
-#endif
 
 #ifdef NGX_COMPILER
     ngx_log_error(NGX_LOG_NOTICE, log, 0, "built by " NGX_COMPILER);

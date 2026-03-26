@@ -205,6 +205,8 @@ static char *ngx_http_grpc_pass(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 #if (NGX_HTTP_SSL)
+static char *ngx_http_grpc_ssl_certificate_cache(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
 static char *ngx_http_grpc_ssl_password_file(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static char *ngx_http_grpc_ssl_conf_command_check(ngx_conf_t *cf, void *post,
@@ -437,6 +439,13 @@ static ngx_command_t  ngx_http_grpc_commands[] = {
       offsetof(ngx_http_grpc_loc_conf_t, upstream.ssl_certificate_key),
       NULL },
 
+    { ngx_string("grpc_ssl_certificate_cache"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE123,
+      ngx_http_grpc_ssl_certificate_cache,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
     { ngx_string("grpc_ssl_password_file"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_grpc_ssl_password_file,
@@ -451,43 +460,6 @@ static ngx_command_t  ngx_http_grpc_commands[] = {
       offsetof(ngx_http_grpc_loc_conf_t, ssl_conf_commands),
       &ngx_http_grpc_ssl_conf_command_post },
 
-#if (T_NGX_SSL_NTLS)
-    { ngx_string("grpc_enable_ntls"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_http_set_complex_value_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, upstream.enable_ntls),
-      NULL },
-
-    { ngx_string("grpc_ssl_enc_certificate"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, upstream.enc_certificate),
-      NULL },
-
-    { ngx_string("grpc_ssl_enc_certificate_key"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, upstream.enc_certificate_key),
-      NULL },
-
-    { ngx_string("grpc_ssl_sign_certificate"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, upstream.sign_certificate),
-      NULL },
-
-    { ngx_string("grpc_ssl_sign_certificate_key"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_grpc_loc_conf_t, upstream.sign_certificate_key),
-      NULL },
-
-#endif
 #endif
 
       ngx_null_command
@@ -1268,7 +1240,7 @@ ngx_http_grpc_body_output_filter(void *data, ngx_chain_t *in)
     ngx_buf_t              *b;
     ngx_int_t               rc;
     ngx_uint_t              next, last;
-    ngx_chain_t            *cl, *out, **ll;
+    ngx_chain_t            *cl, *out, *ln, **ll;
     ngx_http_upstream_t    *u;
     ngx_http_grpc_ctx_t    *ctx;
     ngx_http_grpc_frame_t  *f;
@@ -1496,7 +1468,10 @@ ngx_http_grpc_body_output_filter(void *data, ngx_chain_t *in)
             last = 1;
         }
 
+        ln = in;
         in = in->next;
+
+        ngx_free_chain(r->pool, ln);
     }
 
     ctx->in = in;
@@ -4420,13 +4395,9 @@ ngx_http_grpc_create_loc_conf(ngx_conf_t *cf)
     conf->ssl_verify_depth = NGX_CONF_UNSET_UINT;
     conf->upstream.ssl_certificate = NGX_CONF_UNSET_PTR;
     conf->upstream.ssl_certificate_key = NGX_CONF_UNSET_PTR;
+    conf->upstream.ssl_certificate_cache = NGX_CONF_UNSET_PTR;
     conf->upstream.ssl_passwords = NGX_CONF_UNSET_PTR;
     conf->ssl_conf_commands = NGX_CONF_UNSET_PTR;
-
-#if (T_NGX_SSL_NTLS)
-    conf->upstream.tls_method = NULL;
-    conf->upstream.enable_ntls = NULL;
-#endif
 #endif
 
     /* the hardcoded values */
@@ -4515,9 +4486,7 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->upstream.ssl_session_reuse, 1);
 
     ngx_conf_merge_bitmask_value(conf->ssl_protocols, prev->ssl_protocols,
-                                 (NGX_CONF_BITMASK_SET
-                                  |NGX_SSL_TLSv1|NGX_SSL_TLSv1_1
-                                  |NGX_SSL_TLSv1_2|NGX_SSL_TLSv1_3));
+                              (NGX_CONF_BITMASK_SET|NGX_SSL_DEFAULT_PROTOCOLS));
 
     ngx_conf_merge_str_value(conf->ssl_ciphers, prev->ssl_ciphers,
                              "DEFAULT");
@@ -4538,8 +4507,15 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->upstream.ssl_certificate, NULL);
     ngx_conf_merge_ptr_value(conf->upstream.ssl_certificate_key,
                               prev->upstream.ssl_certificate_key, NULL);
-    ngx_conf_merge_ptr_value(conf->upstream.ssl_passwords,
-                              prev->upstream.ssl_passwords, NULL);
+    ngx_conf_merge_ptr_value(conf->upstream.ssl_certificate_cache,
+                              prev->upstream.ssl_certificate_cache, NULL);
+
+    if (ngx_http_upstream_merge_ssl_passwords(cf, &conf->upstream,
+                                              &prev->upstream)
+        != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
 
     ngx_conf_merge_ptr_value(conf->ssl_conf_commands,
                               prev->ssl_conf_commands, NULL);
@@ -4548,20 +4524,6 @@ ngx_http_grpc_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
-#if (T_NGX_SSL_NTLS)
-    if (conf->upstream.enable_ntls == NULL) {
-        conf->upstream.enable_ntls = prev->upstream.enable_ntls;
-    }
-    ngx_conf_merge_str_value(conf->upstream.enc_certificate,
-                             prev->upstream.enc_certificate, "");
-    ngx_conf_merge_str_value(conf->upstream.enc_certificate_key,
-                             prev->upstream.enc_certificate_key, "");
-    ngx_conf_merge_str_value(conf->upstream.sign_certificate,
-                             prev->upstream.sign_certificate, "");
-    ngx_conf_merge_str_value(conf->upstream.sign_certificate_key,
-                             prev->upstream.sign_certificate_key, "");
-    conf->upstream.ssl_ciphers = conf->ssl_ciphers;
-#endif
 #endif
 
     hash.max_size = 512;
@@ -4903,6 +4865,100 @@ ngx_http_grpc_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #if (NGX_HTTP_SSL)
 
 static char *
+ngx_http_grpc_ssl_certificate_cache(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
+{
+    ngx_http_grpc_loc_conf_t *plcf = conf;
+
+    time_t       inactive, valid;
+    ngx_str_t   *value, s;
+    ngx_int_t    max;
+    ngx_uint_t   i;
+
+    if (plcf->upstream.ssl_certificate_cache != NGX_CONF_UNSET_PTR) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    max = 0;
+    inactive = 10;
+    valid = 60;
+
+    for (i = 1; i < cf->args->nelts; i++) {
+
+        if (ngx_strncmp(value[i].data, "max=", 4) == 0) {
+
+            max = ngx_atoi(value[i].data + 4, value[i].len - 4);
+            if (max <= 0) {
+                goto failed;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "inactive=", 9) == 0) {
+
+            s.len = value[i].len - 9;
+            s.data = value[i].data + 9;
+
+            inactive = ngx_parse_time(&s, 1);
+            if (inactive == (time_t) NGX_ERROR) {
+                goto failed;
+            }
+
+            continue;
+        }
+
+        if (ngx_strncmp(value[i].data, "valid=", 6) == 0) {
+
+            s.len = value[i].len - 6;
+            s.data = value[i].data + 6;
+
+            valid = ngx_parse_time(&s, 1);
+            if (valid == (time_t) NGX_ERROR) {
+                goto failed;
+            }
+
+            continue;
+        }
+
+        if (ngx_strcmp(value[i].data, "off") == 0) {
+
+            plcf->upstream.ssl_certificate_cache = NULL;
+
+            continue;
+        }
+
+    failed:
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid parameter \"%V\"", &value[i]);
+        return NGX_CONF_ERROR;
+    }
+
+    if (plcf->upstream.ssl_certificate_cache == NULL) {
+        return NGX_CONF_OK;
+    }
+
+    if (max == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "\"grpc_ssl_certificate_cache\" must have "
+                           "the \"max\" parameter");
+        return NGX_CONF_ERROR;
+    }
+
+    plcf->upstream.ssl_certificate_cache = ngx_ssl_cache_init(cf->pool, max,
+                                                              valid, inactive);
+    if (plcf->upstream.ssl_certificate_cache == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
 ngx_http_grpc_ssl_password_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_grpc_loc_conf_t *glcf = conf;
@@ -5026,79 +5082,19 @@ ngx_http_grpc_set_ssl(ngx_conf_t *cf, ngx_http_grpc_loc_conf_t *glcf)
             return NGX_ERROR;
         }
 
-        if (glcf->upstream.ssl_certificate->lengths
-            || glcf->upstream.ssl_certificate_key->lengths)
+        if (glcf->upstream.ssl_certificate->lengths == NULL
+            && glcf->upstream.ssl_certificate_key->lengths == NULL)
         {
-            glcf->upstream.ssl_passwords =
-                  ngx_ssl_preserve_passwords(cf, glcf->upstream.ssl_passwords);
-            if (glcf->upstream.ssl_passwords == NULL) {
-                return NGX_ERROR;
-            }
-
-        } else {
-#if (T_NGX_SSL_NTLS)
-            if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                    &glcf->upstream.ssl_certificate->value,
-                                    &glcf->upstream.ssl_certificate_key->value,
-                                    glcf->upstream.ssl_passwords,
-                                    SSL_NORMAL_CERT)
-#else
             if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
                                     &glcf->upstream.ssl_certificate->value,
                                     &glcf->upstream.ssl_certificate_key->value,
                                     glcf->upstream.ssl_passwords)
-#endif
                 != NGX_OK)
             {
                 return NGX_ERROR;
             }
         }
     }
-
-#if (T_NGX_SSL_NTLS)
-    glcf->upstream.tls_method = SSL_CTX_get_ssl_method(glcf->upstream.ssl->ctx);
-    if (glcf->upstream.enc_certificate.len) {
-
-        if (glcf->upstream.enc_certificate_key.len == 0) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "no \"grpc_ssl_enc_certificate_key\" is defined "
-                          "for certificate \"%V\"",
-                          &glcf->upstream.enc_certificate);
-            return NGX_ERROR;
-        }
-
-        if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                &glcf->upstream.enc_certificate,
-                                &glcf->upstream.enc_certificate_key,
-                                glcf->upstream.ssl_passwords,
-                                SSL_ENC_CERT)
-            != NGX_OK)
-        {
-            return NGX_ERROR;
-        }
-    }
-
-    if (glcf->upstream.sign_certificate.len) {
-
-        if (glcf->upstream.sign_certificate_key.len == 0) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "no \"grpc_ssl_sign_certificate_key\" is defined "
-                          "for certificate \"%V\"",
-                          &glcf->upstream.sign_certificate);
-            return NGX_ERROR;
-        }
-
-        if (ngx_ssl_certificate(cf, glcf->upstream.ssl,
-                                &glcf->upstream.sign_certificate,
-                                &glcf->upstream.sign_certificate_key,
-                                glcf->upstream.ssl_passwords,
-                                SSL_SIGN_CERT)
-            != NGX_OK)
-        {
-            return NGX_ERROR;
-        }
-    }
-#endif
 
     if (glcf->upstream.ssl_verify) {
         if (glcf->ssl_trusted_certificate.len == 0) {

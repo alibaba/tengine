@@ -12,10 +12,6 @@
 
 static ngx_int_t ngx_http_write_filter_init(ngx_conf_t *cf);
 
-#if (T_NGX_REQ_STATUS )
-ngx_int_t (*ngx_http_write_filter_stat)(ngx_http_request_t *r) = NULL;
-#endif
-
 
 static ngx_http_module_t  ngx_http_write_filter_module_ctx = {
     NULL,                                  /* preconfiguration */
@@ -244,6 +240,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
             r->out = NULL;
             c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
 
+            if (last) {
+                r->response_sent = 1;
+            }
+
             return NGX_OK;
         }
 
@@ -298,14 +298,6 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     chain = c->send_chain(c, r->out, limit);
 
-#if (T_NGX_REQ_STATUS )
-    if (ngx_http_write_filter_stat != NULL) {
-        if (ngx_http_write_filter_stat(r) == NGX_ERROR) {
-            return NGX_ERROR;
-        }
-    }
-#endif
-
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http write filter %p", chain);
 
@@ -357,6 +349,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
+
+    if (last) {
+        r->response_sent = 1;
+    }
 
     if ((c->buffered & NGX_LOWLEVEL_BUFFERED) && r->postponed == NULL) {
         return NGX_AGAIN;

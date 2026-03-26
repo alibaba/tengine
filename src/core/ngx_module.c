@@ -19,10 +19,7 @@ static ngx_uint_t ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type,
 
 
 ngx_uint_t         ngx_max_module;
-#if (!T_NGX_SHOW_INFO)
-static
-#endif
-ngx_uint_t  ngx_modules_n;
+static ngx_uint_t  ngx_modules_n;
 
 
 ngx_int_t

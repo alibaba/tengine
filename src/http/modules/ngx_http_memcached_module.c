@@ -130,15 +130,6 @@ static ngx_command_t  ngx_http_memcached_commands[] = {
       offsetof(ngx_http_memcached_loc_conf_t, gzip_flag),
       NULL },
 
-#if (T_UPSTREAM_TRIES)
-    { ngx_string("memcached_upstream_tries"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_memcached_loc_conf_t, upstream.next_upstream_tries),
-      NULL },
-#endif
-
       ngx_null_command
 };
 
