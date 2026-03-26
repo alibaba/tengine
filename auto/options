@@ -22,6 +22,7 @@ CPP=
 NGX_OBJS=objs
 
 NGX_DEBUG=NO
+NGX_SSL_ASYNC=NO
 NGX_CC_OPT=
 NGX_LD_OPT=
 CPU=NO
@@ -45,8 +46,6 @@ USE_THREADS=NO
 
 NGX_FILE_AIO=NO
 
-QUIC_BPF=NO
-
 HTTP=YES
 
 NGX_HTTP_LOG_PATH=
@@ -59,9 +58,8 @@ NGX_HTTP_SCGI_TEMP_PATH=
 HTTP_CACHE=YES
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
-HTTP_SSL=NO
+HTTP_SSL=YES
 HTTP_V2=NO
-HTTP_V3=NO
 HTTP_SSI=YES
 HTTP_REALIP=NO
 HTTP_XSLT=NO
@@ -71,7 +69,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
-HTTP_AUTH_REQUEST=NO
+HTTP_AUTH_REQUEST=YES
 HTTP_MIRROR=YES
 HTTP_USERID=YES
 HTTP_SLICE=NO
@@ -90,6 +88,7 @@ HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_GRPC=YES
 HTTP_PERL=NO
+HTTP_LUA=NO
 HTTP_MEMCACHED=YES
 HTTP_LIMIT_CONN=YES
 HTTP_LIMIT_REQ=YES
@@ -106,16 +105,20 @@ HTTP_UPSTREAM_IP_HASH=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
 HTTP_UPSTREAM_RANDOM=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
+HTTP_UPSTREAM_RBTREE=YES
 HTTP_UPSTREAM_ZONE=YES
 
 # STUB
-HTTP_STUB_STATUS=NO
+HTTP_STUB_STATUS=YES
 
 MAIL=NO
 MAIL_SSL=NO
 MAIL_POP3=YES
 MAIL_IMAP=YES
 MAIL_SMTP=YES
+
+# procs module
+PROCS=YES
 
 STREAM=NO
 STREAM_SSL=NO
@@ -127,13 +130,13 @@ STREAM_GEOIP=NO
 STREAM_MAP=YES
 STREAM_SPLIT_CLIENTS=YES
 STREAM_RETURN=YES
-STREAM_PASS=YES
 STREAM_SET=YES
 STREAM_UPSTREAM_HASH=YES
 STREAM_UPSTREAM_LEAST_CONN=YES
 STREAM_UPSTREAM_RANDOM=YES
 STREAM_UPSTREAM_ZONE=YES
 STREAM_SSL_PREREAD=NO
+STREAM_SNI=NO
 
 DYNAMIC_MODULES=
 DYNAMIC_MODULES_SRCS=
@@ -153,7 +156,6 @@ PCRE_JIT=NO
 PCRE2=YES
 
 USE_OPENSSL=NO
-USE_OPENSSL_QUIC=NO
 OPENSSL=NONE
 
 USE_ZLIB=NO
@@ -164,6 +166,18 @@ ZLIB_ASM=NO
 USE_PERL=NO
 NGX_PERL=perl
 
+LUAJIT_INC=$LUAJIT_INC
+LUAJIT_LIB=$LUAJIT_LIB
+LUA_INC=$LUA_INC
+LUA_LIB=$LUA_LIB
+
+XUDP_INC=$XUDP_INC
+XUDP_LIB=$XUDP_LIB
+XQUIC_XDP_INC=$XQUIC_XDP_INC
+
+XQUIC_INC=$XQUIC_INC
+XQUIC_LIB=$XQUIC_LIB
+
 USE_LIBXSLT=NO
 USE_LIBGD=NO
 USE_GEOIP=NO
@@ -171,9 +185,10 @@ USE_GEOIP=NO
 NGX_GOOGLE_PERFTOOLS=NO
 NGX_CPP_TEST=NO
 
-SO_COOKIE_FOUND=NO
-
 NGX_LIBATOMIC=NO
+
+USE_JEMALLOC=NO
+JEMALLOC=NONE
 
 NGX_CPU_CACHE_LINE=
 
@@ -216,9 +231,10 @@ do
 
         --with-threads)                  USE_THREADS=YES            ;;
 
-        --with-file-aio)                 NGX_FILE_AIO=YES           ;;
+        # PROCS
+        --without-procs)                 PROCS=NO                   ;;
 
-        --without-quic_bpf_module)       QUIC_BPF=NONE              ;;
+        --with-file-aio)                 NGX_FILE_AIO=YES           ;;
 
         --with-ipv6)
             NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
@@ -237,7 +253,6 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
 
         --with-http_ssl_module)          HTTP_SSL=YES               ;;
         --with-http_v2_module)           HTTP_V2=YES                ;;
-        --with-http_v3_module)           HTTP_V3=YES                ;;
         --with-http_realip_module)       HTTP_REALIP=YES            ;;
         --with-http_addition_module)     HTTP_ADDITION=YES          ;;
         --with-http_xslt_module)         HTTP_XSLT=YES              ;;
@@ -344,6 +359,7 @@ use the \"--with-mail_ssl_module\" option instead"
                                          STREAM_GEOIP=DYNAMIC       ;;
         --with-stream_ssl_preread_module)
                                          STREAM_SSL_PREREAD=YES     ;;
+        --with-stream_sni)               STREAM_SNI=YES             ;;
         --without-stream_limit_conn_module)
                                          STREAM_LIMIT_CONN=NO       ;;
         --without-stream_access_module)  STREAM_ACCESS=NO           ;;
@@ -352,7 +368,6 @@ use the \"--with-mail_ssl_module\" option instead"
         --without-stream_split_clients_module)
                                          STREAM_SPLIT_CLIENTS=NO    ;;
         --without-stream_return_module)  STREAM_RETURN=NO           ;;
-        --without-stream_pass_module)    STREAM_PASS=NO             ;;
         --without-stream_set_module)     STREAM_SET=NO              ;;
         --without-stream_upstream_hash_module)
                                          STREAM_UPSTREAM_HASH=NO    ;;
@@ -377,6 +392,7 @@ use the \"--with-mail_ssl_module\" option instead"
         --with-ld-opt=*)                 NGX_LD_OPT="$value"        ;;
         --with-cpu-opt=*)                CPU="$value"               ;;
         --with-debug)                    NGX_DEBUG=YES              ;;
+        --with-openssl-async)            NGX_SSL_ASYNC=YES          ;;
 
         --without-pcre)                  USE_PCRE=DISABLED          ;;
         --with-pcre)                     USE_PCRE=YES               ;;
@@ -421,6 +437,11 @@ $0: warning: the \"--with-sha1-asm\" option is deprecated"
         --with-libatomic)                NGX_LIBATOMIC=YES          ;;
         --with-libatomic=*)              NGX_LIBATOMIC="$value"     ;;
 
+        --with-jemalloc)                 USE_JEMALLOC=YES           ;;
+        --with-jemalloc=*)               JEMALLOC="$value"          ;;
+
+        --without-http-upstream-rbtree)  HTTP_UPSTREAM_RBTREE=NO    ;;
+
         --test-build-devpoll)            NGX_TEST_BUILD_DEVPOLL=YES ;;
         --test-build-eventport)          NGX_TEST_BUILD_EVENTPORT=YES ;;
         --test-build-epoll)              NGX_TEST_BUILD_EPOLL=YES   ;;
@@ -464,15 +485,14 @@ cat << END
   --with-poll_module                 enable poll module
   --without-poll_module              disable poll module
 
+  --without-procs                    disable procs module
+
   --with-threads                     enable thread pool support
 
   --with-file-aio                    enable file AIO support
 
-  --without-quic_bpf_module          disable ngx_quic_bpf_module
-
   --with-http_ssl_module             enable ngx_http_ssl_module
   --with-http_v2_module              enable ngx_http_v2_module
-  --with-http_v3_module              enable ngx_http_v3_module
   --with-http_realip_module          enable ngx_http_realip_module
   --with-http_addition_module        enable ngx_http_addition_module
   --with-http_xslt_module            enable ngx_http_xslt_module
@@ -498,6 +518,7 @@ cat << END
   --without-http_charset_module      disable ngx_http_charset_module
   --without-http_gzip_module         disable ngx_http_gzip_module
   --without-http_ssi_module          disable ngx_http_ssi_module
+  --without-http_ssl_module          disable ngx_http_ssl_module
   --without-http_userid_module       disable ngx_http_userid_module
   --without-http_access_module       disable ngx_http_access_module
   --without-http_auth_basic_module   disable ngx_http_auth_basic_module
@@ -518,6 +539,7 @@ cat << END
   --without-http_limit_req_module    disable ngx_http_limit_req_module
   --without-http_empty_gif_module    disable ngx_http_empty_gif_module
   --without-http_browser_module      disable ngx_http_browser_module
+  --without-http_stub_status_module  disable ngx_http_stub_status_module
   --without-http_upstream_hash_module
                                      disable ngx_http_upstream_hash_module
   --without-http_upstream_ip_hash_module
@@ -576,6 +598,7 @@ cat << END
   --with-stream_geoip_module         enable ngx_stream_geoip_module
   --with-stream_geoip_module=dynamic enable dynamic ngx_stream_geoip_module
   --with-stream_ssl_preread_module   enable ngx_stream_ssl_preread_module
+  --with-stream_sni                  enable dynamic server block
   --without-stream_limit_conn_module disable ngx_stream_limit_conn_module
   --without-stream_access_module     disable ngx_stream_access_module
   --without-stream_geo_module        disable ngx_stream_geo_module
@@ -583,7 +606,6 @@ cat << END
   --without-stream_split_clients_module
                                      disable ngx_stream_split_clients_module
   --without-stream_return_module     disable ngx_stream_return_module
-  --without-stream_pass_module       disable ngx_stream_pass_module
   --without-stream_set_module        disable ngx_stream_set_module
   --without-stream_upstream_hash_module
                                      disable ngx_stream_upstream_hash_module
@@ -626,9 +648,12 @@ cat << END
   --with-libatomic                   force libatomic_ops library usage
   --with-libatomic=DIR               set path to libatomic_ops library sources
 
+  --with-jemalloc                    force jemalloc library usage
+  --with-jemalloc=DIR                set path to jemalloc library files
+
   --with-openssl=DIR                 set path to OpenSSL library sources
   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
-
+  --with-openssl-async               enable asynchronous SSL/TLS mode for OpenSSL library
   --with-debug                       enable debug logging
 
 END

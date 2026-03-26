@@ -56,6 +56,17 @@ if [ $NGX_TEST_BUILD_SOLARIS_SENDFILEV = YES ]; then
 fi
 
 
+# add proc
+if [ $PROCS = YES ]; then
+    have=NGX_PROCS . auto/have
+    CORE_SRCS="$CORE_SRCS $PROCS_SRCS"
+    CORE_DEPS="$CORE_DEPS $PROCS_DEPS"
+    CORE_INCS="$CORE_INCS $PROCS_INCS"
+else
+    PROCS_MODULES=
+fi
+
+
 if [ $HTTP = YES ]; then
     HTTP_MODULES=
     HTTP_DEPS=
@@ -102,7 +113,7 @@ if [ $HTTP = YES ]; then
     fi
 
 
-    if [ $HTTP_V2 = YES -o $HTTP_V3 = YES ]; then
+    if [ $HTTP_V2 = YES ]; then
         HTTP_SRCS="$HTTP_SRCS $HTTP_HUFF_SRCS"
     fi
 
@@ -124,7 +135,6 @@ if [ $HTTP = YES ]; then
     #     ngx_http_header_filter
     #     ngx_http_chunked_filter
     #     ngx_http_v2_filter
-    #     ngx_http_v3_filter
     #     ngx_http_range_header_filter
     #     ngx_http_gzip_filter
     #     ngx_http_postpone_filter
@@ -157,7 +167,6 @@ if [ $HTTP = YES ]; then
                       ngx_http_header_filter_module \
                       ngx_http_chunked_filter_module \
                       ngx_http_v2_filter_module \
-                      ngx_http_v3_filter_module \
                       ngx_http_range_header_filter_module \
                       ngx_http_gzip_filter_module \
                       ngx_http_postpone_filter_module \
@@ -215,17 +224,6 @@ if [ $HTTP = YES ]; then
         ngx_module_srcs=src/http/v2/ngx_http_v2_filter_module.c
         ngx_module_libs=
         ngx_module_link=$HTTP_V2
-
-        . auto/module
-    fi
-
-    if [ $HTTP_V3 = YES ]; then
-        ngx_module_name=ngx_http_v3_filter_module
-        ngx_module_incs=
-        ngx_module_deps=
-        ngx_module_srcs=src/http/v3/ngx_http_v3_filter_module.c
-        ngx_module_libs=
-        ngx_module_link=$HTTP_V3
 
         . auto/module
     fi
@@ -423,6 +421,7 @@ if [ $HTTP = YES ]; then
 
     if [ $HTTP_V2 = YES ]; then
         have=NGX_HTTP_V2 . auto/have
+        have=NGX_HTTP_HEADERS . auto/have
 
         ngx_module_name=ngx_http_v2_module
         ngx_module_incs=src/http/v2
@@ -434,32 +433,6 @@ if [ $HTTP = YES ]; then
                          src/http/v2/ngx_http_v2_module.c"
         ngx_module_libs=
         ngx_module_link=$HTTP_V2
-
-        . auto/module
-    fi
-
-    if [ $HTTP_V3 = YES ]; then
-        USE_OPENSSL_QUIC=YES
-        HTTP_SSL=YES
-
-        have=NGX_HTTP_V3 . auto/have
-
-        ngx_module_name=ngx_http_v3_module
-        ngx_module_incs=src/http/v3
-        ngx_module_deps="src/http/v3/ngx_http_v3.h \
-                         src/http/v3/ngx_http_v3_encode.h \
-                         src/http/v3/ngx_http_v3_parse.h \
-                         src/http/v3/ngx_http_v3_table.h \
-                         src/http/v3/ngx_http_v3_uni.h"
-        ngx_module_srcs="src/http/v3/ngx_http_v3.c \
-                         src/http/v3/ngx_http_v3_encode.c \
-                         src/http/v3/ngx_http_v3_parse.c \
-                         src/http/v3/ngx_http_v3_table.c \
-                         src/http/v3/ngx_http_v3_uni.c \
-                         src/http/v3/ngx_http_v3_request.c \
-                         src/http/v3/ngx_http_v3_module.c"
-        ngx_module_libs=
-        ngx_module_link=$HTTP_V3
 
         . auto/module
     fi
@@ -792,6 +765,10 @@ if [ $HTTP = YES ]; then
         . auto/module
     fi
 
+    if [ $HTTP_LUA = YES ]; then
+         NGX_ADDONS="$NGX_ADDONS modules/ngx_http_lua_module"
+    fi
+
     if [ $HTTP_MEMCACHED = YES ]; then
         ngx_module_name=ngx_http_memcached_module
         ngx_module_incs=
@@ -950,6 +927,10 @@ if [ $HTTP = YES ]; then
         ngx_module_link=$HTTP_STUB_STATUS
 
         . auto/module
+    fi
+
+    if [ $HTTP_UPSTREAM_RBTREE = YES ]; then
+        have=NGX_HTTP_UPSTREAM_RBTREE . auto/have
     fi
 fi
 
@@ -1166,16 +1147,6 @@ if [ $STREAM != NO ]; then
         . auto/module
     fi
 
-    if [ $STREAM_PASS = YES ]; then
-        ngx_module_name=ngx_stream_pass_module
-        ngx_module_deps=
-        ngx_module_srcs=src/stream/ngx_stream_pass_module.c
-        ngx_module_libs=
-        ngx_module_link=$STREAM_PASS
-
-        . auto/module
-    fi
-
     if [ $STREAM_SET = YES ]; then
         ngx_module_name=ngx_stream_set_module
         ngx_module_deps=
@@ -1236,6 +1207,14 @@ if [ $STREAM != NO ]; then
         ngx_module_link=$STREAM_SSL_PREREAD
 
         . auto/module
+    fi
+
+    if [ $STREAM_SNI = YES ]; then
+        if [ $STREAM_SSL != YES ]; then
+            echo "--with-stream_ssl_module is needed by --with-stream_sni"
+            exit 1;
+        fi
+        have=T_NGX_STREAM_SNI . auto/have
     fi
 fi
 
@@ -1307,74 +1286,16 @@ fi
 
 if [ $USE_OPENSSL = YES ]; then
     ngx_module_type=CORE
-    ngx_module_name="ngx_openssl_module ngx_openssl_cache_module"
+    ngx_module_name=ngx_openssl_module
     ngx_module_incs=
     ngx_module_deps=src/event/ngx_event_openssl.h
     ngx_module_srcs="src/event/ngx_event_openssl.c
-                     src/event/ngx_event_openssl_cache.c
                      src/event/ngx_event_openssl_stapling.c"
     ngx_module_libs=
     ngx_module_link=YES
     ngx_module_order=
 
     . auto/module
-fi
-
-
-if [ $USE_OPENSSL_QUIC = YES ]; then
-    ngx_module_type=CORE
-    ngx_module_name=ngx_quic_module
-    ngx_module_incs=
-    ngx_module_deps="src/event/quic/ngx_event_quic.h \
-                     src/event/quic/ngx_event_quic_transport.h \
-                     src/event/quic/ngx_event_quic_protection.h \
-                     src/event/quic/ngx_event_quic_connection.h \
-                     src/event/quic/ngx_event_quic_frames.h \
-                     src/event/quic/ngx_event_quic_connid.h \
-                     src/event/quic/ngx_event_quic_migration.h \
-                     src/event/quic/ngx_event_quic_streams.h \
-                     src/event/quic/ngx_event_quic_ssl.h \
-                     src/event/quic/ngx_event_quic_tokens.h \
-                     src/event/quic/ngx_event_quic_ack.h \
-                     src/event/quic/ngx_event_quic_output.h \
-                     src/event/quic/ngx_event_quic_socket.h \
-                     src/event/quic/ngx_event_quic_openssl_compat.h"
-    ngx_module_srcs="src/event/quic/ngx_event_quic.c \
-                     src/event/quic/ngx_event_quic_udp.c \
-                     src/event/quic/ngx_event_quic_transport.c \
-                     src/event/quic/ngx_event_quic_protection.c \
-                     src/event/quic/ngx_event_quic_frames.c \
-                     src/event/quic/ngx_event_quic_connid.c \
-                     src/event/quic/ngx_event_quic_migration.c \
-                     src/event/quic/ngx_event_quic_streams.c \
-                     src/event/quic/ngx_event_quic_ssl.c \
-                     src/event/quic/ngx_event_quic_tokens.c \
-                     src/event/quic/ngx_event_quic_ack.c \
-                     src/event/quic/ngx_event_quic_output.c \
-                     src/event/quic/ngx_event_quic_socket.c \
-                     src/event/quic/ngx_event_quic_openssl_compat.c"
-
-    ngx_module_libs=
-    ngx_module_link=YES
-    ngx_module_order=
-
-    . auto/module
-
-    if [ $QUIC_BPF = YES -a $SO_COOKIE_FOUND = YES ]; then
-        ngx_module_type=CORE
-        ngx_module_name=ngx_quic_bpf_module
-        ngx_module_incs=
-        ngx_module_deps=
-        ngx_module_srcs="src/event/quic/ngx_event_quic_bpf.c \
-                         src/event/quic/ngx_event_quic_bpf_code.c"
-        ngx_module_libs=
-        ngx_module_link=YES
-        ngx_module_order=
-
-        . auto/module
-
-        have=NGX_QUIC_BPF . auto/have
-    fi
 fi
 
 
@@ -1391,8 +1312,8 @@ if [ $USE_PCRE = YES ]; then
     . auto/module
 fi
 
-
-modules="$CORE_MODULES $EVENT_MODULES"
+# add proc
+modules="$CORE_MODULES $EVENT_MODULES $PROCS_MODULES"
 
 
 # thread pool module should be initialized after events
@@ -1488,49 +1409,6 @@ if [ $NGX_COMPAT = YES ]; then
     have=NGX_STREAM_UPSTREAM_ZONE . auto/have
 fi
 
-case "$NGX_PLATFORM" in
-    Linux:*)
-        have=T_PIPE_SET_SIZE . auto/have
-    ;;
-esac
-
-have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
-have=T_NGX_MASTER_ENV . auto/have
-have=T_PIPES . auto/have
-have=T_NGX_INPUT_BODY_FILTER . auto/have
-have=T_NGX_GZIP_CLEAR_ETAG . auto/have
-have=T_NGX_RESOLVER_FILE . auto/have
-have=T_DEPRECATED . auto/have
-have=T_NGX_VARS . auto/have
-have=T_NGX_HTTP_STUB_STATUS . auto/have
-have=T_UPSTREAM_TRIES  . auto/have
-have=T_GEO . auto/have
-have=T_NGX_RET_CACHE  . auto/have
-have=T_LIMIT_REQ  . auto/have
-have=T_LIMIT_REQ_RATE_VAR  . auto/have
-if [ $HTTP_V2 = YES ]; then
-    have=T_NGX_HTTP2_SRV_ENABLE . auto/have
-fi
-have=T_NGX_SSL_HANDSHAKE_TIME . auto/have
-have=T_NGX_HTTP_IMPROVED_IF . auto/have
-have=T_NGX_HTTP_UPSTREAM_RETRY_CC . auto/have
-have=T_NGX_HTTP_SSL_VCE . auto/have
-have=T_NGX_HTTP_UPSTREAM_RANDOM . auto/have
-have=T_NGX_IMPROVED_LIST . auto/have
-have=T_NGX_SERVER_INFO . auto/have
-have=T_NGX_ACCEPT_FILTER . auto/have
-have=T_NGX_MODIFY_DEFAULT_VALUE . auto/have
-have=T_NGX_HTTP_UPSTREAM_ID . auto/have
-have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
-have=T_NGX_SHOW_INFO . auto/have
-have=T_NGX_HTTP_IMAGE_FILTER . auto/have
-have=T_HTTP_HEADER . auto/have
-have=T_HTTP_UPSTREAM_TIMEOUT_VAR . auto/have
-have=T_NGX_HTTPS_ALLOW_HTTP . auto/have
-have=T_NGX_REQUEST_START_TIME . auto/have
-have=T_NGX_SOCKET_BUFFER . auto/have
-have=T_NGX_HTTP_DYUPS . auto/have
-
 
 cat << END                                    > $NGX_MODULES_C
 
@@ -1572,3 +1450,45 @@ cat << END                                    >> $NGX_MODULES_C
 };
 
 END
+
+case "$NGX_PLATFORM" in
+    Linux:*)
+        have=T_PIPE_SET_SIZE . auto/have
+    ;;
+esac
+
+have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
+have=T_NGX_MASTER_ENV . auto/have
+have=T_PIPES . auto/have
+have=T_NGX_INPUT_BODY_FILTER . auto/have
+have=T_NGX_GZIP_CLEAR_ETAG . auto/have
+have=T_NGX_RESOLVER_FILE . auto/have
+have=T_DEPRECATED . auto/have
+have=T_NGX_VARS . auto/have
+have=T_NGX_HTTP_STUB_STATUS . auto/have
+have=T_UPSTREAM_TRIES  . auto/have
+have=T_GEO . auto/have
+have=T_NGX_RET_CACHE  . auto/have
+have=T_LIMIT_REQ  . auto/have
+have=T_LIMIT_REQ_RATE_VAR  . auto/have
+if [ $HTTP_V2 = YES ]; then
+    have=T_NGX_HTTP2_SRV_ENABLE . auto/have
+fi
+have=T_NGX_SSL_HANDSHAKE_TIME . auto/have
+have=T_NGX_HTTP_IMPROVED_IF . auto/have
+have=T_NGX_HTTP_UPSTREAM_RETRY_CC . auto/have
+have=T_NGX_HTTP_SSL_VCE . auto/have
+have=T_NGX_HTTP_UPSTREAM_RANDOM . auto/have
+have=T_NGX_IMPROVED_LIST . auto/have
+have=T_NGX_SERVER_INFO . auto/have
+have=T_NGX_ACCEPT_FILTER . auto/have
+have=T_NGX_MODIFY_DEFAULT_VALUE . auto/have
+have=T_NGX_HTTP_UPSTREAM_ID . auto/have
+have=T_NGX_HTTP_IMPROVED_REWRITE . auto/have
+have=T_NGX_SHOW_INFO . auto/have
+have=T_NGX_HTTP_IMAGE_FILTER . auto/have
+have=T_HTTP_HEADER . auto/have
+have=T_HTTP_UPSTREAM_TIMEOUT_VAR . auto/have
+have=T_NGX_HTTPS_ALLOW_HTTP . auto/have
+have=T_NGX_REQUEST_START_TIME . auto/have
+have=T_NGX_SOCKET_BUFFER . auto/have
