@@ -119,6 +119,11 @@ typedef struct {
     char                    **environment;
 
     ngx_uint_t                transparent;  /* unsigned  transparent:1; */
+
+#if (T_PIPE_SET_SIZE)
+    size_t pipe_size;
+#endif
+
 } ngx_core_conf_t;
 
 
@@ -144,6 +149,10 @@ extern ngx_module_t           ngx_core_module;
 extern ngx_uint_t             ngx_test_config;
 extern ngx_uint_t             ngx_dump_config;
 extern ngx_uint_t             ngx_quiet_mode;
+#if (T_NGX_SHOW_INFO)
+extern ngx_uint_t             ngx_show_modules;
+extern ngx_uint_t             ngx_show_directives;
+#endif
 
 
 #endif /* _NGX_CYCLE_H_INCLUDED_ */

@@ -74,6 +74,10 @@ typedef struct {
     ngx_hash_t                       headers_in_hash;
     ngx_array_t                      upstreams;
                                              /* ngx_http_upstream_srv_conf_t */
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    ngx_rbtree_t                     rbtree;
+    ngx_rbtree_node_t                sentinel;
+#endif
 } ngx_http_upstream_main_conf_t;
 
 typedef struct ngx_http_upstream_srv_conf_s  ngx_http_upstream_srv_conf_t;
@@ -128,6 +132,9 @@ typedef struct {
 
 
 struct ngx_http_upstream_srv_conf_s {
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+    ngx_rbtree_node_t                node;
+#endif
     ngx_http_upstream_peer_t         peer;
     void                           **srv_conf;
 

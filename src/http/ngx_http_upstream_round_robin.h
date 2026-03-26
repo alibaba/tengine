@@ -106,7 +106,7 @@ struct ngx_http_upstream_rr_peers_s {
 
     ngx_str_t                      *name;
 
-#if (T_NGX_HTTP_DYUPS)
+#if (NGX_DYUPS)
     ngx_uint_t                      init_number;
 #endif
 

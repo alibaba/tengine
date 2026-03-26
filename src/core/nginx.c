@@ -204,6 +204,10 @@ ngx_module_t  ngx_core_module = {
 
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
+#if (T_NGX_SHOW_INFO)
+ngx_uint_t   ngx_show_modules;
+ngx_uint_t   ngx_show_directives;
+#endif
 static ngx_uint_t   ngx_show_configure;
 #if (NGX_SSL && NGX_SSL_ASYNC)
 /* indicate that nginx start without ngx_ssl_init()
