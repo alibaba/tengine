@@ -30,7 +30,8 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
 
 CORE_INCS="$CORE_INCS \
            $ngx_addon_dir \
-           $XQUIC_INC"
+           $XQUIC_INC \
+           $ngx_addon_dir/../ngx_http_lua_module/src"
 
 CORE_LIBS="$CORE_LIBS \
            -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm -lstdc++"

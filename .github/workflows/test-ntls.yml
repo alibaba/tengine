@@ -1,4 +1,4 @@
-name: test tengine ntls
+name: test tengine ntls and xquic
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
           path: tengine
       - name: get dependencies
         run: |
-          sudo apt install -y libpcre3 libpcre3-dev
+          sudo apt install -y libpcre3 libpcre3-dev libevent-dev cmake
       - name: 'checkout luajit2'
         uses: actions/checkout@v3
         with:
@@ -55,6 +55,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: Tongsuo-Project/Tongsuo
+          ref: 8.4-stable
           path: Tongsuo
       - name: build Tongsuo
         working-directory: Tongsuo
@@ -65,6 +66,35 @@ jobs:
           make -s -j4
           make install_sw
           make clean
+      - name: checkout xquic
+        uses: actions/checkout@v3
+        with:
+          repository: alibaba/xquic
+          path: xquic
+      - name: build xquic
+        working-directory: xquic
+        env:
+          CC: ${{ matrix.compiler.CC }}
+        run: |
+          mkdir -p build && cd build
+          if [ "${{ matrix.compiler.compiler }}" = "GNU" ]; then
+            CFLAGS="-Wno-deprecated-declarations -Wno-dangling-pointer -Wno-stringop-truncation"
+          else
+            CFLAGS="-Wno-deprecated-declarations"
+          fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DXQC_ENABLE_TESTING=1 \
+            -DXQC_SUPPORT_SENDMMSG_BUILD=1 \
+            -DXQC_ENABLE_BBR2=1 \
+            -DXQC_ENABLE_RENO=1 \
+            -DSSL_TYPE=babassl \
+            -DSSL_PATH=${RUNNER_TEMP}/tongsuo \
+            -DSSL_INC_PATH=${RUNNER_TEMP}/tongsuo/include \
+            -DSSL_LIB_PATH="${RUNNER_TEMP}/tongsuo/lib64/libssl.a;${RUNNER_TEMP}/tongsuo/lib64/libcrypto.a"
+          make -j4
+          sudo cp "libxquic.so" /usr/local/lib/
       - name: build Tengine
         working-directory: tengine
         env:
@@ -78,16 +108,19 @@ jobs:
             --with-pcre \
             --add-module=modules/ngx_tongsuo_ntls \
             --add-module=modules/ngx_http_lua_module \
+            --add-module=modules/ngx_http_xquic_module \
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
             --with-http_v2_module \
             --with-stream \
             --with-stream_ssl_module \
-            --with-stream_sni
+            --with-stream_sni \
+            --with-xquic-inc="../xquic/include" \
+            --with-xquic-lib="../xquic/build"
           make -j2
           sudo make install
-      - name: run test cases
+      - name: run ntls test cases
         working-directory: tengine
         env:
           TEST_OPENSSL_BINARY: ${{ runner.temp }}/tongsuo/bin/tongsuo
@@ -95,6 +128,14 @@ jobs:
           TEST_NGINX_LEAVE: 1
         run: |
           prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_tongsuo_ntls/t
+      - name: run xquic test cases
+        working-directory: tengine
+        env:
+          TEST_XQUIC_CLIENT: ${{ github.workspace }}/xquic/build/test_client
+          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+          TEST_NGINX_LEAVE: 1
+        run: |
+          prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_http_xquic_module/t
       - name: debug
         if: ${{ failure() }}
         run: |

@@ -281,7 +281,7 @@ ok(!!get_ssl_socket(8085), 'ssl unexpected eof');
 
 # close_notify is sent before lingering close
 
-is(get_ssl_shutdown(8085), 1, 'ssl shutdown on lingering close');
+is(!!get_ssl_shutdown(8085), 1, 'ssl shutdown on lingering close');
 
 $t->stop();
 
