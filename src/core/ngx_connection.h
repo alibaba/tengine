@@ -144,6 +144,10 @@ struct ngx_connection_s {
 
     ngx_pool_t         *pool;
 
+#if (T_NGX_MULTI_UPSTREAM)
+    void               *multi_c;
+#endif
+
     int                 type;
 
     struct sockaddr    *sockaddr;

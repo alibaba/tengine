@@ -295,6 +295,13 @@ struct ngx_stream_session_s {
     unsigned                       health_check:1;
 
     unsigned                       limit_conn_status:2;
+
+#if (T_NGX_MULTI_UPSTREAM)
+    ngx_queue_t                  *multi_item;
+    ngx_queue_t                  *backend_r;
+    ngx_queue_t                   waiting_queue;
+    ngx_flag_t                    waiting;
+#endif
 };
 
 

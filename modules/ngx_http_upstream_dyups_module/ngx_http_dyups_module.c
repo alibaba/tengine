@@ -4,6 +4,9 @@
 
 
 #include <ngx_http.h>
+#if (NGX_HTTP_UPSTREAM_CHECK)
+#include "../ngx_http_upstream_check_module/ngx_http_upstream_check_module.h"
+#endif
 #include <ngx_http_dyups.h>
 #ifdef NGX_DYUPS_LUA
 #include <ngx_http_dyups_lua.h>

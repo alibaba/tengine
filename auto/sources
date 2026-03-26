@@ -63,6 +63,8 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_md5.c \
            src/core/ngx_sha1.c \
            src/core/ngx_rbtree.c \
+           src/core/ngx_trie.c \
+           src/core/ngx_segment_tree.c \
            src/core/ngx_radix_tree.c \
            src/core/ngx_slab.c \
            src/core/ngx_times.c \
@@ -145,6 +147,8 @@ UNIX_DEPS="$CORE_DEPS $EVENT_DEPS \
             src/os/unix/ngx_socket.h \
             src/os/unix/ngx_os.h \
             src/os/unix/ngx_user.h \
+            src/os/unix/ngx_pipe.h \
+            src/os/unix/ngx_sysinfo.h \
             src/os/unix/ngx_dlopen.h \
             src/os/unix/ngx_process_cycle.h"
 
@@ -156,6 +160,11 @@ UNIX_DEPS="$CORE_DEPS $EVENT_DEPS \
 #            src/os/unix/ngx_sunpro_x86.il \
 #            src/os/unix/ngx_sunpro_amd64.il \
 #            src/os/unix/ngx_sunpro_sparc64.il \
+
+
+PIPE_DEPS="src/os/unix/ngx_pipe.h"
+PIPE_SRCS="src/os/unix/ngx_pipe.c"
+SYSINFO_SRCS="src/os/unix/ngx_sysinfo.c"
 
 
 UNIX_SRCS="$CORE_SRCS $EVENT_SRCS \
@@ -180,6 +189,8 @@ UNIX_SRCS="$CORE_SRCS $EVENT_SRCS \
             src/os/unix/ngx_posix_init.c \
             src/os/unix/ngx_user.c \
             src/os/unix/ngx_dlopen.c \
+            src/os/unix/ngx_pipe.c \
+            src/os/unix/ngx_sysinfo.c \
             src/os/unix/ngx_process_cycle.c"
 
 POSIX_DEPS=src/os/unix/ngx_posix_config.h

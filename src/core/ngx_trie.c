@@ -6,6 +6,7 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <ngx_trie.h>
 
 
 #define NGX_TRIE_MAX_QUEUE_SIZE     300

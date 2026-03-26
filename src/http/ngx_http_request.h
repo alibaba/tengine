@@ -537,6 +537,10 @@ struct ngx_http_request_s {
     unsigned                          limit_rate_set:1;
     unsigned                          limit_rate_after_set:1;
 
+#if (T_NGX_HTTP_SYSGUARD)
+    unsigned                          sysguard_set:1;
+#endif
+
 #if 0
     unsigned                          cacheable:1;
 #endif
@@ -549,6 +553,12 @@ struct ngx_http_request_s {
     unsigned                          lingering_close:1;
     unsigned                          discard_body:1;
     unsigned                          reading_body:1;
+#if (T_NGX_MULTI_UPSTREAM)
+    ngx_queue_t                      *multi_item;
+    ngx_queue_t                      *backend_r;
+    ngx_queue_t                       waiting_queue;
+    ngx_flag_t                        waiting;
+#endif
     unsigned                          internal:1;
     unsigned                          error_page:1;
     unsigned                          filter_finalize:1;

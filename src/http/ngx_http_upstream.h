@@ -122,6 +122,9 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
 #define NGX_HTTP_UPSTREAM_MODIFY        0x0040
 #define NGX_HTTP_UPSTREAM_MAX_CONNS     0x0100
+#if (T_NGX_HTTP_UPSTREAM_ID)
+#define NGX_HTTP_UPSTREAM_ID            0x0200
+#endif
 
 
 struct ngx_http_upstream_srv_conf_s {
@@ -409,6 +412,16 @@ struct ngx_http_upstream_s {
     unsigned                         request_body_blocked:1;
     unsigned                         header_sent:1;
     unsigned                         response_received:1;
+
+#if (T_NGX_MULTI_UPSTREAM)
+    unsigned                         multi:1;
+    void                            *multi_init;
+    ngx_flag_t                       multi_mode;
+#endif
+
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
+    ngx_resolver_ctx_t              *dyn_resolve_ctx;
+#endif
 };
 
 

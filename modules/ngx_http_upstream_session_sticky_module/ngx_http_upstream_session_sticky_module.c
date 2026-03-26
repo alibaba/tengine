@@ -8,6 +8,9 @@
 #include <ngx_http.h>
 #include <ngx_config.h>
 #include <ngx_md5.h>
+#if (NGX_HTTP_UPSTREAM_CHECK)
+#include "../ngx_http_upstream_check_module/ngx_http_upstream_check_module.h"
+#endif
 
 
 #define NGX_HTTP_SESSION_STICKY_DELIMITER       '|'

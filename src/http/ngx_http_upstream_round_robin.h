@@ -38,6 +38,13 @@ struct ngx_http_upstream_rr_peer_s {
     socklen_t                       socklen;
     ngx_str_t                       name;
     ngx_str_t                       server;
+#if (T_NGX_HTTP_UPSTREAM_ID)
+    ngx_str_t                       id;
+#endif
+
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
+    ngx_str_t                       dyn_host;
+#endif
 
     ngx_int_t                       current_weight;
     ngx_int_t                       effective_weight;
@@ -69,6 +76,9 @@ struct ngx_http_upstream_rr_peer_s {
     ngx_uint_t                      refs;
     ngx_http_upstream_host_t       *host;
 #endif
+#if (NGX_HTTP_UPSTREAM_CHECK)
+    ngx_uint_t                      check_index;
+#endif
 
     ngx_http_upstream_rr_peer_t    *next;
 
@@ -95,6 +105,10 @@ struct ngx_http_upstream_rr_peers_s {
     unsigned                        weighted:1;
 
     ngx_str_t                      *name;
+
+#if (T_NGX_HTTP_DYUPS)
+    ngx_uint_t                      init_number;
+#endif
 
     ngx_http_upstream_rr_peers_t   *next;
 

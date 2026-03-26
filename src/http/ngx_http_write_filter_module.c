@@ -44,6 +44,8 @@ ngx_module_t  ngx_http_write_filter_module = {
 };
 
 
+ngx_int_t (*ngx_http_write_filter_stat)(ngx_http_request_t *r) = NULL;
+
 ngx_int_t
 ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
