@@ -526,6 +526,10 @@ typedef ngx_int_t (*ngx_http_output_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
 typedef ngx_int_t (*ngx_http_request_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
+#if (T_NGX_INPUT_BODY_FILTER)
+typedef ngx_int_t (*ngx_http_input_body_filter_pt)
+    (ngx_http_request_t *r, ngx_buf_t *buf);
+#endif
 
 
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);

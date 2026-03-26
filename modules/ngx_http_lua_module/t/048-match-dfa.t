@@ -207,3 +207,41 @@ exec opts: 0
 你
 --- no_error_log
 [error]
+
+
+
+=== TEST 9: matched with do
+--- config
+    location /re {
+        content_by_lua '
+            local m = ngx.re.match("hello", "(h)(e)(l)", "jo")
+            if m then
+                ngx.say(m[0])
+                ngx.say(m[1])
+                ngx.say(m[2])
+                ngx.say(m[3])
+            else
+                ngx.say("not matched!")
+            end
+            local m = ngx.re.match("horld", "(h)(e)?(l)?", "jo")
+            if m then
+                ngx.say(m[0])
+                ngx.say(m[1])
+                ngx.say(m[2])
+                ngx.say(m[3])
+            else
+                ngx.say("not matched!")
+            end
+        ';
+    }
+--- request
+    GET /re
+--- response_body
+hel
+h
+e
+l
+h
+h
+false
+false

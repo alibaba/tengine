@@ -23,5 +23,7 @@ char *ngx_http_lua_balancer_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
 char *ngx_http_lua_balancer_by_lua_block(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+char *ngx_http_lua_balancer_keepalive(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 
 #endif /* _NGX_HTTP_LUA_BALANCER_H_INCLUDED_ */

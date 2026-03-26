@@ -33,6 +33,7 @@ __DATA__
 --- error_code: 500
 --- error_log
 bad argument #1 to 'receive' (table expected, got string)
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -51,6 +52,7 @@ bad argument #1 to 'receive' (table expected, got string)
 --- error_code: 500
 --- error_log
 bad argument #1 to 'receiveuntil' (table expected, got number)
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

@@ -1488,6 +1488,30 @@ if [ $NGX_COMPAT = YES ]; then
     have=NGX_STREAM_UPSTREAM_ZONE . auto/have
 fi
 
+have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
+have=T_NGX_MASTER_ENV . auto/have
+have=T_PIPES . auto/have
+have=T_NGX_INPUT_BODY_FILTER . auto/have
+have=T_NGX_GZIP_CLEAR_ETAG . auto/have
+have=T_NGX_RESOLVER_FILE . auto/have
+have=T_DEPRECATED . auto/have
+have=T_NGX_VARS . auto/have
+have=T_NGX_HTTP_STUB_STATUS . auto/have
+have=T_UPSTREAM_TRIES  . auto/have
+have=T_GEO . auto/have
+have=T_NGX_RET_CACHE  . auto/have
+have=T_LIMIT_REQ  . auto/have
+have=T_LIMIT_REQ_RATE_VAR  . auto/have
+if [ $HTTP_V2 = YES ]; then
+    have=T_NGX_HTTP2_SRV_ENABLE . auto/have
+fi
+have=T_NGX_SSL_HANDSHAKE_TIME . auto/have
+have=T_NGX_HTTP_IMPROVED_IF . auto/have
+have=T_NGX_HTTP_UPSTREAM_RETRY_CC . auto/have
+have=T_NGX_HTTP_SSL_VCE . auto/have
+have=T_NGX_HTTP_UPSTREAM_RANDOM . auto/have
+have=T_NGX_IMPROVED_LIST . auto/have
+
 
 cat << END                                    > $NGX_MODULES_C
 

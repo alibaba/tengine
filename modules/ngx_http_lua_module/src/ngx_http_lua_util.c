@@ -549,6 +549,10 @@ ngx_http_lua_send_header_if_needed(ngx_http_request_t *r,
         if (!ctx->buffering) {
             dd("sending headers");
             rc = ngx_http_send_header(r);
+            if (r->filter_finalize) {
+                ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+            }
+
             ctx->header_sent = 1;
             return rc;
         }
@@ -598,6 +602,12 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
 
     if (r->header_only) {
         ctx->eof = 1;
+
+        if (!r->request_body && r == r->main) {
+            if (ngx_http_discard_request_body(r) != NGX_OK) {
+                return NGX_ERROR;
+            }
+        }
 
         if (ctx->buffering) {
             return ngx_http_lua_send_http10_headers(r, ctx);

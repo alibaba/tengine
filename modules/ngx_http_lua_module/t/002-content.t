@@ -1098,3 +1098,25 @@ failed to load inlined Lua code: content_by_lua(...45678901234567890123456789012
 GET /lua
 --- response_body_like: 503 Service Temporarily Unavailable
 --- error_code: 503
+
+
+
+=== TEST 52: send_header trigger filter finalize does not clear the ctx
+--- config
+    location /lua {
+        content_by_lua_block {
+            ngx.header["Last-Modified"] = ngx.http_time(ngx.time())
+            ngx.send_headers()
+            local phase = ngx.get_phase()
+        }
+        header_filter_by_lua_block {
+            ngx.header["X-Hello-World"] = "Hello World"
+        }
+    }
+--- request
+GET /lua
+--- more_headers
+If-Unmodified-Since: Wed, 01 Jan 2020 07:28:00 GMT
+--- error_code: 412
+--- no_error_log
+unknown phase: 0

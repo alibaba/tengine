@@ -4,7 +4,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (3 * blocks() + 15);
+plan tests => repeat_each() * (3 * blocks() + 16);
 
 our $HtmlDir = html_dir;
 
@@ -143,12 +143,15 @@ GET /t
 
 
 === TEST 3: access a TCP interface
+test-nginx use the same port for tcp(http) and udp(http3)
+so need to change to a port that is not listen by any app.
+default port range:
+net.ipv4.ip_local_port_range = 32768	60999
+choose a port greater than 61000 should be less race.
 --- config
     server_tokens off;
     location /t {
-        #set $port 5000;
-        set $port $TEST_NGINX_SERVER_PORT;
-        #set $port 1234;
+        set $port 65432;
 
         content_by_lua '
             local socket = ngx.socket
@@ -1218,4 +1221,114 @@ qr/send: fd:\d+ \d+ of \d+/
 qr/send: fd:\d+ 22 of 22
 send: fd:\d+ 16 of 16
 send: fd:\d+ 22 of 22/
+--- log_level: debug
+
+
+
+=== TEST 23: udp bind
+--- config
+    server_tokens off;
+    location /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+        #set $port 1234;
+
+        content_by_lua_block {
+            local socket = ngx.socket
+            local udp = socket.udp()
+
+            local port = ngx.var.port
+            udp:settimeout(1000) -- 1 sec
+
+            local ok, err = udp:bind("127.0.0.10")
+            if not ok then
+                ngx.say("failed to bind: ", err)
+                return
+            end
+
+            local ok, err = udp:setpeername("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected")
+
+            local req = "\0\1\0\0\0\1\0\0flush_all\r\n"
+            local ok, err = udp:send(req)
+            if not ok then
+                ngx.say("failed to send: ", err)
+                return
+            end
+
+            local data, err = udp:receive()
+            if not data then
+                ngx.say("failed to receive data: ", err)
+                return
+            end
+            ngx.print("received ", #data, " bytes: ", data)
+        }
+    }
+--- request
+GET /t
+--- response_body eval
+"connected\nreceived 12 bytes: \x{00}\x{01}\x{00}\x{00}\x{00}\x{01}\x{00}\x{00}OK\x{0d}\x{0a}"
+--- no_error_log
+[error]
+--- log_level: debug
+--- error_log
+lua udp socket receive buffer size: 65536
+
+
+
+=== TEST 24: udp bind failed
+--- config
+    server_tokens off;
+    location /t {
+        #set $port 5000;
+        set $port $TEST_NGINX_MEMCACHED_PORT;
+        #set $port 1234;
+
+        content_by_lua_block {
+            local socket = ngx.socket
+            local udp = socket.udp()
+
+            local port = ngx.var.port
+            udp:settimeout(1000) -- 1 sec
+
+            local ok, err = udp:bind("127.0.0.1000")
+            if not ok then
+                ngx.say("failed to bind: ", err)
+                return
+            end
+
+            local ok, err = udp:setpeername("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected")
+
+            local req = "\0\1\0\0\0\1\0\0flush_all\r\n"
+            local ok, err = udp:send(req)
+            if not ok then
+                ngx.say("failed to send: ", err)
+                return
+            end
+
+            local data, err = udp:receive()
+            if not data then
+                ngx.say("failed to receive data: ", err)
+                return
+            end
+            ngx.print("received ", #data, " bytes: ", data)
+        }
+    }
+--- request
+GET /t
+--- response_body
+failed to bind: bad address
+--- no_error_log
+[error]
 --- log_level: debug

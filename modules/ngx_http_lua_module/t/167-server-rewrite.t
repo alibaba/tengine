@@ -79,7 +79,8 @@ server_rewrite_by_lua_block in server
     }
 --- request
 GET /lua
---- raw_response_headers_like: Location: /foo\r\n
+--- raw_response_headers_like eval
+qr{[Ll]ocation: /foo\r\n}
 --- response_body_like: 302 Found
 --- error_code: 302
 --- no_error_log
@@ -198,6 +199,7 @@ delete thread 1
 --- ignore_response
 --- no_error_log
 [error]
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

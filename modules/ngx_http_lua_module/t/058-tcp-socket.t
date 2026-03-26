@@ -21,6 +21,7 @@ run_tests();
 __DATA__
 
 === TEST 1: sanity
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -90,6 +91,7 @@ close: 1 nil
 
 
 === TEST 2: no trailing newline
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -253,10 +255,12 @@ second line received: (?:Date|Server): .*?
 --- no_error_log
 [error]
 --- timeout: 10
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
 === TEST 5: connection refused (tcp)
+--- no_http2
 --- config
     location /test {
         content_by_lua '
@@ -327,6 +331,7 @@ lua tcp socket connect timed out, when connecting to 127.0.0.2:12345
 
 
 === TEST 7: not closed manually
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -441,6 +446,7 @@ attempt to send data on a closed socket
 
 
 === TEST 10: explicit *l pattern for receive
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -509,6 +515,7 @@ close: 1 nil
 
 
 === TEST 11: *a pattern for receive
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -577,6 +584,7 @@ close: 1 nil
 
 
 === TEST 12: mixing *a and *l patterns for receive
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -656,6 +664,7 @@ close: 1 nil
 
 
 === TEST 13: receive by chunks
+--- no_http2
 --- timeout: 5
 --- config
     server_tokens off;
@@ -731,6 +740,7 @@ close: 1 nil
 
 
 === TEST 14: receive by chunks (very small buffer)
+--- no_http2
 --- timeout: 5
 --- config
     server_tokens off;
@@ -807,6 +817,7 @@ close: 1 nil
 
 
 === TEST 15: line reading (very small buffer)
+--- no_http2
 --- config
     server_tokens off;
     lua_socket_buffer_size 1;
@@ -876,6 +887,7 @@ close: 1 nil
 
 
 === TEST 16: ngx.socket.connect (working)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -982,6 +994,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
 
 
 === TEST 18: receive by chunks (stringified size)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1056,6 +1069,7 @@ close: 1 nil
 
 
 === TEST 19: cannot survive across request boundary (send)
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -1115,6 +1129,7 @@ received: OK|failed to send request: closed)\$"
 
 
 === TEST 20: cannot survive across request boundary (receive)
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -1190,6 +1205,7 @@ received: OK|failed to receive a line: closed \[nil\])$/
 
 
 === TEST 21: cannot survive across request boundary (close)
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -1259,6 +1275,7 @@ received: OK|failed to close: closed)$/
 
 
 === TEST 22: cannot survive across request boundary (connect)
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -1335,6 +1352,7 @@ lua reuse socket upstream ctx
 
 
 === TEST 23: connect again immediately
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1403,6 +1421,7 @@ close: 1 nil
 
 
 === TEST 24: two sockets mix together
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1494,6 +1513,7 @@ GET /t
 
 
 === TEST 25: send tables of string fragments (with integers too)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1564,6 +1584,7 @@ close: 1 nil
 
 
 === TEST 26: send tables of string fragments (bad type "nil")
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1619,10 +1640,13 @@ GET /t
 --- ignore_response
 --- error_log
 bad argument #1 to 'send' (bad data type nil found)
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP/3 stream 0 reset by server#
 
 
 
 === TEST 27: send tables of string fragments (bad type "boolean")
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1678,10 +1702,13 @@ GET /t
 --- ignore_response
 --- error_log
 bad argument #1 to 'send' (bad data type boolean found)
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP/3 stream 0 reset by server#
 
 
 
 === TEST 28: send tables of string fragments (bad type ngx.null)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1737,10 +1764,13 @@ GET /t
 --- ignore_response
 --- error_log
 bad argument #1 to 'send' (bad data type userdata found)
+--- curl_error eval
+qr#curl: \(52\) Empty reply from server|curl: \(95\) HTTP/3 stream 0 reset by server#
 
 
 
 === TEST 29: cosocket before location capture (tcpsock:send did not clear u->waiting)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1808,6 +1838,7 @@ subrequest: 200, OK\r
 
 
 === TEST 30: CR in a line
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1877,6 +1908,7 @@ close: nil closed
 
 
 === TEST 31: receive(0)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -1935,6 +1967,7 @@ close: 1 nil
 
 
 === TEST 32: send("")
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -2176,6 +2209,7 @@ lua tcp socket read timed out
 
 
 === TEST 37: successful reread after a read time out happen (receive -> receive)
+--- no_http2
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER ipv6=off;
@@ -2253,6 +2287,7 @@ lua tcp socket read timed out
 
 
 === TEST 38: successful reread after a read time out happen (receive -> receiveuntil)
+--- no_http2
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER ipv6=off;
@@ -2333,6 +2368,7 @@ lua tcp socket read timed out
 
 
 === TEST 39: successful reread after a read time out happen (receiveuntil -> receiveuntil)
+--- no_http2
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER ipv6=off;
@@ -2415,6 +2451,7 @@ lua tcp socket read timed out
 
 
 === TEST 40: successful reread after a read time out happen (receiveuntil -> receive)
+--- no_http2
 --- config
     server_tokens off;
     resolver $TEST_NGINX_RESOLVER ipv6=off;
@@ -2495,6 +2532,7 @@ lua tcp socket read timed out
 
 
 === TEST 41: receive(0)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -2542,6 +2580,7 @@ close: 1 nil
 
 
 === TEST 42: empty options table
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -2580,6 +2619,7 @@ close: 1 nil
 
 
 === TEST 43: u->coctx left over bug
+--- no_http2
 --- config
     server_tokens off;
     location = /t {
@@ -2671,6 +2711,7 @@ lua clean up the timer for pending ngx.sleep
 
 
 === TEST 44: bad request tries to connect
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -2725,6 +2766,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):7: bad request/
 
 
 === TEST 45: bad request tries to receive
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -2782,6 +2824,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 
 === TEST 46: bad request tries to send
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -2839,6 +2882,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 
 === TEST 47: bad request tries to close
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -2896,6 +2940,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 
 === TEST 48: bad request tries to set keepalive
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -2953,6 +2998,7 @@ qr/runtime error: content_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 
 === TEST 49: bad request tries to receiveuntil
+--- no_http2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -3084,6 +3130,7 @@ could not cancel
 
 
 === TEST 52: tcp_nodelay on
+--- no_http2
 --- config
     tcp_nodelay on;
     server_tokens off;
@@ -3157,6 +3204,7 @@ lua socket tcp_nodelay
 
 
 === TEST 53: tcp_nodelay off
+--- no_http2
 --- config
     tcp_nodelay off;
     server_tokens off;
@@ -3348,6 +3396,7 @@ lua tcp socket connect timeout: 100
 
 
 === TEST 56: reuse cleanup
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -3412,6 +3461,7 @@ lua http cleanup reuse
 
 
 === TEST 57: reuse cleanup in ngx.timer (fake_request)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -3495,6 +3545,7 @@ lua http cleanup reuse
 
 
 === TEST 58: free cleanup in ngx.timer (without sock:close)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -3576,6 +3627,7 @@ total_send_bytes: 114
 
 
 === TEST 59: reuse cleanup in subrequest
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -3644,6 +3696,7 @@ lua http cleanup reuse
 
 
 === TEST 60: setkeepalive on socket already shutdown
+--- no_http2
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -3682,6 +3735,7 @@ failed to setkeepalive: closed
 
 
 === TEST 61: options_table is nil
+--- no_http2
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -3788,6 +3842,7 @@ failed to connect: bad port number: 65536
 
 
 === TEST 64: send boolean and nil
+--- no_http2
 --- config
     location /t {
         set $port $TEST_NGINX_SERVER_PORT;
@@ -3850,6 +3905,7 @@ received: truefalsenil
 
 
 === TEST 65: receiveany method in cosocket
+--- no_http2
 --- config
     server_tokens off;
     location = /t {
@@ -3942,10 +3998,13 @@ lua tcp socket read any
 --- config
     server_tokens off;
     location = /t {
+        set $port $TEST_NGINX_RAND_PORT_1;
+
         content_by_lua_block {
             local sock = ngx.socket.tcp()
+            local port = ngx.var.port
             sock:settimeout(500)
-            assert(sock:connect("127.0.0.1", 7658))
+            assert(sock:connect("127.0.0.1", port))
 
             while true do
                 local data, err = sock:receiveany(1024)
@@ -3972,7 +4031,7 @@ lua tcp socket read any
 
 --- request
 GET /t
---- tcp_listen: 7658
+--- tcp_listen: $TEST_NGINX_RAND_PORT_1
 --- tcp_shutdown: 1
 --- tcp_query eval: "send data after read side closed"
 --- tcp_query_len: 32
@@ -3983,6 +4042,7 @@ GET /t
 
 
 === TEST 67: receiveany with limited, max <= 0
+--- no_http2
 --- config
     location = /t {
         set $port $TEST_NGINX_SERVER_PORT;
@@ -4019,6 +4079,7 @@ GET /t
 
 
 === TEST 68: receiveany with limited, max is larger than data
+--- no_http2
 --- config
     server_tokens off;
     location = /t {
@@ -4088,6 +4149,7 @@ lua tcp socket calling receiveany() method to read at most 128 bytes
 
 
 === TEST 69: receiveany with limited, max is smaller than data
+--- no_http2
 --- config
     server_tokens off;
     location = /t {
@@ -4162,6 +4224,7 @@ lua tcp socket calling receiveany() method to read at most 7 bytes
 
 
 === TEST 70: send tables of string fragments (with floating point number too)
+--- no_http2
 --- config
     server_tokens off;
     location /t {
@@ -4236,6 +4299,7 @@ close: 1 nil
 
 === TEST 71: send numbers
 the maximum number of significant digits is 14 in lua
+--- no_http2
 --- config
     server_tokens off;
     location /t {

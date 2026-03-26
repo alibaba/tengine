@@ -419,6 +419,15 @@ struct ngx_http_request_s {
     ngx_str_t                         exten;
     ngx_str_t                         unparsed_uri;
 
+#if (NGX_HTTP_PROXY_CONNECT)
+    ngx_str_t                         connect_host;
+    ngx_str_t                         connect_port;
+    in_port_t                         connect_port_n;
+    u_char                           *connect_host_start;
+    u_char                           *connect_host_end;
+    u_char                           *connect_port_end;
+#endif
+
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
     ngx_str_t                         schema;

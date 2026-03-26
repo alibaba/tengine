@@ -19,7 +19,13 @@ our $StapScript = $t::StapThread::StapScript;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 - 1);
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    plan(skip_all => "HTTP3 does not support client abort");
+} elsif (defined $ENV{TEST_NGINX_USE_HTTP2}) {
+    plan(skip_all => "HTTP2 does not support client abort");
+} else {
+    plan tests => repeat_each() * (blocks() * 3 - 1);
+}
 
 $ENV{TEST_NGINX_RESOLVER} ||= '8.8.8.8';
 $ENV{TEST_NGINX_MEMCACHED_PORT} ||= '11211';

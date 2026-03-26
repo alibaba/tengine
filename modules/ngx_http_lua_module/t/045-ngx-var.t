@@ -170,10 +170,22 @@ invalid referer: 1
     }
 --- request
 GET /t
---- raw_response_headers_like
-Proxy-Host: 127.0.0.1\:\d+\r
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers =
+qr/proxy-host: 127.0.0.1\:\d+\r
+proxy-port: \d+\r
+proxy-add-x-forwarded-for: 127.0.0.1\r/;
+} else {
+    $headers =
+qr/Proxy-Host: 127.0.0.1\:\d+\r
 Proxy-Port: \d+\r
-Proxy-Add-X-Forwarded-For: 127.0.0.1\r
+Proxy-Add-X-Forwarded-For: 127.0.0.1\r/;
+}
+
+$headers;
 --- response_body
 hello
 --- no_error_log
@@ -248,19 +260,19 @@ variable "query_string" not changeable
     }
     server {
         # this is the real entry point
-        listen 8091;
+        listen $TEST_NGINX_RAND_PORT_1;
         location / {
             content_by_lua_block{
-                ngx.print("this is backend peer 8091")
+                ngx.print("this is backend peer $TEST_NGINX_RAND_PORT_1")
             }
         }
     }
     server {
         # this is the real entry point
-        listen 8092;
+        listen $TEST_NGINX_RAND_PORT_2;
         location / {
             content_by_lua_block{
-                ngx.print("this is backend peer 8092")
+                ngx.print("this is backend peer $TEST_NGINX_RAND_PORT_2")
             }
         }
     }
@@ -275,6 +287,6 @@ variable "query_string" not changeable
         proxy_pass http://balancer;
     }
 --- pipelined_requests eval
-["GET /balancer?port=8091", "GET /balancer?port=8092"]
+["GET /balancer?port=\$TEST_NGINX_RAND_PORT_1", "GET /balancer?port=\$TEST_NGINX_RAND_PORT_2"]
 --- response_body eval
-["this is backend peer 8091", "this is backend peer 8092"]
+["this is backend peer \$TEST_NGINX_RAND_PORT_1", "this is backend peer \$TEST_NGINX_RAND_PORT_2"]

@@ -768,7 +768,7 @@ foo = 10502
             dogs:set("bar", 32, 0.001)
             dogs:set("baz", 32, 0.001)
             dogs:set("foo", 32, 0.001)
-            ngx.location.capture("/sleep/0.002")
+            ngx.location.capture("/sleep/0.003")
             local res, err, forcible = dogs:add("foo", 10502)
             ngx.say("add: ", res, " ", err, " ", forcible)
             ngx.say("foo = ", dogs:get("foo"))
@@ -797,7 +797,7 @@ foo = 10502
             dogs:set("bar", 32, 0.001)
             dogs:set("baz", 32, 0.001)
             dogs:set("foo", "hi", 0.001)
-            ngx.location.capture("/sleep/0.002")
+            ngx.location.capture("/sleep/0.003")
             local res, err, forcible = dogs:add("foo", "hello")
             ngx.say("add: ", res, " ", err, " ", forcible)
             ngx.say("foo = ", dogs:get("foo"))
@@ -1184,6 +1184,7 @@ nil nil
 
 
 === TEST 45: flush_expires
+--- quic_max_idle_timeout: 1.6
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -1210,6 +1211,7 @@ GET /t
 
 
 === TEST 46: flush_expires with number
+--- quic_max_idle_timeout: 1.6
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -1337,6 +1339,7 @@ GET /t
 
 
 === TEST 51: list all keys in a shdict with expires
+--- quic_max_idle_timeout: 1.6
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
@@ -1426,6 +1429,7 @@ GET /t
 
 
 === TEST 55: list all keys in a shdict with all keys expired
+--- quic_max_idle_timeout: 1.6
 --- http_config
     lua_shared_dict dogs 1m;
 --- config

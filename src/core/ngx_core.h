@@ -88,6 +88,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_event_quic.h>
 #endif
 #endif
+#if (T_PIPES)
+#include <ngx_pipe.h>
+#endif
 #include <ngx_process_cycle.h>
 #include <ngx_conf_file.h>
 #include <ngx_module.h>

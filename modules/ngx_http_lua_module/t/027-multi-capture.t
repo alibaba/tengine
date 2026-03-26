@@ -752,3 +752,75 @@ proxy_cache_path conf/cache levels=1:2 keys_zone=STATIC:10m inactive=10m max_siz
     GET /foo
 --- response_body
 ok
+
+
+
+=== TEST 14: capture multi with headers
+--- config
+    location /foo {
+        content_by_lua_block {
+            local res1, res2, res3 = ngx.location.capture_multi{
+                {"/test", { headers = { ["X-Test-Header"] = "aa"} } },
+                {"/test", { headers = { ["X-Test-Header"] = "bb"} } },
+                {"/test"},
+            }
+            ngx.say("res1.status = " .. res1.status)
+            ngx.say("res1.body = " .. res1.body)
+            ngx.say("res2.status = " .. res2.status)
+            ngx.say("res2.body = " .. res2.body)
+            ngx.say("res3.status = " .. res3.status)
+            ngx.say("res3.body = " .. res3.body)
+        }
+    }
+
+    location = /test {
+        content_by_lua_block {
+            ngx.print(ngx.var.http_x_test_header)
+        }
+    }
+--- request
+    GET /foo
+--- response_body
+res1.status = 200
+res1.body = aa
+res2.status = 200
+res2.body = bb
+res3.status = 200
+res3.body = nil
+
+
+
+=== TEST 15: capture multi with headers override
+--- config
+    location /foo {
+        content_by_lua_block {
+            local res1, res2, res3 = ngx.location.capture_multi{
+                {"/test", { headers = { ["X-Test-Header"] = "aa"} } },
+                {"/test", { headers = { ["X-Test-Header"] = "bb"} } },
+                {"/test"},
+            }
+            ngx.say("res1.status = " .. res1.status)
+            ngx.say("res1.body = " .. res1.body)
+            ngx.say("res2.status = " .. res2.status)
+            ngx.say("res2.body = " .. res2.body)
+            ngx.say("res3.status = " .. res3.status)
+            ngx.say("res3.body = " .. res3.body)
+        }
+    }
+
+    location = /test {
+        content_by_lua_block {
+            ngx.print(ngx.var.http_x_test_header)
+        }
+    }
+--- request
+    GET /foo
+--- more_headers
+X-Test-Header: cc
+--- response_body
+res1.status = 200
+res1.body = aa
+res2.status = 200
+res2.body = bb
+res3.status = 200
+res3.body = cc

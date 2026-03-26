@@ -390,7 +390,7 @@ ngx_http_lua_ssl_client_hello_aborted(void *data)
 {
     ngx_http_lua_ssl_ctx_t      *cctx = data;
 
-    dd("lua ssl client hello done");
+    dd("lua ssl client hello aborted");
 
     if (cctx->done) {
         /* completed successfully already */
@@ -541,6 +541,10 @@ int
 ngx_http_lua_ffi_ssl_get_client_hello_server_name(ngx_http_request_t *r,
     const char **name, size_t *namelen, char **err)
 {
+#ifdef LIBRESSL_VERSION_NUMBER
+    *err = "LibreSSL does not support by ssl_client_hello_by_lua*";
+    return NGX_ERROR;
+#else
     ngx_ssl_conn_t          *ssl_conn;
 #ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
     const unsigned char     *p;
@@ -619,6 +623,7 @@ ngx_http_lua_ffi_ssl_get_client_hello_server_name(ngx_http_request_t *r,
     *err = "no TLS extension support";
     return NGX_ERROR;
 #endif
+#endif  /* LIBRESSL_VERSION_NUMBER */
 }
 
 
@@ -626,6 +631,10 @@ int
 ngx_http_lua_ffi_ssl_get_client_hello_ext(ngx_http_request_t *r,
     unsigned int type, const unsigned char **out, size_t *outlen, char **err)
 {
+#ifdef LIBRESSL_VERSION_NUMBER
+    *err = "LibreSSL does not support by ssl_client_hello_by_lua*";
+    return NGX_ERROR;
+#else
     ngx_ssl_conn_t          *ssl_conn;
 
     if (r->connection == NULL || r->connection->ssl == NULL) {
@@ -649,7 +658,7 @@ ngx_http_lua_ffi_ssl_get_client_hello_ext(ngx_http_request_t *r,
     *err = "OpenSSL too old to support this function";
     return NGX_ERROR;
 #endif
-
+#endif  /* LIBRESSL_VERSION_NUMBER */
 }
 
 
@@ -703,7 +712,7 @@ ngx_http_lua_ffi_ssl_set_protocols(ngx_http_request_t *r,
     }
 #endif
 
-#ifdef SSL_OP_NO_TLSv1_3
+#if defined(NGX_SSL_TLSv1_3) && defined( SSL_OP_NO_TLSv1_3)
     SSL_clear_options(ssl_conn, SSL_OP_NO_TLSv1_3);
     if (!(protocols & NGX_SSL_TLSv1_3)) {
         SSL_set_options(ssl_conn, SSL_OP_NO_TLSv1_3);

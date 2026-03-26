@@ -24,12 +24,30 @@ force=$2
 
 add_fake_shm_module="--add-module=$root/t/data/fake-shm-module"
 
+add_http3_module=--with-http_v3_module
+answer=`$root/util/ver-ge "$version" 1.25.1`
+if [ "$OPENSSL_VER" = "1.1.0l" ] || [ "$answer" = "N" ]; then
+    add_http3_module=""
+fi
+
+disable_pcre2=--without-pcre2
+answer=`$root/util/ver-ge "$version" 1.25.1`
+if [ "$answer" = "N" ] || [ "$USE_PCRE2" = "Y" ]; then
+    disable_pcre2=""
+fi
+if [ "$USE_PCRE2" = "Y" ]; then
+    PCRE_INC=$PCRE2_INC
+    PCRE_LIB=$PCRE2_LIB
+fi
+
 time ngx-build $force $version \
             --with-threads \
             --with-pcre-jit \
+            $disable_pcre2 \
             --with-ipv6 \
             --with-cc-opt="-DNGX_LUA_USE_ASSERT -I$PCRE_INC -I$OPENSSL_INC" \
             --with-http_v2_module \
+            $add_http3_module \
             --with-http_realip_module \
             --with-http_ssl_module \
             --add-module=$root/../ndk-nginx-module \

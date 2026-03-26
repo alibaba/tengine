@@ -55,11 +55,17 @@ typedef struct {
 
 
 #if (NGX_PCRE)
-#include <pcre.h>
-#   if (PCRE_MAJOR > 8) || (PCRE_MAJOR == 8 && PCRE_MINOR >= 21)
+#   if (NGX_PCRE2)
 #       define LUA_HAVE_PCRE_JIT 1
 #   else
-#       define LUA_HAVE_PCRE_JIT 0
+
+#include <pcre.h>
+
+#       if (PCRE_MAJOR > 8) || (PCRE_MAJOR == 8 && PCRE_MINOR >= 21)
+#           define LUA_HAVE_PCRE_JIT 1
+#       else
+#           define LUA_HAVE_PCRE_JIT 0
+#       endif
 #   endif
 #endif
 
@@ -161,7 +167,7 @@ typedef struct ngx_http_lua_co_ctx_s  ngx_http_lua_co_ctx_t;
 
 typedef struct ngx_http_lua_sema_mm_s  ngx_http_lua_sema_mm_t;
 
-typedef union ngx_http_lua_srv_conf_u  ngx_http_lua_srv_conf_t;
+typedef struct ngx_http_lua_srv_conf_s  ngx_http_lua_srv_conf_t;
 
 typedef struct ngx_http_lua_main_conf_s  ngx_http_lua_main_conf_t;
 
@@ -221,9 +227,14 @@ struct ngx_http_lua_main_conf_s {
     ngx_int_t            regex_cache_entries;
     ngx_int_t            regex_cache_max_entries;
     ngx_int_t            regex_match_limit;
-#   if (LUA_HAVE_PCRE_JIT)
+#endif
+
+#if (LUA_HAVE_PCRE_JIT)
+#if (NGX_PCRE2)
+    pcre2_jit_stack     *jit_stack;
+#else
     pcre_jit_stack      *jit_stack;
-#   endif
+#endif
 #endif
 
     ngx_array_t         *shm_zones;  /* of ngx_shm_zone_t* */
@@ -246,13 +257,6 @@ struct ngx_http_lua_main_conf_s {
     ngx_http_lua_main_conf_handler_pt    exit_worker_handler;
     ngx_str_t                            exit_worker_src;
     u_char                              *exit_worker_chunkname;
-
-    ngx_http_lua_balancer_peer_data_t      *balancer_peer_data;
-                    /* neither yielding nor recursion is possible in
-                     * balancer_by_lua*, so there cannot be any races among
-                     * concurrent requests and it is safe to store the peer
-                     * data pointer in the main conf.
-                     */
 
     ngx_chain_t                            *body_filter_chain;
                     /* neither yielding nor recursion is possible in
@@ -312,7 +316,7 @@ struct ngx_http_lua_main_conf_s {
 };
 
 
-union ngx_http_lua_srv_conf_u {
+struct ngx_http_lua_srv_conf_s {
     struct {
 #if (NGX_HTTP_SSL)
         ngx_http_lua_srv_conf_handler_pt     ssl_cert_handler;
@@ -348,6 +352,14 @@ union ngx_http_lua_srv_conf_u {
     } srv;
 
     struct {
+        ngx_uint_t                           max_cached;
+        ngx_queue_t                          cache;
+        ngx_queue_t                          free;
+        ngx_queue_t                         *buckets;
+        ngx_uint_t                           bucket_cnt;
+        ngx_http_upstream_init_pt            original_init_upstream;
+        ngx_http_upstream_init_peer_pt       original_init_peer;
+
         ngx_http_lua_srv_conf_handler_pt     handler;
         ngx_str_t                            src;
         u_char                              *src_key;
@@ -360,6 +372,8 @@ union ngx_http_lua_srv_conf_u {
 typedef struct {
 #if (NGX_HTTP_SSL)
     ngx_ssl_t              *ssl;  /* shared by SSL cosockets */
+    ngx_array_t            *ssl_certificates;
+    ngx_array_t            *ssl_certificate_keys;
     ngx_uint_t              ssl_protocols;
     ngx_str_t               ssl_ciphers;
     ngx_uint_t              ssl_verify_depth;

@@ -6,7 +6,9 @@
 #include "ngx_http_reqstat.h"
 
 
+#if (T_NGX_INPUT_BODY_FILTER)
 static ngx_http_input_body_filter_pt  ngx_http_next_input_body_filter;
+#endif
 extern ngx_int_t (*ngx_http_write_filter_stat)(ngx_http_request_t *r);
 
 
@@ -318,8 +320,10 @@ ngx_http_reqstat_init(ngx_conf_t *cf)
 
     *h = ngx_http_reqstat_init_handler;
 
+#if (T_NGX_INPUT_BODY_FILTER)
     ngx_http_next_input_body_filter = ngx_http_top_input_body_filter;
     ngx_http_top_input_body_filter = ngx_http_reqstat_input_body_filter;
+#endif
 
     ngx_http_write_filter_stat = ngx_http_reqstat_log_flow;
 
@@ -874,11 +878,13 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
                 } else {
                     ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_OUT,
                                            r->connection->sent);
+#if (T_NGX_INPUT_BODY_FILTER)
                     ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN,
                                            r->connection->received);
                     if (store) {
                         store->recv = r->connection->received;
                     }
+#endif
                 }
             }
 
@@ -891,9 +897,11 @@ ngx_http_reqstat_log_handler(ngx_http_request_t *r)
         }
 
         ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_REQ_TOTAL, 1);
+#if (T_NGX_INPUT_BODY_FILTER)
         ngx_http_reqstat_count(fnode, NGX_HTTP_REQSTAT_BYTES_IN,
                                r->connection->received
                                     - (store ? store->recv : 0));
+#endif
 
         if (r->err_status) {
             status = r->err_status;
@@ -1508,12 +1516,17 @@ ngx_http_reqstat_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
 
         case NGX_DECLINED:
         case NGX_AGAIN:
+#if (T_NGX_INPUT_BODY_FILTER)
             return ngx_http_next_input_body_filter(r, buf);
+#else
+            return NGX_OK;
+#endif
 
         default:
             break;
     }
 
+#if (T_NGX_INPUT_BODY_FILTER)
     diff = r->connection->received - store->recv;
     store->recv = r->connection->received;
 
@@ -1528,6 +1541,9 @@ ngx_http_reqstat_input_body_filter(ngx_http_request_t *r, ngx_buf_t *buf)
     }
 
     return ngx_http_next_input_body_filter(r, buf);
+#else
+    return NGX_OK;
+#endif
 }
 
 

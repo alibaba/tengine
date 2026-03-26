@@ -59,8 +59,13 @@ lua exceeding request header limit
             for k, v in pairs(headers) do
                 h[k] = v
             end
-            ngx.say("Foo: ", h["Foo"] or "nil")
-            ngx.say("Bar: ", h["Bar"] or "nil")
+            if (ngx.req.http_version() == 3 or ngx.req.http_version() == 2) then
+                ngx.say("Foo: ", h["foo"] or "nil")
+                ngx.say("Bar: ", h["bar"] or "nil")
+            else
+                ngx.say("Foo: ", h["Foo"] or "nil")
+                ngx.say("Bar: ", h["Bar"] or "nil")
+            end 
         ';
     }
 --- request
@@ -127,6 +132,8 @@ Foo:
 --- response_body eval
 "a" x 2048
 --- timeout: 15
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -145,6 +152,8 @@ Foo:
 --- response_body eval
 "a" x 2048
 --- timeout: 15
+--- skip_eval: 2:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -273,8 +282,13 @@ Content-Type:
     }
 --- request
 GET /bar
---- response_body
-Foo: a
+--- response_body eval
+# Since nginx version 1.23.0, nginx combines same $http_* variable together
+$Test::Nginx::Util::NginxVersion >= 1.023000 ?
+
+"Foo: a, b\n"
+:
+"Foo: a\n"
 
 
 
@@ -480,6 +494,8 @@ for my $k (@k) {
 --- timeout: 4
 --- error_log
 lua exceeding request header limit 101 > 100
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -518,20 +534,30 @@ while ($i <= 98) {
 $s
 --- response_body eval
 my @k;
+
+if (defined($ENV{TEST_NGINX_USE_HTTP3}) || defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "host: localhost\n";
+}
 my $i = 1;
 while ($i <= 98) {
     push @k, "x-$i";
     $i++;
 }
-push @k, "connection: close\n";
-push @k, "host: localhost\n";
+
+my $found_headers = "found 99 headers\n";
+if (!defined($ENV{TEST_NGINX_USE_HTTP3}) && !defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "connection: close\n";
+    push @k, "host: localhost\n";
+    $found_headers = "found 100 headers\n";
+}
 @k = sort @k;
 for my $k (@k) {
     if ($k =~ /\d+/) {
         $k .= ": $&\n";
     }
 }
-CORE::join("", @k) . "found 100 headers\n";
+
+CORE::join("", @k) . $found_headers;
 --- timeout: 4
 --- no_error_log
 [error]
@@ -571,6 +597,9 @@ while ($i <= 101) {
 $s
 --- response_body eval
 my @k;
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    push @k, "host: localhost\n";
+}
 my $i = 1;
 while ($i <= 100) {
     push @k, "x-$i";
@@ -588,6 +617,8 @@ for my $k (@k) {
 --- timeout: 4
 --- error_log
 lua exceeding request header limit 103 > 102
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -623,13 +654,20 @@ while ($i <= 100) {
 $s
 --- response_body eval
 my @k;
+if (defined($ENV{TEST_NGINX_USE_HTTP3}) || defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "host: localhost\n";
+}
 my $i = 1;
 while ($i <= 100) {
     push @k, "x-$i";
     $i++;
 }
-push @k, "connection: close\n";
-push @k, "host: localhost\n";
+
+if (!defined($ENV{TEST_NGINX_USE_HTTP3}) && !defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "connection: close\n";
+    push @k, "host: localhost\n";
+}
+
 @k = sort @k;
 for my $k (@k) {
     if ($k =~ /\d+/) {
@@ -676,13 +714,18 @@ while ($i <= 105) {
 $s
 --- response_body eval
 my @k;
+if (defined($ENV{TEST_NGINX_USE_HTTP3}) || defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "host: localhost\n";
+}
 my $i = 1;
 while ($i <= 105) {
     push @k, "x-$i";
     $i++;
 }
-push @k, "connection: close\n";
-push @k, "host: localhost\n";
+if (!defined($ENV{TEST_NGINX_USE_HTTP3}) && !defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    push @k, "connection: close\n";
+    push @k, "host: localhost\n";
+}
 @k = sort @k;
 for my $k (@k) {
     if ($k =~ /\d+/) {
@@ -825,10 +868,21 @@ hello world
 Content-Type: application/ocsp-request
 Test-Header: 1
 --- response_body_like eval
-qr/Connection: close\r
+my $body;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $body = qr/Connection: close\r
+test-header: 1\r
+\r
+$/;
+} else {
+    $body = qr/Connection: close\r
 Test-Header: 1\r
 \r
-$/
+$/;
+}
+
+$body;
 --- no_error_log
 [error]
 
@@ -876,7 +930,36 @@ Foo20: foo20
 Foo21: foo21
 Foo22: foo22
 --- response_body_like eval
-qr/Bah: bah\r
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = qr/bah: bah\r
+test-header: 1\r
+foo1: foo1\r
+foo2: foo2\r
+foo3: foo3\r
+foo4: foo4\r
+foo5: foo5\r
+foo6: foo6\r
+foo7: foo7\r
+foo8: foo8\r
+foo9: foo9\r
+foo10: foo10\r
+foo11: foo11\r
+foo12: foo12\r
+foo13: foo13\r
+foo14: foo14\r
+foo15: foo15\r
+foo16: foo16\r
+foo17: foo17\r
+foo18: foo18\r
+foo19: foo19\r
+foo20: foo20\r
+foo21: foo21\r
+foo22: foo22\r
+/;
+} else {
+    $headers = qr/Bah: bah\r
 Test-Header: 1\r
 Foo1: foo1\r
 Foo2: foo2\r
@@ -900,7 +983,10 @@ Foo19: foo19\r
 Foo20: foo20\r
 Foo21: foo21\r
 Foo22: foo22\r
-/
+/;
+}
+
+$headers;
 
 
 
@@ -931,11 +1017,21 @@ GET /t
 --- more_headers
 My-Foo: bar
 Bar: baz
---- response_body
-Bar: baz
+--- response_body eval
+my $body;
+if ($ENV{TEST_NGINX_USE_HTTP3} || $ENV{TEST_NGINX_USE_HTTP2}) {
+    $body = "bar: baz
+host: localhost
+my-foo: bar
+";
+} else {
+    $body = "Bar: baz
 Connection: close
 Host: localhost
 My-Foo: bar
+";
+}
+$body;
 
 
 
@@ -1005,29 +1101,23 @@ for my $i ('a' .. 'r') {
 }
 $s
 --- response_body eval
-"GET /back HTTP/1.0\r
+my $s = "GET /back HTTP/1.0\r
 Host: foo\r
-Connection: close\r
-User-Agent: curl\r
-A: a\r
-B: b\r
-C: c\r
-D: d\r
-E: e\r
-F: f\r
-G: g\r
-H: h\r
-I: i\r
-J: j\r
-K: k\r
-L: l\r
-M: m\r
-N: n\r
-O: o\r
-P: p\r
-Q: q\r
-\r
-"
+Connection: close\r\n";
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $s .= "user-agent: curl\r\n";
+    for my $i ('a' .. 'q') {
+        $s .= $i . ": " . "$i\r\n"
+    }
+} else {
+    $s .= "User-Agent: curl\r\n";
+    for my $i ('a' .. 'q') {
+        $s .= uc($i) . ": " . "$i\r\n"
+    }
+}
+
+$s . "\r\n";
 
 
 
@@ -1058,7 +1148,55 @@ for my $i ('a' .. 'r') {
 }
 $s
 --- response_body eval
-"GET /back HTTP/1.0\r
+my $body;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $body = "GET /back HTTP/1.0\r
+Host: foo\r
+Connection: close\r
+user-agent: curl\r
+a: a\r
+b: b\r
+c: c\r
+d: d\r
+e: e\r
+f: f\r
+g: g\r
+h: h\r
+i: i\r
+j: j\r
+k: k\r
+l: l\r
+m: m\r
+n: n\r
+o: o\r
+p: p\r
+q: q\r
+foo-1: 1\r
+foo-2: 2\r
+foo-3: 3\r
+foo-4: 4\r
+foo-5: 5\r
+foo-6: 6\r
+foo-7: 7\r
+foo-8: 8\r
+foo-9: 9\r
+foo-10: 10\r
+foo-11: 11\r
+foo-12: 12\r
+foo-13: 13\r
+foo-14: 14\r
+foo-15: 15\r
+foo-16: 16\r
+foo-17: 17\r
+foo-18: 18\r
+foo-19: 19\r
+foo-20: 20\r
+foo-21: 21\r
+\r
+";
+} else {
+    $body = "GET /back HTTP/1.0\r
 Host: foo\r
 Connection: close\r
 User-Agent: curl\r
@@ -1101,7 +1239,10 @@ foo-19: 19\r
 foo-20: 20\r
 foo-21: 21\r
 \r
-"
+";
+}
+
+$body;
 
 
 
@@ -1130,7 +1271,34 @@ for my $i ('a' .. 'r') {
 }
 $s
 --- response_body eval
-"GET /back HTTP/1.0\r
+my $body;
+
+if ($ENV{TEST_NGINX_USE_HTTP3}) {
+    $body = "GET /back HTTP/1.0\r
+Host: foo\r
+Connection: close\r
+user-agent: curl\r
+bah: bah\r
+a: a\r
+b: b\r
+c: c\r
+d: d\r
+e: e\r
+f: f\r
+g: g\r
+h: h\r
+i: i\r
+j: j\r
+k: k\r
+l: l\r
+m: m\r
+n: n\r
+o: o\r
+p: p\r
+\r
+"
+} else {
+$body = "GET /back HTTP/1.0\r
 Host: foo\r
 Connection: close\r
 User-Agent: curl\r
@@ -1153,6 +1321,9 @@ O: o\r
 P: p\r
 \r
 "
+}
+
+$body;
 
 
 
@@ -1184,7 +1355,55 @@ for my $i ('a' .. 'r') {
 }
 $s
 --- response_body eval
-"GET /back HTTP/1.0\r
+my $body;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $body = "GET /back HTTP/1.0\r
+Host: foo\r
+Connection: close\r
+user-agent: curl\r
+bah: bah\r
+a: a\r
+b: b\r
+c: c\r
+d: d\r
+e: e\r
+f: f\r
+g: g\r
+h: h\r
+i: i\r
+j: j\r
+k: k\r
+l: l\r
+m: m\r
+n: n\r
+o: o\r
+p: p\r
+foo-1: 1\r
+foo-2: 2\r
+foo-3: 3\r
+foo-4: 4\r
+foo-5: 5\r
+foo-6: 6\r
+foo-7: 7\r
+foo-8: 8\r
+foo-9: 9\r
+foo-10: 10\r
+foo-11: 11\r
+foo-12: 12\r
+foo-13: 13\r
+foo-14: 14\r
+foo-15: 15\r
+foo-16: 16\r
+foo-17: 17\r
+foo-18: 18\r
+foo-19: 19\r
+foo-20: 20\r
+foo-21: 21\r
+\r
+";
+} else {
+    $body = "GET /back HTTP/1.0\r
 Host: foo\r
 Connection: close\r
 User-Agent: curl\r
@@ -1228,6 +1447,9 @@ foo-20: 20\r
 foo-21: 21\r
 \r
 "
+}
+
+$body;
 
 
 
@@ -1259,11 +1481,23 @@ GET /t
 --- more_headers
 My-Foo: bar
 Bar: baz
---- response_body
-Bar: baz
+--- response_body eval
+my $body;
+
+if (defined($ENV{TEST_NGINX_USE_HTTP3})|| defined($ENV{TEST_NGINX_USE_HTTP2})) {
+    $body="bar: baz
+host: localhost
+my-foo: bar
+";
+} else {
+    $body="Bar: baz
 Connection: close
 Host: localhost
 My-Foo: bar
+";
+}
+
+$body;
 --- no_error_log
 [error]
 
@@ -1898,6 +2132,8 @@ found 3 headers.
 lua exceeding request header limit 4 > 3
 --- no_error_log
 [error]
+--- skip_eval: 4:$ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -1934,6 +2170,8 @@ found 3 headers.
 --- no_error_log
 lua exceeding request header limit
 [error]
+--- skip_eval: 4: $ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -1972,6 +2210,8 @@ found 3 headers.
 lua exceeding request header limit 4 > 3
 --- no_error_log
 [error]
+--- skip_eval: 4: $ENV{TEST_NGINX_USE_HTTP3}
+--- no_http2
 
 
 
@@ -2002,12 +2242,22 @@ while ($i <= 1) {
     $i++;
 }
 $s
---- response_body
-found 3 headers.
+--- response_body eval
+my $body;
+if (!defined $ENV{TEST_NGINX_USE_HTTP2}) {
+    $body = "found 3 headers.
+";
+} else {
+    $body = "found 2 headers.
+";
+}
+
+$body;
 --- timeout: 4
 --- no_error_log
 lua exceeding request header limit
 [error]
+--- skip_eval: 4: $ENV{TEST_NGINX_USE_HTTP3}
 
 
 

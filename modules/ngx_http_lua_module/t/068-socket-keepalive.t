@@ -168,6 +168,7 @@ received: OK
 
 
 === TEST 3: upstream sockets close prematurely
+--- no_http3
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -243,6 +244,7 @@ done
 
 
 === TEST 4: http keepalive
+--- quic_max_idle_timeout: 1.2
 --- http_config eval
     "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
@@ -318,6 +320,7 @@ done
 
 
 === TEST 5: lua_socket_keepalive_timeout
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -395,6 +398,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 6: lua_socket_pool_size
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -473,6 +477,7 @@ qr/lua tcp socket connection pool size: 1\b/]
 
 
 === TEST 7: "lua_socket_keepalive_timeout 0" means unlimited
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -548,6 +553,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 8: setkeepalive(timeout) overrides lua_socket_keepalive_timeout
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -625,6 +631,7 @@ qr/lua tcp socket connection pool size: 30\b/]
 
 
 === TEST 9: sock:setkeepalive(timeout, size) overrides lua_socket_pool_size
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -731,6 +738,7 @@ bad argument #3 to '?' (bad "pool_size" option value: 0)
 
 
 === TEST 11: sock:keepalive_timeout(0) means unlimited
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -1508,6 +1516,7 @@ done
 
 
 === TEST 25: setkeepalive() with explicit nil args
+--- quic_max_idle_timeout: 1.2
 --- config
    server_tokens off;
    location /t {
@@ -1919,6 +1928,7 @@ too many waiting connect operations
 
 
 === TEST 32: conn queuing: once 'pool_size' is reached and pool has 'backlog'
+--- quic_max_idle_timeout: 1.2
 --- config
     location /t {
         set $port $TEST_NGINX_MEMCACHED_PORT;
@@ -2536,6 +2546,8 @@ GET /t
 --- abort
 --- no_error_log
 [error]
+--- curl_error eval
+qr/curl: \(28\) Operation timed out after \d+ milliseconds with 0 bytes received/
 
 
 
@@ -2643,6 +2655,7 @@ lua tcp socket connect timed out, when connecting to
 
 
 === TEST 46: conn queuing: resume connect operation if resumed connect failed (could not be resolved)
+--- quic_max_idle_timeout: 1.2
 --- config
     resolver 127.0.0.2:12345 ipv6=off;
     resolver_timeout 1s;
@@ -3016,3 +3029,167 @@ connected: 1, reused: 0
 --- error_log
 lua tcp socket keepalive create connection pool for key "A"
 lua tcp socket keepalive create connection pool for key "B"
+
+
+
+=== TEST 54: wrong first argument for setkeepalive
+--- quic_max_idle_timeout: 1.2
+--- http_config eval
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
+--- config
+   server_tokens off;
+   location /t {
+        keepalive_timeout 60s;
+
+        set $port $TEST_NGINX_SERVER_PORT;
+        content_by_lua_block {
+            local port = ngx.var.port
+
+            local sock = ngx.socket.tcp()
+
+            local ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.1\r\nHost: localhost\r\nConnection: keepalive\r\n\r\n"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            local reader = sock:receiveuntil("\r\n0\r\n\r\n")
+            local data, err = reader()
+
+            if not data then
+                ngx.say("failed to receive response body: ", err)
+                return
+            end
+
+            ngx.say("received response of ", #data, " bytes")
+
+            ok, err = sock:setkeepalive()
+            if not ok then
+                ngx.say("failed to set reusable: ", err)
+            end
+
+            ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ok, err = sock:setkeepalive("not a number", "not a number")
+            if not ok then
+                ngx.say("failed to set reusable: ", err)
+            end
+        }
+    }
+
+    location /foo {
+        echo foo;
+    }
+
+    location /sleep {
+        echo_sleep 1;
+    }
+--- request
+GET /t
+--- error_code:
+--- response_body
+--- error_log eval
+qr/\Qbad argument #1 to 'setkeepalive' (number expected, got string)\E/
+--- no_error_log
+[crit]
+--- timeout: 4
+--- curl_error eval
+qr{HTTP/3 stream 0 reset by server}
+
+
+
+=== TEST 55: wrong second argument for setkeepalive
+--- quic_max_idle_timeout: 1.2
+--- http_config eval
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
+--- config
+   server_tokens off;
+   location /t {
+        keepalive_timeout 60s;
+
+        set $port $TEST_NGINX_SERVER_PORT;
+        content_by_lua_block {
+            local port = ngx.var.port
+
+            local sock = ngx.socket.tcp()
+
+            local ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ngx.say("connected: ", ok)
+
+            local req = "GET /foo HTTP/1.1\r\nHost: localhost\r\nConnection: keepalive\r\n\r\n"
+
+            local bytes, err = sock:send(req)
+            if not bytes then
+                ngx.say("failed to send request: ", err)
+                return
+            end
+
+            ngx.say("request sent: ", bytes)
+
+            local reader = sock:receiveuntil("\r\n0\r\n\r\n")
+            local data, err = reader()
+
+            if not data then
+                ngx.say("failed to receive response body: ", err)
+                return
+            end
+
+            ngx.say("received response of ", #data, " bytes")
+
+            ok, err = sock:setkeepalive()
+            if not ok then
+                ngx.say("failed to set reusable: ", err)
+            end
+
+            ok, err = sock:connect("127.0.0.1", port)
+            if not ok then
+                ngx.say("failed to connect: ", err)
+                return
+            end
+
+            ok, err = sock:setkeepalive(10, "not a number")
+            if not ok then
+                ngx.say("failed to set reusable: ", err)
+            end
+        }
+    }
+
+    location /foo {
+        echo foo;
+    }
+
+    location /sleep {
+        echo_sleep 1;
+    }
+--- request
+GET /t
+--- error_code:
+--- response_body
+--- error_log eval
+qr/\Qbad argument #2 to 'setkeepalive' (number expected, got string)\E/
+--- no_error_log
+[crit]
+--- timeout: 4
+--- curl_error eval
+qr{HTTP/3 stream 0 reset by server}

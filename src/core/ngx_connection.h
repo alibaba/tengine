@@ -136,6 +136,9 @@ struct ngx_connection_s {
     ngx_listening_t    *listening;
 
     off_t               sent;
+#if (T_NGX_INPUT_BODY_FILTER)
+    off_t               received;
+#endif
 
     ngx_log_t          *log;
 

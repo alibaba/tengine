@@ -69,6 +69,7 @@ kill status = 200
 kill body = \{"errcode":0\}$
 --- error_log eval
 qr{upstream timed out \(\d+: Connection timed out\) while sending query to drizzle upstream}
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

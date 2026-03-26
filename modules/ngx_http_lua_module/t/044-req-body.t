@@ -7,7 +7,7 @@ log_level('warn');
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 4 + 52 );
+plan tests => repeat_each() * (blocks() * 4 + 58);
 
 #no_diff();
 no_long_string();
@@ -351,9 +351,18 @@ hello, world
 --- user_files
 >>> a.txt
 Will you change this world?
---- raw_response_headers_like
-X-Old: \S+/client_body_temp/\d+\r
-.*?X-New: \S+/html/a\.txt\r
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = qr#x-old: \S+/client_body_temp/\d+\r
+.*?x-new: \S+/html/a\.txt\r#;
+} else {
+    $headers = qr#X-Old: \S+/client_body_temp/\d+\r
+.*?X-New: \S+/html/a\.txt\r#;
+}
+
+$headers;
 --- response_body
 Will you change this world?
 --- no_error_log
@@ -390,9 +399,18 @@ hello, world!
 --- user_files
 >>> a.txt
 Will you change this world?
---- raw_response_headers_like
-X-Old: \S+/client_body_temp/\d+\r
-.*?X-New: \S+/html/a\.txt\r
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = qr#x-old: \S+/client_body_temp/\d+\r
+.*?x-new: \S+/html/a\.txt\r#;
+} else {
+    $headers = qr#X-Old: \S+/client_body_temp/\d+\r
+.*?X-New: \S+/html/a\.txt\r#;
+}
+
+$headers;
 --- response_body
 Will you change this world?
 --- no_error_log
@@ -898,6 +916,7 @@ body: hell
 --- no_error_log
 [error]
 [alert]
+--- skip_eval: 4:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -959,6 +978,7 @@ body file: hello
 [alert]
 --- error_log
 a client request body is buffered to a temporary file
+--- skip_eval: 5:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -985,9 +1005,9 @@ a client request body is buffered to a temporary file
 --- error_code: 500
 --- error_log eval
 qr/lua entry thread aborted: runtime error: content_by_lua\(nginx\.conf:\d+\):2: request body not read yet/
-
 --- no_error_log
 [alert]
+--- skip_eval: 4:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1017,8 +1037,8 @@ body: hell
 --- no_error_log
 [error]
 [alert]
---- no_error_log
 a client request body is buffered to a temporary file
+--- skip_eval: 5:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1241,8 +1261,8 @@ body: hello, my dear friend!
 --- no_error_log
 [error]
 [alert]
---- no_error_log
 a client request body is buffered to a temporary file
+--- skip_eval: 5:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1382,8 +1402,8 @@ failed to get req socket: request body already exists
 --- no_error_log
 [error]
 [alert]
---- no_error_log
 a client request body is buffered to a temporary file
+--- skip_eval: 5:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1405,6 +1425,7 @@ Expect: 100-Continue
 [alert]
 [error]
 http finalize request: 500, "/test?" a:1, c:0
+--- skip_eval: 3:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 
@@ -1480,13 +1501,22 @@ probe syscall.fcntl {
 --- stap_out_unlike
 fcntl\(O_DIRECT\)
 
---- raw_response_headers_like
-.*?X-New: \S+/html/a\.txt\r
+--- raw_response_headers_like eval
+my $headers;
+
+if (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+    $headers = qr#.*?x-new: \S+/html/a\.txt\r#;
+} else {
+    $headers = qr#.*?X-New: \S+/html/a\.txt\r#;
+}
+
+$headers;
 --- response_body
 Will you change this world?
 --- no_error_log
 [error]
 [alert]
+--- skip_eval: 6:$ENV{TEST_NGINX_USE_HTTP3}
 
 
 

@@ -116,6 +116,7 @@ ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
                 return NGX_ERROR;
             }
         }
+
 #if (T_NGX_XQUIC)
         }
 #endif

@@ -297,6 +297,8 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
 
     (void) lmcf->init_worker_handler(cycle->log, lmcf, lmcf->lua);
 
+    ngx_http_lua_set_req(lmcf->lua, NULL);
+
     ngx_destroy_pool(c->pool);
     return NGX_OK;
 

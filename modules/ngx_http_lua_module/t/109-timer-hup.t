@@ -6,6 +6,10 @@ BEGIN {
     if ($ENV{TEST_NGINX_CHECK_LEAK}) {
         $SkipReason = "unavailable for the hup tests";
 
+    } elsif (defined $ENV{TEST_NGINX_USE_HTTP3}) {
+        #os.execute("kill -HUP " .. pid)
+        $SkipReason = "send HUP relaod signal by self make two workers with same id";
+
     } else {
         $ENV{TEST_NGINX_USE_HUP} = 1;
         undef $ENV{TEST_NGINX_USE_STAP};
