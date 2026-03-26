@@ -28,7 +28,6 @@ my $t = Test::Nginx->new()->has(qw/http proxy upstream_keepalive/)
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }

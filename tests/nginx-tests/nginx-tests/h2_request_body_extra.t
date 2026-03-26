@@ -23,7 +23,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/);
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/)->plan(50);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -38,9 +38,11 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         listen       127.0.0.1:8081;
         server_name  localhost;
+
+        http2 on;
 
         client_header_buffer_size 1k;
         client_body_buffer_size 2k;
@@ -87,13 +89,7 @@ http {
 
 EOF
 
-plan(skip_all => 'not yet') unless $t->has_version('1.21.2');
-$t->plan(50);
-
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -223,7 +219,7 @@ like(http2_get_body_multi_nolen('/unbuf/', '0123456789' x 128),
 	'body unbuf multi nolen in two buffers');
 like(http2_get_body_multi_nolen('/unbuf/', '0123456789' x 512),
 	qr/(?!.*x-unbuf-file.*)x-body-file/ms,
-        'body unbuf multi nolen in file');
+	'body unbuf multi nolen in file');
 like(read_body_file(http2_get_body_multi_nolen('/unbuf/file',
 	'0123456789' x 512)), qr/^(0123456789){512}$/s,
 	'body unbuf multi nolen in file only');

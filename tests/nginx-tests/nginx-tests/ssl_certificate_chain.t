@@ -22,7 +22,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl socket_ssl/)
 	->has_daemon('openssl')->plan(3);
 
@@ -72,7 +71,10 @@ $t->write_file('openssl.conf', <<EOF);
 default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
+x509_extensions = myca_extensions
 [ req_distinguished_name ]
+[ myca_extensions ]
+basicConstraints = critical,CA:TRUE
 EOF
 
 $t->write_file('ca.conf', <<EOF);
@@ -147,15 +149,14 @@ sub get_ssl_socket {
 	http(
 		'', PeerAddr => '127.0.0.1:' . port($port), start => 1,
 		SSL => 1,
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_PEER(),
-			SSL_ca_file => "$d/root.crt",
-			SSL_verify_callback => sub {
-				my ($ok) = @_;
-				$verify = $ok;
-				return $ok;
+		SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_PEER(),
+		SSL_ca_file => "$d/root.crt",
+		SSL_verify_callback => sub {
+			my ($ok) = @_;
+			$verify = $ok;
+			return $ok;
 		}
-		);
-
+	);
 
 	return $verify;
 }

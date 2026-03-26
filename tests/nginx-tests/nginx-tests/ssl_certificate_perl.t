@@ -22,9 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()
-
 	->has(qw/http http_ssl perl openssl:1.0.2 socket_ssl_sni/)
 	->has_daemon('openssl');
 

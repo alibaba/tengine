@@ -202,26 +202,14 @@ $s->read();
 $s->send('INVALID COMMAND WITH ARGUMENTS' . CRLF
 	. 'NOOP');
 $s->check(qr/^-ERR/, 'pipelined invalid command');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->ok('pipelined noop after invalid command');
-
-}
 
 $s->send('USER test@example.com' . CRLF
 	. 'PASS secret' . CRLF
 	. 'QUIT');
 $s->ok('pipelined user');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->ok('pipelined pass');
 $s->ok('pipelined quit');
-
-}
 
 $s = Test::Nginx::POP3->new();
 $s->read();
@@ -230,14 +218,8 @@ $s->send('AUTH LOGIN' . CRLF
 	. encode_base64('test@example.com', '') . CRLF
 	. encode_base64('secret', ''));
 $s->check(qr/\+ VXNlcm5hbWU6/, 'pipelined auth username challenge');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->check(qr/\+ UGFzc3dvcmQ6/, 'pipelined auth password challenge');
 $s->ok('pipelined auth');
-
-}
 
 ###############################################################################
 

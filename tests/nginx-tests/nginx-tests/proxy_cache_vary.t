@@ -266,13 +266,7 @@ like(get('/', 'bar,foo'), qr/HIT/ms, 'normalize order');
 
 like(get('/multi', 'foo'), qr/MISS/ms, 'multi first');
 like(get('/multi', 'foo'), qr/HIT/ms, 'multi second');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(get('/multi', 'bar'), qr/MISS/ms, 'multi other');
-
-}
 
 # keep c->body_start when Vary changes (ticket #2029)
 

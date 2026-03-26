@@ -43,10 +43,12 @@ http {
 
         proxy_ssl_session_reuse off;
 
+        proxy_ssl_certificate $arg_cert.example.com.crt;
+        proxy_ssl_certificate_key $arg_cert.example.com.key;
+        proxy_ssl_password_file password;
+
         location / {
             proxy_pass https://127.0.0.1:8081/;
-            proxy_ssl_certificate $arg_cert.example.com.crt;
-            proxy_ssl_certificate_key $arg_cert.example.com.key;
         }
 
         location /encrypted {
@@ -54,6 +56,10 @@ http {
             proxy_ssl_certificate $arg_cert.example.com.crt;
             proxy_ssl_certificate_key $arg_cert.example.com.key;
             proxy_ssl_password_file password;
+        }
+
+        location /optimized {
+            proxy_pass https://127.0.0.1:8082/;
         }
 
         location /none {
@@ -132,7 +138,7 @@ sleep 1 if $^O eq 'MSWin32';
 $t->write_file('password', '3.example.com');
 $t->write_file('index.html', '');
 
-$t->try_run('no upstream ssl_certificate variables')->plan(4);
+$t->run()->plan(5);
 
 ###############################################################################
 
@@ -142,6 +148,16 @@ like(http_get('/?cert=2'),
 	qr/X-Verify: FAILED/ms, 'variable - fail certificate');
 like(http_get('/encrypted?cert=3'),
 	qr/X-Verify: SUCCESS/ms, 'variable - with encrypted key');
+
+TODO: {
+todo_skip 'leaves coredump', 1 unless $t->has_version('1.27.5')
+	or $ENV{TEST_NGINX_UNSAFE};
+
+like(http_get('/optimized?cert=3'),
+	qr/X-Verify: SUCCESS/ms, 'variable - with encrypted key optimized');
+
+}
+
 like(http_get('/none'),
 	qr/X-Verify: NONE/ms, 'variable - no certificate');
 

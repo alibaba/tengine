@@ -142,7 +142,7 @@ sub scgi_daemon {
 	while (my $request = $scgi->accept()) {
 		eval { $request->read_env(); };
 		next if $@;
-		
+
 		$uri = $request->env->{REQUEST_URI};
 		$uri =~ s!^/unbuf!!;
 

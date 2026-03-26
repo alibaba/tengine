@@ -94,12 +94,7 @@ like(http_get('/auth'), qr/401.*WWW-Authenticate.*intercepted/s,
 # make sure multiple WWW-Authenticate headers are returned
 # along with intercepted response (ticket #485)
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(http_get('/auth-multi'), qr/401.*WWW-Authenticate: foo.*bar.*intercept/s,
 	'intercepted 401 multi');
-
-}
 
 ###############################################################################

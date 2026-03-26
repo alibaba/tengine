@@ -30,7 +30,6 @@ my $t = Test::Nginx->new()->has(qw/http proxy cache/)->plan(4)
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }

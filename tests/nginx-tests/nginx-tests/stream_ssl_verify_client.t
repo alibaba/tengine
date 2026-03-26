@@ -24,7 +24,6 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return socket_ssl/)
 	->has_daemon('openssl');
 
@@ -79,6 +78,7 @@ stream {
         ssl_verify_client optional_no_ca;
         ssl_client_certificate 2.example.com.crt;
     }
+
     server {
         listen  127.0.0.1:8084 ssl;
         return  $ssl_protocol;
@@ -120,16 +120,13 @@ like(get(8081, '2.example.com'), qr/SUCCESS.*BEGIN/, 'good cert');
 like(get(8082, '2.example.com'), qr/SUCCESS.*BEGIN/, 'good cert optional');
 like(get(8082, '3.example.com'), qr/SUCCESS.*BEGIN/, 'good cert trusted');
 
-SKIP: {
-skip 'Net::SSLeay version >= 1.36 required', 1 if $Net::SSLeay::VERSION < 1.36;
-
 TODO: {
 local $TODO = 'broken TLSv1.3 CA list in LibreSSL'
 	if $t->has_module('LibreSSL') && test_tls13();
+
 my $ca = join ' ', get(8082, '3.example.com');
 is($ca, '/CN=2.example.com', 'no trusted sent');
 
-}
 }
 
 $t->stop();
@@ -141,6 +138,7 @@ is($t->read_file('status.log'), "500\n200\n", 'log');
 sub test_tls13 {
 	get(8084) =~ /TLSv1.3/;
 }
+
 sub get {
 	my ($port, $cert) = @_;
 
@@ -159,6 +157,7 @@ sub get {
 	# While not exactly correct, it looks like there is no other way to
 	# obtain CA list with IO::Socket::SSL, and this seems to be good
 	# enough for tests.
+
 	my $ssl = $s->socket()->_get_ssl_object();
 	my $list = Net::SSLeay::get_client_CA_list($ssl);
 	my @names;

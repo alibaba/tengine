@@ -24,10 +24,8 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl sni socket_ssl_sni/)
-	->has_daemon('openssl')->plan(13);
+	->has_daemon('openssl')->plan(14);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -110,6 +108,17 @@ http {
 
         ssl_verify_client on;
     }
+
+    server {
+        listen       127.0.0.1:8443 ssl;
+        server_name  dup;
+
+        ssl_certificate_key 1.example.com.key;
+        ssl_certificate 1.example.com.crt;
+
+        ssl_verify_client optional;
+        ssl_client_certificate dup.2.example.com.crt;
+    }
 }
 
 EOF
@@ -131,6 +140,8 @@ foreach my $name ('1.example.com', '2.example.com', '3.example.com') {
 		. ">>$d/openssl.out 2>&1") == 0
 		or die "Can't create certificate for $name: $!\n";
 }
+
+$t->write_file('dup.2.example.com.crt', $t->read_file('2.example.com.crt') x 2);
 
 sleep 1 if $^O eq 'MSWin32';
 
@@ -154,16 +165,16 @@ like(get('localhost', '2.example.com'), qr/SUCCESS.*BEGIN/, 'good cert');
 like(get('optional', '2.example.com'), qr/SUCCESS.*BEGI/, 'good cert optional');
 like(get('optional', '3.example.com'), qr/SUCCESS.*BEGIN/, 'good cert trusted');
 
-SKIP: {
-skip 'Net::SSLeay version >= 1.36 required', 1 if $Net::SSLeay::VERSION < 1.36;
-
 TODO: {
 local $TODO = 'broken TLSv1.3 CA list in LibreSSL'
 	if $t->has_module('LibreSSL') && test_tls13();
+
 my $ca = join ' ', get('optional', '3.example.com');
 is($ca, '/CN=2.example.com', 'no trusted sent');
 
-}
+$ca = join ' ', get('dup');
+is($ca, '/CN=2.example.com', 'no duplicates sent');
+
 }
 
 like(get('optional', undef, 'localhost'), qr/421 Misdirected/, 'misdirected');
@@ -173,9 +184,9 @@ like(get('optional', undef, 'localhost'), qr/421 Misdirected/, 'misdirected');
 sub test_tls13 {
 	get('optional') =~ /TLSv1.3/;
 }
+
 sub get {
 	my ($sni, $cert, $host) = @_;
-
 
 	$host = $sni if !defined $host;
 
@@ -197,6 +208,7 @@ sub get {
 	# While not exactly correct, it looks like there is no other way to
 	# obtain CA list with IO::Socket::SSL, and this seems to be good
 	# enough for tests.
+
 	my $ssl = $s->_get_ssl_object();
 	my $list = Net::SSLeay::get_client_CA_list($ssl);
 	my @names;

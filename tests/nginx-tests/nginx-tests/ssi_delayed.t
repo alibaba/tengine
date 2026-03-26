@@ -4,7 +4,7 @@
 # (C) Roman Arutyunyan
 # (C) Nginx, Inc.
 
-# Test for subrequest bug with delay (see 903fb1ddc07f for details).
+# Test for subrequest bug with delay.
 
 ###############################################################################
 
@@ -72,7 +72,7 @@ $t->run()->waitforsocket('127.0.0.1:' . port(8081));
 # ready to handle corresponding write event, wev->delayed won't be
 # cleared.  This results in the subrequest response not being
 # sent to the client, and the whole request will hang if all proxy
-# buffers will be exhausted.  Fixed in 1.11.13 (903fb1ddc07f).
+# buffers will be exhausted.  Fixed in 5d5f0dcac (1.11.13).
 
 like(http_get('/delayed.html'), qr/x{100}y{1024}SEE-THIS/, 'delayed');
 

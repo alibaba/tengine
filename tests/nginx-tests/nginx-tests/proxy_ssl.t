@@ -21,7 +21,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http proxy http_ssl socket_ssl/)
 	->has_daemon('openssl')->plan(8)
 	->write_file_expand('nginx.conf', <<'EOF');
@@ -109,11 +108,14 @@ $t->waitforsocket('127.0.0.1:' . port(8083));
 like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl');
 like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl 2');
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: \./s, 'ssl session new');
+
 TODO: {
 local $TODO = 'no TLS 1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') && http_get('/ssl') =~ /TLSv1.3/;
+
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: r/s, 'ssl session reused');
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: r/s, 'ssl session reused 2');
+
 }
 
 SKIP: {

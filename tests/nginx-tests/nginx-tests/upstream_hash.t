@@ -177,7 +177,9 @@ ok(cmp_peers([iter('/cw', 20)], [iter('/cw2', 20)], $p2), 'consistent weight');
 
 like(many('/?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash');
 like(many('/c?a=1', 10), qr/($p1|$p2|$p3): 10/, 'stable hash - consistent');
+
 # fallback to round-robin
+
 like(many('/?a=', 6), qr/$p1: 2, $p2: 2, $p3: 2/, 'empty key');
 like(many('/c?a=', 6), qr/$p1: 2, $p2: 2, $p3: 2/, 'empty key - consistent');
 

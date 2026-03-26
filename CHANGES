@@ -1,3 +1,15 @@
+Changes with Tengine 3.1.0                                       26 Mar 2026
+
+    *) Upgrade: nginx core upgraded from 1.24.0 to 1.28.3.
+
+    *) Feature: HTTP/3 support (QUIC v1 and draft-29) with xquic library.
+
+    *) Change: lua-nginx-module upgraded to v0.10.27 for PCRE2 compatibility.
+
+    *) Bugfix: various API compatibility fixes for Tengine modules with
+       nginx 1.28.3 core changes.
+
+
 Changes with nginx 1.24.0                                        11 Apr 2023
 
     *) 1.24.x stable branch.

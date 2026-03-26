@@ -24,7 +24,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl access realip socket_ssl/)
 	->has_daemon('openssl');
 
@@ -148,8 +147,6 @@ sub pp_get {
 	my ($url, $proxy) = @_;
 
 	my $s = http($proxy, start => 1);
-
-
 
 	return http(<<EOF, socket => $s, SSL => 1);
 GET $url HTTP/1.0

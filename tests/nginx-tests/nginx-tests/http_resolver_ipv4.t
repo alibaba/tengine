@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite/);
+my $t = Test::Nginx->new()->has(qw/http proxy/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -40,6 +40,9 @@ http {
     server {
         listen       127.0.0.1:8080;
         server_name  localhost;
+
+        add_header X-Addr $upstream_addr always;
+        proxy_next_upstream http_403;
 
         location / {
             proxy_pass  http://$arg_h:%%PORT_8081%%/;
@@ -59,50 +62,38 @@ http {
 
     server {
         listen       127.0.0.1:8081;
-        server_name  localhost;
-
-        location / {
-            return  200 "ipv4";
-        }
-    }
-
-    server {
         listen       [::1]:%%PORT_8081%%;
         server_name  localhost;
 
         location / {
-            return  200 "ipv6";
+            # return 403;
         }
     }
 }
 
 EOF
 
-$t->try_run('no resolver ipv4')->plan(3);
+$t->try_run('no inet6 support')->plan(3);
 
 $t->run_daemon(\&dns_daemon, port(8980), $t);
 $t->waitforfile($t->testdir . '/' . port(8980));
 
 ###############################################################################
 
-like(many('/', 10), qr/ipv4: \d+, ipv6: \d+/, 'ipv4 ipv6');
-is(many('/ipv4', 10), 'ipv4: 10', 'ipv4 only');
-is(many('/ipv6', 10), 'ipv6: 10', 'ipv6 only');
+my $p1 = port(8081);
+
+is(get('/'), "127.0.0.1:$p1, [::1]:$p1", 'ipv4 ipv6');
+is(get('/ipv4'), "127.0.0.1:$p1", 'ipv4 only');
+is(get('/ipv6'), "[::1]:$p1", 'ipv6 only');
 
 ###############################################################################
 
-sub many {
-	my ($uri, $count) = @_;
-	my %hits;
+sub get {
+	my ($uri) = @_;
 
-	for (1 .. $count) {
-		if (http_get("$uri?h=example.com") =~ /(ipv(4|6))/) {;
-			$hits{$1} = 0 unless defined $hits{$1};
-			$hits{$1}++;
-		}
-	}
-
-	return join ', ', map { $_ . ": " . $hits{$_} } sort keys %hits;
+	my $r = http_get("$uri?h=example.com");
+	my ($addr) = $r =~ /X-Addr: (.+)\x0d/m;
+	return $addr;
 }
 
 ###############################################################################

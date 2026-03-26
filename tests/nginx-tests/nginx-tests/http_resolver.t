@@ -31,7 +31,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -153,7 +152,7 @@ like(http_host_header('cname.example.net', '/'), qr/200 OK/,
 # CNAME + A combined answer
 # demonstrates the name in answer section different from what is asked
 
-like(http_host_header('cname_a.example.net', '/'), qr/200 OK/, 'CNAME + A');
+like(http_host_header('cname-a.example.net', '/'), qr/200 OK/, 'CNAME + A');
 
 # CNAME refers to non-existing A
 
@@ -248,17 +247,15 @@ like(http_host_header('ttl.example.net', '/valid'), qr/502 Bad/,
 # When ttl in CNAME is expired, the answer should not be served from cache.
 # Catch this by returning SERVFAIL on the 2nd and subsequent queries.
 
-http_host_header('cname_a_ttl2.example.net', '/');
+http_host_header('cname-a-ttl2.example.net', '/');
 
 sleep 2;
 
-like(http_host_header('cname_a_ttl2.example.net', '/'), qr/502 Bad/,
+like(http_host_header('cname-a-ttl2.example.net', '/'), qr/502 Bad/,
 	'CNAME + A with expired CNAME ttl');
 
-SKIP: {
-skip 'no resolver';
 like(http_host_header('example.net', '/invalid'), qr/502 Bad/, 'no resolver');
-}
+
 like(http_end($s), qr/200 OK/, 'resend after malformed response');
 like(http_end($fe), qr/200 OK/, 'resend after format error');
 
@@ -268,7 +265,7 @@ my $s2 = http_get('/bad', start => 1);
 http_end($s);
 ok(http_end($s2), 'timeout handler on 2nd request');
 
-like(http_host_header('fe_id.example.net', '/'), qr/502 Bad/, 'format error');
+like(http_host_header('fe-id.example.net', '/'), qr/502 Bad/, 'format error');
 
 # several requests waiting on same name query
 # 1st request aborts before name is resolved
@@ -359,7 +356,7 @@ sub reply_handler {
 
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
-	} elsif ($name eq 'fe_id.example.net' && $type == A) {
+	} elsif ($name eq 'fe-id.example.net' && $type == A) {
 		$id = 42;
 		$rcode = FORMERR;
 
@@ -424,7 +421,7 @@ sub reply_handler {
 		select undef, undef, undef, 2.1;
 		return;
 
-	} elsif ($name eq 'cname_a.example.net') {
+	} elsif ($name eq 'cname-a.example.net') {
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 			8, 5, 'alias', 0xc014);
 
@@ -435,16 +432,16 @@ sub reply_handler {
 				4, split(/\./, '127.0.0.1'));
 		}
 
-	} elsif ($name eq 'cname_a_ttl2.example.net' && $type == A) {
+	} elsif ($name eq 'cname-a-ttl2.example.net' && $type == A) {
 		push @rdata, pack("n3N nCa18n", 0xc00c, CNAME, IN, 1,
-			21, 18, 'cname_a_ttl2_alias', 0xc019);
+			21, 18, 'cname-a-ttl2-alias', 0xc019);
 		if (++$state->{cttl2cnt} >= 2) {
 			$rcode = SERVFAIL;
 		}
 		push @rdata, pack('n3N nC4', 0xc036, A, IN, $ttl,
 			4, split(/\./, '127.0.0.1'));
 
-	} elsif ($name eq 'cname_a_ttl_alias.example.net' && $type == A) {
+	} elsif ($name eq 'cname-a-ttl-alias.example.net' && $type == A) {
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
 	} elsif ($name eq 'cname2.example.net') {

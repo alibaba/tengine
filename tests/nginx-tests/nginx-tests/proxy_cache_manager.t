@@ -25,7 +25,7 @@ select STDOUT; $| = 1;
 plan(skip_all => 'long test') unless $ENV{TEST_NGINX_UNSAFE};
 
 plan(skip_all => 'page size is not appropriate') unless
-        POSIX::sysconf(&POSIX::_SC_PAGESIZE) == 4096;
+	POSIX::sysconf(&POSIX::_SC_PAGESIZE) == 4096;
 
 my $t = Test::Nginx->new()->has(qw/http proxy cache/)
 	->write_file_expand('nginx.conf', <<'EOF');

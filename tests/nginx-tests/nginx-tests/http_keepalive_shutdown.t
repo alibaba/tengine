@@ -55,8 +55,6 @@ $t->run();
 
 ###############################################################################
 
-local $TODO = 'not yet' unless $t->has_version('1.21.6');
-
 # signaling on graceful shutdown to client that keepalive connection is closing
 
 my $s = http(<<EOF, start => 1);

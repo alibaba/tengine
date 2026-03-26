@@ -98,7 +98,7 @@ sleep 1 if $^O eq 'MSWin32';
 
 $t->write_file('index.html', '');
 
-$t->try_run('no empty value support')->plan(2);
+$t->run()->plan(2);
 
 ###############################################################################
 

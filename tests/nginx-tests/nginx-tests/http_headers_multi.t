@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite proxy/)->plan(42);
+my $t = Test::Nginx->new()->has(qw/http rewrite proxy/)->plan(47);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -49,6 +49,7 @@ http {
             add_header X-Cookie-Foo $cookie_foo;
             add_header X-Cookie-Bar $cookie_bar;
             add_header X-Cookie-Bazz $cookie_bazz;
+            add_header X-Cookie-Qux $cookie_qux;
 
             return 204;
         }
@@ -144,14 +145,8 @@ like(get('/', map { "X-Forwarded-For: $_" } qw/ foo bar bazz /),
 	qr/X-Forwarded-For: foo, bar, bazz/, 'multi $http_x_forwarded_for');
 like(get('/', 'Cookie: foo=1', 'Cookie: bar=2', 'Cookie: bazz=3'),
 	qr/X-Cookie: foo=1; bar=2; bazz=3/, 'multi $http_cookie');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(get('/', 'Foo: foo', 'Foo: bar', 'Foo: bazz'),
 	qr/X-Foo: foo, bar, bazz/, 'multi $http_foo');
-
-}
 
 # request cookies, $cookie_*
 
@@ -161,32 +156,37 @@ like($r, qr/X-Cookie-Foo: 1/, '$cookie_foo');
 like($r, qr/X-Cookie-Bar: 2/, '$cookie_bar');
 like($r, qr/X-Cookie-Bazz: 3/, '$cookie_bazz');
 
+# request cookies, multiple values
+
+$r = get('/', 'Cookie: foo=1, qux=0; bar=2', 'Cookie: bazz=3');
+
+like($r, qr/X-Cookie: foo=1, qux=0; bar=2; bazz=3/, 'multi comma $http_cookie');
+like($r, qr/X-Cookie-Foo: 1, qux=0/, '$cookie_foo');
+like($r, qr/X-Cookie-Bar: 2/, '$cookie_bar');
+like($r, qr/X-Cookie-Bazz: 3/, '$cookie_bazz');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.29.6');
+
+unlike($r, qr/X-Cookie-Qux:/, '$cookie_qux');
+
+}
+
 # response headers, $http_*
 
 $r = get('/s');
 
 like($r, qr/X-Sent-CC: foo, bar, bazz/, 'multi $sent_http_cache_control');
 like($r, qr/X-Sent-Link: foo, bar, bazz/, 'multi $sent_http_link');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like($r, qr/X-Sent-Foo: foo, bar, bazz/, 'multi $sent_http_foo');
-
-}
 
 # upstream response headers, $upstream_http_*
 
 $r = get('/u');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like($r, qr/X-Upstream-Set-Cookie: foo=1, bar=2, bazz=3/,
 	'multi $upstream_http_set_cookie');
 like($r, qr/X-Upstream-Bar: foo, bar, bazz/, 'multi $upstream_http_bar');
-
-}
 
 # upstream response cookies, $upstream_cookie_*
 
@@ -196,13 +196,8 @@ like($r, qr/X-Upstream-Cookie-Bazz: 3/, '$upstream_cookie_bazz');
 
 # response trailers, $sent_trailer_*
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(get('/t'), qr/X-Sent-Trailer-Foo: foo, bar, bazz/,
 	'multi $sent_trailer_foo');
-
-}
 
 # various variables for request headers:
 #
@@ -216,19 +211,12 @@ like(get('/t'), qr/X-Sent-Trailer-Foo: foo, bar, bazz/,
 like(get('/v'), qr/X-HTTP-Host: localhost/, '$http_host');
 like(get('/v', 'Host: foo', 'Host: bar'),
 	qr/400 Bad/, 'duplicate host rejected');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(get('/v', 'User-Agent: foo', 'User-Agent: bar'),
 	qr/X-User-Agent: foo, bar/, 'multi $http_user_agent (invalid)');
 like(get('/v', 'Referer: foo', 'Referer: bar'),
 	qr/X-Referer: foo, bar/, 'multi $http_referer (invalid)');
 like(get('/v', 'Via: foo', 'Via: bar', 'Via: bazz'),
 	qr/X-Via: foo, bar, bazz/, 'multi $http_via');
-
-}
-
 like(get('/v', 'Cookie: foo', 'Cookie: bar', 'Cookie: bazz'),
 	qr/X-Cookie: foo; bar; bazz/, 'multi $http_cookie');
 like(get('/v', 'X-Forwarded-For: foo', 'X-Forwarded-For: bar',
@@ -246,14 +234,8 @@ like(get('/v', 'Content-Length: 0', 'Content-Length: 0'),
 
 like(get('/v', 'Content-Type: foo'),
 	qr/X-Content-Type: foo/, '$content_type');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(get('/v', 'Content-Type: foo', 'Content-Type: bar'),
 	qr/X-Content-Type: foo, bar/, 'multi $content_type (invalid)');
-
-}
 
 like(http("GET /v HTTP/1.0" . CRLF . CRLF),
 	qr/X-Host: localhost/, '$host from server_name');

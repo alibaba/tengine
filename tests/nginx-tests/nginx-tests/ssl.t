@@ -26,7 +26,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite proxy socket_ssl/)
 	->has_daemon('openssl')->plan(21);
 
@@ -38,7 +37,6 @@ daemon off;
 
 events {
 }
-
 
 http {
     %%TEST_GLOBALS_HTTP%%
@@ -98,19 +96,6 @@ http {
     }
 
     server {
-
-
-
-
-
-
-
-
-
-
-
-
-
         listen       127.0.0.1:8086 ssl;
         server_name  localhost;
 
@@ -131,7 +116,10 @@ $t->write_file('openssl.conf', <<EOF);
 default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
+x509_extensions = myca_extensions
 [ req_distinguished_name ]
+[ myca_extensions ]
+basicConstraints = critical,CA:TRUE
 EOF
 
 my $d = $t->testdir();
@@ -181,13 +169,11 @@ foreach my $name ('localhost', 'inner') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-
 $t->run();
 
 ###############################################################################
 
 # ssl session reuse
-
 
 my $ctx = get_ssl_context();
 
@@ -205,19 +191,13 @@ like(get('/', 8085, $ctx), qr/^body r$/m, 'session reused');
 
 }
 
-
-
-
-
 # ssl certificate inheritance
 
 my $s = get_ssl_socket(8086);
 like($s->dump_peer_certificate(), qr/CN=localhost/, 'CN');
 
-
 $s = get_ssl_socket(8085);
 like($s->dump_peer_certificate(), qr/CN=inner/, 'CN inner');
-
 
 # session timeout
 
@@ -232,18 +212,23 @@ like(get('/', 8086, $ctx), qr/^body \.$/m, 'session timeout');
 
 $ctx = get_ssl_context();
 like(get('/id', 8085, $ctx), qr/^body (\w{64})?$/m, 'session id');
+
 TODO: {
 local $TODO = 'no TLSv1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') && test_tls13();
 local $TODO = 'no TLSv1.3 sessions ids in BoringSSL'
-	if $t->has_module('BoringSSL') && test_tls13();
+	if $t->has_module('BoringSSL|AWS-LC') && test_tls13();
+
 like(get('/id', 8085, $ctx), qr/^body \w{64}$/m, 'session id reused');
+
 }
+
 unlike(http_get('/id'), qr/body \w/, 'session id no ssl');
+
 like(get('/cipher', 8085), qr/^body [\w-]+$/m, 'cipher');
 
 SKIP: {
-skip 'BoringSSL', 1 if $t->has_module('BoringSSL');
+skip 'BoringSSL', 1 if $t->has_module('BoringSSL|AWS-LC');
 
 like(get('/ciphers', 8085), qr/^body [:\w-]+$/m, 'ciphers');
 
@@ -281,7 +266,7 @@ ok(get_ssl_socket(8085), 'ssl unexpected eof');
 
 # close_notify is sent before lingering close
 
-is(get_ssl_shutdown(8085), 1, 'ssl shutdown on lingering close');
+ok(get_ssl_shutdown(8085), 'ssl shutdown on lingering close');
 
 $t->stop();
 
@@ -295,6 +280,7 @@ like(`grep -F '[crit]' ${\($t->testdir())}/error.log`, qr/^$/s, 'no crit');
 sub test_tls13 {
 	return get('/protocol', 8085) =~ /TLSv1.3/;
 }
+
 sub get {
 	my ($uri, $port, $ctx, %extra) = @_;
 	my $s = get_ssl_socket($port, $ctx, %extra) or return;
@@ -335,14 +321,11 @@ sub get_ssl_context {
 sub get_ssl_socket {
 	my ($port, $ctx, %extra) = @_;
 	return http(
-
 		'', PeerAddr => '127.0.0.1:' . port($port), start => 1,
 		SSL => 1,
-			SSL_reuse_ctx => $ctx,
-			%extra
-		);
-
-
+		SSL_reuse_ctx => $ctx,
+		%extra
+	);
 }
 
 sub get_ssl_shutdown {
@@ -353,13 +336,15 @@ sub get_ssl_shutdown {
 		PeerAddr => '127.0.0.1:' . port($port), start => 1,
 		SSL => 1
 	);
+
 	$s->blocking(0);
 	while (IO::Select->new($s)->can_read(8)) {
-                my $n = $s->sysread(my $buf, 16384);
-                next if !defined $n && $!{EWOULDBLOCK};
-                last;
+		my $n = $s->sysread(my $buf, 16384);
+		next if !defined $n && $!{EWOULDBLOCK};
+		last;
 	}
 	$s->blocking(1);
+
 	return $s->stop_SSL();
 }
 

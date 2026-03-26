@@ -10,6 +10,7 @@ use warnings;
 use strict;
 
 use Test::More;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -108,9 +109,6 @@ like($r, qr/201 Created.*(Content-Length|\x0d\0a0\x0d\x0a)/ms,
 is(-s $t->testdir() . '/file', 10,
 	'put file extra data size');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $r = http(<<EOF . '0123456789');
 PUT /file%20sp HTTP/1.1
 Host: localhost
@@ -120,8 +118,6 @@ Content-Length: 10
 EOF
 
 like($r, qr!Location: /file%20sp\x0d?$!ms, 'put file escaped');
-
-}
 
 # 201 replies contain body, response should indicate it's empty
 
@@ -230,44 +226,34 @@ EOF
 
 like($r, qr/415 Unsupported/, 'delete body');
 
-$r = http(<<EOF);
+my $chunked = 'a' . CRLF . '0123456789' . CRLF . '0' . CRLF . CRLF;
+
+$r = http(<<EOF . $chunked);
 MKCOL /test/ HTTP/1.1
 Host: localhost
 Connection: close
 Transfer-Encoding: chunked
 
-a
-0123456789
-0
-
 EOF
 
 like($r, qr/415 Unsupported/, 'mkcol body chunked');
 
-$r = http(<<EOF);
+$r = http(<<EOF . $chunked);
 COPY /file HTTP/1.1
 Host: localhost
 Destination: /file.exist
 Connection: close
 Transfer-Encoding: chunked
 
-a
-0123456789
-0
-
 EOF
 
 like($r, qr/415 Unsupported/, 'copy body chunked');
 
-$r = http(<<EOF);
+$r = http(<<EOF . $chunked);
 DELETE /file HTTP/1.1
 Host: localhost
 Connection: close
 Transfer-Encoding: chunked
-
-a
-0123456789
-0
 
 EOF
 

@@ -258,15 +258,8 @@ $s->read();
 $s->print('MAIL FROM:<test@example.com> SIZE=100' . CRLF
 	. 'RCPT TO:<test@example.com>' . CRLF
 	. 'RS');
-
 $s->ok('split pipelined mail from');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->ok('split pipelined rcpt to');
-
-}
 
 $s->send('ET');
 $s->ok('split pipelined rset');
@@ -284,18 +277,12 @@ $s->send('MAIL FROM:<test@example.com> SIZE=100' . CRLF
 	. 'RCPT TO:<baz@example.com>' . CRLF
 	. 'RCPT TO:<foobar@example.com>' . CRLF
 	. 'RSET');
-
-TODO: {
-todo_skip 'long pipelined - not yet', 6 unless $t->has_version('1.21.0');
-
 $s->ok('long pipelined mail from');
 $s->ok('long pipelined rcpt to');
 $s->ok('long pipelined rcpt to 2');
 $s->ok('long pipelined rcpt to 3');
 $s->ok('long pipelined rcpt to 4');
 $s->ok('long pipelined rset');
-
-}
 
 # Connection must stay even if error returned to rcpt to command
 
@@ -333,12 +320,7 @@ select undef, undef, undef, 0.1;
 $s->send('AR');
 $s->check(qr/^5.. /, 'invalid split command');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->send('HELO example.com');
 $s->ok('good after invalid split command');
-
-}
 
 ###############################################################################

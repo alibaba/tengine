@@ -22,7 +22,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(2)
+my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(4)
 	->write_file_expand('nginx.conf', <<'EOF')->run();
 
 %%TEST_GLOBALS%%
@@ -49,29 +49,33 @@ EOF
 
 ###############################################################################
 
-like(http(<<EOF), qr/405 Not Allowed(?!.*200 OK)/s, 'trace');
+like(http(<<EOF), qr/405 Not Allowed/, 'trace');
 TRACE / HTTP/1.1
 Host: localhost
-
-GET / HTTP/1.1
-Host: localhost
-Connection: close
 
 EOF
 
 TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
+local $TODO = 'not yet' unless $t->has_version('1.29.3');
 
-like(http(<<EOF), qr/405 Not Allowed(?!.*200 OK)/s, 'connect');
+like(http(<<EOF), qr/405 Not Allowed/, 'connect');
+CONNECT localhost:8080 HTTP/1.1
+Host: localhost
+
+EOF
+
+like(http(<<EOF), qr/400 Bad/, 'connect uri');
 CONNECT / HTTP/1.1
 Host: localhost
-
-GET / HTTP/1.1
-Host: localhost
-Connection: close
 
 EOF
 
 }
+
+like(http(<<EOF), qr/400 Bad/, 'connect no port');
+CONNECT localhost HTTP/1.1
+Host: localhost
+
+EOF
 
 ###############################################################################

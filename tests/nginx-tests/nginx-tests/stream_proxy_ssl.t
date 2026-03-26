@@ -36,8 +36,6 @@ daemon off;
 events {
 }
 
-worker_processes 1;  # NOTE: The default value of Tengine worker_processes directive is `worker_processes auto;`.
-
 stream {
     %%TEST_GLOBALS_STREAM%%
 
@@ -80,6 +78,7 @@ http {
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
+
         add_header X-Protocol $ssl_protocol;
     }
 }
@@ -114,13 +113,16 @@ is(stream('127.0.0.1:' . port(8081))->read(), '.', 'ssl');
 is(stream('127.0.0.1:' . port(8081))->read(), '.', 'ssl 2');
 
 is(stream('127.0.0.1:' . port(8082))->read(), '.', 'ssl session new');
+
 TODO: {
 local $TODO = 'no TLSv1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') && test_tls13();
+
 is(stream('127.0.0.1:' . port(8082))->read(), 'r', 'ssl session reused');
 is(stream('127.0.0.1:' . port(8082))->read(), 'r', 'ssl session reused 2');
 
 }
+
 my $s = http('', start => 1);
 
 sleep 3;
@@ -128,7 +130,9 @@ sleep 3;
 like(http_get('/', socket => $s), qr/200 OK/, 'proxy connect timeout');
 
 ###############################################################################
+
 sub test_tls13 {
 	http_get('/') =~ /TLSv1.3/;
 }
+
 ###############################################################################

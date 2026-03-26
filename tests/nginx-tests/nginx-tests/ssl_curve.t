@@ -23,10 +23,8 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
-
-	->has(qw/http http_ssl rewrite socket_ssl openssl:3.0.0/)
+	->has(qw/http http_ssl rewrite socket_ssl/)
 	->has_daemon('openssl');
-
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -73,16 +71,14 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->try_run('no $ssl_curve')->plan(1);
+$t->run()->plan(1);
 
 ###############################################################################
+
+local $TODO = 'OpenSSL too old'
+	unless $t->has_feature('openssl:3.0.0')
+	or $t->has_module('BoringSSL');
 
 like(http_get('/curve', SSL => 1), qr/^prime256v1 /m, 'ssl curve');
 
 ###############################################################################
-
-
-
-
-
-

@@ -22,7 +22,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl socket_ssl/)
 	->has_daemon('openssl')->plan(3);
 
@@ -80,7 +79,10 @@ $t->write_file('openssl.conf', <<EOF);
 default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
+x509_extensions = myca_extensions
 [ req_distinguished_name ]
+[ myca_extensions ]
+basicConstraints = critical,CA:TRUE
 EOF
 
 $t->write_file('ca.conf', <<EOF);
@@ -164,15 +166,11 @@ like(get(8082, 'end'), qr/FAILED/, 'crl - intermediate cert revoked');
 sub get {
 	my ($port, $cert) = @_;
 	http_get(
-
-
 		'/t', PeerAddr => '127.0.0.1:' . port($port),
 		SSL => 1,
-			SSL_cert_file => "$d/$cert.crt",
+		SSL_cert_file => "$d/$cert.crt",
 		SSL_key_file => "$d/$cert.key"
-		);
-
-
+	);
 }
 
 ###############################################################################

@@ -30,7 +30,6 @@ $t->write_file_expand('nginx.conf', <<'EOF');
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -70,8 +69,10 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8081 http2;
+        listen       127.0.0.1:8081;
         server_name  localhost;
+
+        http2 on;
 
         location / {
             return 404;
@@ -92,8 +93,10 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 http2;
+        listen       127.0.0.1:8082;
         server_name  localhost;
+
+        http2 on;
 
         location / {
             return 200 "TEST-OK-IF-YOU-SEE-THIS\n";
@@ -107,10 +110,7 @@ http {
 
 EOF
 
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

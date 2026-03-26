@@ -21,7 +21,7 @@ Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taob
 Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to [get involved](https://github.com/alibaba/tengine).
 
 ## Features
-* All features of nginx-1.24.0 are inherited, i.e., it is 100% compatible with nginx.
+* All features of nginx-1.28.3 are inherited, i.e., it is 100% compatible with nginx.
 * Dynamically configure the servers, locations and upstreams without reloading or restarting worker processes with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * HTTP/3 support (QUIC v1 and draft-29) with [xquic](https://github.com/alibaba/xquic).
 * High-speed UDP transmission with kernel-bypass.

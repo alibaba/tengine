@@ -25,7 +25,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite socket_ssl/)
@@ -136,8 +135,3 @@ like(http_get('/'), qr/200 OK.*http/ms, 'http');
 like(http_get('/', SSL => 1), qr/200 OK.*https/ms, 'https');
 
 ###############################################################################
-
-
-
-
-

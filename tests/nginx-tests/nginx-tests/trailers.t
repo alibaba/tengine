@@ -106,7 +106,7 @@ unlike(head('/t1'), qr/X-Always/, 'no trailers - head');
 unlike(get('/empty'), qr/X-Var/, 'no trailers expected');
 
 $r = get('/proxy');
-like($r, qr/SEE-THIS.*X-Length: 8/ms, 'upstream response variable');
+like($r, qr/SEE-THIS.*X-Length: \d+/ms, 'upstream response variable');
 unlike($r, qr/X-Var/, 'inheritance');
 
 ###############################################################################

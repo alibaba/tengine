@@ -78,9 +78,9 @@ like(http_head('/big.html'), qr/200 OK/, 'head request');
 
 # once proxy_read_timeout expires, nginx will call
 # ngx_http_finalize_upstream_request() with u->pipe->downstream_error set
-# and rc = NGX_HTTP_BAD_GATEWAY; after revision ad3f342f14ba046c this
+# and rc = NGX_HTTP_BAD_GATEWAY; after revision 2aa6d7fd6 (1.9.13) this
 # will result in ngx_http_finalize_request(NGX_HTTP_BAD_GATEWAY),
 # leading to an attempt to return additional error response and
-# the "header already sent" alert; fixed in 93abb5a855d6
+# the "header already sent" alert; fixed in 3377c0011 (1.13.9)
 
 ###############################################################################

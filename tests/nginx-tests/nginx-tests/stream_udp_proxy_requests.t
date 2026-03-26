@@ -29,7 +29,6 @@ my $t = Test::Nginx->new()->has(qw/stream udp/)->plan(26)
 %%TEST_GLOBALS%%
 
 daemon off;
-worker_processes 1;
 
 events {
 }
@@ -77,7 +76,7 @@ stream {
 
     server {
         listen           127.0.0.1:%%PORT_8985_UDP%% udp;
-        proxy_pass       127.0.0.1:%%PORT_8990_UDP%%;
+        proxy_pass       127.0.0.1:%%PORT_8991_UDP%%;
 
         proxy_requests   2;
         proxy_responses  2;
@@ -151,24 +150,16 @@ is($s->read(), '1', 'requests unset follow - response');
 # expects all packets proxied from backend, the last (uneven) session succeed
 
 $s = dgram('127.0.0.1:' . port(8984));
-$s->write('2') for 1 .. 5;
-my $b = join ' ', map { $s->read() } (1 .. 15);
-like($b, qr/^(\d+ 1 2) \1 (?!\1)(\d+ 1 2) \2 (?!\2)\d+ 1 2$/, 'slow backend');
+like(many($s, '2', 5, 15),
+	qr/^(\d+ 1 2) \1 (?!\1)(\d+ 1 2) \2 (?!\2)\d+ 1 2$/, 'slow backend');
 
 # proxy_requests 2, proxy_responses 2
 # client sends 5 packets, each responded with 2 packets
 # expects all packets proxied from backend, the last (uneven) session succeed
 
 $s = dgram('127.0.0.1:' . port(8985));
-$s->write('1') for 1 .. 5;
-$b = join ' ', map { $s->read() } (1 .. 10);
-
-SKIP: {
-skip 'session could early terminate', 1 unless $ENV{TEST_NGINX_UNSAFE};
-
-like($b, qr/^(\d+ 1) \1 (?!\1)(\d+ 1) \2 (?!\2)\d+ 1$/, 'requests - responses');
-
-}
+like(many($s, '1', 5, 10),
+	qr/^(\d+ 1) \1 (?!\1)(\d+ 1) \2 (?!\2)\d+ 1$/, 'requests - responses');
 
 $t->stop();
 
@@ -183,6 +174,17 @@ is($t->read_file('s2.log'), <<EOF, 'uneven session status - responses');
 200
 200
 EOF
+
+###############################################################################
+
+sub many {
+	my ($s, $buf, $wcount, $rcount) = @_;
+
+	$s->write($buf) for 1 .. $wcount;
+	join ' ', map { $_->[1] }
+		sort { $a->[0] <=> $b->[0] }
+		map { [ $s->read() =~ /^(\d+) (.+)/ ] } 1 .. $rcount;
+}
 
 ###############################################################################
 
@@ -201,14 +203,14 @@ sub udp_daemon {
 	open my $fh, '>', $t->testdir() . "/$port";
 	close $fh;
 
-	my $slp = 1 if $port == port(8991);
+	my ($slp, $i) = (1, 1) if $port == port(8991);
 
 	while (1) {
 		$server->recv(my $buffer, 65536);
 		sleep 1, $slp = 0 if $slp;
 
-		$server->send($server->peerport());
-		$server->send($_) for (1 .. $buffer);
+		$server->send(($i ? "${\($i++)} " : "") . $server->peerport());
+		$server->send(($i ? "${\($i++)} " : "") . $_) for (1..$buffer);
 	}
 }
 

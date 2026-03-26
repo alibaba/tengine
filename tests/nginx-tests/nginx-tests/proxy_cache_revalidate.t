@@ -140,9 +140,9 @@ like(http_get('/etag/t2'), qr/X-Cache-Status: HIT.*NEW/ms,
 
 # check that conditional requests are only used for 200/206 responses
 
-# d0ce06cb9be1 in 1.7.3 changed to ignore header filter's work to strip
+# 5d477a76f in 1.7.3 changed to ignore header filter's work to strip
 # the Last-Modified header when storing non-200/206 in cache;
-# 1573fc7875fa in 1.7.9 effectively turned it back.
+# 1ea64b3f8 in 1.7.9 effectively turned it back.
 
 unlike(http_get('/201'), qr/X-If-Modified/, 'other status no revalidation');
 
@@ -152,14 +152,14 @@ select undef, undef, undef, 3.5;
 
 # check that conditional requests are not used to revalidate 404 response
 
-# before fd283aa92e04 introduced in 1.7.7, this test passed by chance because
+# before 4a2fba2d4 introduced in 1.7.7, this test passed by chance because
 # of the If-Modified-Since header that was sent with Epoch in revalidation
 # of responses cached without the Last-Modified header;
-# fd283aa92e04 leaved (an legitimate) successful revalidation of 404 by ETag
-# (introduced by 44b9ab7752e3 in 1.7.3), which caused the test to fail;
-# 1573fc7875fa in 1.7.9 changed to not revalidate non-200/206 responses but
+# 4a2fba2d4 leaved (a legitimate) successful revalidation of 404 by ETag
+# (introduced by b81296167 in 1.7.3), which caused the test to fail;
+# 1ea64b3f8 in 1.7.9 changed to not revalidate non-200/206 responses but
 # leaked Last-Modified and ETag into 404 inherited from stale 200/206 response;
-# 174512857ccf in 1.7.11 fixed the leak and allowed the test to pass.
+# f0b5f8337 in 1.7.11 fixed the leak and allowed the test to pass.
 
 rename("$d/t3_moved", "$d/t3");
 

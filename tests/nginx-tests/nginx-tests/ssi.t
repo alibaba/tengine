@@ -148,13 +148,8 @@ like(http_get('/test3.html'), qr/^XtestX$/m, 'set');
 like(http_get('/test4-echo-none.html'), qr/^X<test>X$/m,
 	'echo encoding none');
 
-TODO: {
-local $TODO = 'no strict URI escaping yet' unless $t->has_version('1.21.1');
-
 like(http_get('/test5-echo-url.html'), qr/^X%3Ctest%3EX$/m,
 	'echo encoding url');
-
-}
 
 like(http_get('/test6-echo-entity.html'), qr/^X&lt;test&gt;X$/m,
 	'echo encoding entity');

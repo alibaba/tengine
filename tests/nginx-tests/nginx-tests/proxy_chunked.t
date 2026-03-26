@@ -14,6 +14,7 @@ use warnings;
 use strict;
 
 use Test::More;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -97,13 +98,9 @@ HTTP/1.1 200 OK
 Connection: close
 Transfer-Encoding: chunked
 
-9
-SEE-THIS
-
-0
-
 EOF
-
+		print $client "8" . CRLF . "SEE-THIS" . CRLF;
+		print $client "0" . CRLF . CRLF;
 		close $client;
 	}
 }

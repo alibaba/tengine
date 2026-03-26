@@ -99,7 +99,7 @@ like(get($us2, 8080), qr/x-bar/, 'off - underscore first');
 like(get($bad, 8080), qr/x-bar/, 'off - bad');
 like(get($bad2, 8080), qr/x-bar/, 'off - bad first');
 
-# ignore_invalid_headers off; headers parsing post 8f55cb5c7e79
+# ignore_invalid_headers off; headers parsing post 3c84e4b70 (1.17.5)
 
 unlike(http('GET /v HTTP/1.0' . CRLF
 	. 'Host: localhost' . CRLF
@@ -125,14 +125,9 @@ my $bad4 = 'GET / HTTP/1.0' . CRLF
 my $bad5 = 'GET / HTTP/1.0' . CRLF
 	. "foo\x02: x-bar" . CRLF . CRLF;
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
-
 like(http($bad3), qr/400 Bad/, 'colon first');
 like(http($bad4), qr/400 Bad/, 'space');
 like(http($bad5), qr/400 Bad/, 'control');
-
-}
 
 ###############################################################################
 

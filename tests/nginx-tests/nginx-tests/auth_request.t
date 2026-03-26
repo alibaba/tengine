@@ -203,13 +203,8 @@ like(http_post_big('/proxy-double'), qr/ 204 /, 'proxy auth with body read');
 
 # Multiple WWW-Authenticate headers (ticket #485).
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(http_get('/proxy-multi-auth'), qr/WWW-Authenticate: foo.*bar/s,
 	'multiple www-authenticate headers');
-
-}
 
 SKIP: {
 	eval { require FCGI; };

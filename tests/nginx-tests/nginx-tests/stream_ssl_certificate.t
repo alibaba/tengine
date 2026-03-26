@@ -152,8 +152,6 @@ local $TODO = 'no TLSv1.3 sessions, old IO::Socket::SSL'
 like(get('default', 8080, $s), qr/default:r/, 'session reused');
 
 TODO: {
-# ticket key name mismatch prevents session resumption
-local $TODO = 'not yet' unless $t->has_version('1.23.2');
 local $TODO = 'no SSL_session_key, old IO::Socket::SSL'
 	if $IO::Socket::SSL::VERSION < 1.965;
 

@@ -1,3 +1,9 @@
+Tengine 3.1.0 [2026-03-26]
+* Upgrade: Nginx核心从1.24.0升级到1.28.3 (光锥)
+* Feature: HTTP/3支持（QUIC v1和draft-29）基于xquic库 (drawing)
+* Change: lua-nginx-module升级到v0.10.27以兼容PCRE2 (光锥)
+* Bugfix: 修复Tengine模块与nginx 1.28.3核心的API兼容性问题 (光锥)
+
 Tengine 3.1.0 [2023-10-27]
 * Security: 修复HTTP2安全漏洞CVE-2023-44487 (lianglli) 
 * Feature: 基于tengine-ingress，允许动态配置不同域名的多个TLS协议版本 (lianglli)
