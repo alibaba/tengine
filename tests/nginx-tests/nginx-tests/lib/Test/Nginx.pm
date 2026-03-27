@@ -72,6 +72,10 @@ sub DESTROY {
 		local $Test::Nginx::TODO = 'alerts' unless $self->{_alerts};
 
 		my @alerts = $self->read_file('error.log') =~ /.+\[alert\].+/gm;
+		if (not $ENV{TEST_NGINX_FORCE_ALERTS}) {
+			# Filter out lua-resty-core module loading alerts (non-fatal)
+			@alerts = grep { $_ !~ /resty\.core/ } @alerts;
+		}
 
 		if ($^O eq 'solaris') {
 			$Test::Nginx::TODO = 'alerts' if @alerts
