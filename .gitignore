@@ -1,3 +1,4 @@
 Makefile
 objs/
 tags
+tests/nginx-tests/nginx-tests/.prove
