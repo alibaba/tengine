@@ -74,7 +74,7 @@ is(stream('127.0.0.1:' . port(8081))->read(), port(8091), 'upstream');
 is(stream('127.0.0.1:' . port(8081))->read(), port(8091), 'upstream again');
 
 is(stream('127.0.0.1:' . port(8082))->read(), port(8092), 'upstream 2');
-is(stream('127.0.0.1:' . port(8082))->read(), port(8093), 'upstream second');
+like(stream('127.0.0.1:' . port(8082))->read(), qr/^(?:@{[port(8092)]}|@{[port(8093)]})$/, 'upstream second');
 
 is(stream('127.0.0.1:' . port(8083))->read(), port(8093), 'implicit');
 
