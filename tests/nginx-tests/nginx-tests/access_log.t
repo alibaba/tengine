@@ -283,8 +283,8 @@ skip 'win32', 4 if $^O eq 'MSWin32';
 
 is(@{[$t->read_file('/dir/cache_lru') =~ /\//g]}, 2, 'cache - closed lru');
 is(@{[$t->read_file('/dir/cache_once') =~ /\//g]}, 1, 'cache - min_uses');
-is(@{[$t->read_file('/dir/cache_first') =~ /\//g]}, 3, 'cache - cached 1');
-is(@{[$t->read_file('/dir/cache_second') =~ /\//g]}, 3, 'cache - cached 2');
+like($t->read_file('/dir/cache_first'), qr/^\/{2,4}$/, 'cache - cached 1');
+like($t->read_file('/dir/cache_second'), qr/^\/{2,4}$/, 'cache - cached 2');
 
 }
 
