@@ -167,6 +167,10 @@ foreach my $name ('root.crt', 'root.crl', '1.example.com.crt',
 
 $t->write_file('t', '');
 
+# nginx 1.28.3+: wait for FIFO daemons to write initial certificate content
+# before nginx parses config and validates certificates at startup
+select undef, undef, undef, 0.5;
+
 $t->plan(4)->run();
 
 ###############################################################################
