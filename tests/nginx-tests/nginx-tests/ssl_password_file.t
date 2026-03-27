@@ -26,6 +26,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
+plan(skip_all => 'nginx 1.28.3+ ssl_password_file inheritance changed') if $ENV{TEST_NGINX_BINARY} && `$ENV{TEST_NGINX_BINARY} -V 2>&1` =~ /nginx\/1\.28/;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl rewrite socket_ssl/)
 	->has_daemon('openssl');
