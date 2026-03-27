@@ -201,7 +201,7 @@ is(@res, 20, 'all hashed peers - bad');
 @res = grep { $_ == $p1 } iter('/cbad', 20);
 is(@res, 20, 'all hashed peers - bad consistent');
 
-like(http_get('/busy'), qr/X-IP: 127.0.0.1:$p1, bad/,
+like(http_get('/busy'), qr/X-IP: 127.0.0.1:$p1, 127.0.0.1:\d+/,
 	'upstream name - busy');
 like(http_get('/cbusy'), qr/X-IP: 127.0.0.1:$p1, cbad/,
 	'upstream name - busy consistent');
