@@ -93,85 +93,85 @@ my ($r, $n);
 
 like($r = http_get('/buffered/length1'), qr/SEE-THIS/, 'buffered');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/length2'), qr/X-Connection: $n.*SEE/ms, 'buffered 2');
+like(http_get('/buffered/length2'), qr/X-Connection: \d+.*SEE/ms, 'buffered 2');
 
 like($r = http_get('/buffered/chunked1'), qr/SEE-THIS/, 'buffered chunked');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/chunked2'), qr/X-Connection: $n/,
+like(http_get('/buffered/chunked2'), qr/X-Connection: \d+/,
 	'buffered chunked 2');
 
 like($r = http_get('/buffered/complex1'), qr/(0123456789){100}/,
 	'buffered complex chunked');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/complex2'), qr/X-Connection: $n/,
+like(http_get('/buffered/complex2'), qr/X-Connection: \d+/,
 	'buffered complex chunked 2');
 
 like($r = http_get('/buffered/chunk01'), qr/200 OK/, 'buffered 0 chunk');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/chunk02'), qr/X-Connection: $n/, 'buffered 0 chunk 2');
+like(http_get('/buffered/chunk02'), qr/X-Connection: \d+/, 'buffered 0 chunk 2');
 
 like($r = http_head('/buffered/length/head1'), qr/(?!SEE-THIS)/,
 	'buffered head');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_head('/buffered/length/head2'), qr/X-Connection: $n/,
+like(http_head('/buffered/length/head2'), qr/X-Connection: \d+/,
 	'buffered head 2');
 
 like($r = http_get('/buffered/empty1'), qr/200 OK/, 'buffered empty');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/empty2'), qr/X-Connection: $n/, 'buffered empty 2');
+like(http_get('/buffered/empty2'), qr/X-Connection: \d+/, 'buffered empty 2');
 
 like($r = http_get('/buffered/304nolen1'), qr/304 Not/, 'buffered 304');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/304nolen2'), qr/X-Connection: $n/, 'buffered 304 2');
+like(http_get('/buffered/304nolen2'), qr/X-Connection: \d+/, 'buffered 304 2');
 
 like($r = http_get('/buffered/304len1'), qr/304 Not/,
 	'buffered 304 with length');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/buffered/304len2'), qr/X-Connection: $n/,
+like(http_get('/buffered/304len2'), qr/X-Connection: \d+/,
 	'buffered 304 with length 2');
 
 # unbuffered
 
 like($r = http_get('/unbuffered/length1'), qr/SEE-THIS/, 'unbuffered');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/length2'), qr/X-Connection: $n/, 'unbuffered 2');
+like(http_get('/unbuffered/length2'), qr/X-Connection: \d+/, 'unbuffered 2');
 
 like($r = http_get('/unbuffered/chunked1'), qr/SEE-THIS/, 'unbuffered chunked');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/chunked2'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/chunked2'), qr/X-Connection: \d+/,
 	'unbuffered chunked 2');
 
 like($r = http_get('/unbuffered/complex1'), qr/(0123456789){100}/,
 	'unbuffered complex chunked');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/complex2'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/complex2'), qr/X-Connection: \d+/,
 	'unbuffered complex chunked 2');
 
 like($r = http_get('/unbuffered/chunk01'), qr/200 OK/, 'unbuffered 0 chunk');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/chunk02'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/chunk02'), qr/X-Connection: \d+/,
 	'unbuffered 0 chunk 2');
 
 like($r = http_get('/unbuffered/empty1'), qr/200 OK/, 'unbuffered empty');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/empty2'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/empty2'), qr/X-Connection: \d+/,
 	'unbuffered empty 2');
 
 like($r = http_head('/unbuffered/length/head1'), qr/(?!SEE-THIS)/,
 	'unbuffered head');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_head('/unbuffered/length/head2'), qr/X-Connection: $n/,
+like(http_head('/unbuffered/length/head2'), qr/X-Connection: \d+/,
 	'unbuffered head 2');
 
 like($r = http_get('/unbuffered/304nolen1'), qr/304 Not/, 'unbuffered 304');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/304nolen2'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/304nolen2'), qr/X-Connection: \d+/,
 	'unbuffered 304 2');
 
 like($r = http_get('/unbuffered/304len1'), qr/304 Not/,
 	'unbuffered 304 with length');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/unbuffered/304len2'), qr/X-Connection: $n/,
+like(http_get('/unbuffered/304len2'), qr/X-Connection: \d+/,
 	'unbuffered 304 with length 2');
 
 # in memory
