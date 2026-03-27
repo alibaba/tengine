@@ -170,7 +170,7 @@ is(http_end_multi(\@s), "$p1: 3", 'conn subtraction');
 
 # simple test with limited peer
 
-is(parallel('/u_lim', 4), "$p1: 3", 'single');
+is(parallel('/u_lim', 4), "$p1: 3", 'single');  # nginx 1.28.3+');
 
 # limited peer with backup peer
 

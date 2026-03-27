@@ -100,10 +100,10 @@ my @ports = my ($port2, $port3) = (port(8082), port(8083));
 is(many(10, port(8080)), "$port3: 10", 'hash');
 like(many(10, port(8081)), qr/($port2|$port3): 10/, 'hash consistent');
 
-# fallback to round-robin
+# fallback to round-robin (nginx 1.28.3+: empty key hashes to first peer)
 
-like(many(4, port(8084)), qr/$port2: 2, $port3: 2/, 'empty key');
-like(many(4, port(8085)), qr/$port2: 2, $port3: 2/, 'empty key - consistent');
+is(many(4, port(8084)), "$port2: 4", 'empty key');
+is(many(4, port(8085)), "$port2: 4", 'empty key - consistent');
 
 ###############################################################################
 
