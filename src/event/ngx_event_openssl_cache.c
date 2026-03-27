@@ -740,7 +740,7 @@ ngx_ssl_cache_pkey_create(ngx_ssl_cache_key_t *id, char **err, void *data)
 
     cb_data.encrypted = 0;
 
-    if (*passwords) {
+    if (passwords != NULL && *passwords) {
         cb_data.pwd = (*passwords)->elts;
         tries = (*passwords)->nelts;
         pwd = &cb_data;
