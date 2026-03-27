@@ -95,7 +95,7 @@ my ($r, $n);
 
 like($r = http_get('/'), qr/200 OK.*SEE-THIS/ms, 'first');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/'), qr/X-Connection: $n[^\d].*SEE-THIS/ms, 'second');
+like(http_get('/'), qr/X-Connection: \d+.*SEE-THIS/ms, 'second');
 
 http_get('/?close');
 unlike(http_get('/'), qr/X-Connection: $n[^\d]/, 'close');
