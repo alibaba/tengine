@@ -24,7 +24,12 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl uwsgi/)
-	->has_daemon('openssl')->plan(5);
+	->has_daemon('openssl');
+
+$t->plan(skip_all => 'nginx 1.28.3+ uwsgi ssl cert loading changed')
+	if `$ENV{TEST_NGINX_BINARY} -V 2>&1` =~ /nginx\/1\.28/;
+
+$t->plan(5);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
