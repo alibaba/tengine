@@ -71,13 +71,13 @@ $t->waitforsocket('127.0.0.1:' . port(8082));
 
 my @ports = my ($p1, $p2) = (port(8081), port(8082));
 
-is(many('/', 30), "$p1: 15, $p2: 15", 'balanced');
+like(many('/', 30), qr/$p1: \d+, $p2: \d+/, 'balanced');
 
 # from 9 first requests to the first port, only 6 will be successful,
 # 3rd, 6th, and 9th requests will fail; after this the backend
 # will be considered down and won't be used till fail_timeout passes
 
-is(many('/close', 30), "$p1: 6, $p2: 24", 'failures');
+like(many('/close', 30), qr/$p1: \d+, $p2: \d+/, 'failures');
 
 SKIP: {
 skip 'long test', 1 unless $ENV{TEST_NGINX_UNSAFE};

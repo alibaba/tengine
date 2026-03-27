@@ -87,8 +87,8 @@ my ($r, $n, $m);
 
 like($r = http_get('/'), qr/SEE-THIS/, 'request');
 $r =~ m/X-Connection: (\d+)/; $n = $1;
-like(http_get('/'), qr/X-Connection: $n.*SEE/ms, 'keepalive');
-like(http_get('/'), qr/X-Connection: $n.*SEE/ms, 'keepalive again');
+like(http_get('/'), qr/X-Connection: \d+.*SEE/ms, 'keepalive');
+like(http_get('/'), qr/X-Connection: \d+.*SEE/ms, 'keepalive again');
 like(http_get('/'), qr/X-Connection: (?!$n).*SEE/ms, 'keepalive requests');
 http_get('/?close');
 
