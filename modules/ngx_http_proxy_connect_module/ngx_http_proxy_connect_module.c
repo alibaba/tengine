@@ -747,6 +747,10 @@ ngx_http_proxy_connect_tunnel(ngx_http_request_t *r,
             }
 
             if (n > 0) {
+                if (!from_upstream && !do_write) {
+                    // NOTE: append the number of bytes read from the client request body to the r->request_length 
+                    r->request_length += n;
+                }
                 do_write = 1;
                 b->last += n;
 
