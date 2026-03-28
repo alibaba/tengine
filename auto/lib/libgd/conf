@@ -86,7 +86,7 @@ else
 cat << END
 
 $0: error: the HTTP image filter module requires the GD library.
-You can either do not enable the module or install the libraries.
+You can either disable the module or install the libraries.
 
 END
 
