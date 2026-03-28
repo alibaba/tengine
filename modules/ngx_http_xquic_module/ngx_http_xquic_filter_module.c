@@ -102,6 +102,12 @@ ngx_http_xquic_stream_send_body(ngx_http_v3_stream_t *qstream,
         ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                     "|xquic|xqc_h3_request_send_body EAGAIN|");
         return NGX_AGAIN;
+    
+    } else if (ret == -XQC_CLOSING) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                    "|xquic|xqc_h3_request_send_body CLOSING|");
+
+        return NGX_ABORT;
 
     } else if (ret < 0) {
         ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
@@ -622,104 +628,49 @@ ngx_http_xquic_header_filter(ngx_http_request_t *r)
 
 
 ngx_chain_t *
-ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
+ngx_http_xquic_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
 {
-    size_t                   size;
-    ssize_t                  n = 0;
-    off_t                    send = 0, buf_size = 0;
+    off_t                    size, n;
+    off_t                   send = 0;
     ngx_http_request_t      *r;
     ngx_http_v3_stream_t    *h3_stream;
-    ngx_chain_t             *last_out = NULL, *last_chain, *cl;
-    ngx_buf_t               *buf;
+    ngx_chain_t             *out = NULL;
+    // ngx_buf_t               *buf;
 
-    r = c->data;
-
-    if (r->xqstream->engine_inner_closed) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                            "|xquic|inner closed and fail to send chain|");
-        return NGX_CHAIN_ERROR;
-    }
-
+    r = fc->data;
+    size = n = 0;
+    h3_stream = r->xqstream;
 
     if (limit == 0 || limit > (off_t) (NGX_MAX_SIZE_T_VALUE - ngx_pagesize)) {
         limit = NGX_MAX_SIZE_T_VALUE - ngx_pagesize;
     }
 
     /* update h3_stream->output_queue here */
-    h3_stream = r->xqstream;
 
-    last_chain = h3_stream->output_queue;
+    // out = h3_stream->output_queue;
 
-    while (last_chain != NULL) {
-        if (last_chain->next == NULL) {
-            break;
-        }
-        last_chain = last_chain->next;
-    }
+    out = in;
 
-    for ( /* void */ ; in; in = in->next) {
-        if (in == NULL) {
-            break;
-        }
-
-        cl = ngx_chain_get_free_buf(h3_stream->request->pool,
-                                    &h3_stream->free_bufs);
-        if (cl == NULL) {
-            goto RETURN_ERROR;
-        }
-
-        cl->next = NULL;
-        buf = cl->buf;
-        buf_size = ngx_buf_size(in->buf);
-        
-        if (!buf->start) {
-            buf->start = ngx_palloc(h3_stream->request->pool,
-                                    buf_size);
-            if (buf->start == NULL) {
-                goto RETURN_ERROR;
-            }
-        
-            buf->end = buf->start + buf_size;
-            buf->last = buf->end;
-        
-            buf->tag = (ngx_buf_tag_t) &ngx_http_xquic_module;
-            buf->memory = 1;
-        }
-        
-        buf->pos = buf->start;
-        buf->last = buf->pos;
-        
-        buf->last = ngx_cpymem(buf->last, in->buf->pos, buf_size);
-        buf->last_buf = in->buf->last_buf;
-        in->buf->pos += buf_size;
-
-        /* update output_queue */
-        if (last_chain == NULL) {
-            h3_stream->output_queue = cl;
-            
-        } else {
-            last_chain->next = cl;
-        }
-
-        last_chain = cl;
-        r->xqstream->queued++; /* used to count buffers not sent*/
-    }
-
-
-    last_out = h3_stream->output_queue;
     send = 0;
     
-    for ( /* void */ ; last_out; last_out = last_out->next) {
+    for ( ;; ) {
 
         if (h3_stream->wait_to_write) {
             break;
         }
 
-        if (ngx_buf_special(last_out->buf)) {
-            if (last_out->buf->last_buf) {
+        if (out == NULL) {
+            break;
+        }
+
+        r->xqstream->queued++;
+
+        if (ngx_buf_special(out->buf)) {
+
+            if (out->buf->last_buf) {
                 ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                                "|xquic|ngx_http_xquic_send_chain|send size %ui|last=%i|",
-                               r->xqstream->body_sent, last_out->buf->last_buf);
+                               r->xqstream->body_sent, out->buf->last_buf);
 
                 n = ngx_http_xquic_stream_send_body(r->xqstream, NULL, 0, 1);
 
@@ -727,96 +678,114 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
                     /* need to send NULL + FIN again */
                     //return in;
+                    h3_stream->wait_to_write = 1;
+                    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, "wait_to_write|send total_size %ui, size %O, n=%z|last=%i|",
+                                r->xqstream->body_sent, size, n, out->buf->last_buf);
+                    fc->write->active = 1;
+                    fc->write->ready = 0;                  
                     goto RETURN_EAGAIN;
 
                 } else if (n < 0) {
                     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                             "|xquic|ngx_http_xquic_send_chain|send body fin error|");
-                    r->xqstream->queued--;
                     goto RETURN_ERROR;
                 }
 
                 r->xqstream->queued--;
                 //return NULL;
+                in = in->next;
                 goto FINISH;
             }
+            in = in->next;
             continue;
         }
 
         /* not support sendfile */
-        if (!ngx_buf_in_memory(last_out->buf)) {
-            ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+        if (!ngx_buf_in_memory(out->buf)) {
+            ngx_log_error(NGX_LOG_ALERT, fc->log, 0,
                           "|xquic|ngx_http_xquic_send_chain|not memory buf|"
                           "t:%d r:%d f:%d %p %p-%p %p %O-%O|",
-                          last_out->buf->temporary,
-                          last_out->buf->recycled,
-                          last_out->buf->in_file,
-                          last_out->buf->start,
-                          last_out->buf->pos,
-                          last_out->buf->last,
-                          last_out->buf->file,
-                          last_out->buf->file_pos,
-                          last_out->buf->file_last);
+                          out->buf->temporary,
+                          out->buf->recycled,
+                          out->buf->in_file,
+                          out->buf->start,
+                          out->buf->pos,
+                          out->buf->last,
+                          out->buf->file,
+                          out->buf->file_pos,
+                          out->buf->file_last);
 
             ngx_debug_point();
 
             goto RETURN_ERROR;
         }
 
-        if (send >= limit) {
-            break;
-        }
-
-        size = last_out->buf->last - last_out->buf->pos;
+        size = ngx_buf_size(out->buf);
 
         n = ngx_http_xquic_stream_send_body(r->xqstream,
-                                             last_out->buf->pos, size,
-                                             last_out->buf->last_buf);
+                                             out->buf->pos, size,
+                                             out->buf->last_buf);
 
         ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                        "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, n=%z|last=%i|",
-                       r->xqstream->body_sent, size, n, last_out->buf->last_buf);
+                       r->xqstream->body_sent, size, n, out->buf->last_buf);
 
 
         if (n < 0) {
             if (n == NGX_AGAIN) {
                 h3_stream->wait_to_write = 1;
+                goto RETURN_EAGAIN;
             } else {
-                ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                         "|xquic|ngx_http_xquic_send_chain|send body error, body_sent %ui, size %O, n=%z|last=%i|",
-                        r->xqstream->body_sent, size, n, last_out->buf->last_buf);
+                        r->xqstream->body_sent, size, n, out->buf->last_buf);
+                goto RETURN_ERROR;
             }
         
             break;
         }
 
-        c->sent += n;
+        fc->sent += n;
         send += n;
         size -= n;
-        last_out->buf->pos += n;  /* in->buf->pos = in->buf->last */
+        out->buf->pos += n;  /* in->buf->pos = in->buf->last */
 
         if (size != 0) {
             /* xquic inner send buffer full will cause n < size */
+            // break;
+            h3_stream->wait_to_write = 1;
+            goto RETURN_EAGAIN;
+        } 
 
+        /* finish sending this buffer */
+
+        r->xqstream->queued--;
+
+        out = out->next;
+        in = in->next;
+
+        if (send >= limit || in == NULL) {
             break;
-        } else {
-            /* finish sending this buffer */
-            r->xqstream->queued--;
         }
+
     }
 
-RETURN_EAGAIN:
-
 FINISH:
+    if (h3_stream->wait_to_write == 0) {
+        r->xqstream->queued = 0;
+    }
+    // r->xqstream->output_queue = out;
+    return in;
 
-    r->xqstream->output_queue = last_out;
-
+RETURN_EAGAIN:
+    fc->write->active = 1;
+    fc->write->ready = 0;
     return in;
 
 RETURN_ERROR:
-
-    r->xqstream->output_queue = last_out;
-
+    fc->error = 1;
+    r->xqstream->queued = 0;
+    // r->xqstream->output_queue = out;
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, n=%z|chain error|", 
                    r->xqstream->body_sent, send, n);
