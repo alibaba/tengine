@@ -120,10 +120,20 @@ typedef struct {
 } ngx_http_upstream_check_peers_shm_t;
 
 
+#if (NGX_HTTP_SSL)
+#define NGX_HTTP_CHECK_CONNECT_DONE          0x0001
+#define NGX_HTTP_CHECK_SSL_HANDSHAKING       0x0002
+#define NGX_HTTP_CHECK_SEND_DONE             0x0004
+#define NGX_HTTP_CHECK_RECV_DONE             0x0008
+#define NGX_HTTP_CHECK_ALL_DONE              0x0010
+
+#else
 #define NGX_HTTP_CHECK_CONNECT_DONE          0x0001
 #define NGX_HTTP_CHECK_SEND_DONE             0x0002
 #define NGX_HTTP_CHECK_RECV_DONE             0x0004
 #define NGX_HTTP_CHECK_ALL_DONE              0x0008
+
+#endif
 
 
 typedef ngx_int_t (*ngx_http_upstream_check_packet_init_pt)
@@ -175,6 +185,11 @@ typedef struct {
 #define NGX_HTTP_CHECK_SSL_HELLO             0x0004
 #define NGX_HTTP_CHECK_MYSQL                 0x0008
 #define NGX_HTTP_CHECK_AJP                   0x0010
+
+#if (NGX_HTTP_SSL)
+#define NGX_HTTP_CHECK_HTTPS                 0x0040
+#endif
+
 
 #define NGX_CHECK_HTTP_1XX                   0x0002
 #define NGX_CHECK_HTTP_2XX                   0x0004
@@ -261,6 +276,19 @@ struct ngx_http_upstream_check_srv_conf_s {
 
     ngx_uint_t                               default_down;
     ngx_uint_t                               unique;
+
+
+#if (NGX_HTTP_SSL)
+    ngx_ssl_t                               *ssl;
+    ngx_str_t                                ssl_ciphers;
+    ngx_uint_t                               ssl_protocols;
+    ngx_str_t                                ssl_server_name;
+    ngx_flag_t                               ssl_verify;
+    ngx_uint_t                               ssl_verify_depth;
+    ngx_str_t                                ssl_crl;
+    ngx_str_t                                ssl_trusted_certificate;
+#endif
+
 };
 
 
@@ -433,6 +461,17 @@ static ngx_int_t ngx_http_upstream_check_ajp_parse(
 static void ngx_http_upstream_check_ajp_reinit(
     ngx_http_upstream_check_peer_t *peer);
 
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_upstream_check_set_ssl_name(
+    ngx_http_upstream_check_peer_t *peer);
+static void ngx_upstream_check_ssl_handshake(
+    ngx_connection_t *c);
+static void ngx_http_upstream_check_ssl_init_connection(
+    ngx_event_t *event);
+
+#endif
+
 static void ngx_http_upstream_check_status_update(
     ngx_http_upstream_check_peer_t *peer,
     ngx_int_t result);
@@ -543,6 +582,20 @@ static ngx_conf_bitmask_t  ngx_check_http_expect_alive_masks[] = {
 };
 
 
+#if (NGX_HTTP_SSL)
+static ngx_conf_bitmask_t  ngx_upstream_check_ssl_protocols[] = {
+    { ngx_string("SSLv2"),   NGX_SSL_SSLv2   },
+    { ngx_string("SSLv3"),   NGX_SSL_SSLv3   },
+    { ngx_string("TLSv1"),   NGX_SSL_TLSv1   },
+    { ngx_string("TLSv1.1"), NGX_SSL_TLSv1_1 },
+    { ngx_string("TLSv1.2"), NGX_SSL_TLSv1_2 },
+    { ngx_string("TLSv1.3"), NGX_SSL_TLSv1_3 },
+    { ngx_null_string, 0 }
+};
+
+#endif
+
+
 static ngx_command_t  ngx_http_upstream_check_commands[] = {
 
     { ngx_string("check"),
@@ -594,6 +647,57 @@ static ngx_command_t  ngx_http_upstream_check_commands[] = {
       0,
       NULL },
 
+#if (NGX_HTTP_SSL)
+    { ngx_string("check_ssl_ciphers"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_ciphers),
+      NULL },
+
+    { ngx_string("check_ssl_protocols"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_1MORE,
+      ngx_conf_set_bitmask_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_protocols),
+      &ngx_upstream_check_ssl_protocols },
+
+    { ngx_string("check_ssl_server_name"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_server_name),
+      NULL },
+
+    { ngx_string("check_ssl_verify"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_verify),
+      NULL },   
+
+    { ngx_string("check_ssl_verify_depth"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_verify_depth),
+      NULL },   
+
+    { ngx_string("check_ssl_trusted_certificate"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_trusted_certificate),
+      NULL },
+
+    { ngx_string("check_ssl_crl"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_upstream_check_srv_conf_t, ssl_crl),
+      NULL },
+
+#endif
       ngx_null_command
 };
 
@@ -761,6 +865,20 @@ static ngx_check_conf_t  ngx_check_types[] = {
       ngx_http_upstream_check_ajp_reinit,
       1,
       0 },
+
+#if (NGX_HTTP_SSL)
+    { NGX_HTTP_CHECK_HTTPS,
+      ngx_string("https"),
+      ngx_string("GET / HTTP/1.0\r\n\r\n"),
+      NGX_CONF_BITMASK_SET | NGX_CHECK_HTTP_2XX | NGX_CHECK_HTTP_3XX,
+      ngx_http_upstream_check_ssl_init_connection,
+      ngx_http_upstream_check_ssl_init_connection,
+      ngx_http_upstream_check_http_init,
+      ngx_http_upstream_check_http_parse,
+      ngx_http_upstream_check_http_reinit,
+      1,
+      1 },
+#endif      
 
     { 0,
       ngx_null_string,
@@ -2984,6 +3102,200 @@ ngx_http_upstream_check_ajp_reinit(ngx_http_upstream_check_peer_t *peer)
 }
 
 
+#if (NGX_HTTP_SSL)
+
+
+static ngx_int_t
+ngx_http_upstream_check_set_ssl_name(ngx_http_upstream_check_peer_t *peer)
+{
+    ngx_connection_t                    *c;
+    ngx_http_upstream_check_srv_conf_t  *ucscf;
+    ngx_str_t                            name;
+    ngx_str_t                            tmp;
+    in_addr_t                            addr;
+    u_char                              *p; 
+
+    c = peer->pc.connection; 
+    ucscf = peer->conf;
+
+    if (ucscf->ssl_server_name.len > 0) {
+        name = ucscf->ssl_server_name; 
+    }
+    else {
+        /* get upstream server's hostname */
+        tmp = *peer->upstream_name;
+
+        p = tmp.data;
+        if (*p == '[') {
+            goto done;  /* ipv6 */
+        }
+
+        for (; p < tmp.data + tmp.len; p++) {
+            if (*p == ':') {
+                break;
+            }
+        }
+
+        if (p - tmp.data  <= 5 || 
+             (p - tmp.data > 5 && ngx_strncmp(tmp.data, "unix:", 5)) == 0) {
+            goto done; /* unix socket */
+        }
+
+        tmp.len = p - tmp.data;
+        
+        addr = ngx_inet_addr(tmp.data, tmp.len);
+        if (addr != INADDR_NONE) {
+            goto done;      /* ipv4 */
+        }
+
+        name = tmp;
+    }
+
+
+#ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
+    /*
+     * SSL_set_tlsext_host_name() needs a null-terminated string,
+     * hence we explicitly null-terminate name here
+     */
+
+    p = ngx_pnalloc(c->pool, name.len + 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    (void) ngx_cpystrn(p, name.data, name.len + 1);
+
+    name.data = p;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                   "upstream check SSL server name: \"%s\"", name.data);
+
+    if (SSL_set_tlsext_host_name(c->ssl->connection,
+                                 (char *) name.data)
+        == 0) {
+        ngx_ssl_error(NGX_LOG_ERR, c->log, 0,
+                      "SSL_set_tlsext_host_name(\"%s\") failed", name.data);
+        return NGX_ERROR;
+    }
+
+#endif
+
+done:
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_upstream_check_ssl_handshake(ngx_connection_t *c)
+{
+    ngx_http_upstream_check_peer_t      *peer;
+    ngx_http_upstream_check_ctx_t       *ctx;
+
+    (void)ctx;
+
+    peer = c->data;
+    ctx = peer->check_data;
+
+    if (c->ssl->handshaked) {
+
+        peer->state = NGX_HTTP_CHECK_CONNECT_DONE; 
+
+        if (c->write->timer_set) {
+            ngx_del_timer(c->write);
+        }
+
+        c->read->handler  = ngx_http_upstream_check_recv_handler;
+        c->write->handler = ngx_http_upstream_check_send_handler;
+
+        /* handshake ok, send the request to upstream server */
+        ngx_http_upstream_check_send_handler(c->write);
+        return;
+    }
+
+    /* handshake failed */
+    ngx_http_upstream_check_status_update(peer, 0);
+    ngx_http_upstream_check_clean_event(peer);
+
+}
+
+
+static void
+ngx_http_upstream_check_ssl_init_connection(ngx_event_t *event)
+{
+    ngx_int_t                            rc;
+    ngx_connection_t                    *c;
+    ngx_http_upstream_check_ctx_t       *ctx;
+    ngx_http_upstream_check_peer_t      *peer;
+    ngx_http_upstream_check_srv_conf_t  *ucscf;
+
+    (void)ctx;
+
+    if (ngx_http_upstream_check_need_exit()) {
+        return;
+    }
+
+    c = event->data;
+    peer = c->data;
+    ctx = peer->check_data;
+    ucscf = peer->conf;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http check ssl send.");
+
+    if (c->pool == NULL) {
+        ngx_log_error(NGX_LOG_ERR, event->log, 0,
+                      "check pool NULL with peer: %V ",
+                      &peer->check_peer_addr->name);
+
+        goto check_send_fail;
+    }
+
+    if (ucscf->ssl == NULL) {
+        ngx_log_error(NGX_LOG_ERR, event->log, 0,
+              "ssl context not initialized for https check with peer: %V ",
+              &peer->check_peer_addr->name);
+
+        goto check_send_fail;
+    }
+
+    if (ngx_ssl_create_connection(ucscf->ssl, c, NGX_SSL_BUFFER|NGX_SSL_CLIENT)
+        != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, event->log, 0,
+            "Failed to create ssl connection");
+        goto check_send_fail;
+    }
+
+    if (ngx_http_upstream_check_set_ssl_name(peer) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, event->log, 0,
+                      "Failed to set ssl sni hostname");
+        goto check_send_fail;
+    }
+
+    rc = ngx_ssl_handshake(c);
+
+    if (rc == NGX_AGAIN) {
+
+        if (!c->write->timer_set) {
+            ngx_add_timer(c->write, ucscf->check_timeout);
+        }
+
+        c->ssl->handler = ngx_upstream_check_ssl_handshake;
+        peer->state = NGX_HTTP_CHECK_SSL_HANDSHAKING;
+        return;
+    }
+
+    ngx_upstream_check_ssl_handshake(c); 
+    return;
+
+check_send_fail:
+    ngx_http_upstream_check_status_update(peer, 0);
+    ngx_http_upstream_check_clean_event(peer);
+}
+
+
+#endif
+
+
 static void
 ngx_http_upstream_check_status_update(ngx_http_upstream_check_peer_t *peer,
     ngx_int_t result)
@@ -3994,7 +4306,13 @@ ngx_http_upstream_check_http_send(ngx_conf_t *cf, ngx_command_t *cmd,
     if (value[1].len
         && (ucscf->check_type_conf->name.len != 4
             || ngx_strncmp(ucscf->check_type_conf->name.data,
-                           "http", 4) != 0))
+                           "http", 4) != 0)
+#if (NGX_HTTP_SSL) 
+        && (ucscf->check_type_conf->name.len != 5
+                    || ngx_strncmp(ucscf->check_type_conf->name.data,
+                                "https", 5) != 0)
+#endif                          
+                           )
     {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid check_http_send for type \"%V\"",
@@ -4366,6 +4684,12 @@ ngx_http_upstream_check_create_srv_conf(ngx_conf_t *cf)
     ucscf->check_keepalive_requests = 1;
     ucscf->check_type_conf = NGX_CONF_UNSET_PTR;
 
+#if (NGX_HTTP_SSL)
+    ucscf->ssl_protocols = NGX_CONF_UNSET_UINT;
+    ucscf->ssl_verify = NGX_CONF_UNSET;
+    ucscf->ssl_verify_depth = NGX_CONF_UNSET_UINT;
+#endif    
+
     return ucscf;
 }
 
@@ -4394,6 +4718,9 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
     ngx_check_conf_t                   *check;
     ngx_http_upstream_srv_conf_t       *us = conf;
     ngx_http_upstream_check_srv_conf_t *ucscf;
+#if (NGX_HTTP_SSL)
+    ngx_pool_cleanup_t                 *cln;
+#endif
 
     if (us->srv_conf == NULL) {
         return NGX_CONF_OK;
@@ -4462,6 +4789,85 @@ ngx_http_upstream_check_init_srv_conf(ngx_conf_t *cf, void *conf)
         if (ucscf->code.status_alive == 0) {
             ucscf->code.status_alive = check->default_status_alive;
         }
+
+
+#if (NGX_HTTP_SSL)
+
+        if (check->type == NGX_HTTP_CHECK_HTTPS) {
+
+            if (ucscf->ssl_protocols == NGX_CONF_UNSET_UINT) {
+                ucscf->ssl_protocols = NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1
+                                        |NGX_SSL_TLSv1_1|NGX_SSL_TLSv1_2;
+            }
+
+            if (ucscf->ssl_ciphers.len == 0) {
+                ngx_str_set(&ucscf->ssl_ciphers,"DEFAULT");
+            }
+
+            if (ucscf->ssl_verify == NGX_CONF_UNSET) {
+                ucscf->ssl_verify = 0;
+            }
+
+            ucscf->ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
+            if (ucscf->ssl == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            ucscf->ssl->log = cf->log;
+
+            if (ngx_ssl_create(ucscf->ssl, ucscf->ssl_protocols, NULL) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+
+            cln = ngx_pool_cleanup_add(cf->pool, 0);
+            if (cln == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            cln->handler = ngx_ssl_cleanup_ctx;
+            cln->data = ucscf->ssl;
+
+            if (ngx_ssl_ciphers(cf, ucscf->ssl, &ucscf->ssl_ciphers, 0) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+
+
+            if (ucscf->ssl_verify) {
+                if (ucscf->ssl_trusted_certificate.len == 0) {
+                    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                            "no proxy_ssl_trusted_certificate for check_ssl_verify");
+                    return NGX_CONF_ERROR;
+                }
+
+                if (ucscf->ssl_verify_depth == NGX_CONF_UNSET_UINT) {
+                    ucscf->ssl_verify_depth = 1;
+                }
+
+                if (ngx_ssl_trusted_certificate(cf, ucscf->ssl,
+                                                &ucscf->ssl_trusted_certificate,
+                                                ucscf->ssl_verify_depth)
+                    != NGX_OK)
+                {
+                    return NGX_CONF_ERROR;
+                }
+
+                if (ucscf->ssl_crl.len == 0) {
+                    ucscf->ssl_crl.data = (u_char*)"";
+                }
+
+                if (ngx_ssl_crl(cf, ucscf->ssl, &ucscf->ssl_crl) != NGX_OK) {
+                    return NGX_CONF_ERROR;
+                }
+            }
+
+            if (ngx_ssl_client_session_cache(cf, ucscf->ssl, 0)
+                != NGX_OK)
+            {
+                return NGX_CONF_ERROR;
+            }
+        }
+#endif
+
     }
 
     return NGX_CONF_OK;
