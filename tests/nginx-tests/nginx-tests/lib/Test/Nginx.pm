@@ -145,9 +145,9 @@ sub has_module($) {
 		rewrite	=> '(?s)^(?!.*--without-http_rewrite_module)',
 		proxy	=> '(?s)^(?!.*--without-http_proxy_module)',
 		fastcgi	=> '(?s)^(?!.*--without-http_fastcgi_module)',
-		uwsgi	=> '(?s)^(?!.*--without-http_uwsgi_module)',
-		scgi	=> '(?s)^(?!.*--without-http_scgi_module)',
-		grpc	=> '(?s)^(?!.*--without-http_grpc_module)',
+		uwsgi	=> '--with-http_uwsgi_module',
+		scgi	=> '--with-http_scgi_module',
+		grpc	=> '--with-http_grpc_module',
 		memcached
 			=> '(?s)^(?!.*--without-http_memcached_module)',
 		limit_conn
