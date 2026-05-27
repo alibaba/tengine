@@ -1037,6 +1037,8 @@ ngx_http_script_start_args_code(ngx_http_script_engine_t *e)
 void
 ngx_http_script_regex_start_code(ngx_http_script_engine_t *e)
 {
+    int                           *cap;
+    u_char                        *p;
     size_t                         len;
     ngx_int_t                      rc;
     ngx_uint_t                     n;
@@ -1143,15 +1145,19 @@ ngx_http_script_regex_start_code(ngx_http_script_engine_t *e)
     if (code->lengths == NULL) {
         e->buf.len = code->size;
 
-        if (code->uri) {
-            if (r->ncaptures && (r->quoted_uri || r->plus_in_uri)) {
-                e->buf.len += 2 * ngx_escape_uri(NULL, r->uri.data, r->uri.len,
-                                                 NGX_ESCAPE_ARGS);
-            }
-        }
+        cap = r->captures;
+        p = r->captures_data;
 
         for (n = 2; n < r->ncaptures; n += 2) {
-            e->buf.len += r->captures[n + 1] - r->captures[n];
+            e->buf.len += cap[n + 1] - cap[n];
+
+            if (code->uri) {
+                if (r->quoted_uri || r->plus_in_uri) {
+                    e->buf.len += 2 * ngx_escape_uri(NULL, &p[cap[n]],
+                                                     cap[n + 1] - cap[n],
+                                                     NGX_ESCAPE_ARGS);
+                }
+            }
         }
 
     } else {
@@ -1183,6 +1189,7 @@ ngx_http_script_regex_start_code(ngx_http_script_engine_t *e)
         return;
     }
 
+    e->is_args = 0;
     e->quote = code->redirect;
 
     e->pos = e->buf.data;
@@ -1927,6 +1934,7 @@ ngx_http_script_complex_value_code(ngx_http_script_engine_t *e)
     le.ip = code->lengths->elts;
     le.line = e->line;
     le.request = e->request;
+    le.is_args = e->is_args;
     le.quote = e->quote;
 
     for (len = 0; *(uintptr_t *) le.ip; len += lcode(&le)) {
