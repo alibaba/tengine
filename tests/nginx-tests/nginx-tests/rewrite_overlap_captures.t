@@ -87,30 +87,31 @@ $t->run();
 # PoC #1 - long '+' run forces large escape expansion in both $1 and $2.
 # Pre-fix: heap-buffer-overflow under ASan / segfault.
 my $payload = '+' x 64;
-like(http_get("/redirect/$payload"), qr|^Location: http://example\.com/|m,
+like(http_get("/redirect/$payload"),
+    qr{^Location: http://example\.com/}m,
     'overlap captures + redirect (no overflow)');
 
 # PoC #2 - same payload via '?' args path.
 like(http_get("/args/$payload"),
-    qr/args=(?:%2B|\+){64}(?:%2B|\+){64}/,
+    qr{args=(?:%2B|\+){64}(?:%2B|\+){64}},
     'overlap captures + args (no overflow)');
 
 # Quoted URI variant - '%' triggers quoted_uri branch.
 like(http_get('/redirect/%2B%2B%2B%2B%2B%2B%2B%2B'),
-    qr|^Location: http://example\.com/|m,
+    qr{^Location: http://example\.com/}m,
     'overlap captures with %-encoded input');
 
 # Regression: single capture still produces correct Location.
 like(http_get('/simple/foo+bar'),
-    qr|^Location: http://example\.com/foo(?:%2B|\+)bar|m,
+    qr{^Location: http://example\.com/foo(?:%2B|\+)bar}m,
     'non-overlapping capture still works');
 
 # is_args reset hardening (paired with CVE-2026-42945 fix).
-like(http_get('/leak/'), qr/tmp=x=1/, 'is_args reset between rewrites');
+like(http_get('/leak/'), qr{tmp=x=1}, 'is_args reset between rewrites');
 
 # Memory safety: worker is alive after the PoC requests above.
 like(http_get('/simple/healthcheck'),
-    qr|^Location: http://example\.com/healthcheck|m,
+    qr{^Location: http://example\.com/healthcheck}m,
     'worker still alive after PoC requests');
 
 ###############################################################################
