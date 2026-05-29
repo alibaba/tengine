@@ -2,6 +2,9 @@ Makefile
 objs/
 tags
 
+# macOS metadata files
+.DS_Store
+
 # Test temporary files
 tests/nginx-tests/tengine-tests/ckeys.log
 tests/nginx-tests/tengine-tests/clog

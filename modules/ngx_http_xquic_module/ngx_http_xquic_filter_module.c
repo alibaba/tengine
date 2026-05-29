@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #include <ngx_http_xquic.h>
@@ -67,19 +67,32 @@ ngx_http_xquic_stream_send_header(ngx_http_v3_stream_t *qstream)
 {
     ssize_t ret = 0;
     uint8_t header_only = (qstream->request->header_only == 1);
+    xqc_request_stats_t stats;
+    ngx_http_xquic_main_conf_t *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
     ret = xqc_h3_request_send_headers(qstream->h3_request,
                         &(qstream->resp_headers), header_only);
+    
+    if (qmcf->manually_send != NGX_CONF_UNSET && qmcf->manually_send != 0) {
+        xqc_engine_finish_send(qmcf->xquic_engine);
+    }
+    
     if (ret < 0) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                    "|xquic|xqc_h3_request_send_headers error|ret=%z|", ret);
+                      "|xquic|xqc_h3_request_send_headers error|ret=%z|", ret);
         qstream->queued--;
         return NGX_ERROR;
     } else {
         ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                    "|xquic|xqc_h3_request_send_headers success size=%z|", ret);
+                      "|xquic|xqc_h3_request_send_headers success size=%z|", ret);
         qstream->queued--;
     }
+
+    stats = xqc_h3_request_get_stats(qstream->h3_request);
+
+#if (T_HEADER_SIZE)
+    qstream->resp_header_size = stats.send_header_size;
+#endif
 
     if (header_only) {
         return ret;
@@ -261,14 +274,14 @@ ngx_http_xquic_save_response_headers(ngx_http_request_t *r)
             continue;
         }
 
-        if (header[i].key.len > NGX_HTTP_V3_MAX_FIELD) {
+        if (header[i].key.len > NGX_HTTP_V2_MAX_FIELD) {
             ngx_log_error(NGX_LOG_CRIT, r->connection->log, 0,
                           "too long response header name: \"%V\"",
                           &header[i].key);
             return NGX_ERROR;
         }
 
-        if (header[i].value.len > NGX_HTTP_V3_MAX_FIELD) {
+        if (header[i].value.len > NGX_HTTP_V2_MAX_FIELD) {
             ngx_log_error(NGX_LOG_CRIT, r->connection->log, 0,
                           "too long response header value: \"%V: %V\"",
                           &header[i].key, &header[i].value);
@@ -459,47 +472,43 @@ ngx_http_xquic_header_filter(ngx_http_request_t *r)
 
     /* server */
     if (r->headers_out.server == NULL) {
-#if (T_NGX_SERVER_INFO)
-        if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_OFF) {
-            /* no Server header */
+        h = ngx_list_push(&r->headers_out.headers);
+        if (h == NULL) {
+            return NGX_ERROR;
+        }
 
-        } else
-#endif
-        {
-            h = ngx_list_push(&r->headers_out.headers);
-            if (h == NULL) {
+        h->hash = 1;
+        ngx_str_set(&h->key, NGX_HTTP_XQUIC_NAME_SERVER);
+#if (T_NGX_SERVER_INFO)
+        if (clcf->server_tag.len > 0) {
+            h->value.len = clcf->server_tag.len;
+            h->value.data = ngx_pnalloc(r->pool, clcf->server_tag.len);
+            if (h->value.data == NULL) {
                 return NGX_ERROR;
             }
 
-            h->hash = 1;
-            ngx_str_set(&h->key, NGX_HTTP_XQUIC_NAME_SERVER);
-
-#if (T_NGX_SERVER_INFO)
-            if (clcf->server_tag_type == NGX_HTTP_SERVER_TAG_CUSTOMIZED) {
-                h->value = clcf->server_tag;
-
-            } else
+            p = ngx_cpymem(h->value.data, clcf->server_tag.data, clcf->server_tag.len);
+        } else {
 #endif
-            {
-                if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+        if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
 #if (T_NGX_SERVER_INFO)
-                    ngx_str_set(&h->value, TENGINE_VER);
+            ngx_str_set(&h->value, TENGINE_VER);
 #else
-                    ngx_str_set(&h->value, NGINX_VER);
+            ngx_str_set(&h->value, NGINX_VER);
 #endif
-                } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+        } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
 #if (T_NGX_SERVER_INFO)
-                    ngx_str_set(&h->value, TENGINE_VER_BUILD);
+            ngx_str_set(&h->value, TENGINE_VER_BUILD);
 #else
-                    ngx_str_set(&h->value, NGINX_VER_BUILD);
+            ngx_str_set(&h->value, NGINX_VER_BUILD);
 #endif
-                } else {
-                    ngx_str_set(&h->value, TENGINE);
-                }
-            }
-
-            r->headers_out.server = h;
+        } else {
+            ngx_str_set(&h->value, TENGINE);
         }
+#if (T_NGX_SERVER_INFO)
+        }
+#endif
+        r->headers_out.server = h;
     }
 
     /* date */
@@ -643,12 +652,13 @@ ngx_chain_t *
 ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {
     size_t                   size;
-    ssize_t                  n = 0;
-    off_t                    send = 0, buf_size = 0;
+    ssize_t                  n;
+    off_t                    send, left_size, buf_size;
     ngx_http_request_t      *r;
     ngx_http_v3_stream_t    *h3_stream;
-    ngx_chain_t             *last_out = NULL, *last_chain, *cl;
+    ngx_chain_t             *last_out, *last_chain, *cl;
     ngx_buf_t               *buf;
+    ngx_http_xquic_main_conf_t *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
     r = c->data;
 
@@ -749,7 +759,7 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
                 } else if (n < 0) {
                     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                            "|xquic|ngx_http_xquic_send_chain|send body fin error|");
+                                  "|xquic|ngx_http_xquic_send_chain|send body fin error|");
                     r->xqstream->queued--;
                     goto RETURN_ERROR;
                 }
@@ -792,8 +802,8 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                                              last_out->buf->last_buf);
 
         ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                       "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, n=%z|last=%i|",
-                       r->xqstream->body_sent, size, n, last_out->buf->last_buf);
+                      "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, n=%z|last=%i|",
+                      r->xqstream->body_sent, size, n, last_out->buf->last_buf);
 
 
         if (n < 0) {
@@ -801,8 +811,8 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 h3_stream->wait_to_write = 1;
             } else {
                 ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                        "|xquic|ngx_http_xquic_send_chain|send body error, body_sent %ui, size %O, n=%z|last=%i|",
-                        r->xqstream->body_sent, size, n, last_out->buf->last_buf);
+                              "|xquic|ngx_http_xquic_send_chain|send body error, body_sent %ui, size %O, n=%z|last=%i|",
+                              r->xqstream->body_sent, size, n, last_out->buf->last_buf);
             }
         
             break;
@@ -823,15 +833,30 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         }
     }
 
+    if (last_out == NULL) {
+        left_size = 0;
+    } else {
+        left_size = ngx_buf_size(last_out->buf);
+    }
+
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, limit %O|left_size=%O|", 
+                   r->xqstream->body_sent, send, limit, left_size);
+
 RETURN_EAGAIN:
 
 FINISH:
-
+    if (qmcf->manually_send != NGX_CONF_UNSET && qmcf->manually_send != 0) {
+        xqc_engine_finish_send(qmcf->xquic_engine);
+    }
     r->xqstream->output_queue = last_out;
 
     return in;
 
 RETURN_ERROR:
+    if (qmcf->manually_send != NGX_CONF_UNSET && qmcf->manually_send != 0) {
+        xqc_engine_finish_send(qmcf->xquic_engine);
+    }
 
     r->xqstream->output_queue = last_out;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 /**
@@ -11,18 +11,23 @@
 #include <ngx_http_xquic.h>
 #include <ngx_xquic_intercom.h>
 #include <ngx_xquic_recv.h>
+#include <ngx_xquic_send.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 #include <xquic/xquic_typedef.h>
 #include <xquic/xquic.h>
-
 #define NGX_XQUIC_TMP_BUF_LEN 512
-#define NGX_XQUIC_SUPPORT_CID_ROUTE 1
+
+#define NGX_XQUIC_WORKER_PID(worker_id)   ((worker_id) & 0x3fffff)
+
 #if (T_NGX_UDPV2)
 static void ngx_xquic_batch_udp_traffic(ngx_event_t * ev);
 #endif
 
+extern ngx_xquic_intercom_ctx_t *g_intercom_ctx;
+
+extern ngx_uint_t    ngx_xquic_reload_flag;
 
 xqc_engine_callback_t ngx_xquic_engine_callback = {
 
@@ -34,7 +39,9 @@ xqc_engine_callback_t ngx_xquic_engine_callback = {
     .log_callbacks = {
         .xqc_log_write_err = ngx_xquic_log_write_err,
         .xqc_log_write_stat = ngx_xquic_log_write_stat,
+        .xqc_qlog_event_write = ngx_xquic_qlog_event_write,
     },
+    .keylog_cb = ngx_xquic_engine_log_key,
 };
 
 xqc_transport_callbacks_t ngx_xquic_transport_callbacks = {
@@ -42,11 +49,23 @@ xqc_transport_callbacks_t ngx_xquic_transport_callbacks = {
     .server_accept = ngx_xquic_conn_accept,
     .server_refuse = ngx_xquic_conn_refuse,
     .write_socket = ngx_xquic_server_send,
+    .write_socket_ex = ngx_xquic_server_mp_send,
 #if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
     .write_mmsg  = ngx_xquic_server_send_mmsg,
+    .write_mmsg_ex  = ngx_xquic_server_mp_send_mmsg,
 #endif
+    .path_created_notify = ngx_xquic_path_created_notify,
+    .path_removed_notify = ngx_xquic_path_removed_notify,
     .conn_update_cid_notify = ngx_http_v3_conn_update_cid_notify,
+    .stateless_reset = ngx_xquic_stateless_reset,
+    .conn_peer_addr_changed_notify = ngx_xquic_conn_peer_addr_changed_notify,
+    .path_peer_addr_changed_notify = ngx_xquic_path_peer_addr_changed_notify,
     .conn_cert_cb = ngx_http_v3_cert_cb,
+
+#if (T_NGX_HTTP_SSL_FINGERPRINT)
+    .conn_ssl_msg_cb = ngx_http_v3_ssl_msg_cb,
+#endif
+    .conn_send_packet_before_accept = ngx_xquic_send_packet_early,
 };
 
 
@@ -174,6 +193,12 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     if (xqc_engine_get_default_config(&config, XQC_ENGINE_SERVER) < 0) {
         return NGX_ERROR;
     }
+    if (qmcf->hash_conflict_threshold != NGX_CONF_UNSET_UINT) {
+        config.hash_conflict_threshold = qmcf->hash_conflict_threshold;
+    }
+    if (qmcf->conn_hash_size != NGX_CONF_UNSET_UINT) {
+        config.conns_hash_bucket_size = qmcf->conn_hash_size;
+    }
 
     if (qmcf->stateless_reset_token_key.len > 0
         && qmcf->stateless_reset_token_key.len <= XQC_RESET_TOKEN_MAX_KEY_LEN)
@@ -181,6 +206,16 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
         strncpy(config.reset_token_key, (char *)qmcf->stateless_reset_token_key.data, XQC_RESET_TOKEN_MAX_KEY_LEN);
         config.reset_token_keylen = qmcf->stateless_reset_token_key.len;
     }
+
+    int i = 0;
+    for (i = 0; i < XQC_TOKEN_MAX_KEY_VERSION; i++) {
+        ngx_str_t *s_tk = &qmcf->token_key_list[i];
+        if (s_tk->len > 0 && s_tk->len <= XQC_TOKEN_MAX_KEY_LEN) {
+            ngx_memcpy(config.token_key_list[i], s_tk->data, s_tk->len);
+            config.tk_len_list[i] = s_tk->len;
+        }
+    }
+    config.cur_tk_index = qmcf->tk_max_version & XQC_TOKEN_VERSION_MASK;
 
     if (qmcf == NULL) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
@@ -205,6 +240,8 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     /* init log level */
     config.cfg_log_level = qmcf->log_level;
     config.cfg_log_timestamp = 0;
+    config.cfg_log_event = qmcf->enable_qlog_event;  
+    config.cfg_qlog_importance = qmcf->event_importance;   
 
 #if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
     /* set sendmmsg */
@@ -274,6 +311,10 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
         }
     }
 
+    if (qmcf->manually_send != NGX_CONF_UNSET && qmcf->manually_send != 0) {
+        config.manually_triggered_send = 1;
+    }
+
     /* create engine */
     qmcf->xquic_engine = xqc_engine_create(XQC_ENGINE_SERVER, &config, engine_ssl_config, 
                                            &ngx_xquic_engine_callback, &ngx_xquic_transport_callbacks, qmcf);
@@ -303,24 +344,279 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     {
         cong_ctrl = xqc_cubic_cb;
     } else {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
-                    "|xquic|unknown xquic_congestion_control|%V|", &qmcf->congestion_control);     
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "|xquic|unknown xquic_congestion_control|%V|", &qmcf->congestion_control);
         return NGX_ERROR;
     }
 
     int pacing_on = (qmcf->pacing_on? 1 : 0);
+    int customize_cc = 0;
+
+    if (qmcf->initcwnd == NGX_CONF_UNSET) {
+        qmcf->initcwnd = 0;
+    }
+
+    if (qmcf->mincwnd == NGX_CONF_UNSET) {
+        qmcf->mincwnd = 0;
+    }
+
+    if (qmcf->init_rtt_us == NGX_CONF_UNSET) {
+        qmcf->init_rtt_us = 0;
+    }
+
+    if (qmcf->init_pto_us == NGX_CONF_UNSET) {
+        qmcf->init_pto_us = 0;
+    }
+
+    if (qmcf->initcwnd != 0 || qmcf->mincwnd != 0) {
+        customize_cc = 1;
+    }
 
     xqc_conn_settings_t conn_settings = {
-        .pacing_on  =   pacing_on,
-        .cong_ctrl_callback = cong_ctrl,
+        .pacing_on             = pacing_on,
+        .cong_ctrl_callback    = cong_ctrl,
+        .initial_rtt           = qmcf->init_rtt_us,
+        .initial_pto_duration  = qmcf->init_pto_us, 
+        .cc_params             = {
+            .customize_on = customize_cc,
+            .init_cwnd = qmcf->initcwnd,
+            .min_cwnd = qmcf->mincwnd,
+        },
+        .max_streams_bidi      = 0,
+        .max_streams_uni       = 0
     };
 
     if (qmcf->anti_amplification_limit != NGX_CONF_UNSET_UINT) {
         conn_settings.anti_amplification_limit = qmcf->anti_amplification_limit;
     }
 
+    if (qmcf->sndq_packets_used_max != NGX_CONF_UNSET_UINT) {
+        conn_settings.sndq_packets_used_max = qmcf->sndq_packets_used_max;
+    }
+
     if (qmcf->keyupdate_pkt_threshold != NGX_CONF_UNSET_UINT) {
         conn_settings.keyupdate_pkt_threshold = qmcf->keyupdate_pkt_threshold;
+    }
+
+    if (qmcf->idle_time_out != NGX_CONF_UNSET_UINT) {
+        conn_settings.idle_time_out = qmcf->idle_time_out;
+    }
+
+    if (qmcf->enable_multipath != NGX_CONF_UNSET_UINT) {
+        conn_settings.enable_multipath = qmcf->enable_multipath;
+    }
+
+    if (qmcf->enable_fec != NGX_CONF_UNSET_UINT) {
+        if (qmcf->enable_fec & NGX_XQUIC_FEC_ENC_SWITCH_BIT) {
+            conn_settings.enable_encode_fec = 1;
+        }
+        if (qmcf->enable_fec & NGX_XQUIC_FEC_DEC_SWITCH_BIT) {
+            conn_settings.enable_decode_fec = 1;
+        }
+    }
+
+    if (qmcf->fec_mp_mode == XQC_FEC_MP_USE_STB) {
+        conn_settings.fec_params.fec_mp_mode = XQC_FEC_MP_USE_STB;
+
+    } else {
+        conn_settings.fec_params.fec_mp_mode = XQC_FEC_MP_DEFAULT;
+    }
+
+    if (qmcf->fec_code_rate != NGX_CONF_UNSET) {
+        conn_settings.fec_params.fec_code_rate = (float)qmcf->fec_code_rate / 100.0;
+    }
+
+    if (qmcf->symbol_number_per_block != NGX_CONF_UNSET_UINT) {
+        conn_settings.fec_params.fec_max_symbol_num_per_block = qmcf->symbol_number_per_block;
+    }
+
+    if (qmcf->fec_blk_log_mod != NGX_CONF_UNSET_UINT) {
+        conn_settings.fec_params.fec_blk_log_mod = qmcf->fec_blk_log_mod;
+    }
+
+    if (qmcf->fec_packet_mask_mode != NGX_CONF_UNSET_UINT) {
+        conn_settings.fec_params.fec_packet_mask_mode = qmcf->fec_packet_mask_mode;
+    }
+
+    if (qmcf->fec_log_on != NGX_CONF_UNSET) {
+        conn_settings.fec_params.fec_log_on = qmcf->fec_log_on;
+    }
+
+    if (qmcf->fec_stream_level_on != NGX_CONF_UNSET_UINT) {
+        conn_settings.fec_level = qmcf->fec_stream_level_on;
+    }
+
+    if (qmcf->ack_frequency != NGX_CONF_UNSET_UINT) {
+        conn_settings.ack_frequency = qmcf->ack_frequency;
+    }
+
+    if (qmcf->control_pto_value != NGX_CONF_UNSET) {
+        conn_settings.control_pto_value = 1;
+    }
+
+    if (qmcf->pmtud_probing_interval != NGX_CONF_UNSET_UINT) {
+        conn_settings.pmtud_probing_interval = qmcf->pmtud_probing_interval;
+    }
+
+    if (qmcf->probing_pkt_out_size != NGX_CONF_UNSET_UINT) {
+        conn_settings.probing_pkt_out_size = qmcf->probing_pkt_out_size;
+    }
+
+    if (qmcf->init_pkt_out_size != NGX_CONF_UNSET_UINT) {
+        conn_settings.max_pkt_out_size = qmcf->init_pkt_out_size;
+    }
+
+    if (qmcf->fec_conn_queue_rpr_timeout != NGX_CONF_UNSET_MSEC) {
+        conn_settings.fec_conn_queue_rpr_timeout = qmcf->fec_conn_queue_rpr_timeout;
+    }
+
+    char *scheme = NULL, *buf = NULL;
+    ngx_int_t scheme_num = 0;
+    // fec scheme option
+    if (qmcf->fec_encoder_scheme.len) {
+        scheme = strtok_r((char *)qmcf->fec_encoder_scheme.data, ",", &buf);
+        while (scheme != NULL) {
+            if (ngx_strncmp(scheme, "xor", sizeof("xor")-1) == 0) {
+                conn_settings.fec_params.fec_encoder_schemes[scheme_num] = XQC_XOR_CODE;
+
+            } else if (ngx_strncmp(scheme, "reedsolomon", sizeof("reedsolomon")-1) == 0) {
+                conn_settings.fec_params.fec_encoder_schemes[scheme_num] = XQC_REED_SOLOMON_CODE;
+
+            } else if (ngx_strncmp(scheme, "packetmask", sizeof("packetmask")-1) == 0) {
+                conn_settings.fec_params.fec_encoder_schemes[scheme_num] = XQC_PACKET_MASK_CODE;
+            }
+            scheme_num++;
+            scheme = strtok_r(NULL, ",", &buf);
+        }
+        conn_settings.fec_params.fec_encoder_schemes_num = scheme_num;
+    }
+
+    scheme_num = 0;
+    if (qmcf->fec_decoder_scheme.len) {
+        scheme = strtok_r((char *)qmcf->fec_decoder_scheme.data, ",", &buf);
+        while (scheme != NULL) {
+            if (ngx_strncmp(scheme, "xor", sizeof("xor")-1) == 0) {
+                conn_settings.fec_params.fec_decoder_schemes[scheme_num] = XQC_XOR_CODE;
+
+            } else if (ngx_strncmp(scheme, "reedsolomon", sizeof("reedsolomon")-1) == 0) {
+                conn_settings.fec_params.fec_decoder_schemes[scheme_num] = XQC_REED_SOLOMON_CODE;
+
+            } else if (ngx_strncmp(scheme, "packetmask", sizeof("packetmask")-1) == 0) {
+                conn_settings.fec_params.fec_decoder_schemes[scheme_num] = XQC_PACKET_MASK_CODE;
+            }
+            scheme_num++;
+            scheme = strtok_r(NULL, ",", &buf);
+        }
+        conn_settings.fec_params.fec_decoder_schemes_num = scheme_num;
+    }
+
+    if (qmcf->enable_pmtud != NGX_CONF_UNSET_UINT) {
+        conn_settings.enable_pmtud = qmcf->enable_pmtud;
+    }
+
+#ifdef XQC_PROTECT_POOL_MEM
+    if (qmcf->enable_mempool_protection != NGX_CONF_UNSET) {
+        conn_settings.protect_pool_mem = qmcf->enable_mempool_protection;
+    }
+#endif
+
+    if (qmcf->enable_marking_reinjection != NGX_CONF_UNSET) {
+        conn_settings.marking_reinjection = qmcf->enable_marking_reinjection;
+    }
+
+    if (qmcf->multipath_scheduler.len == sizeof("minrtt")-1
+        && ngx_strncmp(qmcf->multipath_scheduler.data, "minrtt",  sizeof("minrtt")-1) == 0)
+    {
+        conn_settings.scheduler_callback = xqc_minrtt_scheduler_cb;
+
+    } else if (qmcf->multipath_scheduler.len == sizeof("backup")-1
+        && ngx_strncmp(qmcf->multipath_scheduler.data, "backup",  sizeof("backup")-1) == 0)
+    {
+        conn_settings.scheduler_callback = xqc_backup_scheduler_cb;
+
+    } else if (qmcf->multipath_scheduler.len == sizeof("backupfec")-1
+        && ngx_strncmp(qmcf->multipath_scheduler.data, "backupfec",  sizeof("backupfec")-1) == 0)
+    {
+        conn_settings.scheduler_callback = xqc_backup_fec_scheduler_cb;
+
+    } else if (qmcf->multipath_scheduler.len == sizeof("rap")-1
+        && ngx_strncmp(qmcf->multipath_scheduler.data, "rap",  sizeof("rap")-1) == 0)
+    {
+        conn_settings.scheduler_callback = xqc_rap_scheduler_cb;
+
+    } else {
+        conn_settings.scheduler_callback = xqc_minrtt_scheduler_cb;
+    }
+
+    if (qmcf->mp_enable_reinjection != NGX_CONF_UNSET_UINT) {
+        conn_settings.mp_enable_reinjection = qmcf->mp_enable_reinjection;
+    }
+
+    if (qmcf->reinjection_control.len == sizeof("deadline")-1
+        && ngx_strncmp(qmcf->reinjection_control.data, "deadline",  sizeof("deadline")-1) == 0)
+    {
+        conn_settings.reinj_ctl_callback = xqc_deadline_reinj_ctl_cb;
+
+    } else if (qmcf->reinjection_control.len == sizeof("default")-1
+        && ngx_strncmp(qmcf->reinjection_control.data, "default",  sizeof("default")-1) == 0)
+    {
+        conn_settings.reinj_ctl_callback = xqc_default_reinj_ctl_cb;
+
+    } else if (qmcf->reinjection_control.len == sizeof("dgram")-1
+        && ngx_strncmp(qmcf->reinjection_control.data, "dgram",  sizeof("dgram")-1) == 0)
+    {
+        conn_settings.reinj_ctl_callback = xqc_dgram_reinj_ctl_cb;
+
+    } else {
+        conn_settings.reinj_ctl_callback = xqc_deadline_reinj_ctl_cb;
+    }
+
+    if (qmcf->reinj_flexible_deadline_srtt_factor != NGX_CONF_UNSET) {
+        conn_settings.reinj_flexible_deadline_srtt_factor = (double)qmcf->reinj_flexible_deadline_srtt_factor / 100.0;
+    }
+
+    if (qmcf->reinj_hard_deadline != NGX_CONF_UNSET_UINT) {
+        conn_settings.reinj_hard_deadline = qmcf->reinj_hard_deadline;
+    }
+
+    if (qmcf->reinj_deadline_lower_bound != NGX_CONF_UNSET_UINT) {
+        conn_settings.reinj_deadline_lower_bound = qmcf->reinj_deadline_lower_bound;
+    }
+
+    if (qmcf->standby_path_probe_timeout != NGX_CONF_UNSET_UINT) {
+        conn_settings.standby_path_probe_timeout = qmcf->standby_path_probe_timeout;
+    }
+
+    if (qmcf->mp_sched_rtt_thr_high != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.rtt_us_thr_high = qmcf->mp_sched_rtt_thr_high;
+    }
+
+    if (qmcf->mp_sched_rtt_thr_low != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.rtt_us_thr_low = qmcf->mp_sched_rtt_thr_low;
+    }
+
+    if (qmcf->mp_sched_bw_Bps_thr != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.bw_Bps_thr = qmcf->mp_sched_bw_Bps_thr;
+    }
+
+    if (qmcf->mp_sched_loss_percent_high != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.loss_percent_thr_high = qmcf->mp_sched_loss_percent_high;
+    }
+
+    if (qmcf->mp_sched_loss_percent_low != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.loss_percent_thr_low = qmcf->mp_sched_loss_percent_low;
+    }
+
+    if (qmcf->mp_sched_pto_thr != NGX_CONF_UNSET_UINT) {
+        conn_settings.scheduler_params.pto_cnt_thr = qmcf->mp_sched_pto_thr;
+    }
+
+    if (qmcf->max_streams_bidi != NGX_CONF_UNSET_UINT) {
+        conn_settings.max_streams_bidi = qmcf->max_streams_bidi;
+    }
+
+    if (qmcf->max_streams_uni != NGX_CONF_UNSET_UINT) {
+        conn_settings.max_streams_uni = qmcf->max_streams_uni;
     }
 
     xqc_server_set_conn_settings(qmcf->xquic_engine, &conn_settings);
@@ -329,6 +625,8 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
                                         qmcf->qpack_encoder_dynamic_table_capacity);
     xqc_h3_engine_set_dec_max_dtable_capacity(qmcf->xquic_engine, 
                                         qmcf->qpack_decoder_dynamic_table_capacity);
+    xqc_h3_engine_set_qpack_compat_duplicate(qmcf->xquic_engine,
+                                        qmcf->qpack_compat_duplicate);
 
 
     /* init event timer */
@@ -389,12 +687,11 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
     ls = (ngx_listening_t *)(cycle->listening.elts);
     for (i = 0; i < cycle->listening.nelts; i++) {
 
-#if !(T_RELOAD)
 #if (NGX_HAVE_REUSEPORT)
         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
+            /* 只对该进程对应listen结构体做初始化 */
             continue;
         }
-#endif
 #endif
 
         if (ls[i].fd == -1) {
@@ -422,7 +719,7 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
         c->data = qmcf;
         if (c->data == NULL) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
-                        "|xquic|ngx_xquic_process_init|qmcf equals NULL|");
+                          "|xquic|ngx_xquic_process_init|qmcf equals NULL|");
             return NGX_ERROR;  
         }
     }
@@ -434,7 +731,11 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-    if (with_xquic && ngx_xquic_intercom_init(cycle, qmcf->xquic_engine) != NGX_OK) {
+    /* 初始化g_intercom_ctx */
+    if (with_xquic && ngx_xquic_intercom_worker_init_ctx(cycle, qmcf->xquic_engine) != NGX_OK) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
+                      "|xquic|ngx_xquic_process_init|ngx_xquic_intercom_worker_init_ctx fail|");
+ 
         return NGX_ERROR;
     }
 
@@ -450,6 +751,7 @@ ngx_xquic_process_exit(ngx_cycle_t *cycle)
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, cycle->log, 0, "|xquic|ngx_xquic_process_exit|");
 
     if (qmcf->xquic_engine) {
+        xqc_h3_ctx_destroy(qmcf->xquic_engine);
         xqc_engine_destroy(qmcf->xquic_engine);
         qmcf->xquic_engine = NULL;
 
@@ -469,6 +771,23 @@ void
 ngx_xquic_log_write_stat(xqc_log_level_t lvl, const void *buf, size_t size, void *engine_user_data)
 {
     ngx_log_xquic(NGX_LOG_WARN, ngx_cycle->x_log, 0, "%*s|", size, buf);
+}
+
+
+void 
+ngx_xquic_qlog_event_write(qlog_event_importance_t lvl, const void *buf, size_t size, void *engine_user_data)
+{
+    ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|qlog%*s|", size, buf);
+}
+
+
+void 
+ngx_xquic_engine_log_key(const xqc_cid_t *scid, const char *line, void *user_data)
+{
+    ngx_http_xquic_main_conf_t *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+    if (qmcf->enable_keylog != NGX_CONF_UNSET && qmcf->enable_keylog) {
+        ngx_log_xquic(NGX_LOG_WARN, ngx_cycle->x_log, 0, "|sslkey|scid=%s|%s|", xqc_scid_str(qmcf->xquic_engine, scid), line);
+    }
 }
 
 
@@ -616,6 +935,20 @@ ngx_xquic_generate_route_cid(unsigned char *buf, size_t len, const uint8_t *curr
     /* fill with random data */
     ngx_xquic_random_buf(buf, qmcf->cid_len);
 
+    /* keep server id */
+    if (current_cid_buf) {
+
+        if (XQC_UNLIKELY(current_cid_buflen < qmcf->cid_server_id_offset + qmcf->cid_server_id_length)) {
+            /* just return 0 to force xquic generate random cid */
+            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|not enough buffer for server id space %d (required at least %d)",
+                current_cid_buflen, qmcf->cid_server_id_offset + qmcf->cid_server_id_length);
+            return 0;
+        }
+
+        /* copy server id */
+        ngx_memcpy(buf + qmcf->cid_server_id_offset, current_cid_buf + qmcf->cid_server_id_offset, qmcf->cid_server_id_length);
+    }
+
     /* calculate salt */
     salt = ngx_murmur_hash2(buf, qmcf->cid_worker_id_salt_range);
 
@@ -649,6 +982,99 @@ ngx_sum_complement(uint64_t a, uint64_t b, uint32_t c)
     return (a + b) % c;
 }
 #endif
+
+
+ngx_int_t
+ngx_xquic_get_worker_id_pid_from_cid(ngx_xquic_recv_packet_t *packet,
+    uint32_t *worker_id, uint32_t *pid)
+{
+    ngx_core_conf_t             *ccf;
+    ngx_http_xquic_main_conf_t  *qmcf;
+    uint32_t                     worker, salt;
+    u_char                      *dcid;
+
+    ccf  = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, ngx_core_module);
+    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+    dcid = packet->xquic.dcid.cid_buf;
+
+    if (packet->xquic.dcid.cid_len >= qmcf->cid_len) {
+        /* calculate salt */
+        salt = ngx_murmur_hash2(dcid, qmcf->cid_worker_id_salt_range);
+        /* get cipher worker */
+        memcpy(&worker, dcid + qmcf->cid_worker_id_offset, sizeof(worker));
+        /* decrypt */
+        worker = (ntohl(worker) ^ qmcf->cid_worker_id_secret) - salt;
+   
+        *pid = NGX_XQUIC_WORKER_PID(worker);
+#ifdef UINT64_MAX
+        *worker_id = ngx_sum_complement(worker >> PID_MAX_BIT, salt, ccf->worker_processes);
+#else
+        /**
+         * 在数学意义上， 可以简化成 ((worker >> PID_MAX_BIT) + salt) % ccf->worker_processes 
+         * 但在实现中，(worker >> PID_MAX_BIT) + salt 运算可能造成溢出。
+         * */
+        *worker_id = ((worker >> PID_MAX_BIT) % ccf->worker_processes + salt % ccf->worker_processes)
+                % ccf->worker_processes;
+#endif
+        return NGX_OK;
+    } else {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, 
+                "|xquic|cid length invalid|cid_len:%d, the minimal length:%d|dcid:%s|",
+                packet->xquic.dcid.cid_len, qmcf->cid_len, xqc_dcid_str(qmcf->xquic_engine, &packet->xquic.dcid));
+        return NGX_ERROR;
+    }
+}
+
+
+ngx_int_t
+ngx_xquic_intercom_packet_dispatch(ngx_xquic_recv_packet_t *packet, uint32_t *worker_num)
+{
+    uint32_t                     worker_id, pid;
+    ngx_core_conf_t             *ccf;
+    ccf  = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, ngx_core_module);
+
+    if (ccf->worker_processes == 0) { /* 防止异常场景的除0错误 */
+        return NGX_XQUIC_PACKET_NO_DISPATCH;
+    }
+    if (packet->buf[0] & NGX_XQUIC_PKT_LONG) { //long header
+        /* 区分是long header还是short header，long header的initial和0RTT报文本worker处理，short header判断worker id */
+        
+        /* 
+         * 进一步区分initial和0RTT报文(quic建连报文)不做dispatch，其他报文做dispatch
+         * 但这里解析quic报文的packet type太深入协议，不排除未来quic协议这里有变化，虽然可能性比较小
+         */
+        int pkt_type = (packet->buf[0] & NGX_XQUIC_PKT_TYPE) >> 4;
+        if ((pkt_type == NGX_XQUIC_PKT_TYPE_INITIAL) || (pkt_type == NGX_XQUIC_PKT_TYPE_0RTT))
+        {
+            return NGX_XQUIC_PACKET_NO_DISPATCH;
+        }
+    }
+
+    if (ngx_xquic_get_worker_id_pid_from_cid(packet, &worker_id, &pid) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                "|xquic|ngx_xquic_intercom_packet_dispatch get worker_id and pid error");
+        return NGX_XQUIC_PACKET_DISPATCH_ERROR;
+    }
+   
+    *worker_num = worker_id % ccf->worker_processes;
+    if (worker_id == ngx_worker) {
+        if (ngx_xquic_reload_flag && pid != (uint32_t)ngx_pid) {
+            if (g_intercom_ctx && g_intercom_ctx->reload_expire_time > (ngx_uint_t)ngx_time()) {
+                return NGX_XQUIC_PACKET_DISPATCH_RELOAD_INTERCOM; 
+            } else {
+                /* 
+                 * ngx_xquic_reload_flag 0 标识该进程已经不再需要往reload队列转包 
+                 * 为了避免旧的worker进程已退出，新的worker进程还往reload队列转包
+                 */
+                ngx_xquic_reload_flag = 0; 
+            } 
+        } 
+        return NGX_XQUIC_PACKET_NO_DISPATCH;
+    } else {
+        return NGX_XQUIC_PACKET_DISPATCH_INTERCOM; 
+    }
+}
+
 
 ngx_int_t
 ngx_xquic_get_target_worker_from_cid(ngx_xquic_recv_packet_t *packet)

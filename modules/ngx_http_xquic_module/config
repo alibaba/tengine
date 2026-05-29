@@ -26,7 +26,8 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
                 $ngx_addon_dir/ngx_xquic_recv.c \
                 $ngx_addon_dir/ngx_xquic_send.c \
                 $ngx_addon_dir/ngx_http_v3_stream.c \
-                $ngx_addon_dir/ngx_http_xquic_filter_module.c"
+                $ngx_addon_dir/ngx_http_xquic_filter_module.c \
+                $ngx_addon_dir/ngx_http_xquic_dynamic_cert.c"
 
 CORE_INCS="$CORE_INCS \
            $ngx_addon_dir \

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #include <nginx.h>
@@ -10,14 +10,181 @@
 #include <ngx_xquic.h>
 #include <ngx_http_xquic.h>
 
-
 #include <xquic/xquic.h>
 #include <xquic/xquic_typedef.h>
 
 
-
 static void ngx_http_v3_run_request(ngx_http_request_t *r, ngx_http_v3_stream_t *h3_stream);
 static void ngx_http_v3_stream_free(ngx_http_v3_stream_t *h3_stream);
+/*
+ * ngx_http_v3_upgrade_recv - custom recv() for HTTP/3 upgraded tunnels.
+ *
+ * Root cause of the crash:
+ *   After a 101 Switching Protocols upgrade (e.g. WebSocket), the generic
+ *   upstream tunnel in ngx_http_upstream_process_upgraded() calls src->recv()
+ *   on the downstream (client-side) connection to read upgraded frames from
+ *   the client.  For HTTP/3, downstream is a QUIC fake connection whose recv
+ *   pointer is NULL because QUIC body data must be pulled via the xquic
+ *   engine API (xqc_h3_request_recv_body), not via a socket-level read.
+ *   Dereferencing the NULL recv pointer causes SIGSEGV (signal 11).
+ *
+ * Fix:
+ *   This function is installed as fc->recv during ngx_http_upstream_upgrade()
+ *   when r->http_version == NGX_HTTP_VERSION_30.  It pulls available body
+ *   data directly from the QUIC engine, making the generic tunnel loop work
+ *   without modification.
+ *
+ * Return values follow the nginx recv convention:
+ *   > 0  bytes read into buf
+ *   NGX_AGAIN  no data available right now (maps to -XQC_EAGAIN)
+ *   NGX_ERROR  fatal read error
+ */
+ssize_t
+ngx_http_v3_upgrade_recv(ngx_connection_t *c, u_char *buf, size_t size)
+{
+    uint8_t               fin;
+    ssize_t               n;
+    ngx_http_request_t   *r;
+    xqc_h3_request_t     *h3_request;
+
+    r = c->data;
+
+    if (r == NULL || r->xqstream == NULL) {
+        return NGX_ERROR;
+    }
+
+    h3_request = (xqc_h3_request_t *) r->xqstream->h3_request;
+    if (h3_request == NULL) {
+        return NGX_ERROR;
+    }
+
+    fin = 0;
+    n = xqc_h3_request_recv_body(h3_request, buf, size, &fin);
+
+    if (n == -XQC_EAGAIN) {
+        c->read->ready = 0;
+        return NGX_AGAIN;
+    }
+
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                      "|xquic|ngx_http_v3_upgrade_recv|"
+                      "xqc_h3_request_recv_body error: %z|", n);
+        return NGX_ERROR;
+    }
+
+    if (fin) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "|xquic|ngx_http_v3_upgrade_recv|"
+                       "stream fin received, n=%z (ignored for upgrade)|", n);
+
+        /*
+         * For upgraded connections (e.g. WebSocket) over HTTP/3, the stream
+         * FIN on the request direction merely indicates the end of the HTTP
+         * request body (which is empty for a GET upgrade), NOT the
+         * termination of the upgraded connection.  Do NOT set c->read->eof
+         * here — doing so would cause ngx_http_upstream_process_upgraded()
+         * to see downstream->read->eof and immediately finalize the
+         * upgraded connection ("upgraded done").
+         *
+         * Instead, mark read as not-ready and return NGX_AGAIN so the tunnel
+         * loop keeps the connection alive, waiting for the upstream to send
+         * upgraded frames.
+         */
+        c->read->ready = 0;
+        return (n > 0) ? n : NGX_AGAIN;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "|xquic|ngx_http_v3_upgrade_recv|recv %z bytes|", n);
+
+    return n;
+}
+
+
+/*
+ * ngx_http_v3_upgrade_send - custom send() for HTTP/3 upgraded tunnels.
+ *
+ * Root cause of the crash (write direction):
+ *   After a 101 Switching Protocols upgrade (e.g. WebSocket), the generic
+ *   upstream tunnel in ngx_http_upstream_process_upgraded() calls dst->send()
+ *   on the downstream (client-side) connection to write upgraded frames
+ *   received from the upstream.  For HTTP/3, downstream is a QUIC fake
+ *   connection whose send pointer is NULL (fake conn is created via ngx_memcpy
+ *   from h3c->connection, which itself was zero-initialised by
+ *   ngx_get_connection).  Dereferencing the NULL send pointer causes
+ *   SIGSEGV — same root cause as the recv crash.
+ *
+ * Fix:
+ *   This function is installed as fc->send during ngx_http_upstream_upgrade()
+ *   when r->http_version == NGX_HTTP_VERSION_30.  It pushes data directly
+ *   into the QUIC stream via xqc_h3_request_send_body, making the generic
+ *   tunnel loop work without modification.
+ *
+ * Return values follow the nginx send convention:
+ *   > 0  bytes written
+ *   NGX_AGAIN  send buffer full, try again later (maps to -XQC_EAGAIN)
+ *   NGX_ERROR  fatal write error
+ */
+ssize_t
+ngx_http_v3_upgrade_send(ngx_connection_t *c, u_char *buf, size_t size)
+{
+    ssize_t                         n;
+    ngx_http_request_t             *r;
+    xqc_h3_request_t               *h3_request;
+    ngx_http_xquic_main_conf_t     *qmcf;
+
+    r = c->data;
+
+    if (r == NULL || r->xqstream == NULL) {
+        return NGX_ERROR;
+    }
+
+    h3_request = (xqc_h3_request_t *) r->xqstream->h3_request;
+    if (h3_request == NULL) {
+        return NGX_ERROR;
+    }
+
+    /*
+     * fin=0: upgraded frames (e.g. WebSocket) are a continuous stream; the
+     * tunnel loop will send many frames before the connection closes, so we
+     * never set fin here.
+     */
+    n = xqc_h3_request_send_body(h3_request, buf, size, 0);
+
+    if (n == -XQC_EAGAIN) {
+        c->write->ready = 0;
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "|xquic|ngx_http_v3_upgrade_send|EAGAIN|");
+        return NGX_AGAIN;
+    }
+
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                      "|xquic|ngx_http_v3_upgrade_send|"
+                      "xqc_h3_request_send_body error: %z|", n);
+        return NGX_ERROR;
+    }
+
+    r->xqstream->body_sent += n;
+    c->sent += n;
+
+    /* flush the QUIC engine send buffer if manually_send mode is enabled */
+    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+    if (qmcf != NULL
+        && qmcf->manually_send != NGX_CONF_UNSET
+        && qmcf->manually_send != 0)
+    {
+        xqc_engine_finish_send(qmcf->xquic_engine);
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "|xquic|ngx_http_v3_upgrade_send|sent %z bytes|", n);
+
+    return n;
+}
+
+
 void ngx_http_v3_stream_cancel(ngx_http_v3_stream_t *h3_stream,
     ngx_int_t status);
 
@@ -226,7 +393,7 @@ free_request:
 
 
 ngx_int_t
-ngx_http_v3_check_request_limit(ngx_http_v3_stream_t *user_stream)
+ngx_http_v3_check_request_limit(ngx_http_v3_stream_t *user_stream, xqc_h3_request_t *h3_request)
 {
     ngx_http_xquic_main_conf_t  *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
@@ -236,12 +403,12 @@ ngx_http_v3_check_request_limit(ngx_http_v3_stream_t *user_stream)
     }
 
     /* check max qps limit */
-    ngx_atomic_uint_t quic_qps_nexttime = *ngx_stat_quic_qps_nexttime;
+    ngx_atomic_int_t quic_qps_nexttime = *ngx_stat_quic_qps_nexttime;
     if (ngx_current_msec <= quic_qps_nexttime) {
         /* still in current stat round, check cps limit. decline if reach max QPS limit */
         if (*ngx_stat_quic_qps >= qmcf->max_quic_qps) {
             ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|reached max qps limit"
-                      "|limit:%ui|", qmcf->max_quic_qps);
+                          "|limit:%ui|", qmcf->max_quic_qps);
             return NGX_DECLINED;
         }
 
@@ -273,12 +440,12 @@ int
 ngx_http_v3_request_create_notify(xqc_h3_request_t *h3_request, void *user_data)
 {
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                                "|xquic|xqc_http_v3_request_create_notify|");
+                  "|xquic|xqc_http_v3_request_create_notify|");
 
     ngx_http_xquic_connection_t *h3c = xqc_h3_get_conn_user_data_by_request(h3_request);
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                                "|xquic|xqc_http_v3_request_create_notify in connection|%p|", h3c);
+                  "|xquic|xqc_http_v3_request_create_notify in connection|%p|", h3c);
 
     xqc_stream_id_t stream_id = xqc_h3_stream_id(h3_request);
 
@@ -287,13 +454,12 @@ ngx_http_v3_request_create_notify(xqc_h3_request_t *h3_request, void *user_data)
     xqc_h3_request_set_user_data(h3_request, user_stream);
 
     /* limit while allow creation of usere_stream, which will be freed in request_close_notify */
-    if (ngx_http_v3_check_request_limit(user_stream) != NGX_OK) {
+    if (ngx_http_v3_check_request_limit(user_stream, h3_request) != NGX_OK) {
         /* if request is limited, refuse it */
         ngx_http_v3_stream_refuse(user_stream, NGX_HTTP_REQUEST_LIMITED);
         (void) ngx_atomic_fetch_add(ngx_stat_quic_queries_refused, 1);
         return NGX_OK;
     }
-
 
     /* add stat */
     (void) ngx_atomic_fetch_add(ngx_stat_quic_qps, 1);
@@ -315,7 +481,7 @@ ngx_http_v3_request_close_notify(xqc_h3_request_t *h3_request,
     xqc_request_stats_t          stats = xqc_h3_request_get_stats(h3_request);
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                                "|xquic|xqc_http_v3_request_close_notify|err=%d|", stats.stream_err);
+                  "|xquic|xqc_http_v3_request_close_notify|err=%d|", stats.stream_err);
 
     if (!h3_stream->run_request) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
@@ -329,14 +495,15 @@ ngx_http_v3_request_close_notify(xqc_h3_request_t *h3_request,
 
     if (!h3_stream->request_closed) {
         h3_stream->engine_inner_closed = 1;
+        h3_stream->queued = 0;
         ngx_http_v3_close_stream(h3_stream, 0);
         return NGX_OK;
     }
 
     if (h3_stream->closed) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                                "|xquic|ngx_http_v3_request_close_notify|free stream twice|stream_id=%ui|err=%d|", 
-                                h3_stream->id, stats.stream_err);
+                      "|xquic|ngx_http_v3_request_close_notify|free stream twice|stream_id=%ui|err=%d|", 
+                      h3_stream->id, stats.stream_err);
         return NGX_OK;
     }
 
@@ -675,16 +842,51 @@ ngx_http_v3_cookie(ngx_http_request_t *r, ngx_http_v3_header_t *header)
 }
 
 
+static ngx_int_t
+ngx_http_v3_priority(ngx_http_request_t *r, ngx_http_v3_header_t *header,
+    xqc_h3_request_t *h3_request)
+{
+    ngx_http_xquic_main_conf_t *qmcf;
+    ngx_int_t ret;
+    xqc_h3_priority_t h3_prio;
+
+    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+
+    ret = xqc_parse_http_priority(&h3_prio, header->value.data, header->value.len);
+    if (ret != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                      "|xquic|xqc_parse_http_priority error|value:%*s|",
+                      header->value.data, header->value.len);
+        return NGX_ERROR; 
+    }
+
+    ngx_http_xquic_ignore_cc_switch_update(r, qmcf);
+    if (!qmcf->ignore_cc_switch_on) {
+        h3_prio.fastpath = 0;
+    }
+
+    ret = xqc_h3_request_set_priority(h3_request, &h3_prio);
+    if (ret != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                      "|xquic|xqc_h3_request_set_priority error|value:%*s|",
+                      header->value.data, header->value.len);
+        return NGX_ERROR; 
+    }
+
+    return NGX_OK;
+}
+
 
 ngx_int_t
 ngx_http_v3_request_process_header(ngx_http_request_t *r,
-    xqc_http_header_t * in_header)
+    xqc_http_header_t * in_header, xqc_h3_request_t *h3_request)
 {
     ngx_table_elt_t            *h;
     ngx_http_header_t          *hh;
     ngx_http_core_main_conf_t  *cmcf;
 
     static ngx_str_t cookie = ngx_string("cookie");
+    static ngx_str_t priority = ngx_string("priority");
 
 
     /* invalid name length */
@@ -724,6 +926,12 @@ ngx_http_v3_request_process_header(ngx_http_request_t *r,
         && ngx_memcmp(header->name.data, cookie.data, cookie.len) == 0)
     {
         return ngx_http_v3_cookie(r, header);
+
+    /* check for priority */
+    } else if (header->name.len == priority.len
+               && ngx_memcmp(header->name.data, priority.data, priority.len) == 0)
+    {
+        return ngx_http_v3_priority(r, header, h3_request);
     }
 
     /* copy to headers_in */
@@ -846,44 +1054,78 @@ ngx_http_v3_init_request_body(ngx_http_request_t *r)
 
 
 ngx_int_t
-ngx_http_v3_recv_body(ngx_http_request_t         *r, 
-    ngx_http_v3_stream_t      *stream, 
-    xqc_h3_request_t          *h3_request)
+ngx_http_v3_recv_body(ngx_http_request_t   *r, 
+                      ngx_http_v3_stream_t *stream, 
+                      xqc_h3_request_t     *h3_request)
 {
+    ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
-    ngx_buf_t                 *buf;
-    ngx_int_t                  rc;
-    ngx_connection_t          *fc;
+	ngx_buf_t                 *buf;
     off_t                      len;
+    ngx_int_t                  rc;
+
+    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                  "|xquic|ngx_http_v3_recv_body|");
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-    fc = r->connection;
 
     /* check if skip data */
     if (stream->skip_data) {
         stream->in_closed = 1;
 
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "|xquic|ngx_http_v3_recv_body|skipping http3 DATA, reason: %d|",
                        stream->skip_data);
 
         return NGX_ERROR;
     }
 
-    if (r->request_body && r->request_body->buf) {
-        buf = r->request_body->buf;
+    /* init request body */
+    if (r->request_body == NULL
+        && ngx_http_v3_init_request_body(r) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "|xquic|ngx_http_v3_init_request_body error, skip data|");
+    
+        stream->skip_data = NGX_HTTP_V3_DATA_INTERNAL_ERROR;
+        return NGX_ERROR;
+    }
+	
+	rb = r->request_body;
 
+    /* zero content-length case */
+    if (rb->buf == NULL) {
+        /* 1 byte to receive fin */
+        buf = ngx_create_temp_buf(r->pool, 1);
+        if (buf == NULL) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "|xquic|ngx_http_v3_recv_body: create temp buf error|");
+            return NGX_ERROR;
+        }
+
+        rb->buf = buf;
+
+        rb->bufs = ngx_alloc_chain_link(r->pool);
+        if (rb->bufs == NULL) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "|xquic|ngx_http_v3_recv_body: ngx_alloc_chain_link error|");
+            return NGX_ERROR;
+        }
+
+        rb->bufs->buf = buf;
+        rb->bufs->next = NULL;
+    }
+
+    if (rb && rb->buf) {
+        buf = rb->buf;
     } else {
         buf = stream->body_buffer;
-
         if (buf == NULL) {
             len = clcf->client_body_buffer_size;
-
             buf = ngx_create_temp_buf(r->pool, (size_t) len);
             if (buf == NULL) {
-                ngx_log_error(NGX_LOG_WARN, fc->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                               "|xquic|ngx_http_v3_recv_body|create temp buf error|");
-
                 return NGX_ERROR;
             }
 
@@ -896,57 +1138,50 @@ ngx_http_v3_recv_body(ngx_http_request_t         *r,
 
     do {
         if (buf->last == buf->end) {
-            len = buf->end - buf->start;
-            off_t pos_len = buf->pos - buf->start;
-
-            u_char *new_buf = ngx_pcalloc(r->pool, len * 2);
-            if (new_buf == NULL) {
-                ngx_log_error(NGX_LOG_WARN, fc->log, 0,
-                              "|xquic|ngx_http_v3_recv_body|ngx_pcalloc error|");
-
-                return NGX_ERROR;
-            }
-
-            ngx_memcpy(new_buf, buf->start, len);
-            buf->pos = new_buf + pos_len;
-            buf->last = new_buf + len;
-            buf->end = new_buf + len * 2;
-            ngx_pfree(r->pool, buf->start);
-            buf->start = new_buf;
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "|xquic|ngx_http_v3_recv_body|client intended "
+                          "to send too large body %O bytes|", rb->rest);
+            ngx_http_finalize_request(r, NGX_HTTP_REQUEST_ENTITY_TOO_LARGE);            
+            stream->request = NULL;
+            return NGX_ERROR;
         }
 
-        ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                       "|xquic|ngx_http_v3_recv_body|buf->size:%z|", buf->end - buf->last);
-
         size = xqc_h3_request_recv_body(h3_request, buf->last, buf->end - buf->last, &fin);
         if (size == -XQC_EAGAIN) {
             break;
         }
         if (size < 0) {
-            ngx_log_error(NGX_LOG_WARN, fc->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "|xquic|ngx_http_v3_recv_body|xqc_h3_request_recv_body error:%z|", size);
             return NGX_ERROR;
         }
 
         buf->last += size;
-        ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
+
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                       "|xquic|ngx_http_v3_recv_body|xqc_h3_request_recv_body size:%z|", size);
 
     } while (size > 0 && !fin);
+
+#if (T_NGX_HTTP_STAT_TIME)
+    if (r == r->main) {
+        r->stat_time.req_recv_finished_time = ngx_current_msec;
+    }
+#endif
 
     if (r->request_body) {
         rc = ngx_http_v3_process_request_body(r, NULL, 0, fin);
 
         if (rc != NGX_OK) {
-            ngx_log_error(NGX_LOG_WARN, fc->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "|xquic|ngx_http_v3_recv_body|ngx_http_v3_process_request_body error:%z|", rc);
             return NGX_ERROR;
         }
-
     }
 
     if (fin) {
-
         stream->in_closed = 1;
     }
 
@@ -957,6 +1192,14 @@ ngx_http_v3_recv_body(ngx_http_request_t         *r,
 void
 ngx_http_v3_state_headers_complete(ngx_http_v3_stream_t *h3_stream)
 {
+    xqc_request_stats_t stats;
+    stats = xqc_h3_request_get_stats(h3_stream->h3_request);
+
+#if (T_HEADER_SIZE)
+    h3_stream->req_header_size = stats.recv_header_size;
+#endif
+
+    h3_stream->request->request_length += stats.recv_header_size;
     ngx_http_v3_run_request(h3_stream->request, h3_stream);
 }
 
@@ -969,16 +1212,23 @@ ngx_http_v3_request_read_notify(xqc_h3_request_t *h3_request, xqc_request_notify
     unsigned char                fin = 0;
     ngx_http_v3_stream_t        *user_stream = (ngx_http_v3_stream_t *) user_data;
     ngx_http_request_t          *r = user_stream->request;
-  //ngx_connection_t            *fc = r->connection;
-  //ngx_http_request_body_t     *rb = r->request_body;
     ngx_int_t                    ret;
+    static ngx_str_t             priority = ngx_string("priority");
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                                "|xquic|ngx_http_v3_request_read_notify|");
+                  "|xquic|ngx_http_v3_request_read_notify|");
 
     if (user_stream->request_closed) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                                "|xquic|ngx_http_v3_request_read_notify|request_closed|");
+                      "|xquic|ngx_http_v3_request_read_notify|read_flag:%d|request_closed|", 
+                      flag);
+        return NGX_OK;
+    }
+
+    if (user_stream->request_freed || NULL == r) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
+                      "|xquic|ngx_http_v3_request_read_notify|request_freed|skip_data:%d",
+                      user_stream->skip_data);
         return NGX_OK;
     }
 
@@ -989,28 +1239,41 @@ ngx_http_v3_request_read_notify(xqc_h3_request_t *h3_request, xqc_request_notify
         headers = xqc_h3_request_recv_headers(h3_request, &fin);
         if (headers == NULL) {
             ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                            "|xquic|xqc_h3_request_recv_headers error|");
+                          "|xquic|xqc_h3_request_recv_headers error|");
             return NGX_ERROR;
         }
 
         for (i = 0; i < headers->count; i++) {
             ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                            "|xquic|header name:%*s value:%*s|",
-                            headers->headers[i].name.iov_len, headers->headers[i].name.iov_base, 
-                            headers->headers[i].value.iov_len, headers->headers[i].value.iov_base);
+                          "|xquic|header name:%*s value:%*s|",
+                          headers->headers[i].name.iov_len, headers->headers[i].name.iov_base, 
+                          headers->headers[i].value.iov_len, headers->headers[i].value.iov_base);
 
             ret = ngx_http_v3_request_process_header(user_stream->request, 
-                        &(headers->headers[i]));
+                        &(headers->headers[i]), h3_request);
 
             /* NGX_ABORT - request has been closed */
             /* NGX_ERROR,NGX_DECLINED - request err but not closed */   
 
             if (ret != NGX_OK) {
                 ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                                "|xquic|ngx_http_v3_request_process_header error|header name:%*s value:%*s|",
-                                headers->headers[i].name.iov_len, headers->headers[i].name.iov_base, 
-                                headers->headers[i].value.iov_len,headers->headers[i].value.iov_base);
+                              "|xquic|ngx_http_v3_request_process_header error|header name:%*s value:%*s|",
+                              headers->headers[i].name.iov_len, headers->headers[i].name.iov_base, 
+                              headers->headers[i].value.iov_len,headers->headers[i].value.iov_base);
                 return NGX_ERROR; 
+            }
+            
+            if ((headers->headers[i]).name.iov_len == priority.len
+                && ngx_memcmp((headers->headers[i]).name.iov_base, priority.data, priority.len) == 0)
+            {
+                if (i != headers->count - 1) {
+                    xqc_http_header_t tmp_header = headers->headers[i];
+                    headers->headers[i] = headers->headers[headers->count - 1];
+                    headers->headers[headers->count - 1] = tmp_header;
+                }
+                memset(&(headers->headers[headers->count - 1]), 0, sizeof(xqc_http_header_t));
+                headers->count--;
+                i--;
             }
         }
 
@@ -1024,28 +1287,55 @@ ngx_http_v3_request_read_notify(xqc_h3_request_t *h3_request, xqc_request_notify
         ngx_http_v3_state_headers_complete(user_stream);
     }
 
+    if (flag & XQC_REQ_NOTIFY_READ_EMPTY_FIN) {
+        user_stream->in_closed = 1;
+    }
+    
     /* wait for request body */
-    if (!(flag & XQC_REQ_NOTIFY_READ_BODY)) {
-        return NGX_OK;
-    }
+    if (flag & (XQC_REQ_NOTIFY_READ_BODY | XQC_REQ_NOTIFY_READ_EMPTY_FIN)) {
+        
+        if (user_stream->request_closed) {
+            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                          "|xquic|ngx_http_v3_recv_body error|read_flag:%d|request closed|", 
+                          flag);
+            return NGX_ERROR;
+        }
 
-    if (user_stream->request_closed) {
-        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                   "|xquic|ngx_http_v3_recv_body error, request closed|");
-        return NGX_ERROR;
-    }
+#if (T_NGX_XQUIC)
+        /*
+         * After an upgraded connection (e.g. WebSocket) is established, the
+         * downstream data must be read by ngx_http_v3_upgrade_recv (installed
+         * as c->recv) from within ngx_http_upstream_process_upgraded.  We
+         * must NOT call ngx_http_v3_recv_body here, because it would consume
+         * the data from xquic's internal buffer via xqc_h3_request_recv_body,
+         * leaving nothing for ngx_http_v3_upgrade_recv to read later.
+         *
+         * Instead, just mark the connection as read-ready and post the
+         * read event so that the upstream tunnel loop picks it up.
+         */
+        if (r->upstream && r->upstream->upgrade) {
+            ngx_connection_t *fc = r->connection;
 
-    /* read request body */
-    if (ngx_http_v3_recv_body(r, user_stream, h3_request) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                        "|xquic|ngx_http_v3_recv_body error|");
-        return NGX_ERROR; 
+            fc->read->ready = 1;
+            ngx_post_event(fc->read, &ngx_posted_events);
+
+            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+                           "|xquic|ngx_http_v3_request_read_notify|"
+                           "upgraded connection, posted read event|");
+            return NGX_OK;
+        }
+#endif
+
+        /* read request body */
+        if (ngx_http_v3_recv_body(r, user_stream, h3_request) != NGX_OK) {
+            ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                          "|xquic|ngx_http_v3_recv_body error|");
+            return NGX_ERROR; 
+        }
     }
 
     return NGX_OK;
 }
-
-
 
 
 static ngx_int_t
@@ -1182,7 +1472,6 @@ ngx_http_v3_construct_cookie_header(ngx_http_request_t *r)
 }
 
 
-
 static void
 ngx_http_v3_run_request(ngx_http_request_t *r, 
     ngx_http_v3_stream_t *h3_stream)
@@ -1230,7 +1519,7 @@ ngx_http_v3_stream_cancel(ngx_http_v3_stream_t *h3_stream,
     ngx_int_t ret = xqc_h3_request_close(h3_request);
     if (ret != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|xqc_h3_request_close err|%i|", ret);
+                      "|xquic|ngx_http_v3_stream_cancel|xqc_h3_request_close err|%i|", ret);
     }
 
     if (!h3_stream->request_closed) {
@@ -1246,6 +1535,10 @@ ngx_http_v3_stream_free(ngx_http_v3_stream_t *h3_stream)
     ngx_http_xquic_connection_t  *h3c;
 
     h3c = h3_stream->connection;
+
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
+                  "|xquic|ngx_http_v3_stream_free|h3_stream:%p|h3c:%p|",
+                  h3_stream, h3c);
 
     /* don't delete node from streams_index, free in conn close */
     h3_stream->list_node->entry = NULL;
@@ -1271,6 +1564,10 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
     ngx_http_xquic_connection_t  *h3c;
     ngx_http_request_t           *r = NULL;
 
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
+                  "|xquic|ngx_http_v3_close_stream|h3_stream:%p|request_closed:%d|closed:%d|",
+                  h3_stream, h3_stream->request_closed, h3_stream->closed);
+
     if (h3_stream->request_closed || h3_stream->closed) {
         return;
     }
@@ -1279,7 +1576,7 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
     fc = h3_stream->request->connection;
     r = h3_stream->request;
 
-    if (h3_stream->engine_inner_closed == 0 && h3_stream->queued) {
+    if (h3_stream->queued) {
         fc->write->handler = ngx_http_v3_close_stream_handler;
         fc->read->handler = ngx_http_v3_close_stream_handler;
         return;
@@ -1288,7 +1585,6 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, fc->log, 0,
                    "|xquic| close stream %ui, processing %ui|",
                    h3_stream->id, h3c->processing);
-
 
     h3_stream->request_closed = 1;
 
@@ -1339,7 +1635,6 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
     fc->data = (void *) h3c->free_fake_connections;
     h3c->free_fake_connections = fc;
 
-
     h3c->processing--;
 
     if (h3c->processing == 0) {
@@ -1347,12 +1642,8 @@ ngx_http_v3_close_stream(ngx_http_v3_stream_t *h3_stream,
             ngx_log_debug(NGX_LOG_DEBUG_HTTP, h3c->connection->log, 0,
                           "|xquic|close connection after stream close|");
             ngx_http_v3_finalize_connection(h3c, NGX_XQUIC_CONN_NO_ERR);
-
             return;
         }
-
     }
 }
-
-
 
