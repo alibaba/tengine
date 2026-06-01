@@ -36,8 +36,6 @@ typedef enum {
     NGX_XQUIC_FEC_DEC_SWITCH_BIT = 0x2,
 } ngx_xquic_fec_state_e ;
 
-int ngx_xquic_retry_packet_condition_check(xqc_engine_t *engine, xqc_connection_t *conn,
-    const xqc_cid_t * cid, void * user_data);
 int ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn, 
     const xqc_cid_t * cid, void * user_data);
 void ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn, 
