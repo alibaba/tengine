@@ -20,11 +20,11 @@
 #define NGX_XQUIC_PKT_TYPE_0RTT                     (0x1)
 #define NGX_XQUIC_SUPPORT_CID_ROUTE 1
 
-/* 
- * 标识报文是否需要做二次转发的判断结果
- * NO_DISPATCH 不需要转发
- * DISPATCH_INTERCOM 转发到其他worker的分发队列
- * DISPATCH_RELOAD_INTERCOM 转发到reload队列
+/*
+ * Result codes indicating whether a packet needs to be forwarded a second time.
+ * NO_DISPATCH: no forwarding required.
+ * DISPATCH_INTERCOM: forward to another worker's dispatch queue.
+ * DISPATCH_RELOAD_INTERCOM: forward to the reload queue.
  */
 #define NGX_XQUIC_PACKET_NO_DISPATCH                NGX_OK
 #define NGX_XQUIC_PACKET_DISPATCH_INTERCOM          (NGX_OK + 1)

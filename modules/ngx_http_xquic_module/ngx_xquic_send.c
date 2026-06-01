@@ -106,8 +106,9 @@ ngx_xquic_server_send(const unsigned char *buf, size_t size,
 }
 
 /*
- * ngx_xquic_send_packet_early 函数使用listen connection发送报文
- * 一般在ngx_http_xquic_connection_t尚未创建或无法使用时调用，如发送retry packet的场景
+ * ngx_xquic_send_packet_early sends a packet via the listen connection.
+ * Typically called when ngx_http_xquic_connection_t has not yet been created
+ * or cannot be used, e.g. when sending a retry packet.
  */
 ssize_t
 ngx_xquic_send_packet_early(const unsigned char *buf, size_t size,
@@ -136,7 +137,7 @@ ngx_xquic_send_packet_early(const unsigned char *buf, size_t size,
 
     } while ((res < 0) && (errno == EINTR));
 
-    if (res < 0) { /* EAGAIN也意味着发送失败，因为发送的数据无法缓存后再发送 */
+    if (res < 0) { /* EAGAIN also counts as failure: data cannot be cached and resent later */
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
                     "|xquic|ngx_xquic_send_packet_early|socket err|res:%z|errno:%s",
                     res, strerror(errno));
@@ -280,7 +281,7 @@ ngx_xquic_server_send_mmsg(const struct iovec *msg_iov, unsigned int vlen,
         }else if(res < vlen) {
             if (res <= 0) {
                 //if (ngx_xudp_error_is_fatal(res)) {
-                /* 只要xudp发送出现异常，均需要降级处理，避免xudp有bug影响报文发送 */
+                /* Always degrade on any xudp send error to avoid xudp bugs affecting packet delivery */
                 ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
                               "|xquic|ngx_xquic_server_send_mmsg|xudp degrade|dcid=%s|",
                               xqc_dcid_str(qc->engine, &qc->dcid));
@@ -416,7 +417,7 @@ ngx_xquic_server_mp_send_mmsg(uint64_t path_id,
         }else if(res < vlen) {
             if (res <= 0) {
                 //if (ngx_xudp_error_is_fatal(res)) {
-                /* 只要xudp发送出现异常，均需要降级处理，避免xudp有bug影响报文发送 */
+                /* Always degrade on any xudp send error to avoid xudp bugs affecting packet delivery */
                 ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
                               "|xquic|ngx_xquic_server_mp_send_mmsg|xudp degrade|dcid=%s|path=%uL|addr=%V|",
                               xqc_dcid_str(qc->engine, cid), path_id, &addr_text);

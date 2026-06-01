@@ -23,7 +23,7 @@
 #define NGX_XQUIC_QLOG_EVENT_EXTRA       3
 #define NGX_XQUIC_QLOG_EVENT_REMOVED     4
 
-#define NGX_INTERCOM_SEND_RECV_BUF_SIZE (1024*1024*2) /* 设置intercom queue和reload queue收发包缓冲区大小 */
+#define NGX_INTERCOM_SEND_RECV_BUF_SIZE (1024*1024*2) /* Send/recv buffer size for the intercom queue and the reload queue */
 #define NGX_XQUIC_HASH_CONFLICT_THRESHOLD_FOR_LOG   10
 
 #define NGX_XQUIC_MAX_FILE_NAME_SIZE                512
@@ -128,10 +128,12 @@ static ngx_command_t  ngx_http_xquic_commands[] = {
       NULL },
 
     /*
-     * 支持多个版本的token key的轮转，配置其中每个版本的token_key的配置格式为 version:token_key,
-     * 版本和token_key以冒号分隔,多个版本的token_key配置示例如下:
-     * xquic_token_key 10:token_key1 9:token_key2 8:token_key3;
-     * 最多支持4个版本的token key的轮转，版本号依次加1, 默认使用最新版本(版本号最大)加密
+     * Support rotation among multiple versions of token keys. The configuration format for
+     * each version of token_key is "version:token_key", with the version and token_key
+     * separated by a colon. Example with multiple versions:
+     *   xquic_token_key 10:token_key1 9:token_key2 8:token_key3;
+     * Up to 4 token-key versions are supported. Version numbers are incremented by 1.
+     * By default the latest version (the largest version number) is used for encryption.
      */
     { ngx_string("xquic_token_key"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1234,
@@ -140,11 +142,13 @@ static ngx_command_t  ngx_http_xquic_commands[] = {
       0,
       NULL },
 
-    /* 
-     * 支持从文件中读取token key, 文件每一行的格式:
-     * version1:token_key1
-     * 最多支持4个版本，文件行数超过4个版本，或者有重复，则为非法格式
-     * xquic_token_key和xquic_token_key_file 只需要配置一个, 都配置了，当有相同的版本多处配置会校验失败
+    /*
+     * Support reading token keys from a file, with each line in the file using the format:
+     *   version1:token_key1
+     * Up to 4 versions are supported. If the file contains more than 4 versions, or has
+     * duplicates, the format is considered invalid.
+     * Only one of xquic_token_key and xquic_token_key_file needs to be configured. If both
+     * are configured, having the same version appear in multiple places will fail validation.
      */
     { ngx_string("xquic_token_key_file"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
@@ -1832,7 +1836,7 @@ ngx_http_xquic_close_reuseport_fd(ngx_cycle_t *cycle)
             }
             c = ls[i].connection;
             if (c) {
-                if (c->read && c->read->active) { /* 清理读事件 */
+                if (c->read && c->read->active) { /* Clean up the read event */
                     if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
                         ngx_del_event(c->read, NGX_READ_EVENT, 0);
                     } else {

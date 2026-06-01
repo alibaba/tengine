@@ -5,7 +5,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <ngx_xquic_intercom.h>
-#define NGX_XQUIC_DISPATCH_RELOAD_TIME 300   //reload过程中，默认reload后旧worker存在的最大时间
+#define NGX_XQUIC_DISPATCH_RELOAD_TIME 300   // Max time the old worker may live after a reload (during reload window)
 
 
 static ngx_int_t ngx_xquic_intercom_create_socket(ngx_xquic_intercom_ctx_t *ctx, const u_char *path);
@@ -16,7 +16,7 @@ static uint64_t ngx_xquic_stat_recv_cnt = 0;
 static uint64_t ngx_xquic_stat_send_eagain_cnt = 0;
 
 extern ngx_uint_t    ngx_xquic_reload_flag;
-ngx_xquic_intercom_ctx_t *g_intercom_ctx = NULL; /* 用于进程间的报文dispatcher和reload时的报文dispatcher */
+ngx_xquic_intercom_ctx_t *g_intercom_ctx = NULL; /* Packet dispatcher for cross-process and reload-time dispatching */
 
 ngx_int_t
 ngx_xquic_set_send_recv_buf_size(ngx_socket_t s, ngx_int_t send_buf_size, ngx_int_t recv_buf_size)
@@ -120,7 +120,7 @@ ngx_xquic_intercom_worker_init_addr(ngx_xquic_intercom_ctx_t *ctx, ngx_cycle_t *
         return NGX_ERROR;
     }
 
-    /* ngx_snprintf 最后一个字节赋0需要预留一个字节的空间 */
+    /* ngx_snprintf needs one reserved byte at the end to write the trailing NUL */
     *ngx_snprintf(path, sizeof(path) - 1, "%V", &qmcf->intercom_socket_path) = 0;
     
     if (ngx_create_full_path(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)) {
@@ -163,7 +163,7 @@ ngx_xquic_intercom_worker_init_connection(ngx_xquic_intercom_ctx_t *ctx, ngx_cyc
 
     qmcf = ngx_http_cycle_get_module_main_conf(cycle, ngx_http_xquic_module);
 
-    /* 初始化转发队列的socket和connection */
+    /* Initialize the socket and connection of the dispatch queue */
     *ngx_snprintf(path, sizeof(path) - 1, "%V#%uD", &qmcf->intercom_socket_path, ngx_worker) = 0;
     
     if (ngx_xquic_intercom_create_socket(ctx, path) != NGX_OK) {
@@ -172,7 +172,7 @@ ngx_xquic_intercom_worker_init_connection(ngx_xquic_intercom_ctx_t *ctx, ngx_cyc
         return NGX_ERROR;
     }
 
-    /* 初始化reload队列的connection */
+    /* Initialize the connection of the reload queue */
     if (ctx->reload_sock == NULL) {
         ngx_log_error(NGX_LOG_ERR, log, 0,
                       "|xquic|ngx_xquic_intercom_worker_init_connection reload_sock NULL|");
@@ -201,7 +201,8 @@ ngx_xquic_intercom_worker_init_connection(ngx_xquic_intercom_ctx_t *ctx, ngx_cyc
     rev = c->read;
     rev->log = ctx->log;
     rev->data = c;
-    /* 这里虽然设置了读数据回调函数，但并未加入到读事件通知中，只有收到prereload信号的时候，才会加入到事件中*/
+    /* The read callback is set here, but it is not added to read-event notifications;
+       it is added only when the prereload signal is received. */
     rev->handler = ngx_xquic_reload_intercom_recv_handler; 
 
     return NGX_OK;
@@ -217,7 +218,7 @@ ngx_xquic_intercom_worker_init_ctx(ngx_cycle_t *cycle, void *engine)
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
-    /* 这里worker_processes = 1时，仍然需要reload的queue，所以仍需要初始化g_intercom_ctx */
+    /* Even when worker_processes = 1, the reload queue is still required, so g_intercom_ctx must be initialized */
     if (ccf->worker_processes < 1 || ngx_process != NGX_PROCESS_WORKER) {
         return NGX_OK;
     }
@@ -241,7 +242,7 @@ ngx_xquic_intercom_worker_init_ctx(ngx_cycle_t *cycle, void *engine)
         return NGX_ERROR;
     }
 
-    /* 初始化xquic_ls, 用于加速报文发送时的listen结构体查找 */
+    /* Initialize xquic_ls to speed up the lookup of the listen struct when sending packets */
     ls = (ngx_listening_t *) cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
         if (ls[i].reuseport && ls[i].xquic && ls[i].worker == ngx_worker) {
@@ -253,13 +254,14 @@ ngx_xquic_intercom_worker_init_ctx(ngx_cycle_t *cycle, void *engine)
                               "|xquic|ngx_xquic_intercom_worker_init_ctx xquic_ls push error|");
                 return NGX_ERROR;
             }
-            *lsp = &ls[i];  /* 这里ngx_cycle已经初始化完成了，故只需要存listen结构体指针就行 */
+            *lsp = &ls[i];  /* ngx_cycle is already initialized, so only the listen struct pointer needs to be stored */
         }
     }
 
 
     if (ngx_xquic_reload_flag) {
-        /* reload_expire_time的作用是避免老worker已经退出，新的worker还继续往老worker的reload队列转发报文 */
+        /* reload_expire_time prevents the new worker from forwarding packets to the old worker's reload
+           queue after the old worker has already exited */
         ctx->reload_expire_time = ngx_time() + NGX_XQUIC_DISPATCH_RELOAD_TIME;  
     }
 
@@ -336,12 +338,12 @@ ngx_xquic_intercom_master_init_ctx(ngx_cycle_t *cycle)
                           g_intercom_ctx->worker_processes, ccf->worker_processes);
         }
         /*
-         * 这里复用可复用的fd。
-         * 当reload前后worker_processes个数不一样时，可能会带来fd的泄漏,
-         * 但这种情况属于异常情况，相较于fd的泄漏，worker_processess个数不一样带来的长连接
-         * 断开影响更大。
-         * reload前后worker_processes个数配置不一样是应该避免的情况。
-         */ 
+         * Reuse the fds that can be reused.
+         * If the number of worker_processes differs before and after reload, fd leakage may occur.
+         * However, this is an exceptional situation; compared to fd leakage, the impact of broken
+         * long-lived connections caused by a change in worker_processes is far greater.
+         * Changing worker_processes between reloads should be avoided.
+         */
         i = ngx_min(ccf->worker_processes, g_intercom_ctx->worker_processes);
         ngx_memcpy(ctx->reload_sock, g_intercom_ctx->reload_sock, i * sizeof(ngx_socket_t));
     }
@@ -357,7 +359,8 @@ ngx_xquic_intercom_master_init_ctx(ngx_cycle_t *cycle)
                           "|xquic|ngx_xquic_intercom_master_init_ctx init sock error|");
             return NGX_ERROR;
         }
-        /* master中创建的本地socket关联的文件，需要worker中继承, 故需要修改权限和归属  */
+        /* The file associated with the local socket created in the master must be inherited by the worker,
+           so the permissions and ownership need to be adjusted */
         if (chmod((const char *)reload_path, mode) == -1
             || chown((const char *)reload_path, ccf->user, -1) == -1)
         {
@@ -701,7 +704,7 @@ ngx_xquic_add_reload_intercom_socket_event()
     ngx_event_t         *rev;
     if (g_intercom_ctx) {
         if (ngx_xquic_reload_flag && g_intercom_ctx->reload_expire_time > (ngx_uint_t)ngx_time()) {
-            /* 两次reload相隔时间太短，会影响reload队列，告警出来 */
+            /* Two reloads too close together may affect the reload queue; emit a warning */
             ngx_log_error(NGX_LOG_ERR, g_intercom_ctx->log, 0,
                           "|xquic|reload interval too short|");
         } 

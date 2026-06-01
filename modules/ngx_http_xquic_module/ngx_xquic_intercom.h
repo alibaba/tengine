@@ -11,21 +11,21 @@
 
 typedef struct {
     ngx_pool_t           *pool;
-    ngx_socket_t         *reload_sock; /* 存放reload socket 数组，在master中创建*/
-    ngx_array_t          xquic_ls; /* 存放ngx_cycle中quic 监听端口的ngx_listening_t结构体指针 */
+    ngx_socket_t         *reload_sock; /* Array of reload sockets, created in the master */
+    ngx_array_t          xquic_ls; /* Pointers to ngx_listening_t of QUIC listen ports in ngx_cycle */
 
     struct sockaddr_un   *addr;
     ngx_int_t            *addrlen;
 
     ngx_connection_t     *connection;
-    ngx_connection_t     *reload_conn; /* reload队列的connection */
+    ngx_connection_t     *reload_conn; /* Connection for the reload queue */
 
     ngx_log_t            *log;
 
     xqc_engine_t         *xquic_engine;
 
-    ngx_int_t             worker_processes; /* 存放worker数量，当发现reload前后worker数量不一样时，告警出来 */
-    ngx_uint_t            reload_expire_time; /* 往reload队列转发的超时时间 */
+    ngx_int_t             worker_processes; /* Worker count; emit a warning if it changes across reload */
+    ngx_uint_t            reload_expire_time; /* Expiration time for forwarding to the reload queue */
 } ngx_xquic_intercom_ctx_t;
 
 

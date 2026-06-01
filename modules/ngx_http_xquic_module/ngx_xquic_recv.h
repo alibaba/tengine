@@ -50,7 +50,7 @@ void ngx_xquic_packet_get_cid_raw(xqc_engine_t *engine, unsigned char *payload, 
 
 void ngx_xquic_recv_from_reload_intercom(ngx_xquic_recv_packet_t *packet);
 
-/* 用来比较地址与配置的listen地址是否匹配, 如果匹配则返回NGX_OK */
+/* Compare the address with the configured listen address; return NGX_OK on match */
 ngx_int_t ngx_xquic_sockaddr_cmp_listen(ngx_listening_t *ls, struct sockaddr *addr);
  
 ngx_int_t ngx_xquic_intercom_packet_dispatch(ngx_xquic_recv_packet_t *packet, uint32_t * worker_num);

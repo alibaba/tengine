@@ -689,7 +689,7 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
-            /* 只对该进程对应listen结构体做初始化 */
+            /* Only initialize the listen struct belonging to this process */
             continue;
         }
 #endif
@@ -731,7 +731,7 @@ ngx_xquic_process_init(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
-    /* 初始化g_intercom_ctx */
+    /* Initialize g_intercom_ctx */
     if (with_xquic && ngx_xquic_intercom_worker_init_ctx(cycle, qmcf->xquic_engine) != NGX_OK) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
                       "|xquic|ngx_xquic_process_init|ngx_xquic_intercom_worker_init_ctx fail|");
@@ -1010,8 +1010,8 @@ ngx_xquic_get_worker_id_pid_from_cid(ngx_xquic_recv_packet_t *packet,
         *worker_id = ngx_sum_complement(worker >> PID_MAX_BIT, salt, ccf->worker_processes);
 #else
         /**
-         * 在数学意义上， 可以简化成 ((worker >> PID_MAX_BIT) + salt) % ccf->worker_processes 
-         * 但在实现中，(worker >> PID_MAX_BIT) + salt 运算可能造成溢出。
+         * Mathematically this simplifies to ((worker >> PID_MAX_BIT) + salt) % ccf->worker_processes,
+         * but in practice the expression (worker >> PID_MAX_BIT) + salt may overflow.
          * */
         *worker_id = ((worker >> PID_MAX_BIT) % ccf->worker_processes + salt % ccf->worker_processes)
                 % ccf->worker_processes;
@@ -1033,15 +1033,18 @@ ngx_xquic_intercom_packet_dispatch(ngx_xquic_recv_packet_t *packet, uint32_t *wo
     ngx_core_conf_t             *ccf;
     ccf  = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, ngx_core_module);
 
-    if (ccf->worker_processes == 0) { /* 防止异常场景的除0错误 */
+    if (ccf->worker_processes == 0) { /* Guard against divide-by-zero in abnormal cases */
         return NGX_XQUIC_PACKET_NO_DISPATCH;
     }
     if (packet->buf[0] & NGX_XQUIC_PKT_LONG) { //long header
-        /* 区分是long header还是short header，long header的initial和0RTT报文本worker处理，short header判断worker id */
-        
-        /* 
-         * 进一步区分initial和0RTT报文(quic建连报文)不做dispatch，其他报文做dispatch
-         * 但这里解析quic报文的packet type太深入协议，不排除未来quic协议这里有变化，虽然可能性比较小
+        /* Distinguish long header from short header: initial and 0-RTT long-header packets are
+           processed by this worker, while short-header packets are dispatched by worker id. */
+
+        /*
+         * Further distinguish initial and 0-RTT packets (QUIC handshake packets): they are
+         * not dispatched, while other packets are dispatched.
+         * However, parsing the QUIC packet type here digs deep into the protocol, and we
+         * cannot rule out future QUIC protocol changes in this area, although the chance is small.
          */
         int pkt_type = (packet->buf[0] & NGX_XQUIC_PKT_TYPE) >> 4;
         if ((pkt_type == NGX_XQUIC_PKT_TYPE_INITIAL) || (pkt_type == NGX_XQUIC_PKT_TYPE_0RTT))
@@ -1062,9 +1065,10 @@ ngx_xquic_intercom_packet_dispatch(ngx_xquic_recv_packet_t *packet, uint32_t *wo
             if (g_intercom_ctx && g_intercom_ctx->reload_expire_time > (ngx_uint_t)ngx_time()) {
                 return NGX_XQUIC_PACKET_DISPATCH_RELOAD_INTERCOM; 
             } else {
-                /* 
-                 * ngx_xquic_reload_flag 0 标识该进程已经不再需要往reload队列转包 
-                 * 为了避免旧的worker进程已退出，新的worker进程还往reload队列转包
+                /*
+                 * ngx_xquic_reload_flag == 0 indicates that this process no longer needs to
+                 * forward packets to the reload queue. This avoids the new worker continuing
+                 * to forward packets to the reload queue after the old worker has exited.
                  */
                 ngx_xquic_reload_flag = 0; 
             } 

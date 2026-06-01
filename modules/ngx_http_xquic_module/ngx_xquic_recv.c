@@ -426,15 +426,16 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
     uint64_t recv_time; 
     uint32_t worker_num = ngx_worker;
     recv_time = ngx_xquic_get_time();
-    /* 
-     * 需要注意出现如下三种场景需要根据cid的hash做转发：
-     * NGX_XQUIC_SUPPORT_CID_ROUTE宏没定义的场景
-     * cid route 开关没开的场景
-     * 解析worker_id和pid出错的场景(只有cid的长度过短时会出现解析出错)
-     * 但基于cid的hash做转发是有安全风险的
+    /*
+     * Note: in the following three cases the packet has to be forwarded based on a hash
+     * of the cid:
+     *   - the NGX_XQUIC_SUPPORT_CID_ROUTE macro is not defined
+     *   - the cid-route switch is off
+     *   - parsing worker_id and pid fails (this can only happen when the cid is too short)
+     * However, forwarding based on the cid hash has security risks.
      */
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE) 
-    if (!ngx_xquic_is_cid_route_on((ngx_cycle_t *)ngx_cycle)) { /* 如果cid route 开关没开 */
+    if (!ngx_xquic_is_cid_route_on((ngx_cycle_t *)ngx_cycle)) { /* cid-route switch is off */
         goto cid_route_no_support; 
     }
 
@@ -447,7 +448,7 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
     case NGX_XQUIC_PACKET_DISPATCH_RELOAD_INTERCOM:
         goto send_packet;
     case NGX_XQUIC_PACKET_DISPATCH_ERROR:
-        /* 只有当cid的长度过短时，才会出现error */
+        /* This error only occurs when the cid is too short */
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|dispatch result error|");
         goto cid_route_no_support;
     default:
@@ -712,7 +713,7 @@ ngx_xquic_udpv2_dispatch_packet(xqc_engine_t *engine, const ngx_udpv2_packet_t *
     uint64_t recv_time;
     recv_time = upkt->pkt_micrs ? upkt->pkt_micrs : ngx_xquic_get_time();
 
-    /* 一段时间打印一次xudp收到的xquic报文数量, 用以监控 */
+    /* Periodically log the number of xquic packets received via xudp for monitoring */
     static uint64_t ngx_xudp_recv_count = 0; 
     static ngx_msec_t ngx_xudp_last_record = 0;
     static uint64_t ngx_xudp_last_recv_count = 0;
@@ -737,7 +738,7 @@ ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt
 
     ngx_http_xquic_main_conf_t  *qmcf;
 
-    if (ngx_terminate) { /* 只有terminate时才不再对包做处理 */
+    if (ngx_terminate) { /* Only stop processing packets when terminating */
         return;
     }
 

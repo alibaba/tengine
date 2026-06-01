@@ -1,25 +1,26 @@
 /*
  * xQUIC Integration for Dynamic Certificate Module
  *
- * 本文件为独立编译单元，提供 ngx_http_v3_cert_cb_dynamic 函数。
- * ngx_http_xquic.c 中的 ngx_http_v3_cert_cb 通过前向声明调用此函数。
+ * This file is a standalone compilation unit that provides ngx_http_v3_cert_cb_dynamic.
+ * ngx_http_v3_cert_cb in ngx_http_xquic.c invokes this function via a forward declaration.
  *
- * 当 dynamic_cert_enable on 且共享内存就绪时，
- * ngx_http_v3_cert_cb 优先调用此函数，走 C 模块双缓冲 rbtree 证书查找；
- * 若 SNI 未命中动态证书，直接读取 SSL_CTX 中的静态证书兜底返回，
- * 不再 fallback 到 ngx_http_v3_cert_cb_lua。
+ * When dynamic_cert_enable is on and the shared memory is ready,
+ * ngx_http_v3_cert_cb calls this function first and uses the C-module double-buffered
+ * rbtree certificate lookup. If the SNI does not match a dynamic certificate, it falls
+ * back to the static certificate read directly from SSL_CTX, and no longer falls back
+ * to ngx_http_v3_cert_cb_lua.
  *
- * 整个文件受 T_NGX_HAVE_DYNAMIC_CERT 宏保护：
- * 仅当 ngx_http_dynamic_cert_module 编译进来时，本文件的代码才生效。
+ * The entire file is guarded by the T_NGX_HAVE_DYNAMIC_CERT macro:
+ * the code in this file only takes effect when ngx_http_dynamic_cert_module is compiled in.
  */
 
-#include <ngx_config.h>   /* 引入 ngx_auto_config.h，使 T_NGX_HAVE_DYNAMIC_CERT 可见 */
+#include <ngx_config.h>   /* Include ngx_auto_config.h so that T_NGX_HAVE_DYNAMIC_CERT is visible */
 
 #if (T_NGX_HAVE_DYNAMIC_CERT)
 
 #include "ngx_http_dynamic_cert_module.h"
 
-/* 前向声明：ngx_http_xquic.c 中定义 */
+/* Forward declaration: defined in ngx_http_xquic.c */
 extern ngx_int_t ngx_http_find_virtual_server_inner(ngx_connection_t *c,
     ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
     ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
@@ -27,10 +28,11 @@ extern ngx_int_t ngx_http_find_virtual_server_inner(ngx_connection_t *c,
 /*
  * ngx_http_v3_cert_cb_dynamic_extract_from_ctx
  *
- * 从 SSL_CTX 中提取证书/私钥/链，通过 chain/cert/key 指针返回给 xQUIC 引擎。
- * 动态证书和静态证书兜底共用此函数。
+ * Extract the certificate/private key/chain from SSL_CTX and return them to the xQUIC
+ * engine through the chain/cert/key pointers. Used by both the dynamic-certificate
+ * path and the static-certificate fallback.
  *
- * 返回值：XQC_OK 成功，XQC_ERROR 失败。
+ * Returns: XQC_OK on success, XQC_ERROR on failure.
  */
 static xqc_int_t
 ngx_http_v3_cert_cb_dynamic_extract_from_ctx(SSL_CTX *ctx,
@@ -76,18 +78,20 @@ ngx_http_v3_cert_cb_dynamic_extract_from_ctx(SSL_CTX *ctx,
 /*
  * ngx_http_v3_cert_cb_dynamic:
  *
- * 在 xQUIC 握手阶段为 C 模块动态证书路径提供证书。
+ * Provides certificates for the C-module dynamic-certificate path during the xQUIC handshake.
  *
- * 证书选取顺序：
- *   1. 动态证书：通过 ngx_http_dynamic_cert_lookup_ssl_ctx 按 SNI 查找，
- *      命中后从返回的 SSL_CTX 中提取证书/私钥/链，通过指针返回给 xQUIC 引擎。
- *      不使用 SSL_set_SSL_CTX()，避免破坏 QUIC SSL 对象的 quic_method。
- *   2. 静态证书兜底：动态证书未命中时，直接从当前 server block 的 SSL_CTX 中
- *      读取静态证书，通过 chain/cert/key 指针返回给 xQUIC 引擎。
+ * Certificate selection order:
+ *   1. Dynamic certificate: looked up by SNI via ngx_http_dynamic_cert_lookup_ssl_ctx.
+ *      On a hit, the certificate/private key/chain are extracted from the returned SSL_CTX
+ *      and passed back to the xQUIC engine through pointers. SSL_set_SSL_CTX() is not used,
+ *      to avoid breaking the quic_method of the QUIC SSL object.
+ *   2. Static certificate fallback: when the dynamic lookup misses, the static certificate
+ *      is read directly from the current server block's SSL_CTX and passed back to the xQUIC
+ *      engine via the chain/cert/key pointers.
  *
- * 返回值：
- *   XQC_OK    - 证书已就绪（通过 chain/cert/key 指针返回）
- *   XQC_ERROR - 发生错误
+ * Returns:
+ *   XQC_OK    - certificate is ready (returned via the chain/cert/key pointers)
+ *   XQC_ERROR - an error occurred
  */
 xqc_int_t
 ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
@@ -108,21 +112,24 @@ ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
     c  = qc->connection;
 
     /*
-     * 无 SNI 客户端处理：
+     * Handling clients without SNI:
      *
-     * xquic 库中 xqc_ssl_cert_cb 会检查 SSL_get_servername 的返回值：
-     *   - 返回 NULL（ClientHello 无 SNI 扩展）→ 直接返回 XQC_SSL_FAIL，cert_cb 不被调用
-     *   - 返回 ""（ClientHello 有 SNI 扩展但值为空字符串）→ 通过 NULL 检查，cert_cb 被调用
+     * In the xquic library, xqc_ssl_cert_cb checks the return value of SSL_get_servername:
+     *   - Returns NULL (ClientHello has no SNI extension) -> returns XQC_SSL_FAIL directly,
+     *     cert_cb is not invoked.
+     *   - Returns "" (ClientHello has the SNI extension but the value is an empty string) ->
+     *     passes the NULL check, and cert_cb is invoked.
      *
-     * 因此本函数收到的 sni 可能是 ""（空字符串），此时走端口回退逻辑：
-     *   - 尝试用监听端口号作为域名查找证书
-     *   - 如果端口回退也失败，返回 NULL，走静态证书兜底
+     * So the sni received by this function may be "" (empty string). In that case the
+     * port-fallback path is taken:
+     *   - Try to look up the certificate using the listening port number as the domain name.
+     *   - If port fallback also fails, return NULL and fall back to the static certificate.
      */
     if (sni != NULL && *sni != '\0') {
         host.data = (u_char *) sni;
         host.len  = ngx_strlen(sni);
     } else {
-        /* 无 SNI：不设置 host，后续虚拟主机查找会使用默认配置 */
+        /* No SNI: do not set host; the subsequent virtual-host lookup will use the default config */
         host.data = NULL;
         host.len  = 0;
 
@@ -130,7 +137,7 @@ ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
                       "|dynamic_cert|xquic: SNI is empty, will try port fallback|");
     }
 
-    /* 根据 SNI 确定虚拟主机配置（仅当有 SNI 时） */
+    /* Determine the virtual-host configuration from SNI (only when SNI is present) */
     if (host.data != NULL && host.len > 0) {
         data    = c->data;
         c->data = hc;
@@ -155,19 +162,21 @@ ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
     }
 
     /*
-     * 尝试动态证书：QUIC 专用查找（不调用 SSL_set_SSL_CTX）。
+     * Attempt dynamic certificate: QUIC-specific lookup (does not call SSL_set_SSL_CTX).
      *
-     * 与 TLS 路径的区别：
-     *   TLS 路径使用 ngx_http_dynamic_cert_handler → SSL_set_SSL_CTX() 切换。
-     *   QUIC 路径使用 ngx_http_dynamic_cert_lookup_ssl_ctx → 返回 SSL_CTX *，
-     *   由本函数从中提取证书/私钥/链，通过指针返回给 xQUIC 引擎。
+     * Difference from the TLS path:
+     *   The TLS path uses ngx_http_dynamic_cert_handler -> SSL_set_SSL_CTX() to switch.
+     *   The QUIC path uses ngx_http_dynamic_cert_lookup_ssl_ctx -> returns SSL_CTX *,
+     *   and this function extracts the certificate/private key/chain from it and passes
+     *   them back to the xQUIC engine via pointers.
      *
-     * 原因：SSL_set_SSL_CTX() 在 BabaSSL/OpenSSL 中会修改 SSL 对象的 method 指针，
-     * 将 QUIC method 切换回 TLS method，导致后续 SSL_do_handshake 走
-     * ssl3_do_write 报错 "called a function you should not call"。
+     * Reason: in BabaSSL/OpenSSL, SSL_set_SSL_CTX() modifies the method pointer of the
+     * SSL object, switching the QUIC method back to the TLS method. This causes the
+     * subsequent SSL_do_handshake to go through ssl3_do_write and fail with
+     * "called a function you should not call".
      *
-     * 注意：不依赖 qc->ssl_conn（cert_cb 阶段尚未赋值，永远为 NULL）。
-     * SNI 由 xquic 参数传入，base_ctx 从 sscf->ssl.ctx 获取。
+     * Note: this does not rely on qc->ssl_conn (it is always NULL at the cert_cb stage).
+     * SNI is passed in as the xquic argument, and base_ctx is obtained from sscf->ssl.ctx.
      */
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
     if (sscf == NULL || sscf->ssl.ctx == NULL) {
@@ -180,7 +189,7 @@ ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
                                                        c, c->log);
 
     if (dynamic_ctx != NULL) {
-        /* 动态证书命中：从 SSL_CTX 提取证书/私钥/链返回给 xQUIC */
+        /* Dynamic certificate hit: extract cert/key/chain from SSL_CTX and return to xQUIC */
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "xquic dynamic cert: C module found cert for \"%s\"", sni);
 
@@ -189,9 +198,10 @@ ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
     }
 
     /*
-     * 动态证书未命中：从 SSL_CTX 读取静态证书兜底。
-     * sscf 已在上方获取并校验过，直接复用。
-     * 不 fallback 到 ngx_http_v3_cert_cb_lua，避免在 C 模块路径下触发 Lua 逻辑。
+     * Dynamic certificate miss: fall back to the static certificate read from SSL_CTX.
+     * sscf has already been fetched and validated above and can be reused directly.
+     * Do not fall back to ngx_http_v3_cert_cb_lua, to avoid triggering Lua logic on the
+     * C-module path.
      */
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "xquic dynamic cert: no dynamic cert for \"%s\", fallback to static", sni);

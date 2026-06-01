@@ -28,7 +28,7 @@ extern ngx_module_t ngx_http_lua_module;
 
 #if (T_NGX_HAVE_DYNAMIC_CERT)
 #include "ngx_http_dynamic_cert_module.h"
-/* ngx_http_xquic_dynamic_cert.c 中定义，独立编译单元 */
+/* Defined in ngx_http_xquic_dynamic_cert.c, a standalone compilation unit */
 xqc_int_t ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
     void **cert, void **key, void *conn_user_data);
 #endif /* T_NGX_HAVE_DYNAMIC_CERT */
@@ -172,8 +172,8 @@ ngx_http_find_virtual_server_inner(ngx_connection_t *c,
                                    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
 /*
  * ngx_http_v3_cert_cb_lua:
- * 原有的证书选择逻辑（Lua 动态加载 + 静态 SSL_CTX 兜底）。
- * 当 C 模块动态证书加载未启用时，由 ngx_http_v3_cert_cb 调用。
+ * The original certificate-selection logic (Lua dynamic loading + static SSL_CTX fallback).
+ * Invoked by ngx_http_v3_cert_cb when C-module dynamic certificate loading is not enabled.
  */
 static xqc_int_t
 ngx_http_v3_cert_cb_lua(const char *sni, void **chain,
