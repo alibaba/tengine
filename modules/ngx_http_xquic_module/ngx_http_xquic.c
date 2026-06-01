@@ -292,15 +292,19 @@ ngx_http_v3_cert_cb_lua(const char *sni, void **chain,
 
 /*
  * ngx_http_v3_cert_cb:
- * xQUIC 引擎统一证书回调入口（注册到 xqc_engine_callback_t.conn_cert_cb）。
+ * Unified certificate-callback entry for the xQUIC engine (registered as
+ * xqc_engine_callback_t.conn_cert_cb).
  *
- * 分流逻辑：
- *   1. 若 dynamic_cert_enable on 且 C 模块已初始化（dmcf->cert_app != NULL）：
- *      调用 ngx_http_v3_cert_cb_dynamic，走 C 模块路径：
- *        - 动态证书命中 → XQC_OK（证书已通过 ssl_conn 设置）
- *        - 动态证书未命中 → 静态证书兜底（从 SSL_CTX 读取），仍返回 XQC_OK
- *        - 错误 → XQC_ERROR
- *   2. 否则，调用原有 ngx_http_v3_cert_cb_lua，走 Lua 动态加载 + 静态 SSL_CTX 兜底。
+ * Routing logic:
+ *   1. If dynamic_cert_enable is on and the C module is initialized
+ *      (dmcf->cert_app != NULL):
+ *      Call ngx_http_v3_cert_cb_dynamic and take the C-module path:
+ *        - Dynamic certificate hit  -> XQC_OK (certificate set via ssl_conn)
+ *        - Dynamic certificate miss -> static certificate fallback (read from SSL_CTX),
+ *          still returns XQC_OK
+ *        - Error                    -> XQC_ERROR
+ *   2. Otherwise, call the original ngx_http_v3_cert_cb_lua, which uses Lua dynamic
+ *      loading + static SSL_CTX fallback.
  */
 xqc_int_t
 ngx_http_v3_cert_cb(const char *sni, void **chain,
@@ -312,10 +316,11 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
 
 #if (T_NGX_HAVE_DYNAMIC_CERT)
     /*
-     * 检查 C 模块动态证书加载开关：
-     *   - dmcf->enable == 1：配置了 dynamic_cert_enable on
-     *   - dmcf->cert_app != NULL：frame_init 已完成，strategy 双缓冲 slot 就绪
-     * 两者同时满足才走 C 模块路径。
+     * Check the C-module dynamic-certificate loading switch:
+     *   - dmcf->enable == 1: "dynamic_cert_enable on" is configured.
+     *   - dmcf->cert_app != NULL: frame_init has completed and the strategy double-buffer
+     *     slot is ready.
+     * Take the C-module path only when both conditions are met.
      */
     {
         ngx_http_dynamic_cert_main_conf_t  *dmcf;
@@ -554,7 +559,8 @@ ngx_xquic_conn_peer_addr_changed_notify(xqc_connection_t *conn, void *conn_user_
 
     c->ip_country_send_cnt = 0; /* ip_country_send_cnt reset */
 #endif
-    /* 这里不考虑服务端地址发生变化的情况，因为目前没有服务端地址发生变化的用法 */
+    /* Changes to the server-side address are not handled here; there is currently no
+       use case for the server-side address changing. */
 
     return;
 }
@@ -1015,7 +1021,7 @@ ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
                       "|xquic|quic get connection failed|");
         return NGX_ERROR;
     }
-    c->shared = 1;  /* 所有连接都共享同一个fd，连接关闭时不会释放fd */
+    c->shared = 1;  /* All connections share the same fd; the fd is not freed on connection close */
     log = ngx_palloc(qc->pool, sizeof(ngx_log_t));
     if (log == NULL) {
         goto failed;
@@ -1135,11 +1141,11 @@ ngx_http_xquic_close_idle_connection(ngx_cycle_t *cycle)
     c = cycle->connections;
 
     for (i = 0; i < cycle->connection_n; i++) {
-        if (c[i].fd != (ngx_socket_t) -1 && c[i].idle   /* fd合法且connection状态是idle */
-            && c[i].listening && c[i].listening->xquic)  /* 判断connection是xquic的 */
+        if (c[i].fd != (ngx_socket_t) -1 && c[i].idle   /* valid fd and connection state is idle */
+            && c[i].listening && c[i].listening->xquic)  /* check that the connection belongs to xquic */
         {
             if (&c[i] == c[i].listening->connection) {
-                continue; /* listening的connection 不需要关闭 */ 
+                continue; /* listening connection does not need to be closed */
             }
             c[i].close = 1;
             ngx_log_error(NGX_LOG_INFO, cycle->log, NGX_ETIMEDOUT, "|xquic|graceful shutdown|");
@@ -1160,7 +1166,7 @@ ngx_http_xquic_close_idle_connection(ngx_cycle_t *cycle)
 void
 ngx_http_xquic_close_connection(ngx_connection_t *c) 
 {
-    if (c->listening && c->listening->connection == c) { /* 意味着是listening的connection */
+    if (c->listening && c->listening->connection == c) { /* This is the listening connection */
         return;
     }
     ngx_http_xquic_connection_t     *qc = c->data;
@@ -1369,7 +1375,7 @@ ngx_xquic_path_connect(ngx_http_xquic_connection_t *qc,
                       "|xquic|quic multipath get connection failed|");
         return NULL;
     }
-    c->shared = 1; /* 所有连接都共享同一个fd，连接关闭时不会释放fd */
+    c->shared = 1; /* All connections share the same fd; the fd is not freed on connection close */
 
     c->pool = ngx_create_pool(4096, qc->connection->log);
     if (c->pool == NULL) {
@@ -1628,7 +1634,8 @@ ngx_http_xquic_init_connection(ngx_http_xquic_connection_t *qc)
     c->log_error = NGX_ERROR_INFO;
 
     c->data = qc;
-    c->read->handler = ngx_http_empty_handler; /* connection中的fd是共享的fd，由listen 的connection统一收包处理，故read handler设置为empty */    
+    c->read->handler = ngx_http_empty_handler; /* The fd in this connection is shared; packets are received by the listen connection,
+                                                  so the read handler is set to empty here */    
 
     return NGX_OK;
 }
