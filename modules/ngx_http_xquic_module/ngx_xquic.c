@@ -27,7 +27,7 @@ static void ngx_xquic_batch_udp_traffic(ngx_event_t * ev);
 
 extern ngx_xquic_intercom_ctx_t *g_intercom_ctx;
 
-extern ngx_uint_t    ngx_xquic_reload_flag;
+ngx_uint_t    ngx_xquic_reload_flag;
 
 xqc_engine_callback_t ngx_xquic_engine_callback = {
 
@@ -625,10 +625,12 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
 
     xqc_h3_engine_set_enc_max_dtable_capacity(qmcf->xquic_engine, 
                                         qmcf->qpack_encoder_dynamic_table_capacity);
-    xqc_h3_engine_set_dec_max_dtable_capacity(qmcf->xquic_engine, 
+    xqc_h3_engine_set_dec_max_dtable_capacity(qmcf->xquic_engine,
                                         qmcf->qpack_decoder_dynamic_table_capacity);
+#ifdef XQC_COMPAT_DUPLICATE
     xqc_h3_engine_set_qpack_compat_duplicate(qmcf->xquic_engine,
                                         qmcf->qpack_compat_duplicate);
+#endif
 
 
     /* init event timer */
