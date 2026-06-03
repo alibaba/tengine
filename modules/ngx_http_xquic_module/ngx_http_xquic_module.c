@@ -4,8 +4,6 @@
 
 #include <ngx_http_xquic_module.h>
 #include <ngx_xquic.h>
-#include <ngx_comm_math.h>
-#include <ngx_http_diamond.h>
 #include <unistd.h>
 
 

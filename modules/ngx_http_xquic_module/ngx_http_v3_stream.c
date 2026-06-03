@@ -860,11 +860,6 @@ ngx_http_v3_priority(ngx_http_request_t *r, ngx_http_v3_header_t *header,
         return NGX_ERROR; 
     }
 
-    ngx_http_xquic_ignore_cc_switch_update(r, qmcf);
-    if (!qmcf->ignore_cc_switch_on) {
-        h3_prio.fastpath = 0;
-    }
-
     ret = xqc_h3_request_set_priority(h3_request, &h3_prio);
     if (ret != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,

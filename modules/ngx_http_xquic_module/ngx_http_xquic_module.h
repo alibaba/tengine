@@ -158,12 +158,6 @@ typedef struct {
 
 #endif
 
-#if (T_NGX_XQUIC_IGNORE_CC)
-    ngx_int_t                   ignore_cc_switch_index;
-    ngx_int_t                   ignore_cc_switch_on;
-    ngx_msec_t                  ignore_cc_switch_next_update_time;
-#endif
-
     /* max streams configuration */
     ngx_uint_t                  max_streams_bidi;
     ngx_uint_t                  max_streams_uni;
@@ -207,7 +201,6 @@ ngx_int_t ngx_xquic_ssl_get_protocol(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s);
 ngx_int_t ngx_xquic_ssl_get_cipher_name(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s);
 
 ngx_int_t ngx_xquic_ssl_get_session_reused(SSL *ssl, ngx_pool_t *pool, ngx_str_t *s);
-    ngx_str_t *s);
 
 ngx_int_t ngx_http_xquic_check_hc_file(ngx_http_xquic_main_conf_t *qmcf);
 #endif /* _NGX_HTTP_XQUIC_MODULE_H_INCLUDED_ */

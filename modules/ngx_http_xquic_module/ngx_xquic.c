@@ -332,15 +332,17 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
     /* set congestion control */
     xqc_cong_ctrl_callback_t cong_ctrl;
     if (qmcf->congestion_control.len == sizeof("bbr")-1
-        && ngx_strncmp(qmcf->congestion_control.data, "bbr", sizeof("bbr")-1) == 0) 
+        && ngx_strncmp(qmcf->congestion_control.data, "bbr", sizeof("bbr")-1) == 0)
     {
         cong_ctrl = xqc_bbr_cb;
+#ifdef XQC_ENABLE_RENO
     } else if (qmcf->congestion_control.len == sizeof("reno")-1
-        && ngx_strncmp(qmcf->congestion_control.data, "reno", sizeof("reno")-1) == 0) 
+        && ngx_strncmp(qmcf->congestion_control.data, "reno", sizeof("reno")-1) == 0)
     {
         cong_ctrl = xqc_reno_cb;
+#endif
     } else if (qmcf->congestion_control.len == sizeof("cubic")-1
-        && ngx_strncmp(qmcf->congestion_control.data, "cubic", sizeof("cubic")-1) == 0) 
+        && ngx_strncmp(qmcf->congestion_control.data, "cubic", sizeof("cubic")-1) == 0)
     {
         cong_ctrl = xqc_cubic_cb;
     } else {
