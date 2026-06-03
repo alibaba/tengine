@@ -1417,6 +1417,7 @@ ngx_http_xquic_init_main_conf(ngx_conf_t *cf, void *conf)
 
     if (qmcf->hash_conflict_threshold == NGX_CONF_UNSET_UINT) {
         qmcf->hash_conflict_threshold = NGX_XQUIC_HASH_CONFLICT_THRESHOLD_FOR_LOG;
+    }
 
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
 
