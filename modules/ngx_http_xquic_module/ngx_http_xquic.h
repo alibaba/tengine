@@ -89,10 +89,13 @@ struct ngx_http_xquic_connection_s {
     void                           *stats_ctx;
 
     xqc_engine_t                   *engine;
+};
+
+
 typedef enum {
     NGX_XQUIC_PATH_STATE_CLOSED = 0,
     NGX_XQUIC_PATH_STATE_AVAILABLE
-} ngx_xquic_path_state_e ;
+} ngx_xquic_path_state_e;
 
 struct ngx_xquic_path_s {
     uint64_t                        path_id;
