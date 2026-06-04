@@ -257,7 +257,7 @@ class TestXudpReload(unittest.TestCase):
         self.assertEqual(len(pid_dict.keys()), 1)
         self.assertIn(list(pid_dict.keys())[0], pids)
 
-        # 副路径发生网络迁移
+        # secondary path network migration
         self.restart_nginx()
         pids = self.get_nginx_pid()
         cmd = "./test_client -a '%s' -p 2445 -s 1024000 -l d -t 3 -M -i eth0 -i eth0 -x 104 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "%(self.local_ip)
@@ -270,7 +270,7 @@ class TestXudpReload(unittest.TestCase):
         check_xudp = self.check_xudp_status()
         self.assertEqual(check_xudp, True)
 
-        # 主路径关闭
+        # primary path closed
         cmd = "./test_client -a '%s' -p 2445 -s 1024000 -l d -t 3 -M -i eth0 -i eth0 -x 105 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "%(self.local_ip)
         self.restart_nginx()
         pids = self.get_nginx_pid()
@@ -285,7 +285,7 @@ class TestXudpReload(unittest.TestCase):
         self.assertEqual(check_xudp, True)
 
 
-        # 副路径关闭
+        # secondary path closed
         cmd = "./test_client -a '%s' -p 2445 -s 1024000 -l d -t 3 -M -i eth0 -i eth0 -x 106 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "%(self.local_ip)
         self.restart_nginx()
         pids = self.get_nginx_pid()
@@ -307,7 +307,7 @@ class TestXudpReload(unittest.TestCase):
         org_worker = "worker_processes 4;"
         modify_worker = "worker_processes 8;"
 
-        #测试reload之后worker数量比reload之前多的场景
+        # test scenario where worker count after reload is greater than before
         cmd = "sed -i 's/%s/%s/' conf/nginx_xudp_reload.conf"%(org_worker, modify_worker)
         os.system(cmd)
         pids = self.get_nginx_pid()

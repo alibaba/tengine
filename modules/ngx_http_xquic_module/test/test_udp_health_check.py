@@ -33,29 +33,29 @@ class TestUdpHealthCheck(unittest.TestCase):
         time.sleep(2)
 
     def test_1_udp_ok(self):
-        # 创建UDP套接字
+        # create UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         try:
-            # 要发送的消息
+            # message to send
             message = 'UDPSTATUS'
-            # 发送消息到UDP服务器
+            # send message to UDP server
             sock.sendto(message.encode(), ('127.0.0.1', 2445))
 
-            # 设置一个合理的超时时间，以免接收阻塞太久
+            # set a reasonable timeout to avoid blocking too long on recv
             sock.settimeout(2)
 
             resp = None
 
             try:
-                # 接收UDP服务器的响应
+                # receive response from UDP server
                 data, server = sock.recvfrom(4096)
                 resp = data.decode()
             except socket.timeout:
                 pass
 
         finally:
-            # 关闭套接字
+            # close socket
             sock.close()
 
         self.assertEqual(resp == 'UDPOK', True)
@@ -63,34 +63,34 @@ class TestUdpHealthCheck(unittest.TestCase):
         print("%s success"%(sys._getframe().f_code.co_name))
 
     def test_1_udp_no_resp(self):
-        # 删除健康检查文件
+        # remove health check file
         os.system("rm -f ./htdocs/status.taobao")
-        # 创建UDP套接字
+        # create UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         try:
-            # 要发送的消息
+            # message to send
             message = 'UDPSTATUS'
-            # 发送消息到UDP服务器
+            # send message to UDP server
             sock.sendto(message.encode(), ('127.0.0.1', 2445))
 
-            # 设置一个合理的超时时间，以免接收阻塞太久
+            # set a reasonable timeout to avoid blocking too long on recv
             sock.settimeout(2)
 
             resp = None
 
             try:
-                # 接收UDP服务器的响应
+                # receive response from UDP server
                 data, server = sock.recvfrom(4096)
                 resp = data.decode()
             except socket.timeout:
                 pass
 
         finally:
-            # 关闭套接字
+            # close socket
             sock.close()
 
-        # 恢复健康检查文件
+        # restore health check file
         os.system("touch ./htdocs/status.taobao")
 
         self.assertEqual(resp == None, True)

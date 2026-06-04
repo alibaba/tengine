@@ -174,7 +174,7 @@ class TestReusesport(unittest.TestCase):
 #        print("%s success"%(sys._getframe().f_code.co_name))
 
     def test_6_multipath(self):
-        # 主路径发生网络迁移
+        # primary path network migration
         cmd = " ./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 103 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
         self.restart_nginx()
         pids = self.get_nginx_pid() 
@@ -186,15 +186,15 @@ class TestReusesport(unittest.TestCase):
         self.assertEqual(len(pid_dict.keys()), 1)
         self.assertIn(list(pid_dict.keys())[0], pids)
     
-        # 副路径发生网络迁移
-        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 104 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' " 
+        # secondary path network migration
+        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 104 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
         res = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         stdout, stderr = res.communicate()
         lines = stdout.splitlines()
         (count, pid_dict) = self.get_pid_from_lines(lines)
         self.assertEqual(count, 100)
         
-        # 主路径关闭
+        # primary path closed
         cmd = "./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 105 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
         res = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         stdout, stderr = res.communicate()
@@ -203,8 +203,8 @@ class TestReusesport(unittest.TestCase):
         self.assertEqual(count, 100)
  
         
-        # 副路径关闭
-        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 106 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' " 
+        # secondary path closed
+        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 102400 -l d -t 3 -M -i lo -i lo -x 106 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
         res = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         stdout, stderr = res.communicate()
         lines = stdout.splitlines()
@@ -221,7 +221,7 @@ class TestReusesport(unittest.TestCase):
         return lines
 
 #    def test_7_multipath_reload(self):
-#        #主路径迁移
+#        # primary path migration
 #        self.restart_nginx()
 #        pids = self.get_nginx_pid() 
 #        cmd = " ./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 103 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
@@ -231,17 +231,17 @@ class TestReusesport(unittest.TestCase):
 #        self.assertEqual(len(pid_dict.keys()), 1)
 #        self.assertIn(list(pid_dict.keys())[0], pids)
 #
-#        # 副路径发生网络迁移
+#        # secondary path network migration
 #        self.restart_nginx()
-#        pids = self.get_nginx_pid() 
-#        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 104 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' " 
+#        pids = self.get_nginx_pid()
+#        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 104 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
 #        lines = self.get_output_when_reload(cmd)
 #        (count, pid_dict) = self.get_pid_from_lines(lines)
 #        self.assertEqual(count, 100)
 #        self.assertEqual(len(pid_dict.keys()), 1)
 #        self.assertIn(list(pid_dict.keys())[0], pids)
 #
-#        # 主路径关闭
+#        # primary path closed
 #        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 105 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
 #        self.restart_nginx()
 #        pids = self.get_nginx_pid() 
@@ -252,8 +252,8 @@ class TestReusesport(unittest.TestCase):
 #        self.assertIn(list(pid_dict.keys())[0], pids)
 #
 #
-#        # 副路径关闭
-#        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 106 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' " 
+#        # secondary path closed
+#        cmd = "./test_client -a '127.0.0.1' -p 2445 -s 1024000 -l d -t 3 -M -i lo -i lo -x 106 -n 100 -E -u 'https://acs.waptest.taobao.com/h5/' "
 #        self.restart_nginx()
 #        pids = self.get_nginx_pid() 
 #        lines = self.get_output_when_reload(cmd)
