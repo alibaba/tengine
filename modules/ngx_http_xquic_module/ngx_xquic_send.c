@@ -315,7 +315,6 @@ degrade:
     res = sendmmsg(fd, msg, vlen, 0);
 
     if (res < 0 && (errno == EAGAIN)) {
-on_block:
         return ngx_http_xquic_on_write_block(qc, wev);
     } else if (res < 0) {
 
@@ -451,7 +450,6 @@ degrade:
     res = sendmmsg(fd, msg, vlen, 0);
 
     if (res < 0 && (errno == EAGAIN)) {
-on_block:
         return ngx_http_xquic_on_write_block(qc, wev);
 
     } else if (res < 0) {

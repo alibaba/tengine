@@ -403,7 +403,7 @@ ngx_http_v3_check_request_limit(ngx_http_v3_stream_t *user_stream, xqc_h3_reques
     }
 
     /* check max qps limit */
-    ngx_atomic_int_t quic_qps_nexttime = *ngx_stat_quic_qps_nexttime;
+    ngx_msec_t quic_qps_nexttime = (ngx_msec_t) *ngx_stat_quic_qps_nexttime;
     if (ngx_current_msec <= quic_qps_nexttime) {
         /* still in current stat round, check cps limit. decline if reach max QPS limit */
         if (*ngx_stat_quic_qps >= qmcf->max_quic_qps) {
@@ -846,11 +846,8 @@ static ngx_int_t
 ngx_http_v3_priority(ngx_http_request_t *r, ngx_http_v3_header_t *header,
     xqc_h3_request_t *h3_request)
 {
-    ngx_http_xquic_main_conf_t *qmcf;
     ngx_int_t ret;
     xqc_h3_priority_t h3_prio;
-
-    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
     ret = xqc_parse_http_priority(&h3_prio, header->value.data, header->value.len);
     if (ret != NGX_OK) {
