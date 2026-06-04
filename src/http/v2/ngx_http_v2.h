@@ -84,6 +84,7 @@ typedef struct {
     unsigned                         index:1;
     ngx_http_v2_header_t             header;
     size_t                           header_limit;
+    ngx_uint_t                       headers;
     u_char                           field_state;
     u_char                          *field_start;
     u_char                          *field_end;
