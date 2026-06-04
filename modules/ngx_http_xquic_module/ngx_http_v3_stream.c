@@ -352,6 +352,7 @@ int
 ngx_http_v3_request_write_notify(xqc_h3_request_t *h3_request, 
     void *user_data)
 {
+    ngx_connection_t   *fc;
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
                                 "|xquic|xqc_http_v3_request_write_notify|");
 
@@ -365,6 +366,15 @@ ngx_http_v3_request_write_notify(xqc_h3_request_t *h3_request,
     }
 
     h3_stream->wait_to_write = 0;
+
+    fc = h3_stream->request->connection;
+
+    fc->write->active = 1;
+    fc->write->ready = 0;
+
+    if (!fc->write->delayed) {
+        fc->write->handler(fc->write);
+    }
 
 
     /* don't have data to send */
