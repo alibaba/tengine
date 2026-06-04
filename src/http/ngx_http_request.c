@@ -1988,7 +1988,7 @@ ngx_http_process_request_headers(ngx_event_t *rev)
 
             if (r->headers_in.count++ >= cscf->max_headers) {
                 r->lingering_close = 1;
-                ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "client sent too many header lines");
                 ngx_http_finalize_request(r,
                                           NGX_HTTP_REQUEST_HEADER_TOO_LARGE);
