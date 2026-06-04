@@ -189,9 +189,13 @@ ngx_xquic_intercom_worker_init_connection(ngx_xquic_intercom_ctx_t *ctx, ngx_cyc
     if (c == NULL) {
         ngx_log_error(NGX_LOG_ERR, log, 0,
                       "|xquic|ngx_xquic_intercom_worker_init_connection get connection NULL|");
-        
+
         return NGX_ERROR;
     }
+    /* The reload fd is owned by the master and reused across reloads,
+     * so the worker only borrows the connection slot and must not close
+     * the underlying fd on exit. */
+    c->shared = 1;
     c->pool = ctx->pool;
     c->log = ctx->log;
     c->data = ctx;
@@ -475,9 +479,14 @@ ngx_xquic_intercom_exit()
             ngx_close_connection(g_intercom_ctx->connection);
             g_intercom_ctx->connection = NULL;
         }
+        if (g_intercom_ctx->reload_conn) {
+            /* shared=1 keeps the master-owned fd open while releasing the slot */
+            ngx_close_connection(g_intercom_ctx->reload_conn);
+            g_intercom_ctx->reload_conn = NULL;
+        }
         ngx_destroy_pool(g_intercom_ctx->pool);
         g_intercom_ctx = NULL;
-    }   
+    }
 }
 
 static ngx_int_t

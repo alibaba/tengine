@@ -105,7 +105,7 @@ ngx_ingress_shared_memory_write_status(
     ngx_int_t    rc;
     ngx_int_t    err;
 
-    /* 加锁 */
+    /* acquire lock */
     err = flock(shared->lock_fd, LOCK_EX|LOCK_NB);
     if (err != 0) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,

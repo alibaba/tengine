@@ -240,7 +240,7 @@ class TestXudpReload(unittest.TestCase):
         print("%s success"%(sys._getframe().f_code.co_name))
     def test_3_xudp_multipath_reload(self):
         self.ssh.exec_command("> clog")
-        #主路径迁移
+        # primary path migration
         self.restart_nginx()
 
         pids = self.get_nginx_pid()

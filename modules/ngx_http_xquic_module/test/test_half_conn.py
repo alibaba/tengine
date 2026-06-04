@@ -328,7 +328,7 @@ class TestHalfConf(unittest.TestCase):
         f = os.popen("cat logs/error.log | grep 'check_token fail'")
  
         lines = f.readlines()
-        self.assertEqual(len(lines), 1) #version 0 版本的token 没过期
+        self.assertEqual(len(lines), 1) # version 0 token has not expired
         f.close()
 
         print("%s success"%(sys._getframe().f_code.co_name))
