@@ -38,5 +38,6 @@ void ngx_xquic_intercom_send(ngx_int_t worker_num, ngx_xquic_recv_packet_t *pack
 ngx_int_t ngx_xquic_intercom_packet_hash(ngx_xquic_recv_packet_t *packet);
 ngx_int_t ngx_xquic_reload_intercom_init(ngx_cycle_t *cycle, void *engine);
 ngx_int_t ngx_xquic_intercom_master_init_ctx(ngx_cycle_t *cycle);
+ngx_int_t ngx_xquic_intercom_worker_init_ctx(ngx_cycle_t *cycle, void *engine);
 #endif /* _T_NGX_XQUIC_INTERCOM_INCLUDED_H_ */
 

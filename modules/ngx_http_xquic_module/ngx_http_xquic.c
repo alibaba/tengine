@@ -501,7 +501,7 @@ ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data)
 
 
 void
-ngx_http_v3_conn_update_cid_notify(xqc_h3_conn_t *h3_conn, const xqc_cid_t *retire_cid,
+ngx_http_v3_conn_update_cid_notify(xqc_connection_t *conn, const xqc_cid_t *retire_cid,
     const xqc_cid_t *new_cid, void *conn_user_data)
 {
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) conn_user_data;

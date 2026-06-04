@@ -4,6 +4,7 @@
 
 #include <ngx_http_xquic_module.h>
 #include <ngx_xquic.h>
+#include <ngx_xquic_intercom.h>
 #include <unistd.h>
 
 
@@ -735,7 +736,8 @@ static ngx_http_variable_t  ngx_http_xquic_vars[] = {
 int
 ngx_http_xquic_parse_token_key(ngx_str_t *raw, int *version, ngx_str_t *key)
 {
-    int i = 0, ret = NGX_ERROR;;
+    size_t         i = 0;
+    int            ret = NGX_ERROR;
     unsigned char *p = raw->data;
 
     for (i = 0; i < raw->len; i++) {
@@ -760,16 +762,17 @@ ngx_http_xquic_parse_token_key(ngx_str_t *raw, int *version, ngx_str_t *key)
 static char *
 ngx_conf_read_xquic_token_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    int i = 0, max_version = 0;
-    ngx_str_t *value;
+    ngx_uint_t                  i = 0;
+    int                         max_version = 0;
+    ngx_str_t                  *value;
     ngx_http_xquic_main_conf_t *qmcf = conf;
-    
+
     if (qmcf == NULL) {
         ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "|xquic|xquic qmcf NULL|");
         return NGX_CONF_ERROR;
     }
     value = cf->args->elts;
-    for (i = 1; i < (cf->args->nelts); i++) {
+    for (i = 1; i < cf->args->nelts; i++) {
         int ret, ver = 0;
         ngx_str_t key = {0, NULL};
         ret = ngx_http_xquic_parse_token_key(&value[i], &ver, &key);
@@ -1127,7 +1130,7 @@ ngx_http_xquic_create_main_conf(ngx_conf_t *cf)
 
     qmcf->qpack_encoder_dynamic_table_capacity = NGX_CONF_UNSET_SIZE;
     qmcf->qpack_decoder_dynamic_table_capacity = NGX_CONF_UNSET_SIZE;
-    qmcf->qpack_compat_duplicate               = NGX_CONF_UNSET_SIZE;
+    qmcf->qpack_compat_duplicate               = NGX_CONF_UNSET;
 
 #if (NGX_XQUIC_SUPPORT_CID_ROUTE)
     qmcf->cid_route             = NGX_CONF_UNSET;
@@ -1210,7 +1213,6 @@ static ngx_int_t ngx_http_xquic_read_token_key_file(ngx_str_t *tk_file,
 {
     char file_name[NGX_XQUIC_MAX_FILE_NAME_SIZE];
     char line_buf[XQC_TOKEN_MAX_KEY_LEN];
-    int version_cnt = 0;
 
     if (tk_file->len == 0 || tk_file->data == NULL) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0, "|xquic|xquic token file not set, using default token key|");
@@ -1244,7 +1246,7 @@ static ngx_int_t ngx_http_xquic_read_token_key_file(ngx_str_t *tk_file,
             line_buf[len - 1] = '\0';
             len--;
         }
-        ngx_str_t raw = {len, line_buf};
+        ngx_str_t raw = {len, (u_char *) line_buf};
         ngx_str_t key = {0, NULL};
         int ret, ver = 0;
         ret = ngx_http_xquic_parse_token_key(&raw, &ver, &key);
@@ -1411,7 +1413,7 @@ ngx_http_xquic_init_main_conf(ngx_conf_t *cf, void *conf)
         qmcf->qpack_decoder_dynamic_table_capacity = 16 * 1024;
     }
 
-    if (qmcf->qpack_compat_duplicate == NGX_CONF_UNSET_SIZE) {
+    if (qmcf->qpack_compat_duplicate == NGX_CONF_UNSET) {
         qmcf->qpack_compat_duplicate = 1;
     }
 
@@ -1814,9 +1816,11 @@ void
 ngx_http_xquic_close_reuseport_fd(ngx_cycle_t *cycle)
 {
     ngx_listening_t   *ls;
-    ngx_uint_t         i = 0, j = 0;
+    ngx_uint_t         i = 0;
     ngx_connection_t  *c;
 #if (T_DYRELOAD)
+    ngx_listening_t  **lsp;
+    ngx_uint_t         j = 0;
     lsp = cycle->listening.elts;
     for (j = 0; j < cycle->listening.nelts; j++) {
         ls = lsp[j];

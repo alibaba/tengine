@@ -44,7 +44,7 @@ void ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn,
 int ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn, const xqc_cid_t *cid, void *user_data);
 int ngx_http_v3_conn_close_notify(xqc_h3_conn_t *h3_conn, const xqc_cid_t *cid, void *user_data);
 void ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data);
-void ngx_http_v3_conn_update_cid_notify(xqc_h3_conn_t *h3_conn, const xqc_cid_t *retire_cid,
+void ngx_http_v3_conn_update_cid_notify(xqc_connection_t *conn, const xqc_cid_t *retire_cid,
     const xqc_cid_t *new_cid, void *conn_user_data);
 void ngx_xquic_conn_peer_addr_changed_notify(xqc_connection_t *conn, void *conn_user_data);
 void ngx_xquic_path_peer_addr_changed_notify(xqc_connection_t *conn, uint64_t path_id, void *conn_user_data);

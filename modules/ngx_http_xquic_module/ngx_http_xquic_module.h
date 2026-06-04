@@ -112,7 +112,7 @@ typedef struct {
     ngx_uint_t                  fec_mp_mode;
     ngx_str_t                   fec_encoder_scheme;
     ngx_str_t                   fec_decoder_scheme;
-    ngx_uint_t                  fec_code_rate;
+    ngx_int_t                   fec_code_rate;
     ngx_uint_t                  symbol_number_per_block;
     ngx_uint_t                  fec_blk_log_mod;
     ngx_uint_t                  fec_packet_mask_mode;
@@ -134,7 +134,7 @@ typedef struct {
     ngx_uint_t                  mp_enable_reinjection;
     ngx_str_t                   reinjection_control;
 
-    ngx_uint_t                  reinj_flexible_deadline_srtt_factor; /* alpha * 100 */
+    ngx_int_t                   reinj_flexible_deadline_srtt_factor; /* alpha * 100 */
     ngx_uint_t                  reinj_hard_deadline;
     ngx_uint_t                  reinj_deadline_lower_bound;
     ngx_uint_t                  mp_sched_rtt_thr_high;
