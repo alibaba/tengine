@@ -53,13 +53,12 @@ if (!$test_client) {
 
 # Tests: 2 sanity tests (directive parse + xquic startup) always run,
 # 4 e2e tests (baseline 200 + bomb rejected, x2 servers) when
-# test_client is available.
-
-my $test_count = $has_test_client ? 6 : 2;
+# test_client is available — otherwise skipped, but still counted
+# in the plan since Test::More's skip() emits "ok # SKIP" lines.
 
 my $t = Test::Nginx->new()->has(qw/http rewrite/)
     ->has_daemon('openssl')
-    ->plan($test_count)
+    ->plan(6)
     ->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
