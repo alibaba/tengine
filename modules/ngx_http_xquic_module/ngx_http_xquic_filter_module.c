@@ -67,16 +67,15 @@ ngx_http_xquic_stream_send_header(ngx_http_v3_stream_t *qstream)
 {
     ssize_t ret = 0;
     uint8_t header_only = (qstream->request->header_only == 1);
-    xqc_request_stats_t stats;
     ngx_http_xquic_main_conf_t *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
     ret = xqc_h3_request_send_headers(qstream->h3_request,
                         &(qstream->resp_headers), header_only);
-    
+
     if (qmcf->manually_send != NGX_CONF_UNSET && qmcf->manually_send != 0) {
         xqc_engine_finish_send(qmcf->xquic_engine);
     }
-    
+
     if (ret < 0) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
                       "|xquic|xqc_h3_request_send_headers error|ret=%z|", ret);
@@ -88,10 +87,12 @@ ngx_http_xquic_stream_send_header(ngx_http_v3_stream_t *qstream)
         qstream->queued--;
     }
 
-    stats = xqc_h3_request_get_stats(qstream->h3_request);
-
 #if (T_HEADER_SIZE)
-    qstream->resp_header_size = stats.send_header_size;
+    {
+        xqc_request_stats_t stats;
+        stats = xqc_h3_request_get_stats(qstream->h3_request);
+        qstream->resp_header_size = stats.send_header_size;
+    }
 #endif
 
     if (header_only) {
@@ -653,13 +654,14 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {
     size_t                   size;
     ssize_t                  n;
-    off_t                    send, left_size, buf_size;
+    off_t                    send, buf_size;
     ngx_http_request_t      *r;
     ngx_http_v3_stream_t    *h3_stream;
     ngx_chain_t             *last_out, *last_chain, *cl;
     ngx_buf_t               *buf;
     ngx_http_xquic_main_conf_t *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
+    last_out = NULL;
     r = c->data;
 
     if (r->xqstream->engine_inner_closed) {
@@ -833,15 +835,10 @@ ngx_http_xquic_send_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         }
     }
 
-    if (last_out == NULL) {
-        left_size = 0;
-    } else {
-        left_size = ngx_buf_size(last_out->buf);
-    }
-
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, limit %O|left_size=%O|", 
-                   r->xqstream->body_sent, send, limit, left_size);
+                   "|xquic|ngx_http_xquic_send_chain|send tot_size %ui, size %O, limit %O|left_size=%O|",
+                   r->xqstream->body_sent, send, limit,
+                   last_out == NULL ? (off_t) 0 : ngx_buf_size(last_out->buf));
 
 RETURN_EAGAIN:
 
