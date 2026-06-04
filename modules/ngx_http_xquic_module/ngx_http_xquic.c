@@ -1005,8 +1005,6 @@ ngx_http_v3_read_client_request_body_handler(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
 {
-    u_char                           text[NGX_SOCKADDR_STRLEN];
-    ngx_str_t                        addr;
     ngx_log_t                       *log;
     ngx_event_t                     *rev, *wev;
     ngx_listening_t                 *ls;
@@ -1057,6 +1055,9 @@ ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
 
 #if (NGX_DEBUG)
     {
+        u_char     text[NGX_SOCKADDR_STRLEN];
+        ngx_str_t  addr;
+
         if (lc->log->log_level & NGX_LOG_DEBUG_HTTP) {
             addr.data = text;
             addr.len = ngx_sock_ntop(qc->peer_sockaddr, qc->peer_socklen, text,
@@ -1185,90 +1186,6 @@ ngx_http_xquic_close_connection(ngx_connection_t *c)
 
 
 /**
- * used to recv udp packets
- */
-static void
-ngx_http_xquic_read_handler(ngx_event_t *rev)
-{
-    ssize_t                        n;
-    ngx_connection_t              *c, *lc;
-    ngx_xquic_recv_packet_t        packet;
-    ngx_http_xquic_connection_t   *qc;
-
-    c = rev->data;
-    qc = c->data;
-
-    if (rev->timedout) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "|xquic|client timed out|");
-        return;
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "|xquic|connection read handler|");
-
-    do {
-        n = ngx_xquic_recv(c, packet.buf, sizeof(packet.buf));
-
-        if (n == NGX_AGAIN) {
-            break;
-        } else if (n == 0) {
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "|xquic|ngx_xquic_recv 0|");
-            break;
-        } else if (n < 0) {
-            ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
-                          "|xquic|recv = %z|", n);
- 
-            if (n == NGX_DONE && qc->processing == 0) {
-                ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_NO_ERR, "client request done");
-            } else {
-                ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_RECV_ERR, "read packet error");
-            }
-
-            goto finish_recv;
-        }
-
-        packet.len = n;
-
-        /* check QUIC magic bit */
-        if (!NGX_XQUIC_CHECK_MAGIC_BIT(packet.buf)) {
-            ngx_log_debug(NGX_LOG_WARN, c->log, 0,
-                          "|xquic|invalid packet head|");
-            continue;
-        }
-
-        /* get dcid here */
-        ngx_xquic_packet_get_cid(&packet, qc->engine);
-
-        ngx_http_xquic_session_process_packet(qc, &packet, n);
-
-        if (qc->xquic_off) {
-            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "xquic not allow");
-        
-            ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_NO_ERR, "xquic not allow");
-        
-            return;
-        }
-
-    } while (rev->ready);
-
-    if (c->close) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "|xquic|graceful shutdown|");
-        ngx_int_t ret = xqc_h3_conn_close(qc->engine, &(qc->dcid));
-        if (ret != NGX_OK) {
-            ngx_log_error(NGX_LOG_WARN, qc->connection->log, 0,
-                          "|xquic|xqc_h3_conn_close err|cid:%s|err:%i|",
-                          xqc_scid_str(qc->engine, &qc->dcid), ret);
-        }
-
-        return;
-    }
-
-finish_recv:
-    xqc_engine_finish_recv(qc->engine);
-}
-
-
-/**
  * connection readmsg_handler used to recv udp packets
  */
 /*
@@ -1354,8 +1271,6 @@ ngx_xquic_path_connect(ngx_http_xquic_connection_t *qc,
     struct sockaddr *local_sockaddr, socklen_t local_socklen,
     struct sockaddr *peer_sockaddr, socklen_t peer_socklen)
 {
-    u_char                           text[NGX_SOCKADDR_STRLEN];
-    ngx_str_t                        addr;
     ngx_log_t                       *log;
     ngx_event_t                     *rev, *wev;
     ngx_connection_t                *c;
@@ -1441,6 +1356,9 @@ ngx_xquic_path_connect(ngx_http_xquic_connection_t *qc,
 
 #if (NGX_DEBUG)
     {
+        u_char     text[NGX_SOCKADDR_STRLEN];
+        ngx_str_t  addr;
+
         if (qc->connection->log->log_level & NGX_LOG_DEBUG_HTTP) {
             addr.data = text;
             addr.len = ngx_sock_ntop(peer_sockaddr, peer_socklen, text,

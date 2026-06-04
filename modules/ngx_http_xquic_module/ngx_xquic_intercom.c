@@ -728,9 +728,11 @@ ngx_xquic_intercom_send(ngx_int_t worker_num, ngx_xquic_recv_packet_t *packet,
     ngx_int_t           n;
     ngx_err_t           err;
     ngx_connection_t   *c;
+#if (NGX_DEBUG)
     ngx_http_xquic_main_conf_t *qmcf;
 
     qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+#endif
     c = ctx->connection;
 
     n = sendto(c->fd, packet, sizeof(ngx_xquic_recv_packet_t), 0,
