@@ -1682,12 +1682,42 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
     };
 
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+                    /* NOT: " ", "-", ".", "_", "0"-"9", "A"-"Z", "a"-"z" */
+
+    static uint32_t   form[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0xfc009ffe, /* 1111 1100 0000 0000  1001 1111 1111 1110 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x78000001, /* 0111 1000 0000 0000  0000 0000 0000 0001 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xf8000001, /* 1111 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+#endif
+
     static uint32_t  *map[] =
         { uri, args, uri_component, html, refresh, memcached, memcached,
-          mail_xtext };
+          mail_xtext
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+          , form
+#endif
+        };
 
     static u_char  map_char[] =
-        { '%', '%', '%', '%', '%', '%', '%', '+' };
+        { '%', '%', '%', '%', '%', '%', '%', '+'
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+          , '%'
+#endif
+        };
 
 
     escape = map[type];
@@ -1718,7 +1748,19 @@ ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
             src++;
 
         } else {
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+            if (type == NGX_ESCAPE_WWW_FORM
+                && *src == ' ')
+            {
+                src++;
+                *dst++ = '+';
+
+            } else {
+                *dst++ = *src++;
+            }
+#else
             *dst++ = *src++;
+#endif
         }
         size--;
     }
@@ -1749,6 +1791,14 @@ ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
 
         switch (state) {
         case sw_usual:
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+            if (ch == '+'
+                && (type & NGX_UNESCAPE_WWW_FORM))
+            {
+                *d++ = ' ';
+                break;
+            }
+#endif
             if (ch == '?'
                 && (type & (NGX_UNESCAPE_URI|NGX_UNESCAPE_REDIRECT)))
             {
