@@ -181,6 +181,12 @@ static ngx_int_t ngx_http_upstream_response_time_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_upstream_response_length_variable(
     ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
+#if (T_NGX_HTTP_STAT_TIME)
+static ngx_int_t ngx_http_upstream_stat_time_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_upstream_first_pkg_time_variable(
+    ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
+#endif
 static ngx_int_t ngx_http_upstream_header_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_upstream_trailer_variable(ngx_http_request_t *r,
@@ -468,6 +474,30 @@ static ngx_http_variable_t  ngx_http_upstream_vars[] = {
       ngx_http_upstream_response_length_variable, 2,
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
+#if (T_NGX_HTTP_STAT_TIME)
+    { ngx_string("upstream_stat_send_start_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 1,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_stat_send_finish_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 2,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_stat_recv_start_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 3,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_stat_recv_finish_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 4,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_stat_send_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 100,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_stat_recv_time"), NULL,
+      ngx_http_upstream_stat_time_variable, 101,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("upstream_first_pkg_time"), NULL,
+      ngx_http_upstream_first_pkg_time_variable, 0,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+#endif
+
 #if (NGX_HTTP_CACHE)
 
     { ngx_string("upstream_cache_status"), NULL,
@@ -753,6 +783,10 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         }
 
         ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
+
+#ifdef T_NGX_HTTP_STAT_TIME
+        u->state->ups_send_start_time = ngx_current_msec;
+#endif
     }
 
     cln = ngx_http_cleanup_add(r, 0);
@@ -1657,6 +1691,17 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     if (u->state && u->state->response_time == (ngx_msec_t) -1) {
         u->state->response_time = ngx_current_msec - u->start_time;
+#ifdef T_NGX_HTTP_STAT_TIME
+        if (u->state->ups_recv_start_time != 0) {
+            u->state->ups_recv_finish_time = ngx_current_msec;
+        }
+        if (u->state->ups_send_start_time != 0
+            && u->state->ups_send_finish_time == 0)
+        {
+            u->state->ups_send_finish_time = ngx_current_msec;
+        }
+        u->state->ups_finish_time = ngx_current_msec;
+#endif
     }
 
     u->state = ngx_array_push(r->upstream_states);
@@ -1673,6 +1718,13 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     u->state->response_time = (ngx_msec_t) -1;
     u->state->connect_time = (ngx_msec_t) -1;
     u->state->header_time = (ngx_msec_t) -1;
+#ifdef T_NGX_HTTP_STAT_TIME
+    u->state->ups_send_start_time = ngx_current_msec;
+    u->state->ups_send_finish_time = 0;
+    u->state->ups_recv_start_time = 0;
+    u->state->ups_recv_finish_time = 0;
+    u->state->ups_finish_time = 0;
+#endif
 
     rc = ngx_event_connect_peer(&u->peer);
 #if (T_NGX_HTTP_DYNAMIC_RESOLVE)
@@ -2348,6 +2400,10 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
         u->state->connect_time = ngx_current_msec - u->start_time;
     }
 
+#ifdef T_NGX_HTTP_STAT_TIME
+    u->state->ups_send_finish_time = ngx_current_msec;
+#endif
+
     if (!u->request_sent && ngx_http_upstream_test_connect(c) != NGX_OK) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
@@ -2774,6 +2830,12 @@ ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
         u->valid_header_in = 0;
 
         u->peer.cached = 0;
+#endif
+
+#ifdef T_NGX_HTTP_STAT_TIME
+        if (u->state->ups_recv_start_time == 0) {
+            u->state->ups_recv_start_time = ngx_current_msec;
+        }
 #endif
 
         u->response_received = 1;
@@ -5072,6 +5134,18 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
     if (u->state && u->state->response_time == (ngx_msec_t) -1) {
         u->state->response_time = ngx_current_msec - u->start_time;
 
+#ifdef T_NGX_HTTP_STAT_TIME
+        if (u->state->ups_recv_start_time != 0) {
+            u->state->ups_recv_finish_time = ngx_current_msec;
+        }
+        if (u->state->ups_send_start_time != 0
+            && u->state->ups_send_finish_time == 0)
+        {
+            u->state->ups_send_finish_time = ngx_current_msec;
+        }
+        u->state->ups_finish_time = ngx_current_msec;
+#endif
+
         if (u->pipe && u->pipe->read_length) {
             u->state->bytes_received += u->pipe->read_length
                                         - u->pipe->preread_size;
@@ -6482,6 +6556,158 @@ ngx_http_upstream_response_length_variable(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
+
+#if (T_NGX_HTTP_STAT_TIME)
+
+static ngx_int_t
+ngx_http_upstream_first_pkg_time_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char                     *p;
+    size_t                      len;
+    ngx_uint_t                  i;
+    ngx_msec_int_t              ms = 0;
+    ngx_http_upstream_state_t  *state;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 1;
+
+    if (r->upstream_states == NULL || r->upstream_states->nelts == 0) {
+        return NGX_OK;
+    }
+
+    len = NGX_TIME_T_LEN;
+    state = r->upstream_states->elts;
+
+    for (i = 0; i < r->upstream_states->nelts; i++) {
+        if (state[i].status) {
+            ngx_msec_int_t  first_pkg_time = 0;
+
+            if (state[i].ups_send_start_time != 0) {
+                if (state[i].ups_recv_start_time != 0) {
+                    first_pkg_time = state[i].ups_recv_start_time
+                                     - state[i].ups_send_start_time;
+                } else if (state[i].ups_finish_time != 0) {
+                    first_pkg_time = state[i].ups_finish_time
+                                     - state[i].ups_send_start_time;
+                }
+            }
+            ms += first_pkg_time;
+        }
+    }
+
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+
+    p = ngx_sprintf(p, "%M", ms);
+
+    v->len = p - v->data;
+
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_stat_time_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char                     *p;
+    size_t                      len;
+    ngx_uint_t                  i;
+    ngx_msec_int_t              ms = 0;
+    ngx_http_upstream_state_t  *state;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    if (r->upstream_states == NULL || r->upstream_states->nelts == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    len = r->upstream_states->nelts * (NGX_TIME_T_LEN + 4 + 2);
+
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+
+    i = 0;
+    state = r->upstream_states->elts;
+
+    for ( ;; ) {
+        if (state[i].status) {
+
+            ngx_int_t  format = 0;
+
+            if (data == 1 && state[i].ups_send_start_time != 0) {
+                ms = state[i].ups_send_start_time;
+            } else if (data == 2 && state[i].ups_send_finish_time != 0) {
+                ms = state[i].ups_send_finish_time;
+            } else if (data == 3 && state[i].ups_recv_start_time != 0) {
+                ms = state[i].ups_recv_start_time;
+            } else if (data == 4 && state[i].ups_recv_finish_time != 0) {
+                ms = state[i].ups_recv_finish_time;
+            } else if (data == 100 && state[i].ups_send_finish_time != 0) {
+                ms = state[i].ups_send_finish_time - state[i].ups_send_start_time;
+                format = 1;
+            } else if (data == 101 && state[i].ups_recv_finish_time != 0) {
+                ms = state[i].ups_recv_finish_time - state[i].ups_recv_start_time;
+                format = 1;
+            } else {
+                ms = 0;
+            }
+
+            ms = ngx_max(ms, 0);
+
+            if (format == 1) {
+                p = ngx_sprintf(p, "%T.%03M", (time_t) ms / 1000, ms % 1000);
+            } else {
+                p = ngx_sprintf(p, "%M", ms);
+            }
+
+        } else {
+            *p++ = '-';
+        }
+
+        if (++i == r->upstream_states->nelts) {
+            break;
+        }
+
+        if (state[i].peer) {
+            *p++ = ',';
+            *p++ = ' ';
+
+        } else {
+            *p++ = ' ';
+            *p++ = ':';
+            *p++ = ' ';
+
+            if (++i == r->upstream_states->nelts) {
+                break;
+            }
+
+            continue;
+        }
+    }
+
+    v->len = p - v->data;
+
+    return NGX_OK;
+}
+
+#endif
 
 
 static ngx_int_t

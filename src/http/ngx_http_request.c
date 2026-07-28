@@ -582,6 +582,10 @@ ngx_http_create_request(ngx_connection_t *c)
     ctx->request = r;
     ctx->current_request = r;
 
+#if (T_NGX_HTTP_STAT_TIME)
+    r->stat_time.req_recv_start_time = ngx_current_msec;
+#endif
+
 #if (NGX_STAT_STUB)
     (void) ngx_atomic_fetch_add(ngx_stat_reading, 1);
     r->stat_reading = 1;
@@ -2612,6 +2616,12 @@ ngx_http_process_request_header(ngx_http_request_t *r)
 {
 #if !(NGX_HTTP_PROXY_CONNECT)
     ngx_http_core_srv_conf_t  *cscf;
+#endif
+
+#if (T_NGX_HTTP_STAT_TIME)
+    if (r == r->main) {
+        r->stat_time.req_recv_finished_time = ngx_current_msec;
+    }
 #endif
 
     if (r->headers_in.server.len == 0
