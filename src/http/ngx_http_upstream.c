@@ -401,6 +401,15 @@ static ngx_command_t  ngx_http_upstream_commands[] = {
 
 #endif
 
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+    { ngx_string("upstream_change_no_server_status"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_upstream_main_conf_t, change_no_server_status),
+      NULL },
+#endif
+
       ngx_null_command
 };
 
@@ -941,8 +950,21 @@ found:
 #endif
 
     if (uscf->peer.init(r, uscf) != NGX_OK) {
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+        ngx_http_upstream_main_conf_t  *umcf;
+
+        umcf = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
+        if (umcf->change_no_server_status) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_BAD_GATEWAY);
+        } else {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+        }
+#else
         ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
+#endif
         return;
     }
 
@@ -8008,6 +8030,10 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
 
 #endif
 
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+    umcf->change_no_server_status = NGX_CONF_UNSET;
+#endif
+
     return umcf;
 }
 
@@ -8068,6 +8094,10 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
     if (ngx_hash_init(&hash, headers_in.elts, headers_in.nelts) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
+
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+    ngx_conf_init_value(umcf->change_no_server_status, 0);
+#endif
 
     return NGX_CONF_OK;
 }

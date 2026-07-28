@@ -94,6 +94,10 @@ typedef struct {
     ngx_rbtree_node_t                sentinel;
 
 #endif
+
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+    ngx_flag_t                       change_no_server_status;
+#endif
 } ngx_http_upstream_main_conf_t;
 
 typedef struct ngx_http_upstream_srv_conf_s  ngx_http_upstream_srv_conf_t;
