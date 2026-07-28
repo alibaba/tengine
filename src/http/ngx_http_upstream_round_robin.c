@@ -1017,17 +1017,20 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp,
          * peer selected last time instead of rescanning smooth weights.
          */
         if (rrp->peers->last_number == NGX_CONF_UNSET_UINT) {
-            for (peer = rrp->peers->peer, i = 0;
-                 i < rrp->peers->init_number; i++)
-            {
+            /*
+             * First selection for this peers set: start at the peer chosen by
+             * init_number (0 for resolved peers, random for shared groups) and
+             * include it. Advancing to ->next here would skip the first
+             * upstream, breaking next_upstream tries/timeout ordering for
+             * resolved (DNS) peers. last_peer/last_number are recorded below
+             * once a peer is actually selected.
+             */
+            begin_number = rrp->peers->init_number;
+            for (peer = rrp->peers->peer, i = 0; i < begin_number; i++) {
                 peer = peer->next;
             }
 
-            rrp->peers->last_number = i;
-            rrp->peers->last_peer = peer;
-        }
-
-        if (rrp->peers->last_peer && rrp->peers->last_peer->next) {
+        } else if (rrp->peers->last_peer && rrp->peers->last_peer->next) {
             begin_number = (rrp->peers->last_number + 1) % rrp->peers->number;
             peer = rrp->peers->last_peer->next;
 
