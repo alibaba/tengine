@@ -157,12 +157,17 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
 		upstream_least_conn
 			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
+		upstream_least_time
+			=> '(?s)^(?!.*--without-http_upstream_least_time_mod)',
 		upstream_random
 			=> '(?s)^(?!.*--without-http_upstream_random_module)',
 		upstream_keepalive
-			=> '(?s)^(?!.*--without-http_upstream_keepalive_modu)',
+			=> '(?s)(?:--add-module=\S*ngx_http_upstream_keepalive_module|^(?!.*--without-http_upstream_keepalive_modu))',
 		upstream_zone
 			=> '(?s)^(?!.*--without-http_upstream_zone_module)',
+		upstream_sticky
+			=> '(?s)^(?!.*--without-http_upstream_sticky)',
+		tunnel	=> '(?s)^(?!.*--without-http_tunnel_module)',
 		http	=> '(?s)^(?!.*--without-http(?!\S))',
 		cache	=> '(?s)^(?!.*--without-http-cache)',
 		pop3	=> '(?s)^(?!.*--without-mail_pop3_module)',
@@ -180,6 +185,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-stream_limit_conn_module)',
 		stream_map
 			=> '(?s)^(?!.*--without-stream_map_module)',
+		stream_pass
+			=> '(?s)^(?!.*--without-stream_pass_module)',
 		stream_return
 			=> '(?s)^(?!.*--without-stream_return_module)',
 		stream_set
@@ -192,6 +199,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
 		stream_upstream_least_conn
 			=> '(?s)^(?!.*--without-stream_upstream_least_conn_m)',
+		stream_upstream_least_time
+			=> '(?s)^(?!.*--without-stream_upstream_least_time_m)',
 		stream_upstream_random
 			=> '(?s)^(?!.*--without-stream_upstream_random_modul)',
 		stream_upstream_zone
@@ -760,7 +769,8 @@ sub test_globals_http() {
 	$s .= "root $self->{_testdir};\n";
 	$s .= "access_log $self->{_testdir}/access.log;\n";
 	$s .= "client_body_temp_path $self->{_testdir}/client_body_temp;\n";
-	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n";
+	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n"
+		if $self->has_module('lua');
 
 	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n"
 		if $self->has_module('fastcgi');

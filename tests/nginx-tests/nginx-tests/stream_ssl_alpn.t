@@ -25,8 +25,12 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()
 	->has(qw/stream stream_ssl stream_return socket_ssl_alpn/)
-	->has_daemon('openssl')
-	->write_file_expand('nginx.conf', <<'EOF');
+	->has_daemon('openssl');
+
+plan(skip_all => 'no ALPN support in OpenSSL')
+	if $t->has_module('OpenSSL') and not $t->has_feature('openssl:1.0.2');
+
+$t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
 
@@ -53,9 +57,6 @@ stream {
 
 EOF
 
-
-
-
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
 default_bits = 2048
@@ -74,7 +75,7 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-$t->try_run('no ssl_alpn')->plan(6);
+$t->run()->plan(6);
 
 ###############################################################################
 
@@ -103,12 +104,12 @@ like($t->read_file('test.log'), qr/500$/, 'alpn mismatch - log');
 
 sub get_ssl {
 	my (@alpn) = @_;
+
 	my $s = stream(
 		PeerAddr => '127.0.0.1:' . port(8080),
 		SSL => 1,
 		SSL_alpn_protocols => [ @alpn ]
-		);
-
+	);
 
 	return $s->read();
 }

@@ -17,6 +17,9 @@ typedef struct {
 
 typedef struct {
     ngx_uint_t                            two;
+#if (NGX_HTTP_UPSTREAM_ZONE)
+    ngx_uint_t                            config;
+#endif
     ngx_http_upstream_random_range_t     *ranges;
 } ngx_http_upstream_random_srv_conf_t;
 
@@ -127,6 +130,11 @@ ngx_http_upstream_update_random(ngx_pool_t *pool,
 
     rcf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_random_module);
 
+    if (rcf->ranges) {
+        ngx_free(rcf->ranges);
+        rcf->ranges = NULL;
+    }
+
     peers = us->peer.data;
 
     size = peers->number * sizeof(ngx_http_upstream_random_range_t);
@@ -186,11 +194,15 @@ ngx_http_upstream_init_random_peer(ngx_http_request_t *r,
     ngx_http_upstream_rr_peers_rlock(rp->rrp.peers);
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
-    if (rp->rrp.peers->shpool && rcf->ranges == NULL) {
+    if (rp->rrp.peers->config
+        && (rcf->ranges == NULL || rcf->config != *rp->rrp.peers->config))
+    {
         if (ngx_http_upstream_update_random(NULL, us) != NGX_OK) {
             ngx_http_upstream_rr_peers_unlock(rp->rrp.peers);
             return NGX_ERROR;
         }
+
+        rcf->config = *rp->rrp.peers->config;
     }
 #endif
 
@@ -220,15 +232,33 @@ ngx_http_upstream_get_random_peer(ngx_peer_connection_t *pc, void *data)
 
     ngx_http_upstream_rr_peers_rlock(peers);
 
-    if (rp->tries > 20 || peers->single) {
+    if (rp->tries > 20 || peers->number < 2) {
         ngx_http_upstream_rr_peers_unlock(peers);
         return ngx_http_upstream_get_round_robin_peer(pc, rrp);
     }
+
+#if (NGX_HTTP_UPSTREAM_ZONE)
+    if (peers->config && rrp->config != *peers->config) {
+        ngx_http_upstream_rr_peers_unlock(peers);
+        return ngx_http_upstream_get_round_robin_peer(pc, rrp);
+    }
+#endif
 
     pc->cached = 0;
     pc->connection = NULL;
 
     now = ngx_time();
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    peer = ngx_http_upstream_get_rr_peer_by_sid(rrp, pc->hint, &i, 1);
+
+    if (peer) {
+        n = i / (8 * sizeof(uintptr_t));
+        m = (uintptr_t) 1 << i % (8 * sizeof(uintptr_t));
+
+        goto found;
+    }
+#endif
 
     for ( ;; ) {
 
@@ -273,7 +303,12 @@ ngx_http_upstream_get_random_peer(ngx_peer_connection_t *pc, void *data)
         }
     }
 
+#if (NGX_HTTP_UPSTREAM_SID)
+found:
+#endif
+
     rrp->current = peer;
+    ngx_http_upstream_rr_peer_ref(peers, peer);
 
     if (now - peer->checked > peer->fail_timeout) {
         peer->checked = now;
@@ -282,6 +317,10 @@ ngx_http_upstream_get_random_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    pc->sid = &peer->sid;
+#endif
 
     peer->conns++;
 
@@ -314,10 +353,17 @@ ngx_http_upstream_get_random2_peer(ngx_peer_connection_t *pc, void *data)
 
     ngx_http_upstream_rr_peers_wlock(peers);
 
-    if (rp->tries > 20 || peers->single) {
+    if (rp->tries > 20 || peers->number < 2) {
         ngx_http_upstream_rr_peers_unlock(peers);
         return ngx_http_upstream_get_round_robin_peer(pc, rrp);
     }
+
+#if (NGX_HTTP_UPSTREAM_ZONE)
+    if (peers->config && rrp->config != *peers->config) {
+        ngx_http_upstream_rr_peers_unlock(peers);
+        return ngx_http_upstream_get_round_robin_peer(pc, rrp);
+    }
+#endif
 
     pc->cached = 0;
     pc->connection = NULL;
@@ -328,6 +374,17 @@ ngx_http_upstream_get_random2_peer(ngx_peer_connection_t *pc, void *data)
 
 #if (NGX_SUPPRESS_WARN)
     p = 0;
+#endif
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    peer = ngx_http_upstream_get_rr_peer_by_sid(rrp, pc->hint, &i, 0);
+
+    if (peer) {
+        n = i / (8 * sizeof(uintptr_t));
+        m = (uintptr_t) 1 << i % (8 * sizeof(uintptr_t));
+
+        goto found;
+    }
 #endif
 
     for ( ;; ) {
@@ -383,7 +440,12 @@ ngx_http_upstream_get_random2_peer(ngx_peer_connection_t *pc, void *data)
         }
     }
 
+#if (NGX_HTTP_UPSTREAM_SID)
+found:
+#endif
+
     rrp->current = peer;
+    ngx_http_upstream_rr_peer_ref(peers, peer);
 
     if (now - peer->checked > peer->fail_timeout) {
         peer->checked = now;
@@ -392,6 +454,10 @@ ngx_http_upstream_get_random2_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = peer->sockaddr;
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    pc->sid = &peer->sid;
+#endif
 
     peer->conns++;
 
@@ -467,6 +533,7 @@ ngx_http_upstream_random(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     uscf->peer.init_upstream = ngx_http_upstream_init_random;
 
     uscf->flags = NGX_HTTP_UPSTREAM_CREATE
+                  |NGX_HTTP_UPSTREAM_MODIFY
                   |NGX_HTTP_UPSTREAM_WEIGHT
                   |NGX_HTTP_UPSTREAM_MAX_CONNS
                   |NGX_HTTP_UPSTREAM_MAX_FAILS

@@ -1,5 +1,20 @@
 ngx_addon_name=ngx_http_proxy_connect_module
 
+# proxy_connect and the native ngx_http_tunnel_module both handle the CONNECT
+# method and conflict at runtime (the proxy_connect POST_READ handler rejects
+# CONNECT with 405 before the tunnel handler runs). The native tunnel module is
+# off by default; only one CONNECT implementation may be linked at a time.
+if [ "$HTTP_TUNNEL" = YES ]; then
+    cat << END
+
+$0: error: the ngx_http_proxy_connect_module conflicts with the native
+ngx_http_tunnel_module. Drop --with-http_tunnel_module, or drop
+--add-module=.../ngx_http_proxy_connect_module, so only one is linked.
+
+END
+    exit 1
+fi
+
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP
     ngx_module_name=ngx_http_proxy_connect_module

@@ -74,7 +74,7 @@ void ngx_shm_pool_reset(ngx_shm_pool_t * pool);
  * @brief Get the memory space size of the memory pool
  * 
  * @param pool shared memory pool
- * @return ngx_int_t 共享内存总大小
+ * @return ngx_int_t Total shared memory size
  * @note contains allocated space
  */
 ngx_int_t ngx_shm_pool_size(ngx_shm_pool_t * pool);

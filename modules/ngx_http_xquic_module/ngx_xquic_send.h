@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #ifndef _T_NGX_XQUIC_SEND_H_INCLUDED_
@@ -22,10 +22,31 @@
 
 ssize_t ngx_xquic_server_send(const unsigned char *buf, size_t size,
     const struct sockaddr *peer_addr, socklen_t peer_addrlen, void *user_data);
+ssize_t
+ngx_xquic_send_packet_early(const unsigned char *buf, size_t size,
+    const struct sockaddr *peer_addr, socklen_t peer_addrlen, void *user_data);
+
+
+ssize_t ngx_xquic_server_mp_send(uint64_t path_id, 
+    const unsigned char *buf, size_t size,
+    const struct sockaddr *peer_addr, socklen_t peer_addrlen,
+    void *conn_user_data);
+
+ssize_t ngx_xquic_stateless_reset(const unsigned char *buf, size_t size,
+    const struct sockaddr *peer_addr, socklen_t peer_addrlen,
+    const struct sockaddr *local_addr, socklen_t local_addrlen,
+    void *user_data);
+
 
 #if defined(T_NGX_XQUIC_SUPPORT_SENDMMSG)
 ssize_t ngx_xquic_server_send_mmsg(const struct iovec *msg_iov, unsigned int vlen,
     const struct sockaddr *peer_addr, socklen_t peer_addrlen, void *user_data);
+
+
+ssize_t ngx_xquic_server_mp_send_mmsg(uint64_t path_id, 
+    const struct iovec *msg_iov, unsigned int vlen,
+    const struct sockaddr *peer_addr, socklen_t peer_addrlen,
+    void *conn_user_data);
 #endif
 
 void ngx_http_xquic_write_handler(ngx_event_t *wev);

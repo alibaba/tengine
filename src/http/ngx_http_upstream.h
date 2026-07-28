@@ -43,6 +43,7 @@
                                              |NGX_HTTP_UPSTREAM_FT_HTTP_429)
 
 #define NGX_HTTP_UPSTREAM_INVALID_HEADER     40
+#define NGX_HTTP_UPSTREAM_EARLY_HINTS        41
 
 
 #define NGX_HTTP_UPSTREAM_IGN_XA_REDIRECT    0x00000002
@@ -54,6 +55,9 @@
 #define NGX_HTTP_UPSTREAM_IGN_XA_BUFFERING   0x00000080
 #define NGX_HTTP_UPSTREAM_IGN_XA_CHARSET     0x00000100
 #define NGX_HTTP_UPSTREAM_IGN_VARY           0x00000200
+
+
+#define NGX_HTTP_UPSTREAM_NOTIFY_HEADER      0x1
 
 
 typedef struct {
@@ -110,18 +114,33 @@ typedef struct {
     time_t                           fail_timeout;
     ngx_msec_t                       slow_start;
     ngx_uint_t                       down;
+
+    unsigned                         backup:1;
+
 #if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                        id;
 #endif
 
-#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
+#if (NGX_HTTP_UPSTREAM_ZONE)
     ngx_str_t                        host;
+    ngx_str_t                        service;
 #endif
 
-    unsigned                         backup:1;
+#if (T_NGX_HTTP_DYNAMIC_RESOLVE)
+    /*
+     * Tengine dynamic resolve keeps its own per-server host separate from the
+     * nginx "host" field above: nginx sets "host" only for servers using the
+     * "resolve" parameter (zone-based run-time resolving), whereas Tengine
+     * records the host of every server so ngx_http_upstream_dynamic_module can
+     * re-resolve it at run time. Sharing the field made nginx treat every
+     * server as zone-resolved and reject upstreams not in shared memory.
+     */
+    ngx_str_t                        dyn_resolve_host;
+#endif
 
-    NGX_COMPAT_BEGIN(6)
-    NGX_COMPAT_END
+#if (NGX_HTTP_UPSTREAM_SID || NGX_COMPAT)
+    ngx_str_t                        sid;
+#endif
 } ngx_http_upstream_server_t;
 
 
@@ -131,8 +150,13 @@ typedef struct {
 #define NGX_HTTP_UPSTREAM_FAIL_TIMEOUT  0x0008
 #define NGX_HTTP_UPSTREAM_DOWN          0x0010
 #define NGX_HTTP_UPSTREAM_BACKUP        0x0020
+/* NGX_HTTP_UPSTREAM_MODIFY uses 0x0080 to avoid clashing with the Tengine
+ * NGX_HTTP_UPSTREAM_ID (0x0040); upstream nginx defines it as 0x0040 */
+#define NGX_HTTP_UPSTREAM_MODIFY        0x0080
 #define NGX_HTTP_UPSTREAM_MAX_CONNS     0x0100
+#if (T_NGX_HTTP_UPSTREAM_ID)
 #define NGX_HTTP_UPSTREAM_ID            0x0040
+#endif
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
 #define T_NGX_HTTP_UPSTREAM_RANDOM_FLAG 0x0200
 #endif
@@ -162,6 +186,8 @@ struct ngx_http_upstream_srv_conf_s {
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
     ngx_shm_zone_t                  *shm_zone;
+    ngx_resolver_t                  *resolver;
+    ngx_msec_t                       resolver_timeout;
 #endif
 };
 
@@ -185,7 +211,7 @@ typedef struct {
 
     size_t                           send_lowat;
     size_t                           buffer_size;
-    size_t                           limit_rate;
+    ngx_http_complex_value_t        *limit_rate;
 
     size_t                           busy_buffers_size;
     size_t                           max_temp_file_size;
@@ -205,6 +231,8 @@ typedef struct {
     ngx_flag_t                       request_buffering;
     ngx_flag_t                       pass_request_headers;
     ngx_flag_t                       pass_request_body;
+    ngx_flag_t                       pass_trailers;
+    ngx_flag_t                       pass_early_hints;
 
     ngx_flag_t                       ignore_client_abort;
     ngx_flag_t                       intercept_errors;
@@ -219,6 +247,8 @@ typedef struct {
 
     ngx_http_upstream_local_t       *local;
     ngx_flag_t                       socket_keepalive;
+    size_t                           socket_rcvbuf;
+    size_t                           socket_sndbuf;
 
 #if (NGX_HTTP_CACHE)
     ngx_shm_zone_t                  *cache_zone;
@@ -253,8 +283,8 @@ typedef struct {
     signed                           store:2;
     unsigned                         intercept_404:1;
     unsigned                         change_buffering:1;
-    unsigned                         pass_trailers:1;
     unsigned                         preserve_output:1;
+    unsigned                         ignore_input:1;
 
 #if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_ssl_t                       *ssl;
@@ -266,6 +296,7 @@ typedef struct {
 
     ngx_http_complex_value_t        *ssl_certificate;
     ngx_http_complex_value_t        *ssl_certificate_key;
+    ngx_ssl_cache_t                 *ssl_certificate_cache;
     ngx_array_t                     *ssl_passwords;
 
 #if (T_NGX_SSL_NTLS)
@@ -284,7 +315,7 @@ typedef struct {
 
     ngx_str_t                        module;
 
-    NGX_COMPAT_BEGIN(2)
+    NGX_COMPAT_BEGIN(5)
     NGX_COMPAT_END
 } ngx_http_upstream_conf_t;
 
@@ -390,6 +421,7 @@ struct ngx_http_upstream_s {
 
     ngx_buf_t                        buffer;
     off_t                            length;
+    off_t                            early_hints_length;
 
     ngx_chain_t                     *out_bufs;
     ngx_chain_t                     *busy_bufs;
@@ -423,6 +455,7 @@ struct ngx_http_upstream_s {
 
 #if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_str_t                        ssl_name;
+    ngx_str_t                        ssl_alpn_protocol;
 #endif
 
     ngx_http_cleanup_pt             *cleanup;
@@ -444,6 +477,7 @@ struct ngx_http_upstream_s {
     unsigned                         request_body_sent:1;
     unsigned                         request_body_blocked:1;
     unsigned                         header_sent:1;
+    unsigned                         response_received:1;
 
 #if (T_NGX_MULTI_UPSTREAM)
     unsigned                         multi:1;
@@ -481,6 +515,10 @@ char *ngx_http_upstream_param_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
 ngx_int_t ngx_http_upstream_hide_headers_hash(ngx_conf_t *cf,
     ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev,
     ngx_str_t *default_hide_headers, ngx_hash_init_t *hash);
+#if (NGX_HTTP_SSL)
+ngx_int_t ngx_http_upstream_merge_ssl_passwords(ngx_conf_t *cf,
+    ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev);
+#endif
 
 
 #define ngx_http_conf_upstream_srv_conf(uscf, module)                         \

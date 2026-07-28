@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #ifndef _T_NGX_XQUIC_H_INCLUDED_
 #define _T_NGX_XQUIC_H_INCLUDED_
-
 
 #include <ngx_core.h>
 #include <ngx_config.h>
@@ -15,11 +14,27 @@
 #include <xquic/xquic_typedef.h>
 #include <xquic/xquic.h>
 
-#define NGX_HTTP_V3_INT_OCTETS           4
-#define NGX_HTTP_V3_MAX_FIELD                                                 \
-    (127 + (1 << (NGX_HTTP_V3_INT_OCTETS - 1) * 7) - 1)
-
+#define NGX_XQUIC_PKT_LONG                          (0x80)
+#define NGX_XQUIC_PKT_TYPE                          (0x30)
+#define NGX_XQUIC_PKT_TYPE_INITIAL                  (0x0)
+#define NGX_XQUIC_PKT_TYPE_0RTT                     (0x1)
 #define NGX_XQUIC_SUPPORT_CID_ROUTE 1
+
+/*
+ * Result codes indicating whether a packet needs to be forwarded a second time.
+ * NO_DISPATCH: no forwarding required.
+ * DISPATCH_INTERCOM: forward to another worker's dispatch queue.
+ * DISPATCH_RELOAD_INTERCOM: forward to the reload queue.
+ */
+#define NGX_XQUIC_PACKET_NO_DISPATCH                NGX_OK
+#define NGX_XQUIC_PACKET_DISPATCH_INTERCOM          (NGX_OK + 1)
+#define NGX_XQUIC_PACKET_DISPATCH_RELOAD_INTERCOM   (NGX_OK + 2)
+#define NGX_XQUIC_PACKET_DISPATCH_ERROR             NGX_ERROR
+
+typedef enum {
+    NGX_XQUIC_FEC_ENC_SWITCH_BIT = 0x1,
+    NGX_XQUIC_FEC_DEC_SWITCH_BIT = 0x2,
+} ngx_xquic_fec_state_e ;
 
 int ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn, 
     const xqc_cid_t * cid, void * user_data);
@@ -31,11 +46,15 @@ int ngx_http_v3_conn_close_notify(xqc_h3_conn_t *h3_conn, const xqc_cid_t *cid, 
 void ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data);
 void ngx_http_v3_conn_update_cid_notify(xqc_connection_t *conn, const xqc_cid_t *retire_cid,
     const xqc_cid_t *new_cid, void *conn_user_data);
+void ngx_xquic_conn_peer_addr_changed_notify(xqc_connection_t *conn, void *conn_user_data);
+void ngx_xquic_path_peer_addr_changed_notify(xqc_connection_t *conn, uint64_t path_id, void *conn_user_data);
 
 void ngx_xquic_engine_set_event_timer(xqc_msec_t wake_after, void *user_data);
 
 void ngx_xquic_log_write_err(xqc_log_level_t lvl, const void *buf, size_t size, void *engine_user_data);
 void ngx_xquic_log_write_stat(xqc_log_level_t lvl, const void *buf, size_t size, void *engine_user_data);
+void ngx_xquic_qlog_event_write(qlog_event_importance_t lvl, const void *buf, size_t size, void *engine_user_data);
+void ngx_xquic_engine_log_key(const xqc_cid_t *scid, const char *line, void *user_data);
 
 ngx_int_t ngx_xquic_process_init(ngx_cycle_t *cycle);
 void ngx_xquic_process_exit(ngx_cycle_t *cycle);
@@ -49,7 +68,7 @@ ssize_t
 ngx_xquic_cid_generate_cb(const xqc_cid_t *ori_cid, uint8_t *cid_buf, size_t cid_buflen, void *engine_user_data);
 
 /* worker ID is 4 bytes */
-#define NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH         (4)
+#define T_NGX_QUIC_CID_ROUTE_WORKER_ID_LENGTH         (4)
 
 /**
  * @return CID length based on negotiation result

@@ -702,7 +702,7 @@ if [ $HTTP = YES ]; then
 
         ngx_module_name=ngx_http_proxy_module
         ngx_module_incs=
-        ngx_module_deps=
+        ngx_module_deps=src/http/modules/ngx_http_proxy_module.h
         ngx_module_srcs=src/http/modules/ngx_http_proxy_module.c
         ngx_module_libs=
         ngx_module_link=$HTTP_PROXY
@@ -750,6 +750,28 @@ if [ $HTTP = YES ]; then
         ngx_module_srcs=src/http/modules/ngx_http_grpc_module.c
         ngx_module_libs=
         ngx_module_link=$HTTP_GRPC
+
+        . auto/module
+    fi
+
+    if [ $HTTP_PROXY = YES -a $HTTP_V2 = YES ]; then
+        ngx_module_name=ngx_http_proxy_v2_module
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=src/http/modules/ngx_http_proxy_v2_module.c
+        ngx_module_libs=
+        ngx_module_link=$HTTP_V2
+
+        . auto/module
+    fi
+
+    if [ $HTTP_TUNNEL = YES ]; then
+        ngx_module_name=ngx_http_tunnel_module
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=src/http/modules/ngx_http_tunnel_module.c
+        ngx_module_libs=
+        ngx_module_link=$HTTP_TUNNEL
 
         . auto/module
     fi
@@ -881,6 +903,19 @@ if [ $HTTP = YES ]; then
         . auto/module
     fi
 
+    if [ $HTTP_UPSTREAM_LEAST_TIME = YES ]; then
+        have=NGX_HTTP_UPSTREAM_LEAST_TIME . auto/have
+
+        ngx_module_name=ngx_http_upstream_least_time_module
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=src/http/modules/ngx_http_upstream_least_time_module.c
+        ngx_module_libs=
+        ngx_module_link=$HTTP_UPSTREAM_LEAST_TIME
+
+        . auto/module
+    fi
+
     if [ $HTTP_UPSTREAM_RANDOM = YES ]; then
         ngx_module_name=ngx_http_upstream_random_module
         ngx_module_incs=
@@ -912,6 +947,20 @@ if [ $HTTP = YES ]; then
         ngx_module_srcs=src/http/modules/ngx_http_upstream_zone_module.c
         ngx_module_libs=
         ngx_module_link=$HTTP_UPSTREAM_ZONE
+
+        . auto/module
+    fi
+
+    if [ $HTTP_UPSTREAM_STICKY = YES ]; then
+        have=NGX_HTTP_UPSTREAM_STICKY . auto/have
+        have=NGX_HTTP_UPSTREAM_SID . auto/have
+
+        ngx_module_name=ngx_http_upstream_sticky_module
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=src/http/modules/ngx_http_upstream_sticky_module.c
+        ngx_module_libs=
+        ngx_module_link=$HTTP_UPSTREAM_STICKY
 
         . auto/module
     fi
@@ -1147,6 +1196,16 @@ if [ $STREAM != NO ]; then
         . auto/module
     fi
 
+    if [ $STREAM_PASS = YES ]; then
+        ngx_module_name=ngx_stream_pass_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_pass_module.c
+        ngx_module_libs=
+        ngx_module_link=$STREAM_PASS
+
+        . auto/module
+    fi
+
     if [ $STREAM_SET = YES ]; then
         ngx_module_name=ngx_stream_set_module
         ngx_module_deps=
@@ -1173,6 +1232,18 @@ if [ $STREAM != NO ]; then
         ngx_module_srcs=src/stream/ngx_stream_upstream_least_conn_module.c
         ngx_module_libs=
         ngx_module_link=$STREAM_UPSTREAM_LEAST_CONN
+
+        . auto/module
+    fi
+
+    if [ $STREAM_UPSTREAM_LEAST_TIME = YES ]; then
+        have=NGX_STREAM_UPSTREAM_LEAST_TIME . auto/have
+
+        ngx_module_name=ngx_stream_upstream_least_time_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_upstream_least_time_module.c
+        ngx_module_libs=
+        ngx_module_link=$STREAM_UPSTREAM_LEAST_TIME
 
         . auto/module
     fi
@@ -1286,10 +1357,11 @@ fi
 
 if [ $USE_OPENSSL = YES ]; then
     ngx_module_type=CORE
-    ngx_module_name=ngx_openssl_module
+    ngx_module_name="ngx_openssl_module ngx_openssl_cache_module"
     ngx_module_incs=
     ngx_module_deps=src/event/ngx_event_openssl.h
     ngx_module_srcs="src/event/ngx_event_openssl.c
+                     src/event/ngx_event_openssl_cache.c
                      src/event/ngx_event_openssl_stapling.c"
     ngx_module_libs=
     ngx_module_link=YES
@@ -1451,10 +1523,15 @@ cat << END                                    >> $NGX_MODULES_C
 
 END
 
+case "$NGX_PLATFORM" in
+    Linux:*)
+        have=T_PIPE_SET_SIZE . auto/have
+    ;;
+esac
+
 have=T_NGX_DNS_RESOLVE_BACKUP . auto/have
 have=T_NGX_MASTER_ENV . auto/have
 have=T_PIPES . auto/have
-have=T_PIPE_SET_SIZE . auto/have
 have=T_NGX_INPUT_BODY_FILTER . auto/have
 have=T_NGX_GZIP_CLEAR_ETAG . auto/have
 have=T_NGX_RESOLVER_FILE . auto/have
@@ -1476,6 +1553,7 @@ have=T_NGX_HTTP_SSL_VCE . auto/have
 have=T_NGX_HTTP_UPSTREAM_RANDOM . auto/have
 have=T_NGX_IMPROVED_LIST . auto/have
 have=T_NGX_SERVER_INFO . auto/have
+have=T_NGX_HTTP_TOO_MANY_HEADER_WARN . auto/have
 have=T_NGX_ACCEPT_FILTER . auto/have
 have=T_NGX_MODIFY_DEFAULT_VALUE . auto/have
 have=T_NGX_HTTP_UPSTREAM_ID . auto/have

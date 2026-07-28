@@ -47,10 +47,10 @@ ngx_udpv2_write_handler_mainlogic(ngx_event_t *wev)
     lc  = (ngx_connection_t*)(wev->data) ;
     ls = lc->listening ;
 
-    /* 不管是何种触发方式，删除写事件 */
+    /* always remove the write event regardless of trigger mode */
     ngx_del_event(wev, NGX_WRITE_EVENT, 0);
 
-    /* 处理posted的写事件 */
+    /* process posted write events */
     ngx_event_process_posted((ngx_cycle_t *) ngx_cycle, ngx_udpv2_writable_queue(ls));
 }
 

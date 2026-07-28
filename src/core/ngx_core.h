@@ -26,6 +26,7 @@ typedef struct ngx_event_aio_s       ngx_event_aio_t;
 typedef struct ngx_connection_s      ngx_connection_t;
 typedef struct ngx_thread_task_s     ngx_thread_task_t;
 typedef struct ngx_ssl_s             ngx_ssl_t;
+typedef struct ngx_ssl_cache_s       ngx_ssl_cache_t;
 typedef struct ngx_proxy_protocol_s  ngx_proxy_protocol_t;
 typedef struct ngx_ssl_connection_s  ngx_ssl_connection_t;
 typedef struct ngx_udp_connection_s  ngx_udp_connection_t;
@@ -83,6 +84,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #include <ngx_crc.h>
 #include <ngx_crc32.h>
 #include <ngx_murmurhash.h>
+#include <ngx_siphash.h>
 #if (NGX_PCRE)
 #include <ngx_regex.h>
 #endif
@@ -112,6 +114,9 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #endif
 #if (NGX_PROCS)
 #include <ngx_proc.h>
+#endif
+#if (NGX_HAVE_BPF)
+#include <ngx_bpf.h>
 #endif
 
 

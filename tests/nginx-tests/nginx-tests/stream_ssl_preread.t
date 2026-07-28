@@ -108,10 +108,6 @@ stream {
 
 EOF
 
-
-
-
-
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
 default_bits = 2048
@@ -206,12 +202,12 @@ sub get_oldver {
 
 sub get_ssl {
 	my ($host, $port) = @_;
+
 	my $s = stream(
 		PeerAddr => '127.0.0.1:' . port($port),
 		SSL => 1,
 		SSL_hostname => $host
-		);
-
+	);
 
 	return $s->read();
 }

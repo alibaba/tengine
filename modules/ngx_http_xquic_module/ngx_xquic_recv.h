@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #ifndef _T_NGX_XQUIC_RECV_H_INCLUDED_
@@ -48,6 +48,12 @@ void ngx_xquic_packet_get_cid(ngx_xquic_recv_packet_t *packet,
 void ngx_xquic_packet_get_cid_raw(xqc_engine_t *engine, unsigned char *payload, size_t sz,
     xqc_cid_t *dcid, xqc_cid_t *scid);
 
+void ngx_xquic_recv_from_reload_intercom(ngx_xquic_recv_packet_t *packet);
+
+/* Compare the address with the configured listen address; return NGX_OK on match */
+ngx_int_t ngx_xquic_sockaddr_cmp_listen(ngx_listening_t *ls, struct sockaddr *addr);
+ 
+ngx_int_t ngx_xquic_intercom_packet_dispatch(ngx_xquic_recv_packet_t *packet, uint32_t * worker_num);
 #if (T_NGX_UDPV2)
 void ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt);
 #endif
@@ -66,6 +72,7 @@ ngx_int_t   ngx_xquic_get_target_worker_from_cid(ngx_xquic_recv_packet_t *packet
 
 #define NGX_XQUIC_CHECK_MAGIC_BIT(pos) (((*(pos)) & 0x40) == 0x40)
 #define NGX_XQUIC_HEALTH_CHECK  "Healthcheck"
+#define NGX_XQUIC_KEEPALIVE_IGNORE  "Keepalived"
 #define NGX_XQUIC_HEALTH_CHECK_REQ  "UDPSTATUS"
 #define NGX_XQUIC_HEALTH_CHECK_RSP  "UDPOK"
 

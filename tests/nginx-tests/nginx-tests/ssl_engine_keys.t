@@ -28,7 +28,7 @@ plan(skip_all => 'may not work, leaves coredump')
 	unless $ENV{TEST_NGINX_UNSAFE};
 
 my $t = Test::Nginx->new()->has(qw/http proxy http_ssl/)->has_daemon('openssl')
-	->has_daemon('softhsm2-util')->has_daemon('pkcs11-tool')->plan(2);
+	->has_daemon('softhsm2-util');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -86,10 +86,29 @@ EOF
 #
 # http://mailman.nginx.org/pipermail/nginx-devel/2014-October/006151.html
 #
-# Note that library paths may differ on different systems,
+# Note that library paths vary on different systems,
 # and may need to be adjusted.
 
-$t->write_file('openssl.conf', <<EOF);
+my $libsofthsm2_path;
+my @so_paths = (
+	'/usr/lib/softhsm',		# Debian-based
+	'/usr/local/lib/softhsm',	# FreeBSD
+	'/opt/local/lib/softhsm',	# MacPorts
+	'/lib64',			# RHEL-based
+	split /:/, $ENV{TEST_NGINX_SOFTHSM} || ''
+);
+
+for my $so_path (@so_paths) {
+	$so_path .= '/libsofthsm2.so';
+	if (-e $so_path) {
+		$libsofthsm2_path = $so_path;
+		last;
+	}
+};
+
+plan(skip_all => "libsofthsm2.so not found") unless $libsofthsm2_path;
+
+my $openssl_conf = <<EOF;
 openssl_conf = openssl_def
 
 [openssl_def]
@@ -101,7 +120,7 @@ pkcs11 = pkcs11_section
 [pkcs11_section]
 engine_id = pkcs11
 dynamic_path = /usr/local/lib/engines/pkcs11.so
-MODULE_PATH = /usr/local/lib/softhsm/libsofthsm2.so
+MODULE_PATH = $libsofthsm2_path
 init = 1
 PIN = 1234
 
@@ -111,6 +130,9 @@ encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
 EOF
+
+$openssl_conf =~ s|^(?=dynamic_path)|# |m if $^O ne 'freebsd';
+$t->write_file('openssl.conf', $openssl_conf);
 
 my $d = $t->testdir();
 
@@ -129,18 +151,23 @@ foreach my $name ('localhost') {
 		. '--pin 1234 --so-pin 1234 '
 		. ">>$d/openssl.out 2>&1");
 
-	system('pkcs11-tool --module=/usr/local/lib/softhsm/libsofthsm2.so '
-		. '-p 1234 -l -k -d 0 -a nx_key_0 --key-type rsa:2048 '
-		. ">>$d/openssl.out 2>&1");
+	system("openssl genrsa -out $d/$name.key 2048 "
+		. ">>$d/openssl.out 2>&1") == 0
+		or die "Can't create private key: $!\n";
+
+	system("softhsm2-util --import $d/$name.key --id 00 --label nx_key_0 "
+		. '--token NginxZero --pin 1234 '
+		. ">>$d/openssl.out 2>&1") == 0
+		or die "Can't import private key: $!\n";
 
 	system('openssl req -x509 -new '
 		. "-subj /CN=$name/ -out $d/$name.crt -text "
 		. "-engine pkcs11 -keyform engine -key id_00 "
 		. ">>$d/openssl.out 2>&1") == 0
-		or die "Can't create certificate for $name: $!\n";
+		or plan(skip_all => "missing engine");
 }
 
-$t->run();
+$t->run()->plan(2);
 
 $t->write_file('index.html', '');
 

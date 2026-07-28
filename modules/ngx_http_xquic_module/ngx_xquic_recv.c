@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 
@@ -11,6 +11,9 @@
 #include <xquic/xquic.h>
 #include <xquic/xqc_errno.h>
 
+#define NGX_XQUIC_RECV_PACKET_DEFAULT_INTERVAL 32
+
+extern ngx_xquic_intercom_ctx_t *g_intercom_ctx;
 
 ngx_inline void
 ngx_xquic_packet_get_cid_raw(xqc_engine_t *engine, unsigned char *payload, size_t sz, 
@@ -32,6 +35,24 @@ ngx_xquic_packet_get_cid(ngx_xquic_recv_packet_t *packet,
 {
     return ngx_xquic_packet_get_cid_raw(engine, (unsigned char *)packet->buf, packet->len, &packet->xquic.dcid, &packet->xquic.scid);
 }
+
+
+inline void
+ngx_xquic_record_recv_pkts(ngx_int_t record_interval, char *mode, uint64_t *total_recv_count,
+    uint64_t *last_recv_count, ngx_msec_t *last_record_time)
+{
+    (*total_recv_count)++;
+    if (ngx_current_msec >= *last_record_time + 1000 * record_interval)
+    {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                      "|xquic|recv packet statistic|%s|pid:%d|recv pkts:%uL|total recv pkts:%uL|",
+                      mode, ngx_getpid(), *total_recv_count - *last_recv_count,
+                      *total_recv_count);
+        *last_record_time = ngx_current_msec;
+        *last_recv_count = *total_recv_count;
+    }
+}
+
 
 ngx_int_t
 ngx_xquic_recv(ngx_connection_t *c, char *buf, size_t size)
@@ -292,6 +313,7 @@ ngx_xquic_event_recv(ngx_event_t *ev)
                    &ls->addr_text, ev->available);
 
     do {
+        ngx_memset(&packet, 0, sizeof(ngx_xquic_recv_packet_t));
         packet.local_socklen = ls->socklen;
         ngx_memcpy(&packet.local_sockaddr, ls->sockaddr, ls->socklen);
 
@@ -325,6 +347,9 @@ finish_recv:
 void
 ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t *packet)
 {
+    static uint64_t     ngx_xquic_recv_count = 0; 
+    static ngx_msec_t   ngx_xquic_last_record = 0;
+    static uint64_t     ngx_xquic_last_recv_count = 0;
 
     if (ngx_terminate || ngx_exiting) {
         return;
@@ -343,7 +368,7 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
         return;
     }
 
-    /* check healthcheck */
+    /* check healthcheck & keepalive */
     if (packet->len >= sizeof(NGX_XQUIC_HEALTH_CHECK)
         && ngx_strncmp(packet->buf, NGX_XQUIC_HEALTH_CHECK, sizeof(NGX_XQUIC_HEALTH_CHECK)-1) == 0) 
     {
@@ -352,17 +377,31 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
         return;
     }
 
+    if (packet->len >= sizeof(NGX_XQUIC_KEEPALIVE_IGNORE)
+        && ngx_strncmp(packet->buf, NGX_XQUIC_KEEPALIVE_IGNORE, sizeof(NGX_XQUIC_KEEPALIVE_IGNORE)-1) == 0) 
+    {
+        ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
+                      "|xquic|keepalive ignored|");
+        return;
+    }
+
+    ngx_http_xquic_main_conf_t  *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+
     /* check healthcheck, REQ/RSP mode */
     if (packet->len == sizeof(NGX_XQUIC_HEALTH_CHECK_REQ)-1
         && ngx_strncmp(packet->buf, NGX_XQUIC_HEALTH_CHECK_REQ, sizeof(NGX_XQUIC_HEALTH_CHECK_REQ)-1) == 0)
     {
-        ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
-                      "|xquic|health check, req/rsp mode|");
-        sendto(c->fd, NGX_XQUIC_HEALTH_CHECK_RSP, sizeof(NGX_XQUIC_HEALTH_CHECK_RSP)-1, 0, &packet->sockaddr, packet->socklen);
+        if (ngx_http_xquic_check_hc_file(qmcf) == NGX_OK) {
+            ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
+                         "|xquic|health check, req/rsp mode|");
+            sendto(c->fd, NGX_XQUIC_HEALTH_CHECK_RSP, sizeof(NGX_XQUIC_HEALTH_CHECK_RSP)-1, 0, &packet->sockaddr, packet->socklen);
+
+        } else {
+            ngx_log_error(NGX_LOG_ERR, c->log, 0, "|xquic|health check file missing|%V|", &qmcf->hc_file);
+        }
+
         return;
     }
-    
-    ngx_http_xquic_main_conf_t  *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
 #if (NGX_DEBUG)
     {
@@ -383,32 +422,71 @@ ngx_xquic_dispatcher_process_packet(ngx_connection_t *c, ngx_xquic_recv_packet_t
     }
 #endif
 
-
-    ngx_int_t worker_num = ngx_xquic_intercom_packet_hash(packet);
-
-    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                    "|xquic|packet_get_cid|dcid=%s|targetWorkerId=%i|ngx_worker=%ui|", 
-                    xqc_dcid_str(&packet->xquic.dcid), worker_num, ngx_worker);
-
-    if (ngx_worker != (ngx_uint_t) worker_num) {
-        ngx_xquic_intercom_send(worker_num, packet);
-        return;
+    ngx_core_conf_t *ccf; 
+    uint64_t recv_time; 
+    uint32_t worker_num = ngx_worker;
+    recv_time = ngx_xquic_get_time();
+    /*
+     * Note: in the following three cases the packet has to be forwarded based on a hash
+     * of the cid:
+     *   - the NGX_XQUIC_SUPPORT_CID_ROUTE macro is not defined
+     *   - the cid-route switch is off
+     *   - parsing worker_id and pid fails (this can only happen when the cid is too short)
+     * However, forwarding based on the cid hash has security risks.
+     */
+#if (NGX_XQUIC_SUPPORT_CID_ROUTE) 
+    if (!ngx_xquic_is_cid_route_on((ngx_cycle_t *)ngx_cycle)) { /* cid-route switch is off */
+        goto cid_route_no_support; 
     }
 
-    uint64_t recv_time = ngx_xquic_get_time();
-    ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
-                    "|xquic|xqc_server_read_handler recv_size=%zd, recv_time=%llu|", 
-                    packet->len, recv_time);
+    ngx_int_t dispatch_result = ngx_xquic_intercom_packet_dispatch(packet, &worker_num);
+    
+    switch (dispatch_result) {
+    case NGX_XQUIC_PACKET_NO_DISPATCH:
+        goto process_packet;
+    case NGX_XQUIC_PACKET_DISPATCH_INTERCOM:
+    case NGX_XQUIC_PACKET_DISPATCH_RELOAD_INTERCOM:
+        goto send_packet;
+    case NGX_XQUIC_PACKET_DISPATCH_ERROR:
+        /* This error only occurs when the cid is too short */
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|dispatch result error|");
+        goto cid_route_no_support;
+    default:
+        ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                "|xquic|xqc_server_read_handler recv_size=%zd, recv_time=%llu|", 
+                packet->len, recv_time);
+        goto process_packet;
+    }
+#endif 
 
+cid_route_no_support:
+    ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, ngx_core_module);
+    worker_num = ngx_murmur_hash2(packet->xquic.dcid.cid_buf, packet->xquic.dcid.cid_len)
+                                                % ccf->worker_processes;
+
+    if (ngx_worker != (ngx_uint_t) worker_num) {
+        goto send_packet;
+    } else {
+        goto process_packet;
+    }
+
+send_packet:
+    ngx_xquic_intercom_send(worker_num, packet, g_intercom_ctx);
+    return;
+ 
+process_packet:
+    ngx_xquic_record_recv_pkts(NGX_XQUIC_RECV_PACKET_DEFAULT_INTERVAL, "kernel",
+                               &ngx_xquic_recv_count, &ngx_xquic_last_recv_count, &ngx_xquic_last_record);
     if (xqc_engine_packet_process(qmcf->xquic_engine, (u_char *)packet->buf, packet->len,
                                   (struct sockaddr *) &(packet->local_sockaddr), packet->local_socklen,
                                   (struct sockaddr *) &(packet->sockaddr), packet->socklen, 
                                   (xqc_msec_t) recv_time, c) != 0) 
     {
         ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
-                    "|xquic|xqc_server_read_handler: packet process err|");
-        return;
+                      "|xquic|xqc_server_read_handler: packet process err|");
     }
+    
+    return;
 }
 
 
@@ -490,7 +568,89 @@ ngx_xquic_cmp_sockaddr(struct sockaddr *sa1, struct sockaddr *sa2)
     return NGX_OK;
 }
 
+ngx_int_t
+ngx_xquic_sockaddr_cmp_listen(ngx_listening_t *ls, struct sockaddr *addr)
+{
+    if (ls->wildcard) {
+        /* listen on *:port  */
+        if ((ls->sockaddr)->sa_family != addr->sa_family) {
+            return NGX_DECLINED;
+        }
+        if (ngx_xquic_sockaddr_port(ls->sockaddr) != ngx_xquic_sockaddr_port(addr)) {
+            return NGX_DECLINED;
+        }
+    } else {
+        if (ngx_xquic_cmp_sockaddr(ls->sockaddr, addr) != NGX_OK) {
+            return NGX_DECLINED;
+        }
+    }
+    
+    return NGX_OK; //match success
+}
 
+void
+ngx_xquic_recv_from_reload_intercom(ngx_xquic_recv_packet_t *packet)
+{
+    u_char                  text[NGX_SOCKADDR_STRLEN];
+    ngx_str_t               addr;
+    ngx_uint_t              i;
+    ngx_listening_t        *ls, **lsp;
+    ngx_connection_t       *c;
+    ngx_xquic_intercom_ctx_t    *ctx = g_intercom_ctx;
+    if (ngx_terminate) {
+        return;
+    }
+
+    if (ctx == NULL) {
+        return;
+    }
+    ngx_http_xquic_main_conf_t       *qmcf;
+
+    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
+    
+    lsp = (ngx_listening_t **) ctx->xquic_ls.elts;
+    for (i = 0; i < ctx->xquic_ls.nelts; i++) {
+        ls = lsp[i];       
+
+        if (ls->fd == -1) {
+            continue;
+        }
+
+        if (ngx_xquic_sockaddr_cmp_listen(ls, &packet->local_sockaddr) != NGX_OK) {
+            continue;
+        }
+
+        ngx_log_error(NGX_LOG_DEBUG, ctx->log, 0, "|xquic|listening:%p|worker:%d, ngx_worker:%d|",
+                ls, ls->worker, ngx_worker);
+        c = ls->connection;
+ 
+        uint64_t recv_time = ngx_xquic_get_time();
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                    "|xquic|xqc_server_read_handler recv_size=%zd, recv_time=%llu|\
+                    dcid=%s|ngx_worker=%ui|", 
+                    packet->len, recv_time, 
+                    xqc_dcid_str(qmcf->xquic_engine, &packet->xquic.dcid), ngx_worker);
+
+        if (xqc_engine_packet_process(qmcf->xquic_engine, (u_char *)packet->buf, packet->len,
+                                  (struct sockaddr *) &(packet->local_sockaddr), packet->local_socklen,
+                                  (struct sockaddr *) &(packet->sockaddr), packet->socklen, 
+                                  (xqc_msec_t) recv_time, c) != 0) 
+        {
+            ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                    "|xquic|xqc_server_read_handler: packet process err|");
+        }
+        return;
+    }
+
+    addr.data = text;
+    addr.len = ngx_sock_ntop(&packet->local_sockaddr, packet->local_socklen, text,
+                             NGX_SOCKADDR_STRLEN, 1);
+
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                  "|xquic|recv_from_intercom: can't find dispatcher for packet|by address %V|",
+                  &addr);
+
+}
 
 
 void
@@ -525,20 +685,8 @@ ngx_xquic_recv_from_intercom(ngx_xquic_recv_packet_t *packet)
             continue;
         }
 
-        if (ls[i].wildcard) {
-            /* listen on *:port  */
-
-            if ((ls[i].sockaddr)->sa_family != packet->local_sockaddr.sa_family) {
-                continue;
-            }
-
-            if (ngx_xquic_sockaddr_port(ls[i].sockaddr) != ngx_xquic_sockaddr_port(&packet->local_sockaddr)) {
-                continue;
-            }
-        } else {
-            if (ngx_xquic_cmp_sockaddr(ls[i].sockaddr, &packet->local_sockaddr) != NGX_OK) {
-                continue;
-            }
+        if (ngx_xquic_sockaddr_cmp_listen(&ls[i], &packet->local_sockaddr) != NGX_OK) {
+            continue;
         }
 
         c = ls[i].connection;
@@ -565,6 +713,14 @@ ngx_xquic_udpv2_dispatch_packet(xqc_engine_t *engine, const ngx_udpv2_packet_t *
     uint64_t recv_time;
     recv_time = upkt->pkt_micrs ? upkt->pkt_micrs : ngx_xquic_get_time();
 
+    /* Periodically log the number of xquic packets received via xudp for monitoring */
+    static uint64_t ngx_xudp_recv_count = 0; 
+    static ngx_msec_t ngx_xudp_last_record = 0;
+    static uint64_t ngx_xudp_last_recv_count = 0;
+    ngx_xquic_record_recv_pkts(NGX_XQUIC_RECV_PACKET_DEFAULT_INTERVAL, "xudp", 
+                              &ngx_xudp_recv_count, &ngx_xudp_last_recv_count, &ngx_xudp_last_record);
+
+
     if (xqc_engine_packet_process(engine, (u_char *)upkt->pkt_payload, upkt->pkt_sz,
                                   (struct sockaddr *) &(upkt->pkt_local_sockaddr), upkt->pkt_local_socklen,
                                   (struct sockaddr *) &(upkt->pkt_sockaddr), upkt->pkt_socklen,
@@ -582,13 +738,13 @@ ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt
 
     ngx_http_xquic_main_conf_t  *qmcf;
 
-    if (ngx_terminate || ngx_exiting) {
+    if (ngx_terminate) { /* Only stop processing packets when terminating */
         return;
     }
 
     if (c->data == NULL) {
         ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                      "|xquic|ngx_xquic_dispatcher_process_packet: engine NULL|");
+                      "|xquic|ngx_xquic_dispatcher_process: engine NULL|");
         return;
     }
 
@@ -610,13 +766,26 @@ ngx_xquic_dispatcher_process(ngx_connection_t *c, const ngx_udpv2_packet_t *upkt
         return;
     }
 
+    if (upkt->pkt_sz >= sizeof(NGX_XQUIC_KEEPALIVE_IGNORE)
+        && ngx_strncmp(upkt->pkt_payload, NGX_XQUIC_KEEPALIVE_IGNORE, sizeof(NGX_XQUIC_KEEPALIVE_IGNORE)-1) == 0) 
+    {
+        ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
+                      "|xquic|keepalive ignored|");
+        return;
+    }
+
     /* check healthcheck, REQ/RSP mode */
     if (upkt->pkt_sz == sizeof(NGX_XQUIC_HEALTH_CHECK_REQ)-1
         && ngx_strncmp(upkt->pkt_payload, NGX_XQUIC_HEALTH_CHECK_REQ, sizeof(NGX_XQUIC_HEALTH_CHECK_REQ)-1) == 0)
     {
-        ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
-                      "|xquic|health check, req/rsp mode|");
-        sendto(c->fd, NGX_XQUIC_HEALTH_CHECK_RSP, sizeof(NGX_XQUIC_HEALTH_CHECK_RSP)-1, 0, &(upkt->pkt_sockaddr.sockaddr), upkt->pkt_socklen);
+        if (ngx_http_xquic_check_hc_file(qmcf) == NGX_OK) {
+            ngx_log_debug(NGX_LOG_DEBUG, c->log, 0,
+                        "|xquic|health check, req/rsp mode|");
+            sendto(c->fd, NGX_XQUIC_HEALTH_CHECK_RSP, sizeof(NGX_XQUIC_HEALTH_CHECK_RSP)-1, 0, &(upkt->pkt_sockaddr.sockaddr), upkt->pkt_socklen);
+            
+        } else {
+            ngx_log_error(NGX_LOG_ERR, c->log, 0, "|xquic|health check file missing|%V|", &qmcf->hc_file);
+        }
         return;
     }
 

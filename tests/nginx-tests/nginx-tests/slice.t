@@ -22,8 +22,8 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice rewrite/)
-	->plan(79);
+my $t = Test::Nginx->new()->has(qw/http proxy cache fastcgi slice rewrite map/)
+	->plan(85);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -43,6 +43,10 @@ http {
 
     fastcgi_cache_path   %%TESTDIR%%/cache2  keys_zone=NAME2:1m;
     fastcgi_cache_key    $uri$is_args$args$slice_range;
+
+    map $http_range $range {
+        ~bytes=(.+) $1;
+    }
 
     server {
         listen       127.0.0.1:8080;
@@ -114,7 +118,43 @@ http {
         location / {
             if ($http_range = "") {
                 set $limit_rate 100;
-	    }
+            }
+        }
+
+        location /bad_status {
+            add_header Content-Range "bytes 0-1/100";
+
+            if ($http_range = "bytes=2-3") {
+                return 200;
+            }
+
+            return 206 fo;
+        }
+
+        location /bad_etag {
+            add_header Content-Range "bytes $range/100";
+            add_header ETag $http_range;
+            return 206 fo;
+        }
+
+        location /bad_crange {
+            add_header Content-Range "bytes";
+            return 206 fo;
+        }
+
+        location /bad_length {
+            add_header Content-Range "bytes 0-1/*";
+            return 206 fo;
+        }
+
+        location /bad_range1 {
+            add_header Content-Range "bytes 0-2/100";
+            return 206 foo;
+        }
+
+        location /bad_range2 {
+            add_header Content-Range "bytes 1-2/100";
+            return 206 fo;
         }
     }
 }
@@ -292,6 +332,15 @@ $r = http_get('/cache-redirect');
 like($r, qr/ 200 .*^0123456789abcdef$/ms, 'in named location');
 is(scalar @{[ glob $t->testdir() . '/cach3/*' ]}, 8,
 	'in named location - cache entries');
+
+# invalid ranges
+
+ok(!get('/proxy/bad_status', ''), 'bad range - status');
+ok(!get('/proxy/bad_etag', ''), 'bad range - etag');
+ok(!get('/proxy/bad_crange', ''), 'bad range - content-range');
+ok(!get('/proxy/bad_length', ''), 'bad range - incomplete length');
+ok(!get('/proxy/bad_range1', ''), 'bad range - unexpected range 1');
+ok(!get('/proxy/bad_range2', ''), 'bad range - unexpected range 2');
 
 ###############################################################################
 

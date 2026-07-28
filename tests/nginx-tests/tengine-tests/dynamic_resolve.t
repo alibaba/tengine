@@ -126,8 +126,11 @@ foreach my $ip (@server_addrs) {
     $t->run_daemon(\&http_daemon, $ip);
 }
 
-$t->run_daemon(\&dns_server_daemon);
+$t->run_daemon(\&dns_server_daemon, $t);
 my $dns_pid = pop @{$t->{_daemons}};
+
+$t->waitforfile($t->testdir . '/dns_server.ready')
+    or die "+ failed to start dns server!\n";
 
 $t->run();
 
@@ -135,11 +138,12 @@ $t->run();
 
 unlike(http_get('/static'), qr/127.0.0.1/,
     'static resolved should be taobao\' IP addr');
-like(http_get('/'), qr/127\.0\.0\.2/,
+like(http_get_retry('/', qr/127\.0\.0\.2/, 3), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2');
 
 # test variable in proxy_pass argument
-like(http_get('/proxy_pass_var'), qr/127\.0\.0\.2/,
+like(http_get_retry('/proxy_pass_var', qr/127\.0\.0\.2/, 3),
+    qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2 for /proxy_pass_var');
 
 # kill dns daemon
@@ -158,6 +162,17 @@ like(http_get('/shutdown'), qr/502 Bad Gateway/,
 like(http_get('/next'), qr/127\.0\.0\.1/, 'next upstream should be 127.0.0.1');
 
 ###############################################################################
+
+sub http_get_retry {
+    my ($uri, $pattern, $tries) = @_;
+    my $resp;
+    for (1 .. $tries) {
+        $resp = http_get($uri);
+        return $resp if $resp =~ $pattern;
+        select undef, undef, undef, 0.3;
+    }
+    return $resp;
+}
 
 sub http_daemon {
     my $addr = shift @_;
@@ -250,6 +265,8 @@ sub reply_handler {
 }
 
 sub dns_server_daemon {
+    my ($t) = @_;
+
     eval { require Net::DNS::Nameserver; };
 
     my $ns = new Net::DNS::Nameserver(
@@ -258,6 +275,11 @@ sub dns_server_daemon {
         ReplyHandler => \&reply_handler,
         Verbose      => 0
     ) or die "couldn't create nameserver object\n";
+
+    # signal readiness — socket is already bound at this point
+    open(my $fh, '>', $t->testdir . '/dns_server.ready')
+        or die "cannot create ready file: $!";
+    close($fh);
 
     $ns->start_server(1);
 }

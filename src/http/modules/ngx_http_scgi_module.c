@@ -151,6 +151,20 @@ static ngx_command_t ngx_http_scgi_commands[] = {
       offsetof(ngx_http_scgi_loc_conf_t, upstream.socket_keepalive),
       NULL },
 
+    { ngx_string("scgi_socket_rcvbuf"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.socket_rcvbuf),
+      NULL },
+
+    { ngx_string("scgi_socket_sndbuf"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_scgi_loc_conf_t, upstream.socket_sndbuf),
+      NULL },
+
     { ngx_string("scgi_connect_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -223,7 +237,7 @@ static ngx_command_t ngx_http_scgi_commands[] = {
 
     { ngx_string("scgi_limit_rate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_size_slot,
+      ngx_http_set_complex_value_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_scgi_loc_conf_t, upstream.limit_rate),
       NULL },
@@ -462,9 +476,18 @@ static ngx_str_t ngx_http_scgi_hide_headers[] = {
 };
 
 
+static ngx_keyval_t  ngx_http_scgi_headers[] = {
+    { ngx_string("HTTP_HOST"),
+      ngx_string("$host$is_request_port$request_port") },
+    { ngx_null_string, ngx_null_string }
+};
+
+
 #if (NGX_HTTP_CACHE)
 
 static ngx_keyval_t  ngx_http_scgi_cache_headers[] = {
+    { ngx_string("HTTP_HOST"),
+      ngx_string("$host$is_request_port$request_port") },
     { ngx_string("HTTP_IF_MODIFIED_SINCE"),
       ngx_string("$upstream_cache_last_modified") },
     { ngx_string("HTTP_IF_UNMODIFIED_SINCE"), ngx_string("") },
@@ -643,7 +666,7 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
 {
     off_t                         content_length_n;
     u_char                        ch, sep, *key, *val, *lowcase_key;
-    size_t                        len, key_len, val_len, allocated;
+    size_t                        len, params_len, key_len, val_len, allocated;
     ngx_buf_t                    *b;
     ngx_str_t                     content_length;
     ngx_uint_t                    i, n, hash, skip_empty, header_params;
@@ -658,11 +681,9 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
     u_char                        buffer[NGX_OFF_T_LEN];
 
     content_length_n = 0;
-    body = r->upstream->request_bufs;
 
-    while (body) {
-        content_length_n += ngx_buf_size(body->buf);
-        body = body->next;
+    if (r->headers_in.content_length_n > 0) {
+        content_length_n = r->headers_in.content_length_n;
     }
 
     content_length.data = buffer;
@@ -670,6 +691,7 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
 
     len = sizeof("CONTENT_LENGTH") + content_length.len + 1;
 
+    params_len = 0;
     header_params = 0;
     ignored = NULL;
 
@@ -707,8 +729,10 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
                 continue;
             }
 
-            len += key_len + val_len + 1;
+            params_len += key_len + val_len + 1;
         }
+
+        len += params_len;
     }
 
     if (scf->upstream.pass_request_headers) {
@@ -823,6 +847,7 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
 
         e.ip = params->values->elts;
         e.pos = b->last;
+        e.end = b->last + params_len;
         e.request = r;
         e.flushed = 1;
 
@@ -861,6 +886,10 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
             code = *(ngx_http_script_code_pt *) e.ip;
             code((ngx_http_script_engine_t *) &e);
 
+            if (e.status) {
+                return NGX_ERROR;
+            }
+
 #if (NGX_DEBUG)
             val = e.pos;
 #endif
@@ -868,11 +897,26 @@ ngx_http_scgi_create_request(ngx_http_request_t *r)
                 code = *(ngx_http_script_code_pt *) e.ip;
                 code((ngx_http_script_engine_t *) &e);
             }
+
+            if (e.status) {
+                return NGX_ERROR;
+            }
+
+            if (ngx_http_script_check_length(&e, 1) != NGX_OK) {
+                return NGX_ERROR;
+            }
+
             *e.pos++ = '\0';
             e.ip += sizeof(uintptr_t);
 
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "scgi param: \"%s: %s\"", key, val);
+        }
+
+        if (e.pos != e.end) {
+            ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                          "scgi request length mismatch");
+            return NGX_ERROR;
         }
 
         b->last = e.pos;
@@ -1038,6 +1082,8 @@ ngx_http_scgi_process_status_line(ngx_http_request_t *r)
 
     if (rc == NGX_ERROR) {
         u->process_header = ngx_http_scgi_process_header;
+        u->buffer.pos = status->line_start;
+        r->state = 0;
         return ngx_http_scgi_process_header(r);
     }
 
@@ -1162,7 +1208,10 @@ ngx_http_scgi_process_header(ngx_http_request_t *r)
                 }
 
                 u->headers_in.status_n = status;
-                u->headers_in.status_line = *status_line;
+
+                if (status_line->len > 3) {
+                    u->headers_in.status_line = *status_line;
+                }
 
             } else if (u->headers_in.location) {
                 u->headers_in.status_n = 302;
@@ -1289,6 +1338,21 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    /*
+     * set by ngx_pcalloc():
+     *
+     *     conf->upstream.bufs.num = 0;
+     *     conf->upstream.ignore_headers = 0;
+     *     conf->upstream.next_upstream = 0;
+     *     conf->upstream.cache_zone = NULL;
+     *     conf->upstream.cache_use_stale = 0;
+     *     conf->upstream.cache_methods = 0;
+     *     conf->upstream.temp_path = NULL;
+     *     conf->upstream.hide_headers_hash = { NULL, 0 };
+     *     conf->upstream.store_lengths = NULL;
+     *     conf->upstream.store_values = NULL;
+     */
+
     conf->upstream.store = NGX_CONF_UNSET;
     conf->upstream.store_access = NGX_CONF_UNSET_UINT;
     conf->upstream.next_upstream_tries = NGX_CONF_UNSET_UINT;
@@ -1299,6 +1363,8 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.local = NGX_CONF_UNSET_PTR;
     conf->upstream.socket_keepalive = NGX_CONF_UNSET;
+    conf->upstream.socket_rcvbuf = NGX_CONF_UNSET_SIZE;
+    conf->upstream.socket_sndbuf = NGX_CONF_UNSET_SIZE;
 
     conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
@@ -1307,7 +1373,7 @@ ngx_http_scgi_create_loc_conf(ngx_conf_t *cf)
 
     conf->upstream.send_lowat = NGX_CONF_UNSET_SIZE;
     conf->upstream.buffer_size = NGX_CONF_UNSET_SIZE;
-    conf->upstream.limit_rate = NGX_CONF_UNSET_SIZE;
+    conf->upstream.limit_rate = NGX_CONF_UNSET_PTR;
 
     conf->upstream.busy_buffers_size_conf = NGX_CONF_UNSET_SIZE;
     conf->upstream.max_temp_file_size_conf = NGX_CONF_UNSET_SIZE;
@@ -1400,6 +1466,12 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->upstream.socket_keepalive,
                               prev->upstream.socket_keepalive, 0);
 
+    ngx_conf_merge_size_value(conf->upstream.socket_rcvbuf,
+                              prev->upstream.socket_rcvbuf, 0);
+
+    ngx_conf_merge_size_value(conf->upstream.socket_sndbuf,
+                              prev->upstream.socket_sndbuf, 0);
+
     ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
                               prev->upstream.connect_timeout, 60000);
 
@@ -1419,8 +1491,8 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               prev->upstream.buffer_size,
                               (size_t) ngx_pagesize);
 
-    ngx_conf_merge_size_value(conf->upstream.limit_rate,
-                              prev->upstream.limit_rate, 0);
+    ngx_conf_merge_ptr_value(conf->upstream.limit_rate,
+                              prev->upstream.limit_rate, NULL);
 
 
     ngx_conf_merge_bufs_value(conf->upstream.bufs, prev->upstream.bufs,
@@ -1534,7 +1606,7 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_conf_merge_path_value(cf, &conf->upstream.temp_path,
                                   prev->upstream.temp_path,
                                   &ngx_http_scgi_temp_path)
-        != NGX_OK)
+        != NGX_CONF_OK)
     {
         return NGX_CONF_ERROR;
     }
@@ -1666,7 +1738,8 @@ ngx_http_scgi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->params_source = prev->params_source;
     }
 
-    rc = ngx_http_scgi_init_params(cf, conf, &conf->params, NULL);
+    rc = ngx_http_scgi_init_params(cf, conf, &conf->params,
+                                   ngx_http_scgi_headers);
     if (rc != NGX_OK) {
         return NGX_CONF_ERROR;
     }
@@ -1984,6 +2057,11 @@ ngx_http_scgi_store(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (ngx_strcmp(value[1].data, "off") == 0) {
         scf->upstream.store = 0;
         return NGX_CONF_OK;
+    }
+
+    if (value[1].len == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "empty path");
+        return NGX_CONF_ERROR;
     }
 
 #if (NGX_HTTP_CACHE)

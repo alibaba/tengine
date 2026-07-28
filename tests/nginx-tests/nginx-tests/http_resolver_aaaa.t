@@ -89,7 +89,7 @@ like(http_host_header('cname.example.net', '/'), qr/\[fe80::1\]/,
 # CNAME + AAAA combined answer
 # demonstrates the name in answer section different from what is asked
 
-like(http_host_header('cname_a.example.net', '/'), qr/\[::1\]/, 'CNAME + AAAA');
+like(http_host_header('cname-a.example.net', '/'), qr/\[::1\]/, 'CNAME + AAAA');
 
 # many AAAA records in round robin
 # nonexisting IPs enumerated with proxy_next_upstream
@@ -117,118 +117,118 @@ like(http_host_header('2.example.net', '/two'), qr/200 OK/, 'two ns cached');
 
 # various ipv4/ipv6 combinations
 
-$response = http_host_header('z_z.example.net', '/');
+$response = http_host_header('z-z.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'zero zero responses');
 like($response, qr/502 Bad/, 'zero zero');
 
-like(http_host_header('z_n.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
+like(http_host_header('z-n.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
 	'zero AAAA');
 
-$response = http_host_header('z_c.example.net', '/');
+$response = http_host_header('z-c.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'zero CNAME responses');
 like($response, qr/127.0.0.201:$p0/, 'zero CNAME 1');
 like($response, qr/\[fe80::1\]:$p0/, 'zero CNAME 2');
 
-$response = http_host_header('z_cn.example.net', '/');
+$response = http_host_header('z-cn.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'zero CNAME+AAAA responses');
 like($response, qr/\[fe80::1\]:$p0/, 'zero CNAME+AAAA 1');
 like($response, qr/\[fe80::2\]:$p0/, 'zero CNAME+AAAA 2');
 
-$response = http_host_header('z_e.example.net', '/');
+$response = http_host_header('z-e.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'zero error responses');
 like($response, qr/502 Bad/, 'zero error');
 
-like(http_host_header('n_z.example.net', '/'), qr/^127.0.0.201:$p0$/ms,
+like(http_host_header('n-z.example.net', '/'), qr/^127.0.0.201:$p0$/ms,
 	'A zero');
 
-$response = http_host_header('n_n.example.net', '/');
+$response = http_host_header('n-n.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'A AAAA responses');
 like($response, qr/127.0.0.201:$p0/, 'A AAAA 1');
 like($response, qr/\[fe80::1\]:$p0/, 'A AAAA 2');
 
-like(http_host_header('n_c.example.net', '/'), qr/^127.0.0.201:$p0$/ms,
+like(http_host_header('n-c.example.net', '/'), qr/^127.0.0.201:$p0$/ms,
 	'A CNAME');
 
-$response = http_host_header('n_cn.example.net', '/');
+$response = http_host_header('n-cn.example.net', '/');
 is(@n = $response =~ /$p0/g, 4, 'A CNAME+AAAA responses');
 like($response, qr/127.0.0.201:$p0/, 'A CNAME+AAAA 1');
 like($response, qr/127.0.0.202:$p0/, 'A CNAME+AAAA 2');
 like($response, qr/\[fe80::1\]:$p0/, 'A CNAME+AAAA 3');
 like($response, qr/\[fe80::2\]:$p0/, 'A CNAME+AAAA 4');
 
-$response = http_host_header('n_e.example.net', '/');
+$response = http_host_header('n-e.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'A error responses');
 like($response, qr/502 Bad/, 'A error');
 
-$response = http_host_header('c_z.example.net', '/');
+$response = http_host_header('c-z.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'CNAME zero responses');
 like($response, qr/502 Bad/, 'CNAME zero');
 
-like(http_host_header('c_n.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
+like(http_host_header('c-n.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
 	'CNAME AAAA');
 
-$response = http_host_header('c_c.example.net', '/');
+$response = http_host_header('c-c.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'CNAME CNAME responses');
 like($response, qr/127.0.0.201:$p0/, 'CNAME CNAME 1');
 like($response, qr/\[fe80::1\]:$p0/, 'CNAME CNAME 2');
 
-like(http_host_header('c1_c2.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
+like(http_host_header('c1-c2.example.net', '/'), qr/^\[fe80::1\]:$p0$/ms,
 	'CNAME1 CNAME2');
 
-$response = http_host_header('c_cn.example.net', '/');
+$response = http_host_header('c-cn.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'CNAME CNAME+AAAA responses');
 like($response, qr/\[fe80::1\]:$p0/, 'CNAME CNAME+AAAA 1');
 like($response, qr/\[fe80::2\]:$p0/, 'CNAME CNAME+AAAA 1');
 
-$response = http_host_header('c_e.example.net', '/');
+$response = http_host_header('c-e.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'CNAME error responses');
 like($response, qr/502 Bad/, 'CNAME error');
 
-$response = http_host_header('cn_z.example.net', '/');
+$response = http_host_header('cn-z.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'CNAME+A zero responses');
 like($response, qr/127.0.0.201:$p0/, 'CNAME+A zero 1');
 like($response, qr/127.0.0.202:$p0/, 'CNAME+A zero 2');
 
-$response = http_host_header('cn_n.example.net', '/');
+$response = http_host_header('cn-n.example.net', '/');
 is(@n = $response =~ /$p0/g, 4, 'CNAME+A AAAA responses');
 like($response, qr/127.0.0.201:$p0/, 'CNAME+A AAAA 1');
 like($response, qr/127.0.0.202:$p0/, 'CNAME+A AAAA 2');
 like($response, qr/\[fe80::1\]:$p0/, 'CNAME+A AAAA 3');
 like($response, qr/\[fe80::2\]:$p0/, 'CNAME+A AAAA 4');
 
-$response = http_host_header('cn_c.example.net', '/');
+$response = http_host_header('cn-c.example.net', '/');
 is(@n = $response =~ /$p0/g, 2, 'CNAME+A CNAME responses');
 like($response, qr/127.0.0.201:$p0/, 'CNAME+A CNAME 1');
 like($response, qr/127.0.0.202:$p0/, 'CNAME+A CNAME 2');
 
-$response = http_host_header('cn_cn.example.net', '/');
+$response = http_host_header('cn-cn.example.net', '/');
 is(@n = $response =~ /$p0/g, 4, 'CNAME+A CNAME+AAAA responses');
 like($response, qr/127.0.0.201:$p0/, 'CNAME+A CNAME+AAAA 1');
 like($response, qr/127.0.0.202:$p0/, 'CNAME+A CNAME+AAAA 2');
 like($response, qr/\[fe80::1\]:$p0/, 'CNAME+A CNAME+AAAA 3');
 like($response, qr/\[fe80::2\]:$p0/, 'CNAME+A CNAME+AAAA 4');
 
-$response = http_host_header('cn_e.example.net', '/');
+$response = http_host_header('cn-e.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'CNAME+A error responses');
 like($response, qr/502 Bad/, 'CNAME+A error');
 
-$response = http_host_header('e_z.example.net', '/');
+$response = http_host_header('e-z.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'error zero responses');
 like($response, qr/502 Bad/, 'error zero');
 
-$response = http_host_header('e_n.example.net', '/');
+$response = http_host_header('e-n.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'error AAAA responses');
 like($response, qr/502 Bad/, 'error AAAA');
 
-$response = http_host_header('e_c.example.net', '/');
+$response = http_host_header('e-c.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'error CNAME responses');
 like($response, qr/502 Bad/, 'error CNAME');
 
-$response = http_host_header('e_cn.example.net', '/');
+$response = http_host_header('e-cn.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'error CNAME+AAAA responses');
 like($response, qr/502 Bad/, 'error CNAME+AAAA');
 
-$response = http_host_header('e_e.example.net', '/');
+$response = http_host_header('e-e.example.net', '/');
 is(@n = $response =~ /$p0/g, 0, 'error error responses');
 like($response, qr/502 Bad/, 'error error');
 
@@ -320,7 +320,7 @@ sub reply_handler {
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 			8, 5, 'alias', 0xc012);
 
-	} elsif ($name eq 'cname_a.example.net') {
+	} elsif ($name eq 'cname-a.example.net') {
 		push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 			8, 5, 'alias', 0xc014);
 
@@ -343,21 +343,21 @@ sub reply_handler {
 			push @rdata, rd_addr6($ttl, '::1');
 		}
 
-	} elsif ($name eq 'z_z.example.net') {
+	} elsif ($name eq 'z-z.example.net') {
 		# assume no answers given
 
-	} elsif ($name eq 'z_n.example.net') {
+	} elsif ($name eq 'z-n.example.net') {
 		if ($type == AAAA) {
 			push @rdata, rd_addr6($ttl, 'fe80::1');
 		}
 
-	} elsif ($name eq 'z_c.example.net') {
+	} elsif ($name eq 'z-c.example.net') {
 		if ($type == AAAA) {
 			push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 				9, 6, 'alias2', 0xc010);
 		}
 
-	} elsif ($name eq 'z_cn.example.net') {
+	} elsif ($name eq 'z-cn.example.net') {
 		if ($type == AAAA) {
 			push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 				8, 5, 'alias', 0xc011);
@@ -367,17 +367,17 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'z_e.example.net') {
+	} elsif ($name eq 'z-e.example.net') {
 		if ($type == AAAA) {
 			$rcode = SERVFAIL;
 		}
 
-	} elsif ($name eq 'n_z.example.net') {
+	} elsif ($name eq 'n-z.example.net') {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.201');
 		}
 
-	} elsif ($name eq 'n_n.example.net') {
+	} elsif ($name eq 'n-n.example.net') {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.201');
 		}
@@ -385,7 +385,7 @@ sub reply_handler {
 			push @rdata, rd_addr6($ttl, 'fe80::1');
 		}
 
-	} elsif ($name eq 'n_c.example.net') {
+	} elsif ($name eq 'n-c.example.net') {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.201');
 		}
@@ -394,7 +394,7 @@ sub reply_handler {
 				9, 6, 'alias2', 0xc010);
 		}
 
-	} elsif ($name eq 'n_cn.example.net') {
+	} elsif ($name eq 'n-cn.example.net') {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.201');
 			push @rdata, rd_addr($ttl, '127.0.0.202');
@@ -408,7 +408,7 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'n_e.example.net') {
+	} elsif ($name eq 'n-e.example.net') {
 		if ($type == A) {
 			push @rdata, rd_addr($ttl, '127.0.0.201');
 		}
@@ -416,13 +416,13 @@ sub reply_handler {
 			$rcode = SERVFAIL;
 		}
 
-	} elsif ($name eq 'c_z.example.net') {
+	} elsif ($name eq 'c-z.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 				8, 5, 'alias', 0xc010);
 		}
 
-	} elsif ($name eq 'c_n.example.net') {
+	} elsif ($name eq 'c-n.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa5n", 0xc00c, CNAME, IN, $ttl,
 				8, 5, 'alias', 0xc010);
@@ -431,11 +431,11 @@ sub reply_handler {
 			push @rdata, rd_addr6($ttl, "fe80::1");
 		}
 
-	} elsif ($name eq 'c_c.example.net') {
+	} elsif ($name eq 'c-c.example.net') {
 		push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 			9, 6, 'alias2', 0xc010);
 
-	} elsif ($name eq 'c1_c2.example.net') {
+	} elsif ($name eq 'c1-c2.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 				9, 6, 'alias4', 0xc012);
@@ -445,7 +445,7 @@ sub reply_handler {
 				9, 6, 'alias6', 0xc012);
 		}
 
-	} elsif ($name eq 'c_cn.example.net') {
+	} elsif ($name eq 'c-cn.example.net') {
 		push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 			9, 6, 'alias2', 0xc011);
 
@@ -456,7 +456,7 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'cn_z.example.net') {
+	} elsif ($name eq 'cn-z.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 				9, 6, 'alias2', 0xc011);
@@ -466,7 +466,7 @@ sub reply_handler {
 				4, split('\.', '127.0.0.202'));
 		}
 
-	} elsif ($name eq 'cn_n.example.net') {
+	} elsif ($name eq 'cn-n.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 				9, 6, 'alias2', 0xc011);
@@ -482,7 +482,7 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'cn_c.example.net') {
+	} elsif ($name eq 'cn-c.example.net') {
 		push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 			9, 6, 'alias2', 0xc011);
 		if ($type == A) {
@@ -492,7 +492,7 @@ sub reply_handler {
 				4, split('\.', '127.0.0.202'));
 		}
 
-	} elsif ($name eq 'cn_cn.example.net') {
+	} elsif ($name eq 'cn-cn.example.net') {
 		push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 			9, 6, 'alias2', 0xc012);
 
@@ -509,7 +509,7 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'cn_e.example.net') {
+	} elsif ($name eq 'cn-e.example.net') {
 		if ($type == A) {
 			push @rdata, pack("n3N nCa6n", 0xc00c, CNAME, IN, $ttl,
 				9, 6, 'alias2', 0xc011);
@@ -523,12 +523,12 @@ sub reply_handler {
 		}
 
 
-	} elsif ($name eq 'e_z.example.net') {
+	} elsif ($name eq 'e-z.example.net') {
 		if ($type == A) {
 			$rcode = SERVFAIL;
 		}
 
-	} elsif ($name eq 'e_n.example.net') {
+	} elsif ($name eq 'e-n.example.net') {
 		if ($type == A) {
 			$rcode = SERVFAIL;
 		}
@@ -536,7 +536,7 @@ sub reply_handler {
 			push @rdata, rd_addr6($ttl, 'fe80::1');
 		}
 
-	} elsif ($name eq 'e_c.example.net') {
+	} elsif ($name eq 'e-c.example.net') {
 		if ($type == A) {
 			$rcode = SERVFAIL;
 		}
@@ -545,7 +545,7 @@ sub reply_handler {
 				9, 6, 'alias2', 0xc010);
 		}
 
-	} elsif ($name eq 'e_cn.example.net') {
+	} elsif ($name eq 'e-cn.example.net') {
 		if ($type == A) {
 			$rcode = SERVFAIL;
 		}
@@ -558,7 +558,7 @@ sub reply_handler {
 				16, expand_ip6("fe80::2"));
 		}
 
-	} elsif ($name eq 'e_e.example.net') {
+	} elsif ($name eq 'e-e.example.net') {
 		if ($type == A) {
 			$rcode = SERVFAIL;
 		}

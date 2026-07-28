@@ -12,6 +12,7 @@
 #include <ngx_xquic_recv.h>
 #include <ngx_xquic.h>
 
+#include <ngx_xquic_intercom.h>
 #include <sys/socket.h>
 #include <netinet/udp.h>
 
@@ -24,6 +25,13 @@
 #include <ngx_http_lua_ssl_certby.h>
 extern ngx_module_t ngx_http_lua_module;
 #endif
+
+#if (T_NGX_HAVE_DYNAMIC_CERT)
+#include "ngx_http_dynamic_cert_module.h"
+/* Defined in ngx_http_xquic_dynamic_cert.c, a standalone compilation unit */
+xqc_int_t ngx_http_v3_cert_cb_dynamic(const char *sni, void **chain,
+    void **cert, void **key, void *conn_user_data);
+#endif /* T_NGX_HAVE_DYNAMIC_CERT */
 
 ngx_int_t
 ngx_http_v3_conn_check_concurrent_cnt(ngx_http_xquic_main_conf_t *qmcf)
@@ -77,11 +85,11 @@ ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn,
     const xqc_cid_t * cid, void * user_data)
 {
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                    "|xquic|ngx_xquic_server_conn_accept|dcid=%s|", xqc_dcid_str(cid));
+                  "|xquic|ngx_xquic_server_conn_accept|dcid=%s|", xqc_dcid_str(engine, cid));
 
     if (user_data == NULL) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, 
-                      "|xquic|ngx_xquic_server_conn_accept|user_data is NULL|dcid=%s|", xqc_dcid_str(cid));
+                      "|xquic|ngx_xquic_server_conn_accept|user_data is NULL|dcid=%s|", xqc_dcid_str(engine, cid));
         return XQC_ERROR;
     }
 
@@ -96,7 +104,6 @@ ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn,
         (void) ngx_atomic_fetch_add(ngx_stat_quic_conns_refused, 1);
         return XQC_ERROR;
     }
-  
 
     socklen_t peer_addrlen; 
     socklen_t local_addrlen;
@@ -115,7 +122,7 @@ ngx_xquic_conn_accept(xqc_engine_t *engine, xqc_connection_t *conn,
 
     /* init user data */
     ngx_http_xquic_connection_t* qc = ngx_http_v3_create_connection(
-                            (ngx_connection_t *)lc, cid, 
+                            (ngx_connection_t *)lc, (xqc_cid_t *)cid, 
                             (struct sockaddr *)&local_addr, local_addrlen,
                             (struct sockaddr *)&peer_addr, peer_addrlen,
                             qmcf->xquic_engine);
@@ -142,17 +149,18 @@ ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn,
     const xqc_cid_t *cid, void *user_data)
 {
     ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|ngx_xquic_server_conn_refuse|scid=%s|", xqc_dcid_str(cid));
+                  "|xquic|ngx_xquic_server_conn_refuse|scid=%s|", xqc_dcid_str(engine, cid));
 
     uint64_t err = xqc_conn_get_errno(conn);
 
     ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)user_data;
     if (qc == NULL) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|user_data is NULL|cid:%s|", xqc_dcid_str(cid));
+                      "|xquic|user_data is NULL|cid:%s|", xqc_dcid_str(engine, cid));
         return;
     }
 
+    ngx_http_v3_finalize_paths(qc);
     ngx_http_v3_finalize_connection(qc, err);
 
     (void) ngx_atomic_fetch_add(ngx_stat_quic_concurrent_conns, -1);
@@ -160,12 +168,16 @@ ngx_xquic_conn_refuse(xqc_engine_t *engine, xqc_connection_t *conn,
 
 ngx_int_t
 ngx_http_find_virtual_server_inner(ngx_connection_t *c,
-    ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
-    ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
-
-xqc_int_t
-ngx_http_v3_cert_cb(const char *sni, void **chain,
-    void **cert, void **key, void *conn_user_data)
+                                   ngx_http_virtual_names_t *virtual_names, ngx_str_t *host,
+                                   ngx_http_request_t *r, ngx_http_core_srv_conf_t **cscfp);
+/*
+ * ngx_http_v3_cert_cb_lua:
+ * The original certificate-selection logic (Lua dynamic loading + static SSL_CTX fallback).
+ * Invoked by ngx_http_v3_cert_cb when C-module dynamic certificate loading is not enabled.
+ */
+static xqc_int_t
+ngx_http_v3_cert_cb_lua(const char *sni, void **chain,
+                        void **cert, void **key, void *conn_user_data)
 {
     ngx_int_t                       ret;
     int                             ssl_ret;
@@ -178,6 +190,7 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     STACK_OF(X509)                 *cert_chain;
     X509                           *certificate;
     EVP_PKEY                       *private_key;
+    void                           *data;
 
     if (NULL == sni || NULL == conn_user_data) {
         return -XQC_EPARAM;
@@ -191,7 +204,9 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     hc = qc->http_connection;
     c = qc->connection;
 
-    /* The ngx_http_find_virtual_server() function requires ngx_http_connection_t in c->data */
+    /* The ngx_http_find_virtual_server() function requires
+       ngx_http_connection_t in c->data */
+    data = c->data;
     c->data = hc;
 
     /*
@@ -199,23 +214,21 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
      * block listen on the same port. but useless when there is noly a single
      * server block
     */
-   ret = ngx_http_find_virtual_server_inner(c,
-            hc->addr_conf->virtual_names, &host, NULL, &cscf);
-   c->data = qc;
+    ret = ngx_http_find_virtual_server_inner(c, hc->addr_conf->virtual_names, 
+                                             &host, NULL, &cscf);
+    c->data = data;
 
     if (ret == NGX_OK) {
         hc->ssl_servername = ngx_palloc(c->pool, sizeof(ngx_str_t));
         if (hc->ssl_servername == NULL) {
             ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
-                        "|xquic|crete ssl_servername fail|");
-
+                          "|xquic|crete ssl_servername fail|");
             return XQC_ERROR;
         }
 
         /* get server config */
         *hc->ssl_servername = host;
         hc->conf_ctx = cscf->ctx;
-
     } else {
         /* try to get ssl config from the default connection */
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
@@ -242,14 +255,14 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
     if (NULL == sscf || NULL == sscf->ssl.ctx) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                    "|xquic|CFG or CTX not found||sni:%s|", sni);
+                      "|xquic|CFG or CTX not found||sni:%s|", sni);
         return XQC_ERROR;
     }
 
     ssl_ret = SSL_CTX_get0_chain_certs(sscf->ssl.ctx, &cert_chain);
     if (ssl_ret != 1) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                    "|xquic|get chain certificate fail|err=%i", ssl_ret);
+                      "|xquic|get chain certificate fail|err=%i", ssl_ret);
         return XQC_ERROR;
     }
 
@@ -258,15 +271,15 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
 
     if (NULL == certificate) {
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                    "|xquic|get certificate fail|");
+                      "|xquic|get certificate fail|");
         return XQC_ERROR;
     }
 
     if (NULL == private_key) {
         /*  keyless server */
         ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-                    "|xquic|get private key fail, \"ssl_keyless off\" config "
-                    "lost|sni:%s", sni);
+                      "|xquic|get private key fail, \"ssl_keyless off\" config "
+                      "lost|sni:%s", sni);
         return XQC_ERROR;
     }
 
@@ -277,18 +290,140 @@ ngx_http_v3_cert_cb(const char *sni, void **chain,
     return XQC_OK;
 }
 
+/*
+ * ngx_http_v3_cert_cb:
+ * Unified certificate-callback entry for the xQUIC engine (registered as
+ * xqc_engine_callback_t.conn_cert_cb).
+ *
+ * Routing logic:
+ *   1. If dynamic_cert_enable is on and the C module is initialized
+ *      (dmcf->cert_app != NULL):
+ *      Call ngx_http_v3_cert_cb_dynamic and take the C-module path:
+ *        - Dynamic certificate hit  -> XQC_OK (certificate set via ssl_conn)
+ *        - Dynamic certificate miss -> static certificate fallback (read from SSL_CTX),
+ *          still returns XQC_OK
+ *        - Error                    -> XQC_ERROR
+ *   2. Otherwise, call the original ngx_http_v3_cert_cb_lua, which uses Lua dynamic
+ *      loading + static SSL_CTX fallback.
+ */
+xqc_int_t
+ngx_http_v3_cert_cb(const char *sni, void **chain,
+                    void **cert, void **key, void *conn_user_data)
+{
+    if (sni == NULL || conn_user_data == NULL) {
+        return -XQC_EPARAM;
+    }
+
+#if (T_NGX_HAVE_DYNAMIC_CERT)
+    /*
+     * Check the C-module dynamic-certificate loading switch:
+     *   - dmcf->enable == 1: "dynamic_cert_enable on" is configured.
+     *   - dmcf->cert_app != NULL: frame_init has completed and the strategy double-buffer
+     *     slot is ready.
+     * Take the C-module path only when both conditions are met.
+     */
+    {
+        ngx_http_dynamic_cert_main_conf_t  *dmcf;
+        dmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle,
+                                                   ngx_http_dynamic_cert_module);
+        if (dmcf != NULL && dmcf->enable && dmcf->cert_app != NULL) {
+            return ngx_http_v3_cert_cb_dynamic(sni, chain, cert, key, conn_user_data);
+        }
+    }
+#endif /* T_NGX_HAVE_DYNAMIC_CERT */
+
+    return ngx_http_v3_cert_cb_lua(sni, chain, cert, key, conn_user_data);
+}
+
+
+#define NGX_INITIAL_PATH_ID 0
+
+int 
+ngx_xquic_path_created_notify(xqc_connection_t *conn,
+    const xqc_cid_t *path_scid, uint64_t path_id, void *conn_user_data)
+{
+    ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)conn_user_data;
+
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
+                "|xquic|ngx_xquic_path_created_notify|scid=%s|path=%ui|", 
+                xqc_scid_str(qc->engine, path_scid), path_id);
+
+    /* first path, ignore */
+    if (path_id == NGX_INITIAL_PATH_ID) {
+        return NGX_OK;
+    }
+
+    /* get peer & local address */
+    socklen_t peer_addrlen; 
+    socklen_t local_addrlen;
+    struct sockaddr_storage peer_addr;
+    struct sockaddr_storage local_addr;
+    if (xqc_path_get_peer_addr(conn, path_id, (struct sockaddr *)(&peer_addr), sizeof(peer_addr), &peer_addrlen) != XQC_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
+                      "|xquic|ngx xquic path create fail|copy peer addr fail|");
+        return NGX_ERROR;
+    }
+    if (xqc_conn_get_local_addr(conn, (struct sockaddr *)(&local_addr), sizeof(local_addr), &local_addrlen) != XQC_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
+                      "|xquic|ngx xquic path create fail|copy local addr fail|");
+        return NGX_ERROR;
+    }
+
+    /* init path & add to L4 path list */
+    ngx_int_t rc = ngx_xquic_path_create(qc, (xqc_cid_t *)path_scid, path_id,  
+                                         (struct sockaddr *)&local_addr, local_addrlen,
+                                         (struct sockaddr *)&peer_addr, peer_addrlen);
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
+                      "|xquic|ngx_xquic_path_create fail|");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+void 
+ngx_xquic_path_removed_notify(const xqc_cid_t *scid, uint64_t path_id,
+    void *conn_user_data)
+{
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
+                  "|xquic|ngx_xquic_path_removed_notify|path=%uL|", 
+                  path_id);
+
+    ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)conn_user_data;
+
+    ngx_uint_t index = path_id & NGX_XQUIC_MP_PATH_INDEX;
+    ngx_xquic_list_node_t *node = NULL;
+    ngx_xquic_path_t *path = NULL;
+
+    /* don't free the memory until connection finalize */
+
+    if (qc == NULL || qc->path_index == NULL) {
+        return;
+    }
+
+    for (node = qc->path_index[index]; node != NULL; node = node->next) {
+        path = node->entry;
+
+        if (path != NULL && path->path_id == path_id) {
+            path->path_state = NGX_XQUIC_PATH_STATE_CLOSED;
+        }
+    }
+}
+
+
 int 
 ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn, 
     const xqc_cid_t *cid, void *user_data)
 {
-    ngx_connection_t               *c;
-
+    ngx_connection_t *c;
     /* we set alp user_data when accept connection */
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) user_data;
     user_conn->ssl_conn = (ngx_ssl_conn_t *) xqc_h3_conn_get_ssl(h3_conn);
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                    "|xquic|ngx_http_v3_conn_create_notify|%p|", user_conn->engine);
+                  "|xquic|ngx_http_v3_conn_create_notify|%p|", user_conn->engine);
 
     xqc_h3_conn_set_user_data(h3_conn, user_conn);
 
@@ -299,7 +434,7 @@ ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn,
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|SSL_set_ex_data() failed|");
         return XQC_ERROR;
     }
-    
+
     c->xquic_conn = 1;
 
     ngx_ssl_connection_t *p_ssl = ngx_pcalloc(c->pool, sizeof(ngx_ssl_connection_t));
@@ -309,6 +444,12 @@ ngx_http_v3_conn_create_notify(xqc_h3_conn_t *h3_conn,
     }
     p_ssl->connection = user_conn->ssl_conn;
     c->ssl = p_ssl;
+
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    /* ssl handshake start time */
+    ngx_time_t *tp = ngx_timeofday();
+    c->ssl->handshake_start_msec = tp->sec * 1000 + tp->msec;
+#endif
 
     return NGX_OK;
 }
@@ -321,14 +462,15 @@ ngx_http_v3_conn_close_notify(xqc_h3_conn_t *h3_conn,
     uint64_t err = xqc_h3_conn_get_errno(h3_conn);
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                    "|xquic|ngx_http_v3_conn_close_notify|err=%i|", err);
+                  "|xquic|ngx_http_v3_conn_close_notify|err=%i|", err);
 
     if (err != H3_NO_ERROR) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|ngx_http_v3_conn_close|err=%i|", err);
+                      "|xquic|ngx_http_v3_conn_close|err=%i|", err);
     }
 
     ngx_http_xquic_connection_t *h3c = (ngx_http_xquic_connection_t *)user_data;
+    ngx_http_v3_finalize_paths(h3c);
     ngx_http_v3_finalize_connection(h3c, err);
 
     (void) ngx_atomic_fetch_add(ngx_stat_quic_concurrent_conns, -1);
@@ -343,11 +485,18 @@ ngx_http_v3_conn_handshake_finished(xqc_h3_conn_t *h3_conn, void *user_data)
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) user_data;
 
     ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
-                    "|xquic|ngx_http_v3_conn_handshake_finished|dcid=%s|", 
-                    xqc_dcid_str(&user_conn->dcid));
-
+                  "|xquic|ngx_http_v3_conn_handshake_finished|dcid=%s|", 
+                  xqc_dcid_str(user_conn->engine, &user_conn->dcid));
 
     /* TODO */
+#if (T_NGX_SSL_HANDSHAKE_TIME)
+    ngx_connection_t *c = user_conn->connection;
+    if (c != NULL) {
+        ngx_time_t *tp;
+        tp = ngx_timeofday();
+        c->ssl->handshake_end_msec = tp->sec * 1000 + tp->msec;
+    }
+#endif
 }
 
 
@@ -358,10 +507,105 @@ ngx_http_v3_conn_update_cid_notify(xqc_connection_t *conn, const xqc_cid_t *reti
     ngx_http_xquic_connection_t *user_conn = (ngx_http_xquic_connection_t *) conn_user_data;
 
     ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0, 
-                "|xquic|ngx_http_v3_conn_update_cid_notify|old_cid=%s|new_cid:%s|", 
-                xqc_dcid_str(retire_cid), xqc_scid_str(new_cid));
+                  "|xquic|ngx_http_v3_conn_update_cid_notify|old_cid=%s|new_cid:%s|", 
+                  xqc_dcid_str(user_conn->engine, retire_cid), xqc_scid_str(user_conn->engine, new_cid));
 
     memcpy(&user_conn->dcid, new_cid, sizeof(xqc_cid_t));
+}
+
+void
+ngx_xquic_conn_peer_addr_changed_notify(xqc_connection_t *conn, void *conn_user_data)
+{
+    ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *) conn_user_data;
+
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                  "|xquic|ngx_xquic_conn_peer_addr_changed_notify|");
+
+    socklen_t peer_addrlen;
+    struct sockaddr_storage peer_addr;
+    if (xqc_conn_get_peer_addr(conn, (struct sockaddr *)&peer_addr, sizeof(peer_addr), &peer_addrlen) != XQC_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                      "|xquic|ngx accept copy peer addr fail|");
+        return;
+    }
+
+    struct sockaddr *peer_sockaddr = (struct sockaddr *)&peer_addr;
+    socklen_t peer_socklen = peer_addrlen;
+
+    ngx_memcpy(qc->peer_sockaddr, peer_sockaddr, peer_socklen);
+    qc->peer_socklen = peer_socklen;
+
+#if (T_NGX_IP_COUNTRY)
+    ngx_connection_t *c = qc->connection;
+    u_char            text[NGX_SOCKADDR_STRLEN];
+    void             *data;
+    if (c == NULL) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "|xquic|connection NULL|");
+        return;
+    }
+    size_t len =  ngx_sock_ntop(peer_sockaddr, peer_addrlen, text, NGX_SOCKADDR_STRLEN, 0);
+    if (len == 0) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|peer_sockaddr str length error|");
+        return; 
+    }
+    data = ngx_pnalloc(c->pool, len);
+    if (data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "|xquic|addr_text alloc failed|");
+        return;
+    }
+    ngx_memcpy(data, text, len);
+    c->addr_text.data = data;
+    c->addr_text.len = len;
+
+    c->ip_country_send_cnt = 0; /* ip_country_send_cnt reset */
+#endif
+    /* Changes to the server-side address are not handled here; there is currently no
+       use case for the server-side address changing. */
+
+    return;
+}
+
+
+void
+ngx_xquic_path_peer_addr_changed_notify(xqc_connection_t *conn, uint64_t path_id, void *conn_user_data)
+{
+    ngx_xquic_list_node_t     *node = NULL;
+    ngx_uint_t                 index = 0;
+    ngx_xquic_path_t          *path = NULL;
+    ngx_connection_t          *c;
+
+    ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *) conn_user_data;
+
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                  "|xquic|ngx_xquic_path_peer_addr_changed_notify|");
+
+    socklen_t peer_addrlen;
+    struct sockaddr_storage peer_addr;
+    if (xqc_path_get_peer_addr(conn, path_id, (struct sockaddr *)&peer_addr, sizeof(peer_addr), &peer_addrlen) != XQC_OK) {
+        ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
+                      "|xquic|ngx accept copy peer addr fail|");
+        return;
+    }
+
+    struct sockaddr *peer_sockaddr = (struct sockaddr *)&peer_addr;
+    socklen_t peer_socklen = peer_addrlen;
+
+    /* find path */
+    index = path_id & NGX_XQUIC_MP_PATH_INDEX;
+    for (node = qc->path_index[index]; node != NULL; node = node->next) {
+    
+        path = node->entry;
+    
+        if ((path != NULL) && (path->path_id == path_id)) {
+
+            c = path->c;
+
+            ngx_memcpy(c->sockaddr, peer_sockaddr, peer_socklen);
+            c->socklen = peer_socklen;
+
+            return;
+        }
+    }
 }
 
 
@@ -369,31 +613,33 @@ ngx_int_t
 ngx_http_v3_read_request_body(ngx_http_request_t *r)
 {
     off_t                      len;
-    ngx_http_v3_stream_t      *stream;
+    ngx_http_v3_stream_t      *qstream;
     ngx_http_request_body_t   *rb;
     ngx_http_core_loc_conf_t  *clcf;
     ngx_buf_t                 *buf;
     ngx_int_t                  rc;
-    ngx_connection_t          *fc;
 
-    stream = r->xqstream;
+    qstream = r->xqstream;
     rb = r->request_body;
-    fc = r->connection;
 
-    ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
+    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                   "|xquic|ngx_http_v3_read_request_body|");
 
-    if (stream->skip_data) {
+    if (qstream->skip_data) {
         r->request_body_no_buffering = 0;
         rb->post_handler(r);
         return NGX_OK;
     }
 
-    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (!r->request_body && ngx_http_v3_init_request_body(r) != NGX_OK) {
+        qstream->skip_data = NGX_HTTP_V3_DATA_INTERNAL_ERROR;
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     len = r->headers_in.content_length_n;
 
-    if (r->request_body_no_buffering && !stream->in_closed) {
+    if (r->request_body_no_buffering && !qstream->in_closed) {
 
         if (len < 0 || len > (off_t) clcf->client_body_buffer_size) {
             len = clcf->client_body_buffer_size;
@@ -401,37 +647,43 @@ ngx_http_v3_read_request_body(ngx_http_request_t *r)
 
         rb->buf = ngx_create_temp_buf(r->pool, (size_t) len);
 
+    } else if (len < 0) {
+
+        len = clcf->client_body_buffer_size;
+        rb->buf = ngx_create_temp_buf(r->pool, (size_t) (len + 1));
+
     } else if (len >= 0 && len <= (off_t) clcf->client_body_buffer_size
-               && !r->request_body_in_file_only)
-    {
-        rb->buf = ngx_create_temp_buf(r->pool, (size_t) len);
+               && !r->request_body_in_file_only) {
+
+        rb->buf = ngx_create_temp_buf(r->pool, (size_t) (len + 1));
 
     } else {
-        rb->buf = ngx_create_temp_buf(r->pool, (size_t) clcf->client_body_buffer_size);
-        if (rb->buf != NULL) {
-            rb->buf->sync = 1;
-        }
+
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "|xquic|ngx_http_v3_read_request_body|client intended to send too large body: "
+                      "%O bytes", len);
+        return NGX_HTTP_REQUEST_ENTITY_TOO_LARGE;
+
     }
 
     if (rb->buf == NULL) {
-        stream->skip_data = 1;
-        ngx_log_error(NGX_LOG_WARN, fc->log, 0,
+        qstream->skip_data = 1;
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "|xquic|ngx_http_v3_read_request_body|create request_body error|");
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
     rb->rest = 1;
 
-    buf = stream->body_buffer;
+    buf = qstream->body_buffer;
 
-    if (stream->in_closed) {
+    if (qstream->in_closed) {
         r->request_body_no_buffering = 0;
 
         if (buf) {
             rc = ngx_http_v3_process_request_body(r, buf->pos, buf->last - buf->pos, 1);
 
             ngx_pfree(r->pool, buf->start);
-
             return rc;
         }
 
@@ -444,7 +696,7 @@ ngx_http_v3_read_request_body(ngx_http_request_t *r)
         ngx_pfree(r->pool, buf->start);
 
         if (rc != NGX_OK) {
-            stream->skip_data = 1;
+            qstream->skip_data = 1;
             return rc;
         }
     } else {
@@ -464,30 +716,30 @@ ngx_http_v3_read_unbuffered_request_body(ngx_http_request_t *r)
     ngx_buf_t                   *buf;
     ngx_int_t                    rc;
     ngx_connection_t            *fc;
-    ngx_http_v3_stream_t        *stream;
+    ngx_http_v3_stream_t        *qstream;
 
-    stream = r->xqstream;
+    qstream = r->xqstream;
     fc = r->connection;
 
     ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
                   "|ngx_http_v3_read_unbuffered_request_body|");
 
     if (fc->read->timedout) {
-        stream->skip_data = 1;
+        qstream->skip_data = 1;
         fc->timedout = 1;
 
         return NGX_HTTP_REQUEST_TIME_OUT;
     }
 
     if (fc->error) {
-        stream->skip_data = 1;
+        qstream->skip_data = 1;
         return NGX_HTTP_BAD_REQUEST;
     }
 
     rc = ngx_http_v3_filter_request_body(r);
 
     if (rc != NGX_OK) {
-        stream->skip_data = 1;
+        qstream->skip_data = 1;
         return rc;
     }
 
@@ -583,11 +835,12 @@ ngx_http_v3_process_request_body(ngx_http_request_t *r, u_char *pos,
             r->headers_in.content_length_n = rb->received;
         }
 
-        r->read_event_handler = ngx_http_block_reading;
-        ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
-                      "|xquic|ngx_http_v3_process_request_body|post_handler|");
-
-        rb->post_handler(r);
+        if (rb->post_handler) {
+            r->read_event_handler = ngx_http_block_reading;
+            ngx_log_error(NGX_LOG_DEBUG, fc->log, 0,
+                          "|xquic|ngx_http_v3_process_request_body|post_handler|");
+            rb->post_handler(r);
+        }
 
         return NGX_OK;
     }
@@ -624,7 +877,6 @@ ngx_http_v3_filter_request_body(ngx_http_request_t *r)
     ngx_connection_t          *fc;
     ngx_http_core_loc_conf_t  *clcf;
     ngx_uint_t                 fin;
-//    size_t                     size;
 
     rb = r->request_body;
     fc = r->connection;
@@ -753,126 +1005,27 @@ ngx_http_v3_read_client_request_body_handler(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
 {
-    int                              value;
-    u_char                           text[NGX_SOCKADDR_STRLEN];
-    ngx_str_t                        addr;
     ngx_log_t                       *log;
     ngx_event_t                     *rev, *wev;
-    ngx_socket_t                     s;
     ngx_listening_t                 *ls;
     ngx_connection_t                *c;
-    ngx_http_xquic_main_conf_t      *qmcf;
 
     ls = lc->listening;
 
-    switch(qc->local_sockaddr->sa_family) {
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        s = ngx_socket(AF_INET6, SOCK_DGRAM, 0);
-        break;
-#endif
-    default: /* AF_INET */
-        s = ngx_socket(AF_INET, SOCK_DGRAM, 0);
-        break;
-    }
-
-    if (s == (ngx_socket_t) -1) {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "xquic" ngx_socket_n " %V failed",
-                      &ls->addr_text);
-        return NGX_ERROR;
-    }
-
-    c = ngx_get_connection(s, lc->log);
+    c = ngx_get_connection(ls->fd, lc->log);
 
     if (c == NULL) {
-        if (ngx_close_socket(s) == -1) {
-            ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                          "quic" ngx_close_socket_n " failed");
-        }
-
+        ngx_log_error(NGX_LOG_EMERG, lc->log, 0,
+                      "|xquic|quic get connection failed|");
         return NGX_ERROR;
     }
-
-    value = 1;
-    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-                   (const void *) &value, sizeof(int))
-        == -1)
-    {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic| setsockopt(SO_REUSEADDR) %V failed|",
-                       &ls->addr_text);
-
-        goto failed;
-    }
-
-    qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
-
-    if (qmcf->new_udp_hash == 1 &&
-        setsockopt(s, SOL_UDP, 200,
-                   (const void *) &value, sizeof(int))
-        == -1)
-    {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic| setsockopt(new-udp-hash) %V failed|",
-                      &ls->addr_text);
-    }
-
-    int socket_sndbuf = qmcf->socket_sndbuf;
-    if (setsockopt(s, SOL_SOCKET, SO_SNDBUF,
-                   (const void *) &(socket_sndbuf), sizeof(int))
-        == -1)
-    {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic| setsockopt(SO_SNDBUF, %d) %V failed, ignored|",
-                      qmcf->socket_sndbuf, &ls->addr_text);
-    }    
-
-    int socket_rcvbuf = qmcf->socket_rcvbuf;
-    if (setsockopt(s, SOL_SOCKET, SO_RCVBUF,
-                   (const void *) &(socket_rcvbuf), sizeof(int))
-        == -1)
-    {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic| setsockopt(SO_RCVBUF, %d) %V failed, ignored|",
-                      qmcf->socket_rcvbuf, &ls->addr_text);
-    }
-
-    if (ngx_nonblocking(s) == -1) {
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "xquic" ngx_nonblocking_n " failed");
-
-        goto failed;
-    }
-
-    if (bind(s, qc->local_sockaddr, qc->local_socklen) == -1) {
-        addr.data = text;
-        addr.len = ngx_sock_ntop(qc->local_sockaddr, qc->local_socklen,
-                                 text, NGX_SOCKADDR_STRLEN, 1);
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic|bind() to %V failed|", &addr);
-
-        goto failed;
-    }
-
-    if (connect(s, qc->peer_sockaddr, qc->peer_socklen) == -1) {
-        addr.data = text;
-        addr.len = ngx_sock_ntop(qc->peer_sockaddr, qc->peer_socklen, text,
-                                 NGX_SOCKADDR_STRLEN, 1);
-
-        ngx_log_error(NGX_LOG_EMERG, lc->log, ngx_socket_errno,
-                      "|xquic|connect() to %V failed|", &addr);
-
-        goto failed;
-    }
-
+    c->shared = 1;  /* All connections share the same fd; the fd is not freed on connection close */
     log = ngx_palloc(qc->pool, sizeof(ngx_log_t));
     if (log == NULL) {
         goto failed;
     }
 
     *log = ls->log;
-
     log->data = NULL;
     log->handler = NULL;
 
@@ -887,13 +1040,12 @@ ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
     c->local_socklen = qc->local_socklen;
     c->addr_text = qc->addr_text;
     c->ssl = NULL;
-#if (NGX_SLIGHT_SSL)
+#if (T_NGX_SLIGHTSSL_ALI)
     c->s_ssl = NULL;
 #endif
 
     rev = c->read;
     wev = c->write;
-
     wev->ready = 1;
 
     rev->log = c->log;
@@ -903,21 +1055,26 @@ ngx_http_xquic_connect(ngx_http_xquic_connection_t *qc, ngx_connection_t *lc)
 
 #if (NGX_DEBUG)
     {
+        u_char     text[NGX_SOCKADDR_STRLEN];
+        ngx_str_t  addr;
+
         if (lc->log->log_level & NGX_LOG_DEBUG_HTTP) {
             addr.data = text;
             addr.len = ngx_sock_ntop(qc->peer_sockaddr, qc->peer_socklen, text,
                                      NGX_SOCKADDR_STRLEN, 1);
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, lc->log, 0,
-                           "|xquic|create connect fd %d to %V|", s, &addr);
+                           "|xquic|create connect fd %d to %V|", ls->fd, &addr);
         }
     }
 #endif
 
     qc->connection = c;
-
     return NGX_OK;
-
 failed:
+    if (c->pool) {
+        ngx_destroy_pool(c->pool);
+        c->pool = NULL;
+    }
     ngx_close_connection(c);
     return NGX_ERROR;
 }
@@ -961,8 +1118,8 @@ ngx_http_xquic_session_process_packet(ngx_http_xquic_connection_t *qc,
 {
     uint64_t recv_time = ngx_xquic_get_time();
     ngx_log_error(NGX_LOG_DEBUG, qc->connection->log, 0,
-                    "|xquic|xqc_server_read_handler recv_size=%zd, recv_time=%llu, recv_total=%d|", 
-                    recv_size, recv_time, ++qc->recv_packets_num);
+                  "|xquic|xqc_server_read_handler recv_size=%zd, recv_time=%llu, recv_total=%d|", 
+                  recv_size, recv_time, ++qc->recv_packets_num);
 
     if (xqc_engine_packet_process(qc->engine, (u_char *)packet->buf, recv_size,
                                   qc->local_sockaddr, qc->local_socklen,
@@ -970,112 +1127,68 @@ ngx_http_xquic_session_process_packet(ngx_http_xquic_connection_t *qc,
                                   (xqc_msec_t) recv_time, NULL) != 0) 
     {
         ngx_log_error(NGX_LOG_DEBUG, qc->connection->log, 0,
-                    "|xquic|xqc_server_read_handler: packet process err|");
+                      "|xquic|xqc_server_read_handler: packet process err|");
         return;
     }
 }
 
 
-/**
- * used to recv udp packets
- */
-static void
-ngx_http_xquic_read_handler(ngx_event_t *rev)
+void
+ngx_http_xquic_close_idle_connection(ngx_cycle_t *cycle)
 {
-    ssize_t                        n;
-    ngx_connection_t              *c, *lc;
-    ngx_xquic_recv_packet_t        packet;
-    ngx_http_xquic_connection_t   *qc;
+    ngx_connection_t                *c;
+    ngx_uint_t                       i, ret;
+    ngx_http_xquic_connection_t     *qc;
+    c = cycle->connections;
 
-    c = rev->data;
-    qc = c->data;
+    for (i = 0; i < cycle->connection_n; i++) {
+        if (c[i].fd != (ngx_socket_t) -1 && c[i].idle   /* valid fd and connection state is idle */
+            && c[i].listening && c[i].listening->xquic)  /* check that the connection belongs to xquic */
+        {
+            if (&c[i] == c[i].listening->connection) {
+                continue; /* listening connection does not need to be closed */
+            }
+            c[i].close = 1;
+            ngx_log_error(NGX_LOG_INFO, cycle->log, NGX_ETIMEDOUT, "|xquic|graceful shutdown|");
+            qc = c[i].data;
+            if (qc && qc->engine) {
+                ret = xqc_h3_conn_close(qc->engine, &(qc->dcid));
+                if (ret != NGX_OK) {
+                    ngx_log_error(NGX_LOG_WARN, qc->connection->log, 0,
+                            "|xquic|xqc_h3_conn_close err|cid:%s|err:%i|",
+                            xqc_scid_str(qc->engine, &qc->dcid), ret);
+                }
+                xqc_engine_main_logic(qc->engine);
+            }
+        }
+    }
+}
 
-    if (rev->timedout) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "|xquic|client timed out|");
+void
+ngx_http_xquic_close_connection(ngx_connection_t *c) 
+{
+    if (c->listening && c->listening->connection == c) { /* This is the listening connection */
         return;
     }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "|xquic|connection read handler|");
-
-    do {
-        n = ngx_xquic_recv(c, packet.buf, sizeof(packet.buf));
-
-        if (n == NGX_AGAIN) {
-            break;
-        } else if (n == 0) {
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "|xquic|ngx_xquic_recv 0|");
-            break;
-        } else if (n < 0) {
-            ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
-                        "|xquic|recv = %z|", n);
- 
-
-            if (n == NGX_DONE && qc->processing == 0) {
-                ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_NO_ERR, "client request done");
-            } else {
-                ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_RECV_ERR, "read packet error");
-            }
-
-            goto finish_recv;
-        }
-
-        packet.len = n;
-
-        /* check QUIC magic bit */
-        if (!NGX_XQUIC_CHECK_MAGIC_BIT(packet.buf)) {
-            ngx_log_debug(NGX_LOG_WARN, c->log, 0,
-                          "|xquic|invalid packet head|");
-            continue;
-        }
-
-        /* get dcid here */
-        ngx_xquic_packet_get_cid(&packet, qc->engine);
-
-        //ngx_xquic_server_session_process_packet(qc, &packet, n);
-
-        if (xqc_cid_is_equal(&(qc->dcid), &(packet.xquic.dcid)) != NGX_OK) {
-            ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "|xquic|ngx_http_xquic_read_handler: "
-                          "packet connectionID %s != %s (qc connection ID), processing: %d|",
-                          xqc_dcid_str(&packet.xquic.dcid), xqc_scid_str(&qc->dcid), qc->processing);
-
-            if (qc->processing == 0) {
-                lc = c->listening->connection;
-
-                ngx_memcpy(&packet.sockaddr, qc->peer_sockaddr, qc->peer_socklen);
-                packet.socklen = qc->peer_socklen;
-                ngx_memcpy(&packet.local_sockaddr, qc->local_sockaddr, qc->local_socklen);
-                packet.local_socklen = qc->local_socklen;
-
-                /* ngx_http_v3_finalize_connection(qc, NGX_XQUIC_CONN_HANDSHAKE_ERR); */
-                ngx_xquic_dispatcher_process_packet(lc, &packet);
-
-                return;
-            }
-			//from the same source address
-			//if not client retry handshake, just drop the packets with different cid
-        } else {
-            ngx_http_xquic_session_process_packet(qc, &packet, n);
-        }
-
-        if (qc->xquic_off) {
-            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "xquic not allow");
-        
-            ngx_http_v3_connection_error(qc, NGX_XQUIC_CONN_NO_ERR, "xquic not allow");
-        
-            return;
-        }
-
-    } while (rev->ready);
-
-finish_recv:
-    xqc_engine_finish_recv(qc->engine);
+    ngx_http_xquic_connection_t     *qc = c->data;
+    if (qc == NULL || qc->engine == NULL) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, 
+                      "|xquic|gx_http_xquic_close_connection qc or engine NULL|");
+        return;
+    }
+    
+    ngx_int_t ret = xqc_h3_conn_close(qc->engine, &(qc->dcid));
+    if (ret != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                      "|xquic|xquic connection close error|");
+    }
 }
 
 
 /**
  * connection readmsg_handler used to recv udp packets
  */
+/*
 static void
 ngx_http_xquic_readmsg_handler(ngx_event_t *rev)
 {
@@ -1100,6 +1213,7 @@ ngx_http_xquic_readmsg_handler(ngx_event_t *rev)
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "|xquic| connection readmsg handler|");
 
     for ( ;; ) {
+        ngx_memset(&packet, 0, sizeof(ngx_xquic_recv_packet_t));
         packet.local_socklen = qc->local_socklen;
         ngx_memcpy(&packet.local_sockaddr, qc->local_sockaddr, qc->local_socklen);
 
@@ -1136,7 +1250,201 @@ ngx_http_xquic_readmsg_handler(ngx_event_t *rev)
 finish_recv:
     xqc_engine_finish_recv(qmcf->xquic_engine);
 }
+*/
 
+
+static ngx_int_t
+ngx_xquic_path_init(ngx_connection_t *path,
+    ngx_http_xquic_connection_t *qc)
+{
+    path->log = qc->connection->log;
+
+    path->data = qc;
+    
+    return NGX_OK;
+}
+
+
+static ngx_connection_t *
+ngx_xquic_path_connect(ngx_http_xquic_connection_t *qc, 
+    xqc_cid_t *path_scid, uint64_t path_id, 
+    struct sockaddr *local_sockaddr, socklen_t local_socklen,
+    struct sockaddr *peer_sockaddr, socklen_t peer_socklen)
+{
+    ngx_log_t                       *log;
+    ngx_event_t                     *rev, *wev;
+    ngx_connection_t                *c;
+    ngx_xquic_path_t                *path = NULL;
+    ngx_listening_t                 *ls = NULL;
+
+    ls = qc->connection->listening;
+    if (ls == NULL || ls->fd == -1) {
+        ngx_log_error(NGX_LOG_EMERG, ngx_cycle->log, 0,
+                      "|xquic|listening NULL|");
+        return NULL;
+    }
+    c = ngx_get_connection(ls->fd, qc->connection->log); 
+
+    if (c == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, ngx_cycle->log, 0,
+                      "|xquic|quic multipath get connection failed|");
+        return NULL;
+    }
+    c->shared = 1; /* All connections share the same fd; the fd is not freed on connection close */
+
+    c->pool = ngx_create_pool(4096, qc->connection->log);
+    if (c->pool == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, ngx_cycle->log, 0,
+                      "|xquic|connection pool create failed|");
+        return NULL;
+    }
+
+    /* copy local & peer address */
+    c->local_sockaddr = ngx_palloc(c->pool, local_socklen);
+    if (c->local_sockaddr == NULL) {
+        goto failed;
+    }
+    c->local_socklen = local_socklen;
+    ngx_memcpy(c->local_sockaddr, local_sockaddr, local_socklen);
+
+    c->sockaddr = ngx_palloc(c->pool, peer_socklen);
+    if (c->sockaddr == NULL) {
+        goto failed;
+    }
+    ngx_memcpy(c->sockaddr, peer_sockaddr, peer_socklen);
+    c->socklen = peer_socklen;
+
+    c->addr_text.data = ngx_pcalloc(c->pool, NGX_SOCKADDR_STRLEN);
+    if (c->addr_text.data == NULL) {
+        goto failed;
+    }
+    c->addr_text.len = ngx_sock_ntop(c->sockaddr, c->socklen, c->addr_text.data,
+                                 NGX_SOCKADDR_STRLEN, 1);
+
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0, 
+                  "|xquic|ngx_xquic_path_connect|path=%uL|addr=%V|%uD|", 
+                  path_id, &(c->addr_text), peer_socklen);
+
+    log = ngx_palloc(c->pool, sizeof(ngx_log_t));
+    if (log == NULL) {
+        goto failed;
+    }
+
+    *log = *(qc->connection->log);
+
+    log->data = NULL;
+    log->handler = NULL;
+
+    c->log = log;
+    c->type = SOCK_DGRAM;
+
+    c->listening = ls;
+    c->ssl = NULL;
+#if (T_NGX_SLIGHTSSL_ALI)
+    c->s_ssl = NULL;
+#endif
+
+    rev = c->read;
+    wev = c->write;
+
+    wev->ready = 1;
+
+    rev->log = c->log;
+    wev->log = c->log;
+
+    c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
+
+#if (NGX_DEBUG)
+    {
+        u_char     text[NGX_SOCKADDR_STRLEN];
+        ngx_str_t  addr;
+
+        if (qc->connection->log->log_level & NGX_LOG_DEBUG_HTTP) {
+            addr.data = text;
+            addr.len = ngx_sock_ntop(peer_sockaddr, peer_socklen, text,
+                                     NGX_SOCKADDR_STRLEN, 1);
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                           "|xquic|path create connect to %V|", &addr);
+        }
+    }
+#endif
+
+    /* init path */
+    path = ngx_pcalloc(qc->pool, sizeof(ngx_xquic_path_t));
+    if (path == NULL) {
+        goto failed;
+    }
+    path->qc = qc;
+    path->c = c;
+    path->path_id = path_id;
+    path->path_state = NGX_XQUIC_PATH_STATE_AVAILABLE;
+    path->scid = *path_scid;
+
+    c->data = path;
+    c->read->handler = ngx_http_empty_handler;
+
+    /* add to path list */
+    ngx_xquic_list_node_t *list_node = ngx_pcalloc(qc->pool, 
+                                                   sizeof(ngx_xquic_list_node_t));
+    if (list_node == NULL) {
+        goto failed;
+    }
+    list_node->entry = path;
+
+    ngx_uint_t index = path_id & NGX_XQUIC_MP_PATH_INDEX;
+    list_node->next = qc->path_index[index];
+    qc->path_index[index] = list_node;
+
+    return c;
+
+failed:
+    if (c->pool) {
+        ngx_destroy_pool(c->pool);
+        c->pool = NULL;
+    }
+    ngx_close_connection(c);
+    return NULL;
+}
+
+
+/**
+ * create path for multipath, and add to qc->path_list
+ */
+ngx_int_t
+ngx_xquic_path_create(ngx_http_xquic_connection_t *qc, 
+    xqc_cid_t *path_scid, uint64_t path_id,
+    struct sockaddr *local_sockaddr, socklen_t local_socklen,
+    struct sockaddr *peer_sockaddr, socklen_t peer_socklen)
+{
+    ngx_connection_t *path = NULL;
+
+    path = ngx_xquic_path_connect(qc, path_scid, path_id, 
+                                  local_sockaddr, local_socklen,
+                                  peer_sockaddr, peer_socklen);
+    if (path == NULL) {
+        ngx_log_error(NGX_LOG_ERR, qc->connection->log, 0, 
+                      "|xquic|ngx_xquic_path_connect failed|");
+        return NGX_ERROR;
+    }
+
+    if (ngx_xquic_path_init(path, qc) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, qc->connection->log, 0, 
+                      "|xquic|ngx_xquic_path_init failed|");
+        if (path->pool) {
+            ngx_destroy_pool(path->pool);
+            path->pool = NULL;
+        }
+        ngx_close_connection(path);
+        return NGX_ERROR;
+    }
+
+#if (NGX_STAT_STUB)
+    /* add ngx_stat_active because the count of UDP sockets increased */
+    (void) ngx_atomic_fetch_add(ngx_stat_active, 1);
+#endif
+
+    return NGX_OK;
+}
 
 /**
  * init http v3 connection
@@ -1155,7 +1463,6 @@ ngx_http_xquic_init_connection(ngx_http_xquic_connection_t *qc)
     struct sockaddr_in6         *sin6;
 #endif
     ngx_http_connection_t       *hc;
-
 
     hc = ngx_pcalloc(qc->pool, sizeof(ngx_http_connection_t));
     if (hc == NULL) {
@@ -1222,6 +1529,9 @@ ngx_http_xquic_init_connection(ngx_http_xquic_connection_t *qc)
         }
     }
 
+    ngx_log_error(NGX_LOG_INFO, qc->connection->log, 0, 
+                  "|init connection|hc->addr_conf:%p|virtual_names:%p", hc->addr_conf, hc->addr_conf->virtual_names);
+
     /* the default server configuration for the address:port */
     hc->conf_ctx = hc->addr_conf->default_server->ctx;
 
@@ -1242,16 +1552,11 @@ ngx_http_xquic_init_connection(ngx_http_xquic_connection_t *qc)
     c->log_error = NGX_ERROR_INFO;
 
     c->data = qc;
-    c->read->handler = ngx_http_xquic_readmsg_handler;
-    c->write->handler = ngx_http_xquic_write_handler;
-
-    if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-        return NGX_ERROR;
-    }
+    c->read->handler = ngx_http_empty_handler; /* The fd in this connection is shared; packets are received by the listen connection,
+                                                  so the read handler is set to empty here */    
 
     return NGX_OK;
 }
-
 
 /**
  * create http v3 connection
@@ -1282,7 +1587,8 @@ ngx_http_v3_create_connection(ngx_connection_t *lc, const xqc_cid_t *connection_
     }
 
     qc->pool = pool;
-    qc->dcid = *connection_id;
+    qc->dcid.cid_len = connection_id->cid_len;
+    ngx_memcpy(qc->dcid.cid_buf, connection_id->cid_buf, connection_id->cid_len);
     qc->engine = engine;
 
     qc->start_msec = ngx_current_msec;
@@ -1293,6 +1599,14 @@ ngx_http_v3_create_connection(ngx_connection_t *lc, const xqc_cid_t *connection_
     qc->streams_index = ngx_pcalloc(qc->pool, ngx_http_xquic_index_size(qmcf)
                                               * sizeof(ngx_xquic_list_node_t *));
     if (qc->streams_index == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    /* init path_id */
+    qc->path_index = ngx_pcalloc(qc->pool, (NGX_XQUIC_MP_PATH_INDEX + 1)
+                                            * sizeof(ngx_xquic_list_node_t *));
+    if (qc->path_index == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
@@ -1336,7 +1650,11 @@ ngx_http_v3_create_connection(ngx_connection_t *lc, const xqc_cid_t *connection_
         return NULL;
     }
 
-    if(ngx_http_xquic_init_connection(qc) != NGX_OK) {
+    if (ngx_http_xquic_init_connection(qc) != NGX_OK) {
+        if (qc->connection->pool) {
+            ngx_destroy_pool(qc->connection->pool);
+            qc->connection->pool = NULL;
+        }
         ngx_close_connection(qc->connection);
         ngx_destroy_pool(pool);
         return NULL;
@@ -1369,10 +1687,9 @@ ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
     ngx_event_t                     *ev;
     ngx_connection_t                *c, *fc;
     ngx_http_request_t              *r;
-    ngx_http_v3_stream_t            *stream = NULL;
+    ngx_http_v3_stream_t            *qstream = NULL;
     ngx_xquic_list_node_t           *node = NULL;
     ngx_http_xquic_main_conf_t      *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
-
 
     c = h3c->connection;
 
@@ -1390,7 +1707,6 @@ ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
     c->read->handler = ngx_http_empty_handler;
     c->write->handler = ngx_http_empty_handler;
 
-
     /* check all the streams */
     size = ngx_http_xquic_index_size(qmcf);
 
@@ -1403,18 +1719,18 @@ ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
         /* may delete stream in the loop, will not delete node */
         for (node = h3c->streams_index[i]; node != NULL; node = node->next) {
 
-            stream = node->entry;
+            qstream = node->entry;
 
-            if (stream == NULL || stream->request_closed) {
+            if (qstream == NULL || qstream->request_closed) {
                 continue;
             }
 
             ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, 
-                    "|xquic|find unclosed stream while finalizing request|stream_id=%i|", stream->id);
+                          "|xquic|find unclosed stream while finalizing request|stream_id=%i|", qstream->id);
 
-            stream->handled = 0;
+            qstream->handled = 0;
 
-            r = stream->request;
+            r = qstream->request;
 
             /* stream->request may be closed before engine close h3 stream */
             if (r == NULL) {
@@ -1425,8 +1741,8 @@ ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
 
             fc->error = 1;
 
-            if (stream->queued) {
-                stream->queued = 0;
+            if (qstream->queued) {
+                qstream->queued = 0;
 
                 ev = fc->write;
                 ev->delayed = 0;
@@ -1440,8 +1756,8 @@ ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
 
             /* ev->handler may call ngx_http_v3_close_stream.
              * struct stream will memset to zero and stream->closed will set to 1 in ngx_http_v3_close_stream */
-            if (r == stream->request && !stream->closed) {
-                ngx_http_v3_close_stream(stream, 0);
+            if (r == qstream->request && !qstream->closed) {
+                ngx_http_v3_close_stream(qstream, 0);
             }
         }
     }
@@ -1468,8 +1784,8 @@ ngx_http_v3_connection_error(ngx_http_xquic_connection_t *qc,
     ngx_http_xquic_main_conf_t  *qmcf = ngx_http_cycle_get_module_main_conf(ngx_cycle, ngx_http_xquic_module);
 
     ngx_log_debug3(NGX_LOG_DEBUG_HTTP, qc->connection->log, 0,
-                  "|xquic|ngx_xquic_server_session_close: close connection_id: %ul|err=%i|%s|",
-                  qc->connection_id, err, err_details);
+                   "|xquic|ngx_xquic_server_session_close: close connection_id: %ul|err=%i|%s|",
+                   qc->connection_id, err, err_details);
 
     ev = qc->connection->read;
 
@@ -1485,3 +1801,88 @@ ngx_http_v3_connection_error(ngx_http_xquic_connection_t *qc,
 }
 
 
+void
+ngx_http_v3_finalize_paths(ngx_http_xquic_connection_t *qc)
+{
+    ngx_uint_t index;
+    ngx_xquic_list_node_t *node  = NULL;
+    ngx_xquic_path_t *path  = NULL;
+
+    ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
+                  "|xquic|ngx_http_v3_finalize_paths|");
+
+    if (qc == NULL || qc->path_index == NULL) {
+        return;
+    }
+
+    for (index = 0; index <= NGX_XQUIC_MP_PATH_INDEX; index++) {
+        for (node = qc->path_index[index]; node != NULL; node = node->next) {
+            path = node->entry;
+
+            if (path != NULL) {
+                path->path_state = NGX_XQUIC_PATH_STATE_CLOSED;
+                if (path->c->pool) {
+                    ngx_destroy_pool(path->c->pool);
+                    path->c->pool = NULL;
+                }
+                ngx_close_connection(path->c);
+
+#if (NGX_STAT_STUB)
+                (void) ngx_atomic_fetch_add(ngx_stat_active, -1);
+#endif
+            }
+        }
+    }
+
+    qc->path_index = NULL;
+}
+
+
+#if (T_NGX_HTTP_SSL_FINGERPRINT)
+
+void ngx_http_v3_ssl_msg_cb(int msg_type, 
+    const void *msg, size_t msg_len, void *user_data)
+{
+    ngx_int_t                       rc;
+    ngx_http_ssl_srv_conf_t        *sscf;
+    ngx_http_connection_t          *hc;
+
+    if (msg_type != XQC_TLS_1_3_CLIENT_HELLO) {
+        return;
+    }
+
+    ngx_http_xquic_connection_t *qc = (ngx_http_xquic_connection_t *)user_data;
+    if (qc == NULL || qc->connection == NULL) {
+        return;
+    }
+
+    hc = qc->http_connection;
+    if (hc == NULL) {
+        return;
+    }
+
+    sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
+    if (NULL == sscf || sscf->ssl_fingerprint == 0) {
+        return;
+    }
+
+    if (!ngx_http_ssl_process_fingerprint_enable()) {
+        return;
+    }
+    
+    switch (msg_type) {
+        case XQC_TLS_1_3_CLIENT_HELLO:
+        {
+            rc = ngx_http_ssl_client_hello_process_fingerprint(qc->connection, msg, msg_len);
+            if (rc != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                              "http3 client hello fingerprint failed");
+            }
+        }
+        break;
+        default:
+        break;
+    }
+}
+
+#endif

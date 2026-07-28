@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-   runs-on: "ubuntu-20.04"
+   runs-on: "ubuntu-24.04"
    strategy:
      fail-fast: false
      matrix:
@@ -21,7 +21,7 @@ jobs:
        run: |
          sudo apt update
          sudo apt remove nginx libgd3
-         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre++0v5 libpcre++-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
      - name: 'checkout luajit2'
        uses: actions/checkout@v3
        with:
@@ -120,3 +120,35 @@ jobs:
          mkdir t
          PATH=/usr/local/nginx/sbin:$PATH \
          prove -v -Itest-nginx/lib cases/
+
+  # Separate build that enables the native ngx_http_tunnel_module explicitly
+  # (--with-http_tunnel_module; it is off by default) and does NOT link
+  # ngx_http_proxy_connect_module, so the upstream tunnel*.t cases actually run
+  # (has('tunnel') is true here) instead of being skipped. The two CONNECT
+  # implementations cannot be linked together, so this must be its own job.
+  native-tunnel-test:
+   runs-on: "ubuntu-24.04"
+   steps:
+     - uses: actions/checkout@v3
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx libgd3
+         sudo apt install -y libpcre3 libpcre3-dev libssl-dev cpanminus
+     - name: build tengine with native http_tunnel_module (no proxy_connect)
+       run: |
+         ./configure \
+            --with-http_ssl_module \
+            --with-http_tunnel_module
+         make -j2
+         sudo make install
+     - name: run native tunnel test cases
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+       run: |
+         sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
+         prove -v -Inginx-tests/lib \
+           tengine-tests/tunnel.t \
+           tengine-tests/tunnel_auth_basic.t \
+           tengine-tests/tunnel_next_upstream.t

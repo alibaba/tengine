@@ -64,16 +64,21 @@ http {
 
 EOF
 
-$t->try_run('no inet6 support')->plan(3);
+$t->try_run('no inet6 support');
 
-###############################################################################
+my @addrs = resolve('localhost');
+
+plan(skip_all => 'unexpected localhost') if @addrs > 2
+	|| grep { $_ ne '127.0.0.1' && $_ ne '[::1]' } @addrs;
 
 my $p = port(8080);
-my @addrs = resolve('localhost');
 my $exp = qr/$addrs[0]:$p/ if @addrs == 1;
 my $v1 = "$addrs[0]:$p", my $v2 = "$addrs[1]:$p" if @addrs == 2;
 $exp = qr/\Q$v1, $v2\E|\Q$v2, $v1\E/ if @addrs == 2;
-die "too many addresses in localhost" if @addrs > 2;
+
+$t->plan(3);
+
+###############################################################################
 
 like(http_get('/'), qr/Not Found/, 'implicit upstream');
 like(http_get('/'), $exp, 'implicit upstream all tried');

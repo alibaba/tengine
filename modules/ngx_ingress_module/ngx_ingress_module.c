@@ -1336,9 +1336,10 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
 
     ngx_ingress_upstream_t *ups = target_service->upstreams->elts;
     ngx_int_t ups_index = 0;
+    ngx_uint_t i;
     if (target_service->upstream_weight != 0) {
         ngx_int_t  offset = ngx_random() % target_service->upstream_weight;
-        for (ngx_uint_t i = 0; i < target_service->upstreams->nelts; i++) {
+        for (i = 0; i < target_service->upstreams->nelts; i++) {
             if (ups[i].start <= offset && ups[i].end > offset) {
                 ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                         "|ingress|hit weight target|%i|%V|", ups_index, &ups[ups_index].target);
@@ -1384,7 +1385,8 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
 
     if (action_service != NULL) {
         ngx_ingress_action_t *shm_action = action_service->action_a->elts;
-        for (ngx_uint_t i = 0; i < action_service->action_a->nelts; i++) {
+        ngx_uint_t i;
+        for (i = 0; i < action_service->action_a->nelts; i++) {
             ngx_ingress_action_t *action = ngx_array_push(&ctx->action_a);
             if (action == NULL) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1429,7 +1431,8 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
             continue;
         }
         ngx_ingress_metadata_t *shm_metas = service_queue->service->metadata->elts;
-        for (ngx_uint_t i = 0; i < service_queue->service->metadata->nelts; i++) {
+        ngx_uint_t i;
+        for (i = 0; i < service_queue->service->metadata->nelts; i++) {
             ngx_ingress_metadata_t *metadata = ngx_array_push(&ctx->metadata);
             if (metadata == NULL) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,

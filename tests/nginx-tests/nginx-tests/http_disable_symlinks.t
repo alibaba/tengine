@@ -10,8 +10,10 @@ use warnings;
 use strict;
 
 use Test::More;
+
 use POSIX;
 use Cwd qw/ realpath /;
+use Config;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -259,11 +261,17 @@ like(http_get('/complex/3/empty.html'), qr!200 OK!, 'complex root 3');
 # tests to pass as openat() will correctly fail with ENOTDIR
 
 chmod(0700, "$d/link");
-my $rc = $^O eq 'darwin' ? 200 : 404;
 
 like(http_get('/link/tail'), qr!40[34] !, 'file with trailing /, on');
 like(http_get('/link/tailowner'), qr!404 !, 'file with trailing /, owner');
-like(http_get('/link/tailoff'), qr!$rc !, 'file with trailing /, off');
+
+TODO: {
+local $TODO = 'darwin too old'
+	if $^O eq 'darwin' && (split(/\./, $Config{'osvers'}))[0] < 25;
+
+like(http_get('/link/tailoff'), qr!404 !, 'file with trailing /, off');
+
+}
 
 like(http_get('/dirlink'), qr!404 !, 'directory without /');
 like(http_get('/dirlink/'), qr!404 !, 'directory with trailing /');

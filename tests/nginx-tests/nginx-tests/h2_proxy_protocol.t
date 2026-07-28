@@ -39,8 +39,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 proxy_protocol http2;
+        listen       127.0.0.1:8080 proxy_protocol;
         server_name  localhost;
+
+        http2 on;
 
         location /pp {
             set_real_ip_from 127.0.0.1/32;
@@ -54,10 +56,7 @@ http {
 EOF
 
 $t->write_file('t.html', 'SEE-THIS');
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -72,11 +71,7 @@ is($frame->{headers}->{'x-pp'}, '192.0.2.1', 'PROXY remote addr');
 
 # invalid PROXY protocol string
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.25.1');
 $proxy = 'BOGUS TCP4 192.0.2.1 192.0.2.2 1234 5678' . CRLF;
 ok(!http($proxy), 'PROXY invalid protocol');
-
-}
 
 ###############################################################################

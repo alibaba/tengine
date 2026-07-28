@@ -160,6 +160,7 @@ sub imap_test_daemon {
 				print $client '+ ' . CRLF;
 				$client->sysread(my $buf, $1);
 				Test::Nginx::log_core('||', $buf);
+				$_ .= $buf;
 				$buf = <$client>;
 				Test::Nginx::log_core('||', $buf);
 				$_ .= $buf;
@@ -173,6 +174,8 @@ sub imap_test_daemon {
 			if (/^logout/i) {
 				print $client $tag . ' OK logout ok' . CRLF;
 			} elsif (/^login /i) {
+				print $client "* CAPABILITY IMAP4rev1" . CRLF
+					if /capability/;
 				print $client $tag . ' OK login ok' . CRLF;
 			} else {
 				print $client $tag . ' ERR unknown command' . CRLF;

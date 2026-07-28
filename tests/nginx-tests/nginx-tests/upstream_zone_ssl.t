@@ -54,6 +54,8 @@ http {
         ssl_certificate localhost.crt;
         ssl_session_cache builtin;
 
+        keepalive_requests 1;
+
         location / {
             add_header X-Session $ssl_session_reused;
             add_header X-Protocol $ssl_protocol;
@@ -115,24 +117,32 @@ $t->run();
 like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl');
 like(http_get('/ssl'), qr/200 OK.*X-Session: \./s, 'ssl 2');
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: \./s, 'ssl session new');
+
 TODO: {
 local $TODO = 'no TLSv1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') and test_tls13();
+
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: r/s, 'ssl session reused');
 like(http_get('/ssl_reuse'), qr/200 OK.*X-Session: r/s, 'ssl session reused 2');
 
 }
+
 like(http_get('/backup'), qr/200 OK.*X-Session: \./s, 'backup');
 like(http_get('/backup'), qr/200 OK.*X-Session: \./s, 'backup 2');
 like(http_get('/backup_reuse'), qr/200 OK.*X-Session: \./s, 'backup new');
+
 TODO: {
 local $TODO = 'no TLSv1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') and test_tls13();
+
 like(http_get('/backup_reuse'), qr/200 OK.*X-Session: r/s, 'backup reused');
 
 }
+
 ###############################################################################
+
 sub test_tls13 {
 	http_get('/ssl') =~ /TLSv1.3/;
 }
+
 ###############################################################################

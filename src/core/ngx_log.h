@@ -70,6 +70,9 @@ struct ngx_log_s {
     char                *action;
 
     ngx_log_t           *next;
+
+    NGX_COMPAT_BEGIN(5)
+    NGX_COMPAT_END
 };
 
 
@@ -258,7 +261,9 @@ ngx_int_t ngx_log_open_default(ngx_cycle_t *cycle);
 ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle);
 ngx_log_t *ngx_log_get_file_log(ngx_log_t *head);
 char *ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head);
+#if (T_NGX_XQUIC)
 ngx_int_t ngx_log_target(ngx_cycle_t *cycle, ngx_str_t *value, ngx_open_file_t **file);
+#endif
 
 /*
  * ngx_write_stderr() cannot be implemented as macro, since

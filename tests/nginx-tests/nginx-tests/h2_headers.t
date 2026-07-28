@@ -23,7 +23,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/)->plan(103)
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite/)->plan(110)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -36,10 +36,12 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    http2 on;
+
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         listen       127.0.0.1:8081;
-        listen       127.0.0.1:8082 http2 sndbuf=128;
+        listen       127.0.0.1:8082 sndbuf=128;
         server_name  localhost;
 
         large_client_header_buffers 2 64k;
@@ -89,21 +91,21 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8084 http2;
+        listen       127.0.0.1:8084;
         server_name  localhost;
 
         large_client_header_buffers 4 512;
     }
 
     server {
-        listen       127.0.0.1:8085 http2;
+        listen       127.0.0.1:8085;
         server_name  localhost;
 
         large_client_header_buffers 1 512;
     }
 
     server {
-        listen       127.0.0.1:8086 http2;
+        listen       127.0.0.1:8086;
         server_name  localhost;
 
         underscores_in_headers on;
@@ -111,7 +113,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8087 http2;
+        listen       127.0.0.1:8087;
         server_name  localhost;
 
         ignore_invalid_headers off;
@@ -122,11 +124,7 @@ http {
 EOF
 
 $t->run_daemon(\&http_daemon);
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
-$t->run();
-open STDERR, ">&", \*OLDERR;
-$t->waitforsocket('127.0.0.1:' . port(8083));
+$t->run()->waitforsocket('127.0.0.1:' . port(8083));
 
 # file size is slightly beyond initial window size: 2**16 + 80 bytes
 
@@ -955,13 +953,7 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 isnt($frame->{headers}->{'x-referer'}, 'see-this', 'newline in request header');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.4');
-
 is($frame->{headers}->{':status'}, 400, 'newline in request header - bad request');
-
-}
 
 # invalid header name as seen with underscore should not lead to ignoring rest
 
@@ -979,8 +971,6 @@ $frames = $s->read(all => [{ type => 'HEADERS' }]);
 is($frame->{headers}->{'x-referer'}, 'see-this', 'after invalid header name');
 
 # other invalid header name characters as seen with ':'
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.4');
 
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
@@ -994,7 +984,6 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 400, 'colon in header name');
-
 
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ headers => [
@@ -1019,8 +1008,6 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 400, 'control in header name');
-
-}
 
 # header name with underscore - underscores_in_headers on
 
@@ -1079,6 +1066,107 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 400, 'empty authority');
 
+# no ':authority'
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400, 'no authority');
+
+# no ':authority' and non-empty 'host'
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => 'host', value => 'localhost', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 200, 'no authority and non-empty host');
+
+# no ':authority' and non-empty 'host' with port
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => 'host', value => 'localhost:1234', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 200,
+	'no authority and non-empty host with port');
+
+# equal ':authority' and 'host'
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.29.1');
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => ':authority', value => 'localhost', mode => 1 },
+	{ name => 'host', value => 'localhost', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 200, 'equal authority and host');
+
+# equal ':authority' and 'host' with port
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => ':authority', value => 'localhost:1234', mode => 1 },
+	{ name => 'host', value => 'localhost:1234', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 200, 'equal authority and host with port');
+
+}
+
+# non-equal ':authority' and 'host'
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => ':authority', value => 'localhost', mode => 1 },
+	{ name => 'host', value => 'localhost2', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400, 'non-equal authority and host');
+
+# non-equal ':authority' and 'host' with port
+
+$s = Test::Nginx::HTTP2->new();
+$sid = $s->new_stream({ headers => [
+	{ name => ':method', value => 'GET', mode => 0 },
+	{ name => ':scheme', value => 'http', mode => 0 },
+	{ name => ':path', value => '/', mode => 0 },
+	{ name => ':authority', value => 'localhost:1234', mode => 1 },
+	{ name => 'host', value => 'localhost:5678', mode => 1 }]});
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
+is($frame->{headers}->{':status'}, 400,
+	'non-equal authority and host with port');
+
 # client sent invalid :path header
 
 $sid = $s->new_stream({ path => 't1.html' });
@@ -1087,16 +1175,11 @@ $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 400, 'invalid path');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
-
 $sid = $s->new_stream({ path => "/t1.html\x02" });
 $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 400, 'invalid path control');
-
-}
 
 # ngx_http_v2_parse_int() error handling
 

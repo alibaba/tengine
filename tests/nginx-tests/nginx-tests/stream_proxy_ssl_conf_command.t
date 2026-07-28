@@ -26,8 +26,6 @@ my $t = Test::Nginx->new()
 	->has(qw/stream stream_ssl http http_ssl openssl:1.0.2/)
 	->has_daemon('openssl');
 
-plan(skip_all => 'no ssl_conf_command') if $t->has_module('BoringSSL');
-
 $t->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -88,7 +86,7 @@ foreach my $name ('localhost', 'override') {
 }
 
 $t->write_file('index.html', '');
-$t->run()->plan(1);
+$t->try_run('no ssl_conf_command')->plan(1);
 
 ###############################################################################
 

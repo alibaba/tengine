@@ -26,7 +26,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http http_v2 proxy rewrite charset gzip/)
-	->plan(142);
+	->plan(143);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -40,8 +40,10 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    http2 on;
+
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         listen       127.0.0.1:8081;
         server_name  localhost;
 
@@ -88,26 +90,26 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 http2;
+        listen       127.0.0.1:8082;
         server_name  localhost;
         return 200   first;
     }
 
     server {
-        listen       127.0.0.1:8082 http2;
+        listen       127.0.0.1:8082;
         server_name  localhost2;
         return 200   second;
     }
 
     server {
-        listen       127.0.0.1:8083 http2;
+        listen       127.0.0.1:8083;
         server_name  localhost;
 
         http2_max_concurrent_streams 1;
     }
 
     server {
-        listen       127.0.0.1:8086 http2;
+        listen       127.0.0.1:8086;
         server_name  localhost;
 
         send_timeout 1s;
@@ -115,7 +117,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8087 http2;
+        listen       127.0.0.1:8087;
         server_name  localhost;
 
         client_header_timeout 1s;
@@ -132,10 +134,7 @@ http {
 
 EOF
 
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 # file size is slightly beyond initial window size: 2**16 + 80 bytes
 
@@ -303,17 +302,12 @@ is($frame, undef, 'HEAD - no body');
 
 # CONNECT
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
-
 $s = Test::Nginx::HTTP2->new();
 $sid = $s->new_stream({ method => 'CONNECT' });
 $frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
 
 ($frame) = grep { $_->{type} eq "HEADERS" } @$frames;
 is($frame->{headers}->{':status'}, 405, 'CONNECT - not allowed');
-
-}
 
 # TRACE
 
@@ -764,6 +758,37 @@ $frames = $s->read(all => [{ sid => $sid, length => 80 }]);
 $sum = eval join '+', map { $_->{length} } @data;
 is($sum, 80, 'iws duplicate - updated stream window 2');
 
+# SETTINGS frame split after INITIAL_WINDOW_SIZE
+
+TODO: {
+local $TODO = 'not yet';
+
+$s = Test::Nginx::HTTP2->new();
+
+# $s->h2_settings(0, 0x4 => 2**17, 0x5 => 16384);
+{
+	local $SIG{PIPE} = 'IGNORE';
+	syswrite($s->{socket}, pack("x2C2x5nN", 12, 0x4, 4, 2**17));
+}
+
+select undef, undef, undef, 0.2;
+
+{
+	local $SIG{PIPE} = 'IGNORE';
+	syswrite($s->{socket}, pack("nN", 5, 16384));
+}
+
+$s->h2_window(2**17);
+
+$sid = $s->new_stream({ path => '/t1.html' });
+$frames = $s->read(all => [{ sid => $sid, fin => 1 }]);
+
+@data = grep { $_->{type} eq "DATA" } @$frames;
+$sum = eval join '+', map { $_->{length} } @data;
+is($sum, 2**16 + 80, 'iws - increased');
+
+}
+
 # probe for negative available space in a flow control window
 
 # 6.9.2.  Initial Flow-Control Window Size
@@ -1020,14 +1045,9 @@ is($frame->{headers}->{':status'}, 200, 'http2_max_concurrent_streams 3');
 
 # invalid connection preface
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.25.1');
-
 like(http('x' x 16), qr/400 Bad Request/, 'invalid preface');
 like(http('PRI * HTTP/2.0' . CRLF . CRLF . 'x' x 8), qr/400 Bad Request/,
 	'invalid preface 2');
-
-}
 
 # GOAWAY on SYN_STREAM with even StreamID
 

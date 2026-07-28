@@ -315,6 +315,25 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
             continue;
         }
 
+#ifdef SO_PROTOCOL
+
+        olen = sizeof(int);
+
+        if (getsockopt(ls[i].fd, SOL_SOCKET, SO_PROTOCOL,
+                       (void *) &ls[i].protocol, &olen)
+            == -1)
+        {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                          "getsockopt(SO_PROTOCOL) %V failed, ignored",
+                          &ls[i].addr_text);
+            ls[i].protocol = 0;
+
+        } else if (ls[i].protocol == IPPROTO_TCP) {
+            ls[i].protocol = 0;
+        }
+
+#endif
+
 #if (NGX_HAVE_TCP_FASTOPEN)
 
         olen = sizeof(int);
@@ -440,12 +459,16 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
 
-            if (ls[i].add_reuseport) {
+            if (ls[i].add_reuseport || ls[i].change_protocol) {
 
                 /*
                  * to allow transition from a socket without SO_REUSEPORT
                  * to multiple sockets with SO_REUSEPORT, we have to set
                  * SO_REUSEPORT on the old socket before opening new ones
+                 *
+                 * to allow transition between different socket protocols
+                 * (e.g. IPPROTO_MPTCP), SO_REUSEPORT is set on both old
+                 * and new sockets
                  */
 
                 int  reuseport = 1;
@@ -478,7 +501,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 #endif
 
-            if (ls[i].fd != (ngx_socket_t) -1) {
+            if (ls[i].fd != (ngx_socket_t) -1 && !ls[i].change_protocol) {
                 continue;
             }
 
@@ -491,7 +514,8 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
-            s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
+            s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type,
+                           ls[i].protocol);
 
             if (s == (ngx_socket_t) -1) {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -521,7 +545,9 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_REUSEPORT)
 
-            if (ls[i].reuseport && !ngx_test_config) {
+            if ((ls[i].reuseport || ls[i].change_protocol)
+                && !ngx_test_config)
+            {
                 int  reuseport;
 
                 reuseport = 1;
@@ -655,6 +681,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
             if (ls[i].type != SOCK_STREAM) {
                 ls[i].fd = s;
+                ls[i].open = 1;
                 continue;
             }
 
@@ -693,6 +720,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             ls[i].listen = 1;
 
             ls[i].fd = s;
+            ls[i].open = 1;
         }
 
         if (!failed) {
@@ -775,6 +803,8 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
 
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
 
+#if !(NGX_DARWIN)
+
         if (ls[i].keepidle) {
             value = ls[i].keepidle;
 
@@ -791,6 +821,8 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
                               value, &ls[i].addr_text);
             }
         }
+
+#endif
 
         if (ls[i].keepintvl) {
             value = ls[i].keepintvl;
@@ -1024,6 +1056,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         }
 
 #endif
+
     }
 
     return;
@@ -1585,6 +1618,10 @@ ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
     }
 #endif
 
+    if (err == NGX_EMSGSIZE && c->log_error == NGX_ERROR_IGNORE_EMSGSIZE) {
+        return 0;
+    }
+
     if (err == 0
         || err == NGX_ECONNRESET
 #if (NGX_WIN32)
@@ -1602,6 +1639,7 @@ ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
     {
         switch (c->log_error) {
 
+        case NGX_ERROR_IGNORE_EMSGSIZE:
         case NGX_ERROR_IGNORE_EINVAL:
         case NGX_ERROR_IGNORE_ECONNRESET:
         case NGX_ERROR_INFO:

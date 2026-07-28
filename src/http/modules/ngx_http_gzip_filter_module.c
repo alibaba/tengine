@@ -533,8 +533,10 @@ ngx_http_gzip_filter_memory(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
         /*
          * Another zlib variant, https://github.com/zlib-ng/zlib-ng.
          * It used to force window bits to 13 for fast compression level,
-         * uses (64 + sizeof(void*)) additional space on all allocations
-         * for alignment, 16-byte padding in one of window-sized buffers,
+         * used (64 + sizeof(void*)) additional space on all allocations
+         * for alignment and 16-byte padding in one of window-sized buffers,
+         * uses a single allocation with up to 200 bytes for alignment and
+         * internal pointers, 5/4 times more memory for the pending buffer,
          * and 128K hash.
          */
 
@@ -543,7 +545,7 @@ ngx_http_gzip_filter_memory(ngx_http_request_t *r, ngx_http_gzip_ctx_t *ctx)
         }
 
         ctx->allocated = 8192 + 16 + (1 << (wbits + 2))
-                         + 131072 + (1 << (memlevel + 8))
+                         + 131072 + (5 << (memlevel + 6))
                          + 4 * (64 + sizeof(void*));
         ctx->zlib_ng = 1;
     }
@@ -1002,10 +1004,14 @@ static void
 ngx_http_gzip_filter_free_copy_buf(ngx_http_request_t *r,
     ngx_http_gzip_ctx_t *ctx)
 {
-    ngx_chain_t  *cl;
+    ngx_chain_t  *cl, *ln;
 
-    for (cl = ctx->copied; cl; cl = cl->next) {
-        ngx_pfree(r->pool, cl->buf->start);
+    for (cl = ctx->copied; cl; /* void */) {
+        ln = cl;
+        cl = cl->next;
+
+        ngx_pfree(r->pool, ln->buf->start);
+        ngx_free_chain(r->pool, ln);
     }
 
     ctx->copied = NULL;
@@ -1132,7 +1138,7 @@ ngx_http_gzip_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_html_default_types)
-        != NGX_OK)
+        != NGX_CONF_OK)
     {
         return NGX_CONF_ERROR;
     }

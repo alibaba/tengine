@@ -87,6 +87,7 @@ HTTP_FASTCGI=YES
 HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_GRPC=YES
+HTTP_TUNNEL=NO
 HTTP_PERL=NO
 HTTP_LUA=NO
 HTTP_MEMCACHED=YES
@@ -103,10 +104,12 @@ HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
+HTTP_UPSTREAM_LEAST_TIME=YES
 HTTP_UPSTREAM_RANDOM=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 HTTP_UPSTREAM_RBTREE=YES
 HTTP_UPSTREAM_ZONE=YES
+HTTP_UPSTREAM_STICKY=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
@@ -130,9 +133,11 @@ STREAM_GEOIP=NO
 STREAM_MAP=YES
 STREAM_SPLIT_CLIENTS=YES
 STREAM_RETURN=YES
+STREAM_PASS=YES
 STREAM_SET=YES
 STREAM_UPSTREAM_HASH=YES
 STREAM_UPSTREAM_LEAST_CONN=YES
+STREAM_UPSTREAM_LEAST_TIME=YES
 STREAM_UPSTREAM_RANDOM=YES
 STREAM_UPSTREAM_ZONE=YES
 STREAM_SSL_PREREAD=NO
@@ -184,6 +189,8 @@ USE_GEOIP=NO
 
 NGX_GOOGLE_PERFTOOLS=NO
 NGX_CPP_TEST=NO
+
+SO_COOKIE_FOUND=NO
 
 NGX_LIBATOMIC=NO
 
@@ -274,6 +281,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-http_secure_link_module)  HTTP_SECURE_LINK=YES       ;;
         --with-http_degradation_module)  HTTP_DEGRADATION=YES       ;;
         --with-http_slice_module)        HTTP_SLICE=YES             ;;
+        --with-http_tunnel_module)       HTTP_TUNNEL=YES            ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
@@ -294,6 +302,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_uwsgi_module)     HTTP_UWSGI=NO              ;;
         --without-http_scgi_module)      HTTP_SCGI=NO               ;;
         --without-http_grpc_module)      HTTP_GRPC=NO               ;;
+        --without-http_tunnel_module)    HTTP_TUNNEL=NO             ;;
         --without-http_memcached_module) HTTP_MEMCACHED=NO          ;;
         --without-http_limit_conn_module) HTTP_LIMIT_CONN=NO        ;;
         --without-http_limit_req_module) HTTP_LIMIT_REQ=NO         ;;
@@ -303,10 +312,19 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO ;;
+        --without-http_upstream_least_time_module)
+                                         HTTP_UPSTREAM_LEAST_TIME=NO ;;
         --without-http_upstream_random_module)
                                          HTTP_UPSTREAM_RANDOM=NO    ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
         --without-http_upstream_zone_module) HTTP_UPSTREAM_ZONE=NO  ;;
+        --without-http_upstream_sticky_module) HTTP_UPSTREAM_STICKY=NO ;;
+        --without-http_upstream_sticky)
+            HTTP_UPSTREAM_STICKY=NO
+            NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
+$0: warning: the \"--without-http_upstream_sticky\" option is deprecated, \
+use the \"--without-http_upstream_sticky_module\" option instead"
+        ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
         --with-http_perl_module=dynamic) HTTP_PERL=DYNAMIC          ;;
@@ -368,11 +386,14 @@ use the \"--with-mail_ssl_module\" option instead"
         --without-stream_split_clients_module)
                                          STREAM_SPLIT_CLIENTS=NO    ;;
         --without-stream_return_module)  STREAM_RETURN=NO           ;;
+        --without-stream_pass_module)    STREAM_PASS=NO             ;;
         --without-stream_set_module)     STREAM_SET=NO              ;;
         --without-stream_upstream_hash_module)
                                          STREAM_UPSTREAM_HASH=NO    ;;
         --without-stream_upstream_least_conn_module)
                                          STREAM_UPSTREAM_LEAST_CONN=NO ;;
+        --without-stream_upstream_least_time_module)
+                                         STREAM_UPSTREAM_LEAST_TIME=NO ;;
         --without-stream_upstream_random_module)
                                          STREAM_UPSTREAM_RANDOM=NO  ;;
         --without-stream_upstream_zone_module)
@@ -513,6 +534,7 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_slice_module           enable ngx_http_slice_module
+  --with-http_tunnel_module          enable ngx_http_tunnel_module
   --with-http_stub_status_module     enable ngx_http_stub_status_module
 
   --without-http_charset_module      disable ngx_http_charset_module
@@ -546,12 +568,16 @@ cat << END
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
+  --without-http_upstream_least_time_module
+                                     disable ngx_http_upstream_least_time_module
   --without-http_upstream_random_module
                                      disable ngx_http_upstream_random_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_zone_module
                                      disable ngx_http_upstream_zone_module
+  --without-http_upstream_sticky_module
+                                     disable ngx_http_upstream_sticky_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-http_perl_module=dynamic    enable dynamic ngx_http_perl_module
@@ -606,11 +632,14 @@ cat << END
   --without-stream_split_clients_module
                                      disable ngx_stream_split_clients_module
   --without-stream_return_module     disable ngx_stream_return_module
+  --without-stream_pass_module       disable ngx_stream_pass_module
   --without-stream_set_module        disable ngx_stream_set_module
   --without-stream_upstream_hash_module
                                      disable ngx_stream_upstream_hash_module
   --without-stream_upstream_least_conn_module
                                      disable ngx_stream_upstream_least_conn_module
+  --without-stream_upstream_least_time_module
+                                     disable ngx_stream_upstream_least_time_module
   --without-stream_upstream_random_module
                                      disable ngx_stream_upstream_random_module
   --without-stream_upstream_zone_module

@@ -42,8 +42,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 proxy_protocol http2 ssl;
+        listen       127.0.0.1:8080 proxy_protocol ssl;
         server_name  localhost;
+
+        http2 on;
 
         ssl_certificate_key localhost.key;
         ssl_certificate localhost.crt;
@@ -78,10 +80,7 @@ foreach my $name ('localhost') {
 }
 
 $t->write_file('t.html', 'SEE-THIS');
-
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -90,7 +89,8 @@ my $sock = http($proxy, start => 1);
 http('', start => 1, socket => $sock, SSL => 1, SSL_alpn_protocols => ['h2']);
 
 SKIP: {
-skip 'no ALPN negotiation', 2 unless $sock->alpn_selected();
+skip 'no ALPN support in OpenSSL', 2
+	if $t->has_module('OpenSSL') and not $t->has_feature('openssl:1.0.2');
 
 my $s = Test::Nginx::HTTP2->new(undef, socket => $sock);
 my $sid = $s->new_stream({ path => '/pp' });
