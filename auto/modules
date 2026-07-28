@@ -1567,3 +1567,6 @@ have=T_NGX_REQUEST_START_TIME . auto/have
 have=T_NGX_SOCKET_BUFFER . auto/have
 have=T_NGX_X_ACCEL_REDIRECT . auto/have
 have=T_NGX_ESCAPE_WWW_FORM_ALI . auto/have
+if [ $NGX_DUP_HOST = YES ]; then
+    have=T_NGX_DUP_HOST . auto/have
+fi

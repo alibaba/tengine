@@ -2456,6 +2456,7 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_str_t  host;
     in_port_t  port;
 
+#if !defined(T_NGX_DUP_HOST)
     if (r->headers_in.host) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                       "client sent duplicate host header: \"%V: %V\", "
@@ -2465,6 +2466,7 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
         ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
         return NGX_ERROR;
     }
+#endif
 
     r->headers_in.host = h;
     h->next = NULL;
