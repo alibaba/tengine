@@ -207,9 +207,15 @@ u_char *ngx_utf8_cpystrn(u_char *dst, u_char *src, size_t n, size_t len);
 #define NGX_ESCAPE_MEMCACHED      5
 #define NGX_ESCAPE_MAIL_AUTH      6
 #define NGX_ESCAPE_MAIL_XTEXT     7
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+#define NGX_ESCAPE_WWW_FORM       8
+#endif
 
 #define NGX_UNESCAPE_URI       1
 #define NGX_UNESCAPE_REDIRECT  2
+#if (T_NGX_ESCAPE_WWW_FORM_ALI)
+#define NGX_UNESCAPE_WWW_FORM  4
+#endif
 
 uintptr_t ngx_escape_uri(u_char *dst, u_char *src, size_t size,
     ngx_uint_t type);

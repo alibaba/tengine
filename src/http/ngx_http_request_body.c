@@ -1283,6 +1283,12 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     rb = r->request_body;
 
+#if (T_NGX_HTTP_STAT_TIME)
+    if (r == r->main) {
+        r->stat_time.req_recv_finished_time = ngx_current_msec;
+    }
+#endif
+
     ll = &rb->bufs;
 
     for (cl = rb->bufs; cl; cl = cl->next) {

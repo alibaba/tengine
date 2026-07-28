@@ -66,6 +66,13 @@ typedef struct {
     ngx_msec_t                       connect_time;
     ngx_msec_t                       header_time;
     ngx_msec_t                       queue_time;
+#ifdef T_NGX_HTTP_STAT_TIME
+    ngx_msec_t                       ups_send_start_time;
+    ngx_msec_t                       ups_send_finish_time;
+    ngx_msec_t                       ups_recv_start_time;
+    ngx_msec_t                       ups_recv_finish_time;
+    ngx_msec_t                       ups_finish_time;
+#endif
     off_t                            response_length;
     off_t                            bytes_received;
     off_t                            bytes_sent;
@@ -86,6 +93,10 @@ typedef struct {
     ngx_rbtree_t                     rbtree;
     ngx_rbtree_node_t                sentinel;
 
+#endif
+
+#if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
+    ngx_flag_t                       change_no_server_status;
 #endif
 } ngx_http_upstream_main_conf_t;
 

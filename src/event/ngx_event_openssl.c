@@ -4416,6 +4416,13 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 {
     int         n;
     ngx_uint_t  level;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    u_char     *newtext;
+    u_char     *p;
+    u_char     *sni_p;
+    size_t      newlen;
+    const char *servername;
+#endif
 
     level = NGX_LOG_CRIT;
 
@@ -4438,7 +4445,11 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 
             case NGX_ERROR_IGNORE_ECONNRESET:
             case NGX_ERROR_INFO:
+#if (T_NGX_SSL_ERR_LOG_ALI)
+                level = NGX_LOG_ERR;
+#else
                 level = NGX_LOG_INFO;
+#endif
                 break;
 
             case NGX_ERROR_ERR:
@@ -4627,7 +4638,11 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 
             case NGX_ERROR_IGNORE_ECONNRESET:
             case NGX_ERROR_INFO:
+#if (T_NGX_SSL_ERR_LOG_ALI)
+                level = NGX_LOG_ERR;
+#else
                 level = NGX_LOG_INFO;
+#endif
                 break;
 
             case NGX_ERROR_ERR:
@@ -4639,6 +4654,37 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
             }
         }
     }
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    /* insert servername into text */
+    servername = SSL_get_servername(c->ssl->connection, TLSEXT_NAMETYPE_host_name);
+    if (servername == NULL) {
+        servername = "-";
+    }
+
+    /* do not minus 1 due to need adding space */
+    newlen = sizeof(" SNI: ") + ngx_strlen(servername) + ngx_strlen(text) + 1;
+
+    newtext = ngx_palloc(c->pool, newlen);
+    if (newtext) {
+
+        p = ngx_cpymem(newtext, (u_char *) " SNI: ", sizeof(" SNI: ") - 1);
+        sni_p = p;
+        p = ngx_cpymem(p, (u_char *) servername, ngx_strlen(servername));
+
+        /* remove % in server name or ngx log will format it */
+        while (sni_p < p) {
+            if (*sni_p == '%') {
+                *sni_p = '&';
+            }
+            sni_p++;
+        }
+        *p++ = ' ';
+        p = ngx_cpymem(p, (u_char *) text, ngx_strlen(text));
+        *p++ = '\0';
+        text = (char *) newtext;
+    }
+#endif
 
     ngx_ssl_error(level, c->log, err, text);
 }
