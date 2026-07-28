@@ -84,6 +84,9 @@ typedef struct {
 typedef struct {
     ngx_hash_t                       headers_in_hash;
     ngx_array_t                      upstreams;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    ngx_uint_t                       rr_discarded_range;
+#endif
                                              /* ngx_http_upstream_srv_conf_t */
 #if (NGX_HTTP_UPSTREAM_RBTREE)
 
