@@ -637,6 +637,276 @@ void   ingress__action__free_unpacked
   assert(message->base.descriptor == &ingress__action__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   ingress__unit_redirect__init
+                     (Ingress__UnitRedirect         *message)
+{
+  static const Ingress__UnitRedirect init_value = INGRESS__UNIT_REDIRECT__INIT;
+  *message = init_value;
+}
+size_t ingress__unit_redirect__get_packed_size
+                     (const Ingress__UnitRedirect *message)
+{
+  assert(message->base.descriptor == &ingress__unit_redirect__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__unit_redirect__pack
+                     (const Ingress__UnitRedirect *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__unit_redirect__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__unit_redirect__pack_to_buffer
+                     (const Ingress__UnitRedirect *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__unit_redirect__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__UnitRedirect *
+       ingress__unit_redirect__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__UnitRedirect *)
+     protobuf_c_message_unpack (&ingress__unit_redirect__descriptor,
+                                allocator, len, data);
+}
+void   ingress__unit_redirect__free_unpacked
+                     (Ingress__UnitRedirect *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__unit_redirect__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__unit_weight__init
+                     (Ingress__UnitWeight         *message)
+{
+  static const Ingress__UnitWeight init_value = INGRESS__UNIT_WEIGHT__INIT;
+  *message = init_value;
+}
+size_t ingress__unit_weight__get_packed_size
+                     (const Ingress__UnitWeight *message)
+{
+  assert(message->base.descriptor == &ingress__unit_weight__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__unit_weight__pack
+                     (const Ingress__UnitWeight *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__unit_weight__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__unit_weight__pack_to_buffer
+                     (const Ingress__UnitWeight *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__unit_weight__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__UnitWeight *
+       ingress__unit_weight__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__UnitWeight *)
+     protobuf_c_message_unpack (&ingress__unit_weight__descriptor,
+                                allocator, len, data);
+}
+void   ingress__unit_weight__free_unpacked
+                     (Ingress__UnitWeight *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__unit_weight__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__unit__init
+                     (Ingress__Unit         *message)
+{
+  static const Ingress__Unit init_value = INGRESS__UNIT__INIT;
+  *message = init_value;
+}
+size_t ingress__unit__get_packed_size
+                     (const Ingress__Unit *message)
+{
+  assert(message->base.descriptor == &ingress__unit__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__unit__pack
+                     (const Ingress__Unit *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__unit__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__unit__pack_to_buffer
+                     (const Ingress__Unit *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__unit__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__Unit *
+       ingress__unit__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__Unit *)
+     protobuf_c_message_unpack (&ingress__unit__descriptor,
+                                allocator, len, data);
+}
+void   ingress__unit__free_unpacked
+                     (Ingress__Unit *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__unit__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__redirect__init
+                     (Ingress__Redirect         *message)
+{
+  static const Ingress__Redirect init_value = INGRESS__REDIRECT__INIT;
+  *message = init_value;
+}
+size_t ingress__redirect__get_packed_size
+                     (const Ingress__Redirect *message)
+{
+  assert(message->base.descriptor == &ingress__redirect__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__redirect__pack
+                     (const Ingress__Redirect *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__redirect__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__redirect__pack_to_buffer
+                     (const Ingress__Redirect *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__redirect__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__Redirect *
+       ingress__redirect__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__Redirect *)
+     protobuf_c_message_unpack (&ingress__redirect__descriptor,
+                                allocator, len, data);
+}
+void   ingress__redirect__free_unpacked
+                     (Ingress__Redirect *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__redirect__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__failover_rule__init
+                     (Ingress__FailoverRule         *message)
+{
+  static const Ingress__FailoverRule init_value = INGRESS__FAILOVER_RULE__INIT;
+  *message = init_value;
+}
+size_t ingress__failover_rule__get_packed_size
+                     (const Ingress__FailoverRule *message)
+{
+  assert(message->base.descriptor == &ingress__failover_rule__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__failover_rule__pack
+                     (const Ingress__FailoverRule *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__failover_rule__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__failover_rule__pack_to_buffer
+                     (const Ingress__FailoverRule *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__failover_rule__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__FailoverRule *
+       ingress__failover_rule__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__FailoverRule *)
+     protobuf_c_message_unpack (&ingress__failover_rule__descriptor,
+                                allocator, len, data);
+}
+void   ingress__failover_rule__free_unpacked
+                     (Ingress__FailoverRule *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__failover_rule__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__failover__init
+                     (Ingress__Failover         *message)
+{
+  static const Ingress__Failover init_value = INGRESS__FAILOVER__INIT;
+  *message = init_value;
+}
+size_t ingress__failover__get_packed_size
+                     (const Ingress__Failover *message)
+{
+  assert(message->base.descriptor == &ingress__failover__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__failover__pack
+                     (const Ingress__Failover *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__failover__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__failover__pack_to_buffer
+                     (const Ingress__Failover *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__failover__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__Failover *
+       ingress__failover__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__Failover *)
+     protobuf_c_message_unpack (&ingress__failover__descriptor,
+                                allocator, len, data);
+}
+void   ingress__failover__free_unpacked
+                     (Ingress__Failover *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__failover__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   ingress__virtual_service__init
                      (Ingress__VirtualService         *message)
 {
@@ -680,6 +950,96 @@ void   ingress__virtual_service__free_unpacked
   if(!message)
     return;
   assert(message->base.descriptor == &ingress__virtual_service__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__expire_time__init
+                     (Ingress__ExpireTime         *message)
+{
+  static const Ingress__ExpireTime init_value = INGRESS__EXPIRE_TIME__INIT;
+  *message = init_value;
+}
+size_t ingress__expire_time__get_packed_size
+                     (const Ingress__ExpireTime *message)
+{
+  assert(message->base.descriptor == &ingress__expire_time__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__expire_time__pack
+                     (const Ingress__ExpireTime *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__expire_time__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__expire_time__pack_to_buffer
+                     (const Ingress__ExpireTime *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__expire_time__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__ExpireTime *
+       ingress__expire_time__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__ExpireTime *)
+     protobuf_c_message_unpack (&ingress__expire_time__descriptor,
+                                allocator, len, data);
+}
+void   ingress__expire_time__free_unpacked
+                     (Ingress__ExpireTime *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__expire_time__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ingress__host_cert_entry__init
+                     (Ingress__HostCertEntry         *message)
+{
+  static const Ingress__HostCertEntry init_value = INGRESS__HOST_CERT_ENTRY__INIT;
+  *message = init_value;
+}
+size_t ingress__host_cert_entry__get_packed_size
+                     (const Ingress__HostCertEntry *message)
+{
+  assert(message->base.descriptor == &ingress__host_cert_entry__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ingress__host_cert_entry__pack
+                     (const Ingress__HostCertEntry *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ingress__host_cert_entry__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ingress__host_cert_entry__pack_to_buffer
+                     (const Ingress__HostCertEntry *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ingress__host_cert_entry__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Ingress__HostCertEntry *
+       ingress__host_cert_entry__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Ingress__HostCertEntry *)
+     protobuf_c_message_unpack (&ingress__host_cert_entry__descriptor,
+                                allocator, len, data);
+}
+void   ingress__host_cert_entry__free_unpacked
+                     (Ingress__HostCertEntry *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ingress__host_cert_entry__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   ingress__config__init
@@ -1085,7 +1445,7 @@ const ProtobufCMessageDescriptor ingress__path_router__descriptor =
   (ProtobufCMessageInit) ingress__path_router__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ingress__host_router__field_descriptors[4] =
+static const ProtobufCFieldDescriptor ingress__host_router__field_descriptors[5] =
 {
   {
     "host",
@@ -1135,17 +1495,30 @@ static const ProtobufCFieldDescriptor ingress__host_router__field_descriptors[4]
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "type",
+    5,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_ENUM,
+    offsetof(Ingress__HostRouter, has_type),
+    offsetof(Ingress__HostRouter, type),
+    &ingress__host_type__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned ingress__host_router__field_indices_by_name[] = {
   0,   /* field[0] = host */
   2,   /* field[2] = paths */
   1,   /* field[1] = service_name */
   3,   /* field[3] = tags */
+  4,   /* field[4] = type */
 };
 static const ProtobufCIntRange ingress__host_router__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 4 }
+  { 0, 5 }
 };
 const ProtobufCMessageDescriptor ingress__host_router__descriptor =
 {
@@ -1155,7 +1528,7 @@ const ProtobufCMessageDescriptor ingress__host_router__descriptor =
   "Ingress__HostRouter",
   "Ingress",
   sizeof(Ingress__HostRouter),
-  4,
+  5,
   ingress__host_router__field_descriptors,
   ingress__host_router__field_indices_by_name,
   1,  ingress__host_router__number_ranges,
@@ -1597,7 +1970,339 @@ const ProtobufCMessageDescriptor ingress__action__descriptor =
   (ProtobufCMessageInit) ingress__action__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptors[6] =
+static const ProtobufCFieldDescriptor ingress__unit_redirect__field_descriptors[2] =
+{
+  {
+    "from",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__UnitRedirect, from),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "to",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__UnitRedirect, to),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__unit_redirect__field_indices_by_name[] = {
+  0,   /* field[0] = from */
+  1,   /* field[1] = to */
+};
+static const ProtobufCIntRange ingress__unit_redirect__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor ingress__unit_redirect__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.UnitRedirect",
+  "UnitRedirect",
+  "Ingress__UnitRedirect",
+  "Ingress",
+  sizeof(Ingress__UnitRedirect),
+  2,
+  ingress__unit_redirect__field_descriptors,
+  ingress__unit_redirect__field_indices_by_name,
+  1,  ingress__unit_redirect__number_ranges,
+  (ProtobufCMessageInit) ingress__unit_redirect__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__unit_weight__field_descriptors[3] =
+{
+  {
+    "unit",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__UnitWeight, unit),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "weight",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_UINT32,
+    offsetof(Ingress__UnitWeight, has_weight),
+    offsetof(Ingress__UnitWeight, weight),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "consistent_hashing",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_BOOL,
+    offsetof(Ingress__UnitWeight, has_consistent_hashing),
+    offsetof(Ingress__UnitWeight, consistent_hashing),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__unit_weight__field_indices_by_name[] = {
+  2,   /* field[2] = consistent_hashing */
+  0,   /* field[0] = unit */
+  1,   /* field[1] = weight */
+};
+static const ProtobufCIntRange ingress__unit_weight__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor ingress__unit_weight__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.UnitWeight",
+  "UnitWeight",
+  "Ingress__UnitWeight",
+  "Ingress",
+  sizeof(Ingress__UnitWeight),
+  3,
+  ingress__unit_weight__field_descriptors,
+  ingress__unit_weight__field_indices_by_name,
+  1,  ingress__unit_weight__number_ranges,
+  (ProtobufCMessageInit) ingress__unit_weight__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__unit__field_descriptors[3] =
+{
+  {
+    "generic_unit",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__Unit, generic_unit),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "redirects",
+    2,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__Unit, n_redirects),
+    offsetof(Ingress__Unit, redirects),
+    &ingress__unit_redirect__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "weights",
+    3,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__Unit, n_weights),
+    offsetof(Ingress__Unit, weights),
+    &ingress__unit_weight__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__unit__field_indices_by_name[] = {
+  0,   /* field[0] = generic_unit */
+  1,   /* field[1] = redirects */
+  2,   /* field[2] = weights */
+};
+static const ProtobufCIntRange ingress__unit__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor ingress__unit__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.Unit",
+  "Unit",
+  "Ingress__Unit",
+  "Ingress",
+  sizeof(Ingress__Unit),
+  3,
+  ingress__unit__field_descriptors,
+  ingress__unit__field_indices_by_name,
+  1,  ingress__unit__number_ranges,
+  (ProtobufCMessageInit) ingress__unit__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__redirect__field_descriptors[1] =
+{
+  {
+    "host",
+    1,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__Redirect, host),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__redirect__field_indices_by_name[] = {
+  0,   /* field[0] = host */
+};
+static const ProtobufCIntRange ingress__redirect__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor ingress__redirect__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.Redirect",
+  "Redirect",
+  "Ingress__Redirect",
+  "Ingress",
+  sizeof(Ingress__Redirect),
+  1,
+  ingress__redirect__field_descriptors,
+  ingress__redirect__field_indices_by_name,
+  1,  ingress__redirect__number_ranges,
+  (ProtobufCMessageInit) ingress__redirect__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__failover_rule__field_descriptors[4] =
+{
+  {
+    "err_codes",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_UINT32,
+    offsetof(Ingress__FailoverRule, n_err_codes),
+    offsetof(Ingress__FailoverRule, err_codes),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "upstreams",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__FailoverRule, upstreams),
+    &ingress__upstream__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "timeout_ms",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__FailoverRule, timeout_ms),
+    &ingress__timeout__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "redirects",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__FailoverRule, redirects),
+    &ingress__redirect__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__failover_rule__field_indices_by_name[] = {
+  0,   /* field[0] = err_codes */
+  3,   /* field[3] = redirects */
+  2,   /* field[2] = timeout_ms */
+  1,   /* field[1] = upstreams */
+};
+static const ProtobufCIntRange ingress__failover_rule__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 4 }
+};
+const ProtobufCMessageDescriptor ingress__failover_rule__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.FailoverRule",
+  "FailoverRule",
+  "Ingress__FailoverRule",
+  "Ingress",
+  sizeof(Ingress__FailoverRule),
+  4,
+  ingress__failover_rule__field_descriptors,
+  ingress__failover_rule__field_indices_by_name,
+  1,  ingress__failover_rule__number_ranges,
+  (ProtobufCMessageInit) ingress__failover_rule__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__failover__field_descriptors[1] =
+{
+  {
+    "rules",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__Failover, n_rules),
+    offsetof(Ingress__Failover, rules),
+    &ingress__failover_rule__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__failover__field_indices_by_name[] = {
+  0,   /* field[0] = rules */
+};
+static const ProtobufCIntRange ingress__failover__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor ingress__failover__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.Failover",
+  "Failover",
+  "Ingress__Failover",
+  "Ingress",
+  sizeof(Ingress__Failover),
+  1,
+  ingress__failover__field_descriptors,
+  ingress__failover__field_indices_by_name,
+  1,  ingress__failover__number_ranges,
+  (ProtobufCMessageInit) ingress__failover__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptors[8] =
 {
   {
     "service_name",
@@ -1671,19 +2376,45 @@ static const ProtobufCFieldDescriptor ingress__virtual_service__field_descriptor
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "unit",
+    7,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__VirtualService, unit),
+    &ingress__unit__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "failover",
+    8,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__VirtualService, n_failover),
+    offsetof(Ingress__VirtualService, failover),
+    &ingress__failover__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned ingress__virtual_service__field_indices_by_name[] = {
   5,   /* field[5] = action */
+  7,   /* field[7] = failover */
   3,   /* field[3] = force_https */
   4,   /* field[4] = metadata */
   0,   /* field[0] = service_name */
   2,   /* field[2] = timeout_ms */
+  6,   /* field[6] = unit */
   1,   /* field[1] = upstreams */
 };
 static const ProtobufCIntRange ingress__virtual_service__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 6 }
+  { 0, 8 }
 };
 const ProtobufCMessageDescriptor ingress__virtual_service__descriptor =
 {
@@ -1693,14 +2424,129 @@ const ProtobufCMessageDescriptor ingress__virtual_service__descriptor =
   "Ingress__VirtualService",
   "Ingress",
   sizeof(Ingress__VirtualService),
-  6,
+  8,
   ingress__virtual_service__field_descriptors,
   ingress__virtual_service__field_indices_by_name,
   1,  ingress__virtual_service__number_ranges,
   (ProtobufCMessageInit) ingress__virtual_service__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ingress__config__field_descriptors[2] =
+static const ProtobufCFieldDescriptor ingress__expire_time__field_descriptors[2] =
+{
+  {
+    "seconds",
+    1,
+    PROTOBUF_C_LABEL_REQUIRED,
+    PROTOBUF_C_TYPE_UINT64,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__ExpireTime, seconds),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "nanoseconds",
+    2,
+    PROTOBUF_C_LABEL_REQUIRED,
+    PROTOBUF_C_TYPE_UINT32,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__ExpireTime, nanoseconds),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__expire_time__field_indices_by_name[] = {
+  1,   /* field[1] = nanoseconds */
+  0,   /* field[0] = seconds */
+};
+static const ProtobufCIntRange ingress__expire_time__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor ingress__expire_time__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.ExpireTime",
+  "ExpireTime",
+  "Ingress__ExpireTime",
+  "Ingress",
+  sizeof(Ingress__ExpireTime),
+  2,
+  ingress__expire_time__field_descriptors,
+  ingress__expire_time__field_indices_by_name,
+  1,  ingress__expire_time__number_ranges,
+  (ProtobufCMessageInit) ingress__expire_time__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__host_cert_entry__field_descriptors[3] =
+{
+  {
+    "hostname",
+    1,
+    PROTOBUF_C_LABEL_REQUIRED,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__HostCertEntry, hostname),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "pem_data1",
+    2,
+    PROTOBUF_C_LABEL_REQUIRED,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__HostCertEntry, pem_data1),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "pem_data2",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Ingress__HostCertEntry, pem_data2),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ingress__host_cert_entry__field_indices_by_name[] = {
+  0,   /* field[0] = hostname */
+  1,   /* field[1] = pem_data1 */
+  2,   /* field[2] = pem_data2 */
+};
+static const ProtobufCIntRange ingress__host_cert_entry__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor ingress__host_cert_entry__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "Ingress.HostCertEntry",
+  "HostCertEntry",
+  "Ingress__HostCertEntry",
+  "Ingress",
+  sizeof(Ingress__HostCertEntry),
+  3,
+  ingress__host_cert_entry__field_descriptors,
+  ingress__host_cert_entry__field_indices_by_name,
+  1,  ingress__host_cert_entry__number_ranges,
+  (ProtobufCMessageInit) ingress__host_cert_entry__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ingress__config__field_descriptors[3] =
 {
   {
     "routers",
@@ -1726,15 +2572,28 @@ static const ProtobufCFieldDescriptor ingress__config__field_descriptors[2] =
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "host_certs",
+    3,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Ingress__Config, n_host_certs),
+    offsetof(Ingress__Config, host_certs),
+    &ingress__host_cert_entry__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned ingress__config__field_indices_by_name[] = {
+  2,   /* field[2] = host_certs */
   0,   /* field[0] = routers */
   1,   /* field[1] = services */
 };
 static const ProtobufCIntRange ingress__config__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 2 }
+  { 0, 3 }
 };
 const ProtobufCMessageDescriptor ingress__config__descriptor =
 {
@@ -1744,7 +2603,7 @@ const ProtobufCMessageDescriptor ingress__config__descriptor =
   "Ingress__Config",
   "Ingress",
   sizeof(Ingress__Config),
-  2,
+  3,
   ingress__config__field_descriptors,
   ingress__config__field_indices_by_name,
   1,  ingress__config__number_ranges,
@@ -1919,5 +2778,35 @@ const ProtobufCEnumDescriptor ingress__action_value_type__descriptor =
   ingress__action_value_type__enum_values_by_name,
   1,
   ingress__action_value_type__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+static const ProtobufCEnumValue ingress__host_type__enum_values_by_number[3] =
+{
+  { "Web", "INGRESS__HOST_TYPE__Web", 0 },
+  { "MTOP", "INGRESS__HOST_TYPE__MTOP", 1 },
+  { "MCP", "INGRESS__HOST_TYPE__MCP", 2 },
+};
+static const ProtobufCIntRange ingress__host_type__value_ranges[] = {
+{0, 0},{0, 3}
+};
+static const ProtobufCEnumValueIndex ingress__host_type__enum_values_by_name[3] =
+{
+  { "MCP", 2 },
+  { "MTOP", 1 },
+  { "Web", 0 },
+};
+const ProtobufCEnumDescriptor ingress__host_type__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "Ingress.HostType",
+  "HostType",
+  "Ingress__HostType",
+  "Ingress",
+  3,
+  ingress__host_type__enum_values_by_number,
+  3,
+  ingress__host_type__enum_values_by_name,
+  1,
+  ingress__host_type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };

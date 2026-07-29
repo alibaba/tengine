@@ -1570,6 +1570,7 @@ have=T_NGX_ESCAPE_WWW_FORM_ALI . auto/have
 have=T_NGX_HTTP_STAT_TIME . auto/have
 have=T_NGX_SSL_ERR_LOG_ALI . auto/have
 have=T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS . auto/have
+have=T_NGX_HTTP_ROUND_ROBIN_OPT_ALI . auto/have
 if [ $NGX_DUP_HOST = YES ]; then
     have=T_NGX_DUP_HOST . auto/have
 fi

@@ -16,6 +16,14 @@
 #include <ngx_http_multi_upstream_module.h>
 #endif
 
+#if (T_INGRESS_FAILOVER)
+#include "ngx_ingress_failover.h"
+#endif
+
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+#define NGX_RR_MAX_DISCARDED_NUMBER 1000
+#endif
+
 
 #if (NGX_HTTP_CACHE)
 static ngx_int_t ngx_http_upstream_cache(ngx_http_request_t *r,
@@ -407,6 +415,15 @@ static ngx_command_t  ngx_http_upstream_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_HTTP_MAIN_CONF_OFFSET,
       offsetof(ngx_http_upstream_main_conf_t, change_no_server_status),
+      NULL },
+#endif
+
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    { ngx_string("rr_discarded_range"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_upstream_main_conf_t, rr_discarded_range),
       NULL },
 #endif
 
@@ -3234,6 +3251,19 @@ ngx_http_upstream_intercept_errors(ngx_http_request_t *r,
     }
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+#if (T_INGRESS_FAILOVER)
+    ngx_int_t  ret;
+
+    /* do failover checks */
+    ret = ngx_failover_check_handler(r, status);
+    if (ret == NGX_DONE) {
+        ngx_http_upstream_finalize_request(r, u, status);
+        return NGX_OK;
+    } else if (ret == NGX_ERROR) {
+        return NGX_DECLINED;
+    }
+#endif
 
     if (clcf->error_pages == NULL) {
         return NGX_DECLINED;
@@ -8034,6 +8064,10 @@ ngx_http_upstream_create_main_conf(ngx_conf_t *cf)
     umcf->change_no_server_status = NGX_CONF_UNSET;
 #endif
 
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    umcf->rr_discarded_range = NGX_CONF_UNSET_UINT;
+#endif
+
     return umcf;
 }
 
@@ -8097,6 +8131,11 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 
 #if (T_NGX_HTTP_CHANGE_UPSTREAM_NO_SERVER_STATUS)
     ngx_conf_init_value(umcf->change_no_server_status, 0);
+#endif
+
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    ngx_conf_init_uint_value(umcf->rr_discarded_range,
+                             NGX_RR_MAX_DISCARDED_NUMBER);
 #endif
 
     return NGX_CONF_OK;
