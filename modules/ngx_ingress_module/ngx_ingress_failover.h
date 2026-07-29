@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
 
 #ifndef NGX_INGRESS_FAILOVER_H
 #define NGX_INGRESS_FAILOVER_H

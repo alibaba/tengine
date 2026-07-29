@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
+
+/*
  * Stand-alone unit tests for the upstream health-check HTTP response parsers
  * (ngx_http_upstream_check_http_parse.h).
  *

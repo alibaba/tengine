@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
 
 #ifndef NGX_COMM_MATH_H
 #define NGX_COMM_MATH_H

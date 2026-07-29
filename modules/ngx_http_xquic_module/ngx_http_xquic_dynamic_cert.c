@@ -1,4 +1,8 @@
 /*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
+
+/*
  * xQUIC Integration for Dynamic Certificate Module
  *
  * This file is a standalone compilation unit that provides ngx_http_v3_cert_cb_dynamic.

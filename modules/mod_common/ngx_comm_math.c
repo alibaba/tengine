@@ -1,4 +1,6 @@
-
+/*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
 
 #include "ngx_comm_math.h"
 #include <math.h>
