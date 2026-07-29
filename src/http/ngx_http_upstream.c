@@ -16,6 +16,10 @@
 #include <ngx_http_multi_upstream_module.h>
 #endif
 
+#if (T_INGRESS_FAILOVER)
+#include "ngx_ingress_failover.h"
+#endif
+
 #if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
 #define NGX_RR_MAX_DISCARDED_NUMBER 1000
 #endif
@@ -3247,6 +3251,19 @@ ngx_http_upstream_intercept_errors(ngx_http_request_t *r,
     }
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
+#if (T_INGRESS_FAILOVER)
+    ngx_int_t  ret;
+
+    /* do failover checks */
+    ret = ngx_failover_check_handler(r, status);
+    if (ret == NGX_DONE) {
+        ngx_http_upstream_finalize_request(r, u, status);
+        return NGX_OK;
+    } else if (ret == NGX_ERROR) {
+        return NGX_DECLINED;
+    }
+#endif
 
     if (clcf->error_pages == NULL) {
         return NGX_DECLINED;

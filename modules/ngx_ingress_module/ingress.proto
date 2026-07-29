@@ -1,21 +1,37 @@
+/*
+Copyright 2022-2025 The Alibaba Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 syntax = "proto2";
 
 package Ingress;
 
 enum LocationType {
-  LocUnDefined  = 0;    // first element must be zero
-  LocHttpHeader = 1;    // Tag from http header
-  LocHttpQuery  = 2;    // Tag from http query 
-  LocNginxVar   = 3;    // Tag from nginx var 
-  LocXBizInfo   = 4;    // Tag from x-biz-info 
-  LocHttpCookie = 5;    // Tag from http cookie
+  LocUnDefined  = 0; // first element must be zero
+  LocHttpHeader = 1; // Tag from http header
+  LocHttpQuery  = 2; // Tag from http query 
+  LocNginxVar   = 3; // Tag from nginx var 
+  LocXBizInfo   = 4; // Tag from x-biz-info 
+  LocHttpCookie = 5; // Tag from http cookie
 }
 
 enum MatchType {
-  MatchUnDefined    = 0;    // first element must be zero
-  WholeMatch        = 1;    // String matches exactly
-  StrListInMatch    = 2;    // String list match
-  ModCompare        = 3;    // mod result compare value
+  MatchUnDefined    = 0; // first element must be zero
+  WholeMatch        = 1; // String matches exactly
+  StrListInMatch    = 2; // String list match
+  ModCompare        = 3; // mod result compare value
 }
 
 enum OperatorType {
@@ -29,19 +45,19 @@ enum OperatorType {
 
 enum ActionType
 {
-  ActionUnDefined           = 0;    // first element must be zero
-  ActionAddReqHeader        = 1;    // Action add http request header, add action do not care about duplicate
-  ActionAppendReqHeader     = 2;    // Action append http request header
-  ActionAddRespHeader       = 3;    // Action add http response header
-  ActionAppendRespHeader    = 4;    // Action append http response header
-  ActionAddParam            = 5;    // Action add http request query param
+  ActionUnDefined        = 0; // first element must be zero
+  ActionAddReqHeader     = 1; // Action add http request header, add action do not care about duplicate
+  ActionAppendReqHeader  = 2; // Action append http request header
+  ActionAddRespHeader    = 3; // Action add http response header
+  ActionAppendRespHeader = 4; // Action append http response header
+  ActionAddParam         = 5; // Action add http request query param
 }
 
 enum ActionValueType
 {
-  ActionValueUnDefined      = 0;    //first element must be zero
-  ActionStaticValue         = 1;    // value from configure
-  ActionDynamicValue        = 2;    // value from nginx var
+  ActionValueUnDefined = 0; //first element must be zero
+  ActionStaticValue    = 1; // value from configure
+  ActionDynamicValue   = 2; // value from nginx var
 }
 
 
@@ -50,70 +66,73 @@ message TagValueStrList {
 }
 
 message TagItemCondition {
-  optional string value_str = 1;            // string match value, for WholeMatch,PrefixMatch,SuffixMatch, and RegMatch
-  optional TagValueStrList value_list = 2;  // string list for match, for StrListInMatch
-  optional uint64 divisor = 3;              // mode divisor, for ModCompare
-  optional uint64 remainder = 4;            // compare remainder, for ModCompare
-  optional OperatorType operator = 5;       // >, <, =, >=, <=, for ModCompare
+  optional string value_str           = 1; // string match value, for WholeMatch,PrefixMatch,SuffixMatch, and RegMatch
+  optional TagValueStrList value_list = 2; // string list for match, for StrListInMatch
+  optional uint64 divisor             = 3; // mode divisor, for ModCompare
+  optional uint64 remainder           = 4; // compare remainder, for ModCompare
+  optional OperatorType operator      = 5; // >, <, =, >=, <=, for ModCompare
 }
 
 message TagItem {
-  optional LocationType location = 1;       // which location to get the Tag
-  optional string key = 2;                  // The name of the key to be parsed
-  optional TagItemCondition condition = 3;  // The name of the value to be parsed
-  optional MatchType match_type = 4;        // matching method
+  optional LocationType location      = 1; // which location to get the Tag
+  optional string key                 = 2; // The name of the key to be parsed
+  optional TagItemCondition condition = 3; // The name of the value to be parsed
+  optional MatchType match_type       = 4; // matching method
 }
 
 message TagRule {
-  repeated TagItem items = 1;       // 'and' condition
+  repeated TagItem items = 1; // 'and' condition
 }
 
 message TagRouter {
   optional string service_name = 1;
-  repeated TagRule rules = 2;       // 'or' condition
+  repeated TagRule rules       = 2; // 'or' condition
 }
 
 message PathRouter {
-  optional string prefix = 1;
+  optional string prefix       = 1;
   optional string service_name = 2;
-  repeated TagRouter tags = 3;
+  repeated TagRouter tags      = 3;
+}
+
+enum HostType {
+    Web  = 0; // web
+    MTOP = 1; // mtop
+    MCP  = 2; // mcp
 }
 
 message HostRouter {
-  optional string host = 1;
+  optional string host         = 1;
   optional string service_name = 2;
-
-  repeated PathRouter paths = 3;
-  repeated TagRouter tags = 4;
+  repeated PathRouter paths    = 3;
+  repeated TagRouter tags      = 4;
+  optional HostType type       = 5;
 }
 
 message AppnameRouter {
-  optional string appname = 1;
+  optional string appname      = 1;
   optional string service_name = 2;
-
-  repeated TagRouter tags = 3;
+  repeated TagRouter tags      = 3;
 }
 
 message APIRouter {
   optional string service_name = 1;
-  optional string api = 2;
-
-  repeated TagRouter tags = 3;
+  optional string api          = 2;
+  repeated TagRouter tags      = 3;
 }
 
 message Router
 {
-  optional HostRouter host_router = 1;
-
+  optional HostRouter host_router       = 1;
   optional AppnameRouter appname_router = 2;
-  optional APIRouter api_router = 3;
+  optional APIRouter api_router         = 3;
 }
 
 message Timeout
 {
   optional uint32 connect_timeout = 1;
-  optional uint32 read_timeout = 2;
-  optional uint32 write_timeout = 3;
+  optional uint32 read_timeout    = 2;
+  optional uint32 write_timeout   = 3;
 }
 
 message Upstream
@@ -124,54 +143,84 @@ message Upstream
 
 message Metadata
 {
-  optional string key = 1;
+  optional string key   = 1;
   optional string value = 2;
 }
 
-
-
 message Action
 {
-  optional ActionType action_type = 1;          // action type 
-  optional ActionValueType value_type = 2;      // action value type
-  optional string key = 3;                      // action key
-  optional string value = 4;                    // action value
-
+  optional ActionType action_type     = 1; // action type 
+  optional ActionValueType value_type = 2; // action value type
+  optional string key                 = 3; // action key
+  optional string value               = 4; // action value
 }
 
-message UnitRedirect
-{
+message UnitRedirect {
   optional string from = 1;
-  optional string to = 2;
-}
-message UnitWeight
-{
-  optional string unit = 1;
-  optional uint32 weight = 2; 
+  optional string to   = 2;
 }
 
-message Unit
-{
-  optional string generic_unit = 1;
+message UnitWeight {
+  optional string unit             = 1;
+  optional uint32 weight           = 2;
+  optional bool consistent_hashing = 3;
+}
+
+message Unit {
+  optional string generic_unit    = 1;
   repeated UnitRedirect redirects = 2;
-  repeated UnitWeight weights = 3;
+  repeated UnitWeight weights     = 3;
 }
 
-message VirtualService
-{
-  optional string service_name = 1;
+message Redirect {
+  optional string host = 1;
+}
 
-  repeated Upstream upstreams = 2;
-
+message FailoverRule {
+  repeated uint32 err_codes   = 1;
+  optional Upstream upstreams = 2;
   optional Timeout timeout_ms = 3;
-  optional bool force_https = 4;
-
-  repeated Metadata metadata = 5;
-  repeated Action   action = 6;
+  optional Redirect redirects = 4;
 }
 
-message Config
-{
-  repeated Router routers = 1;
-  repeated VirtualService services = 2;
+message Failover {
+  repeated FailoverRule rules = 1;
+}
+
+message VirtualService {
+  optional string service_name = 1;
+  repeated Upstream upstreams  = 2;
+  optional Timeout timeout_ms  = 3;
+  optional bool force_https    = 4;
+  repeated Metadata metadata   = 5;
+  repeated Action   action     = 6;
+  optional Unit unit           = 7;
+  repeated Failover failover   = 8;
+}
+
+message ExpireTime {
+  required uint64 seconds     = 1;
+  required uint32 nanoseconds = 2;
+}
+
+/*
+ * HostCertEntry maps a hostname directly to its PEM certificate data.
+ *
+ * Go controller (buildHostCerts) resolves uid→PEM before serialization,
+ * so the C module can write certificates to the rbtree in a single pass
+ * without cross-table lookups.
+ *
+ * pem_data1: primary certificate PEM (leaf cert + intermediate chain + private key).
+ * pem_data2: optional alternate certificate PEM (ECC/RSA complement).
+ */
+message HostCertEntry {
+  required string hostname  = 1;
+  required string pem_data1 = 2;
+  optional string pem_data2 = 3;
+}
+
+message Config {
+  repeated Router         routers    = 1;
+  repeated VirtualService services   = 2;
+  repeated HostCertEntry  host_certs = 3;  // hostname -> PEM data mapping
 }
