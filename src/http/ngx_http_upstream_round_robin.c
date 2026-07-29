@@ -36,7 +36,7 @@ static void ngx_http_upstream_empty_save_session(ngx_peer_connection_t *pc,
 #endif
 
 
-#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
 static char ngx_rr_discarded_init = 0;
 extern ngx_module_t  ngx_http_upstream_module;
 static ngx_int_t ngx_http_upstream_adapte_rr_peer_weight(
@@ -1153,7 +1153,7 @@ best_chosen:
 }
 
 
-#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
 static ngx_int_t
 ngx_http_upstream_adapte_rr_peer_weight(ngx_http_upstream_rr_peer_data_t *rrp)
 {
