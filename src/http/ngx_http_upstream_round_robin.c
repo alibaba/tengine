@@ -71,7 +71,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         r = 0;
         w = 0;
         t = 0;
-#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
         ngx_rr_discarded_init = 0;
 #endif
 
