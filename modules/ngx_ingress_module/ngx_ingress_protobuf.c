@@ -303,22 +303,6 @@ ngx_ingress_host_hash(const void * p) {
 }
 
 static ngx_uint_t
-ngx_ingress_apiv_hash(const void * p) {
-    ngx_uint_t hash;
-    ngx_ingress_apiv_router_t * api_router = (ngx_ingress_apiv_router_t *)p;
-    hash = ngx_hash_key_lc(api_router->apiv.data, api_router->apiv.len);
-    return hash;
-}
-
-static int
-ngx_ingress_apiv_compare(const void * p1, const void* p2) {
-    ngx_ingress_apiv_router_t * v1 = (ngx_ingress_apiv_router_t*)p1;
-    ngx_ingress_apiv_router_t * v2 = (ngx_ingress_apiv_router_t*)p2;
-
-    return ngx_comm_strcasecmp(&v1->apiv, &v2->apiv);
-}
-
-static ngx_uint_t
 ngx_ingress_app_hash(const void * p) {
     ngx_uint_t hash;
     ngx_ingress_app_router_t * app_router = (ngx_ingress_app_router_t *)p;
@@ -596,141 +580,6 @@ ngx_ingress_update_shm_failover(ngx_ingress_t *ingress,
 }
 
 static ngx_int_t
-ngx_ingress_update_shm_unit(ngx_ingress_t *ingress,
-    ngx_ingress_service_t *shm_service,
-    Ingress__Unit *pbunit
-    )
-{
-    ngx_ingress_unit_t *shm_unit = NULL;
-
-    /* unit */
-    if (pbunit == NULL) {
-        shm_service->unit = NULL;
-        return NGX_OK;
-    }
-
-    shm_unit = ngx_shm_pool_calloc(ingress->pool, sizeof(ngx_ingress_unit_t));
-    if (shm_unit == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                      "|ingress|alloc shm_unit failed|");
-        return NGX_ERROR;
-    }
-
-    shm_service->unit = shm_unit;
-
-    if (pbunit->generic_unit != NULL) {
-        ngx_int_t len = strlen(pbunit->generic_unit);
-        if (len != 0) {
-            shm_unit->generic_unit.data = ngx_shm_pool_calloc(ingress->pool, len);
-            if (shm_unit->generic_unit.data == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                            "|ingress|alloc generic_unit data failed|");
-                return NGX_ERROR;
-            }
-            shm_unit->generic_unit.len = len;
-            ngx_strlow(shm_unit->generic_unit.data, pbunit->generic_unit, len);
-
-            ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                        "|ingress|ingress update %V generic_unit=%V|",
-                        &shm_service->name,
-                        &shm_unit->generic_unit);
-            return NGX_OK;
-        }
-    }
-
-    if (pbunit->n_redirects != 0) {
-        ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                      "|ingress|update redirect unit|service=%V|", &shm_service->name);
-
-        size_t i;
-        shm_unit->redirects = ngx_shm_array_create(ingress->pool, pbunit->n_redirects, sizeof(ngx_ingress_redirect_unit_t));
-        if (shm_unit->redirects == NULL) {
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                          "|ingress|alloc redirects failed|service=%V|", &shm_service->name);
-            return NGX_ERROR;
-        }
-
-        for (i = 0; i < pbunit->n_redirects; i++) {
-            ngx_ingress_redirect_unit_t *shm_redirect = ngx_shm_array_push(shm_unit->redirects);
-            if (shm_redirect == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                                "|ingress|shm_redirect push array failed|service=%V|", &shm_service->name);
-                return NGX_ERROR;
-            }
-
-            ngx_int_t len = strlen(pbunit->redirects[i]->from);
-            shm_redirect->from.data = ngx_shm_pool_calloc(ingress->pool, len);
-            if (shm_redirect->from.data == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                            "|ingress|alloc redirect from data failed|");
-                return NGX_ERROR;
-            }
-            shm_redirect->from.len = len;
-            ngx_strlow(shm_redirect->from.data, pbunit->redirects[i]->from, len);
-
-            len = strlen(pbunit->redirects[i]->to);
-            shm_redirect->to.data = ngx_shm_pool_calloc(ingress->pool, len);
-            if (shm_redirect->to.data == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                            "|ingress|alloc redirect to data failed|");
-                return NGX_ERROR;
-            }
-            shm_redirect->to.len = len;
-            ngx_strlow(shm_redirect->to.data, pbunit->redirects[i]->to, len);
-        }
-
-        return NGX_OK;
-    }
-
-    if (pbunit->n_weights != 0) {
-        size_t i;
-
-        shm_unit->weights = ngx_shm_array_create(ingress->pool, pbunit->n_weights, sizeof(ngx_ingress_weight_unit_t));
-        if (shm_unit->weights == NULL) {
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                          "|ingress|alloc weights failed|service=%V|", &shm_service->name);
-            return NGX_ERROR;
-        }
-
-        ngx_uint_t weight = 0;
-        for (i = 0; i < pbunit->n_weights; i++) {
-            ngx_ingress_weight_unit_t *shm_weights = ngx_shm_array_push(shm_unit->weights);
-            if (shm_weights == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                              "|ingress|shm_weights push array failed|service=%V|", &shm_service->name);
-                return NGX_ERROR;
-            }
-
-            ngx_int_t len = strlen(pbunit->weights[i]->unit);
-            shm_weights->unit.data = ngx_shm_pool_calloc(ingress->pool, len);
-            if (shm_weights->unit.data == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                            "|ingress|alloc prop unit data failed|");
-                return NGX_ERROR;
-            }
-            shm_weights->unit.len = len;
-            ngx_strlow(shm_weights->unit.data, pbunit->weights[i]->unit, len);
-
-            shm_weights->start = weight;
-            weight += pbunit->weights[i]->weight;
-            shm_weights->end = weight;
-
-            shm_unit->consistent_hashing = pbunit->weights[i]->consistent_hashing;
-        }
-
-        if (weight == 0) {
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                          "|ingress|unit weight = 0|service=%V|", &shm_service->name);
-            return NGX_ERROR;
-        }
-        shm_unit->total_weight = weight;
-        return NGX_OK;
-    }
-
-    return NGX_OK;
-}
-
-static ngx_int_t
 ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
     ngx_ingress_service_t *shm_service,
     Ingress__VirtualService *pbservice
@@ -928,12 +777,6 @@ ngx_ingress_update_shm_service(ngx_ingress_t *ingress,
 
     ngx_shm_sort_array(shm_service->metadata, ngx_ingress_metadata_compare);
 
-    /* unit */
-    if (ngx_ingress_update_shm_unit(ingress, shm_service, pbservice->unit) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                      "|ingress|update shm unit failed|service=%V|", &shm_service->name);
-        return NGX_ERROR;
-    }
 
     /* failover */
     if (ngx_ingress_update_shm_failover(ingress, shm_service, pbservice) != NGX_OK) {
@@ -1413,58 +1256,6 @@ ngx_ingress_update_shm_host(
     return NGX_OK;
 }
 
-static ngx_int_t
-ngx_ingress_update_shm_api(ngx_ingress_t *ingress,
-    ngx_ingress_apiv_router_t *shm_apiv,
-    Ingress__APIRouter *pbrouter)
-{
-    size_t                  i;
-    ngx_int_t               rc = NGX_ERROR;
-
-    if (pbrouter->api == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                        "|ingress|pbapi is null|");
-        return NGX_ERROR;
-    }
-
-    shm_apiv->apiv.len = ngx_strlen(pbrouter->api);
-    if (shm_apiv->apiv.len == 0) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                        "|ingress|pbapi length is 0|");
-        return NGX_ERROR;
-    }
-    shm_apiv->apiv.data = ngx_shm_pool_calloc(ingress->pool, shm_apiv->apiv.len);
-    if (shm_apiv->apiv.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                        "|ingress|api alloc failed, length:%d|", shm_apiv->apiv.len);
-        return NGX_ERROR;
-    }
-    ngx_strlow(shm_apiv->apiv.data, (u_char *)pbrouter->api, shm_apiv->apiv.len);
-
-    rc = ngx_ingress_update_shm_tag_routers(ingress, pbrouter->n_tags, pbrouter->tags, &shm_apiv->tags);
-    if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                    "|ingress|update path tag routes failed|%V|", &shm_apiv->apiv);
-        return NGX_ERROR;
-    }
-
-    /* service */
-    if (pbrouter->service_name == NULL || ngx_strlen(pbrouter->service_name) == 0) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                      "|ingress|host service is null|");
-        return NGX_ERROR;
-    }
-
-    shm_apiv->service = ngx_ingress_get_service(ingress, pbrouter->service_name);
-    if (shm_apiv->service == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                        "|ingress|service not exist|host=%V|", &shm_apiv->apiv);
-        
-        return NGX_ERROR;
-    }
-    return NGX_OK;
-}
-
 
 static ngx_int_t
 ngx_ingress_update_shm_app(ngx_ingress_t *ingress,
@@ -1556,14 +1347,6 @@ ngx_ingress_update_shm_by_pb(ngx_ingress_gateway_t *gateway, ngx_ingress_shared_
         return NGX_ERROR;
     }
 
-    ingress->apiv_map = ngx_shm_hash_create(ingress->pool, gateway->apiv_hash_size,
-                                            ngx_ingress_apiv_hash, ngx_ingress_apiv_compare);
-    if (ingress->apiv_map == NULL) {
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                      "|ingress|apiv map create failed|gateway=%V|", &gateway->name);
-        return NGX_ERROR;
-    }
-
     ingress->app_map = ngx_shm_hash_create(ingress->pool, gateway->hash_size,
                                            ngx_ingress_app_hash, ngx_ingress_app_compare);
     if (ingress->app_map == NULL) {
@@ -1615,34 +1398,6 @@ ngx_ingress_update_shm_by_pb(ngx_ingress_gateway_t *gateway, ngx_ingress_shared_
 
             ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
                           "|ingress|host add succ|host=%V", &shm_host->host);
-        }
-
-        if (pbrouter[i]->api_router != NULL) {
-            Ingress__APIRouter *pb_apiv_router = pbrouter[i]->api_router;      
-            
-            ngx_ingress_apiv_router_t *shm_apiv = ngx_shm_pool_calloc(ingress->pool,
-                    sizeof(ngx_ingress_apiv_router_t));
-            if (shm_apiv == NULL) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                              "|ingress|api router alloc failed|gateway=%V|", &gateway->name);
-                return NGX_ERROR;
-            }
-
-            rc = ngx_ingress_update_shm_api(ingress, shm_apiv, pb_apiv_router);
-            if (rc != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                              "|ingress|update api router failed|gateway=%V|", &gateway->name);
-                return NGX_ERROR;
-            }
-            
-            rc = ngx_shm_hash_add(ingress->apiv_map, shm_apiv);
-            if (rc != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                              "|ingress|api ngx_shm_hash_add failed|host=%V", &shm_apiv->apiv);
-                return NGX_ERROR;
-            }
-            ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                          "|ingress|api add succ|api=%V", &shm_apiv->apiv);
         }
 
         if (pbrouter[i]->appname_router != NULL) {

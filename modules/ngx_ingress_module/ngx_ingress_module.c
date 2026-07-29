@@ -40,7 +40,6 @@ static char *ngx_ingress_gateway_set_size_slot(ngx_conf_t *cf, ngx_command_t *cm
 static char *ngx_ingress_gateway_shm_config(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 static ngx_int_t ngx_ingress_route_target_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_ingress_get_unit_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_ingress_get_failover_count_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -49,18 +48,6 @@ static ngx_int_t ngx_ingress_force_https_variable(ngx_http_request_t *r, ngx_htt
 static ngx_int_t ngx_ingress_get_time_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static char *ngx_ingress_gateway_metadata(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 extern int ngx_ingress_metadata_compare(const void *c1, const void *c2);
-static char *ngx_ingress_set_default_api_types(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-
-static ngx_int_t ngx_ingress_get_api_name_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_ingress_get_api_version_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_ingress_get_api_mark_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_ingress_get_api_type_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_ingress_get_api_access_deny_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
 
 /* function declare */
 static void * ngx_ingress_create_main_conf(ngx_conf_t *cf);
@@ -94,13 +81,6 @@ static ngx_command_t ngx_ingress_commands[] = {
       offsetof(ngx_ingress_gateway_t, hash_size),
       NULL },
    
-    { ngx_string("ingress_gateway_apiv_hash_num"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
-      ngx_ingress_gateway_set_num_slot,
-      NGX_HTTP_MAIN_CONF_OFFSET,
-      offsetof(ngx_ingress_gateway_t, apiv_hash_size),
-      NULL },
-
     { ngx_string("ingress_gateway_pool_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
       ngx_ingress_gateway_set_size_slot,
@@ -136,13 +116,6 @@ static ngx_command_t ngx_ingress_commands[] = {
       offsetof(ngx_ingress_loc_conf_t, failover_named_location),
       NULL },
     
-    { ngx_string("ingress_default_api_types"),
-      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
-      ngx_ingress_set_default_api_types,
-      NGX_HTTP_MAIN_CONF_OFFSET,
-      0,
-      NULL },
-
     ngx_null_command
 };
 
@@ -198,7 +171,6 @@ ngx_ingress_create_main_conf(ngx_conf_t *cf)
     }
 
     conf->ctx_var_index = NGX_CONF_UNSET;
-    conf->default_api_allow_types_num = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -214,8 +186,6 @@ ngx_ingress_init_main_conf(ngx_conf_t *cf, void *conf)
 
     u_char                      name_buf[NGX_INGRESS_GATEWAY_MAX_NAME_BUF_LEN];
     size_t                      name_len;
-
-    ngx_conf_init_value(imcf->default_api_allow_types_num, 0);
 
     ngx_ingress_gateway_t *gateway = (ngx_ingress_gateway_t *)imcf->gateways.elts;
     for (i = 0; i < imcf->gateways.nelts; i++) {
@@ -240,7 +210,6 @@ ngx_ingress_init_main_conf(ngx_conf_t *cf, void *conf)
         ngx_conf_init_msec_value(gateway[i].update_check_interval, NGX_INGRESS_UPDATE_INTERVAL);
         ngx_conf_init_size_value(gateway[i].pool_size, NGX_INGRESS_SHM_POOL_SIZE);
         ngx_conf_init_value(gateway[i].hash_size, NGX_INGRESS_HASH_SIZE);
-        ngx_conf_init_value(gateway[i].apiv_hash_size, NGX_INGRESS_HASH_SIZE);
         ngx_conf_init_value(gateway[i].path_segment_bucket_num, NGX_INGRESS_HASH_SIZE);
 
         /* register double buffered shared memory */
@@ -557,101 +526,6 @@ ngx_http_request_t *r, ngx_shm_array_t *tags)
 }
 
 ngx_int_t
-ngx_ingress_get_api_and_ver(ngx_http_request_t *r, ngx_str_t *api, ngx_str_t *v, ngx_str_t *api_type)
-{
-    u_char    *uri_pos, *uri_end, *new_pos;
-    ngx_uint_t i;
-
-    /* /gw/api/v or //gw/api/v or /gw/api/ or /gw/api */
-
-    uri_pos = r->raw_uri.data;
-    uri_end = uri_pos + r->raw_uri.len;
-
-    for ( ; uri_pos < uri_end; uri_pos++) {
-        if (*uri_pos != '/') {
-            break;
-        }
-    }
-
-    /* 1-gw, 2-api, 3-v */
-    for (i = 1; i <= 3; i++) {
-        for (new_pos = uri_pos; new_pos < uri_end; new_pos++) {
-            if (*new_pos == '/' || *new_pos == '?') {
-                break;
-            }
-        }
-
-        if (i == 1 && new_pos - uri_pos > 0) {
-            api_type->data = uri_pos;
-            api_type->len = new_pos - uri_pos;
-        }
-
-        if (i == 2
-            && ((new_pos < uri_end && ((*new_pos) == '/' || (*new_pos) == '?')) || (new_pos == uri_end))
-            && new_pos - uri_pos > 0)
-        {
-            api->data = uri_pos;
-            api->len = new_pos - uri_pos;
-        }
-
-        if (i == 3 && new_pos - uri_pos > 0) {
-            v->data = uri_pos;
-            v->len = new_pos - uri_pos;
-        }
-
-        if (new_pos >= uri_end || *new_pos == '?') {
-            break;
-        }
-
-        uri_pos = new_pos + 1;
-    }
-
-    ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                    "|ingress|api=%V|v=%V|", api, v);
-
-    return NGX_OK;
-
-}
-
-
-ngx_int_t
-ngx_ingress_get_apiv(ngx_ingress_ctx_t *ctx, ngx_http_request_t *r, ngx_str_t *apiv)
-{
-    ngx_int_t rc = NGX_ERROR;
-    ngx_str_t api = ngx_null_string, ver = ngx_string(""), api_type = ngx_string("");
-    
-    rc = ngx_ingress_get_api_and_ver(r, &api, &ver, &api_type);
-    // Empty api version is allowed (E.g., mtop.common.getTimestamp)
-    if (rc != NGX_OK || api.data == NULL || api.len == 0) {
-        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                    "|ingress|get api and ver error|");
-        return NGX_ERROR;
-    }
-    
-    apiv->data = ngx_pcalloc(r->pool, api.len + ver.len + 1);
-    if (apiv->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                    "|ingress|apiv alloc error|");
-        return NGX_ERROR;
-    }
-    ngx_strlow(apiv->data, api.data, api.len);
-    apiv->data[api.len] = '_';
-    ngx_copy(apiv->data + api.len + 1, ver.data, ver.len);
-    apiv->len = api.len + ver.len + 1;
-
-    ctx->mtop_api_name.data = apiv->data;
-    ctx->mtop_api_name.len = api.len;
-
-    ctx->mtop_api_version.data = apiv->data + api.len + 1;
-    ctx->mtop_api_version.len = ver.len;
-
-    ctx->mtop_api_mark = *apiv;
-    ctx->mtop_api_type = api_type;
-    
-    return NGX_OK;
-}
-
-ngx_int_t
 ngx_ingress_service_queue_head_insert(ngx_http_request_t *r, ngx_queue_t *head, ngx_ingress_service_t *service)
 {
     ngx_ingress_service_queue_t *service_queue = ngx_pcalloc(r->pool, sizeof(ngx_ingress_service_queue_t));
@@ -772,50 +646,7 @@ ngx_ingress_match_service(ngx_ingress_ctx_t *ctx, ngx_ingress_gateway_t *gateway
         }
     }
 
-    if (host_router->type == INGRESS__HOST_TYPE__MTOP) {
-        /* match apiv rule */
-        ngx_str_t apiv = ngx_null_string;
-        rc = ngx_ingress_get_apiv(ctx, r, &apiv);
-        if (rc != NGX_OK) {
-            ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
-                          "|ingress|ingress get apiv error|");
-            return NGX_OK;
-        }
-
-        ngx_ingress_apiv_router_t apiv_key, *apiv_router;
-        apiv_key.apiv = apiv;
-        apiv_router = (ngx_ingress_apiv_router_t *)ngx_shm_hash_get(current->apiv_map, &apiv_key);
-        if (apiv_router == NULL) {
-            /* if type, apiv_router must not NULL */
-            ngx_log_error(NGX_LOG_DEBUG, ngx_cycle->log, 0,
-                          "|ingress|ingress get apiv_router NULL|");
-            return NGX_ERROR; /* not found api_router*/
-        }
-        if (apiv_router->service) {
-            rc = ngx_ingress_service_queue_head_insert(r, head, apiv_router->service);
-            if (rc != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                        "|ingress|apiv service insert service queue failed|");
-                return NGX_ERROR;
-            }
-        }
-
-        /* add appname tag router */
-        ngx_ingress_appname_service_queue_head_insert(gateway, current, apiv_router->service, r, head);
-
-        if (apiv_router->tags) {
-            service = ngx_ingress_get_tag_match_service(gateway, r, apiv_router->tags);
-            if (service) {
-                rc = ngx_ingress_service_queue_head_insert(r, head, service);
-                if (rc != NGX_OK) {
-                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
-                            "|ingress|tag service insert service queue failed|");
-                    return NGX_ERROR;
-                }
-            }
-        }
-
-    } else if (host_router->type == INGRESS__HOST_TYPE__Web) {
+    if (host_router->type == INGRESS__HOST_TYPE__Web) {
         /* match path */
         ngx_ingress_path_router_t *path_router = host_router->paths->elts;
         for (i = 0; i < host_router->paths->nelts; i++) {
@@ -1029,32 +860,8 @@ static ngx_http_variable_t  ngx_ingress_vars[] = {
       ngx_ingress_get_time_variable, offsetof(ngx_ingress_ctx_t, write_timeout),
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
     
-    { ngx_string("ingress_unit"), NULL,
-      ngx_ingress_get_unit_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-
     { ngx_string("ingress_failover_count"), NULL,
       ngx_ingress_get_failover_count_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-    
-    { ngx_string("ingress_api_name"), NULL,
-      ngx_ingress_get_api_name_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-    
-    { ngx_string("ingress_api_version"), NULL,
-      ngx_ingress_get_api_version_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-    
-    { ngx_string("ingress_api_mark"), NULL,
-      ngx_ingress_get_api_mark_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-
-    { ngx_string("ingress_api_type"), NULL,
-      ngx_ingress_get_api_type_variable, 0,
-      NGX_HTTP_VAR_NOCACHEABLE, 0 },
-
-    { ngx_string("ingress_api_access_deny"), NULL,
-      ngx_ingress_get_api_access_deny_variable, 0,
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
@@ -1130,7 +937,6 @@ ngx_ingress_get_gateway(ngx_conf_t *cf, ngx_ingress_main_conf_t *imcf, ngx_str_t
 
     /* init gateway */
     gateway->hash_size = NGX_CONF_UNSET_UINT;
-    gateway->apiv_hash_size = NGX_CONF_UNSET_UINT;
     gateway->path_segment_bucket_num = NGX_CONF_UNSET_UINT;
     gateway->pool_size = NGX_CONF_UNSET_SIZE;
     gateway->update_check_interval = NGX_CONF_UNSET_MSEC;
@@ -1852,65 +1658,6 @@ ngx_ingress_init_ctx_failover(ngx_ingress_ctx_t *ctx,
     return NGX_OK;
 }
 
-static ngx_int_t
-ngx_ingress_init_ctx_unit(ngx_ingress_ctx_t *ctx,
-                          ngx_ingress_service_t *service,
-                          ngx_http_request_t *r)
-{
-    if (service->unit == NULL) {
-        return NGX_OK;
-    }
-
-    ngx_ingress_unit_t *shm_unit = service->unit;
-
-    if (shm_unit->total_weight > 0 && shm_unit->weights != NULL) {
-        size_t       i;
-        ngx_int_t    rc;
-        ngx_str_t    utdid = ngx_null_string;
-        ngx_int_t    index = 0;
-
-        index = rand() % shm_unit->total_weight;
-
-        if (shm_unit->consistent_hashing) {
-            ngx_str_t utdid_key = ngx_string("x-utdid");
-            rc = ngx_http_header_in(r, utdid_key.data, utdid_key.len, &utdid);
-            
-            if (rc != NGX_OK || utdid.len == 0) {
-                ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                              "|ingress|ingress unit hash utdid empty|");
-                utdid.data = r->connection->addr_text.data;
-                utdid.len = r->connection->addr_text.len;
-            }
-
-            ngx_uint_t ran_num = ngx_hash_key(utdid.data, utdid.len);
-            index = ran_num % shm_unit->total_weight;
-
-            ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                          "|ingress|ingress unit hash utdid: %V, index: %d|", &utdid, index);
-        }
-
-        ngx_str_t target_unit = ngx_string("");
-
-        ngx_ingress_weight_unit_t *weights = (ngx_ingress_weight_unit_t *)shm_unit->weights->elts;
-        for (i = 0; i < shm_unit->weights->nelts; i++) {
-            if (index >= weights[i].start && index < weights[i].end) {
-                target_unit = weights[i].unit;
-                break;
-            }
-        }
-        ctx->unit.data = ngx_palloc(r->pool, target_unit.len);
-        if (ctx->unit.data == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                        "|ingress|runtime ctx->unit alloc failed|");
-            return NGX_ERROR;
-        }
-        ngx_memcpy(ctx->unit.data, target_unit.data, target_unit.len);
-        ctx->unit.len = target_unit.len;
-    }
-
-    return NGX_OK;
-}
-
 ngx_int_t 
 ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
     ngx_http_request_t *r, ngx_queue_t *head)
@@ -1920,7 +1667,6 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
     ngx_ingress_service_t *timeout_service = NULL;
     ngx_ingress_service_t *force_https_service = NULL;
     ngx_ingress_service_t *action_service = NULL;
-    ngx_ingress_service_t *unit_service = NULL;
     ngx_int_t   action_num = 0;
     ngx_int_t   metadata_num = 0;
     ngx_int_t   rc, i;
@@ -1959,10 +1705,6 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
             action_service = service_queue->service;
         }
 
-        if (service_queue->service->unit != NULL
-            && unit_service == NULL) {
-            unit_service = service_queue->service;
-        }
     }
 
     if (target_service == NULL) {
@@ -2108,17 +1850,6 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
             ngx_memcpy(metadata->value.data, shm_metas[i].value.data, shm_metas[i].value.len);
             metadata->value.len = shm_metas[i].value.len;
 
-            /* set api type */
-            if (metadata->key.len == sizeof(NGX_INGRESS_METADATA_KEY_API_TYPE) - 1
-                && ngx_strncmp(metadata->key.data, NGX_INGRESS_METADATA_KEY_API_TYPE, metadata->key.len) == 0)
-            {
-                ctx->mtop_api_allow_types_num = ngx_comm_split_string(ctx->mtop_api_allow_types,
-                                                                      MAX_INGRESS_API_TYPES_NUM,
-                                                                      metadata->value.data,
-                                                                      metadata->value.data + metadata->value.len,
-                                                                      NGX_INGRESS_API_TYPES_SPLITE_CHAR);
-            }
-
             current_metadata_num ++;
         }
 
@@ -2129,15 +1860,6 @@ ngx_ingress_read_value_from_service_queue(ngx_ingress_ctx_t *ctx,
         last_metadata_num = ctx->metadata.nelts;
     }
     
-
-    if (unit_service != NULL) {
-        rc = ngx_ingress_init_ctx_unit(ctx, unit_service, r);
-        if (rc != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                    "|ingress|init ctx unit failed|");
-            return NGX_ERROR;
-        }
-    }
 
     /* Use failover rules associated with upstream */
     if (target_service != NULL) {
@@ -2272,37 +1994,6 @@ ngx_ingress_route_target_variable(ngx_http_request_t *r,
     v->data = ctx->target.data;
     v->len = ctx->target.len;
 
-    return NGX_OK;
-}
-
-static ngx_int_t
-ngx_ingress_get_unit_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 1;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|unit get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    if (ctx->unit.len > 0) {
-        v->not_found = 0;
-        v->data = ctx->unit.data;
-        v->len = ctx->unit.len;
-    } else {
-        v->not_found = 1;
-        v->data = "";
-        v->len = 0;
-    }
     return NGX_OK;
 }
 
@@ -2503,221 +2194,5 @@ ngx_ingress_gateway_metadata(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
-static char *
-ngx_ingress_set_default_api_types(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_str_t                           *value;
-    ngx_ingress_main_conf_t             *imcf = conf;
-
-    value = cf->args->elts;
-
-    if (imcf->default_api_allow_types_num != NGX_CONF_UNSET) {
-        ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0,
-                           "duplicate \"%V\"", &value[0]);
-
-        return NGX_CONF_ERROR;
-    }
-
-    imcf->default_api_allow_types_num = ngx_comm_split_string(imcf->default_api_allow_types,
-                                                              MAX_INGRESS_API_TYPES_NUM,
-                                                              value[1].data,
-                                                              value[1].data + value[1].len,
-                                                              NGX_INGRESS_API_TYPES_SPLITE_CHAR);
-
-    return NGX_CONF_OK;
-}
-
-static ngx_int_t
-ngx_ingress_get_api_name_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 1;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|api name get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    if (ctx->mtop_api_name.len > 0) {
-        v->valid = 1;
-        v->no_cacheable = 1;
-        v->not_found = 0;
-        v->data = ctx->mtop_api_name.data;
-        v->len = ctx->mtop_api_name.len;
-    } else {
-        v->valid = 0;
-        v->not_found = 1;
-    }
-
-    return NGX_OK;
-}
 
 
-static ngx_int_t
-ngx_ingress_get_api_version_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 1;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|api version get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    if (ctx->mtop_api_version.len > 0) {
-        v->valid = 1;
-        v->no_cacheable = 1;
-        v->not_found = 0;
-        v->data = ctx->mtop_api_version.data;
-        v->len = ctx->mtop_api_version.len;
-    } else {
-        v->valid = 0;
-        v->not_found = 1;
-    }
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_ingress_get_api_mark_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 1;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|api mark get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    if (ctx->mtop_api_mark.len > 0) {
-        v->valid = 1;
-        v->no_cacheable = 1;
-        v->not_found = 0;
-        v->data = ctx->mtop_api_mark.data;
-        v->len = ctx->mtop_api_mark.len;
-    } else {
-        v->valid = 0;
-        v->not_found = 1;
-    }
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_ingress_get_api_type_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 1;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|api mark get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    if (ctx->mtop_api_type.len > 0) {
-        v->valid = 1;
-        v->no_cacheable = 1;
-        v->not_found = 0;
-        v->data = ctx->mtop_api_type.data;
-        v->len = ctx->mtop_api_type.len;
-    } else {
-        v->valid = 0;
-        v->not_found = 1;
-    }
-
-    return NGX_OK;
-}
-
-static ngx_int_t
-ngx_ingress_get_api_access_deny_variable(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_ingress_ctx_t               *ctx;
-    ngx_ingress_main_conf_t         *imcf = NULL;
-    ngx_uint_t                       i;
-
-    ngx_int_t                        allow_types_num = 0;
-    ngx_str_t                       *allow_types = NULL;
-
-    imcf = ngx_http_get_module_main_conf(r, ngx_ingress_module);
-    ctx = ngx_ingress_get_ctx(imcf, r);
-    if (ctx == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "|ingress|api mark get ctx failed|");
-        return NGX_ERROR;
-    }
-
-    v->valid = 1;
-    v->no_cacheable = 1;
-    v->not_found = 0;
-    v->data = (u_char*)"0";
-    v->len = 1;
-
-    if (ctx->mtop_api_type.len == 0) {
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                      "|ingress|api type is empty|");
-        return NGX_OK;
-    }
-
-    allow_types_num = ctx->mtop_api_allow_types_num;
-    allow_types = ctx->mtop_api_allow_types;
-    if (allow_types_num == 0) {
-        allow_types_num = imcf->default_api_allow_types_num;
-        allow_types = imcf->default_api_allow_types;
-
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                      "|ingress|use default api allow types|%d|", allow_types_num);
-    } else {
-        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                      "|ingress|use api allow types|%d|", allow_types_num);
-    }
-
-    if (allow_types_num == 0) {
-        return NGX_OK;
-    }
-
-    for (i = 0; i < allow_types_num; i++) {
-        if (ngx_comm_str_compare(&ctx->mtop_api_type, &allow_types[i]) == 0) {
-            return NGX_OK;
-        }
-    }
-
-    v->data = (u_char*)"1";
-    v->len = 1;
-
-    return NGX_OK;
-}
