@@ -8,6 +8,21 @@
 #include <ngx_http.h>
 #include <ngx_config.h>
 
+#include "ngx_http_upstream_check_http_parse.h"
+
+
+/*
+ * Phase of the HTTP health-check response parser. The health verdict is
+ * reached as soon as the status line (and, for keepalive, the headers) is
+ * parsed -- it never waits for the body. Draining the body afterwards is the
+ * job of the discard handler, so there is no BODY phase here.
+ */
+enum {
+    NGX_CHECK_PARSE_STATUS_LINE = 0,
+    NGX_CHECK_PARSE_HEADERS,
+    NGX_CHECK_PARSE_DONE
+};
+
 
 typedef struct ngx_http_upstream_check_peer_s ngx_http_upstream_check_peer_t;
 typedef struct ngx_http_upstream_check_srv_conf_s
@@ -78,6 +93,11 @@ typedef struct {
 
     size_t                                   padding;
     size_t                                   length;
+
+    /* HTTP response parse state (reset by reinit before every check) */
+    ngx_uint_t                               parse_phase;    /* NGX_CHECK_PARSE_* */
+    ngx_uint_t                               code_n;         /* remembered status class */
+    ngx_http_check_headers_ctx_t             http_headers;   /* header parse state */
 } ngx_http_upstream_check_ctx_t;
 
 
@@ -155,6 +175,19 @@ struct ngx_http_upstream_check_peer_s {
 
     ngx_http_upstream_check_peer_shm_t      *shm;
     ngx_http_upstream_check_srv_conf_t      *conf;
+
+    /*
+     * HTTP response body drain state, kept across the check cycle (reinit does
+     * not touch it; the parser sets it afresh on every verdict). After the
+     * health verdict the discard handler drains the remaining body here, and
+     * connect_handler refuses to reuse a connection whose body is not yet
+     * fully drained (recv_body_pending), which is what makes keepalive reuse
+     * safe against response-body pollution.
+     */
+    off_t                                    recv_body_remaining;
+    ngx_uint_t                               recv_chunk_state;
+    unsigned                                 recv_body_chunked:1;
+    unsigned                                 recv_body_pending:1;
 
     unsigned                                 delete;
 };
@@ -1586,7 +1619,17 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
 
     if (peer->pc.connection != NULL) {
         c = peer->pc.connection;
-        if ((rc = ngx_http_upstream_check_peek_one_byte(c)) == NGX_OK) {
+
+        /*
+         * Only reuse a connection whose previous response body was fully
+         * drained. If draining has not finished (recv_body_pending) -- e.g. a
+         * very large body between two checks -- reusing the socket would read
+         * leftover body bytes and corrupt this check's response parsing, so
+         * close it and reconnect instead.
+         */
+        if (!peer->recv_body_pending
+            && (rc = ngx_http_upstream_check_peek_one_byte(c)) == NGX_OK)
+        {
             goto upstream_check_connect_done;
         } else {
             ngx_close_connection(c);
@@ -1935,7 +1978,24 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
     switch (rc) {
 
     case NGX_AGAIN:
-        /* The peer has closed its half side of the connection. */
+        /*
+         * The response is not complete yet: the status line or headers have not
+         * fully arrived (the verdict never waits for the body). If the peer has
+         * already closed its half of the connection (EOF) the rest will never
+         * come, so fail the check instead of re-arming the read event and
+         * busy-looping on the readable EOF until the check times out. Otherwise
+         * keep the read event armed and wait for more data.
+         */
+        if (c->read->eof) {
+            ngx_log_error(NGX_LOG_ERR, event->log, 0,
+                          "check peer closed connection with an incomplete "
+                          "response, peer: %V ", &peer->check_peer_addr->name);
+            goto check_recv_fail;
+        }
+
+        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+            goto check_recv_fail;
+        }
         return;
 
     case NGX_ERROR:
@@ -1985,6 +2045,15 @@ ngx_http_upstream_check_http_init(ngx_http_upstream_check_peer_t *peer)
 
     ngx_memzero(&ctx->status, sizeof(ngx_http_status_t));
 
+    ctx->parse_phase = NGX_CHECK_PARSE_STATUS_LINE;
+    ctx->code_n = 0;
+    ngx_memzero(&ctx->http_headers, sizeof(ngx_http_check_headers_ctx_t));
+
+    peer->recv_body_pending = 0;
+    peer->recv_body_remaining = 0;
+    peer->recv_chunk_state = sw_chunk_size;
+    peer->recv_body_chunked = 0;
+
     return NGX_OK;
 }
 
@@ -1992,19 +2061,30 @@ ngx_http_upstream_check_http_init(ngx_http_upstream_check_peer_t *peer)
 static ngx_int_t
 ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 {
+    off_t                                avail, cl;
     ngx_int_t                            rc;
+    ngx_buf_t                           *b;
     ngx_uint_t                           code, code_n;
+    ngx_connection_t                    *c;
+    ngx_check_conf_t                    *cf;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     ucscf = peer->conf;
+    cf = ucscf->check_type_conf;
     ctx = peer->check_data;
+    b = &ctx->recv;
+    c = peer->pc.connection;
 
-    if ((ctx->recv.last - ctx->recv.pos) > 0) {
+    /* Phase 1: status line -> the health verdict is decided here */
 
-        rc = ngx_http_upstream_check_parse_status_line(ctx,
-                                                       &ctx->recv,
-                                                       &ctx->status);
+    if (ctx->parse_phase == NGX_CHECK_PARSE_STATUS_LINE) {
+
+        if ((b->last - b->pos) <= 0) {
+            return NGX_AGAIN;
+        }
+
+        rc = ngx_http_upstream_check_parse_status_line(ctx, b, &ctx->status);
         if (rc == NGX_AGAIN) {
             return rc;
         }
@@ -2025,13 +2105,13 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
         } else if (code >= 300 && code < 400) {
             code_n = NGX_CHECK_HTTP_3XX;
         } else if (code >= 400 && code < 500) {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_4XX;
         } else if (code >= 500 && code < 600) {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_5XX;
         } else {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_ERR;
         }
 
@@ -2039,16 +2119,110 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
                        "http_parse: code_n: %ui, conf: %ui",
                        code_n, ucscf->code.status_alive);
 
-        if (code_n & ucscf->code.status_alive) {
-            return NGX_OK;
-        } else {
-            return NGX_ERROR;
+        ctx->code_n = code_n;
+
+        /*
+         * Fast path -- verdict straight from the status line, no body tracking,
+         * exactly as the original code. Taken when:
+         *   - keepalive reuse is off (socket closed right after; default config
+         *     is thus completely unaffected), or
+         *   - the connection is already marked not-reusable (c->error set for
+         *     4xx/5xx/invalid codes), so draining the body would be pointless.
+         */
+        if (!cf->need_keepalive
+            || ucscf->check_keepalive_requests <= 1
+            || c->error)
+        {
+            return (code_n & ucscf->code.status_alive) ? NGX_OK : NGX_ERROR;
         }
-    } else {
+
+        ctx->parse_phase = NGX_CHECK_PARSE_HEADERS;
+    }
+
+    /*
+     * Phase 2 (keepalive only): parse the headers to learn the body framing.
+     * The verdict does NOT wait for the body -- a healthy backend with a large
+     * or slow body must not be timed out. Once the headers are complete we
+     * consume whatever body bytes already arrived in the buffer (coalesced with
+     * the headers) and hand the remaining body length to the peer so the
+     * discard handler can finish draining it before the connection is reused.
+     */
+
+    rc = ngx_http_upstream_check_parse_headers(b, &ctx->http_headers);
+
+    if (rc == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                      "http parse headers error with peer: %V ",
+                      &peer->check_peer_addr->name);
+        return rc;
+    }
+
+    if (rc == NGX_AGAIN) {
+        /*
+         * Headers incomplete. Compact the receive buffer: keep only the
+         * unparsed tail so a fragmented header never accumulates and never
+         * triggers the buffer enlargement that would reset b->pos and corrupt
+         * the incremental header state held in ctx->http_headers.
+         */
+        if (b->pos < b->last) {
+            ngx_memmove(b->start, b->pos, b->last - b->pos);
+            b->last = b->start + (b->last - b->pos);
+        } else {
+            b->last = b->start;
+        }
+        b->pos = b->start;
         return NGX_AGAIN;
     }
 
-    return NGX_OK;
+    /* headers complete: set up body draining from the coalesced buffer bytes */
+
+    if (ctx->http_headers.chunked) {
+        peer->recv_body_chunked = 1;
+        peer->recv_chunk_state = sw_chunk_size;
+        peer->recv_body_remaining = 0;
+
+        rc = ngx_http_upstream_check_chunked_drain(b, &peer->recv_chunk_state,
+                                                   &peer->recv_body_remaining);
+        if (rc == NGX_ERROR) {
+            /*
+             * Malformed chunk framing. The verdict is already decided from the
+             * status line, but the connection cannot be reused safely.
+             */
+            c->error = 1;
+            peer->recv_body_pending = 0;
+        } else {
+            peer->recv_body_pending = (rc == NGX_AGAIN);
+        }
+
+    } else if (ctx->http_headers.seen_cl) {
+        peer->recv_body_chunked = 0;
+        cl = ctx->http_headers.content_length;
+        avail = b->last - b->pos;
+
+        if (avail >= cl) {
+            b->pos += (size_t) cl;
+            peer->recv_body_remaining = 0;
+            peer->recv_body_pending = 0;
+        } else {
+            b->pos = b->last;
+            peer->recv_body_remaining = cl - avail;
+            peer->recv_body_pending = 1;
+        }
+
+    } else {
+        /*
+         * Neither Content-Length nor chunked: the body (if any) is delimited by
+         * connection close and cannot be drained for reuse. Drop keepalive on
+         * this connection so clean_event() closes it instead of reusing a
+         * possibly-dirty socket.
+         */
+        c->error = 1;
+        peer->recv_body_pending = 0;
+    }
+
+    ctx->parse_phase = NGX_CHECK_PARSE_DONE;
+
+    return (ctx->code_n & ucscf->code.status_alive) ? NGX_OK : NGX_ERROR;
 }
 
 
@@ -2779,6 +2953,16 @@ ngx_http_upstream_check_http_reinit(ngx_http_upstream_check_peer_t *peer)
     ctx->state = 0;
 
     ngx_memzero(&ctx->status, sizeof(ngx_http_status_t));
+
+    /*
+     * Reset only the parse state for the next check. The body drain state
+     * (peer->recv_body_*) is deliberately NOT reset here: the discard handler
+     * keeps draining the previous response's body after this reinit, and the
+     * parser rewrites the drain state on the next verdict.
+     */
+    ctx->parse_phase = NGX_CHECK_PARSE_STATUS_LINE;
+    ctx->code_n = 0;
+    ngx_memzero(&ctx->http_headers, sizeof(ngx_http_check_headers_ctx_t));
 }
 
 
