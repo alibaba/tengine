@@ -15,6 +15,12 @@ modules/ngx_http_lua_module/src/ngx_http_lua_autoconf.h
 # Editor / IDE files
 .vscode/
 
+# Local working notes: analysis reports, migration plans, scratch drafts
+*_ANALYSIS.md
+*_PLAN.md
+*.local.md
+.notes/
+
 # Test temporary files
 tests/nginx-tests/tengine-tests/ckeys.log
 tests/nginx-tests/tengine-tests/clog
