@@ -21,6 +21,12 @@
 %{!?tengine_version:%global tengine_version 3.2.0}
 %{!?build_ts:%global build_ts %(date +%%Y%%m%%d%%H%%M%%S)}
 
+# rpm records the builder's hostname in the BUILDHOST tag and it travels with
+# the artifact forever. Pin it so a package built on a shared or internal
+# machine does not carry that machine's name to whoever installs it.
+# Override with --define "_buildhost ..." if a real hostname is wanted.
+%global _buildhost tengine-builder
+
 %bcond_with zstd
 %bcond_with lua
 %bcond_with geoip
