@@ -62,12 +62,21 @@ Requires(pre):  shadow-utils
 # such as openEuler / Kylin / UOS that define neither %%rhel nor %%fedora, and
 # would otherwise silently fall into the pcre1 branch.
 #
-# Rich deps need rpm >= 4.13, so el7 and SLE 12 keep the plain pcre-devel.
+# Rich deps need rpm >= 4.13. Guessing that from the distro release is
+# unreliable (el7-era derivatives do not all define %%rhel), so build.sh probes
+# the running rpm and passes have_rich_deps. Default 0 keeps a bare
+# `rpmbuild -ba` working on any rpm version.
 #
-%if 0%{?rhel} == 7 || ( 0%{?suse_version} && 0%{?suse_version} < 1500 )
-BuildRequires:  pcre-devel
-%else
+%{!?have_rich_deps:%global have_rich_deps 0}
+
+%if %{have_rich_deps}
 BuildRequires:  (pcre2-devel or pcre-devel)
+%else
+%if 0%{?rhel} >= 10 || 0%{?fedora} >= 39
+BuildRequires:  pcre2-devel
+%else
+BuildRequires:  pcre-devel
+%endif
 %endif
 %if %{with zstd}
 BuildRequires:  libzstd-devel

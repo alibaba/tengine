@@ -156,9 +156,21 @@ build_rpm() {
     cp "$TARBALL" "$rpmtop/SOURCES/"
     cp "$SELF_DIR/rpm/tengine.spec" "$rpmtop/SPECS/"
 
+    # Rich dependencies -- "(a or b)" -- need rpm >= 4.13. Ask the running rpm
+    # instead of inferring it from the distro release, because el7-era
+    # derivatives do not consistently define %rhel.
+    rpmver=$(rpm --eval '%{rpmversion}' 2>/dev/null || echo 0)
+    if [ "$(printf '%s\n4.13\n' "$rpmver" | sort -V | head -n 1)" = "4.13" ]; then
+        rich_deps=1
+    else
+        rich_deps=0
+        info "rpm $rpmver predates rich dependencies; requiring pcre-devel"
+    fi
+
     set -- --define "_topdir $rpmtop" \
            --define "tengine_version $TENGINE_VERSION" \
-           --define "build_ts $BUILD_TS"
+           --define "build_ts $BUILD_TS" \
+           --define "have_rich_deps $rich_deps"
     if [ -n "$DIST_TAG" ]; then
         set -- "$@" --define "dist $DIST_TAG"
     fi
