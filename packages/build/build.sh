@@ -159,7 +159,18 @@ build_rpm() {
     # Rich dependencies -- "(a or b)" -- need rpm >= 4.13. Ask the running rpm
     # instead of inferring it from the distro release, because el7-era
     # derivatives do not consistently define %rhel.
-    rpmver=$(rpm --eval '%{rpmversion}' 2>/dev/null || echo 0)
+    #
+    # `rpm --eval '%{rpmversion}'` is not usable here: on el7-era rpm the macro
+    # is undefined and --eval echoes it back verbatim while still exiting 0, so
+    # a `|| echo 0` fallback never fires. `rpm --version` prints
+    # "RPM version X.Y.Z" everywhere; anything not starting with a digit is
+    # treated as "too old" so the safe pcre-devel branch wins.
+    rpmver=$(rpm --version 2>/dev/null | awk '{print $NF}')
+    case "$rpmver" in
+        [0-9]*) ;;
+        *)      rpmver=0 ;;
+    esac
+
     if [ "$(printf '%s\n4.13\n' "$rpmver" | sort -V | head -n 1)" = "4.13" ]; then
         rich_deps=1
     else
