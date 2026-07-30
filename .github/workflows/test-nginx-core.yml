@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+   # Explicit job name so the reported status check is unique across workflows:
+   # ci.yml and test-ntls.yml declare a job with the same id, and required status
+   # checks are matched by name only, without a workflow prefix.
+   name: test nginx core (${{ matrix.compiler.compiler }})
    runs-on: "ubuntu-24.04"
    strategy:
      fail-fast: false

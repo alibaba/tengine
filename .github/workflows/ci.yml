@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+   # Explicit job name so the reported status check is unique across workflows:
+   # test-nginx-core.yml and test-ntls.yml declare a job with the same id, and
+   # required status checks are matched by name only, without a workflow prefix.
+   name: test tengine (${{ matrix.compiler.compiler }})
    runs-on: "ubuntu-24.04"
    strategy:
      fail-fast: false
@@ -140,6 +144,7 @@ jobs:
   # (has('tunnel') is true here) instead of being skipped. The two CONNECT
   # implementations cannot be linked together, so this must be its own job.
   native-tunnel-test:
+   name: test tengine native tunnel
    runs-on: "ubuntu-24.04"
    steps:
      - uses: actions/checkout@v3
