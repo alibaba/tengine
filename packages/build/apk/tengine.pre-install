@@ -1,0 +1,7 @@
+#!/bin/sh
+
+addgroup -S tengine 2>/dev/null
+adduser -S -D -H -h /var/cache/tengine -s /sbin/nologin -G tengine \
+    -g "Tengine web server" tengine 2>/dev/null
+
+exit 0

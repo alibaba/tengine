@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        if ! getent group tengine >/dev/null; then
+            addgroup --system tengine
+        fi
+        if ! getent passwd tengine >/dev/null; then
+            adduser --system --no-create-home --disabled-login \
+                --ingroup tengine --home /var/cache/tengine \
+                --gecos "Tengine web server" tengine
+        fi
+        chown tengine:tengine /var/cache/tengine /var/log/tengine || true
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
