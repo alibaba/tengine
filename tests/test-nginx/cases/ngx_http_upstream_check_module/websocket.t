@@ -1,4 +1,12 @@
 # vi:filetype=perl
+
+# Blocks whose expectation depends on a peer being up wait in "--- init" first:
+# peers start out down (default_down defaults to true) and the first check only
+# fires after a random delay of up to max(interval, 1s), while the framework
+# sends its request roughly 100ms after the server starts. Those blocks also use
+# a shorter check interval so the wait can stay short. Blocks that expect 502,
+# that bypass the checked upstream, or that have no check directive are left
+# untouched.
 # Copyright (C) 2019 Alibaba Group Holding Limited.
 #
 use lib 'lib';
@@ -21,7 +29,7 @@ __DATA__
         server 127.0.0.1:1970;
         server 127.0.0.1:1971;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         #It's a standard websocket request.
         check_http_send "GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n\r\n";
         check_http_expect_alive http_1xx;
@@ -52,6 +60,7 @@ __DATA__
         proxy_pass http://testwebsocket;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^.*websocket.*$
@@ -63,7 +72,7 @@ GET /
         server 127.0.0.1:1970;
         server 127.0.0.1:1971;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET /hc HTTP/1.1\r\nHost: localhost\r\n\r\n";
         check_http_expect_alive http_2xx;
     }
@@ -89,6 +98,7 @@ GET /
         proxy_pass http://testhttp;
     }
 
+--- init: sleep 2;
 --- request
 GET /http
 --- response_body_like: ^.*http.*$
