@@ -120,6 +120,13 @@ jobs:
          mkdir t
          PATH=/usr/local/nginx/sbin:$PATH \
          prove -v -Itest-nginx/lib cases/
+         # health-check keepalive body-drain integration test lives in a subdir;
+         # the cases/ prove above is non-recursive, so invoke it explicitly
+         PATH=/usr/local/nginx/sbin:$PATH \
+         prove -v -Itest-nginx/lib cases/ngx_http_upstream_check_module/http_check_keepalive_body.t
+     - name: upstream check HTTP parser unit tests
+       run: |
+         make -C modules/ngx_http_upstream_check_module/tests
 
   # Separate build that enables the native ngx_http_tunnel_module explicitly
   # (--with-http_tunnel_module; it is off by default) and does NOT link

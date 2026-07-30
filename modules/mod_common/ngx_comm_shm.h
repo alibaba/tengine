@@ -1,10 +1,12 @@
+/*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
 
 #ifndef NGX_COMM_SHM_H
 #define NGX_COMM_SHM_H
 
 #include <ngx_core.h>
 #include <ngx_buf.h>
-#include <ngx_hlist.h>
 
 /**
  * @brief 共享内存分配器
@@ -201,7 +203,7 @@ typedef struct {
     ngx_shm_hash_calc_func hash_func;
     ngx_shm_compar_func compar_func;
     ngx_shm_pool_t *pool;
-    struct hlist_head buckets[0];
+    ngx_queue_t buckets[0];
 } ngx_shm_hash_t;
 
 /**
@@ -258,7 +260,7 @@ void *ngx_shm_hash_get(ngx_shm_hash_t * table, void * elem);
  * @param node bucket list node
  * @return void* Hash表中的元素地址
  */
-void *ngx_shm_hash_get_by_node(struct hlist_node *node);
+void *ngx_shm_hash_get_by_node(ngx_queue_t *node);
 
 /**
  * @brief 复制字符串

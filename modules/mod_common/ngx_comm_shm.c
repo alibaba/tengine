@@ -1,4 +1,6 @@
-
+/*
+ * Copyright (C) 2026 Alibaba Group Holding Limited
+ */
 
 #include "ngx_comm_shm.h"
 #include "ngx_comm_string.h"
@@ -160,7 +162,7 @@ void * ngx_shm_search_array(ngx_shm_array_t *a, const void * key, ngx_shm_compar
 
 /* 共享内存散列表 */
 typedef struct {
-    struct hlist_node  hash_node;
+    ngx_queue_t        hash_node;
     void *data;
 } ngx_shm_hash_node_t;
 
@@ -173,12 +175,13 @@ ngx_shm_hash_t *ngx_shm_hash_create(ngx_shm_pool_t * pool,
     ngx_shm_hash_t * table = NULL;
     u_char * addr;
     ngx_int_t table_size;
+    ngx_int_t i;
 
     if (hash_func == NULL || compar_func == NULL) {
         return NULL;
     }
 
-    table_size = sizeof(ngx_shm_hash_t) + bucket_size * sizeof(struct hlist_head);
+    table_size = sizeof(ngx_shm_hash_t) + bucket_size * sizeof(ngx_queue_t);
 
     addr = ngx_shm_pool_calloc(pool, table_size);
     if (addr == NULL) {
@@ -191,6 +194,12 @@ ngx_shm_hash_t *ngx_shm_hash_create(ngx_shm_pool_t * pool,
     table->hash_func = hash_func;
     table->compar_func = compar_func;
     table->pool = pool;
+
+    /* an empty ngx_queue is self-referential, so it must be initialized
+     * explicitly (a zeroed bucket is not a valid empty queue) */
+    for (i = 0; i < bucket_size; i++) {
+        ngx_queue_init(&table->buckets[i]);
+    }
 
     return table;
 }
@@ -208,7 +217,8 @@ ngx_int_t ngx_shm_hash_add(ngx_shm_hash_t * table, void * elem)
     node->data = elem;
     hash = table->hash_func(elem);
 
-    hlist_add_head(&node->hash_node, &table->buckets[hash % table->bucket_size]);
+    ngx_queue_insert_head(&table->buckets[hash % table->bucket_size],
+                          &node->hash_node);
 
     return NGX_OK;
 }
@@ -217,8 +227,8 @@ ngx_int_t
 ngx_shm_hash_del(ngx_shm_hash_t * table, void * elem)
 {
     ngx_uint_t             hash;
-    struct hlist_head     *slot;
-    struct hlist_node     *q;
+    ngx_queue_t           *slot;
+    ngx_queue_t           *q;
     ngx_shm_hash_node_t   *node;
 
     if (table == NULL) {
@@ -228,11 +238,14 @@ ngx_shm_hash_del(ngx_shm_hash_t * table, void * elem)
 
     slot = &table->buckets[hash % table->bucket_size];
 
-    hlist_for_each(q, slot) {
-        node = hlist_entry(q, ngx_shm_hash_node_t, hash_node);
+    for (q = ngx_queue_head(slot);
+         q != ngx_queue_sentinel(slot);
+         q = ngx_queue_next(q))
+    {
+        node = ngx_queue_data(q, ngx_shm_hash_node_t, hash_node);
 
         if (table->compar_func(node->data, elem) == 0) {
-            hlist_del(&node->hash_node);
+            ngx_queue_remove(&node->hash_node);
             break;
         }
     }
@@ -243,8 +256,8 @@ ngx_shm_hash_del(ngx_shm_hash_t * table, void * elem)
 void * ngx_shm_hash_get(ngx_shm_hash_t * table, void * elem)
 {
     ngx_uint_t             hash;
-    struct hlist_head     *slot;
-    struct hlist_node     *q;
+    ngx_queue_t           *slot;
+    ngx_queue_t           *q;
     ngx_shm_hash_node_t   *node;
 
     if (table == NULL) {
@@ -258,8 +271,11 @@ void * ngx_shm_hash_get(ngx_shm_hash_t * table, void * elem)
         return NULL;
     }
 
-    hlist_for_each(q, slot) {
-        node = hlist_entry(q, ngx_shm_hash_node_t, hash_node);
+    for (q = ngx_queue_head(slot);
+         q != ngx_queue_sentinel(slot);
+         q = ngx_queue_next(q))
+    {
+        node = ngx_queue_data(q, ngx_shm_hash_node_t, hash_node);
 
         if (table->compar_func(node->data, elem) == 0) {
             return node->data;
@@ -406,13 +422,13 @@ void ngx_shm_lockless_hash_capacity(ngx_shm_lockless_hash_t * table,
 
 
 void *
-ngx_shm_hash_get_by_node(struct hlist_node *node)
+ngx_shm_hash_get_by_node(ngx_queue_t *node)
 {
     if (node == NULL) {
         return NULL;
     }
-    
-    ngx_shm_hash_node_t* hnode = hlist_entry(node, ngx_shm_hash_node_t, hash_node);
+
+    ngx_shm_hash_node_t* hnode = ngx_queue_data(node, ngx_shm_hash_node_t, hash_node);
 
     return hnode->data;
 }
