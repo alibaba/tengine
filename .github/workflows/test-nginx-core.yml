@@ -138,7 +138,11 @@ jobs:
        working-directory: tests/nginx-tests
        env:
          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
-         TEST_NGINX_UNSAFE: yes
+         # Do not set TEST_NGINX_UNSAFE here: it force-enables assertions that
+         # upstream guards with "skip 'unsafe on VM'". Those assertions rely on
+         # sub-second response timing and are unreliable on a 2-core CI runner
+         # built --with-debug (e.g. upstream_least_time.t 'equal response time
+         # average'). Tests that genuinely need it set it per invocation below.
        run: |
          # prepare perl library for test case
          sudo cpanm --notest SCGI Protocol::WebSocket Net::SSLeay IO::Socket::SSL Cache::Memcached Cache::Memcached::Fast Net::DNS::Nameserver GD > build.log 2>&1 || (cat build.log && exit 1)
