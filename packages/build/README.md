@@ -99,15 +99,20 @@ Tengine，24 个 job 全跑一遍代价很高，因此仅：
 （rolling）、`anolis23`、`openeuler2203`、`sles12` 未进矩阵，需要时用
 `build.sh docker <目标>`。
 
-**`el7` 两个架构都标记 `continue-on-error`**（尽力而为）。两个独立原因：CentOS 7
-EOL 后镜像源迁到 `vault.centos.org`，其主树只有 x86_64（aarch64 归档在 `/altarch/`
-另一路径，bootstrap 的源改写没覆盖）；且完备功能集要求 CMake ≥ 3.5、能编 xquic
-`-std=gnu11` 与 Tongsuo（OpenSSL 3.0 基线）的编译器，对 gcc 4.8 要求较高。
+**只有 `el7` + `aarch64` 标记 `continue-on-error`**：CentOS 7 EOL 后镜像源迁到
+`vault.centos.org`，其主树只有 x86_64，aarch64 归档在 `/altarch/` 另一路径下，
+bootstrap 的源改写没覆盖，该组合不可能成功。
 
-> **若 el7 持续失败，就应当直接从矩阵移除** —— 宁可不出 el7 包，也不要让同名
-> `tengine` 包在不同发行版上功能集不一致。这只是公共 CI 用 `centos:7` 镜像的限制，
-> 不是 spec 的限制；在自带完整仓库的 el7 系统（如 Alibaba Cloud Linux 2）上直接
-> `build.sh rpm --dist .el7u2` 即可。
+**`el7` + `x86_64` 不免检。** 完备功能集已实测可用 gcc 4.8.5 编出：Tongsuo 的
+OpenSSL 3.0 基线、xquic 的 `-std=gnu11` 及其自带 `-Werror` 都没有问题。唯一的真实
+障碍是 CMake —— el7 只打包 2.8，而通常的替代 `cmake3` 只存在于同样已 EOL 的
+EPEL 7（metalink 已失效，仅剩归档镜像）。因此 bootstrap 改为直接取 Kitware 的静态
+tarball（只需 glibc 2.17，el7 满足）；`build.sh` 会发现这个 CMake 不属于 rpm，
+自动为 spec 关掉对应的 `BuildRequires`（见 `external_cmake`）。
+
+> 在自带完整仓库的 el7 系统上无需这些周折，直接
+> `build.sh rpm --dist .el7u2` 即可 —— 已实测产出 4.9 MB 的完备功能集包
+> （Tongsuo 静态链入、`libxquic.so` 与 `libluajit` 随包、`resty.core` 可加载）。
 
 前置 `prepare` job 做两件事：钉住整个 run 共享的时间戳（24 个包 Release 号一致），
 以及跑一次 [fetch-deps.sh](fetch-deps.sh) 把 pin 的依赖源码下载校验后上传为
