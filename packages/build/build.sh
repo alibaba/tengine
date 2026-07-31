@@ -400,9 +400,17 @@ else
     sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
            -e 's|^#*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' \
            /etc/yum.repos.d/CentOS-*.repo
-    # el7's "cmake" is 2.8; xquic needs the separate cmake3 package.
-    yum -y install rpm-build gcc gcc-c++ make cmake3 tar findutils diffutils curl \
+    yum -y install rpm-build gcc gcc-c++ make tar findutils diffutils curl \
         perl openssl-devel zlib-devel pcre-devel systemd
+    # el7 packages CMake 2.8 and xquic needs >= 3.5. The usual answer, cmake3,
+    # lives only in EPEL 7 -- itself EOL, with a dead metalink and nothing but
+    # an archive mirror left, so pulling it in means rewriting a second set of
+    # repo files. Kitware's own build is a static tarball needing just glibc
+    # 2.17, which el7 has. build.sh detects that rpm does not own this CMake
+    # and drops the matching BuildRequires by itself.
+    curl -fsSL "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-$(uname -m).tar.gz" \
+        | tar xz --strip-components=1 -C /usr/local
+    cmake --version
 fi
 EOS
             ;;
