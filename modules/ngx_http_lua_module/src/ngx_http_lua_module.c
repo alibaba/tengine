@@ -57,6 +57,9 @@ static char *ngx_http_lua_ssl_conf_command_check(ngx_conf_t *cf, void *post,
 #endif
 static char *ngx_http_lua_malloc_trim(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (NGX_PCRE2)
+extern void ngx_http_lua_regex_cleanup(void *data);
+#endif
 
 
 static ngx_conf_post_t  ngx_http_lua_lowat_post =
@@ -838,6 +841,17 @@ ngx_http_lua_init(ngx_conf_t *cf)
 
     cln->data = lmcf;
     cln->handler = ngx_http_lua_sema_mm_cleanup;
+
+#if (NGX_PCRE2)
+    /* add the cleanup of pcre2 regex */
+    cln = ngx_pool_cleanup_add(cf->pool, 0);
+    if (cln == NULL) {
+        return NGX_ERROR;
+    }
+
+    cln->data = lmcf;
+    cln->handler = ngx_http_lua_regex_cleanup;
+#endif
 
 #ifdef HAVE_NGX_LUA_PIPE
     ngx_http_lua_pipe_init();

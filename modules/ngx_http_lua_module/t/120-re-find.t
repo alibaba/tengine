@@ -354,8 +354,11 @@ matched: he
     }
 --- request
     GET /re
---- response_body
-error: pcre_compile() failed: missing ) in "(abc"
+--- response_body eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+"error: pcre2_compile() failed: missing closing parenthesis in \"(abc\"\n"
+:
+"error: pcre_compile() failed: missing ) in \"(abc\"\n"
 --- no_error_log
 [error]
 
@@ -562,8 +565,11 @@ matched: hello, 1234
     }
 --- request
 GET /t
---- response_body_like chop
-^error: pcre_exec\(\) failed: -10$
+--- response_body eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+"error: pcre_exec\(\) failed: -4\n"
+:
+"error: pcre_exec\(\) failed: -10\n"
 
 --- no_error_log
 [error]
@@ -587,6 +593,7 @@ GET /t
         ';
     }
 --- stap
+# TODO: PCRE2 use different option values from PCRE
 probe process("$LIBPCRE_PATH").function("pcre_compile") {
     printf("compile opts: %x\n", $options)
 }
@@ -645,8 +652,14 @@ end
 
 --- request
     GET /re
---- response_body
-error: pcre_exec() failed: -8
+--- response_body eval
+# lua_regex_match_limit uses pcre_extra->match_limit in the PCRE,
+# but PCRE2 replaces this with pcre2_set_match_limit interface,
+# which has different effects.
+$Test::Nginx::Util::PcreVersion == 2 ?
+"failed to match.\n"
+:
+"error: pcre_exec() failed: -8\n"
 --- no_error_log
 [error]
 

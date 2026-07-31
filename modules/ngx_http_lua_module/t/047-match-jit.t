@@ -32,8 +32,11 @@ __DATA__
     GET /re
 --- response_body
 1234
---- error_log
-pcre JIT compiling result: 1
+--- error_log eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+"pcre2 JIT compiled successfully\n"
+:
+"pcre JIT compiling result: 1\n"
 
 
 
@@ -53,8 +56,11 @@ pcre JIT compiling result: 1
     GET /re
 --- response_body
 not matched!
---- error_log
-pcre JIT compiling result: 1
+--- error_log eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+"pcre2 JIT compiled successfully\n"
+:
+"pcre JIT compiling result: 1\n"
 
 
 
@@ -76,9 +82,15 @@ pcre JIT compiling result: 1
 1234
 
 --- grep_error_log eval
-qr/pcre JIT compiling result: \d+/
+$Test::Nginx::Util::PcreVersion == 2 ?
+"pcre2 JIT compiled successfully"
+:
+"pcre JIT compiling result: 1"
 
 --- grep_error_log_out eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+["pcre2 JIT compiled successfully\n", ""]
+:
 ["pcre JIT compiling result: 1\n", ""]
 
 
@@ -101,9 +113,15 @@ qr/pcre JIT compiling result: \d+/
 not matched!
 
 --- grep_error_log eval
-qr/pcre JIT compiling result: \d+/
+$Test::Nginx::Util::PcreVersion == 2 ?
+"pcre2 JIT compiled successfully"
+:
+"pcre JIT compiling result: 1"
 
 --- grep_error_log_out eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+["pcre2 JIT compiled successfully\n", ""]
+:
 ["pcre JIT compiling result: 1\n", ""]
 
 
@@ -128,8 +146,11 @@ qr/pcre JIT compiling result: \d+/
     }
 --- request
     GET /re
---- response_body
-error: pcre_compile() failed: missing ) in "(abc"
+--- response_body eval
+$Test::Nginx::Util::PcreVersion == 2 ?
+"error: pcre2_compile() failed: missing closing parenthesis in \"(abc\"\n"
+:
+"error: pcre_compile() failed: missing ) in \"(abc\"\n"
 --- no_error_log
 [error]
 
@@ -170,8 +191,15 @@ end
 
 --- request
     GET /re
---- response_body
-error: pcre_exec() failed: -8
+--- response_body eval
+# lua_regex_match_limit uses pcre_extra->match_limit in the PCRE,
+# but PCRE2 replaces this with pcre2_set_match_limit interface,
+# which has different effects.
+$Test::Nginx::Util::PcreVersion == 2 ?
+# PCRE2_ERROR_MATCHLIMIT  (-47)
+"error: pcre_exec() failed: -47\n"
+:
+"error: pcre_exec() failed: -8\n"
 
 
 
