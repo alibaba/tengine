@@ -16,7 +16,7 @@ examples and guides.</p>
 
 
 ## Introduction
-Tengine is a web server originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It is based on the [Nginx](http://nginx.org) HTTP server and has many advanced features. Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
+Tengine is a high-performance web server and reverse proxy originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It offers HTTP/3, Kubernetes Ingress support, zero-downtime dynamic configuration, active upstream health checks, and NTLS (SM2/SM3/SM4), while remaining 100% compatible with [nginx](http://nginx.org). Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
 
 Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to [get involved](https://github.com/alibaba/tengine).
 
@@ -47,7 +47,7 @@ Tengine has been an open source project since December 2011. It is being activel
 * Protects the server in case system load or memory use goes too high.
 * Multiple CSS or JavaScript requests can be combined into one request to reduce download time.
 * Removes unnecessary white spaces and comments to reduce the size of a page.
-* Proactive health checks of upstream servers can be performed.
+* Active health checks of upstream servers can be performed.
 * The number of worker processes and CPU affinities can be set automatically.
 * The limit_req module is enhanced with whitelist support and more conditions are allowed in a single location.
 * Enhanced diagnostic information makes it easier to troubleshoot errors.
