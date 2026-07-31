@@ -16,5 +16,11 @@ KillMode=mixed
 TimeoutStopSec=5
 PrivateTmp=true
 
+# Every connection costs at least one descriptor, upstreams and log files more,
+# so the inherited 1024 is reached long before worker_connections is. el7-era
+# systems are where this bites: the default there really is 1024, which the
+# stock worker_connections exactly exhausts.
+LimitNOFILE=65535
+
 [Install]
 WantedBy=multi-user.target

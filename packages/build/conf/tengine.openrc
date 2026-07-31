@@ -12,6 +12,10 @@ description_upgrade="Replace the running binary on the fly"
 command="/usr/sbin/tengine"
 pidfile="/run/tengine.pid"
 
+# Matches LimitNOFILE in the systemd unit: one descriptor per connection at the
+# very least, so the inherited default runs out well before worker_connections.
+rc_ulimit="-n 65535"
+
 depend() {
 	need net
 	use dns logger netmount
