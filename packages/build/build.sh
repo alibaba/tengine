@@ -34,7 +34,7 @@
 #
 # Produced artifacts land in --outdir, e.g.
 #     tengine-3.2.0-20260604232239.el7u2.x86_64.rpm
-#     tengine_3.2.0-20260604232239_amd64.deb
+#     tengine_3.2.0-20260604232239~bookworm_amd64.deb
 #     tengine-3.2.0_p20260604232239-r0.apk
 #
 # Written in POSIX sh on purpose: it re-executes itself inside bare distro
@@ -245,7 +245,18 @@ build_deb() {
 
     work="$OUTDIR/debbuild"
     debtop="$work/tengine-$TENGINE_VERSION"
-    debversion="$TENGINE_VERSION-$BUILD_TS"
+
+    suite=unstable
+    if [ -r /etc/os-release ]; then
+        suite=$(. /etc/os-release; echo "${VERSION_CODENAME:-unstable}")
+    fi
+
+    # The distro codename belongs in the version: neither the deb version nor
+    # the file name carries one otherwise, so debian11/debian12/ubuntu2204/
+    # ubuntu2404 would all produce a byte-identical file name and apt could not
+    # tell the builds apart. "~" sorts lower than no suffix at all, which is the
+    # Debian convention for this.
+    debversion="$TENGINE_VERSION-$BUILD_TS~$suite"
 
     rm -rf "$work"
     mkdir -p "$work"
@@ -256,11 +267,6 @@ build_deb() {
     cp -R "$SELF_DIR/deb/debian" "$debtop/debian"
     cp "$SELF_DIR/conf/tengine.service"   "$debtop/debian/tengine.service"
     cp "$SELF_DIR/conf/tengine.logrotate" "$debtop/debian/tengine.logrotate"
-
-    suite=unstable
-    if [ -r /etc/os-release ]; then
-        suite=$(. /etc/os-release; echo "${VERSION_CODENAME:-unstable}")
-    fi
 
     sed -e "s|@VERSION@|$debversion|" \
         -e "s|@UPSTREAM_VERSION@|$TENGINE_VERSION|" \
