@@ -178,6 +178,36 @@ deps_disable_args() {
 
 # ------------------------------------------------------------------ rpm build
 
+# Is a CMake >= 3.5 reachable on PATH? Deliberately mirrors build-deps.sh's
+# find_cmake, since that is the code which will actually run it.
+cmake_binary_ok() {
+    for c in cmake3 cmake; do
+        command -v "$c" >/dev/null 2>&1 || continue
+        v=$("$c" --version 2>/dev/null | head -n 1 | sed 's/[^0-9.]*\([0-9.]*\).*/\1/')
+        [ -n "$v" ] || continue
+        if [ "$(printf '%s\n3.5\n' "$v" | sort -V | head -n 1)" = "3.5" ]; then
+            echo yes
+            return
+        fi
+    done
+    echo no
+}
+
+# Does rpm itself own a CMake new enough for the spec's BuildRequires? `rpm -q`
+# prints "package foo is not installed" on stdout and exits non-zero, hence both
+# the `||` and the leading-digit check.
+cmake_rpm_ok() {
+    for p in cmake3 cmake; do
+        v=$(rpm -q --qf '%{VERSION}\n' "$p" 2>/dev/null | head -n 1) || continue
+        case "$v" in [0-9]*) ;; *) continue ;; esac
+        if [ "$(printf '%s\n3.5\n' "$v" | sort -V | head -n 1)" = "3.5" ]; then
+            echo yes
+            return
+        fi
+    done
+    echo no
+}
+
 build_rpm() {
     command -v rpmbuild >/dev/null || die "rpmbuild not found (install rpm-build)"
     make_tarball
@@ -216,6 +246,17 @@ build_rpm() {
            --define "tengine_version $TENGINE_VERSION" \
            --define "build_ts $BUILD_TS" \
            --define "have_rich_deps $rich_deps"
+
+    # The spec's CMake BuildRequires can only be satisfied by an rpm-managed
+    # CMake. A usable one installed some other way (pip, upstream tarball,
+    # /usr/local) is invisible to rpm, which would fail the build even though
+    # build-deps.sh can use it happily -- some el7 derivatives package only
+    # cmake 2.8 while carrying a much newer one on PATH. Detect that and drop
+    # only the CMake requirement, rather than all of them.
+    if [ "$(cmake_binary_ok)" = yes ] && [ "$(cmake_rpm_ok)" = no ]; then
+        info "usable CMake found on PATH but not owned by rpm; skipping its BuildRequires"
+        set -- "$@" --with external_cmake
+    fi
     if [ -n "$DIST_TAG" ]; then
         set -- "$@" --define "dist $DIST_TAG"
     fi

@@ -41,6 +41,13 @@
 %bcond_with zstd
 %bcond_with geoip
 
+# A CMake installed outside the package manager (pip, upstream tarball,
+# /usr/local) is perfectly usable by build-deps.sh but invisible to rpm, so its
+# BuildRequires could never be satisfied. build.sh detects that and enables
+# this to drop just the CMake requirement -- everything else stays checked,
+# unlike a blanket --nodeps.
+%bcond_with external_cmake
+
 # Default feature set: everything Tengine is known for. Turn off with
 # --without tongsuo / --without xquic / --without lua.
 %bcond_without tongsuo
@@ -88,6 +95,7 @@ BuildRequires:  zlib-devel
 # "cmake >= 3.5" there can never be satisfied. build-deps.sh already probes
 # both binaries (find_cmake), so accept either package and let it pick.
 # Rich deps need rpm >= 4.13; see have_rich_deps above.
+%if %{without external_cmake}
 %if %{have_rich_deps}
 BuildRequires:  (cmake >= 3.5 or cmake3 >= 3.5)
 %else
@@ -95,6 +103,7 @@ BuildRequires:  (cmake >= 3.5 or cmake3 >= 3.5)
 BuildRequires:  cmake3 >= 3.5
 %else
 BuildRequires:  cmake >= 3.5
+%endif
 %endif
 %endif
 BuildRequires:  gcc-c++
