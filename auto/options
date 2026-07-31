@@ -184,6 +184,7 @@ XQUIC_XDP_INC=$XQUIC_XDP_INC
 
 XQUIC_INC=$XQUIC_INC
 XQUIC_LIB=$XQUIC_LIB
+XQUIC_RPATH=$XQUIC_RPATH
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -339,6 +340,7 @@ use the \"--without-http_upstream_sticky_module\" option instead"
 
         --with-xquic-inc=*)              XQUIC_INC="$value"         ;;
         --with-xquic-lib=*)              XQUIC_LIB="$value"         ;;
+        --with-xquic-rpath=*)            XQUIC_RPATH="$value"       ;;
 
         # LUA
         --with-http_lua_module)          HTTP_LUA=YES               ;;
@@ -618,6 +620,10 @@ cat << END
 
   --with-xquic-inc=PATH              set XQUIC headers path
   --with-xquic-lib=PATH              set XQUIC library path (where libxquic.so is located)
+  --with-xquic-rpath=PATH            set the runtime path recorded for libxquic.so
+                                     (defaults to --with-xquic-lib; set this when
+                                     packaging, where the build tree and the
+                                     installed location differ)
   --with-xquic-link=PATH             set XQUIC headers link path
 
   --with-stream                      enable TCP/UDP proxy module

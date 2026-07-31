@@ -34,7 +34,12 @@ CORE_INCS="$CORE_INCS \
            $XQUIC_INC \
            $ngx_addon_dir/../ngx_http_lua_module/src"
 
+# The runtime path defaults to the link path, which is what a plain source
+# build wants. Packaged builds link against a scratch build tree but have to
+# record the installed location instead, so they pass --with-xquic-rpath.
+ngx_xquic_rpath=${XQUIC_RPATH:-$XQUIC_LIB}
+
 CORE_LIBS="$CORE_LIBS \
-           -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm -lstdc++"
+           -L$XQUIC_LIB -lxquic -Wl,-rpath=$ngx_xquic_rpath -lrt -pthread -lm -lstdc++"
 
 have=T_NGX_XQUIC . auto/have
