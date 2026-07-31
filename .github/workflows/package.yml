@@ -154,6 +154,13 @@ jobs:
             # distinguish it from a stock OpenSSL. enable-ntls in the configure
             # arguments can, and it is what ngx_tongsuo_ntls needs.
             grep -q "enable-ntls" /tmp/banner || { echo "MISSING: Tongsuo NTLS"; exit 1; }
+            # configure records its arguments verbatim, so an absolute path to
+            # the dependency build tree would be printed by -V on every
+            # installed system forever -- including whichever home directory
+            # the package happened to be built in. build-deps.sh
+            # --env-relative-to keeps those three arguments relative.
+            ! grep -qE -- "--with-(openssl|xquic-(inc|lib))=/" /tmp/banner \
+                || { echo "LEAK: absolute build path in banner"; exit 1; }
             # resty.core is loaded during startup, so a passing -t also proves
             # lua_package_path points at the packaged lualib directory.
             /usr/sbin/tengine -t

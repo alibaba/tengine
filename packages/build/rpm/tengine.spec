@@ -215,6 +215,7 @@ sh packages/build/build-deps.sh \
     --staging %{_builddir}/deps-staging \
     --libdir %{_libdir}/tengine \
     --datadir %{tengine_datadir} \
+    --env-relative-to "$PWD" \
     $deps_args
 
 # Exports TENGINE_TONGSUO_SRC / TENGINE_XQUIC_* / LUAJIT_INC / LUAJIT_LIB.
