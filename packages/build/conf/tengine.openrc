@@ -1,0 +1,57 @@
+#!/sbin/openrc-run
+
+description="Tengine HTTP and reverse proxy server"
+extra_commands="checkconfig"
+extra_started_commands="reload reopen upgrade"
+
+description_checkconfig="Check the configuration for syntax errors"
+description_reload="Reload the configuration without dropping connections"
+description_reopen="Reopen the log files"
+description_upgrade="Replace the running binary on the fly"
+
+command="/usr/sbin/tengine"
+pidfile="/run/tengine.pid"
+
+depend() {
+	need net
+	use dns logger netmount
+}
+
+start_pre() {
+	checkpath --directory --owner tengine:tengine --mode 0755 \
+		/var/cache/tengine /var/log/tengine
+	checkconfig || return 1
+}
+
+checkconfig() {
+	ebegin "Checking ${RC_SVCNAME} configuration"
+	${command} -t
+	eend $?
+}
+
+reload() {
+	checkconfig || return 1
+	ebegin "Reloading ${RC_SVCNAME} configuration"
+	start-stop-daemon --signal HUP --pidfile "${pidfile}"
+	eend $?
+}
+
+reopen() {
+	ebegin "Reopening ${RC_SVCNAME} log files"
+	start-stop-daemon --signal USR1 --pidfile "${pidfile}"
+	eend $?
+}
+
+upgrade() {
+	checkconfig || return 1
+
+	ebegin "Upgrading ${RC_SVCNAME} binary"
+	start-stop-daemon --signal USR2 --pidfile "${pidfile}"
+	sleep 1
+	if [ ! -f "${pidfile}.oldbin" ]; then
+		eend 1 "Failed to upgrade, ${pidfile}.oldbin is missing"
+		return 1
+	fi
+	start-stop-daemon --signal QUIT --pidfile "${pidfile}.oldbin"
+	eend 0
+}

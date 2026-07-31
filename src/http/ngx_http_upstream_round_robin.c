@@ -36,6 +36,14 @@ static void ngx_http_upstream_empty_save_session(ngx_peer_connection_t *pc,
 #endif
 
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+static char ngx_rr_discarded_init = 0;
+extern ngx_module_t  ngx_http_upstream_module;
+static ngx_int_t ngx_http_upstream_adapte_rr_peer_weight(
+    ngx_http_upstream_rr_peer_data_t *rrp);
+#endif
+
+
 ngx_int_t
 ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
@@ -63,6 +71,9 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         r = 0;
         w = 0;
         t = 0;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+        ngx_rr_discarded_init = 0;
+#endif
 
 #if (NGX_HTTP_UPSTREAM_ZONE)
         resolve = 0;
@@ -167,6 +178,10 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peers->name = &us->host;
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
         peers->init_number = NGX_CONF_UNSET_UINT;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+        peers->last_number = NGX_CONF_UNSET_UINT;
+        peers->last_peer = NULL;
+#endif
 #endif
 
         n = 0;
@@ -328,6 +343,10 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         backup->name = &us->host;
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
         backup->init_number = NGX_CONF_UNSET_UINT;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+        backup->last_number = NGX_CONF_UNSET_UINT;
+        backup->last_peer = NULL;
+#endif
 #endif
 
         n = 0;
@@ -474,6 +493,10 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     peers->name = &us->host;
 #if (T_NGX_HTTP_UPSTREAM_RANDOM)
     peers->init_number = NGX_CONF_UNSET_UINT;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    peers->last_number = NGX_CONF_UNSET_UINT;
+    peers->last_peer = NULL;
+#endif
 #endif
 
     peerp = &peers->peer;
@@ -675,6 +698,10 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
      * server groups use the random start peer for load balancing.
      */
     peers->init_number = 0;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    peers->last_number = NGX_CONF_UNSET_UINT;
+    peers->last_peer = NULL;
+#endif
 #endif
     peers->name = &ur->host;
 
@@ -780,6 +807,10 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
     ngx_uint_t                     i, n;
     ngx_http_upstream_rr_peer_t   *peer;
     ngx_http_upstream_rr_peers_t  *peers;
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    ngx_http_upstream_main_conf_t *umcf;
+    ngx_uint_t                     discarded_number, discarded_range;
+#endif
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
                    "get rr peer, try: %ui", pc->tries);
@@ -826,6 +857,29 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
         ngx_http_upstream_rr_peer_ref(peers, peer);
 
     } else {
+
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+        /*
+         * For weighted groups, discard a random number of smooth-weight
+         * adaptations once per worker so that workers do not synchronize on
+         * the same starting peer after startup/reload.
+         */
+        if (!ngx_rr_discarded_init && peers->weighted) {
+            umcf = ngx_http_cycle_get_module_main_conf(ngx_cycle,
+                                                       ngx_http_upstream_module);
+            discarded_range = peers->number;
+            if (umcf && umcf->rr_discarded_range != NGX_CONF_UNSET_UINT) {
+                discarded_range = umcf->rr_discarded_range;
+            }
+
+            discarded_number = ngx_random() % peers->number;
+            discarded_number %= discarded_range;
+            for (i = 0; i <= discarded_number; i++) {
+                ngx_http_upstream_adapte_rr_peer_weight(rrp);
+            }
+            ngx_rr_discarded_init = 1;
+        }
+#endif
 
         /* there are several peers */
 
@@ -909,6 +963,10 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp,
     ngx_uint_t                    i, n, p;
     ngx_http_upstream_rr_peer_t  *peer, *best;
 
+#if (T_NGX_HTTP_UPSTREAM_RANDOM)
+    ngx_uint_t                    begin_number;
+#endif
+
 #if (NGX_HTTP_UPSTREAM_SID)
     ngx_int_t                     low_limit;
     ngx_uint_t                    st_p;
@@ -952,13 +1010,52 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp,
          rrp->peers->init_number = ngx_random() % rrp->peers->number;
     }
 
-    for (peer = rrp->peers->peer, i = 0; i < rrp->peers->init_number; i++) {
-        peer = peer->next;
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    if (rrp->peers->weighted == 0) {
+        /*
+         * Non-weighted groups use plain O(1) round-robin: advance from the
+         * peer selected last time instead of rescanning smooth weights.
+         */
+        if (rrp->peers->last_number == NGX_CONF_UNSET_UINT) {
+            /*
+             * First selection for this peers set: start at the peer chosen by
+             * init_number (0 for resolved peers, random for shared groups) and
+             * include it. Advancing to ->next here would skip the first
+             * upstream, breaking next_upstream tries/timeout ordering for
+             * resolved (DNS) peers. last_peer/last_number are recorded below
+             * once a peer is actually selected.
+             */
+            begin_number = rrp->peers->init_number;
+            for (peer = rrp->peers->peer, i = 0; i < begin_number; i++) {
+                peer = peer->next;
+            }
+
+        } else if (rrp->peers->last_peer && rrp->peers->last_peer->next) {
+            begin_number = (rrp->peers->last_number + 1) % rrp->peers->number;
+            peer = rrp->peers->last_peer->next;
+
+        } else {
+            begin_number = 0;
+            peer = rrp->peers->peer;
+        }
+
+    } else {
+        begin_number = rrp->peers->init_number;
+        for (peer = rrp->peers->peer, i = 0; i < begin_number; i++) {
+            peer = peer->next;
+        }
     }
 
+#else
+    begin_number = rrp->peers->init_number;
+    for (peer = rrp->peers->peer, i = 0; i < begin_number; i++) {
+        peer = peer->next;
+    }
+#endif
+
     flag = 1;
-    for (i = rrp->peers->init_number;
-         i != rrp->peers->init_number || flag;
+    for (i = begin_number;
+         i != begin_number || flag;
          i = (i + 1) % rrp->peers->number,
          peer = peer->next ? peer->next : rrp->peers->peer)
     {
@@ -997,6 +1094,16 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp,
         if (peer->max_conns && peer->conns >= peer->max_conns) {
             continue;
         }
+
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+        if (rrp->peers->weighted == 0) {
+            best = peer;
+            rrp->peers->last_peer = peer;
+            rrp->peers->last_number = i;
+            p = i;
+            break;
+        }
+#endif
 
         peer->current_weight += peer->effective_weight;
         total += peer->effective_weight;
@@ -1044,6 +1151,54 @@ best_chosen:
 
     return best;
 }
+
+
+#if (T_NGX_HTTP_UPSTREAM_RANDOM && T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+static ngx_int_t
+ngx_http_upstream_adapte_rr_peer_weight(ngx_http_upstream_rr_peer_data_t *rrp)
+{
+    ngx_int_t                     total, flag;
+    ngx_uint_t                    i, begin_number;
+    ngx_http_upstream_rr_peer_t  *peer, *best;
+
+    if (rrp->peers->init_number == NGX_CONF_UNSET_UINT) {
+         rrp->peers->init_number = ngx_random() % rrp->peers->number;
+    }
+
+    begin_number = rrp->peers->init_number % rrp->peers->number;
+
+    /* peers form a linked list (may live in shared memory), traverse by next */
+    for (peer = rrp->peers->peer, i = 0; i < begin_number; i++) {
+        peer = peer->next;
+    }
+
+    flag = 1;
+    best = NULL;
+    total = 0;
+
+    for (i = begin_number;
+         i != begin_number || flag;
+         i = (i + 1) % rrp->peers->number,
+         peer = peer->next ? peer->next : rrp->peers->peer)
+    {
+        flag = 0;
+        peer->current_weight += peer->effective_weight;
+        total += peer->effective_weight;
+
+        if (best == NULL || peer->current_weight > best->current_weight) {
+            best = peer;
+        }
+    }
+
+    if (best == NULL) {
+        return NGX_ERROR;
+    }
+
+    best->current_weight -= total;
+
+    return NGX_OK;
+}
+#endif
 
 
 #if (NGX_HTTP_UPSTREAM_SID)

@@ -388,6 +388,16 @@ typedef ngx_int_t (*ngx_http_handler_pt)(ngx_http_request_t *r);
 typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 
 
+#if (T_NGX_HTTP_STAT_TIME)
+typedef struct ngx_http_request_stat_time {
+    ngx_msec_t                      req_recv_start_time;
+    ngx_msec_t                      req_recv_finished_time;
+    ngx_msec_t                      resp_send_start_time;
+    ngx_msec_t                      resp_send_finish_time;
+} ngx_http_request_stat_time_t;
+#endif
+
+
 struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
@@ -429,6 +439,10 @@ struct ngx_http_request_s {
 
 #if (T_NGX_RET_CACHE)
     ngx_usec_t                        start_usec;
+#endif
+
+#if (T_NGX_HTTP_STAT_TIME)
+    ngx_http_request_stat_time_t      stat_time;
 #endif
 
     ngx_uint_t                        method;

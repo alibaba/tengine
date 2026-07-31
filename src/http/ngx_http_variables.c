@@ -83,6 +83,23 @@ ngx_http_variable_request_start_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 #endif
 
+#if (T_NGX_HTTP_STAT_TIME)
+static ngx_int_t ngx_http_variable_request_recv_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_response_send_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_recv_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_recv_finish_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_send_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_send_finish_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_server_rt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+#endif
+
 static ngx_int_t ngx_http_variable_content_length(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_host(ngx_http_request_t *r,
@@ -570,6 +587,26 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
 
 #if (T_NGX_REQUEST_START_TIME)
     { ngx_string("request_start_time"), NULL, ngx_http_variable_request_start_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+#endif
+
+#if (T_NGX_HTTP_STAT_TIME)
+    { ngx_string("request_recv_time"), NULL, ngx_http_variable_request_recv_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+    { ngx_string("response_send_time"), NULL, ngx_http_variable_response_send_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+    { ngx_string("request_recv_start_time"), NULL, ngx_http_variable_recv_start_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("request_recv_finish_time"), NULL, ngx_http_variable_recv_finish_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("response_send_start_time"), NULL, ngx_http_variable_send_start_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+    { ngx_string("response_send_finish_time"), NULL, ngx_http_variable_send_finish_time,
+      0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+    { ngx_string("server_rt"), NULL, ngx_http_variable_server_rt,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 #endif
 
@@ -2563,6 +2600,199 @@ ngx_http_variable_request_time(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
+
+#if (T_NGX_HTTP_STAT_TIME)
+
+static ngx_int_t
+ngx_http_variable_request_recv_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+    ngx_msec_int_t   ms;
+
+    if (r->stat_time.req_recv_finished_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    ms = (ngx_msec_int_t)(r->stat_time.req_recv_finished_time
+                          - r->start_sec * 1000 - r->start_msec);
+    ms = ngx_max(ms, 0);
+
+    v->len = ngx_sprintf(p, "%T.%03M", (time_t) ms / 1000, ms % 1000) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_response_send_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_msec_t       current_msec = ngx_current_msec;
+    u_char          *p;
+    ngx_msec_int_t   ms;
+
+    if (r->stat_time.resp_send_start_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    ms = (ngx_msec_int_t)(current_msec - r->stat_time.resp_send_start_time);
+    ms = ngx_max(ms, 0);
+
+    v->len = ngx_sprintf(p, "%T.%03M", (time_t) ms / 1000, ms % 1000) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_send_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+
+    if (r->stat_time.resp_send_start_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%M",
+                         (ngx_msec_int_t) r->stat_time.resp_send_start_time) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_send_finish_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+
+    if (r->stat_time.resp_send_finish_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 4);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%M",
+                         (ngx_msec_int_t) r->stat_time.resp_send_finish_time) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_recv_start_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+
+    if (r->stat_time.req_recv_start_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%M",
+                         (ngx_msec_int_t) r->stat_time.req_recv_start_time) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_recv_finish_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    u_char          *p;
+
+    if (r->stat_time.req_recv_finished_time == 0) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN + 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%M",
+                         (ngx_msec_int_t) r->stat_time.req_recv_finished_time) - p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_variable_server_rt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_msec_t   start, end;
+
+    v->len = 0;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    v->data = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    start = (ngx_msec_t) r->start_sec * 1000 + r->start_msec;
+    end = ngx_current_msec;
+
+    v->len = ngx_sprintf(v->data, "%M", end - start) - v->data;
+
+    return NGX_OK;
+}
+
+#endif
 
 
 static ngx_int_t

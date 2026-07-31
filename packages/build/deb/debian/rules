@@ -1,0 +1,58 @@
+#!/usr/bin/make -f
+#
+# Debian/Ubuntu packaging rules for Tengine.  The configure arguments come
+# from packages/build/configure-args.sh so this package stays byte-for-byte
+# feature-identical to the RPM and APK builds.
+#
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+CONFDIR  := debian/tengine/etc/tengine
+PKGDIR   := debian/tengine
+
+%:
+	dh $@
+
+# The tree defaults to -Werror (auto/cc/gcc); with dpkg hardening flags and an
+# arbitrary gcc version that is a guaranteed build break, so relax it here.
+override_dh_auto_configure:
+	TENGINE_LIBDIR=/usr/lib ./configure \
+		$$(sh packages/build/configure-args.sh) \
+		--with-cc-opt="$(CFLAGS) $(CPPFLAGS) -Wno-error" \
+		--with-ld-opt="$(LDFLAGS)"
+
+override_dh_auto_test:
+
+override_dh_auto_install:
+	dh_auto_install
+	# make install drops the stock nginx.conf plus *.default copies; replace
+	# them with the packaged tengine.conf so the shipped names stay consistent.
+	rm -f $(CONFDIR)/*.default
+	install -p -m 0644 packages/build/conf/tengine.conf \
+		$(CONFDIR)/tengine.conf
+	install -d -m 0755 $(CONFDIR)/conf.d
+	install -p -m 0644 packages/build/conf/conf.d/default.conf \
+		$(CONFDIR)/conf.d/default.conf
+	sed -e 's|%%PREFIX%%|/usr/share/tengine|' \
+	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
+	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
+	    -e 's|%%ERROR_LOG_PATH%%|/var/log/tengine/error.log|' \
+	    man/nginx.8 > debian/tengine.8
+	install -D -p -m 0644 debian/tengine.8 \
+		$(PKGDIR)/usr/share/man/man8/tengine.8
+	install -d -m 0700 $(PKGDIR)/var/cache/tengine
+	install -d -m 0755 $(PKGDIR)/var/log/tengine
+	install -d -m 0755 $(PKGDIR)/usr/lib/tengine/modules
+	# /run is a tmpfs; make install creates it because of --pid-path
+	rm -rf $(PKGDIR)/run $(PKGDIR)/var/run
+
+override_dh_installsystemd:
+	dh_installsystemd --name=tengine
+
+override_dh_clean:
+	dh_clean
+	rm -f debian/tengine.8
+	rm -rf objs

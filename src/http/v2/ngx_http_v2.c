@@ -1143,6 +1143,12 @@ ngx_http_v2_state_read_data(ngx_http_v2_connection_t *h2c, u_char *pos,
         buf->last = ngx_cpymem(buf->last, pos, size);
     }
 
+#if (T_NGX_HTTP_STAT_TIME)
+    if (r == r->main) {
+        r->stat_time.req_recv_finished_time = ngx_current_msec;
+    }
+#endif
+
     pos += size;
     h2c->state.length -= size;
 

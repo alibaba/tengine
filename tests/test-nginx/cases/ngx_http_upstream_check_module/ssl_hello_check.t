@@ -1,5 +1,19 @@
 # vi:filetype=perl
 
+# NOT run by CI, unlike the other cases in this directory. Two reasons:
+#
+#   1. every block drives www.alipay.com:443/444/445 and asserts on that site's
+#      HTML, so it needs third-party network reachability;
+#   2. the ssl_hello check sends a ClientHello that advertises client_version
+#      0x0300 (see sslv3_client_hello_pkt in ngx_http_upstream_check_module.c),
+#      which any TLS1.2+-only peer refuses with "version too low" -- including a
+#      local nginx TLS server, so the case cannot simply be pointed at 127.0.0.1
+#      either. Both www.alipay.com today and a local TLS backend leave every peer
+#      down, i.e. all non-502 blocks fail.
+#
+# Making this case CI-usable requires modernizing the ssl_hello ClientHello
+# first; keep running it by hand against a peer that still accepts SSLv3 hellos.
+
 use lib 'lib';
 use Test::Nginx::LWP;
 

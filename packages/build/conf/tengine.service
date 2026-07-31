@@ -1,0 +1,20 @@
+[Unit]
+Description=Tengine HTTP and reverse proxy server
+Documentation=https://tengine.taobao.org/
+After=network-online.target remote-fs.target nss-lookup.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/run/tengine.pid
+ExecStartPre=/usr/sbin/tengine -t
+ExecStart=/usr/sbin/tengine
+ExecReload=/usr/sbin/tengine -t
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

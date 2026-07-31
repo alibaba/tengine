@@ -144,6 +144,11 @@ struct ngx_http_upstream_rr_peers_s {
     ngx_uint_t                      init_number;
 #endif
 
+#if (T_NGX_HTTP_ROUND_ROBIN_OPT_ALI)
+    ngx_uint_t                      last_number;
+    ngx_http_upstream_rr_peer_t    *last_peer;
+#endif
+
     ngx_uint_t                      total_weight;
     ngx_uint_t                      tries;
 

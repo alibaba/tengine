@@ -1,5 +1,16 @@
 # vi:filetype=perl
 
+# Blocks whose expectation depends on a peer being up wait in "--- init" first:
+# peers start out down (default_down defaults to true) and the first check only
+# fires after a random delay of up to max(interval, 1s), while the framework
+# sends its request roughly 100ms after the server starts. Those blocks also use
+# a shorter check interval so the wait can stay short. Blocks that expect 502,
+# that bypass the checked upstream, or that have no check directive are left
+# untouched.
+#
+# The two www.taobao.com servers of the multi_server block were replaced with
+# 127.0.0.1 so the case no longer needs third-party network reachability.
+
 use lib 'lib';
 use Test::Nginx::LWP;
 use Test::Nginx::Socket;
@@ -16,7 +27,7 @@ __DATA__
 --- http_config
     upstream test{
         server 127.0.0.1:1970;
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -35,6 +46,7 @@ __DATA__
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -45,16 +57,16 @@ GET /
         server 127.0.0.1:1970;
         server 127.0.0.1:1971;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
 
     upstream foo{
-        server www.taobao.com:80;
-        server www.taobao.com:81;
+        server 127.0.0.1:1970;
+        server 127.0.0.1:1971;
 
-        check interval=3000 rise=1 fall=5 timeout=2000 type=http;
+        check interval=500 rise=1 fall=5 timeout=2000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -73,6 +85,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -167,7 +180,7 @@ GET /
         server 127.0.0.1:1970;
         ip_hash;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -186,6 +199,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -197,7 +211,7 @@ GET /
         server 127.0.0.1:1971;
         ip_hash;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -216,6 +230,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -346,7 +361,7 @@ GET /
         server 127.0.0.1:1970;
         least_conn;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -365,6 +380,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -376,7 +392,7 @@ GET /
         server 127.0.0.1:1971;
         least_conn;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -395,6 +411,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -517,7 +534,7 @@ GET /
     upstream test{
         server 127.0.0.1:1970;
         check_keepalive_requests 10;
-        check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+        check interval=500 rise=1 fall=1 timeout=1000 type=http;
         check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
         check_http_expect_alive http_2xx http_3xx;
     }
@@ -536,6 +553,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$

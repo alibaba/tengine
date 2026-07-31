@@ -1,0 +1,89 @@
+# Contributor: Tengine Team <tengine@taobao.net>
+# Maintainer: Tengine Team <tengine@taobao.net>
+#
+# Alpine (musl) package for Tengine.  Built by packages/build/build.sh, which
+# drops the source tarball next to this file and runs `abuild checksum && abuild -r`.
+#
+# _upstream_ver is the plain upstream version and must match the top level
+# directory inside the tarball; pkgver may additionally carry a _p<timestamp>
+# suffix injected by build.sh so every build is uniquely versioned.
+#
+pkgname=tengine
+_upstream_ver=3.2.0
+pkgver=3.2.0
+pkgrel=0
+pkgdesc="Tengine HTTP and reverse proxy server"
+url="https://tengine.taobao.org/"
+arch="all"
+license="BSD-2-Clause"
+makedepends="
+	linux-headers
+	openssl-dev
+	pcre2-dev
+	zlib-dev
+	"
+install="$pkgname.pre-install"
+subpackages="$pkgname-doc $pkgname-openrc"
+source="$pkgname-$_upstream_ver.tar.gz
+	tengine.openrc
+	tengine.logrotate
+	tengine.conf
+	default.conf
+	"
+builddir="$srcdir/$pkgname-$_upstream_ver"
+options="!check"	# no upstream test suite wired into the build
+
+build() {
+	# ngx_backtrace_module needs backtrace() from execinfo.h, which musl
+	# does not provide -- its config aborts configure outright, so keep it
+	# out of the Alpine feature set.
+	#
+	# The tree defaults to -Werror (auto/cc/gcc); relax it so an arbitrary
+	# gcc version cannot break packaging.
+	export TENGINE_LIBDIR=/usr/lib
+	export TENGINE_WITH_BACKTRACE=no
+
+	./configure \
+		$(sh packages/build/configure-args.sh) \
+		--with-cc-opt="$CFLAGS -Wno-error" \
+		--with-ld-opt="$LDFLAGS"
+
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+
+	# make install drops the stock nginx.conf plus *.default copies; replace
+	# them with the packaged tengine.conf so the shipped names stay consistent.
+	rm -f "$pkgdir"/etc/tengine/*.default
+	install -D -m 0644 "$srcdir"/tengine.conf \
+		"$pkgdir"/etc/tengine/tengine.conf
+	install -D -m 0644 "$srcdir"/default.conf \
+		"$pkgdir"/etc/tengine/conf.d/default.conf
+	install -D -m 0644 "$srcdir"/tengine.logrotate \
+		"$pkgdir"/etc/logrotate.d/tengine
+
+	sed -e 's|%%PREFIX%%|/usr/share/tengine|' \
+	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
+	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
+	    -e 's|%%ERROR_LOG_PATH%%|/var/log/tengine/error.log|' \
+	    man/nginx.8 > tengine.8
+	install -D -m 0644 tengine.8 \
+		"$pkgdir"/usr/share/man/man8/tengine.8
+
+	install -D -m 0755 "$srcdir"/tengine.openrc \
+		"$pkgdir"/etc/init.d/tengine
+
+	install -d -m 0700 -o tengine -g tengine "$pkgdir"/var/cache/tengine
+	install -d -m 0755 -o tengine -g tengine "$pkgdir"/var/log/tengine
+	install -d -m 0755 "$pkgdir"/usr/lib/tengine/modules
+
+	# /run is a tmpfs; make install creates it because of --pid-path
+	rm -rf "$pkgdir"/run "$pkgdir"/var/run
+
+	install -D -m 0644 LICENSE \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="SKIP"
