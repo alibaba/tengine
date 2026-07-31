@@ -29,6 +29,7 @@ PRINT_CHECKSUMS=no
 
 die() { printf '%s: error: %s\n' "${0##*/}" "$*" >&2; exit 1; }
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m==>\033[0m %s\n' "$*" >&2; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,13 +54,39 @@ else
     die "no sha256 tool found (need sha256sum, shasum or openssl)"
 fi
 
+DOWNLOAD_TRIES=3
+DOWNLOAD_DELAY=3
+
 if command -v curl >/dev/null 2>&1; then
-    download() { curl -fsSL -o "$2" "$1"; }
+    fetch_to() { curl -fsSL --connect-timeout 20 --retry 2 --retry-delay 2 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-    download() { wget -qO "$2" "$1"; }
+    fetch_to() { wget -q --timeout=20 --tries=2 --waitretry=2 -O "$2" "$1"; }
 else
     die "neither curl nor wget found"
 fi
+
+# Retrying in the shell rather than leaving it to curl: a truncated HTTP/2
+# stream exits 18, which --retry does not consider transient, and covering it
+# with --retry-all-errors would need curl 7.71 (newer than el7 ships).  Without
+# an outer retry a single network hiccup fails a whole packaging run.
+#
+# A failed attempt can leave a partial file behind, which the caller would then
+# hash as if it were complete, so drop it before retrying.
+download() {
+    _try=1
+    while :; do
+        if fetch_to "$1" "$2"; then
+            return 0
+        fi
+        rm -f "$2"
+        if [ "$_try" -ge "$DOWNLOAD_TRIES" ]; then
+            return 1
+        fi
+        warn "download failed, retrying in ${DOWNLOAD_DELAY}s ($_try/$DOWNLOAD_TRIES)"
+        _try=$((_try + 1))
+        sleep "$DOWNLOAD_DELAY"
+    done
+}
 
 mkdir -p "$OUTDIR"
 
