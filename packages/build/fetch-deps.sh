@@ -58,8 +58,12 @@ DOWNLOAD_TRIES=3
 DOWNLOAD_DELAY=3
 
 if command -v curl >/dev/null 2>&1; then
-    fetch_to() { curl -fsSL --connect-timeout 20 --retry 2 --retry-delay 2 -o "$2" "$1"; }
+    # $3 carries the per-attempt options chosen by download(); it is deliberately
+    # unquoted so that an empty value adds no argument at all.
+    # shellcheck disable=SC2086
+    fetch_to() { curl -fsSL --connect-timeout 20 --retry 2 --retry-delay 2 ${3:-} -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
+    # wget only speaks HTTP/1.1, so it ignores $3.
     fetch_to() { wget -q --timeout=20 --tries=2 --waitretry=2 -O "$2" "$1"; }
 else
     die "neither curl nor wget found"
@@ -75,7 +79,15 @@ fi
 download() {
     _try=1
     while :; do
-        if fetch_to "$1" "$2"; then
+        # Networks that truncate HTTP/2 streams are usually fine over HTTP/1.1,
+        # so retries drop to it.  The first attempt keeps HTTP/2, which is
+        # faster where it works.
+        if [ "$_try" = 1 ]; then
+            _opt=""
+        else
+            _opt="--http1.1"
+        fi
+        if fetch_to "$1" "$2" "$_opt"; then
             return 0
         fi
         rm -f "$2"
