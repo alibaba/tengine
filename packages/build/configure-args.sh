@@ -68,7 +68,15 @@ case "${1:-}" in
     --print-openssl-opt)
         # --api=1.1.1 keeps the deprecated 1.1.1 API visible (Tengine still
         # uses parts of it); enable-ntls is what ngx_tongsuo_ntls needs.
-        [ "$TENGINE_WITH_TONGSUO" = yes ] && printf '%s' '--api=1.1.1 enable-ntls'
+        #
+        # no-tests matters for build time: nginx's own OpenSSL rule
+        # (auto/lib/openssl/make) runs a full `make` before `make install_sw`,
+        # which would compile Tongsuo's entire test suite even though the
+        # package ships none of it. Costly everywhere, worst with an el7-era
+        # gcc. build-deps.sh skips them in the first Tongsuo pass for the same
+        # reason.
+        [ "$TENGINE_WITH_TONGSUO" = yes ] && \
+            printf '%s' '--api=1.1.1 enable-ntls no-tests'
         exit 0
         ;;
     --print-ld-opt)

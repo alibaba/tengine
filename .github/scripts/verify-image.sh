@@ -57,6 +57,9 @@ ok "tengine -t passes"
 # resty.core is required by ngx_http_lua_module at startup, and cjson is a
 # compiled C module, so this one request exercises both lua_package_path and
 # lua_package_cpath -- the two settings most likely to be wrong in a package.
+# The same request also names the regex engine: ngx_http_lua_module only gained
+# PCRE2 support in 0.10.26, and the distro packages all build against PCRE2, so
+# a downgrade of either would break the build again without this check.
 workdir=$(mktemp -d)
 cid=""
 # ${cid:-} because the trap can fire before the container is started.
@@ -70,7 +73,14 @@ server {
         content_by_lua_block {
             require "resty.core"
             local cjson = require "cjson"
-            ngx.say(cjson.encode({ lua = "ok", jit = jit and jit.version or "none" }))
+            -- An invalid pattern makes the regex engine name itself in the
+            -- error string: pcre2_compile() on PCRE2, pcre_compile() on PCRE1.
+            local _, re_err = ngx.re.match("x", "(")
+            ngx.say(cjson.encode({
+                lua = "ok",
+                jit = jit and jit.version or "none",
+                regex = re_err or "no error",
+            }))
         }
     }
 }
@@ -103,6 +113,10 @@ esac
 case "$lua_out" in
     *LuaJIT*) ok "LuaJIT is the Lua VM" ;;
     *)        fail "not running on LuaJIT: $lua_out" ;;
+esac
+case "$lua_out" in
+    *pcre2_compile*) ok "Lua regexes run on PCRE2" ;;
+    *)               fail "Lua regexes are not on PCRE2: $lua_out" ;;
 esac
 
 echo "all checks passed for $IMAGE"
