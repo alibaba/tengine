@@ -64,8 +64,11 @@ ngx_http_lua_ffi_get_resp_status(ngx_http_request_t *r)
 
 
 int
-ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int status)
+ngx_http_lua_ffi_set_resp_status_and_reason(ngx_http_request_t *r, int status,
+    const char *reason, size_t reason_len)
 {
+    u_char *buf;
+
     if (r->connection->fd == (ngx_socket_t) -1) {
         return NGX_HTTP_LUA_FFI_BAD_CONTEXT;
     }
@@ -74,6 +77,14 @@ ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int status)
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "attempt to set ngx.status after sending out "
                       "response headers");
+        return NGX_DECLINED;
+    }
+
+    /* per RFC-7230 sec 3.1.2, the status line must be 3 digits, it also makes
+     * buffer size calculation easier */
+    if (status < 100 || status > 999) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "invalid HTTP status code %d", status);
         return NGX_DECLINED;
     }
 
@@ -91,11 +102,30 @@ ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int status)
 
         ngx_str_set(&r->headers_out.status_line, "101 Switching Protocols");
 
+    } else if (reason != NULL && reason_len > 0) {
+        reason_len += 4; /* "ddd <reason>" */
+        buf = ngx_palloc(r->pool, reason_len);
+        if (buf == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "no memory");
+            return NGX_DECLINED;
+        }
+
+        ngx_snprintf(buf, reason_len, "%d %s", status, reason);
+        r->headers_out.status_line.len = reason_len;
+        r->headers_out.status_line.data = buf;
+
     } else {
         r->headers_out.status_line.len = 0;
     }
 
     return NGX_OK;
+}
+
+
+int
+ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int status)
+{
+    return ngx_http_lua_ffi_set_resp_status_and_reason(r, status, NULL, 0);
 }
 
 

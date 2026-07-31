@@ -52,6 +52,8 @@ ngx_str_t  ngx_http_lua_patch_method =
 ngx_str_t  ngx_http_lua_trace_method =
         ngx_http_lua_method_name("TRACE");
 
+ngx_str_t host_header = ngx_string("host");
+
 
 static ngx_str_t  ngx_http_lua_content_length_header_key =
     ngx_string("Content-Length");
@@ -60,10 +62,10 @@ static ngx_str_t  ngx_http_lua_content_length_header_key =
 static ngx_int_t ngx_http_lua_adjust_subrequest(ngx_http_request_t *sr,
     ngx_uint_t method, int forward_body,
     ngx_http_request_body_t *body, unsigned vars_action,
-    ngx_array_t *extra_vars);
+    ngx_array_t *extra_vars, ngx_array_t *extra_headers);
 static int ngx_http_lua_ngx_location_capture(lua_State *L);
 static int ngx_http_lua_ngx_location_capture_multi(lua_State *L);
-static void ngx_http_lua_process_vars_option(ngx_http_request_t *r,
+static void ngx_http_lua_process_keyval_option(ngx_http_request_t *r,
     lua_State *L, int table, ngx_array_t **varsp);
 static ngx_int_t ngx_http_lua_subrequest_add_extra_vars(ngx_http_request_t *r,
     ngx_array_t *extra_vars);
@@ -77,7 +79,7 @@ static void ngx_http_lua_cancel_subreq(ngx_http_request_t *r);
 static ngx_int_t ngx_http_post_request_to_head(ngx_http_request_t *r);
 static ngx_int_t ngx_http_lua_copy_in_file_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_lua_copy_request_headers(ngx_http_request_t *sr,
-    ngx_http_request_t *pr, int pr_not_chunked);
+    ngx_http_request_t *pr, int pr_not_chunked, ngx_array_t *extra_headers);
 
 
 enum {
@@ -125,6 +127,7 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
     ngx_http_lua_ctx_t              *sr_ctx;
     ngx_http_lua_ctx_t              *ctx;
     ngx_array_t                     *extra_vars;
+    ngx_array_t                     *extra_headers;
     ngx_str_t                        uri;
     ngx_str_t                        args;
     ngx_str_t                        extra_args;
@@ -170,12 +173,11 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
         return luaL_error(L, "no request object found");
     }
 
-#if (NGX_HTTP_V2)
-    if (r->main->stream) {
-        return luaL_error(L, "http2 requests not supported yet");
-    }
-#endif
-
+/*
+ * Upstream dropped its HTTP/2 guard here once subrequests worked over v2.
+ * The xquic HTTP/3 path is a separate implementation that never got that
+ * work, so it keeps rejecting instead of silently misbehaving.
+ */
 #if (T_NGX_XQUIC)
     if (r->main->xqstream) {
         return luaL_error(L, "http3 requests not supported yet");
@@ -228,6 +230,7 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
     coctx->pending_subreqs = 0;
 
     extra_vars = NULL;
+    extra_headers = NULL;
 
     for (index = 0; index < nsubreqs; index++) {
         coctx->pending_subreqs++;
@@ -265,6 +268,11 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
         if (extra_vars != NULL) {
             /* flush out existing elements in the array */
             extra_vars->nelts = 0;
+        }
+
+        if (extra_headers != NULL) {
+            /* flush out existing elements in the array */
+            extra_headers->nelts = 0;
         }
 
         vars_action = 0;
@@ -322,7 +330,7 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
 
             switch (lua_type(L, -1)) {
             case LUA_TTABLE:
-                ngx_http_lua_process_vars_option(r, L, -1, &extra_vars);
+                ngx_http_lua_process_keyval_option(r, L, -1, &extra_vars);
 
                 dd("post process vars top: %d", lua_gettop(L));
                 break;
@@ -336,6 +344,29 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
             }
 
             lua_pop(L, 1);
+
+            dd("queries query uri opts: %d", lua_gettop(L));
+
+            /* check the headers option */
+
+            lua_getfield(L, 4, "headers");
+
+            switch (lua_type(L, -1)) {
+            case LUA_TTABLE:
+                ngx_http_lua_process_keyval_option(r, L, -1, &extra_headers);
+
+                dd("post process vars top: %d", lua_gettop(L));
+                break;
+
+            case LUA_TNIL:
+                /* do nothing */
+                break;
+
+            default:
+                return luaL_error(L, "Bad headers option value");
+            }
+
+            lua_pop(L, 1); /* pop the headers */
 
             dd("queries query uri opts: %d", lua_gettop(L));
 
@@ -599,7 +630,8 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
         ngx_http_set_ctx(sr, sr_ctx, ngx_http_lua_module);
 
         rc = ngx_http_lua_adjust_subrequest(sr, method, always_forward_body,
-                                            body, vars_action, extra_vars);
+                                            body, vars_action, extra_vars,
+                                            extra_headers);
 
         if (rc != NGX_OK) {
             ngx_http_lua_cancel_subreq(sr);
@@ -635,7 +667,7 @@ ngx_http_lua_ngx_location_capture_multi(lua_State *L)
 static ngx_int_t
 ngx_http_lua_adjust_subrequest(ngx_http_request_t *sr, ngx_uint_t method,
     int always_forward_body, ngx_http_request_body_t *body,
-    unsigned vars_action, ngx_array_t *extra_vars)
+    unsigned vars_action, ngx_array_t *extra_vars, ngx_array_t *extra_headers)
 {
     ngx_http_request_t          *r;
     ngx_http_core_main_conf_t   *cmcf;
@@ -671,7 +703,9 @@ ngx_http_lua_adjust_subrequest(ngx_http_request_t *sr, ngx_uint_t method,
         }
     }
 
-    if (ngx_http_lua_copy_request_headers(sr, r, pr_not_chunked) != NGX_OK) {
+    if (ngx_http_lua_copy_request_headers(sr, r, pr_not_chunked, extra_headers)
+        != NGX_OK)
+    {
         return NGX_ERROR;
     }
 
@@ -886,7 +920,7 @@ ngx_http_lua_subrequest_add_extra_vars(ngx_http_request_t *sr,
 
 
 static void
-ngx_http_lua_process_vars_option(ngx_http_request_t *r, lua_State *L,
+ngx_http_lua_process_keyval_option(ngx_http_request_t *r, lua_State *L,
     int table, ngx_array_t **varsp)
 {
     ngx_array_t         *vars;
@@ -1653,10 +1687,11 @@ ngx_http_lua_copy_in_file_request_body(ngx_http_request_t *r)
 
 static ngx_int_t
 ngx_http_lua_copy_request_headers(ngx_http_request_t *sr,
-    ngx_http_request_t *pr, int pr_not_chunked)
+    ngx_http_request_t *pr, int pr_not_chunked, ngx_array_t *extra_headers)
 {
     ngx_table_elt_t                 *clh, *header;
     ngx_list_part_t                 *part;
+    ngx_keyval_t                    *header_keyval;
     ngx_chain_t                     *in;
     ngx_uint_t                       i;
     u_char                          *p;
@@ -1687,6 +1722,9 @@ ngx_http_lua_copy_request_headers(ngx_http_request_t *sr,
 
         clh->hash = ngx_http_lua_content_length_hash;
         clh->key = ngx_http_lua_content_length_header_key;
+#if defined(nginx_version) && nginx_version >= 1023000
+        clh->next = NULL;
+#endif
         clh->lowcase_key = ngx_pnalloc(sr->pool, clh->key.len);
         if (clh->lowcase_key == NULL) {
             return NGX_ERROR;
@@ -1716,6 +1754,17 @@ ngx_http_lua_copy_request_headers(ngx_http_request_t *sr,
     part = &pr->headers_in.headers.part;
     header = part->elts;
 
+#if (NGX_HTTP_V3)
+    if (pr->headers_in.server.data != NULL) {
+        if (ngx_http_lua_set_input_header(sr, host_header,
+                                          pr->headers_in.server, 0)
+            == NGX_ERROR)
+        {
+            return NGX_ERROR;
+        }
+    }
+#endif
+
     for (i = 0; /* void */; i++) {
 
         if (i >= part->nelts) {
@@ -1743,6 +1792,20 @@ ngx_http_lua_copy_request_headers(ngx_http_request_t *sr,
                                           header[i].value, 0) == NGX_ERROR)
         {
             return NGX_ERROR;
+        }
+    }
+
+    if (extra_headers && extra_headers->nelts > 0) {
+
+        header_keyval = extra_headers->elts;
+
+        for (i = 0; i < extra_headers->nelts; i++, header_keyval++) {
+
+            if (ngx_http_lua_set_input_header(sr, header_keyval->key,
+                                        header_keyval->value, 1) == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
         }
     }
 

@@ -70,6 +70,18 @@ ngx_http_lua_ffi_var_get(ngx_http_request_t *r, u_char *name_data,
     }
 #endif
 
+#if (NGX_HTTP_V3)
+    if (name_len == 9
+        && r->http_version == NGX_HTTP_VERSION_30
+        && ngx_strncasecmp(name_data, (u_char *) "http_host", 9) == 0
+        && r->headers_in.server.data != NULL)
+    {
+        *value = r->headers_in.server.data;
+        *value_len = r->headers_in.server.len;
+        return NGX_OK;
+    }
+#endif
+
     hash = ngx_hash_strlow(lowcase_buf, name_data, name_len);
 
     name.data = lowcase_buf;

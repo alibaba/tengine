@@ -722,16 +722,14 @@ ngx_http_lua_ngx_send_headers(lua_State *L)
                                | NGX_HTTP_LUA_CONTEXT_ACCESS
                                | NGX_HTTP_LUA_CONTEXT_CONTENT);
 
-    if (!r->header_sent && !ctx->header_sent) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua send headers");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "lua send headers");
 
-        rc = ngx_http_lua_send_header_if_needed(r, ctx);
-        if (rc == NGX_ERROR || rc > NGX_OK) {
-            lua_pushnil(L);
-            lua_pushliteral(L, "nginx output filter error");
-            return 2;
-        }
+    rc = ngx_http_lua_send_header_if_needed(r, ctx);
+    if (rc == NGX_ERROR || rc > NGX_OK) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "nginx output filter error");
+        return 2;
     }
 
     lua_pushinteger(L, 1);
