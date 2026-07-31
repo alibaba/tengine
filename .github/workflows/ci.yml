@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+   # Explicit job name so the reported status check is unique across workflows:
+   # test-nginx-core.yml and test-ntls.yml declare a job with the same id, and
+   # required status checks are matched by name only, without a workflow prefix.
+   name: test tengine (${{ matrix.compiler.compiler }})
    runs-on: "ubuntu-24.04"
    strategy:
      fail-fast: false
@@ -120,10 +124,16 @@ jobs:
          mkdir t
          PATH=/usr/local/nginx/sbin:$PATH \
          prove -v -Itest-nginx/lib cases/
-         # health-check keepalive body-drain integration test lives in a subdir;
-         # the cases/ prove above is non-recursive, so invoke it explicitly
+         # the cases/ prove above is non-recursive, so the upstream_check cases
+         # live in a subdir that was never exercised; invoke them explicitly.
+         # ssl_hello_check.t stays out on purpose -- see the note in that file.
          PATH=/usr/local/nginx/sbin:$PATH \
-         prove -v -Itest-nginx/lib cases/ngx_http_upstream_check_module/http_check_keepalive_body.t
+         prove -v -Itest-nginx/lib \
+           cases/ngx_http_upstream_check_module/http_check.t \
+           cases/ngx_http_upstream_check_module/http_check_keepalive_body.t \
+           cases/ngx_http_upstream_check_module/tcp_check.t \
+           cases/ngx_http_upstream_check_module/websocket.t \
+           cases/ngx_http_upstream_check_module/check_interface.t
      - name: upstream check HTTP parser unit tests
        run: |
          make -C modules/ngx_http_upstream_check_module/tests
@@ -134,6 +144,7 @@ jobs:
   # (has('tunnel') is true here) instead of being skipped. The two CONNECT
   # implementations cannot be linked together, so this must be its own job.
   native-tunnel-test:
+   name: test tengine native tunnel
    runs-on: "ubuntu-24.04"
    steps:
      - uses: actions/checkout@v3

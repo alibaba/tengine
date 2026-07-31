@@ -1,0 +1,26 @@
+Source: tengine
+Section: httpd
+Priority: optional
+Maintainer: Tengine Team <tengine@taobao.net>
+Build-Depends: debhelper (>= 10),
+               libssl-dev,
+               zlib1g-dev,
+               libpcre2-dev | libpcre3-dev
+Standards-Version: 4.5.1
+Homepage: https://tengine.taobao.org/
+Vcs-Git: https://github.com/alibaba/tengine.git
+Vcs-Browser: https://github.com/alibaba/tengine
+
+Package: tengine
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, adduser, logrotate
+Provides: httpd
+Description: Tengine HTTP and reverse proxy server
+ Tengine is a web server originated by Taobao. It is based on the nginx HTTP
+ server and adds many advanced features such as dynamic module loading,
+ upstream health checks, session sticky load balancing, request statistics
+ and consistent hashing.
+ .
+ This package ships the server as /usr/sbin/tengine configured through
+ /etc/tengine/tengine.conf, which keeps it independent from any nginx
+ package installed on the same host.

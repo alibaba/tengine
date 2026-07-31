@@ -7,7 +7,15 @@ on:
 
 jobs:
   build-arm64:
+    name: build arm64 (${{ matrix.compiler.compiler }})
     runs-on: "ubuntu-24.04"
+    # run-on-arch-action caches its QEMU aarch64 image in GHCR when githubToken
+    # is set. Declare the scopes explicitly: with a read-only default token the
+    # cache push fails silently (the action swallows it) and every run rebuilds
+    # the base image from scratch.
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:

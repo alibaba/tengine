@@ -1,5 +1,13 @@
 # vi:filetype=perl
 
+# Blocks whose expectation depends on a peer being up wait in "--- init" first:
+# peers start out down (default_down defaults to true) and the first check only
+# fires after a random delay of up to max(interval, 1s), while the framework
+# sends its request roughly 100ms after the server starts. Those blocks also use
+# a shorter check interval so the wait can stay short. Blocks that expect 502,
+# that bypass the checked upstream, or that have no check directive are left
+# untouched.
+
 use lib 'lib';
 use Test::Nginx::LWP;
 
@@ -335,7 +343,7 @@ upstream backend {
     server 127.0.0.1:1974;
     server 127.0.0.1:1975;
 
-    check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+    check interval=500 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
 }
@@ -358,6 +366,7 @@ server {
         check_status html;
     }
 
+--- init: sleep 2;
 --- request
 GET /status?format=csv&status=up
 --- response_headers
@@ -374,7 +383,7 @@ upstream backend {
     server 127.0.0.1:1974;
     server 127.0.0.1:1975;
 
-    check interval=3000 rise=1 fall=1 timeout=1000 type=http;
+    check interval=500 rise=1 fall=1 timeout=1000 type=http;
     check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
 }
@@ -397,6 +406,7 @@ server {
         check_status csv;
     }
 
+--- init: sleep 2;
 --- request
 GET /status?format=json&status=down
 --- response_headers
@@ -413,7 +423,7 @@ upstream backend {
     server 127.0.0.1:1974;
     server 127.0.0.1:1975;
 
-    check interval=3000 rise=1 fall=1 timeout=2000 type=http;
+    check interval=500 rise=1 fall=1 timeout=2000 type=http;
     check_http_send "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n";
     check_http_expect_alive http_2xx http_3xx;
 }
@@ -436,6 +446,7 @@ server {
         check_status json;
     }
 
+--- init: sleep 2;
 --- request
 GET /status?format=html&status=up
 --- response_headers

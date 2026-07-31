@@ -1,0 +1,115 @@
+name: package tengine
+
+# Builds native packages for the mainstream distro images. Manual/tag only:
+# the matrix compiles Tengine once per target, which is too heavy for every push.
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: 'RPM dist tag override (e.g. .el7u2), empty for distro default'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'tengine-*'
+
+jobs:
+  # A single timestamp for the whole run: the matrix jobs run on separate
+  # runners, so each computing its own date would give every artifact a
+  # different Release.
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      timestamp: ${{ steps.ts.outputs.value }}
+    steps:
+      - name: pin build timestamp
+        id: ts
+        run: echo "value=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: prepare
+    # aarch64 runs on native ARM runners: QEMU emulation would make a single
+    # Tengine compile take 5-10x longer and risk the job timeout.
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    # CentOS 7 is EOL: its mirrors moved to vault.centos.org, whose main tree
+    # is x86_64-only -- the aarch64 archive lives under a different /altarch
+    # path that the bootstrap rewrite does not cover, so that one combination
+    # can never succeed and is exempted. el7 x86_64 is NOT exempted: the source
+    # tree still carries full OpenSSL 1.0.2 fallbacks and no gnu89-invalid
+    # syntax, so it is expected to build and a failure there is real news.
+    continue-on-error: ${{ matrix.target == 'el7' && matrix.arch == 'aarch64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+        target:
+          - el7
+          - el8
+          - el9
+          - el10
+          - anolis8
+          - openeuler2403
+          - sles15
+          - debian11
+          - debian12
+          - ubuntu2204
+          - ubuntu2404
+          - alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner architecture already selects the image variant, so no
+      # --platform is needed here.
+      - name: build ${{ matrix.target }} (${{ matrix.arch }})
+        run: |
+          packages/build/build.sh docker ${{ matrix.target }} \
+            --timestamp ${{ needs.prepare.outputs.timestamp }} \
+            ${{ inputs.dist_tag && format('--dist {0}', inputs.dist_tag) || '' }}
+
+      - name: list artifacts
+        run: ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tengine-${{ matrix.target }}-${{ matrix.arch }}
+          path: |
+            dist/*.rpm
+            dist/*.deb
+            dist/*.apk
+          if-no-files-found: error
+
+  # Smoke-test one RPM and one DEB per architecture: install the package, then
+  # check the binary name, the config path and that the config actually parses.
+  verify:
+    needs: package
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64,  target: el9,        image: 'rockylinux:9', kind: rpm }
+          - { arch: aarch64, target: el9,        image: 'rockylinux:9', kind: rpm }
+          - { arch: x86_64,  target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
+          - { arch: aarch64, target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tengine-${{ matrix.target }}-${{ matrix.arch }}
+          path: pkgs
+
+      - name: install and check (${{ matrix.kind }}, ${{ matrix.arch }})
+        run: |
+          docker run --rm -v "$PWD/pkgs:/pkgs:ro" ${{ matrix.image }} sh -euc '
+            export DEBIAN_FRONTEND=noninteractive
+            # `uname -m` keeps the glob off the .src.rpm that rpmbuild -ba emits
+            case "${{ matrix.kind }}" in
+                rpm) dnf -y install /pkgs/*."$(uname -m)".rpm ;;
+                deb) apt-get update -qq && apt-get install -y /pkgs/*.deb ;;
+            esac
+            test -x /usr/sbin/tengine
+            test -f /etc/tengine/tengine.conf
+            /usr/sbin/tengine -V
+            /usr/sbin/tengine -t
+          '
