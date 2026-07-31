@@ -18,17 +18,23 @@
 #                    openeuler2403 sles15 debian11 debian12 ubuntu2204
 #                    ubuntu2404 alpine
 #
+# Tongsuo (NTLS), xquic (QUIC/HTTP-3) and the Lua stack are part of the default
+# feature set. Their sources are pinned in packages/build/deps.env, downloaded
+# once into <outdir>/deps by fetch-deps.sh and handed to every recipe as a
+# single tengine-deps.tar.gz, so all targets compile identical dependencies.
+#
 # Options:
 #     --outdir DIR      artifact directory                  [./dist]
 #     --dist .el7u2     RPM dist tag override               [rpm default]
 #     --timestamp TS    release timestamp                   [now]
-#     --with FEATURE    zstd | lua | geoip (repeatable)     [none]
+#     --with FEATURE    zstd | geoip (repeatable)           [none]
+#     --without FEATURE tongsuo | xquic | lua (repeatable)  [none]
 #     --platform ARCH   docker --platform, e.g. linux/arm64
 #     --keep            keep intermediate build trees
 #
 # Produced artifacts land in --outdir, e.g.
 #     tengine-3.2.0-20260604232239.el7u2.x86_64.rpm
-#     tengine_3.2.0-20260604232239_amd64.deb
+#     tengine_3.2.0-20260604232239~bookworm_amd64.deb
 #     tengine-3.2.0_p20260604232239-r0.apk
 #
 # Written in POSIX sh on purpose: it re-executes itself inside bare distro
@@ -44,9 +50,11 @@ OUTDIR="$SRC_ROOT/dist"
 DIST_TAG=""
 BUILD_TS=""
 FEATURES=""
+DISABLED=""
 PLATFORM=""
 KEEP_BUILDDIR=no
 TARBALL=""
+DEPS_TARBALL=""
 
 die() { printf '%s: error: %s\n' "${0##*/}" "$*" >&2; exit 1; }
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -100,6 +108,7 @@ while [ $# -gt 0 ]; do
         --dist)      DIST_TAG=$2; shift 2 ;;
         --timestamp) BUILD_TS=$2; shift 2 ;;
         --with)      FEATURES="$FEATURES $2"; shift 2 ;;
+        --without)   DISABLED="$DISABLED $2"; shift 2 ;;
         --platform)  PLATFORM=$2; shift 2 ;;
         --keep)      KEEP_BUILDDIR=yes; shift ;;
         -h|--help)   usage 0 ;;
@@ -143,17 +152,42 @@ make_tarball() {
     rm -rf "$stage"
 }
 
+# Downloads (or reuses) the pinned dependency sources and wraps them into one
+# tarball that the rpm/deb/apk recipes take as a single extra source.
+make_deps_tarball() {
+    DEPS_TARBALL="$OUTDIR/tengine-deps.tar.gz"
+
+    sh "$SELF_DIR/fetch-deps.sh" --outdir "$OUTDIR/deps"
+
+    stage="$OUTDIR/.deps-stage"
+    rm -rf "$stage"
+    mkdir -p "$stage/deps"
+    cp "$OUTDIR"/deps/*.tar.gz "$stage/deps/"
+
+    info "staging dependency sources -> $DEPS_TARBALL"
+    tar -czf "$DEPS_TARBALL" -C "$stage" deps
+    rm -rf "$stage"
+}
+
+# Translates --without switches into build-deps.sh / rpmbuild arguments.
+deps_disable_args() {
+    for f in $DISABLED; do
+        printf ' --without-%s' "$f"
+    done
+}
+
 # ------------------------------------------------------------------ rpm build
 
 build_rpm() {
     command -v rpmbuild >/dev/null || die "rpmbuild not found (install rpm-build)"
     make_tarball
+    make_deps_tarball
 
     rpmtop="$OUTDIR/rpmbuild"
     rm -rf "$rpmtop"
     mkdir -p "$rpmtop/BUILD" "$rpmtop/BUILDROOT" "$rpmtop/RPMS" \
              "$rpmtop/SRPMS" "$rpmtop/SOURCES" "$rpmtop/SPECS"
-    cp "$TARBALL" "$rpmtop/SOURCES/"
+    cp "$TARBALL" "$DEPS_TARBALL" "$rpmtop/SOURCES/"
     cp "$SELF_DIR/rpm/tengine.spec" "$rpmtop/SPECS/"
 
     # Rich dependencies -- "(a or b)" -- need rpm >= 4.13. Ask the running rpm
@@ -188,6 +222,9 @@ build_rpm() {
     for f in $FEATURES; do
         set -- "$@" --with "$f"
     done
+    for f in $DISABLED; do
+        set -- "$@" --without "$f"
+    done
 
     info "rpmbuild tengine-$TENGINE_VERSION-${BUILD_TS}${DIST_TAG}"
     rpmbuild -ba "$@" "$rpmtop/SPECS/tengine.spec"
@@ -204,23 +241,32 @@ build_deb() {
     command -v dpkg-buildpackage >/dev/null || \
         die "dpkg-buildpackage not found (install build-essential debhelper)"
     make_tarball
+    make_deps_tarball
 
     work="$OUTDIR/debbuild"
     debtop="$work/tengine-$TENGINE_VERSION"
-    debversion="$TENGINE_VERSION-$BUILD_TS"
-
-    rm -rf "$work"
-    mkdir -p "$work"
-    tar -xzf "$TARBALL" -C "$work"
-
-    cp -R "$SELF_DIR/deb/debian" "$debtop/debian"
-    cp "$SELF_DIR/conf/tengine.service"   "$debtop/debian/tengine.service"
-    cp "$SELF_DIR/conf/tengine.logrotate" "$debtop/debian/tengine.logrotate"
 
     suite=unstable
     if [ -r /etc/os-release ]; then
         suite=$(. /etc/os-release; echo "${VERSION_CODENAME:-unstable}")
     fi
+
+    # The distro codename belongs in the version: neither the deb version nor
+    # the file name carries one otherwise, so debian11/debian12/ubuntu2204/
+    # ubuntu2404 would all produce a byte-identical file name and apt could not
+    # tell the builds apart. "~" sorts lower than no suffix at all, which is the
+    # Debian convention for this.
+    debversion="$TENGINE_VERSION-$BUILD_TS~$suite"
+
+    rm -rf "$work"
+    mkdir -p "$work"
+    tar -xzf "$TARBALL" -C "$work"
+    # debian/rules reads the dependency sources from deps/ in the source tree.
+    tar -xzf "$DEPS_TARBALL" -C "$debtop"
+
+    cp -R "$SELF_DIR/deb/debian" "$debtop/debian"
+    cp "$SELF_DIR/conf/tengine.service"   "$debtop/debian/tengine.service"
+    cp "$SELF_DIR/conf/tengine.logrotate" "$debtop/debian/tengine.logrotate"
 
     sed -e "s|@VERSION@|$debversion|" \
         -e "s|@UPSTREAM_VERSION@|$TENGINE_VERSION|" \
@@ -245,6 +291,7 @@ build_deb() {
 build_apk() {
     command -v abuild >/dev/null || die "abuild not found (apk add alpine-sdk)"
     make_tarball
+    make_deps_tarball
 
     work="$OUTDIR/apkbuild"
     rm -rf "$work"
@@ -254,7 +301,7 @@ build_apk() {
     cp "$SELF_DIR/conf/tengine.openrc" "$SELF_DIR/conf/tengine.logrotate" \
        "$SELF_DIR/conf/tengine.conf" "$work/"
     cp "$SELF_DIR/conf/conf.d/default.conf" "$work/"
-    cp "$TARBALL" "$work/"
+    cp "$TARBALL" "$DEPS_TARBALL" "$work/"
 
     # pkgver carries the build timestamp as an apk post-release suffix so
     # repeated builds of one upstream version stay distinguishable.
@@ -294,32 +341,38 @@ detect_family() {
 # ------------------------------------------------------------ docker dispatch
 
 # Commands that turn a bare distro image into a working build host.
+#
+# The full feature set adds three build-time needs on every platform: CMake
+# (>= 3.5, for xquic), a C++ compiler (xquic links libstdc++) and Perl (Tongsuo
+# configures itself with it). curl is needed to fetch the dependency sources
+# when the caller did not prime <outdir>/deps beforehand.
 bootstrap_cmd() {
     case "$1" in
         rpm)
             cat <<'EOS'
 if command -v dnf >/dev/null 2>&1; then
     if dnf -q list pcre2-devel >/dev/null 2>&1; then _pcre=pcre2-devel; else _pcre=pcre-devel; fi
-    dnf -y install rpm-build gcc make tar findutils diffutils \
-        openssl-devel zlib-devel systemd "$_pcre"
+    dnf -y install rpm-build gcc gcc-c++ make cmake tar findutils diffutils curl \
+        perl-interpreter perl-FindBin openssl-devel zlib-devel systemd "$_pcre"
 else
     # CentOS 7 is EOL; its mirrors moved to vault.centos.org
     sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
            -e 's|^#*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' \
            /etc/yum.repos.d/CentOS-*.repo
-    yum -y install rpm-build gcc make tar findutils diffutils \
-        openssl-devel zlib-devel pcre-devel systemd
+    # el7's "cmake" is 2.8; xquic needs the separate cmake3 package.
+    yum -y install rpm-build gcc gcc-c++ make cmake3 tar findutils diffutils curl \
+        perl openssl-devel zlib-devel pcre-devel systemd
 fi
 EOS
             ;;
         sles)
-            echo 'zypper --non-interactive --no-gpg-checks install rpm-build gcc make tar findutils libopenssl-devel zlib-devel pcre2-devel systemd-rpm-macros'
+            echo 'zypper --non-interactive --no-gpg-checks install rpm-build gcc gcc-c++ make cmake tar findutils curl perl libopenssl-devel zlib-devel pcre2-devel systemd-rpm-macros'
             ;;
         deb)
-            echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper libssl-dev zlib1g-dev libpcre2-dev'
+            echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev'
             ;;
         apk)
-            echo 'apk add --no-cache alpine-sdk linux-headers openssl-dev pcre2-dev zlib-dev'
+            echo 'apk add --no-cache alpine-sdk cmake perl curl linux-headers openssl-dev pcre2-dev zlib-dev'
             ;;
     esac
 }
@@ -344,6 +397,9 @@ run_docker_target() {
     fi
     for f in $FEATURES; do
         inner="$inner --with $f"
+    done
+    for f in $DISABLED; do
+        inner="$inner --without $f"
     done
 
     set -- run --rm
@@ -377,6 +433,11 @@ case "$ACTION" in
         esac
         ;;
     docker)
+        # Prime the dependency cache on the host: --outdir is bind mounted into
+        # every container as /out, so the targets all reuse this one download
+        # instead of racing to fetch the same tarballs.
+        sh "$SELF_DIR/fetch-deps.sh" --outdir "$OUTDIR/deps"
+
         if [ "$DOCKER_TARGET" = all ]; then
             failed=""
             for t in $ALL_TARGETS; do

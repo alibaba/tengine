@@ -1,3 +1,139 @@
+Changes with Tengine 3.2.0                                         31 Jul 2026
+
+    *) Security: fixed CVE-2026-49975, HPACK/QPACK header decompression bomb
+       in HTTP/1, HTTP/2 and HTTP/3 (lianglli)
+
+    *) Security: fixed CVE-2026-9256, heap buffer overflow with overlapping
+       captures in ngx_http_rewrite_module (lianglli)
+
+    *) Security: fixed CVE-2026-42945, escaping issue and possible buffer
+       overrun in ngx_http_rewrite_module (drawing)
+
+    *) Security: fixed CVE-2026-42946, buffer overread when parsing a split
+       status line in ngx_http_scgi_module and ngx_http_uwsgi_module
+       (drawing)
+
+    *) Security: fixed CVE-2026-42934, buffer overread in recode_from_utf8()
+       of ngx_http_charset_module (drawing)
+
+    *) Security: fixed CVE-2026-40701, use-after-free in the OCSP resolver
+       of ngx_http_ssl_module (drawing)
+
+    *) Security: fixed CVE-2026-1642, a premature plain text response from
+       an SSL backend was parsed before the handshake (drawing)
+
+    *) Security: fixed an out-of-bounds read in mod_dubbo (orbisai0security)
+
+    *) Feature: add new module ngx_zstd for Zstandard response compression
+       and serving pre-compressed static files (lianglli)
+
+    *) Feature: add new module ngx_http_upstream_iwrr_module, a weighted
+       round-robin with O(1) time and O(n) memory (jizhuozhi)
+
+    *) Feature: add new module ngx_http_append_header_module for appending
+       content to the response body (lianglli)
+
+    *) Feature: HTTP/3 connection management and multiplexing, for lower
+       latency and higher resilience to packet loss on unstable networks
+       [XQUIC] (lianglli)
+
+    *) Feature: dynamically configure failover to a backup upstream or a
+       redirect by response status code, with the new variable
+       $ingress_failover_count [tengine-ingress] (lianglli)
+
+    *) Feature: add request and upstream timing statistics variables, e.g.
+       $request_recv_time, $response_send_time, $server_rt and
+       $upstream_first_pkg_time (lianglli)
+
+    *) Feature: add new variable $request_start_time (drawing)
+
+    *) Feature: add new directives proxy_sndbuf_size and proxy_rcvbuf_size
+       (drawing)
+
+    *) Feature: add new directive pipe_size to set the pipe buffer size of
+       asynchronous log (drawing)
+
+    *) Feature: optimize round-robin peer selection for large upstreams,
+       with the new directive rr_discarded_range (lianglli)
+
+    *) Feature: return 502 instead of 500 when an upstream group has no
+       available server, with the new directive
+       upstream_change_no_server_status (lianglli)
+
+    *) Feature: log the client SNI server name in SSL handshake errors
+       (lianglli)
+
+    *) Feature: add escape/unescape support for
+       application/x-www-form-urlencoded (lianglli)
+
+    *) Feature: preserve the original request method name on
+       X-Accel-Redirect (lianglli)
+
+    *) Feature: add new option --with-http_dup_host to allow duplicate Host
+       request headers (lianglli)
+
+    *) Feature: add distribution packages (rpm, deb and apk) and multi-arch
+       container images, built with the full feature set - Tongsuo, xquic
+       and Lua (lianglli)
+
+    *) Feature: add new option --with-xquic-rpath to decouple the xquic
+       runtime path from the link path (lianglli)
+
+    *) Change: update core to Nginx-1.31.3 (lianglli)
+
+    *) Change: use BBR instead of CUBIC as the default congestion control
+       [XQUIC] (lurker-Chen)
+
+    *) Change: build ngx_http_tunnel_module optionally, to avoid conflicting
+       with ngx_http_proxy_connect_module (lianglli)
+
+    *) Change: merge the upstream nginx test suite and add Tengine test
+       cases (lianglli)
+
+    *) Bugfix: drain the HTTP health-check response body for keepalive-safe
+       connection reuse in ngx_http_upstream_check_module (lianglli)
+
+    *) Bugfix: fixed duplicate peer linking in round-robin init, which made
+       a backup peer link to itself (lianglli)
+
+    *) Bugfix: fixed division by zero in the random load balancing init for
+       empty peer groups (lianglli)
+
+    *) Bugfix: fixed round-robin skipping the first peer on initial
+       selection (lianglli)
+
+    *) Bugfix: keep the resolver address order for dynamically resolved
+       upstream peers (lianglli)
+
+    *) Bugfix: fixed ssl_protocols selection for virtual servers with SNI
+       (lianglli)
+
+    *) Bugfix: check the OCSP status in the client certificate verify
+       callback (lianglli)
+
+    *) Bugfix: always build the server_names hash for SNI matching in the
+       Stream module (lianglli)
+
+    *) Bugfix: the server_tag directive was ignored in HTTP/2 and HTTP/3
+       responses (drawing)
+
+    *) Bugfix: fixed the $ssl_handshake_time variable in HTTP/3 (drawing)
+
+    *) Bugfix: fixed closing the request after the upstream finished in
+       HTTP/3 [XQUIC] (lurker-Chen)
+
+    *) Bugfix: fixed 504 of ngx.location.capture in ngx_http_lua_module
+       (YeLi)
+
+    *) Bugfix: adapted the HTTP/3 XQUIC module to the xquic v1.9.1 API
+       (drawing)
+
+    *) Bugfix: fixed the ssl_certificate_compression build with Tongsuo
+       (lianglli)
+
+    *) Bugfix: set the pipe buffer size only on Linux (drawing)
+
+
 Changes with Tengine 3.1.0                                         27 Oct 2023
 
     *) Security: fixed HTTP2 CVE-2023-44487 [lianglli]

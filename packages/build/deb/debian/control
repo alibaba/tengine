@@ -5,7 +5,10 @@ Maintainer: Tengine Team <tengine@taobao.net>
 Build-Depends: debhelper (>= 10),
                libssl-dev,
                zlib1g-dev,
-               libpcre2-dev | libpcre3-dev
+               libpcre2-dev | libpcre3-dev,
+               cmake (>= 3.5),
+               g++,
+               perl
 Standards-Version: 4.5.1
 Homepage: https://tengine.taobao.org/
 Vcs-Git: https://github.com/alibaba/tengine.git
@@ -24,3 +27,8 @@ Description: Tengine HTTP and reverse proxy server
  This package ships the server as /usr/sbin/tengine configured through
  /etc/tengine/tengine.conf, which keeps it independent from any nginx
  package installed on the same host.
+ .
+ It bundles Tongsuo for NTLS and Chinese cryptography, xquic for QUIC and
+ HTTP/3, and the LuaJIT based Lua scripting stack. Tongsuo is linked
+ statically, so this package does not follow the system OpenSSL and has to be
+ rebuilt to pick up TLS security fixes.

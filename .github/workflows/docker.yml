@@ -1,0 +1,237 @@
+name: docker image
+
+# Builds the Debian and Alpine images for amd64 + arm64 and publishes them as
+# multi-arch tags on ghcr.io. Tag pushes publish; a manual run only builds and
+# verifies unless "push" is ticked, so the Dockerfiles can be exercised without
+# touching the registry.
+#
+# NOTE: a GHCR package is private on first push. It has to be flipped to public
+# once, by hand, under https://github.com/<owner>?tab=packages -> tengine ->
+# Package settings -> Change visibility. Nothing in this workflow can do that.
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Push the images to ghcr.io'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'tengine-*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # One place that decides the image name, the version and which tags move.
+  meta:
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.calc.outputs.image }}
+      version: ${{ steps.calc.outputs.version }}
+      push: ${{ steps.calc.outputs.push }}
+      latest: ${{ steps.calc.outputs.latest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: compute image name and tags
+        id: calc
+        env:
+          DISPATCH_PUSH: ${{ inputs.push }}
+        run: |
+          set -eu
+
+          # GHCR rejects upper case in repository names, and the owner may well
+          # be spelled "Alibaba".
+          owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/$owner/tengine" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.ref_type }}" = tag ]; then
+              # refs/tags/tengine-3.2.0 -> 3.2.0, tengine-3.2.0-rc1 -> 3.2.0-rc1
+              version=${GITHUB_REF_NAME#tengine-}
+              push=true
+              # A pre-release must never become what "docker pull tengine" gets.
+              case "$(printf '%s' "$version" | tr '[:upper:]' '[:lower:]')" in
+                  *-rc*|*rc[0-9]*|*-beta*|*-alpha*|*-pre*) latest=false ;;
+                  *)                                       latest=true  ;;
+              esac
+          else
+              # Manual run: a throwaway tag that can never collide with a release.
+              ver=$(sed -n 's/^#define TENGINE_VERSION *"\(.*\)"/\1/p' src/core/nginx.h)
+              version="$ver-dev-$(git rev-parse --short=7 HEAD)"
+              push=${DISPATCH_PUSH:-false}
+              latest=false
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "push=$push" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+          printf 'image=ghcr.io/%s/tengine\nversion=%s\npush=%s\nlatest=%s\n' \
+              "$owner" "$version" "$push" "$latest"
+
+  build:
+    needs: meta
+    # arm64 builds on native runners: emulating a full Tongsuo + xquic + Tengine
+    # compile under QEMU would take 5-10x longer and risk the job timeout.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    # Tongsuo is compiled twice (once for xquic, once by Tengine's configure),
+    # plus xquic, LuaJIT and Tengine itself.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [debian, alpine]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: log in to ghcr.io
+        if: needs.meta.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publishing path: push by digest only. The per-architecture images stay
+      # untagged and the manifest job assembles them into the real tags, so no
+      # arch-specific tag ever shows up in the registry.
+      - name: build and push by digest
+        if: needs.meta.outputs.push == 'true'
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          outputs: type=image,name=${{ needs.meta.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: record digest
+        if: needs.meta.outputs.push == 'true'
+        run: |
+          set -eu
+          mkdir -p /tmp/digests
+          echo "${{ steps.push.outputs.digest }}" > "/tmp/digests/${{ matrix.flavor }}-${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v4
+        if: needs.meta.outputs.push == 'true'
+        with:
+          name: digest-${{ matrix.flavor }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+
+      # Build-only path: load the image into the local daemon and exercise it
+      # right here, since there will be no published tag to verify later.
+      - name: build locally
+        if: needs.meta.outputs.push != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          load: true
+          tags: tengine-local:test
+
+      - name: verify the local image
+        if: needs.meta.outputs.push != 'true'
+        run: ./.github/scripts/verify-image.sh tengine-local:test
+
+  # buildx assembles the per-architecture digests into one multi-arch tag.
+  manifest:
+    needs: [meta, build]
+    if: needs.meta.outputs.push == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [debian, alpine]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.flavor }}-*
+          path: digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create the multi-arch tags
+        env:
+          IMAGE: ${{ needs.meta.outputs.image }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          FLAVOR: ${{ matrix.flavor }}
+          MOVE_LATEST: ${{ needs.meta.outputs.latest }}
+        run: |
+          set -eu
+
+          # Debian is the default flavour and owns the bare tags; Alpine gets
+          # the -alpine suffix, matching how the nginx images are published.
+          if [ "$FLAVOR" = alpine ]; then
+              tags="$VERSION-alpine"
+              [ "$MOVE_LATEST" = true ] && tags="$tags alpine"
+          else
+              tags="$VERSION"
+              [ "$MOVE_LATEST" = true ] && tags="$tags latest"
+          fi
+
+          set --
+          for t in $tags; do
+              set -- "$@" --tag "$IMAGE:$t"
+          done
+          for f in digests/*; do
+              set -- "$@" "$IMAGE@$(cat "$f")"
+          done
+
+          echo "docker buildx imagetools create $*"
+          docker buildx imagetools create "$@"
+
+          for t in $tags; do
+              docker buildx imagetools inspect "$IMAGE:$t"
+          done
+
+  # Pull the published tag back and make sure the promised feature set is
+  # actually in there.
+  verify:
+    needs: [meta, manifest]
+    if: needs.meta.outputs.push == 'true'
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [debian, alpine]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: pull and verify
+        env:
+          IMAGE: ${{ needs.meta.outputs.image }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          set -eu
+          if [ "${{ matrix.flavor }}" = alpine ]; then
+              ref="$IMAGE:$VERSION-alpine"
+          else
+              ref="$IMAGE:$VERSION"
+          fi
+          docker pull "$ref"
+          ./.github/scripts/verify-image.sh "$ref"
