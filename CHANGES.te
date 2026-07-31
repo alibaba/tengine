@@ -81,6 +81,10 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Change: update core to Nginx-1.31.3 (lianglli)
 
+    *) Change: update ngx_http_lua_module to 0.10.29, which adds PCRE2
+       support and matches the pinned lua-resty-core; a build against PCRE2
+       alone previously failed (lianglli)
+
     *) Change: use BBR instead of CUBIC as the default congestion control
        [XQUIC] (lurker-Chen)
 

@@ -221,7 +221,7 @@ ngx_http_lua_get_cur_co_ctx(ngx_http_request_t *r)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
 
-    return ctx->cur_co_ctx;
+    return ctx == NULL ? NULL : ctx->cur_co_ctx;
 }
 
 
@@ -242,6 +242,29 @@ lua_State *
 ngx_http_lua_get_co_ctx_vm(ngx_http_lua_co_ctx_t *coctx)
 {
     return coctx->co;
+}
+
+
+void *
+ngx_http_lua_get_co_ctx_data(ngx_http_lua_co_ctx_t *coctx)
+{
+    return coctx ? coctx->data : NULL;
+}
+
+
+void
+ngx_http_lua_set_co_ctx_cleanup(ngx_http_lua_co_ctx_t *coctx,
+    ngx_http_cleanup_pt cleanup, void *data)
+{
+    coctx->cleanup = cleanup;
+    coctx->data = data;
+}
+
+
+void
+ngx_http_lua_cleanup_co_ctx_pending_operation(ngx_http_lua_co_ctx_t *coctx)
+{
+    ngx_http_lua_cleanup_pending_operation(coctx);
 }
 
 

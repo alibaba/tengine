@@ -424,6 +424,26 @@ ngx_http_lua_ffi_decode_base64(const u_char *src, size_t slen, u_char *dst,
 }
 
 
+int
+ngx_http_lua_ffi_decode_base64mime(const u_char *src, size_t slen, u_char *dst,
+    size_t *dlen)
+{
+    ngx_int_t      rc;
+    ngx_str_t      in, out;
+
+    in.data = (u_char *) src;
+    in.len = slen;
+
+    out.data = dst;
+
+    rc = ngx_http_lua_decode_base64mime(&out, &in);
+
+    *dlen = out.len;
+
+    return rc == NGX_OK;
+}
+
+
 size_t
 ngx_http_lua_ffi_unescape_uri(const u_char *src, size_t len, u_char *dst)
 {

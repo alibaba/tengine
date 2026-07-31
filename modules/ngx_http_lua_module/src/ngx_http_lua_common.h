@@ -55,11 +55,17 @@ typedef struct {
 
 
 #if (NGX_PCRE)
-#include <pcre.h>
-#   if (PCRE_MAJOR > 8) || (PCRE_MAJOR == 8 && PCRE_MINOR >= 21)
+#   if (NGX_PCRE2)
 #       define LUA_HAVE_PCRE_JIT 1
 #   else
-#       define LUA_HAVE_PCRE_JIT 0
+
+#include <pcre.h>
+
+#       if (PCRE_MAJOR > 8) || (PCRE_MAJOR == 8 && PCRE_MINOR >= 21)
+#           define LUA_HAVE_PCRE_JIT 1
+#       else
+#           define LUA_HAVE_PCRE_JIT 0
+#       endif
 #   endif
 #endif
 
@@ -125,23 +131,27 @@ typedef struct {
     (NGX_HTTP_LUA_FILE_TAG_LEN + 2 * MD5_DIGEST_LENGTH)
 
 
-/* must be within 16 bit */
-#define NGX_HTTP_LUA_CONTEXT_SET                0x0001
-#define NGX_HTTP_LUA_CONTEXT_REWRITE            0x0002
-#define NGX_HTTP_LUA_CONTEXT_ACCESS             0x0004
-#define NGX_HTTP_LUA_CONTEXT_CONTENT            0x0008
-#define NGX_HTTP_LUA_CONTEXT_LOG                0x0010
-#define NGX_HTTP_LUA_CONTEXT_HEADER_FILTER      0x0020
-#define NGX_HTTP_LUA_CONTEXT_BODY_FILTER        0x0040
-#define NGX_HTTP_LUA_CONTEXT_TIMER              0x0080
-#define NGX_HTTP_LUA_CONTEXT_INIT_WORKER        0x0100
-#define NGX_HTTP_LUA_CONTEXT_BALANCER           0x0200
-#define NGX_HTTP_LUA_CONTEXT_SSL_CERT           0x0400
-#define NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE     0x0800
-#define NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH     0x1000
-#define NGX_HTTP_LUA_CONTEXT_EXIT_WORKER        0x2000
-#define NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO   0x4000
-#define NGX_HTTP_LUA_CONTEXT_SERVER_REWRITE     0x8000
+/* must be within 32 bits */
+#define NGX_HTTP_LUA_CONTEXT_SET                0x00000001
+#define NGX_HTTP_LUA_CONTEXT_REWRITE            0x00000002
+#define NGX_HTTP_LUA_CONTEXT_ACCESS             0x00000004
+#define NGX_HTTP_LUA_CONTEXT_CONTENT            0x00000008
+#define NGX_HTTP_LUA_CONTEXT_LOG                0x00000010
+#define NGX_HTTP_LUA_CONTEXT_HEADER_FILTER      0x00000020
+#define NGX_HTTP_LUA_CONTEXT_BODY_FILTER        0x00000040
+#define NGX_HTTP_LUA_CONTEXT_TIMER              0x00000080
+#define NGX_HTTP_LUA_CONTEXT_INIT_WORKER        0x00000100
+#define NGX_HTTP_LUA_CONTEXT_BALANCER           0x00000200
+#define NGX_HTTP_LUA_CONTEXT_SSL_CERT           0x00000400
+#define NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE     0x00000800
+#define NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH     0x00001000
+#define NGX_HTTP_LUA_CONTEXT_EXIT_WORKER        0x00002000
+#define NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO   0x00004000
+#define NGX_HTTP_LUA_CONTEXT_SERVER_REWRITE     0x00008000
+
+#ifdef HAVE_PROXY_SSL_PATCH
+#define NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY   0x00010000
+#endif
 
 
 #define NGX_HTTP_LUA_FFI_NO_REQ_CTX         -100
@@ -161,9 +171,11 @@ typedef struct ngx_http_lua_co_ctx_s  ngx_http_lua_co_ctx_t;
 
 typedef struct ngx_http_lua_sema_mm_s  ngx_http_lua_sema_mm_t;
 
-typedef union ngx_http_lua_srv_conf_u  ngx_http_lua_srv_conf_t;
+typedef struct ngx_http_lua_srv_conf_s  ngx_http_lua_srv_conf_t;
 
 typedef struct ngx_http_lua_main_conf_s  ngx_http_lua_main_conf_t;
+
+typedef struct ngx_http_lua_loc_conf_s  ngx_http_lua_loc_conf_t;
 
 typedef struct ngx_http_lua_header_val_s  ngx_http_lua_header_val_t;
 
@@ -177,6 +189,9 @@ typedef ngx_int_t (*ngx_http_lua_main_conf_handler_pt)(ngx_log_t *log,
 
 typedef ngx_int_t (*ngx_http_lua_srv_conf_handler_pt)(ngx_http_request_t *r,
     ngx_http_lua_srv_conf_t *lscf, lua_State *L);
+
+typedef ngx_int_t (*ngx_http_lua_loc_conf_handler_pt)(ngx_http_request_t *r,
+    ngx_http_lua_loc_conf_t *llcf, lua_State *L);
 
 typedef ngx_int_t (*ngx_http_lua_set_header_pt)(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
@@ -221,9 +236,14 @@ struct ngx_http_lua_main_conf_s {
     ngx_int_t            regex_cache_entries;
     ngx_int_t            regex_cache_max_entries;
     ngx_int_t            regex_match_limit;
-#   if (LUA_HAVE_PCRE_JIT)
+#endif
+
+#if (LUA_HAVE_PCRE_JIT)
+#if (NGX_PCRE2)
+    pcre2_jit_stack     *jit_stack;
+#else
     pcre_jit_stack      *jit_stack;
-#   endif
+#endif
 #endif
 
     ngx_array_t         *shm_zones;  /* of ngx_shm_zone_t* */
@@ -246,13 +266,6 @@ struct ngx_http_lua_main_conf_s {
     ngx_http_lua_main_conf_handler_pt    exit_worker_handler;
     ngx_str_t                            exit_worker_src;
     u_char                              *exit_worker_chunkname;
-
-    ngx_http_lua_balancer_peer_data_t      *balancer_peer_data;
-                    /* neither yielding nor recursion is possible in
-                     * balancer_by_lua*, so there cannot be any races among
-                     * concurrent requests and it is safe to store the peer
-                     * data pointer in the main conf.
-                     */
 
     ngx_chain_t                            *body_filter_chain;
                     /* neither yielding nor recursion is possible in
@@ -312,7 +325,7 @@ struct ngx_http_lua_main_conf_s {
 };
 
 
-union ngx_http_lua_srv_conf_u {
+struct ngx_http_lua_srv_conf_s {
     struct {
 #if (NGX_HTTP_SSL)
         ngx_http_lua_srv_conf_handler_pt     ssl_cert_handler;
@@ -348,6 +361,14 @@ union ngx_http_lua_srv_conf_u {
     } srv;
 
     struct {
+        ngx_uint_t                           max_cached;
+        ngx_queue_t                          cache;
+        ngx_queue_t                          free;
+        ngx_queue_t                         *buckets;
+        ngx_uint_t                           bucket_cnt;
+        ngx_http_upstream_init_pt            original_init_upstream;
+        ngx_http_upstream_init_peer_pt       original_init_peer;
+
         ngx_http_lua_srv_conf_handler_pt     handler;
         ngx_str_t                            src;
         u_char                              *src_key;
@@ -357,17 +378,30 @@ union ngx_http_lua_srv_conf_u {
 };
 
 
-typedef struct {
+struct ngx_http_lua_loc_conf_s {
 #if (NGX_HTTP_SSL)
     ngx_ssl_t              *ssl;  /* shared by SSL cosockets */
+    ngx_array_t            *ssl_certificates;
+    ngx_array_t            *ssl_certificate_keys;
     ngx_uint_t              ssl_protocols;
     ngx_str_t               ssl_ciphers;
     ngx_uint_t              ssl_verify_depth;
     ngx_str_t               ssl_trusted_certificate;
     ngx_str_t               ssl_crl;
+    ngx_str_t               ssl_key_log;
 #if (nginx_version >= 1019004)
     ngx_array_t            *ssl_conf_commands;
 #endif
+
+#ifdef HAVE_PROXY_SSL_PATCH
+    ngx_http_lua_loc_conf_handler_pt       proxy_ssl_verify_handler;
+    ngx_str_t                              proxy_ssl_verify_src;
+    u_char                                *proxy_ssl_verify_src_key;
+    u_char                                *proxy_ssl_verify_chunkname;
+    int                                    proxy_ssl_verify_src_ref;
+    ngx_flag_t                             upstream_skip_openssl_default_verify;
+#endif
+
 #endif
 
     ngx_flag_t              force_read_body; /* whether force request body to
@@ -449,7 +483,7 @@ typedef struct {
     ngx_flag_t                       log_socket_errors;
     ngx_flag_t                       check_client_abort;
     ngx_flag_t                       use_default_type;
-} ngx_http_lua_loc_conf_t;
+};
 
 
 typedef enum {
@@ -613,7 +647,7 @@ typedef struct ngx_http_lua_ctx_s {
 
     int                      uthreads; /* number of active user threads */
 
-    uint16_t                 context;   /* the current running directive context
+    uint32_t                 context;   /* the current running directive context
                                            (or running phase) for the current
                                            Lua chunk */
 

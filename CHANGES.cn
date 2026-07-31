@@ -25,6 +25,7 @@ Tengine 3.2.0 [2026-07-31]
 * Feature: 新增发行版软件包(rpm、deb和apk)与多架构容器镜像，默认构建完备功能集——Tongsuo、xquic和Lua (lianglli)
 * Feature: 新增configure选项--with-xquic-rpath，将xquic运行时查找路径与链接路径解耦 (lianglli)
 * Change: 升级core代码到Nginx-1.31.3版本 (lianglli)
+* Change: 升级ngx_http_lua_module到0.10.29版本，支持PCRE2并与pin的lua-resty-core版本匹配，此前仅有PCRE2的环境下编译失败 (lianglli)
 * Change: 默认拥塞控制算法由CUBIC改为BBR [XQUIC] (lurker-Chen)
 * Change: ngx_http_tunnel_module改为可选编译，避免与ngx_http_proxy_connect_module冲突 (lianglli)
 * Change: 合入nginx官方测试集并补充Tengine定制测试用例 (lianglli)

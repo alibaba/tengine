@@ -30,6 +30,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: openresty/luajit2
+          # Pinned (the LuaJIT fork ngx_http_lua_module requires); keep in sync with packages/build/deps.env.
+          ref: v2.1-20260724
           path: luajit2
 
       - name: Compile with ${{ matrix.compiler.compiler }}

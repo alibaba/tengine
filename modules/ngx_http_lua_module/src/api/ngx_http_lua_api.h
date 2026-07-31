@@ -19,7 +19,8 @@
 /* Public API for other Nginx modules */
 
 
-#define ngx_http_lua_version  10025
+#define ngx_http_lua_version  10029
+#define NGX_HTTP_LUA_EXPORT_CO_CTX_CLEANUP 1
 
 
 typedef struct ngx_http_lua_co_ctx_s  ngx_http_lua_co_ctx_t;
@@ -65,6 +66,13 @@ void ngx_http_lua_set_cur_co_ctx(ngx_http_request_t *r,
     ngx_http_lua_co_ctx_t *coctx);
 
 lua_State *ngx_http_lua_get_co_ctx_vm(ngx_http_lua_co_ctx_t *coctx);
+
+
+void *ngx_http_lua_get_co_ctx_data(ngx_http_lua_co_ctx_t *coctx);
+void ngx_http_lua_set_co_ctx_cleanup(ngx_http_lua_co_ctx_t *coctx,
+    ngx_http_cleanup_pt cleanup, void *data);
+void ngx_http_lua_cleanup_co_ctx_pending_operation(
+    ngx_http_lua_co_ctx_t *coctx);
 
 void ngx_http_lua_co_ctx_resume_helper(ngx_http_lua_co_ctx_t *coctx, int nrets);
 

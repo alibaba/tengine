@@ -280,6 +280,9 @@ ngx_http_lua_ngx_redirect(lua_State *L)
 
     h->value.len = len;
     h->value.data = uri;
+#if defined(nginx_version) && nginx_version >= 1023000
+    h->next = NULL;
+#endif
     ngx_str_set(&h->key, "Location");
 
     r->headers_out.status = rc;
@@ -381,6 +384,9 @@ ngx_http_lua_ffi_exit(ngx_http_request_t *r, int status, u_char *err,
                                        | NGX_HTTP_LUA_CONTEXT_TIMER
                                        | NGX_HTTP_LUA_CONTEXT_HEADER_FILTER
                                        | NGX_HTTP_LUA_CONTEXT_BALANCER
+#ifdef HAVE_PROXY_SSL_PATCH
+                                       | NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY
+#endif
                                        | NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO
                                        | NGX_HTTP_LUA_CONTEXT_SSL_CERT
                                        | NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE
@@ -392,6 +398,9 @@ ngx_http_lua_ffi_exit(ngx_http_request_t *r, int status, u_char *err,
     }
 
     if (ctx->context & (NGX_HTTP_LUA_CONTEXT_SSL_CERT
+#ifdef HAVE_PROXY_SSL_PATCH
+                        | NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY
+#endif
                         | NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO
                         | NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE
                         | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH))
