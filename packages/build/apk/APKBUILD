@@ -59,7 +59,8 @@ build() {
 		--workdir "$srcdir/deps-build" \
 		--staging "$srcdir/deps-staging" \
 		--libdir /usr/lib/tengine \
-		--datadir /usr/share/tengine
+		--datadir /usr/share/tengine \
+		--env-relative-to "$PWD"
 
 	. "$srcdir"/deps-build/deps-env.sh
 

@@ -28,7 +28,8 @@ override_dh_auto_configure:
 		--workdir $(CURDIR)/deps-build \
 		--staging $(CURDIR)/deps-staging \
 		--libdir /usr/lib/tengine \
-		--datadir /usr/share/tengine
+		--datadir /usr/share/tengine \
+		--env-relative-to $(CURDIR)
 	. $(CURDIR)/deps-build/deps-env.sh; \
 	export TENGINE_LIBDIR=/usr/lib; \
 	./configure \
