@@ -83,7 +83,20 @@ BuildRequires:  make
 BuildRequires:  zlib-devel
 %if %{with xquic}
 # xquic is built with CMake and links against libstdc++.
+#
+# el7-era distros ship CMake 2.8 as "cmake" and 3.x as "cmake3", so requiring
+# "cmake >= 3.5" there can never be satisfied. build-deps.sh already probes
+# both binaries (find_cmake), so accept either package and let it pick.
+# Rich deps need rpm >= 4.13; see have_rich_deps above.
+%if %{have_rich_deps}
+BuildRequires:  (cmake >= 3.5 or cmake3 >= 3.5)
+%else
+%if 0%{?rhel} == 7
+BuildRequires:  cmake3 >= 3.5
+%else
 BuildRequires:  cmake >= 3.5
+%endif
+%endif
 BuildRequires:  gcc-c++
 %endif
 %if %{with tongsuo}

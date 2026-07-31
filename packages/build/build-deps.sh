@@ -163,8 +163,14 @@ if [ "$WITH_TONGSUO" = yes ]; then
         info "building Tongsuo (static, NTLS enabled)"
         # -fPIC is explicit: the archives get linked into libxquic.so, and a
         # no-shared OpenSSL build does not guarantee position independent code.
+        #
+        # Only the archives are wanted here, so stop at build_libs and skip the
+        # test suite: xquic links libssl.a/libcrypto.a, and Tengine's configure
+        # rebuilds this tree from scratch anyway. Building apps/ and test/ would
+        # add a large amount of compile time -- painful with an el7-era gcc --
+        # and one more chance to fail on code the package never ships.
         ( cd "$tongsuo_src" && ./config --prefix=/usr/local/tongsuo \
-            enable-ntls no-shared -fPIC && make -j"$JOBS" )
+            enable-ntls no-shared no-tests -fPIC && make -j"$JOBS" build_libs )
     fi
 
     emit "export TENGINE_TONGSUO_SRC=$tongsuo_src"
