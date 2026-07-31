@@ -3,6 +3,10 @@ name: package tengine
 # Builds native packages for the mainstream distro images. Manual/tag only:
 # every target compiles Tongsuo (twice -- once for xquic, once through Tengine's
 # own configure), xquic, LuaJIT and Tengine, which is far too heavy for a push.
+#
+# On a tag push the packages are also published as GitHub release assets, which
+# is what makes them permanently and anonymously downloadable; workflow
+# artifacts expire after 90 days and require a login.
 on:
   workflow_dispatch:
     inputs:
@@ -154,3 +158,103 @@ jobs:
             /usr/sbin/tengine -t
           '
 
+  # Publish every package as a release asset. Unlike workflow artifacts these
+  # never expire and need no GitHub login to download. Runs for release and
+  # pre-release tags alike; a pre-release tag is only marked as such.
+  release:
+    needs: [package, verify]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # "tengine-*" matches the per-target package artifacts and skips the
+      # dependency-source artifact.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tengine-*
+          path: artifacts
+
+      - name: flatten artifacts into a release directory
+        run: packages/build/collect-release.sh --indir artifacts --outdir release
+
+      - name: classify the tag and write the release notes
+        id: notes
+        run: |
+          set -eu
+          version=${GITHUB_REF_NAME#tengine-}
+
+          # Keep this rule identical to the one in docker.yml.
+          case "$(printf '%s' "$version" | tr '[:upper:]' '[:lower:]')" in
+              *-rc*|*rc[0-9]*|*-beta*|*-alpha*|*-pre*) prerelease=true ;;
+              *)                                       prerelease=false ;;
+          esac
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+          owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
+          # A sample RPM name for the install snippet, so the notes always point
+          # at a file that actually exists in this release.
+          sample_rpm=$(cd release && ls -1 *.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
+          [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 *.x86_64.rpm | head -n 1)
+          sample_deb=$(cd release && ls -1 *_amd64.deb | head -n 1)
+          base_url="${{ github.server_url }}/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}"
+
+          cat > notes.md <<EOF
+          Tengine $version packages and container images.
+
+          Every artifact here is built with the full feature set: **Tongsuo**
+          (NTLS / Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
+          **LuaJIT** scripting stack, all from the versions pinned in
+          \`packages/build/deps.env\`. Tongsuo is linked statically, so these
+          builds do not follow the system OpenSSL.
+
+          The server installs as \`/usr/sbin/tengine\`, configured through
+          \`/etc/tengine/tengine.conf\`, and can coexist with a distro nginx.
+
+          ## Install
+
+          RPM (RHEL / Rocky / Alma / Anolis / openEuler / SLES):
+
+          \`\`\`sh
+          dnf install $base_url/$sample_rpm
+          \`\`\`
+
+          DEB (Debian / Ubuntu -- the \`~codename\` suffix picks the right build):
+
+          \`\`\`sh
+          curl -fLO $base_url/$sample_deb
+          apt install ./$sample_deb
+          \`\`\`
+
+          Alpine:
+
+          \`\`\`sh
+          apk add --allow-untrusted tengine-*.apk
+          \`\`\`
+
+          ## Container images
+
+          \`\`\`sh
+          docker pull ghcr.io/$owner/tengine:$version
+          docker pull ghcr.io/$owner/tengine:$version-alpine
+          \`\`\`
+
+          Both are multi-arch (amd64 + arm64).
+
+          ## Verify
+
+          \`\`\`sh
+          curl -fLO $base_url/SHA256SUMS
+          sha256sum -c SHA256SUMS
+          \`\`\`
+          EOF
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          body_path: notes.md
+          prerelease: ${{ steps.notes.outputs.prerelease }}
+          fail_on_unmatched_files: true
