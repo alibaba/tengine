@@ -12,19 +12,27 @@ pkgname=tengine
 _upstream_ver=3.2.0
 pkgver=3.2.0
 pkgrel=0
-pkgdesc="Tengine HTTP and reverse proxy server"
+pkgdesc="Tengine HTTP and reverse proxy server with Tongsuo, xquic and Lua"
 url="https://tengine.taobao.org/"
 arch="all"
-license="BSD-2-Clause"
+# Tengine and the resty Lua libraries are BSD-2-Clause, Tongsuo and xquic are
+# Apache-2.0, LuaJIT is MIT.
+license="BSD-2-Clause AND Apache-2.0 AND MIT"
 makedepends="
 	linux-headers
 	openssl-dev
 	pcre2-dev
 	zlib-dev
+	cmake
+	g++
+	perl
 	"
 install="$pkgname.pre-install"
 subpackages="$pkgname-doc $pkgname-openrc"
+# tengine-deps.tar.gz holds the pinned Tongsuo / xquic / LuaJIT / resty
+# tarballs; abuild unpacks it to $srcdir/deps.
 source="$pkgname-$_upstream_ver.tar.gz
+	$pkgname-deps.tar.gz
 	tengine.openrc
 	tengine.logrotate
 	tengine.conf
@@ -43,10 +51,23 @@ build() {
 	export TENGINE_LIBDIR=/usr/lib
 	export TENGINE_WITH_BACKTRACE=no
 
+	# Tongsuo, xquic and LuaJIT come from the pinned sources in $srcdir/deps.
+	# --libdir is the installed path because ngx_http_xquic_module records it
+	# as libxquic.so's runtime path.
+	sh packages/build/build-deps.sh \
+		--srcdir "$srcdir/deps" \
+		--workdir "$srcdir/deps-build" \
+		--staging "$srcdir/deps-staging" \
+		--libdir /usr/lib/tengine \
+		--datadir /usr/share/tengine
+
+	. "$srcdir"/deps-build/deps-env.sh
+
 	./configure \
 		$(sh packages/build/configure-args.sh) \
 		--with-cc-opt="$CFLAGS -Wno-error" \
-		--with-ld-opt="$LDFLAGS"
+		--with-ld-opt="$LDFLAGS $(sh packages/build/configure-args.sh --print-ld-opt)" \
+		--with-openssl-opt="$(sh packages/build/configure-args.sh --print-openssl-opt)"
 
 	make
 }
@@ -54,10 +75,17 @@ build() {
 package() {
 	make DESTDIR="$pkgdir" install
 
+	# The bundled libxquic.so / libluajit and the Lua modules are staged with
+	# their final absolute paths already in place.
+	cp -a "$srcdir"/deps-staging/. "$pkgdir"/
+
 	# make install drops the stock nginx.conf plus *.default copies; replace
 	# them with the packaged tengine.conf so the shipped names stay consistent.
 	rm -f "$pkgdir"/etc/tengine/*.default
 	install -D -m 0644 "$srcdir"/tengine.conf \
+		"$pkgdir"/etc/tengine/tengine.conf
+	# lua_package_cpath carries a libdir placeholder; apk always uses /usr/lib.
+	sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' \
 		"$pkgdir"/etc/tengine/tengine.conf
 	install -D -m 0644 "$srcdir"/default.conf \
 		"$pkgdir"/etc/tengine/conf.d/default.conf

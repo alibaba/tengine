@@ -16,18 +16,34 @@ PKGDIR   := debian/tengine
 %:
 	dh $@
 
+# Tongsuo, xquic and the Lua stack are built from the pinned sources that
+# build.sh drops in deps/. --libdir is the installed location on purpose:
+# ngx_http_xquic_module records it as libxquic.so's runtime path.
+#
 # The tree defaults to -Werror (auto/cc/gcc); with dpkg hardening flags and an
 # arbitrary gcc version that is a guaranteed build break, so relax it here.
 override_dh_auto_configure:
-	TENGINE_LIBDIR=/usr/lib ./configure \
+	sh packages/build/build-deps.sh \
+		--srcdir deps \
+		--workdir $(CURDIR)/deps-build \
+		--staging $(CURDIR)/deps-staging \
+		--libdir /usr/lib/tengine \
+		--datadir /usr/share/tengine
+	. $(CURDIR)/deps-build/deps-env.sh; \
+	export TENGINE_LIBDIR=/usr/lib; \
+	./configure \
 		$$(sh packages/build/configure-args.sh) \
 		--with-cc-opt="$(CFLAGS) $(CPPFLAGS) -Wno-error" \
-		--with-ld-opt="$(LDFLAGS)"
+		--with-ld-opt="$(LDFLAGS) $$(sh packages/build/configure-args.sh --print-ld-opt)" \
+		--with-openssl-opt="$$(sh packages/build/configure-args.sh --print-openssl-opt)"
 
 override_dh_auto_test:
 
 override_dh_auto_install:
 	dh_auto_install
+	# The bundled libxquic.so / libluajit and the Lua modules are staged with
+	# their final absolute paths already in place.
+	cp -a $(CURDIR)/deps-staging/. $(PKGDIR)/
 	# make install drops the stock nginx.conf plus *.default copies; replace
 	# them with the packaged tengine.conf so the shipped names stay consistent.
 	rm -f $(CONFDIR)/*.default
@@ -36,6 +52,8 @@ override_dh_auto_install:
 	install -d -m 0755 $(CONFDIR)/conf.d
 	install -p -m 0644 packages/build/conf/conf.d/default.conf \
 		$(CONFDIR)/conf.d/default.conf
+	# lua_package_cpath carries a libdir placeholder; deb always uses /usr/lib.
+	sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' $(CONFDIR)/tengine.conf
 	sed -e 's|%%PREFIX%%|/usr/share/tengine|' \
 	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
 	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
@@ -52,7 +70,18 @@ override_dh_auto_install:
 override_dh_installsystemd:
 	dh_installsystemd --name=tengine
 
+# libxquic.so and libluajit are private to this package: -l lets dpkg-shlibdeps
+# resolve the tengine binary against them, --ignore-missing-info keeps it from
+# failing because no package "provides" them, and -X keeps dh_makeshlibs from
+# advertising their sonames system-wide.
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/$(PKGDIR)/usr/lib/tengine \
+		--dpkg-shlibdeps-params=--ignore-missing-info
+
+override_dh_makeshlibs:
+	dh_makeshlibs -X/usr/lib/tengine/
+
 override_dh_clean:
 	dh_clean
 	rm -f debian/tengine.8
-	rm -rf objs
+	rm -rf objs deps-build deps-staging
