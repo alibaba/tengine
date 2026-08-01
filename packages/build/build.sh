@@ -64,7 +64,7 @@ usage() {
     exit "${1:-0}"
 }
 
-ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 debian11 debian12 debian13 ubuntu2204 ubuntu2404 alpine"
+ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 debian11 debian12 debian13 ubuntu2204 ubuntu2404 ubuntu2604 alpine"
 
 # Container targets: alias -> "image|family".  family drives both the
 # bootstrap commands and which native builder runs inside.
@@ -85,6 +85,7 @@ docker_image() {
         debian13)   echo "debian:13|deb" ;;
         ubuntu2204) echo "ubuntu:22.04|deb" ;;
         ubuntu2404) echo "ubuntu:24.04|deb" ;;
+        ubuntu2604) echo "ubuntu:26.04|deb" ;;
         alpine)     echo "alpine:3.22|apk" ;;
         *)          return 1 ;;
     esac

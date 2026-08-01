@@ -86,6 +86,7 @@ jobs:
           - debian13
           - ubuntu2204
           - ubuntu2404
+          - ubuntu2604
           - alpine
     steps:
       - uses: actions/checkout@v4
