@@ -398,15 +398,21 @@ bootstrap_cmd() {
             cat <<'EOS'
 if command -v dnf >/dev/null 2>&1; then
     if dnf -q list pcre2-devel >/dev/null 2>&1; then _pcre=pcre2-devel; else _pcre=pcre-devel; fi
+    # Tongsuo's Configure pulls in a handful of Perl modules that every distro
+    # splits up differently -- and on el8 "perl-FindBin" is hidden behind a
+    # module stream, so asking for the package name gets filtered out entirely.
+    # Requesting the perl(...) virtual provides instead lets rpm resolve each
+    # module to whatever package happens to carry it.
     dnf -y install rpm-build gcc gcc-c++ make cmake tar findutils diffutils curl \
-        perl-interpreter perl-FindBin openssl-devel zlib-devel systemd "$_pcre"
+        perl "perl(FindBin)" "perl(IPC::Cmd)" "perl(lib)" \
+        openssl-devel zlib-devel systemd "$_pcre"
 else
     # CentOS 7 is EOL; its mirrors moved to vault.centos.org
     sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
            -e 's|^#*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' \
            /etc/yum.repos.d/CentOS-*.repo
     yum -y install rpm-build gcc gcc-c++ make tar findutils diffutils curl \
-        perl openssl-devel zlib-devel pcre-devel systemd
+        perl "perl(IPC::Cmd)" openssl-devel zlib-devel pcre-devel systemd
     # el7 packages CMake 2.8 and xquic needs >= 3.5. The usual answer, cmake3,
     # lives only in EPEL 7 -- itself EOL, with a dead metalink and nothing but
     # an archive mirror left, so pulling it in means rewriting a second set of
