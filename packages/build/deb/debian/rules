@@ -5,7 +5,13 @@
 # feature-identical to the RPM and APK builds.
 #
 
-export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+# optimize=-lto: dpkg turns LTO on by default and DPKG_EXPORT_BUILDFLAGS hands
+# it to build-deps.sh as well, so Tongsuo's static archives end up carrying LTO
+# bytecode. gcc then re-runs its analysis while linking libxquic.so, where the
+# -Wno-* that build-deps.sh passes no longer apply, and hardening's -Werror
+# turns a free-nonheap-object warning inside BN_RECP_CTX_free fatal. Nothing
+# in this package benefits from LTO.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
 
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
