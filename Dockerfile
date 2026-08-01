@@ -20,8 +20,8 @@
 # Dockerfile.alpine for the musl variant).
 #
 
-ARG BASE_IMAGE=debian:12
-ARG RUNTIME_IMAGE=debian:12-slim
+ARG BASE_IMAGE=debian:13
+ARG RUNTIME_IMAGE=debian:13-slim
 
 FROM ${BASE_IMAGE} AS builder
 
