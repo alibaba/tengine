@@ -351,7 +351,12 @@ build_apk() {
         "$work/APKBUILD" > "$work/APKBUILD.new"
     mv "$work/APKBUILD.new" "$work/APKBUILD"
 
-    [ -f "$HOME/.abuild/abuild.conf" ] || abuild-keygen -a -i -n
+    # -i would install the public key through doas, which the alpine build image
+    # does not carry; the build runs as root, so place it directly instead.
+    if [ ! -f "$HOME/.abuild/abuild.conf" ]; then
+        abuild-keygen -a -n
+        cp "$HOME"/.abuild/*.rsa.pub /etc/apk/keys/
+    fi
     REPODEST="$work/repo"
     export REPODEST
 
