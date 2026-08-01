@@ -24,6 +24,7 @@ Tengine 3.2.0 [2026-07-31]
 * Feature: 新增configure选项--with-http_dup_host，允许客户端发送重复的Host请求头 (lianglli)
 * Feature: 新增发行版软件包(rpm、deb和apk)与多架构容器镜像，默认构建完备功能集——Tongsuo、xquic和Lua (lianglli)
 * Feature: 新增configure选项--with-xquic-rpath，将xquic运行时查找路径与链接路径解耦 (lianglli)
+* Feature: 公开ngx_http_upstream_rbtree_lookup()，便于第三方模块按名字查找upstream (lhanjian)
 * Change: 升级core代码到Nginx-1.31.3版本 (lianglli)
 * Change: 升级ngx_http_lua_module到0.10.29版本，支持PCRE2并与pin的lua-resty-core版本匹配，此前仅有PCRE2的环境下编译失败 (lianglli)
 * Change: 默认拥塞控制算法由CUBIC改为BBR [XQUIC] (lurker-Chen)

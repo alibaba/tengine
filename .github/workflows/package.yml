@@ -211,18 +211,22 @@ jobs:
 
           owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
-          # A sample RPM name for the install snippet, so the notes always point
-          # at a file that actually exists in this release.
-          sample_rpm=$(cd release && ls -1 *.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
-          [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 *.x86_64.rpm | head -n 1)
-          sample_deb=$(cd release && ls -1 *_amd64.deb | head -n 1)
+          # A sample package name for each install snippet, so the notes always
+          # point at a file that actually exists in this release. Match the main
+          # package explicitly: the debug packages sort ahead of it under the C
+          # locale ("tengine-dbgsym_" before "tengine_", "-" being 0x2D and "_"
+          # 0x5F), so a bare glob would advertise the debug symbols instead.
+          sample_rpm=$(cd release && ls -1 tengine-[0-9]*.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
+          [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 tengine-[0-9]*.x86_64.rpm | head -n 1)
+          sample_deb=$(cd release && ls -1 tengine_[0-9]*_amd64.deb | head -n 1)
+          sample_apk=$(cd release && ls -1 tengine-[0-9]*.x86_64.apk | head -n 1)
           base_url="${{ github.server_url }}/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}"
 
           cat > notes.md <<EOF
           Tengine $version packages and container images.
 
           Every artifact here is built with the full feature set: **Tongsuo**
-          (NTLS / Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
+          (NTLS / TLCP, Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
           **LuaJIT** scripting stack, all from the versions pinned in
           \`packages/build/deps.env\`. Tongsuo is linked statically, so these
           builds do not follow the system OpenSSL.
@@ -248,7 +252,8 @@ jobs:
           Alpine:
 
           \`\`\`sh
-          apk add --allow-untrusted tengine-*.apk
+          curl -fLO $base_url/$sample_apk
+          apk add --allow-untrusted ./$sample_apk
           \`\`\`
 
           ## Container images
