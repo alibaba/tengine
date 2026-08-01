@@ -205,6 +205,8 @@ jobs:
               *)                                       prerelease=false ;;
           esac
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          # Past releases are titled "Tengine-3.1.0"; the tag itself is bare.
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
           owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
@@ -267,6 +269,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          name: Tengine-${{ steps.notes.outputs.version }}
           files: release/*
           body_path: notes.md
           prerelease: ${{ steps.notes.outputs.prerelease }}
