@@ -64,7 +64,7 @@ usage() {
     exit "${1:-0}"
 }
 
-ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 debian11 debian12 ubuntu2204 ubuntu2404 alpine"
+ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 debian11 debian12 debian13 ubuntu2204 ubuntu2404 alpine"
 
 # Container targets: alias -> "image|family".  family drives both the
 # bootstrap commands and which native builder runs inside.
@@ -82,6 +82,7 @@ docker_image() {
         sles15)     echo "registry.suse.com/bci/bci-base:15.6|sles" ;;
         debian11)   echo "debian:11|deb" ;;
         debian12)   echo "debian:12|deb" ;;
+        debian13)   echo "debian:13|deb" ;;
         ubuntu2204) echo "ubuntu:22.04|deb" ;;
         ubuntu2404) echo "ubuntu:24.04|deb" ;;
         alpine)     echo "alpine:3.22|apk" ;;
