@@ -78,7 +78,7 @@ The server runs as `/usr/sbin/tengine` with `/etc/tengine/tengine.conf`; drop yo
 Every release ships `.rpm`, `.deb` and `.apk` packages for the mainstream distributions (RHEL/Rocky/Alma/Anolis/openEuler/SLES, Debian/Ubuntu, Alpine) on both x86_64 and aarch64, attached to the [release page](https://github.com/alibaba/tengine/releases):
 
 ```bash
-dnf install https://github.com/alibaba/tengine/releases/download/tengine-3.2.0/tengine-3.2.0-<ts>.el9.x86_64.rpm
+dnf install https://github.com/alibaba/tengine/releases/download/3.2.0/tengine-3.2.0-<ts>.el9.x86_64.rpm
 ```
 
 These packages install alongside a distribution nginx without conflicting. See [packages/build/README.md](packages/build/README.md) for the exact feature set, how to build them yourself, and how the container images are produced.

@@ -97,6 +97,9 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
     *) Bugfix: drain the HTTP health-check response body for keepalive-safe
        connection reuse in ngx_http_upstream_check_module (lianglli)
 
+    *) Bugfix: a unix socket upstream server combined with "check port=" was
+       reported alive forever, so a backup server never took over (lianglli)
+
     *) Bugfix: fixed duplicate peer linking in round-robin init, which made
        a backup peer link to itself (lianglli)
 

@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# The tengine user is created by .pre-install, which runs before the package
+# contents are unpacked -- so the directories cannot be chowned there. Do it
+# here instead, once they exist.
+#
+
+chown tengine:tengine /var/cache/tengine /var/log/tengine 2>/dev/null || true
+
+exit 0

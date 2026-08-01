@@ -30,6 +30,7 @@ Tengine 3.2.0 [2026-07-31]
 * Change: ngx_http_tunnel_module改为可选编译，避免与ngx_http_proxy_connect_module冲突 (lianglli)
 * Change: 合入nginx官方测试集并补充Tengine定制测试用例 (lianglli)
 * Bugfix: 修复ngx_http_upstream_check_module在HTTP健康检查复用长连接时未排空响应体的问题 (lianglli)
+* Bugfix: 修复unix socket类型的upstream server配置check port=时被永久判定为存活，导致backup无法接管的问题 (lianglli)
 * Bugfix: 修复round-robin初始化时重复链接peer导致backup peer自环的问题 (lianglli)
 * Bugfix: 修复random负载均衡初始化时空peer组导致的除零问题 (lianglli)
 * Bugfix: 修复round-robin首次选择跳过第一个peer的问题 (lianglli)

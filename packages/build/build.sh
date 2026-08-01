@@ -339,7 +339,8 @@ build_apk() {
     rm -rf "$work"
     mkdir -p "$work"
 
-    cp "$SELF_DIR/apk/APKBUILD" "$SELF_DIR/apk/tengine.pre-install" "$work/"
+    cp "$SELF_DIR/apk/APKBUILD" "$SELF_DIR/apk/tengine.pre-install" \
+        "$SELF_DIR/apk/tengine.post-install" "$work/"
     cp "$SELF_DIR/conf/tengine.openrc" "$SELF_DIR/conf/tengine.logrotate" \
        "$SELF_DIR/conf/tengine.conf" "$work/"
     cp "$SELF_DIR/conf/conf.d/default.conf" "$work/"

@@ -27,7 +27,7 @@ makedepends="
 	g++
 	perl
 	"
-install="$pkgname.pre-install"
+install="$pkgname.pre-install $pkgname.post-install"
 subpackages="$pkgname-doc $pkgname-openrc"
 # tengine-deps.tar.gz holds the pinned Tongsuo / xquic / LuaJIT / resty
 # tarballs; abuild unpacks it to $srcdir/deps.
@@ -104,8 +104,11 @@ package() {
 	install -D -m 0755 "$srcdir"/tengine.openrc \
 		"$pkgdir"/etc/init.d/tengine
 
-	install -d -m 0700 -o tengine -g tengine "$pkgdir"/var/cache/tengine
-	install -d -m 0755 -o tengine -g tengine "$pkgdir"/var/log/tengine
+	# No -o/-g here: the tengine user only comes into being when the package is
+	# installed, so resolving the name at build time fails. .post-install takes
+	# ownership once the directories are on disk, the same way the deb does.
+	install -d -m 0700 "$pkgdir"/var/cache/tengine
+	install -d -m 0755 "$pkgdir"/var/log/tengine
 	install -d -m 0755 "$pkgdir"/usr/lib/tengine/modules
 
 	# /run is a tmpfs; make install creates it because of --pid-path
