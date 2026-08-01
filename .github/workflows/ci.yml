@@ -140,6 +140,7 @@ jobs:
            cases/ngx_http_upstream_check_module/http_check.t \
            cases/ngx_http_upstream_check_module/http_check_keepalive_body.t \
            cases/ngx_http_upstream_check_module/tcp_check.t \
+           cases/ngx_http_upstream_check_module/unix_socket_check.t \
            cases/ngx_http_upstream_check_module/websocket.t \
            cases/ngx_http_upstream_check_module/check_interface.t
      - name: upstream check HTTP parser unit tests
