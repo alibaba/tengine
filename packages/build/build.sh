@@ -398,12 +398,17 @@ bootstrap_cmd() {
             cat <<'EOS'
 if command -v dnf >/dev/null 2>&1; then
     if dnf -q list pcre2-devel >/dev/null 2>&1; then _pcre=pcre2-devel; else _pcre=pcre-devel; fi
+    # el9 images carry curl-minimal, which conflicts with the full curl package.
+    # It provides /usr/bin/curl all the same, so only ask for curl when the image
+    # has none -- replacing it would drag the whole dependency chain along.
+    _curl=curl
+    command -v curl >/dev/null 2>&1 && _curl=
     # Tongsuo's Configure pulls in a handful of Perl modules that every distro
     # splits up differently -- and on el8 "perl-FindBin" is hidden behind a
     # module stream, so asking for the package name gets filtered out entirely.
     # Requesting the perl(...) virtual provides instead lets rpm resolve each
     # module to whatever package happens to carry it.
-    dnf -y install rpm-build gcc gcc-c++ make cmake tar findutils diffutils curl \
+    dnf -y install rpm-build gcc gcc-c++ make cmake tar findutils diffutils $_curl \
         perl "perl(FindBin)" "perl(IPC::Cmd)" "perl(lib)" \
         openssl-devel zlib-devel systemd "$_pcre"
 else
