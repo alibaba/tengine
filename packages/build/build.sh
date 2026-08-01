@@ -360,8 +360,10 @@ build_apk() {
     REPODEST="$work/repo"
     export REPODEST
 
+    # Both invocations need -F: abuild refuses to run as root without it, and
+    # the container build has no unprivileged user to drop to.
     info "abuild tengine-${TENGINE_VERSION}_p${BUILD_TS}"
-    ( cd "$work" && abuild checksum && abuild -F -r )
+    ( cd "$work" && abuild -F checksum && abuild -F -r )
 
     find "$work/repo" -name '*.apk' -exec cp {} "$OUTDIR/" \;
     [ "$KEEP_BUILDDIR" = yes ] || rm -rf "$work"
