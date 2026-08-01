@@ -464,9 +464,23 @@ run_docker_target() {
     engine=$(command -v docker || command -v podman) || \
         die "neither docker nor podman found"
 
+    # The SUSE and openEuler images leave %dist empty, so their packages come out
+    # as tengine-<ver>-<ts>.<arch>.rpm with nothing naming the target -- two
+    # different distributions producing the same file name once a release
+    # directory is assembled. Give them one unless the caller asked for its own.
+    target_dist=""
+    if [ -z "$DIST_TAG" ]; then
+        case "$target" in
+            sles15)        target_dist=".sles15" ;;
+            openeuler2403) target_dist=".oe2403" ;;
+        esac
+    fi
+
     inner="--outdir /out --timestamp $BUILD_TS"
     if [ -n "$DIST_TAG" ]; then
         inner="$inner --dist $DIST_TAG"
+    elif [ -n "$target_dist" ]; then
+        inner="$inner --dist $target_dist"
     fi
     for f in $FEATURES; do
         inner="$inner --with $f"

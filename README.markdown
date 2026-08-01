@@ -123,5 +123,5 @@ Dingtalk user group: 23394285
 [BSD-2-Clause License](https://github.com/alibaba/tengine/blob/master/LICENSE)
 
 <h1 align="center" style="border-bottom: none">
-    <a href="https://tengine.taobao.org" target="_blank"><img alt="Tengine" src="/docs/image/tengine-logo.png"></a>
+    <a href="https://tengine.taobao.org" target="_blank"><img alt="Tengine" src="/docs/image/tengine-logo.png" width="294"></a>
 </h1>

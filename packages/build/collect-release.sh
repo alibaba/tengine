@@ -17,8 +17,10 @@
 #   * apk file names carry no architecture, so the x86_64 and aarch64 builds of
 #     the same version are byte-different files with identical names. The
 #     architecture is appended here.
-#   * every architecture's job produces the same .src.rpm. Those are identical,
-#     so the duplicate is dropped after a checksum comparison.
+#   * every architecture's job produces a .src.rpm of the same sources, but rpm
+#     stamps the build platform into the header, so the two are not byte-equal
+#     and a checksum comparison cannot dedupe them. One per target is what a
+#     release needs, so the second architecture's copy is dropped.
 #
 # Anything else that collides is kept under a <target>- prefix rather than
 # overwritten, and a collision that survives even that is a hard error: a
@@ -73,13 +75,19 @@ for jobdir in "$INDIR"/*; do
         [ -f "$src" ] || continue
         base=$(basename "$src")
 
+        srcrpm=no
         case "$base" in
-            *.apk) base="${base%.apk}.$arch.apk" ;;
+            *.apk)     base="${base%.apk}.$arch.apk" ;;
+            *.src.rpm) srcrpm=yes ;;
         esac
 
         dest="$OUTDIR/$base"
         if [ -e "$dest" ]; then
-            if [ "$(sha256_of "$src")" = "$(sha256_of "$dest")" ]; then
+            # A source rpm that is already there came from this target's other
+            # architecture and carries the same sources, so drop it without
+            # comparing checksums -- they never match.
+            if [ "$srcrpm" = yes ] || \
+               [ "$(sha256_of "$src")" = "$(sha256_of "$dest")" ]; then
                 skipped=$((skipped + 1))
                 continue
             fi
