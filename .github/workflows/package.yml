@@ -16,6 +16,11 @@ on:
         default: ''
   push:
     tags:
+      # 3.x tags are bare version numbers (3.1.0, 3.2.0-rc1); 2.x used a
+      # "tengine-" prefix. Both are accepted -- the version is derived by
+      # stripping that prefix when present, so either shape yields the same
+      # package and image versions.
+      - '[0-9]+.[0-9]+.[0-9]+*'
       - 'tengine-*'
 
 jobs:
