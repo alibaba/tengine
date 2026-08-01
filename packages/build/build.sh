@@ -84,7 +84,7 @@ docker_image() {
         debian12)   echo "debian:12|deb" ;;
         ubuntu2204) echo "ubuntu:22.04|deb" ;;
         ubuntu2404) echo "ubuntu:24.04|deb" ;;
-        alpine)     echo "alpine:3.20|apk" ;;
+        alpine)     echo "alpine:3.22|apk" ;;
         *)          return 1 ;;
     esac
 }
