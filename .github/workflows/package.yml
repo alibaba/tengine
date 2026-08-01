@@ -226,7 +226,7 @@ jobs:
           Tengine $version packages and container images.
 
           Every artifact here is built with the full feature set: **Tongsuo**
-          (NTLS / Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
+          (NTLS / TLCP, Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
           **LuaJIT** scripting stack, all from the versions pinned in
           \`packages/build/deps.env\`. Tongsuo is linked statically, so these
           builds do not follow the system OpenSSL.
