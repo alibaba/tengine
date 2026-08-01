@@ -83,6 +83,7 @@ jobs:
           - sles15
           - debian11
           - debian12
+          - debian13
           - ubuntu2204
           - ubuntu2404
           - alpine
