@@ -16,7 +16,7 @@ examples and guides.</p>
 
 
 ## Introduction
-Tengine is a high-performance web server and reverse proxy originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It offers HTTP/3, Kubernetes Ingress support, zero-downtime dynamic configuration, active upstream health checks, and NTLS (SM2/SM3/SM4), while remaining 100% compatible with [nginx](http://nginx.org). Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
+Tengine is a high-performance web server and reverse proxy originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It offers HTTP/3, Kubernetes Ingress support, zero-downtime dynamic configuration, active upstream health checks, and NTLS/TLCP (SM2/SM3/SM4), while remaining 100% compatible with [nginx](http://nginx.org). Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
 
 Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to [get involved](https://github.com/alibaba/tengine).
 
@@ -35,7 +35,7 @@ Tengine has been an open source project since December 2011. It is being activel
 * Dynamically configure failover to a backup upstream or a redirect by response status code with [tengine-ingress](https://github.com/alibaba/tengine-ingress).
 * Support the CONNECT HTTP method for forward proxy.
 * Support asynchronous OpenSSL, using hardware such as QAT for HTTPS acceleration.
-* NTLS (dual-certificate TLS) support with the Chinese SM2/SM3/SM4 algorithms via [Tongsuo](https://github.com/Tongsuo-Project/Tongsuo).
+* NTLS/TLCP (dual-certificate TLS, GM/T 0024) support with the Chinese SM2/SM3/SM4 algorithms via [Tongsuo](https://github.com/Tongsuo-Project/Tongsuo).
 * Zstandard (zstd) response compression, and serving pre-compressed static files.
 * Enhanced operations monitoring, such as asynchronous log & rollback, DNS caching, memory usage, etc.
 * Fine-grained timing statistics variables for the request and for each stage of the upstream interaction.
