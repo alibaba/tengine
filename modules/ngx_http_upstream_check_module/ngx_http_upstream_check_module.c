@@ -503,6 +503,7 @@ static void ngx_http_upstream_check_status_prometheus_format(ngx_buf_t *b,
 
 static ngx_int_t ngx_http_upstream_check_addr_change_port(ngx_pool_t *pool,
     ngx_addr_t *dst, ngx_addr_t *src, ngx_uint_t port);
+static ngx_flag_t ngx_http_upstream_check_addr_has_port(ngx_addr_t *addr);
 
 static ngx_check_conf_t *ngx_http_get_check_type_conf(ngx_str_t *str);
 
@@ -958,7 +959,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
                    "peer: %V, index: %ui",
                    &us->host, &peer_addr->name, index);
 
-    if (ucscf->port) {
+    if (ucscf->port && ngx_http_upstream_check_addr_has_port(peer_addr)) {
         peer->check_peer_addr = ngx_pcalloc(pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
             return NGX_ERROR;
@@ -968,10 +969,30 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
                 peer->check_peer_addr, peer_addr, ucscf->port)
             != NGX_OK) {
 
+            ngx_log_error(NGX_LOG_ERR, pool->log, 0,
+                          "http upstream check cannot apply \"port=%ui\" to "
+                          "peer \"%V\" in upstream \"%V\", it is excluded "
+                          "from health checking",
+                          ucscf->port, &peer_addr->name, &us->host);
+
             return NGX_ERROR;
         }
 
     } else {
+        /*
+         * An address without the notion of a port, such as a unix domain
+         * socket, cannot be checked on a different port: ignore "port=" and
+         * check the peer on its own address instead of silently dropping it
+         * out of health checking.
+         */
+        if (ucscf->port) {
+            ngx_log_error(NGX_LOG_WARN, pool->log, 0,
+                          "http upstream check ignores \"port=%ui\" for peer "
+                          "\"%V\" in upstream \"%V\", the peer has no port "
+                          "and is checked on its own address",
+                          ucscf->port, &peer_addr->name, &us->host);
+        }
+
         peer->check_peer_addr = peer->peer_addr;
     }
 
@@ -1042,7 +1063,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
 
-    if (ucscf->port) {
+    if (ucscf->port && ngx_http_upstream_check_addr_has_port(peer_addr)) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
             return NGX_ERROR;
@@ -1052,10 +1073,30 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
                 peer->check_peer_addr, peer_addr, ucscf->port)
             != NGX_OK) {
 
+            ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                               "\"check\" cannot apply \"port=%ui\" to peer "
+                               "\"%V\" in upstream \"%V\", it is excluded "
+                               "from health checking",
+                               ucscf->port, &peer_addr->name, &us->host);
+
             return NGX_ERROR;
         }
 
     } else {
+        /*
+         * An address without the notion of a port, such as a unix domain
+         * socket, cannot be checked on a different port: ignore "port=" and
+         * check the peer on its own address instead of silently dropping it
+         * out of health checking.
+         */
+        if (ucscf->port) {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "\"check\" ignores \"port=%ui\" for peer "
+                               "\"%V\" in upstream \"%V\", the peer has no "
+                               "port and is checked on its own address",
+                               ucscf->port, &peer_addr->name, &us->host);
+        }
+
         peer->check_peer_addr = peer->peer_addr;
     }
 
@@ -1063,6 +1104,28 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
         ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
 
     return peer->index;
+}
+
+
+/*
+ * Whether the address family carries a port that a health check can be
+ * redirected to. Keep the families in sync with the switch in
+ * ngx_http_upstream_check_addr_change_port() below.
+ */
+static ngx_flag_t
+ngx_http_upstream_check_addr_has_port(ngx_addr_t *addr)
+{
+    switch (addr->sockaddr->sa_family) {
+
+    case AF_INET:
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+#endif
+        return 1;
+
+    default:
+        return 0;
+    }
 }
 
 

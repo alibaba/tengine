@@ -745,7 +745,8 @@ ngx_xquic_intercom_send(ngx_int_t worker_num, ngx_xquic_recv_packet_t *packet,
     c = ctx->connection;
 
     n = sendto(c->fd, packet, sizeof(ngx_xquic_recv_packet_t), 0,
-               &ctx->addr[worker_num], ctx->addrlen[worker_num]);
+               (struct sockaddr *) &ctx->addr[worker_num],
+               ctx->addrlen[worker_num]);
 
     ngx_xquic_stat_send_cnt++;
 
