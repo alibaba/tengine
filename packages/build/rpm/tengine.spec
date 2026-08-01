@@ -109,17 +109,22 @@ BuildRequires:  cmake >= 3.5
 BuildRequires:  gcc-c++
 %endif
 %if %{with tongsuo}
-# Tongsuo's Configure is Perl and needs FindBin; Text::Template comes from the
-# tarball's own external/perl fallback. SUSE and el7 ship one monolithic perl,
-# everything newer splits the interpreter and FindBin into separate packages.
+# Tongsuo's Configure is Perl; Text::Template comes from the tarball's own
+# external/perl fallback. SUSE and el7 ship one monolithic perl, everything
+# newer splits it up -- and on el8 the perl-FindBin package name is hidden
+# behind a module stream, so depend on the perl(...) virtual provides and let
+# rpm map each module to whichever package carries it.
 %if 0%{?suse_version}
 BuildRequires:  perl
 %else
 %if 0%{?rhel} == 7
 BuildRequires:  perl
+BuildRequires:  perl(IPC::Cmd)
 %else
-BuildRequires:  perl-interpreter
-BuildRequires:  perl-FindBin
+BuildRequires:  perl
+BuildRequires:  perl(FindBin)
+BuildRequires:  perl(IPC::Cmd)
+BuildRequires:  perl(lib)
 %endif
 %endif
 %endif
