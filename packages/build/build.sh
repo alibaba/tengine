@@ -418,8 +418,12 @@ else
     sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
            -e 's|^#*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' \
            /etc/yum.repos.d/CentOS-*.repo
+    # perl-core drags in the full set of core modules. Tongsuo's Configure and
+    # its generated Makefile reach for several of them (IPC::Cmd, Data::Dumper,
+    # ...) and el7 splits every one into its own package, so pulling them in
+    # one by one just moves the failure to the next module.
     yum -y install rpm-build gcc gcc-c++ make tar findutils diffutils curl \
-        perl "perl(IPC::Cmd)" openssl-devel zlib-devel pcre-devel systemd
+        perl-core openssl-devel zlib-devel pcre-devel systemd
     # el7 packages CMake 2.8 and xquic needs >= 3.5. The usual answer, cmake3,
     # lives only in EPEL 7 -- itself EOL, with a dead metalink and nothing but
     # an archive mirror left, so pulling it in means rewriting a second set of
