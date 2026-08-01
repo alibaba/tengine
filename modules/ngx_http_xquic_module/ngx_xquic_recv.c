@@ -37,7 +37,14 @@ ngx_xquic_packet_get_cid(ngx_xquic_recv_packet_t *packet,
 }
 
 
-inline void
+/*
+ * static, because a bare C99 "inline" definition provides no external symbol:
+ * any compiler that declines to inline it leaves an undefined reference behind,
+ * which is what Alpine's gcc does here while the other distros' builds happen
+ * to inline it away. Both call sites live in this file, so internal linkage is
+ * all this needs.
+ */
+static inline void
 ngx_xquic_record_recv_pkts(ngx_int_t record_interval, char *mode, uint64_t *total_recv_count,
     uint64_t *last_recv_count, ngx_msec_t *last_record_time)
 {
