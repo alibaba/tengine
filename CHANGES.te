@@ -79,6 +79,9 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
     *) Feature: add new option --with-xquic-rpath to decouple the xquic
        runtime path from the link path (lianglli)
 
+    *) Feature: expose ngx_http_upstream_rbtree_lookup() so that third-party
+       modules can look an upstream up by name (lhanjian)
+
     *) Change: update core to Nginx-1.31.3 (lianglli)
 
     *) Change: update ngx_http_lua_module to 0.10.29, which adds PCRE2
