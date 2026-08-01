@@ -38,6 +38,12 @@
 # Override with --define "_buildhost ..." if a real hostname is wanted.
 %global _buildhost tengine-builder
 
+# el10 and Fedora enable LTO by default. Linking libxquic.so then re-runs the
+# analysis over Tongsuo's objects at link time, where gcc reports
+# free-nonheap-object inside BN_RECP_CTX_free and -Werror makes it fatal.
+# Nothing in this package benefits from LTO.
+%global _lto_cflags %{nil}
+
 %bcond_with zstd
 %bcond_with geoip
 
