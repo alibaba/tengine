@@ -81,12 +81,17 @@ jobs:
           - anolis8
           - openeuler2403
           - sles15
+          - sles16
           - debian11
           - debian12
           - debian13
           - ubuntu2204
           - ubuntu2404
-          - alpine
+          - ubuntu2604
+          - alpine321
+          - alpine322
+          - alpine323
+          - alpine324
     steps:
       - uses: actions/checkout@v4
 

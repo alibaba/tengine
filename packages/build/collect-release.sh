@@ -14,9 +14,10 @@
 # Two artifact naming quirks have to be handled, or files would silently
 # overwrite each other once the per-job directories are merged:
 #
-#   * apk file names carry no architecture, so the x86_64 and aarch64 builds of
-#     the same version are byte-different files with identical names. The
-#     architecture is appended here.
+#   * apk file names carry neither the architecture nor anything identifying the
+#     Alpine release they were built on, so every alpine target and architecture
+#     would produce the same name. Both are appended here, which is what lets the
+#     release ship one apk per Alpine version.
 #   * every architecture's job produces a .src.rpm of the same sources, but rpm
 #     stamps the build platform into the header, so the two are not byte-equal
 #     and a checksum comparison cannot dedupe them. One per target is what a
@@ -77,7 +78,7 @@ for jobdir in "$INDIR"/*; do
 
         srcrpm=no
         case "$base" in
-            *.apk)     base="${base%.apk}.$arch.apk" ;;
+            *.apk)     base="${base%.apk}.$target.$arch.apk" ;;
             *.src.rpm) srcrpm=yes ;;
         esac
 
