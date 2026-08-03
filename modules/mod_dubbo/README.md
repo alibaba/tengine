@@ -35,7 +35,7 @@ sudo yum install gcc-c++
 
 ### Run Tengine
 
-modify tengine config file ```/usr/local/nginx/conf/nginx.conf``` to 
+modify tengine config file ```/usr/local/tengine/conf/tengine.conf``` to 
 
 ```
 worker_processes  1;
@@ -81,15 +81,15 @@ http {
 ### Start Tengine
 
 ```
-/usr/local/nginx/sbin/nginx
+/usr/local/tengine/sbin/tengine
 ```
 
 Other Commond (no need execute usual)
 ```
 #restart
-/usr/local/nginx/sbin/nginx -s reload
+/usr/local/tengine/sbin/tengine -s reload
 #stop
-/usr/local/nginx/sbin/nginx -s stop
+/usr/local/tengine/sbin/tengine -s stop
 ```
 
 ### More document

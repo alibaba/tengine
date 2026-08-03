@@ -89,7 +89,7 @@ http {
 启动 tengine
 
 ```shell
-/usr/local/tengine/sbin/tengine -p /usr/local/tengine/ -c conf/nginx.conf
+/usr/local/tengine/sbin/tengine -p /usr/local/tengine/ -c conf/tengine.conf
 ```
 
 启动后 tengine 监听 2443 UDP 端口，此端口可以接收 HTTP3 请求，可以通过编译 xquic 自带的 `test_client` 测试（cmake 编译 xquic 时需要带 `-DXQC_ENABLE_TESTING=1` 参数）

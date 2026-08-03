@@ -136,7 +136,7 @@ jobs:
         working-directory: tengine
         env:
           TEST_OPENSSL_BINARY: ${{ runner.temp }}/tongsuo/bin/tongsuo
-          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+          TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
           TEST_NGINX_LEAVE: 1
         run: |
           prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_tongsuo_ntls/t
@@ -144,7 +144,7 @@ jobs:
         working-directory: tengine
         env:
           TEST_XQUIC_CLIENT: ${{ github.workspace }}/xquic/build/test_client
-          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+          TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
           TEST_NGINX_LEAVE: 1
         run: |
           prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_http_xquic_module/t

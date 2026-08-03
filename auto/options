@@ -491,12 +491,12 @@ cat << END
   --help                             print this message
 
   --prefix=PATH                      set installation prefix
-  --sbin-path=PATH                   set nginx binary pathname
+  --sbin-path=PATH                   set tengine binary pathname
   --modules-path=PATH                set modules path
-  --conf-path=PATH                   set nginx.conf pathname
+  --conf-path=PATH                   set tengine.conf pathname
   --error-log-path=PATH              set error log pathname
-  --pid-path=PATH                    set nginx.pid pathname
-  --lock-path=PATH                   set nginx.lock pathname
+  --pid-path=PATH                    set tengine.pid pathname
+  --lock-path=PATH                   set tengine.lock pathname
 
   --user=USER                        set non-privileged user for
                                      worker processes
@@ -706,12 +706,32 @@ if [ ".$NGX_PLATFORM" = ".win32" ]; then
 fi
 
 
-NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/nginx}
+# Tengine 3.2.0 renamed the default install layout from the inherited nginx
+# names to tengine (prefix /usr/local/tengine, binary sbin/tengine, config
+# conf/tengine.conf). An install made by an earlier release lives under
+# different paths, so "make install" no longer replaces it and the old binary
+# keeps serving traffic. Warn when both the paths are defaulted and a legacy
+# install is present, since the two would otherwise coexist silently.
+if [ -z "$NGX_PREFIX" ] && [ -z "$NGX_SBIN_PATH" ] \
+   && [ -x /usr/local/nginx/sbin/nginx ]
+then
+    NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
+$0: warning: found an existing install at \"/usr/local/nginx/sbin/nginx\". \
+Tengine 3.2.0 installs to \"/usr/local/tengine/sbin/tengine\" by default, so \
+\"make install\" will not replace that binary and the old one keeps running. \
+Remove the old install once you have switched over, or keep the previous \
+layout by passing --prefix=/usr/local/nginx \
+--sbin-path=/usr/local/nginx/sbin/nginx \
+--conf-path=/usr/local/nginx/conf/nginx.conf \
+--pid-path=/usr/local/nginx/logs/nginx.pid"
+fi
+
+NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/tengine}
 NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
-NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
+NGX_CONF_PATH=${NGX_CONF_PATH:-conf/tengine.conf}
 NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
-NGX_PID_PATH=${NGX_PID_PATH:-logs/nginx.pid}
-NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/nginx.lock}
+NGX_PID_PATH=${NGX_PID_PATH:-logs/tengine.pid}
+NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/tengine.lock}
 
 if [ ".$NGX_ERROR_LOG_PATH" = ".stderr" ]; then
     NGX_ERROR_LOG_PATH=

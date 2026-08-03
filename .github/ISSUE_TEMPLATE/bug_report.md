@@ -32,7 +32,7 @@ assignees: ''
 
 ### Ⅵ. Environment:
 
-- Tengine version (use `sbin/nginx -V`):
+- Tengine version (use `sbin/tengine -V`):
 - OS (e.g. from /etc/os-release):
 - Kernel (e.g. `uname -a`):
 - Others:

@@ -25,6 +25,7 @@ Tengine 3.2.0 [2026-07-31]
 * Feature: 新增发行版软件包(rpm、deb和apk)与多架构容器镜像，默认构建完备功能集——Tongsuo、xquic和Lua (lianglli)
 * Feature: 新增configure选项--with-xquic-rpath，将xquic运行时查找路径与链接路径解耦 (lianglli)
 * Feature: 公开ngx_http_upstream_rbtree_lookup()，便于第三方模块按名字查找upstream (lhanjian)
+* Change: 自助编译的默认安装路径由沿用nginx的命名改为tengine：前缀/usr/local/tengine、二进制sbin/tengine、配置conf/tengine.conf、pid文件logs/tengine.pid，与rpm、deb、apk包及容器镜像保持一致。旧版本安装在原路径下，make install不会覆盖它，旧二进制会继续运行；切换后请自行删除旧安装，或通过--prefix、--sbin-path、--conf-path、--pid-path显式保留原有布局 (lianglli)
 * Change: 升级core代码到Nginx-1.31.3版本 (lianglli)
 * Change: 升级ngx_http_lua_module到0.10.29版本，支持PCRE2并与pin的lua-resty-core版本匹配，此前仅有PCRE2的环境下编译失败 (lianglli)
 * Change: 默认拥塞控制算法由CUBIC改为BBR [XQUIC] (lurker-Chen)

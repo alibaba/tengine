@@ -250,8 +250,8 @@ make install DESTDIR=%{buildroot}
 # build-deps.sh are staged with their final absolute paths already in place.
 cp -a %{_builddir}/deps-staging/. %{buildroot}/
 
-# make install drops the stock nginx.conf plus *.default copies; replace them
-# with the packaged tengine.conf so the shipped names stay consistent.
+# make install ships the in-tree conf/tengine.conf plus *.default copies;
+# replace them with the packaged tengine.conf, which adds the conf.d layout.
 rm -f %{buildroot}%{tengine_confdir}/*.default
 install -p -m 0644 packages/build/conf/tengine.conf \
     %{buildroot}%{tengine_confdir}/tengine.conf
@@ -278,7 +278,7 @@ sed -e 's|%%PREFIX%%|%{tengine_datadir}|' \
     -e 's|%%PID_PATH%%|/run/tengine.pid|' \
     -e 's|%%CONF_PATH%%|%{tengine_confdir}/tengine.conf|' \
     -e 's|%%ERROR_LOG_PATH%%|%{tengine_logdir}/error.log|' \
-    man/nginx.8 > tengine.8
+    man/tengine.8 > tengine.8
 install -D -p -m 0644 tengine.8 %{buildroot}%{_mandir}/man8/tengine.8
 
 install -d -m 0700 %{buildroot}%{tengine_home}

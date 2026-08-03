@@ -64,7 +64,7 @@ jobs:
        run: |
          sudo make install
 
-# TODO: fix tests so they don't depend on /usr/local/nginx/logs/
+# TODO: fix tests so they don't depend on /usr/local/tengine/logs/
 #       so we can run `make`, `make test`, `make install`.
 
      - name: build
@@ -117,7 +117,7 @@ jobs:
      - name: tengine test cases using nginx-tests lib
        working-directory: tests/nginx-tests
        env:
-         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
        run: |
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
          prove -v -Inginx-tests/lib tengine-tests/
@@ -130,12 +130,12 @@ jobs:
        run: |
          sudo cpanm --notest Shell Test::Base Test::LongString List::MoreUtils LWP::UserAgent HTTP::Response  > build.log 2>&1 || (cat build.log && exit 1)
          mkdir t
-         PATH=/usr/local/nginx/sbin:$PATH \
+         TEST_NGINX_BINARY=/usr/local/tengine/sbin/tengine \
          prove -v -Itest-nginx/lib cases/
          # the cases/ prove above is non-recursive, so the upstream_check cases
          # live in a subdir that was never exercised; invoke them explicitly.
          # ssl_hello_check.t stays out on purpose -- see the note in that file.
-         PATH=/usr/local/nginx/sbin:$PATH \
+         TEST_NGINX_BINARY=/usr/local/tengine/sbin/tengine \
          prove -v -Itest-nginx/lib \
            cases/ngx_http_upstream_check_module/http_check.t \
            cases/ngx_http_upstream_check_module/http_check_keepalive_body.t \
@@ -172,7 +172,7 @@ jobs:
      - name: run native tunnel test cases
        working-directory: tests/nginx-tests
        env:
-         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
        run: |
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
          prove -v -Inginx-tests/lib \

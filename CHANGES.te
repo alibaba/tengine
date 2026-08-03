@@ -82,6 +82,16 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
     *) Feature: expose ngx_http_upstream_rbtree_lookup() so that third-party
        modules can look an upstream up by name (lhanjian)
 
+    *) Change: the default install layout inherited from nginx is now named
+       after Tengine: prefix /usr/local/tengine, binary sbin/tengine,
+       configuration conf/tengine.conf, and logs/tengine.pid. This matches
+       the layout the rpm, deb and apk packages and the container images
+       already used. An install made by an earlier release uses the old
+       paths, so "make install" leaves it in place instead of upgrading it
+       and the old binary keeps running; remove it once you have switched
+       over, or keep the previous layout by passing --prefix, --sbin-path,
+       --conf-path and --pid-path explicitly (lianglli)
+
     *) Change: update core to Nginx-1.31.3 (lianglli)
 
     *) Change: update ngx_http_lua_module to 0.10.29, which adds PCRE2
