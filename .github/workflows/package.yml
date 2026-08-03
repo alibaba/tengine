@@ -87,7 +87,10 @@ jobs:
           - ubuntu2204
           - ubuntu2404
           - ubuntu2604
-          - alpine
+          - alpine321
+          - alpine322
+          - alpine323
+          - alpine324
     steps:
       - uses: actions/checkout@v4
 
