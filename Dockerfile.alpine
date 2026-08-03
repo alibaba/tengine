@@ -51,7 +51,7 @@ RUN set -eux; \
     cp -a /tmp/deps-staging/. /out/
 
 # Same post-install fixups as the distro packages: ship the packaged
-# tengine.conf instead of the stock nginx.conf, resolve the libdir placeholder
+# tengine.conf instead of the in-tree one, resolve the libdir placeholder
 # in lua_package_cpath, and drop /run (a tmpfs at runtime).
 RUN set -eux; \
     rm -f /out/etc/tengine/*.default; \

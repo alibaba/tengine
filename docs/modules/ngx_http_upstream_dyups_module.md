@@ -4,7 +4,7 @@ This module can be used to update your upstream-list without reloadding Nginx.
 
 ## Example
 
-file: conf/nginx.conf
+file: conf/tengine.conf
 
 `ATTENTION`: You MUST use nginx variable to do proxy_pass
 

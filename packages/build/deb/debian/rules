@@ -51,8 +51,8 @@ override_dh_auto_install:
 	# The bundled libxquic.so / libluajit and the Lua modules are staged with
 	# their final absolute paths already in place.
 	cp -a $(CURDIR)/deps-staging/. $(PKGDIR)/
-	# make install drops the stock nginx.conf plus *.default copies; replace
-	# them with the packaged tengine.conf so the shipped names stay consistent.
+	# make install ships the in-tree conf/tengine.conf plus *.default copies;
+	# replace them with the packaged tengine.conf, which adds the conf.d layout.
 	rm -f $(CONFDIR)/*.default
 	install -p -m 0644 packages/build/conf/tengine.conf \
 		$(CONFDIR)/tengine.conf
@@ -65,7 +65,7 @@ override_dh_auto_install:
 	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
 	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
 	    -e 's|%%ERROR_LOG_PATH%%|/var/log/tengine/error.log|' \
-	    man/nginx.8 > debian/tengine.8
+	    man/tengine.8 > debian/tengine.8
 	install -D -p -m 0644 debian/tengine.8 \
 		$(PKGDIR)/usr/share/man/man8/tengine.8
 	install -d -m 0700 $(PKGDIR)/var/cache/tengine

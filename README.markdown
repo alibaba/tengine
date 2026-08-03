@@ -93,8 +93,38 @@ make
 sudo make install
 ```
 
-By default, it will be installed to _/usr/local/nginx_. You can use the __'--prefix'__ option to specify the root directory.
+By default, it will be installed to _/usr/local/tengine_. Everything is named after Tengine, which matches the layout used by the `.rpm`/`.deb`/`.apk` packages and the container images:
+
+| | Default path |
+|---|---|
+| binary | `/usr/local/tengine/sbin/tengine` |
+| configuration | `/usr/local/tengine/conf/tengine.conf` |
+| pid file | `/usr/local/tengine/logs/tengine.pid` |
+| error log | `/usr/local/tengine/logs/error.log` |
+| access log | `/usr/local/tengine/logs/access.log` |
+| dynamic modules | `/usr/local/tengine/modules` |
+
+You can use the __'--prefix'__ option to specify the root directory, or `--sbin-path`, `--conf-path`, `--pid-path`, `--error-log-path` and `--http-log-path` to place the individual files.
 If you want to know all the _'configure'_ options, you should run __'./configure --help'__ for help.
+
+> **Upgrading from 3.1.0 or earlier.** Those releases installed to
+> _/usr/local/nginx_ as `sbin/nginx` driven by `conf/nginx.conf`. Because
+> 3.2.0 writes to different paths, `make install` does not replace that
+> install -- the old binary stays on disk and keeps serving traffic, and
+> running it still reports the old version, which easily reads as "the
+> upgrade did not take effect". After switching over, stop and remove the old
+> install, and update any systemd unit, init script or log rotation config
+> still pointing at the old paths. `configure` prints a warning when it finds
+> an install at `/usr/local/nginx/sbin/nginx`.
+>
+> To keep the previous layout instead, pass the old paths explicitly:
+>
+> ```bash
+> ./configure --prefix=/usr/local/nginx \
+>     --sbin-path=/usr/local/nginx/sbin/nginx \
+>     --conf-path=/usr/local/nginx/conf/nginx.conf \
+>     --pid-path=/usr/local/nginx/logs/nginx.pid
+> ```
 
 A plain `./configure` builds without Tongsuo, xquic and Lua -- those need their own libraries. To reproduce the full feature set of the released packages and images, use the packaging helpers:
 

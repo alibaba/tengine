@@ -97,4 +97,4 @@ jobs:
               --without-http_upstream_keepalive_module
             make -j4
             make install
-            file /usr/local/nginx/sbin/nginx | grep aarch64
+            file /usr/local/tengine/sbin/tengine | grep aarch64

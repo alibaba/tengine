@@ -26,10 +26,10 @@
 .\"
 .\"
 .Dd June 16, 2015
-.Dt NGINX 8
+.Dt TENGINE 8
 .Os
 .Sh NAME
-.Nm nginx
+.Nm tengine
 .Nd "HTTP and reverse proxy server, mail proxy server"
 .Sh SYNOPSIS
 .Nm
@@ -177,30 +177,36 @@ Error log file.
 Exit status is 0 on success, or 1 if the command fails.
 .Sh EXAMPLES
 Test configuration file
-.Pa ~/mynginx.conf
+.Pa ~/mytengine.conf
 with global directives for PID and quantity of worker processes:
 .Bd -literal -offset indent
-nginx -t -c ~/mynginx.conf \e
-	-g "pid /var/run/mynginx.pid; worker_processes 2;"
+tengine -t -c ~/mytengine.conf \e
+	-g "pid /var/run/mytengine.pid; worker_processes 2;"
 .Ed
 .Sh SEE ALSO
-.\"Xr nginx.conf 5
+.\"Xr tengine.conf 5
 .\"Pp
 Documentation at
-.Pa http://nginx.org/en/docs/ .
+.Pa https://tengine.taobao.org/ .
 .Pp
 For questions and technical support, please refer to
-.Pa http://nginx.org/en/support.html .
+.Pa https://github.com/alibaba/tengine/issues .
 .Sh HISTORY
-Development of
 .Nm
-started in 2002, with the first public release on October 4, 2004.
+is a fork of nginx, whose development started in 2002 with the first public
+release on October 4, 2004.
+.Nm
+was started at Taobao and first released publicly on December 1, 2011.
 .Sh AUTHORS
 .An -nosplit
-.An Igor Sysoev Aq igor@sysoev.ru .
+.An Igor Sysoev Aq igor@sysoev.ru
+wrote nginx, on which
+.Nm
+is based.
+.Nm
+is maintained by the Tengine team at Alibaba.
 .Pp
 This manual page was originally written by
 .An Sergey A. Osokin Aq osa@FreeBSD.org.ru
-as a result of compiling many
-.Nm
+as a result of compiling many nginx
 documents from all over the world.

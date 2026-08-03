@@ -149,7 +149,7 @@ jobs:
      - name: run cases in nginx-tests
        working-directory: tests/nginx-tests
        env:
-         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
          # Do not set TEST_NGINX_UNSAFE here: it force-enables assertions that
          # upstream guards with "skip 'unsafe on VM'". Those assertions rely on
          # sub-second response timing and are unreliable on a 2-core CI runner
@@ -164,5 +164,5 @@ jobs:
          prove -I nginx-tests/lib nginx-tests/
          # It must be root for some cases.
          sudo groupadd wheel    # for proxy_bind_transparent.t
-         sudo TEST_NGINX_BINARY=/usr/local/nginx/sbin/nginx TEST_NGINX_UNSAFE=yes prove -I nginx-tests/lib nginx-tests/proxy_bind_transparent.t nginx-tests/proxy_bind_transparent_capability.t
+         sudo TEST_NGINX_BINARY=/usr/local/tengine/sbin/tengine TEST_NGINX_UNSAFE=yes prove -I nginx-tests/lib nginx-tests/proxy_bind_transparent.t nginx-tests/proxy_bind_transparent_capability.t
 

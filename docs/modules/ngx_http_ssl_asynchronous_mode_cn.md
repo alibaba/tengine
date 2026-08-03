@@ -28,7 +28,7 @@ Description
 配置示例
 ==========
 
-配置文件: conf/nginx.conf
+配置文件: conf/tengine.conf
 '''
     http {
         ssl_async  on;

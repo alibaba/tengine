@@ -54,39 +54,39 @@ echo
 
 
 cat << END
-  nginx path prefix: "$NGX_PREFIX"
-  nginx binary file: "$NGX_SBIN_PATH"
-  nginx modules path: "$NGX_MODULES_PATH"
-  nginx configuration prefix: "$NGX_CONF_PREFIX"
-  nginx configuration file: "$NGX_CONF_PATH"
-  nginx pid file: "$NGX_PID_PATH"
+  tengine path prefix: "$NGX_PREFIX"
+  tengine binary file: "$NGX_SBIN_PATH"
+  tengine modules path: "$NGX_MODULES_PATH"
+  tengine configuration prefix: "$NGX_CONF_PREFIX"
+  tengine configuration file: "$NGX_CONF_PATH"
+  tengine pid file: "$NGX_PID_PATH"
 END
 
 if test -n "$NGX_ERROR_LOG_PATH"; then
-    echo "  nginx error log file: \"$NGX_ERROR_LOG_PATH\""
+    echo "  tengine error log file: \"$NGX_ERROR_LOG_PATH\""
 else
-    echo "  nginx logs errors to stderr"
+    echo "  tengine logs errors to stderr"
 fi
 
 cat << END
-  nginx http access log file: "$NGX_HTTP_LOG_PATH"
-  nginx http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"
+  tengine http access log file: "$NGX_HTTP_LOG_PATH"
+  tengine http client request body temporary files: "$NGX_HTTP_CLIENT_TEMP_PATH"
 END
 
 if [ $HTTP_PROXY = YES ]; then
-    echo "  nginx http proxy temporary files: \"$NGX_HTTP_PROXY_TEMP_PATH\""
+    echo "  tengine http proxy temporary files: \"$NGX_HTTP_PROXY_TEMP_PATH\""
 fi
 
 if [ $HTTP_FASTCGI = YES ]; then
-    echo "  nginx http fastcgi temporary files: \"$NGX_HTTP_FASTCGI_TEMP_PATH\""
+    echo "  tengine http fastcgi temporary files: \"$NGX_HTTP_FASTCGI_TEMP_PATH\""
 fi
 
 if [ $HTTP_UWSGI = YES ]; then
-    echo "  nginx http uwsgi temporary files: \"$NGX_HTTP_UWSGI_TEMP_PATH\""
+    echo "  tengine http uwsgi temporary files: \"$NGX_HTTP_UWSGI_TEMP_PATH\""
 fi
 
 if [ $HTTP_SCGI = YES ]; then
-    echo "  nginx http scgi temporary files: \"$NGX_HTTP_SCGI_TEMP_PATH\""
+    echo "  tengine http scgi temporary files: \"$NGX_HTTP_SCGI_TEMP_PATH\""
 fi
 
 echo "$NGX_POST_CONF_MSG"
