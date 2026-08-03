@@ -81,6 +81,7 @@ jobs:
           - anolis8
           - openeuler2403
           - sles15
+          - sles16
           - debian11
           - debian12
           - debian13

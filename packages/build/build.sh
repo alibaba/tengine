@@ -15,8 +15,9 @@
 #     packages/build/build.sh docker all     # every target listed below
 #
 # Container targets: el7 el8 el9 el10 fedora anolis8 anolis23 openeuler2203
-#                    openeuler2403 sles15 debian11 debian12 ubuntu2204
-#                    ubuntu2404 alpine
+#                    openeuler2403 sles15 sles16 debian11 debian12 debian13
+#                    ubuntu2204 ubuntu2404 ubuntu2604 alpine321 alpine322
+#                    alpine323 alpine324
 #
 # Tongsuo (NTLS), xquic (QUIC/HTTP-3) and the Lua stack are part of the default
 # feature set. Their sources are pinned in packages/build/deps.env, downloaded
@@ -64,7 +65,7 @@ usage() {
     exit "${1:-0}"
 }
 
-ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 debian11 debian12 debian13 ubuntu2204 ubuntu2404 ubuntu2604 alpine321 alpine322 alpine323 alpine324"
+ALL_TARGETS="el7 el8 el9 el10 anolis8 anolis23 openeuler2203 openeuler2403 sles15 sles16 debian11 debian12 debian13 ubuntu2204 ubuntu2404 ubuntu2604 alpine321 alpine322 alpine323 alpine324"
 
 # Container targets: alias -> "image|family".  family drives both the
 # bootstrap commands and which native builder runs inside.
@@ -80,6 +81,7 @@ docker_image() {
         openeuler2203) echo "openeuler/openeuler:22.03-lts-sp4|rpm" ;;
         openeuler2403) echo "openeuler/openeuler:24.03-lts|rpm" ;;
         sles15)     echo "registry.suse.com/bci/bci-base:15.6|sles" ;;
+        sles16)     echo "registry.suse.com/bci/bci-base:16|sles" ;;
         debian11)   echo "debian:11|deb" ;;
         debian12)   echo "debian:12|deb" ;;
         debian13)   echo "debian:13|deb" ;;
@@ -479,6 +481,7 @@ run_docker_target() {
     if [ -z "$DIST_TAG" ]; then
         case "$target" in
             sles15)        target_dist=".sles15" ;;
+            sles16)        target_dist=".sles16" ;;
             openeuler2403) target_dist=".oe2403" ;;
         esac
     fi
