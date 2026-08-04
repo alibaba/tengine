@@ -505,6 +505,25 @@ run_docker_target() {
     fi
     set -- "$@" -v "$SRC_ROOT:/src:ro" -v "$OUTDIR:/out" -w / "$image"
 
+    # Pull up front rather than letting `run` do it implicitly: a full matrix
+    # makes dozens of anonymous registry pulls, and a timeout or a rate limit
+    # would otherwise fail the target outright. Retry with a growing pause; a
+    # tag that genuinely does not exist fails all attempts and still reports.
+    pull_delay=5
+    pull_attempt=1
+    while :; do
+        if [ -n "$PLATFORM" ]; then
+            "$engine" pull --platform "$PLATFORM" "$image" && break
+        else
+            "$engine" pull "$image" && break
+        fi
+        [ "$pull_attempt" -lt 3 ] || die "[$target] cannot pull $image (3 attempts)"
+        info "[$target] pull of $image failed, retrying in ${pull_delay}s"
+        sleep "$pull_delay"
+        pull_attempt=$((pull_attempt + 1))
+        pull_delay=$((pull_delay * 3))
+    done
+
     info "[$target] building in $image"
     "$engine" "$@" sh -euc "
         $(bootstrap_cmd "$family")
