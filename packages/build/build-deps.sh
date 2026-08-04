@@ -236,7 +236,12 @@ if [ "$WITH_XQUIC" = yes ]; then
         fi
 
         mkdir -p "$xquic_src/build"
+        # Force the Makefiles generator: newer CMake (Alpine 3.23+/CMake 4.x)
+        # defaults to Ninja when no -G is given, which is not in makedepends and
+        # makes configure abort with "CMAKE_MAKE_PROGRAM is not set". The build
+        # drives `make xquic` below regardless, so pin the generator to match.
         ( cd "$xquic_src/build" && "$cmake_bin" .. \
+            -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_FLAGS="$xqc_cflags" \
             -DXQC_SUPPORT_SENDMMSG_BUILD=1 \
