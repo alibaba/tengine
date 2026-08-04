@@ -8,8 +8,12 @@
 #     docker build -f Dockerfile.alpine -t tengine:alpine .
 #
 
-ARG BASE_IMAGE=alpine:3.22
-ARG RUNTIME_IMAGE=alpine:3.22
+# Tracks the newest Alpine the nginx official images are built on, so the
+# published tags line up with theirs. .github/scripts/image-tags.sh parses the
+# version out of BASE_IMAGE to derive the "-alpineX.Y" image tags -- keep the
+# "alpine:<major>.<minor>" shape when bumping this.
+ARG BASE_IMAGE=alpine:3.24
+ARG RUNTIME_IMAGE=alpine:3.24
 
 FROM ${BASE_IMAGE} AS builder
 
