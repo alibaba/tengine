@@ -81,7 +81,7 @@ docker_image() {
         openeuler2203) echo "openeuler/openeuler:22.03-lts-sp4|rpm" ;;
         openeuler2403) echo "openeuler/openeuler:24.03-lts|rpm" ;;
         sles15)     echo "registry.suse.com/bci/bci-base:15.6|sles" ;;
-        sles16)     echo "registry.suse.com/bci/bci-base:16|sles" ;;
+        sles16)     echo "registry.suse.com/bci/bci-base:16.0|sles" ;;
         debian11)   echo "debian:11|deb" ;;
         debian12)   echo "debian:12|deb" ;;
         debian13)   echo "debian:13|deb" ;;
