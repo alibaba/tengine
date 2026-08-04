@@ -20,6 +20,10 @@
 # Dockerfile.alpine for the musl variant).
 #
 
+# Debian 13 is "trixie", the same base the nginx official images use.
+# .github/scripts/image-tags.sh parses the release number out of BASE_IMAGE and
+# maps it to the codename used in the "-trixie" style image tags -- when bumping
+# this, keep the "debian:<release>" shape and add the codename to that map.
 ARG BASE_IMAGE=debian:13
 ARG RUNTIME_IMAGE=debian:13-slim
 

@@ -38,7 +38,7 @@ tengine-3.2.0_p20260604232239-r0.apk
 Release 为构建时间戳（可用 `--timestamp` 固定）。
 
 deb 版本号带 `~<codename>` 后缀（`~bookworm`、`~noble`……）：deb 的版本与文件名
-本身都不含发行版标识，四个 debian/ubuntu 目标会产出完全同名的文件，扁平化到
+本身都不含发行版标识，六个 debian/ubuntu 目标会产出完全同名的文件，扁平化到
 同一个 Release 时互相覆盖，`apt` 也无法区分。`~` 排序低于无后缀，是 Debian 惯例。
 apk 文件名不含架构，发布时由 [collect-release.sh](collect-release.sh) 补 `.x86_64` /
 `.aarch64`。
@@ -50,7 +50,7 @@ apk 文件名不含架构，发布时由 [collect-release.sh](collect-release.sh
 ```sh
 packages/build/build.sh docker el9          # Rocky 9
 packages/build/build.sh docker ubuntu2404   # Ubuntu 24.04
-packages/build/build.sh docker alpine       # Alpine 3.20
+packages/build/build.sh docker alpine324    # Alpine 3.24
 packages/build/build.sh docker all          # 全部目标
 ```
 
@@ -65,10 +65,13 @@ packages/build/build.sh docker all          # 全部目标
 | `fedora` | `fedora:latest` | rpm |
 | `anolis8` / `anolis23` | `openanolis/anolisos:8.8` / `:23` | rpm |
 | `openeuler2203` / `openeuler2403` | `openeuler/openeuler:22.03-lts-sp4` / `:24.03-lts` | rpm |
-| `sles15` | `registry.suse.com/bci/bci-base:15.6` | rpm |
-| `debian11` / `debian12` | `debian:11` / `debian:12` | deb |
-| `ubuntu2204` / `ubuntu2404` | `ubuntu:22.04` / `ubuntu:24.04` | deb |
-| `alpine` | `alpine:3.20` | apk |
+| `sles15` / `sles16` | `registry.suse.com/bci/bci-base:15.6` / `:16.0` | rpm |
+| `debian11` / `debian12` / `debian13` | `debian:11` / `:12` / `:13` | deb |
+| `ubuntu2204` / `ubuntu2404` / `ubuntu2604` | `ubuntu:22.04` / `:24.04` / `:26.04` | deb |
+| `alpine321` / `alpine322` / `alpine323` / `alpine324` | `alpine:3.21` / `:3.22` / `:3.23` / `:3.24` | apk |
+
+apk 绑定构建时的 musl 与各库 soname，不像 rpm/deb 那样能搬到更高版本，因此每个
+Alpine 版本一个目标，覆盖 nginx 官方同样发布的 3.21~3.24。
 
 同一份 spec 适用于所有 RHEL/SUSE 派生发行版，加目标只需在
 [build.sh](build.sh) 的 `docker_image()` 里加一行镜像映射。若目标系统本身没有
@@ -89,15 +92,20 @@ packages/build/build.sh docker el9 --platform linux/arm64
 
 [.github/workflows/package.yml](../../.github/workflows/package.yml) —
 **不在日常 push/PR 上触发**：每个目标要编 Tongsuo（两遍）、xquic、LuaJIT 与
-Tengine，24 个 job 全跑一遍代价很高，因此仅：
+Tengine，36 个 job 全跑一遍代价很高，因此仅：
 
 - push tag `tengine-*` 时自动触发（并发布 Release）
 - 手动 `workflow_dispatch`（可传 `dist_tag`，如 `.el7u2`）
 
-矩阵为 12 目标 × 2 架构 = 24 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
+矩阵为 18 目标 × 2 架构 = 36 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
 原生 `ubuntu-24.04-arm` runner（QEMU 模拟会让单次编译慢 5~10 倍）。`fedora`
 （rolling）、`anolis23`、`openeuler2203`、`sles12` 未进矩阵，需要时用
 `build.sh docker <目标>`。
+
+矩阵已完整覆盖 nginx 官方包支持的发行版清单（RHEL 8/9/10、Debian 11/12/13、
+Ubuntu 22.04/24.04/26.04、SLES 15 SP6+/16、Alpine 3.21~3.24，均双架构），并额外
+包含 `el7`、`anolis8`、`openeuler2403`，以及 nginx 只发 x86_64 的 SLES 15 的
+aarch64。
 
 **只有 `el7` + `aarch64` 标记 `continue-on-error`**：CentOS 7 EOL 后镜像源迁到
 `vault.centos.org`，其主树只有 x86_64，aarch64 归档在 `/altarch/` 另一路径下，
@@ -114,9 +122,9 @@ tarball（只需 glibc 2.17，el7 满足）；`build.sh` 会发现这个 CMake �
 > `build.sh rpm --dist .el7u2` 即可 —— 已实测产出 4.9 MB 的完备功能集包
 > （Tongsuo 静态链入、`libxquic.so` 与 `libluajit` 随包、`resty.core` 可加载）。
 
-前置 `prepare` job 做两件事：钉住整个 run 共享的时间戳（24 个包 Release 号一致），
+前置 `prepare` job 做两件事：钉住整个 run 共享的时间戳（36 个包 Release 号一致），
 以及跑一次 [fetch-deps.sh](fetch-deps.sh) 把 pin 的依赖源码下载校验后上传为
-artifact —— 24 个矩阵 job 各自下载它，既省 24 次重复下载，又保证全矩阵编译的是
+artifact —— 36 个矩阵 job 各自下载它，既省 36 次重复下载，又保证全矩阵编译的是
 同一份字节。
 
 `verify` job 另取 4 个组合（el9/ubuntu2404 × x86_64/aarch64）实机装包，校验
@@ -130,7 +138,7 @@ artifact —— 24 个矩阵 job 各自下载它，既省 24 次重复下载，�
 
 ### Release 发布（tag 触发）
 
-`release` job 在 tag 上跑：下载全部 24 份 artifact →
+`release` job 在 tag 上跑：下载全部 36 份 artifact →
 [collect-release.sh](collect-release.sh) 扁平化 → `softprops/action-gh-release`
 上传为 **Release assets**。
 
@@ -151,8 +159,17 @@ artifact 90 天过期且需要登录 GitHub。
 
 | Dockerfile | 基底 | 镜像 tag |
 |---|---|---|
-| [Dockerfile](../../Dockerfile) | `debian:12` → `debian:12-slim` | `3.2.0`、`latest` |
-| [Dockerfile.alpine](../../Dockerfile.alpine) | `alpine:3.20` | `3.2.0-alpine`、`alpine` |
+| [Dockerfile](../../Dockerfile) | `debian:13` → `debian:13-slim` | `3.2.0`、`3.2`、`3`、`latest`、`3.2.0-trixie`、`3.2-trixie`、`3-trixie`、`trixie` |
+| [Dockerfile.alpine](../../Dockerfile.alpine) | `alpine:3.24` | `3.2.0-alpine`、`3.2-alpine`、`3-alpine`、`alpine`、`3.2.0-alpine3.24`、`3.2-alpine3.24`、`3-alpine3.24`、`alpine3.24` |
+
+基底与 nginx 官方镜像一致（trixie + 最新 Alpine），tag 形状也照其体系：版本号、
+minor/major 系列、浮动别名，各自再带一份发行版后缀。tag 清单由
+[.github/scripts/image-tags.sh](../../.github/scripts/image-tags.sh) 统一生成，
+发行版部分是从两个 Dockerfile 的 `BASE_IMAGE` 反解出来的——换基底时 tag 自动跟着变，
+Debian 只需在脚本的版本号→代号表里补一行。
+
+预发布 tag（`3.2.0-rc1` 等）只发版本号形态的 `3.2.0-rc1`、`3.2.0-rc1-trixie`，
+不移动 `latest` / `3.2` / `3` 这类滚动 tag。
 
 本地构建：
 
@@ -173,8 +190,8 @@ configure 参数同样出自 [configure-args.sh](configure-args.sh)，因此镜�
 
 - 每个 flavor × 架构在原生 runner 上构建，**按 digest 推送**，再由 `manifest` job
   用 `docker buildx imagetools create` 合成 multi-arch tag，注册表里不留架构专用 tag
-- **RC 不动 `latest` / `alpine`**（避免 `docker pull tengine` 拉到预发布），但 RC 的
-  版本化 tag 与正式版一样永久留在 ghcr
+- **RC 不动 `latest` / `alpine` / `3.2` / `3` 等滚动 tag**（避免 `docker pull tengine`
+  拉到预发布），但 RC 的版本化 tag 与正式版一样永久留在 ghcr
 - `verify` job 把发布出去的 tag 拉回来跑
   [verify-image.sh](../../.github/scripts/verify-image.sh)：断言三模块编入、Tongsuo
   在位、`tengine -t` 通过、HTTP 可访问，并真跑一段 Lua
@@ -321,7 +338,7 @@ packages/build/
 ├── deps.env              第三方依赖版本、仓库与 sha256（唯一真源）
 ├── fetch-deps.sh         下载 + 校验依赖源码（--print-checksums 用于升级）
 ├── build-deps.sh         编译 Tongsuo / xquic / LuaJIT / resty 库，产出 deps-env.sh
-├── collect-release.sh    把 24 份 artifact 扁平成 Release 目录 + SHA256SUMS
+├── collect-release.sh    把 36 份 artifact 扁平成 Release 目录 + SHA256SUMS
 ├── conf/
 │   ├── tengine.conf      主配置（FHS 绝对路径 + lua_package_path/cpath）
 │   ├── conf.d/default.conf   含注释版 HTTP/3 与 NTLS 示例
@@ -336,7 +353,9 @@ packages/build/
 ├── Dockerfile            debian-slim 镜像（多阶段）
 ├── Dockerfile.alpine     alpine 镜像（多阶段）
 └── .github/
-    ├── scripts/verify-image.sh   镜像冒烟校验（含真跑 Lua）
+    ├── scripts/
+    │   ├── image-tags.sh         镜像 tag 清单（发行版部分反解自 Dockerfile）
+    │   └── verify-image.sh       镜像冒烟校验（含真跑 Lua）
     └── workflows/
         ├── package.yml   包矩阵 + Release 上传
         └── docker.yml    镜像构建 + ghcr 发布

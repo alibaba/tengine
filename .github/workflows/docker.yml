@@ -5,6 +5,15 @@ name: docker image
 # verifies unless "push" is ticked, so the Dockerfiles can be exercised without
 # touching the registry.
 #
+# The published tag set follows the nginx official images -- version, minor and
+# major series, a floating alias and a distro-suffixed variant of each:
+#
+#     3.2.0  3.2  3  latest  3.2.0-trixie      3.2-trixie  3-trixie  trixie
+#     3.2.0-alpine  ...      3.2.0-alpine3.24  ...                   alpine3.24
+#
+# .github/scripts/image-tags.sh owns that list; the rolling tags are withheld
+# from pre-releases.
+#
 # NOTE: a GHCR package is private on first push. It has to be flipped to public
 # once, by hand, under https://github.com/<owner>?tab=packages -> tengine ->
 # Package settings -> Change visibility. Nothing in this workflow can do that.
@@ -158,6 +167,9 @@ jobs:
       matrix:
         flavor: [debian, alpine]
     steps:
+      # image-tags.sh reads the base images back out of the Dockerfiles.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           pattern: digest-${{ matrix.flavor }}-*
@@ -183,13 +195,9 @@ jobs:
 
           # Debian is the default flavour and owns the bare tags; Alpine gets
           # the -alpine suffix, matching how the nginx images are published.
-          if [ "$FLAVOR" = alpine ]; then
-              tags="$VERSION-alpine"
-              [ "$MOVE_LATEST" = true ] && tags="$tags alpine"
-          else
-              tags="$VERSION"
-              [ "$MOVE_LATEST" = true ] && tags="$tags latest"
-          fi
+          # The script also derives the minor/major series tags and the
+          # distro-suffixed ones (-trixie, -alpine3.24) from the Dockerfiles.
+          tags=$(./.github/scripts/image-tags.sh "$FLAVOR" "$VERSION" "$MOVE_LATEST")
 
           set --
           for t in $tags; do

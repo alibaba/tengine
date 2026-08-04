@@ -27,7 +27,7 @@ jobs:
   # A single timestamp for the whole run: the matrix jobs run on separate
   # runners, so each computing its own date would give every artifact a
   # different Release. This job also downloads the pinned third-party sources
-  # once so that all 24 matrix jobs build from the identical bytes instead of
+  # once so that all 36 matrix jobs build from the identical bytes instead of
   # each re-fetching them.
   prepare:
     runs-on: ubuntu-24.04
@@ -268,7 +268,11 @@ jobs:
           docker pull ghcr.io/$owner/tengine:$version-alpine
           \`\`\`
 
-          Both are multi-arch (amd64 + arm64).
+          Both are multi-arch (amd64 + arm64). As with the nginx official
+          images, the minor and major series of this version, the floating
+          \`latest\` / \`alpine\` aliases and a base-suffixed variant of each
+          (\`-trixie\`, \`-alpine<ver>\`) are published as well -- a pre-release
+          only gets the version-pinned tags.
 
           ## Verify
 
