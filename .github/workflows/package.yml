@@ -38,12 +38,12 @@ jobs:
         id: ts
         run: echo "value=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: fetch and verify the pinned dependency sources
         run: packages/build/fetch-deps.sh --outdir dist/deps
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: deps
           path: dist/deps
@@ -95,12 +95,12 @@ jobs:
           - alpine323
           - alpine324
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # build.sh looks for the dependency tarballs here and skips downloading
       # anything whose checksum already matches, so this doubles as an offline
       # cache for the container build.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: deps
           path: dist/deps
@@ -138,7 +138,7 @@ jobs:
               echo "ok: package names carry $want"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
           path: |
@@ -162,7 +162,7 @@ jobs:
           - { arch: x86_64,  target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
           - { arch: aarch64, target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
           path: pkgs
@@ -211,11 +211,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # "tengine-*" matches the per-target package artifacts and skips the
       # dependency-source artifact.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: tengine-*
           path: artifacts
