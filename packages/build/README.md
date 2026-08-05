@@ -92,20 +92,30 @@ packages/build/build.sh docker el9 --platform linux/arm64
 
 [.github/workflows/package.yml](../../.github/workflows/package.yml) —
 **不在日常 push/PR 上触发**：每个目标要编 Tongsuo（两遍）、xquic、LuaJIT 与
-Tengine，36 个 job 全跑一遍代价很高，因此仅：
+Tengine，40 个 job 全跑一遍代价很高，因此仅：
 
 - push tag `tengine-*` 时自动触发（并发布 Release）
 - 手动 `workflow_dispatch`（可传 `dist_tag`，如 `.el7u2`）
 
-矩阵为 18 目标 × 2 架构 = 36 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
+矩阵为 20 目标 × 2 架构 = 40 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
 原生 `ubuntu-24.04-arm` runner（QEMU 模拟会让单次编译慢 5~10 倍）。`fedora`
-（rolling）、`anolis23`、`openeuler2203`、`sles12` 未进矩阵，需要时用
-`build.sh docker <目标>`。
+与 `sles12` 未进矩阵，需要时用 `build.sh docker <目标>`。
+
+`fedora` 刻意不进矩阵：nginx 官方包支持清单本就不含 Fedora，而 `fedora:latest`
+是 rolling tag，每半年换一个大版本，产出的 `%dist`（`.fc43` 之类）会随之漂移，
+损害构建可复现性；单版本 EOL 也只有约 13 个月。它的用途是本地
+`build.sh docker fedora` 随手验证，不需要 CI 常驻。
 
 矩阵已完整覆盖 nginx 官方包支持的发行版清单（RHEL 8/9/10、Debian 11/12/13、
 Ubuntu 22.04/24.04/26.04、SLES 15 SP6+/16、Alpine 3.21~3.24，均双架构），并额外
-包含 `el7`、`anolis8`、`openeuler2403`，以及 nginx 只发 x86_64 的 SLES 15 的
-aarch64。
+包含 `el7`、`anolis8`、`anolis23`、`openeuler2203`、`openeuler2403`，以及 nginx
+只发 x86_64 的 SLES 15 的 aarch64。信创发行版（龙蜥、openEuler）是 Tengine 的核心
+用户群，因此两个版本各覆盖一条 LTS。
+
+> openEuler 镜像的 `%dist` 为空，两个 openEuler 目标会产出同名 rpm，因此
+> `build.sh` 为它们分别指定 `.oe2203` / `.oe2403`（见 `run_docker_target` 的
+> `target_dist`）。Anolis 无此问题 —— 其镜像自带 `%dist`，产物形如
+> `tengine-3.2.0-<ts>.an8.x86_64.rpm`。
 
 **只有 `el7` + `aarch64` 标记 `continue-on-error`**：CentOS 7 EOL 后镜像源迁到
 `vault.centos.org`，其主树只有 x86_64，aarch64 归档在 `/altarch/` 另一路径下，

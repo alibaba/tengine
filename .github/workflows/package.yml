@@ -27,7 +27,7 @@ jobs:
   # A single timestamp for the whole run: the matrix jobs run on separate
   # runners, so each computing its own date would give every artifact a
   # different Release. This job also downloads the pinned third-party sources
-  # once so that all 36 matrix jobs build from the identical bytes instead of
+  # once so that all 40 matrix jobs build from the identical bytes instead of
   # each re-fetching them.
   prepare:
     runs-on: ubuntu-24.04
@@ -79,6 +79,8 @@ jobs:
           - el9
           - el10
           - anolis8
+          - anolis23
+          - openeuler2203
           - openeuler2403
           - sles15
           - sles16
