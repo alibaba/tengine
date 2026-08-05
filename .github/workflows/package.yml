@@ -276,6 +276,11 @@ jobs:
           (\`-trixie\`, \`-alpine<ver>\`) are published as well -- a pre-release
           only gets the version-pinned tags.
 
+          A \`-perl\` variant of each image adds \`ngx_http_perl_module\`
+          (\`$version-perl\`, \`$version-alpine-perl\`, and the same rolling
+          aliases). The module is already loaded in the shipped configuration,
+          so \`perl\`, \`perl_set\` and \`perl_modules\` work out of the box.
+
           ## Verify
 
           \`\`\`sh

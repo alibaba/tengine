@@ -6,6 +6,10 @@
 # out, as in the apk package) and the single base image for both stages.
 #
 #     docker build -f Dockerfile.alpine -t tengine:alpine .
+#     docker build -f Dockerfile.alpine -t tengine:alpine-perl --target perl .
+#
+# See the Debian Dockerfile for why the perl variant costs one apk package
+# rather than a second full compile.
 #
 
 # Tracks the newest Alpine the nginx official images are built on, so the
@@ -18,9 +22,10 @@ ARG RUNTIME_IMAGE=alpine:3.24
 FROM ${BASE_IMAGE} AS builder
 
 # cmake + g++ are for xquic, perl configures Tongsuo, curl fetches the pinned
-# dependency tarballs.
+# dependency tarballs. perl-dev carries the headers and ExtUtils::Embed that
+# auto/lib/perl/conf refuses to build without.
 RUN apk add --no-cache \
-        build-base cmake perl curl ca-certificates \
+        build-base cmake perl perl-dev curl ca-certificates \
         linux-headers openssl-dev pcre2-dev zlib-dev
 
 WORKDIR /usr/src/tengine
@@ -45,6 +50,7 @@ RUN set -eux; \
     . /tmp/deps-build/deps-env.sh; \
     export TENGINE_LIBDIR=/usr/lib; \
     export TENGINE_WITH_BACKTRACE=no; \
+    export TENGINE_WITH_PERL=yes; \
     ./configure \
         $(sh packages/build/configure-args.sh) \
         --with-cc-opt="-Wno-error" \
@@ -65,8 +71,17 @@ RUN set -eux; \
     sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' /out/etc/tengine/tengine.conf; \
     rm -rf /out/run /out/var/run
 
+# Set the perl module aside for the "perl" stage -- see the Debian Dockerfile.
+RUN set -eux; \
+    install -d /out-perl/usr/lib/tengine/modules; \
+    mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
+       /out-perl/usr/lib/tengine/modules/; \
+    install -d /out-perl/usr/lib/tengine/perl; \
+    mv /out/usr/lib/tengine/perl/nginx.pm /out-perl/usr/lib/tengine/perl/; \
+    rm -rf /out/usr/lib/tengine/perl
 
-FROM ${RUNTIME_IMAGE}
+
+FROM ${RUNTIME_IMAGE} AS runtime
 
 ARG TENGINE_VERSION=dev
 LABEL org.opencontainers.image.title="Tengine" \
@@ -100,3 +115,29 @@ EXPOSE 80 443 443/udp
 STOPSIGNAL SIGQUIT
 
 CMD ["/usr/sbin/tengine", "-g", "daemon off;"]
+
+
+# --------------------------------------------------------------- perl variant
+# Mirrors the Debian one; on Alpine the runtime package is just "perl", which
+# brings libperl.so with it.
+FROM runtime AS perl
+
+RUN apk add --no-cache perl
+
+COPY --from=builder /out-perl/ /
+
+# Prepending with printf+cat rather than `sed -i 1i`: BusyBox sed does not
+# expand \n in inserted text, so the Debian and Alpine images would end up with
+# different files.
+RUN set -eux; \
+    { printf 'load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;\n\n'; \
+      cat /etc/tengine/tengine.conf; } > /tmp/tengine.conf; \
+    cat /tmp/tengine.conf > /etc/tengine/tengine.conf; \
+    rm -f /tmp/tengine.conf; \
+    /usr/sbin/tengine -t
+
+
+# ------------------------------------------------------------ default variant
+# Last stage on purpose, so a plain build with no --target stays the default
+# image. See the Debian Dockerfile.
+FROM runtime AS default
