@@ -113,8 +113,30 @@ jobs:
             --timestamp ${{ needs.prepare.outputs.timestamp }} \
             ${{ inputs.dist_tag && format('--dist {0}', inputs.dist_tag) || '' }}
 
+      # The dist tag is what keeps two builds of the same distro family apart in
+      # a release directory, so assert it reached the file name instead of
+      # leaving that to whoever downloads the artifact. Two groups matter:
+      # openEuler and SLES images leave %dist empty and build.sh fills it in;
+      # Anolis is trusted to define its own, which is only an assumption until
+      # something checks it.
       - name: list artifacts
-        run: ls -lh dist/
+        run: |
+          set -eu
+          ls -lh dist/
+          case "${{ matrix.target }}" in
+              sles15)        want=.sles15 ;;
+              sles16)        want=.sles16 ;;
+              openeuler2203) want=.oe2203 ;;
+              openeuler2403) want=.oe2403 ;;
+              anolis8)       want=.an8    ;;
+              anolis23)      want=.an23   ;;
+              *)             want=        ;;
+          esac
+          if [ -n "$want" ]; then
+              ls dist/ | grep -qF -- "$want" \
+                  || { echo "MISSING dist tag '$want' in the package names above"; exit 1; }
+              echo "ok: package names carry $want"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
