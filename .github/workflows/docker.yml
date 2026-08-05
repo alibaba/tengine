@@ -6,13 +6,19 @@ name: docker image
 # touching the registry.
 #
 # The published tag set follows the nginx official images -- version, minor and
-# major series, a floating alias and a distro-suffixed variant of each:
+# major series, a floating alias and a distro-suffixed variant of each, times
+# two image variants (default and perl):
 #
-#     3.2.0  3.2  3  latest  3.2.0-trixie      3.2-trixie  3-trixie  trixie
-#     3.2.0-alpine  ...      3.2.0-alpine3.24  ...                   alpine3.24
+#     3.2.0         3.2  3  latest  3.2.0-trixie      3.2-trixie  ...  trixie
+#     3.2.0-alpine  ...             3.2.0-alpine3.24  ...              alpine3.24
+#     3.2.0-perl    ...  perl       3.2.0-trixie-perl ...              trixie-perl
+#     3.2.0-alpine-perl ...         3.2.0-alpine3.24-perl ...          alpine3.24-perl
 #
 # .github/scripts/image-tags.sh owns that list; the rolling tags are withheld
 # from pre-releases.
+#
+# The perl variant is NOT a second compile -- see the Dockerfile header. It is a
+# --target on the same build, so it costs one extra runtime layer.
 #
 # NOTE: a GHCR package is private on first push. It has to be flipped to public
 # once, by hand, under https://github.com/<owner>?tab=packages -> tengine ->
@@ -113,24 +119,50 @@ jobs:
       # Publishing path: push by digest only. The per-architecture images stay
       # untagged and the manifest job assembles them into the real tags, so no
       # arch-specific tag ever shows up in the registry.
-      - name: build and push by digest
+      #
+      # The perl variant is built in this same job rather than as its own matrix
+      # entry on purpose. It is a --target on the very same Dockerfile, so every
+      # builder layer is already in this runner's buildx state: the second build
+      # only has to run the handful of runtime instructions. A separate job
+      # would instead re-import the whole layer set from the GHA cache -- and
+      # two jobs writing the same cache scope would race.
+      - name: build and push by digest (default)
         if: needs.meta.outputs.push == 'true'
         id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          target: default
           build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
           outputs: type=image,name=${{ needs.meta.outputs.image }},push-by-digest=true,name-canonical=true,push=true
 
-      - name: record digest
+      - name: build and push by digest (perl)
+        if: needs.meta.outputs.push == 'true'
+        id: push_perl
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          target: perl
+          build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          outputs: type=image,name=${{ needs.meta.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+
+      # One artifact per (flavour, arch) holding both variants' digests. The
+      # file name carries the variant AND the arch because the manifest job
+      # downloads with merge-multiple, which flattens every artifact into one
+      # directory -- same-named files would overwrite each other.
+      - name: record digests
         if: needs.meta.outputs.push == 'true'
         run: |
           set -eu
           mkdir -p /tmp/digests
-          echo "${{ steps.push.outputs.digest }}" > "/tmp/digests/${{ matrix.flavor }}-${{ matrix.arch }}"
+          echo "${{ steps.push.outputs.digest }}"      > "/tmp/digests/default-${{ matrix.arch }}"
+          echo "${{ steps.push_perl.outputs.digest }}" > "/tmp/digests/perl-${{ matrix.arch }}"
 
       - uses: actions/upload-artifact@v4
         if: needs.meta.outputs.push == 'true'
@@ -139,23 +171,39 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
 
-      # Build-only path: load the image into the local daemon and exercise it
+      # Build-only path: load the images into the local daemon and exercise them
       # right here, since there will be no published tag to verify later.
-      - name: build locally
+      - name: build locally (default)
         if: needs.meta.outputs.push != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          target: default
           build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
           load: true
           tags: tengine-local:test
 
-      - name: verify the local image
+      - name: build locally (perl)
         if: needs.meta.outputs.push != 'true'
-        run: ./.github/scripts/verify-image.sh tengine-local:test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.flavor == 'alpine' && 'Dockerfile.alpine' || 'Dockerfile' }}
+          target: perl
+          build-args: TENGINE_VERSION=${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}-${{ matrix.arch }}
+          load: true
+          tags: tengine-local:test-perl
+
+      - name: verify the local images
+        if: needs.meta.outputs.push != 'true'
+        run: |
+          ./.github/scripts/verify-image.sh tengine-local:test
+          ./.github/scripts/verify-image.sh tengine-local:test-perl --variant perl
 
   # buildx assembles the per-architecture digests into one multi-arch tag.
   manifest:
@@ -166,10 +214,13 @@ jobs:
       fail-fast: false
       matrix:
         flavor: [debian, alpine]
+        variant: [default, perl]
     steps:
       # image-tags.sh reads the base images back out of the Dockerfiles.
       - uses: actions/checkout@v4
 
+      # Pulls in both variants' digests for this flavour; the tag step picks
+      # out the ones belonging to matrix.variant by file-name prefix.
       - uses: actions/download-artifact@v4
         with:
           pattern: digest-${{ matrix.flavor }}-*
@@ -189,6 +240,7 @@ jobs:
           IMAGE: ${{ needs.meta.outputs.image }}
           VERSION: ${{ needs.meta.outputs.version }}
           FLAVOR: ${{ matrix.flavor }}
+          VARIANT: ${{ matrix.variant }}
           MOVE_LATEST: ${{ needs.meta.outputs.latest }}
         run: |
           set -eu
@@ -197,15 +249,25 @@ jobs:
           # the -alpine suffix, matching how the nginx images are published.
           # The script also derives the minor/major series tags and the
           # distro-suffixed ones (-trixie, -alpine3.24) from the Dockerfiles.
-          tags=$(./.github/scripts/image-tags.sh "$FLAVOR" "$VERSION" "$MOVE_LATEST")
+          # "default" is spelled as no variant at all, so its tags stay bare.
+          if [ "$VARIANT" = default ]; then
+              tags=$(./.github/scripts/image-tags.sh "$FLAVOR" "$VERSION" "$MOVE_LATEST")
+          else
+              tags=$(./.github/scripts/image-tags.sh "$FLAVOR" "$VERSION" "$MOVE_LATEST" "$VARIANT")
+          fi
 
           set --
           for t in $tags; do
               set -- "$@" --tag "$IMAGE:$t"
           done
-          for f in digests/*; do
+          # Only this variant's digests -- the artifact holds both.
+          found=0
+          for f in digests/"$VARIANT"-*; do
+              [ -e "$f" ] || continue
               set -- "$@" "$IMAGE@$(cat "$f")"
+              found=$((found + 1))
           done
+          [ "$found" -gt 0 ] || { echo "no digests for variant $VARIANT" >&2; exit 1; }
 
           echo "docker buildx imagetools create $*"
           docker buildx imagetools create "$@"
@@ -225,6 +287,7 @@ jobs:
       matrix:
         flavor: [debian, alpine]
         arch: [amd64, arm64]
+        variant: [default, perl]
     steps:
       - uses: actions/checkout@v4
 
@@ -238,12 +301,18 @@ jobs:
         env:
           IMAGE: ${{ needs.meta.outputs.image }}
           VERSION: ${{ needs.meta.outputs.version }}
+          VARIANT: ${{ matrix.variant }}
         run: |
           set -eu
-          if [ "${{ matrix.flavor }}" = alpine ]; then
-              ref="$IMAGE:$VERSION-alpine"
-          else
-              ref="$IMAGE:$VERSION"
-          fi
+          # Reassemble the version-pinned tag this variant was published under:
+          # 3.2.0, 3.2.0-alpine, 3.2.0-perl, 3.2.0-alpine-perl.
+          ref="$IMAGE:$VERSION"
+          [ "${{ matrix.flavor }}" = alpine ] && ref="$ref-alpine"
+          [ "$VARIANT" = default ] || ref="$ref-$VARIANT"
+
           docker pull "$ref"
-          ./.github/scripts/verify-image.sh "$ref"
+          if [ "$VARIANT" = default ]; then
+              ./.github/scripts/verify-image.sh "$ref"
+          else
+              ./.github/scripts/verify-image.sh "$ref" --variant "$VARIANT"
+          fi

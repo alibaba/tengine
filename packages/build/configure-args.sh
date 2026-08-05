@@ -34,6 +34,11 @@
 #   TENGINE_WITH_GEOIP      yes|no  stream geoip module   [no]  needs libGeoIP
 #   TENGINE_WITH_MAIL       yes|no  mail proxy modules    [yes]
 #   TENGINE_WITH_PCRE_JIT   yes|no  PCRE JIT compilation  [yes]
+#   TENGINE_WITH_PERL       yes|no  ngx_http_perl_module  [no]  needs libperl-dev
+#                           Always dynamic. Off by default because the distro
+#                           packages have no %files entry for the module or for
+#                           nginx.pm, and rpmbuild fails on unpackaged files.
+#                           The container images turn it on -- see Dockerfile.
 #
 #   TENGINE_TONGSUO_SRC     Tongsuo source tree for --with-openssl
 #   TENGINE_XQUIC_INC       xquic headers
@@ -53,6 +58,7 @@ set -e
 : "${TENGINE_WITH_GEOIP:=no}"
 : "${TENGINE_WITH_MAIL:=yes}"
 : "${TENGINE_WITH_PCRE_JIT:=yes}"
+: "${TENGINE_WITH_PERL:=no}"
 
 # Private directory for the libraries this package brings along (libxquic.so,
 # libluajit) plus the compiled Lua C modules.
@@ -153,6 +159,22 @@ if [ "$TENGINE_WITH_MAIL" = yes ]; then
 fi
 
 [ "$TENGINE_WITH_GEOIP" = yes ] && echo "--with-stream_geoip_module"
+
+#
+# Perl.  Only ever built as a dynamic module, so the same Tengine binary serves
+# the images that ship it and the ones that do not.
+#
+# The module's own install rule (auto/install) runs `$(MAKE) install` inside the
+# generated ExtUtils::MakeMaker tree, which puts nginx.pm wherever MakeMaker's
+# site directory happens to be -- a path that differs per distro and per perl
+# release. Pinning it next to the other private files keeps the layout the same
+# everywhere, and configure compiles the path into the binary's @INC, so nothing
+# has to be configured at runtime for `use nginx;` to resolve.
+#
+if [ "$TENGINE_WITH_PERL" = yes ]; then
+    echo "--with-http_perl_module=dynamic"
+    echo "--with-perl_modules_path=${TENGINE_PRIVATE_LIBDIR}/perl"
+fi
 
 #
 # Tongsuo.  ngx_tongsuo_ntls only defines T_NGX_SSL_NTLS when USE_OPENSSL is

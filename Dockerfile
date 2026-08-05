@@ -13,6 +13,23 @@
 #     docker build -t tengine .
 #     docker run --rm -p 8080:80 tengine
 #
+# Two variants are built from this file, mirroring how the nginx official
+# images are published:
+#
+#     docker build -t tengine .                        # default
+#     docker build -t tengine:perl --target perl .     # + ngx_http_perl_module
+#
+# There is only ever ONE compile. ngx_http_perl_module is always built, as a
+# dynamic module, and its two files are set aside in /out-perl by the builder;
+# the default runtime simply does not copy them. So the perl variant costs a
+# `perl` runtime package and a few hundred KB rather than a second 90-minute
+# build, and both variants share every builder layer in the buildx cache.
+#
+# A side effect worth knowing: `tengine -V` in the DEFAULT image lists
+# --with-http_perl_module=dynamic even though the .so is not there. That is the
+# same thing nginx's own images do -- their slim variants advertise dynamic
+# modules they do not ship, because one build feeds every variant.
+#
 # Both stages are parameterised so the image can be rebased, e.g.
 #     --build-arg BASE_IMAGE=openanolis/anolisos:8.8 \
 #     --build-arg RUNTIME_IMAGE=openanolis/anolisos:8.8
@@ -30,12 +47,13 @@ ARG RUNTIME_IMAGE=debian:13-slim
 FROM ${BASE_IMAGE} AS builder
 
 # cmake + g++ are for xquic, perl configures Tongsuo, curl fetches the pinned
-# dependency tarballs.
+# dependency tarballs. libperl-dev carries the perl headers and
+# ExtUtils::Embed, which auto/lib/perl/conf refuses to build without.
 RUN set -eux; \
     export DEBIAN_FRONTEND=noninteractive; \
     apt-get update -qq; \
     apt-get install -y --no-install-recommends \
-        build-essential cmake perl curl ca-certificates \
+        build-essential cmake perl libperl-dev curl ca-certificates \
         libssl-dev zlib1g-dev libpcre2-dev; \
     rm -rf /var/lib/apt/lists/*
 
@@ -59,6 +77,7 @@ RUN set -eux; \
 RUN set -eux; \
     . /tmp/deps-build/deps-env.sh; \
     export TENGINE_LIBDIR=/usr/lib; \
+    export TENGINE_WITH_PERL=yes; \
     ./configure \
         $(sh packages/build/configure-args.sh) \
         --with-cc-opt="-Wno-error" \
@@ -79,8 +98,20 @@ RUN set -eux; \
     sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' /out/etc/tengine/tengine.conf; \
     rm -rf /out/run /out/var/run
 
+# Move the perl module out of the default tree so only the "perl" stage picks
+# it up. nginx.pm lands in the private libdir because configure-args.sh passes
+# --with-perl_modules_path; the .packlist and perllocal.pod MakeMaker leaves
+# behind are build bookkeeping and are dropped rather than shipped.
+RUN set -eux; \
+    install -d /out-perl/usr/lib/tengine/modules; \
+    mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
+       /out-perl/usr/lib/tengine/modules/; \
+    install -d /out-perl/usr/lib/tengine/perl; \
+    mv /out/usr/lib/tengine/perl/nginx.pm /out-perl/usr/lib/tengine/perl/; \
+    rm -rf /out/usr/lib/tengine/perl
 
-FROM ${RUNTIME_IMAGE}
+
+FROM ${RUNTIME_IMAGE} AS runtime
 
 ARG TENGINE_VERSION=dev
 LABEL org.opencontainers.image.title="Tengine" \
@@ -118,3 +149,43 @@ EXPOSE 80 443 443/udp
 STOPSIGNAL SIGQUIT
 
 CMD ["/usr/sbin/tengine", "-g", "daemon off;"]
+
+
+# --------------------------------------------------------------- perl variant
+#
+# Adds ngx_http_perl_module and a perl runtime. Unlike the nginx official perl
+# image, which only drops the module in and leaves loading it to the operator,
+# the load_module line is prepended here -- so `perl_set` and friends work out
+# of the box, and the `tengine -t` below actually proves the module loads
+# instead of merely proving the file exists.
+#
+# perl (not just perl-base) is what pulls in libperl.so.*, which the module
+# links against.
+FROM runtime AS perl
+
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update -qq; \
+    apt-get install -y --no-install-recommends perl; \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out-perl/ /
+
+# load_module is only valid in the main context, and the packaged tengine.conf
+# has no include there, so prepend it to the file itself. printf+cat rather
+# than `sed -i 1i` to stay identical to the Alpine image, whose BusyBox sed
+# does not expand \n in inserted text.
+RUN set -eux; \
+    { printf 'load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;\n\n'; \
+      cat /etc/tengine/tengine.conf; } > /tmp/tengine.conf; \
+    cat /tmp/tengine.conf > /etc/tengine/tengine.conf; \
+    rm -f /tmp/tengine.conf; \
+    /usr/sbin/tengine -t
+
+
+# ------------------------------------------------------------ default variant
+#
+# Last stage on purpose: a plain `docker build .` with no --target has to keep
+# producing the default image, not the perl one. Nothing is added here; the
+# alias exists so `--target default` also works.
+FROM runtime AS default

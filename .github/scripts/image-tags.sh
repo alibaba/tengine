@@ -9,6 +9,12 @@
 #     .github/scripts/image-tags.sh debian 3.2.0 true
 #     .github/scripts/image-tags.sh alpine 3.2.0 true
 #
+# A fourth argument names an image variant, which is appended to every tag the
+# same way nginx suffixes its own variants:
+#
+#     .github/scripts/image-tags.sh debian 3.2.0 true perl
+#         -> 3.2.0-perl 3.2.0-trixie-perl ... perl trixie-perl
+#
 # Version-pinned tags (3.2.0, 3.2.0-trixie) are always printed. The rolling
 # tags -- the minor and major series, "latest" and the bare distro name -- only
 # come out when <move-rolling> is true, so a pre-release tag can never become
@@ -22,14 +28,18 @@
 
 set -eu
 
-[ $# -eq 3 ] || {
-    echo "usage: ${0##*/} <debian|alpine> <version> <move-rolling:true|false>" >&2
+[ $# -eq 3 ] || [ $# -eq 4 ] || {
+    echo "usage: ${0##*/} <debian|alpine> <version> <move-rolling:true|false> [variant]" >&2
     exit 2
 }
 
 FLAVOR=$1
 VERSION=$2
 MOVE=$3
+VARIANT=${4:-}
+
+# Appended to every tag: "" for the default image, "-perl" for the perl one.
+sfx=${VARIANT:+-$VARIANT}
 
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$SELF_DIR/../.." && pwd)
@@ -85,16 +95,16 @@ fi
 # Each series gets both an unsuffixed (or -alpine) tag and a distro-suffixed
 # one: 3.2.0 / 3.2.0-trixie, 3.2.0-alpine / 3.2.0-alpine3.24.
 for v in $series; do
-    if [ -n "$flavor_tag" ]; then
-        echo "$v-$flavor_tag"
-    else
-        echo "$v"
-    fi
-    echo "$v-$distro"
+    echo "$v${flavor_tag:+-$flavor_tag}$sfx"
+    echo "$v-$distro$sfx"
 done
 
-# The floating aliases: "latest"/"alpine" and the bare distro name.
+# The floating aliases: "latest"/"alpine" and the bare distro name. A variant
+# replaces "latest" rather than extending it, which is how nginx spells them --
+# "perl" and "alpine-perl", never "latest-perl".
 if [ "$MOVE" = true ]; then
-    echo "${flavor_tag:-latest}"
-    echo "$distro"
+    alias_tag=$flavor_tag
+    [ -n "$VARIANT" ] && alias_tag="${alias_tag:+$alias_tag-}$VARIANT"
+    echo "${alias_tag:-latest}"
+    echo "$distro$sfx"
 fi

@@ -477,11 +477,14 @@ run_docker_target() {
     # as tengine-<ver>-<ts>.<arch>.rpm with nothing naming the target -- two
     # different distributions producing the same file name once a release
     # directory is assembled. Give them one unless the caller asked for its own.
+    # Anolis is deliberately absent: its images do define %dist (an8 packages
+    # ship as ...-<ts>.an8.<arch>.rpm), so anolis8 and anolis23 already differ.
     target_dist=""
     if [ -z "$DIST_TAG" ]; then
         case "$target" in
             sles15)        target_dist=".sles15" ;;
             sles16)        target_dist=".sles16" ;;
+            openeuler2203) target_dist=".oe2203" ;;
             openeuler2403) target_dist=".oe2403" ;;
         esac
     fi

@@ -92,20 +92,30 @@ packages/build/build.sh docker el9 --platform linux/arm64
 
 [.github/workflows/package.yml](../../.github/workflows/package.yml) —
 **不在日常 push/PR 上触发**：每个目标要编 Tongsuo（两遍）、xquic、LuaJIT 与
-Tengine，36 个 job 全跑一遍代价很高，因此仅：
+Tengine，40 个 job 全跑一遍代价很高，因此仅：
 
 - push tag `tengine-*` 时自动触发（并发布 Release）
 - 手动 `workflow_dispatch`（可传 `dist_tag`，如 `.el7u2`）
 
-矩阵为 18 目标 × 2 架构 = 36 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
+矩阵为 20 目标 × 2 架构 = 40 个 job，单 job `timeout-minutes: 150`。`aarch64` 跑在
 原生 `ubuntu-24.04-arm` runner（QEMU 模拟会让单次编译慢 5~10 倍）。`fedora`
-（rolling）、`anolis23`、`openeuler2203`、`sles12` 未进矩阵，需要时用
-`build.sh docker <目标>`。
+与 `sles12` 未进矩阵，需要时用 `build.sh docker <目标>`。
+
+`fedora` 刻意不进矩阵：nginx 官方包支持清单本就不含 Fedora，而 `fedora:latest`
+是 rolling tag，每半年换一个大版本，产出的 `%dist`（`.fc43` 之类）会随之漂移，
+损害构建可复现性；单版本 EOL 也只有约 13 个月。它的用途是本地
+`build.sh docker fedora` 随手验证，不需要 CI 常驻。
 
 矩阵已完整覆盖 nginx 官方包支持的发行版清单（RHEL 8/9/10、Debian 11/12/13、
 Ubuntu 22.04/24.04/26.04、SLES 15 SP6+/16、Alpine 3.21~3.24，均双架构），并额外
-包含 `el7`、`anolis8`、`openeuler2403`，以及 nginx 只发 x86_64 的 SLES 15 的
-aarch64。
+包含 `el7`、`anolis8`、`anolis23`、`openeuler2203`、`openeuler2403`，以及 nginx
+只发 x86_64 的 SLES 15 的 aarch64。信创发行版（龙蜥、openEuler）是 Tengine 的核心
+用户群，因此两个版本各覆盖一条 LTS。
+
+> openEuler 镜像的 `%dist` 为空，两个 openEuler 目标会产出同名 rpm，因此
+> `build.sh` 为它们分别指定 `.oe2203` / `.oe2403`（见 `run_docker_target` 的
+> `target_dist`）。Anolis 无此问题 —— 其镜像自带 `%dist`，产物形如
+> `tengine-3.2.0-<ts>.an8.x86_64.rpm`。
 
 **只有 `el7` + `aarch64` 标记 `continue-on-error`**：CentOS 7 EOL 后镜像源迁到
 `vault.centos.org`，其主树只有 x86_64，aarch64 归档在 `/altarch/` 另一路径下，
@@ -155,15 +165,18 @@ artifact 90 天过期且需要登录 GitHub。
 
 ## Docker 镜像
 
-两条线，都是 multi-arch（amd64 + arm64），推到 ghcr.io：
+两条线 × 两个变体，都是 multi-arch（amd64 + arm64），推到 ghcr.io：
 
-| Dockerfile | 基底 | 镜像 tag |
-|---|---|---|
-| [Dockerfile](../../Dockerfile) | `debian:13` → `debian:13-slim` | `3.2.0`、`3.2`、`3`、`latest`、`3.2.0-trixie`、`3.2-trixie`、`3-trixie`、`trixie` |
-| [Dockerfile.alpine](../../Dockerfile.alpine) | `alpine:3.24` | `3.2.0-alpine`、`3.2-alpine`、`3-alpine`、`alpine`、`3.2.0-alpine3.24`、`3.2-alpine3.24`、`3-alpine3.24`、`alpine3.24` |
+| Dockerfile | 基底 | 变体 | 镜像 tag |
+|---|---|---|---|
+| [Dockerfile](../../Dockerfile) | `debian:13` → `debian:13-slim` | 默认 | `3.2.0`、`3.2`、`3`、`latest`、`3.2.0-trixie`、`3.2-trixie`、`3-trixie`、`trixie` |
+| 同上 | 同上 | `--target perl` | 上面每个 tag 加 `-perl` 后缀，浮动别名为 `perl` / `trixie-perl` |
+| [Dockerfile.alpine](../../Dockerfile.alpine) | `alpine:3.24` | 默认 | `3.2.0-alpine`、`3.2-alpine`、`3-alpine`、`alpine`、`3.2.0-alpine3.24`、`3.2-alpine3.24`、`3-alpine3.24`、`alpine3.24` |
+| 同上 | 同上 | `--target perl` | 同样加 `-perl`：`3.2.0-alpine-perl`、`alpine-perl`、`3.2.0-alpine3.24-perl`、`alpine3.24-perl` |
 
 基底与 nginx 官方镜像一致（trixie + 最新 Alpine），tag 形状也照其体系：版本号、
-minor/major 系列、浮动别名，各自再带一份发行版后缀。tag 清单由
+minor/major 系列、浮动别名，各自再带一份发行版后缀，变体后缀再乘一遍（nginx 的
+写法是 `perl` / `alpine-perl`，不是 `latest-perl`，此处一致）。tag 清单由
 [.github/scripts/image-tags.sh](../../.github/scripts/image-tags.sh) 统一生成，
 发行版部分是从两个 Dockerfile 的 `BASE_IMAGE` 反解出来的——换基底时 tag 自动跟着变，
 Debian 只需在脚本的版本号→代号表里补一行。
@@ -174,7 +187,8 @@ Debian 只需在脚本的版本号→代号表里补一行。
 本地构建：
 
 ```sh
-docker build -t tengine .
+docker build -t tengine .                                    # 默认
+docker build -t tengine:perl --target perl .                 # + perl 模块
 docker build -f Dockerfile.alpine -t tengine:alpine .
 docker run --rm -p 8080:80 tengine
 ```
@@ -185,17 +199,43 @@ configure 参数同样出自 [configure-args.sh](configure-args.sh)，因此镜�
 一致。日志软链到 `/dev/stdout` 与 `/dev/stderr`，`STOPSIGNAL SIGQUIT`（Tengine 的
 优雅退出信号），暴露 `80 443 443/udp`（HTTP/3 走 UDP）。
 
+#### perl 变体只多一层，不是第二次编译
+
+`ngx_http_perl_module` **始终**被编译（永远是动态模块），builder 随后把
+`ngx_http_perl_module.so` 与 `nginx.pm` 挪到 `/out-perl`，默认 runtime 不拷贝它们；
+`--target perl` 的 stage 从默认镜像继承（`FROM runtime`），只多装一个 perl 运行时包
+再把这两个文件拷进去。因此 perl 变体的成本是一层几百 KB，而不是再跑一遍 90 分钟的
+Tongsuo + xquic 编译，两个变体在 buildx 里共享全部 builder 层。
+
+- **`tengine -V` 在默认镜像里也会列出 `--with-http_perl_module=dynamic`，但 `.so`
+  不在镜像内。** 这与 nginx 官方镜像行为一致（其 slim 变体同样列着没随包发的动态
+  模块），因为一次构建喂多个变体。要判断某个镜像是否真带 perl，看
+  `/usr/lib/tengine/modules/ngx_http_perl_module.so` 是否存在，`verify-image.sh`
+  正是这么断言的（并且反向断言默认镜像里**没有**它）。
+- perl 变体的 `tengine.conf` 顶部预置了 `load_module`，开箱即用（nginx 官方 perl
+  镜像只放模块、要用户自己加载）；这也让 stage 内的 `tengine -t` 真正验证了模块可加载。
+- `nginx.pm` 装在 `/usr/lib/tengine/perl`（`--with-perl_modules_path`），该路径被
+  编译进二进制的 `@INC`，`use nginx;` 无需额外配置。
+- 系统包（rpm/deb/apk）**不含** perl 模块：`TENGINE_WITH_PERL` 默认 `no`，因为 spec
+  的 `%files` 没有对应条目，rpmbuild 会因 unpackaged files 直接失败。
+
 发布由 [docker.yml](../../.github/workflows/docker.yml) 负责，触发与打包一致
 （tag `tengine-*` 自动，`workflow_dispatch` 手动且默认只构建不推送）：
 
 - 每个 flavor × 架构在原生 runner 上构建，**按 digest 推送**，再由 `manifest` job
   用 `docker buildx imagetools create` 合成 multi-arch tag，注册表里不留架构专用 tag
+- 两个变体在**同一个 job 内**先后构建（`--target default` / `--target perl`），不拆成
+  独立 matrix 项：第二次构建的 builder 层已在该 runner 的 buildx 里，只需跑几条
+  runtime 指令；拆开则要从 GHA cache 重新导入整套层，且两个 job 写同一 cache scope
+  会互相竞争。digest 按 `<变体>-<架构>` 命名放进同一 artifact，`manifest` job 按前缀取用
 - **RC 不动 `latest` / `alpine` / `3.2` / `3` 等滚动 tag**（避免 `docker pull tengine`
   拉到预发布），但 RC 的版本化 tag 与正式版一样永久留在 ghcr
 - `verify` job 把发布出去的 tag 拉回来跑
   [verify-image.sh](../../.github/scripts/verify-image.sh)：断言三模块编入、Tongsuo
   在位、`tengine -t` 通过、HTTP 可访问，并真跑一段 Lua
-  （`require "resty.core"` + `cjson`）验证 `lua_package_path` / `cpath` 正确
+  （`require "resty.core"` + `cjson`）验证 `lua_package_path` / `cpath` 正确；
+  `--variant perl` 再额外请求一个 perl handler，用返回的 `$nginx::VERSION` 证明
+  `nginx.pm` 确实从编译进 `@INC` 的路径解析成功
 
 ### ⚠️ 一次性手动操作
 
