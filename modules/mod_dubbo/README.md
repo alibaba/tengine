@@ -10,14 +10,14 @@ git clone https://github.com/alibaba/tengine.git
 ```
 cd ./tengine
 
-wget https://ftp.pcre.org/pub/pcre/pcre-8.43.tar.gz
-tar xvf pcre-8.43.tar.gz
+wget https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.tar.gz
+tar xvf pcre-8.45.tar.gz
 
 wget https://www.openssl.org/source/openssl-1.0.2s.tar.gz
 tar xvf openssl-1.0.2s.tar.gz
 
-wget http://www.zlib.net/zlib-1.2.11.tar.gz
-tar xvf zlib-1.2.11.tar.gz
+wget http://www.zlib.net/zlib-1.3.1.tar.gz
+tar xvf zlib-1.3.1.tar.gz
 ```
 
 ### Build Tengine
