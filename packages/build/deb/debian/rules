@@ -16,8 +16,10 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 
-CONFDIR  := debian/tengine/etc/tengine
-PKGDIR   := debian/tengine
+CONFDIR   := debian/tengine/etc/tengine
+PKGDIR    := debian/tengine
+# ngx_http_perl_module and the two perl files it needs ship separately.
+PERLPKGDIR := debian/tengine-module-perl
 
 %:
 	dh $@
@@ -38,6 +40,7 @@ override_dh_auto_configure:
 		--env-relative-to $(CURDIR)
 	. $(CURDIR)/deps-build/deps-env.sh; \
 	export TENGINE_LIBDIR=/usr/lib; \
+	export TENGINE_WITH_PERL=yes; \
 	./configure \
 		$$(sh packages/build/configure-args.sh) \
 		--with-cc-opt="$(CFLAGS) $(CPPFLAGS) -Wno-error" \
@@ -47,10 +50,40 @@ override_dh_auto_configure:
 override_dh_auto_test:
 
 override_dh_auto_install:
-	dh_auto_install
+	# --destdir is required now that the source builds more than one binary
+	# package: without it dh_auto_install switches to debian/tmp and every
+	# path below, all of which are relative to debian/tengine, would miss.
+	dh_auto_install --destdir=$(PKGDIR)
 	# The bundled libxquic.so / libluajit and the Lua modules are staged with
 	# their final absolute paths already in place.
 	cp -a $(CURDIR)/deps-staging/. $(PKGDIR)/
+	#
+	# Split the perl payload out into tengine-module-perl. It is three files
+	# and only the module .so is placed correctly by the build:
+	#
+	#   1. ngx_http_perl_module.so  - nginx's own install rule honours DESTDIR,
+	#      so this one really is under $(PKGDIR).
+	#   2. nginx.pm                 - loaded through the single @INC entry that
+	#      --with-perl_modules_path compiled into the binary.
+	#   3. auto/nginx/nginx.so      - the XS object nginx.pm's XSLoader::load()
+	#      dlopens. Without it the interpreter dies during perl_parse() with
+	#      "Can't locate loadable object for module nginx".
+	#
+	# 2 and 3 cannot come from the install tree: auto/install delegates them to
+	# `$(MAKE) install` in the generated MakeMaker tree, which puts the XS
+	# object in INSTALLSITEARCH -- one directory deeper than the path nginx adds
+	# to @INC -- so DynaLoader would never find it. Both come from blib instead,
+	# with the XS object placed at <@INC dir>/auto/nginx/. Same reasoning as the
+	# container images; see the comment in Dockerfile.
+	rm -rf $(PKGDIR)/usr/lib/tengine/perl $(PKGDIR)/usr/share/man/man3
+	install -d $(PERLPKGDIR)/usr/lib/tengine/modules
+	mv $(PKGDIR)/usr/lib/tengine/modules/ngx_http_perl_module.so \
+		$(PERLPKGDIR)/usr/lib/tengine/modules/
+	install -d $(PERLPKGDIR)/usr/lib/tengine/perl/auto/nginx
+	install -p -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
+		$(PERLPKGDIR)/usr/lib/tengine/perl/nginx.pm
+	install -p -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+		$(PERLPKGDIR)/usr/lib/tengine/perl/auto/nginx/nginx.so
 	# make install ships the in-tree conf/tengine.conf plus *.default copies;
 	# replace them with the packaged tengine.conf, which adds the conf.d layout.
 	rm -f $(CONFDIR)/*.default

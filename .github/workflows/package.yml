@@ -150,6 +150,14 @@ jobs:
                   ;;
           esac
 
+          # Every format builds ngx_http_perl_module into its own subpackage:
+          # tengine-module-perl for rpm/deb, tengine-mod-perl on Alpine, which
+          # uses the -mod- convention. A perl toolchain that went missing from a
+          # build image would otherwise just silently drop the subpackage.
+          ls dist/ | grep -qE '^tengine-mod(ule)?-perl[-_]' \
+              || { echo "MISSING perl subpackage in the list above"; exit 1; }
+          echo "ok: perl subpackage built"
+
       - uses: actions/upload-artifact@v7
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
@@ -212,6 +220,25 @@ jobs:
             # resty.core is loaded during startup, so a passing -t also proves
             # lua_package_path points at the packaged lualib directory.
             /usr/sbin/tengine -t
+            #
+            # The perl subpackage came in with the glob above. Loading it is the
+            # only way to prove the XS object sits where DynaLoader looks: a
+            # perl_set directive makes the module build its interpreter during
+            # configuration parsing, and a missing or misplaced
+            # perl/auto/nginx/nginx.so fails there with "Cant locate loadable
+            # object for module nginx". The module .so lives in lib64 on the
+            # RHEL family and lib on Debian, hence the glob.
+            # The sub returns a bare number so this whole script stays free of
+            # single quotes, which the shell layers around it would eat.
+            mod=$(ls /usr/lib*/tengine/modules/ngx_http_perl_module.so)
+            printf "%s\n" \
+                "load_module $mod;" \
+                "events {}" \
+                "http {" \
+                "    perl_set \$answer \"sub { return 42; }\";" \
+                "    server { listen 8080; }" \
+                "}" > /tmp/perl.conf
+            /usr/sbin/tengine -t -c /tmp/perl.conf
           '
 
   # Publish every package as a release asset. Unlike workflow artifacts these
