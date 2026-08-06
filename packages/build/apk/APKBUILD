@@ -29,7 +29,11 @@ makedepends="
 	perl-dev
 	"
 install="$pkgname.pre-install $pkgname.post-install"
-subpackages="$pkgname-doc $pkgname-openrc $pkgname-mod-perl:mod_perl"
+# -dbg has to come first: abuild splits subpackages in order and the debug
+# symbols must be taken before anything else moves the binaries away. It is
+# what makes Alpine match the other two formats, which produce debug packages
+# (rpm -debuginfo, deb -dbgsym) without being asked.
+subpackages="$pkgname-dbg $pkgname-doc $pkgname-openrc $pkgname-mod-perl:mod_perl"
 # tengine-deps.tar.gz holds the pinned Tongsuo / xquic / LuaJIT / resty
 # tarballs; abuild unpacks it to $srcdir/deps.
 source="$pkgname-$_upstream_ver.tar.gz

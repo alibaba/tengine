@@ -282,9 +282,11 @@ jobs:
 
           # A sample package name for each install snippet, so the notes always
           # point at a file that actually exists in this release. Match the main
-          # package explicitly: the debug packages sort ahead of it under the C
-          # locale ("tengine-dbgsym_" before "tengine_", "-" being 0x2D and "_"
-          # 0x5F), so a bare glob would advertise the debug symbols instead.
+          # package explicitly rather than by a bare glob: the subpackages sort
+          # ahead of it under the C locale ("tengine-module-perl_" before
+          # "tengine_", "-" being 0x2D and "_" 0x5F), so a bare glob would
+          # advertise a subpackage instead. Requiring a digit right after the
+          # name is what separates the two.
           sample_rpm=$(cd release && ls -1 tengine-[0-9]*.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
           [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 tengine-[0-9]*.x86_64.rpm | head -n 1)
           sample_deb=$(cd release && ls -1 tengine_[0-9]*_amd64.deb | head -n 1)
@@ -343,6 +345,26 @@ jobs:
           aliases). The module is already loaded in the shipped configuration,
           so \`perl\`, \`perl_set\` and \`perl_modules\` work out of the box.
 
+          ## Perl module
+
+          \`ngx_http_perl_module\` ships as a separate subpackage
+          (\`tengine-module-perl\`, \`tengine-mod-perl\` on Alpine) so the base
+          install does not pull in libperl. It is dynamic and not loaded by
+          default; add
+
+          \`\`\`nginx
+          load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;
+          \`\`\`
+
+          to the main context (\`/usr/lib64\` on the RHEL family).
+
+          ## Debug symbols
+
+          The \`-debuginfo\` / \`-debugsource\` (rpm), \`-dbgsym\` (deb) and
+          \`-dbg\` (apk) packages are listed alongside the runtime packages and
+          are only needed to read a core dump or attach a debugger. They have
+          their own checksum file, \`SHA256SUMS.debug\`.
+
           ## Verify
 
           \`\`\`sh
@@ -351,10 +373,15 @@ jobs:
           \`\`\`
           EOF
 
+      # Release assets are one flat list, so both directories are named here.
+      # collect-release.sh keeps them siblings rather than nesting the debug one,
+      # which is what lets each glob expand to files only.
       - uses: softprops/action-gh-release@v2
         with:
           name: Tengine-${{ steps.notes.outputs.version }}
-          files: release/*
+          files: |
+            release/*
+            release-debug/*
           body_path: notes.md
           prerelease: ${{ steps.notes.outputs.prerelease }}
           fail_on_unmatched_files: true
