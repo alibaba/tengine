@@ -889,7 +889,17 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         }
 
 #if (NGX_HAVE_PR_SET_KEEPCAPS && NGX_HAVE_CAPABILITIES)
+        unsigned int cap_mask = 0;
+
         if (ccf->transparent && ccf->user) {
+            cap_mask |= CAP_TO_MASK(CAP_NET_RAW);
+        }
+
+#if (T_NGX_XQUIC)
+        cap_mask |= CAP_TO_MASK(CAP_NET_BIND_SERVICE);
+#endif
+
+        if (cap_mask) {
             if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) == -1) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
                               "prctl(PR_SET_KEEPCAPS, 1) failed");
@@ -906,17 +916,17 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
             exit(2);
         }
 
-#if (NGX_HAVE_CAPABILITIES)
-        if (ccf->transparent && ccf->user) {
-            struct __user_cap_data_struct    data;
-            struct __user_cap_header_struct  header;
+#if (NGX_HAVE_PR_SET_KEEPCAPS && NGX_HAVE_CAPABILITIES)
+        struct __user_cap_data_struct    data;
+        struct __user_cap_header_struct  header;
 
+        if (cap_mask) {
             ngx_memzero(&header, sizeof(struct __user_cap_header_struct));
             ngx_memzero(&data, sizeof(struct __user_cap_data_struct));
 
             header.version = _LINUX_CAPABILITY_VERSION_1;
-            data.effective = CAP_TO_MASK(CAP_NET_RAW);
-            data.permitted = data.effective;
+            data.effective = cap_mask;
+            data.permitted = cap_mask;
 
             if (syscall(SYS_capset, &header, &data) == -1) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
