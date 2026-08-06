@@ -507,7 +507,12 @@ EOS
             echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl libperl-dev curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev'
             ;;
         apk)
-            echo 'apk add --no-cache alpine-sdk cmake perl curl linux-headers openssl-dev pcre2-dev zlib-dev'
+            # `apk update` rather than `apk add --no-cache`: unlike rpmbuild and
+            # dpkg-buildpackage, abuild installs the APKBUILD's makedepends
+            # itself, so it needs a usable package index left behind on disk.
+            # --no-cache throws the index away, and abuild then reports every
+            # makedepend this list does not already cover as "no such package".
+            echo 'apk update && apk add alpine-sdk cmake perl perl-dev curl linux-headers openssl-dev pcre2-dev zlib-dev'
             ;;
     esac
 }
