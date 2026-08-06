@@ -376,7 +376,7 @@ jobs:
       # Release assets are one flat list, so both directories are named here.
       # collect-release.sh keeps them siblings rather than nesting the debug one,
       # which is what lets each glob expand to files only.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: Tengine-${{ steps.notes.outputs.version }}
           files: |
