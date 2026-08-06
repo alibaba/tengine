@@ -20,14 +20,14 @@ jobs:
           - { compiler: GNU,  CC: gcc,  CXX: g++}
           - { compiler: LLVM, CC: clang, CXX: clang++}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           path: tengine
       - name: get dependencies
         run: |
           sudo apt install -y libpcre3 libpcre3-dev libevent-dev cmake
       - name: 'checkout luajit2'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/luajit2
           # Pinned (the LuaJIT fork ngx_http_lua_module requires); keep in sync with packages/build/deps.env.
@@ -39,7 +39,7 @@ jobs:
           make
           sudo make install
       - name: 'checkout lua-resty-lrucache'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/lua-resty-lrucache
           # Pinned (resty.core's dependency); keep in sync with packages/build/deps.env.
@@ -50,7 +50,7 @@ jobs:
         run: |
           sudo make install
       - name: 'checkout lua-resty-core'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/lua-resty-core
           # lua-resty-core pins the ngx_lua version with a strict equality check
@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo make install
       - name: checkout Tongsuo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: Tongsuo-Project/Tongsuo
           ref: 8.4-stable
@@ -79,7 +79,7 @@ jobs:
           make install_sw
           make clean
       - name: checkout xquic
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: alibaba/xquic
           path: xquic

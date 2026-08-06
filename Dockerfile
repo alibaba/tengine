@@ -99,15 +99,25 @@ RUN set -eux; \
     rm -rf /out/run /out/var/run
 
 # Move the perl module out of the default tree so only the "perl" stage picks
-# it up. nginx.pm lands in the private libdir because configure-args.sh passes
-# --with-perl_modules_path; the .packlist and perllocal.pod MakeMaker leaves
-# behind are build bookkeeping and are dropped rather than shipped.
+# it up.
+#
+# The .so is placed by nginx's own install rule, which honours DESTDIR, so it is
+# under /out as expected. nginx.pm is NOT: auto/install delegates it to
+# `$(MAKE) install` inside the generated MakeMaker tree, and that copy does not
+# reliably land under DESTDIR. Take it straight from blib instead -- pm_to_blib
+# is a plain product of the build that already has %%VERSION%% substituted, so
+# this is both more direct and independent of MakeMaker's install semantics.
+#
+# Whatever MakeMaker did drop under /out (man3, .packlist, the arch directory)
+# is build bookkeeping the images do not ship, hence the rm.
 RUN set -eux; \
+    find /out -name 'nginx.pm' -o -name 'ngx_http_perl_module.so' | sort; \
     install -d /out-perl/usr/lib/tengine/modules; \
     mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
        /out-perl/usr/lib/tengine/modules/; \
     install -d /out-perl/usr/lib/tengine/perl; \
-    mv /out/usr/lib/tengine/perl/nginx.pm /out-perl/usr/lib/tengine/perl/; \
+    install -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
+        /out-perl/usr/lib/tengine/perl/nginx.pm; \
     rm -rf /out/usr/lib/tengine/perl
 
 

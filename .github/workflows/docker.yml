@@ -51,7 +51,7 @@ jobs:
       push: ${{ steps.calc.outputs.push }}
       latest: ${{ steps.calc.outputs.latest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: compute image name and tags
         id: calc
@@ -104,7 +104,7 @@ jobs:
         flavor: [debian, alpine]
         arch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
@@ -164,7 +164,7 @@ jobs:
           echo "${{ steps.push.outputs.digest }}"      > "/tmp/digests/default-${{ matrix.arch }}"
           echo "${{ steps.push_perl.outputs.digest }}" > "/tmp/digests/perl-${{ matrix.arch }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.meta.outputs.push == 'true'
         with:
           name: digest-${{ matrix.flavor }}-${{ matrix.arch }}
@@ -217,11 +217,11 @@ jobs:
         variant: [default, perl]
     steps:
       # image-tags.sh reads the base images back out of the Dockerfiles.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Pulls in both variants' digests for this flavour; the tag step picks
       # out the ones belonging to matrix.variant by file-name prefix.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: digest-${{ matrix.flavor }}-*
           path: digests
@@ -289,7 +289,7 @@ jobs:
         arch: [amd64, arm64]
         variant: [default, perl]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/login-action@v3
         with:

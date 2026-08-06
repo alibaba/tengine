@@ -38,12 +38,12 @@ jobs:
         id: ts
         run: echo "value=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: fetch and verify the pinned dependency sources
         run: packages/build/fetch-deps.sh --outdir dist/deps
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: deps
           path: dist/deps
@@ -95,12 +95,12 @@ jobs:
           - alpine323
           - alpine324
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # build.sh looks for the dependency tarballs here and skips downloading
       # anything whose checksum already matches, so this doubles as an offline
       # cache for the container build.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: deps
           path: dist/deps
@@ -113,10 +113,32 @@ jobs:
             --timestamp ${{ needs.prepare.outputs.timestamp }} \
             ${{ inputs.dist_tag && format('--dist {0}', inputs.dist_tag) || '' }}
 
+      # The dist tag is what keeps two builds of the same distro family apart in
+      # a release directory, so assert it reached the file name instead of
+      # leaving that to whoever downloads the artifact. Two groups matter:
+      # openEuler and SLES images leave %dist empty and build.sh fills it in;
+      # Anolis is trusted to define its own, which is only an assumption until
+      # something checks it.
       - name: list artifacts
-        run: ls -lh dist/
+        run: |
+          set -eu
+          ls -lh dist/
+          case "${{ matrix.target }}" in
+              sles15)        want=.sles15 ;;
+              sles16)        want=.sles16 ;;
+              openeuler2203) want=.oe2203 ;;
+              openeuler2403) want=.oe2403 ;;
+              anolis8)       want=.an8    ;;
+              anolis23)      want=.an23   ;;
+              *)             want=        ;;
+          esac
+          if [ -n "$want" ]; then
+              ls dist/ | grep -qF -- "$want" \
+                  || { echo "MISSING dist tag '$want' in the package names above"; exit 1; }
+              echo "ok: package names carry $want"
+          fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
           path: |
@@ -140,7 +162,7 @@ jobs:
           - { arch: x86_64,  target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
           - { arch: aarch64, target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
           path: pkgs
@@ -189,11 +211,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # "tengine-*" matches the per-target package artifacts and skips the
       # dependency-source artifact.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: tengine-*
           path: artifacts
