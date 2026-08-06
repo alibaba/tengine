@@ -26,7 +26,7 @@ assignees: ''
 
 ### Ⅴ. Anything else we need to know?
 
-1. If applicable, add nginx  [debug log doc](http://nginx.org/en/docs/debugging_log.html).
+1. If applicable, add nginx  [debug log doc](https://nginx.org/en/docs/debugging_log.html).
 2.
 3.
 

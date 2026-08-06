@@ -10,13 +10,13 @@ git clone https://github.com/alibaba/tengine.git
 ```
 cd ./tengine
 
-wget https://ftp.pcre.org/pub/pcre/pcre-8.43.tar.gz
+wget https://downloads.sourceforge.net/project/pcre/pcre/8.43/pcre-8.43.tar.gz
 tar xvf pcre-8.43.tar.gz
 
 wget https://www.openssl.org/source/openssl-1.0.2s.tar.gz
 tar xvf openssl-1.0.2s.tar.gz
 
-wget http://www.zlib.net/zlib-1.2.11.tar.gz
+wget https://www.zlib.net/fossils/zlib-1.2.11.tar.gz
 tar xvf zlib-1.2.11.tar.gz
 ```
 
@@ -119,7 +119,7 @@ sudo yum install maven
 
 #or
 
-wget http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+wget https://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
 sudo yum -y install apache-maven
 
 
