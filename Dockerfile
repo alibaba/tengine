@@ -98,26 +98,38 @@ RUN set -eux; \
     sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' /out/etc/tengine/tengine.conf; \
     rm -rf /out/run /out/var/run
 
-# Move the perl module out of the default tree so only the "perl" stage picks
-# it up.
+# Move the perl payload out of the default tree so only the "perl" stage picks
+# it up. It is THREE files, and only the first is placed correctly by the build:
 #
-# The .so is placed by nginx's own install rule, which honours DESTDIR, so it is
-# under /out as expected. nginx.pm is NOT: auto/install delegates it to
-# `$(MAKE) install` inside the generated MakeMaker tree, and that copy does not
-# reliably land under DESTDIR. Take it straight from blib instead -- pm_to_blib
-# is a plain product of the build that already has %%VERSION%% substituted, so
-# this is both more direct and independent of MakeMaker's install semantics.
+#   1. ngx_http_perl_module.so  - the nginx dynamic module. nginx's own install
+#      rule honours DESTDIR, so this one really is under /out.
+#   2. nginx.pm                 - loaded through the @INC entry that
+#      --with-perl_modules_path compiles into the binary.
+#   3. auto/nginx/nginx.so      - the XS object that nginx.pm's XSLoader::load()
+#      dlopens. Without it the interpreter dies during perl_parse() with
+#      "Can't locate loadable object for module nginx".
 #
-# Whatever MakeMaker did drop under /out (man3, .packlist, the arch directory)
-# is build bookkeeping the images do not ship, hence the rm.
+# Neither 2 nor 3 can be taken from /out. auto/install delegates them to
+# `$(MAKE) install` in the generated MakeMaker tree, which puts the XS object in
+# INSTALLSITEARCH -- <perl_modules_path>/<archname>/auto/nginx/ -- one directory
+# deeper than the single path nginx adds to @INC, so DynaLoader would never find
+# it there. (The nginx packages get away with pointing perl_modules_path at
+# perl's own vendorarch, which already is an arch directory on @INC; this layout
+# keeps the file next to everything else Tengine ships instead.)
+#
+# So both come straight from blib, which is a plain product of the build, and
+# the XS object is placed at <@INC dir>/auto/nginx/ where DynaLoader looks.
 RUN set -eux; \
-    find /out -name 'nginx.pm' -o -name 'ngx_http_perl_module.so' | sort; \
+    ls -l objs/src/http/modules/perl/blib/lib \
+          objs/src/http/modules/perl/blib/arch/auto/nginx; \
     install -d /out-perl/usr/lib/tengine/modules; \
     mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
        /out-perl/usr/lib/tengine/modules/; \
-    install -d /out-perl/usr/lib/tengine/perl; \
+    install -d /out-perl/usr/lib/tengine/perl/auto/nginx; \
     install -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
         /out-perl/usr/lib/tengine/perl/nginx.pm; \
+    install -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+        /out-perl/usr/lib/tengine/perl/auto/nginx/nginx.so; \
     rm -rf /out/usr/lib/tengine/perl
 
 
