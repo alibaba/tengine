@@ -71,16 +71,21 @@ RUN set -eux; \
     sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' /out/etc/tengine/tengine.conf; \
     rm -rf /out/run /out/var/run
 
-# Set the perl module aside for the "perl" stage. nginx.pm comes from blib
-# rather than from /out -- see the Debian Dockerfile for why.
+# Set the perl payload aside for the "perl" stage: the nginx module, nginx.pm
+# and the XS object it dlopens. The latter two come from blib and the XS object
+# goes to <@INC dir>/auto/nginx/ -- see the Debian Dockerfile for why neither
+# can be taken from /out.
 RUN set -eux; \
-    find /out -name 'nginx.pm' -o -name 'ngx_http_perl_module.so' | sort; \
+    ls -l objs/src/http/modules/perl/blib/lib \
+          objs/src/http/modules/perl/blib/arch/auto/nginx; \
     install -d /out-perl/usr/lib/tengine/modules; \
     mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
        /out-perl/usr/lib/tengine/modules/; \
-    install -d /out-perl/usr/lib/tengine/perl; \
+    install -d /out-perl/usr/lib/tengine/perl/auto/nginx; \
     install -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
         /out-perl/usr/lib/tengine/perl/nginx.pm; \
+    install -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+        /out-perl/usr/lib/tengine/perl/auto/nginx/nginx.so; \
     rm -rf /out/usr/lib/tengine/perl
 
 

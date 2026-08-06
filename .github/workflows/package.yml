@@ -138,12 +138,25 @@ jobs:
               echo "ok: package names carry $want"
           fi
 
+          # Debian names the automatic debug-symbol package tengine-dbgsym_*.deb
+          # and Ubuntu names it *.ddeb, so a collection glob that covers only one
+          # of the two drops the symbols on half the deb targets without failing
+          # anything. Assert both families actually shipped one.
+          case "${{ matrix.target }}" in
+              debian*|ubuntu*)
+                  ls dist/ | grep -q '^tengine-dbgsym_.*\.d\?deb$' \
+                      || { echo "MISSING debug symbol package in the list above"; exit 1; }
+                  echo "ok: debug symbols packaged"
+                  ;;
+          esac
+
       - uses: actions/upload-artifact@v7
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
           path: |
             dist/*.rpm
             dist/*.deb
+            dist/*.ddeb
             dist/*.apk
           if-no-files-found: error
 
