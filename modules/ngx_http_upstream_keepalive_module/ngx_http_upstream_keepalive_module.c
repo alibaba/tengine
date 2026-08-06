@@ -1105,3 +1105,30 @@ ngx_http_upstream_keepalive_timeout(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
+void
+ngx_http_upstream_keepalive_clear_cache_connections(ngx_http_upstream_srv_conf_t *us) {
+    if (us == NULL) {
+        return;
+    }
+    ngx_http_upstream_keepalive_srv_conf_t *kcf;
+    ngx_http_upstream_keepalive_cache_t *item;
+    ngx_queue_t *q, *cache;
+    kcf = ngx_http_conf_upstream_srv_conf(us, ngx_http_upstream_keepalive_module);
+    if (kcf == NULL || kcf->max_cached == 0) {
+        return;
+    }
+    cache = &kcf->cache;
+    if (cache == NULL || cache->prev == NULL || cache->next == NULL) {
+        return;
+    }
+    kcf->timeout = 0;
+    for (q = ngx_queue_head(cache); q != ngx_queue_sentinel(cache); q = ngx_queue_next(q)) {
+        item = ngx_queue_data(q, ngx_http_upstream_keepalive_cache_t, queue);
+        if (item->connection && item->connection->read && item->connection->read->timer_set) {
+            ngx_del_timer(item->connection->read);
+            ngx_add_timer(item->connection->read, kcf->timeout);
+        }
+    }
+}
+
+
