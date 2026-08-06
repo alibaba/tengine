@@ -105,6 +105,26 @@ jobs:
           name: deps
           path: dist/deps
 
+      # An apk is signed by abuild during the build, with an RSA key that is not
+      # GPG -- unlike rpm, it cannot be signed afterwards. So the key has to be
+      # placed here rather than in the release job. Without the secret, build.sh
+      # falls back to a throwaway key and the apk needs --allow-untrusted, which
+      # is how it behaved before signing existed.
+      - name: place the apk signing key
+        if: startsWith(matrix.target, 'alpine')
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; apk packages will carry a throwaway signature"
+              exit 0
+          fi
+          install -d -m 0700 "$HOME/apk-key"
+          printf '%s\n' "$APK_PRIVKEY" > "$HOME/apk-key/tengine-packaging.rsa"
+          chmod 600 "$HOME/apk-key/tengine-packaging.rsa"
+          echo "TENGINE_APK_PRIVKEY=$HOME/apk-key/tengine-packaging.rsa" >> "$GITHUB_ENV"
+
       # The runner architecture already selects the image variant, so no
       # --platform is needed here.
       - name: build ${{ matrix.target }} (${{ matrix.arch }})
@@ -149,6 +169,14 @@ jobs:
                   echo "ok: debug symbols packaged"
                   ;;
           esac
+
+          # Every format builds ngx_http_perl_module into its own subpackage:
+          # tengine-module-perl for rpm/deb, tengine-mod-perl on Alpine, which
+          # uses the -mod- convention. A perl toolchain that went missing from a
+          # build image would otherwise just silently drop the subpackage.
+          ls dist/ | grep -qE '^tengine-mod(ule)?-perl[-_]' \
+              || { echo "MISSING perl subpackage in the list above"; exit 1; }
+          echo "ok: perl subpackage built"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -212,6 +240,25 @@ jobs:
             # resty.core is loaded during startup, so a passing -t also proves
             # lua_package_path points at the packaged lualib directory.
             /usr/sbin/tengine -t
+            #
+            # The perl subpackage came in with the glob above. Loading it is the
+            # only way to prove the XS object sits where DynaLoader looks: a
+            # perl_set directive makes the module build its interpreter during
+            # configuration parsing, and a missing or misplaced
+            # perl/auto/nginx/nginx.so fails there with "Cant locate loadable
+            # object for module nginx". The module .so lives in lib64 on the
+            # RHEL family and lib on Debian, hence the glob.
+            # The sub returns a bare number so this whole script stays free of
+            # single quotes, which the shell layers around it would eat.
+            mod=$(ls /usr/lib*/tengine/modules/ngx_http_perl_module.so)
+            printf "%s\n" \
+                "load_module $mod;" \
+                "events {}" \
+                "http {" \
+                "    perl_set \$answer \"sub { return 42; }\";" \
+                "    server { listen 8080; }" \
+                "}" > /tmp/perl.conf
+            /usr/sbin/tengine -t -c /tmp/perl.conf
           '
 
   # Publish every package as a release asset. Unlike workflow artifacts these
@@ -233,8 +280,60 @@ jobs:
           pattern: tengine-*
           path: artifacts
 
+      # Before the checksums are taken, because rpmsign rewrites the package to
+      # embed the signature in its header. A no-op when the secret is absent,
+      # which is what keeps forks building.
+      - name: sign the rpm packages
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          if [ -n "${GPG_PRIVATE_KEY:-}" ]; then
+              sudo apt-get update -qq && sudo apt-get install -y rpm
+          fi
+          packages/build/sign-release.sh rpms artifacts
+
       - name: flatten artifacts into a release directory
         run: packages/build/collect-release.sh --indir artifacts --outdir release
+
+      # Signs the checksum files rather than the packages: this is what covers
+      # the deb packages, which have no in-band signature outside a repository.
+      - name: sign the checksum files and export the public key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          sums=release/SHA256SUMS
+          if [ -f release-debug/SHA256SUMS.debug ]; then
+              sums="$sums release-debug/SHA256SUMS.debug"
+          fi
+          # shellcheck disable=SC2086 # deliberate word splitting
+          packages/build/sign-release.sh detach $sums
+          packages/build/sign-release.sh pubkey release/tengine-packaging-key.asc
+
+      # apk verifies against the public half of the abuild RSA key, which is a
+      # different key from the GPG one above. Derive and publish it so an
+      # installer can drop it in /etc/apk/keys and skip --allow-untrusted.
+      - name: export the apk public key
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; no apk public key to publish"
+              exit 0
+          fi
+          printf '%s\n' "$APK_PRIVKEY" > /tmp/apk.rsa
+          chmod 600 /tmp/apk.rsa
+          # The file name matters: apk looks for the exact basename that abuild
+          # recorded in the package, so it has to match the key placed above.
+          openssl rsa -in /tmp/apk.rsa -pubout \
+              -out release/tengine-packaging.rsa.pub
+          rm -f /tmp/apk.rsa
 
       - name: classify the tag and write the release notes
         id: notes
@@ -255,9 +354,11 @@ jobs:
 
           # A sample package name for each install snippet, so the notes always
           # point at a file that actually exists in this release. Match the main
-          # package explicitly: the debug packages sort ahead of it under the C
-          # locale ("tengine-dbgsym_" before "tengine_", "-" being 0x2D and "_"
-          # 0x5F), so a bare glob would advertise the debug symbols instead.
+          # package explicitly rather than by a bare glob: the subpackages sort
+          # ahead of it under the C locale ("tengine-module-perl_" before
+          # "tengine_", "-" being 0x2D and "_" 0x5F), so a bare glob would
+          # advertise a subpackage instead. Requiring a digit right after the
+          # name is what separates the two.
           sample_rpm=$(cd release && ls -1 tengine-[0-9]*.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
           [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 tengine-[0-9]*.x86_64.rpm | head -n 1)
           sample_deb=$(cd release && ls -1 tengine_[0-9]*_amd64.deb | head -n 1)
@@ -291,11 +392,13 @@ jobs:
           apt install ./$sample_deb
           \`\`\`
 
-          Alpine:
+          Alpine (drop the key first, or pass \`--allow-untrusted\` instead):
 
           \`\`\`sh
+          curl -fLo /etc/apk/keys/tengine-packaging.rsa.pub \\
+              $base_url/tengine-packaging.rsa.pub
           curl -fLO $base_url/$sample_apk
-          apk add --allow-untrusted ./$sample_apk
+          apk add ./$sample_apk
           \`\`\`
 
           ## Container images
@@ -316,18 +419,64 @@ jobs:
           aliases). The module is already loaded in the shipped configuration,
           so \`perl\`, \`perl_set\` and \`perl_modules\` work out of the box.
 
+          ## Perl module
+
+          \`ngx_http_perl_module\` ships as a separate subpackage
+          (\`tengine-module-perl\`, \`tengine-mod-perl\` on Alpine) so the base
+          install does not pull in libperl. It is dynamic and not loaded by
+          default; add
+
+          \`\`\`nginx
+          load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;
+          \`\`\`
+
+          to the main context (\`/usr/lib64\` on the RHEL family).
+
+          ## Debug symbols
+
+          The \`-debuginfo\` / \`-debugsource\` (rpm), \`-dbgsym\` (deb) and
+          \`-dbg\` (apk) packages are listed alongside the runtime packages and
+          are only needed to read a core dump or attach a debugger. They have
+          their own checksum file, \`SHA256SUMS.debug\`.
+
           ## Verify
+
+          Checksums:
 
           \`\`\`sh
           curl -fLO $base_url/SHA256SUMS
           sha256sum -c SHA256SUMS
           \`\`\`
+
+          The checksum file itself is signed, which is what covers the deb
+          packages -- they carry no in-band signature, since Debian's trust
+          model signs a repository rather than individual files:
+
+          \`\`\`sh
+          curl -fLO $base_url/SHA256SUMS.asc
+          curl -fLO $base_url/tengine-packaging-key.asc
+          gpg --import tengine-packaging-key.asc
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          \`\`\`
+
+          The rpm packages are signed in-band with the same key, so once it is
+          imported into rpm they verify individually:
+
+          \`\`\`sh
+          rpm --import $base_url/tengine-packaging-key.asc
+          rpm --checksig $sample_rpm
+          \`\`\`
           EOF
 
-      - uses: softprops/action-gh-release@v2
+      # Release assets are one flat list, so both directories are named here.
+      # collect-release.sh keeps them siblings rather than nesting the debug one,
+      # which is what lets each glob expand to files only.
+      - uses: softprops/action-gh-release@v3
         with:
           name: Tengine-${{ steps.notes.outputs.version }}
-          files: release/*
+          files: |
+            release/*
+            release-debug/*
           body_path: notes.md
           prerelease: ${{ steps.notes.outputs.prerelease }}
           fail_on_unmatched_files: true

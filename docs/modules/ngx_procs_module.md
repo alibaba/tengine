@@ -3,12 +3,6 @@
 
 provides a mechanism to support standalone processes
 
-# Code Examples #
-
-a daytime server module, run in a standalone process.
-
-http://tengine.taobao.org/examples/ngx_proc_daytime_module
-
 # Examples #
 
     processes {

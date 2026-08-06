@@ -4,9 +4,9 @@ Priority: optional
 Maintainer: min.peng <betterpm@gmail.com>
 Uploaders: min.peng <betterpm@gmail.com>
 Build-Depends:  debhelper (>= 7.0.50~), libssl-dev (>= 0.9.7), libpcre3-dev, zlib1g-dev
-Standards-Version: 3.9.2
-Homepage: http://tengine.taobao.org/
-Vcs-Git: git://github.com/alibaba/tengine.git
+Standards-Version: 4.6.2
+Homepage: https://tengine.taobao.org/
+Vcs-Git: https://github.com/alibaba/tengine.git
 Vcs-Browser: https://github.com/alibaba/tengine
 
 Package: tengine

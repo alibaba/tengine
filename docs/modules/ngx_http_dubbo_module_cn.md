@@ -2,7 +2,7 @@ ngx_http_dubbo_module
 =================
 
 该模块提供对后端Dubbo服务体系对接的支持。（Tengine 2.3.2版本之后）
-[Apache Dubbo™](http://dubbo.apache.org) 是一款高性能Java RPC框架。最初由Alibaba开源，经过长期发展和演进，目前已经成为业界主流微服务框架之一。
+[Apache Dubbo™](https://dubbo.apache.org) 是一款高性能Java RPC框架。最初由Alibaba开源，经过长期发展和演进，目前已经成为业界主流微服务框架之一。
 
 在Dubbo服务框架中包含Consumer（client）和Provider（Server）两个角色。该模块支持Tengine作为网关代理，前端接收HTTP/HTTPS/HTTP2等请求，后端作为Dubbo的Consumer调用Dubbo的Provider服务（业务）。
 

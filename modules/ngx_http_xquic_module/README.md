@@ -98,7 +98,7 @@ http {
 ./test_client -a 127.0.0.1 -p 2443 -u https://domain/
 ```
 
-更为详细的指令可参考官网文档 [XQUIC模块](http://tengine.taobao.org/document_cn/xquic_cn.html)
+更为详细的指令可参考官网文档 [XQUIC模块](https://tengine.taobao.org/document_cn/xquic_cn.html)
 
 # 浏览器使用 HTTP3
 

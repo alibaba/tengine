@@ -15,7 +15,7 @@
 
 
 ## Introduction
-Tengine is a high-performance web server and reverse proxy originated by [Taobao](http://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It offers HTTP/3, Kubernetes Ingress support, zero-downtime dynamic configuration, active upstream health checks, and NTLS/TLCP (SM2/SM3/SM4), while remaining 100% compatible with [nginx](http://nginx.org). Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](http://www.taobao.com) and [tmall.com](http://www.tmall.com).
+Tengine is a high-performance web server and reverse proxy originated by [Taobao](https://en.wikipedia.org/wiki/Taobao), the largest e-commerce website in Asia. It offers HTTP/3, Kubernetes Ingress support, zero-downtime dynamic configuration, active upstream health checks, and NTLS/TLCP (SM2/SM3/SM4), while remaining 100% compatible with [nginx](https://nginx.org). Tengine has proven to be very stable and efficient on some of the top 100 websites in the world, including [taobao.com](https://www.taobao.com) and [tmall.com](https://www.tmall.com).
 
 Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to [get involved](https://github.com/alibaba/tengine).
 
@@ -84,7 +84,7 @@ dnf install https://github.com/alibaba/tengine/releases/download/3.2.0/tengine-3
 These packages install alongside a distribution nginx without conflicting. See [packages/build/README.md](packages/build/README.md) for the exact feature set, how to build them yourself, and how the container images are produced.
 
 ### From source
-Tengine can be downloaded at [http://tengine.taobao.org/download/tengine.tar.gz](http://tengine.taobao.org/download/tengine.tar.gz). You can also checkout the latest source code from GitHub at [https://github.com/alibaba/tengine](https://github.com/alibaba/tengine)
+Tengine can be downloaded at [https://tengine.taobao.org/download/tengine.tar.gz](https://tengine.taobao.org/download/tengine.tar.gz). You can also checkout the latest source code from GitHub at [https://github.com/alibaba/tengine](https://github.com/alibaba/tengine)
 
 To install Tengine, just follow these three steps:
 ```bash
@@ -140,8 +140,8 @@ make
 ```
 
 ## Documentation
-The homepage of Tengine is at [http://tengine.taobao.org/](http://tengine.taobao.org/)
-You can access [http://tengine.taobao.org/documentation.html](http://tengine.taobao.org/documentation.html) for more information.
+The homepage of Tengine is at [https://tengine.taobao.org/](https://tengine.taobao.org/)
+You can access [https://tengine.taobao.org/documentation.html](https://tengine.taobao.org/documentation.html) for more information.
 
 ## Contact
 [https://github.com/alibaba/tengine/issues](https://github.com/alibaba/tengine/issues)

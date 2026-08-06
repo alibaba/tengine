@@ -27,6 +27,7 @@
 #     --without tongsuo         system OpenSSL, no NTLS; implies --without xquic
 #     --without xquic           no QUIC/HTTP-3
 #     --without lua             no ngx_http_lua_module
+#     --without perl            no tengine-module-perl subpackage
 #
 
 %{!?tengine_version:%global tengine_version 3.2.0}
@@ -55,10 +56,14 @@
 %bcond_with external_cmake
 
 # Default feature set: everything Tengine is known for. Turn off with
-# --without tongsuo / --without xquic / --without lua.
+# --without tongsuo / --without xquic / --without lua / --without perl.
 %bcond_without tongsuo
 %bcond_without xquic
 %bcond_without lua
+# ngx_http_perl_module, shipped as the tengine-module-perl subpackage. Always
+# dynamic, so one tengine binary serves hosts that install the subpackage and
+# hosts that do not.
+%bcond_without perl
 
 # libxquic.so and libluajit live in %%{_libdir}/tengine, private to this
 # package. Keep them out of the automatic dependency generator on both sides:
@@ -174,6 +179,16 @@ BuildRequires:  libzstd-devel
 %if %{with geoip}
 BuildRequires:  GeoIP-devel
 %endif
+%if %{with perl}
+# The embedded interpreter needs the perl headers and libperl. SUSE keeps both
+# in the monolithic perl package; the RHEL family splits the headers out.
+%if 0%{?suse_version}
+BuildRequires:  perl
+%else
+BuildRequires:  perl-devel
+BuildRequires:  perl(ExtUtils::Embed)
+%endif
+%endif
 
 Requires:       logrotate
 %{?systemd_requires}
@@ -190,6 +205,22 @@ This package ships the server as /usr/sbin/tengine configured through
 /etc/tengine/tengine.conf, which keeps it independent from any nginx package
 installed on the same host.
 
+%if %{with perl}
+%package module-perl
+Summary:        Perl module for Tengine
+Requires:       %{name} = %{version}-%{release}
+
+%description module-perl
+ngx_http_perl_module for Tengine, providing the perl, perl_set and
+perl_modules directives.
+
+The module is dynamic and is NOT loaded automatically. Add
+
+    load_module %{_libdir}/tengine/modules/ngx_http_perl_module.so;
+
+to the main context of /etc/tengine/tengine.conf to enable it.
+%endif
+
 %prep
 # -a 1 unpacks the dependency tarball into deps/ inside the source tree.
 %setup -q -a 1
@@ -201,6 +232,9 @@ export TENGINE_WITH_ZSTD=yes
 %endif
 %if %{with geoip}
 export TENGINE_WITH_GEOIP=yes
+%endif
+%if %{with perl}
+export TENGINE_WITH_PERL=yes
 %endif
 
 # Build the pinned third-party dependencies first. --libdir is the *installed*
@@ -285,6 +319,37 @@ install -d -m 0700 %{buildroot}%{tengine_home}
 install -d -m 0755 %{buildroot}%{tengine_logdir}
 install -d -m 0755 %{buildroot}%{_libdir}/tengine/modules
 
+%if %{with perl}
+# The perl payload is three files and only the module .so is placed correctly
+# by `make install`:
+#
+#   1. ngx_http_perl_module.so  - nginx's own install rule honours DESTDIR, so
+#      this one is already under %%{buildroot}.
+#   2. nginx.pm                 - loaded through the single @INC entry that
+#      --with-perl_modules_path compiled into the binary.
+#   3. auto/nginx/nginx.so      - the XS object that nginx.pm's XSLoader::load()
+#      dlopens. Without it the interpreter dies during perl_parse() with
+#      "Can't locate loadable object for module nginx".
+#
+# 2 and 3 cannot be taken from the install tree: auto/install delegates them to
+# `$(MAKE) install` in the generated MakeMaker tree, which puts the XS object in
+# INSTALLSITEARCH -- <perl_modules_path>/<archname>/auto/nginx/ -- one directory
+# deeper than the path nginx adds to @INC, so DynaLoader would never find it.
+# Take both from blib, a plain product of the build, and place the XS object at
+# <@INC dir>/auto/nginx/ where DynaLoader looks. Same reasoning as the images;
+# see the comment in Dockerfile.
+#
+# Clear whatever MakeMaker dropped in the install tree (its own arch directory,
+# man3, .packlist) before staging ours, so the glob below can never match the
+# files this section is about to place. It is build bookkeeping either way.
+rm -rf %{buildroot}%{_libdir}/tengine/perl %{buildroot}%{_mandir}/man3
+install -d -m 0755 %{buildroot}%{_libdir}/tengine/perl/auto/nginx
+install -p -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
+    %{buildroot}%{_libdir}/tengine/perl/nginx.pm
+install -p -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+    %{buildroot}%{_libdir}/tengine/perl/auto/nginx/nginx.so
+%endif
+
 # /run is a tmpfs; make install creates it because of --pid-path
 rm -rf %{buildroot}/run %{buildroot}%{_localstatedir}/run
 
@@ -354,6 +419,16 @@ exit 0
 %config(noreplace) %{_sysconfdir}/logrotate.d/tengine
 %attr(0700,%{tengine_user},%{tengine_group}) %dir %{tengine_home}
 %attr(0755,%{tengine_user},%{tengine_group}) %dir %{tengine_logdir}
+
+%if %{with perl}
+%files module-perl
+%{_libdir}/tengine/modules/ngx_http_perl_module.so
+%dir %{_libdir}/tengine/perl
+%dir %{_libdir}/tengine/perl/auto
+%dir %{_libdir}/tengine/perl/auto/nginx
+%{_libdir}/tengine/perl/nginx.pm
+%{_libdir}/tengine/perl/auto/nginx/nginx.so
+%endif
 
 %changelog
 * Thu Jul 30 2026 Tengine Team <tengine@taobao.net> - 3.2.0-2

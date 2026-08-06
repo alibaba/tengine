@@ -2,7 +2,7 @@ ngx_http_dubbo_module
 ====
 
 This module provides support for the backend Dubbo support after Tengine version 2.3.2.
-[Apache Dubbo™](http://dubbo.apache.org)  is a high-performance, java based open source RPC framework.It is open source by Alibaba, in years of development, it is one of the most popular microservice framework.
+[Apache Dubbo™](https://dubbo.apache.org)  is a high-performance, java based open source RPC framework.It is open source by Alibaba, in years of development, it is one of the most popular microservice framework.
 
 There are two roles Consumer(client) and Provider(Server) in Dubbo. This module is used to make Tengine as a proxy gateway which receives HTTP/HTTPS/HTTP2 requests at the front then as a Dubbo Consumer passes the requests to backend Dubbo Provider service.
 

@@ -26,9 +26,14 @@ makedepends="
 	cmake
 	g++
 	perl
+	perl-dev
 	"
 install="$pkgname.pre-install $pkgname.post-install"
-subpackages="$pkgname-doc $pkgname-openrc"
+# -dbg has to come first: abuild splits subpackages in order and the debug
+# symbols must be taken before anything else moves the binaries away. It is
+# what makes Alpine match the other two formats, which produce debug packages
+# (rpm -debuginfo, deb -dbgsym) without being asked.
+subpackages="$pkgname-dbg $pkgname-doc $pkgname-openrc $pkgname-mod-perl:mod_perl"
 # tengine-deps.tar.gz holds the pinned Tongsuo / xquic / LuaJIT / resty
 # tarballs; abuild unpacks it to $srcdir/deps.
 source="$pkgname-$_upstream_ver.tar.gz
@@ -50,6 +55,8 @@ build() {
 	# gcc version cannot break packaging.
 	export TENGINE_LIBDIR=/usr/lib
 	export TENGINE_WITH_BACKTRACE=no
+	# ngx_http_perl_module ships as the tengine-mod-perl subpackage.
+	export TENGINE_WITH_PERL=yes
 
 	# Tongsuo, xquic and LuaJIT come from the pinned sources in $srcdir/deps.
 	# --libdir is the installed path because ngx_http_xquic_module records it
@@ -116,6 +123,40 @@ package() {
 
 	install -D -m 0644 LICENSE \
 		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+
+	# MakeMaker bookkeeping from the perl module's install rule; the real
+	# payload is staged by the mod_perl split function below.
+	rm -rf "$pkgdir"/usr/lib/tengine/perl "$pkgdir"/usr/share/man/man3
+}
+
+mod_perl() {
+	pkgdesc="Perl module for Tengine"
+	depends="$pkgname=$pkgver-r$pkgrel"
+
+	# The perl payload is three files and only the module .so is placed
+	# correctly by the build:
+	#
+	#   1. ngx_http_perl_module.so  - nginx's own install rule honours DESTDIR,
+	#      so this one really is under $pkgdir.
+	#   2. nginx.pm                 - loaded through the single @INC entry that
+	#      --with-perl_modules_path compiled into the binary.
+	#   3. auto/nginx/nginx.so      - the XS object nginx.pm's XSLoader::load()
+	#      dlopens. Without it the interpreter dies during perl_parse() with
+	#      "Can't locate loadable object for module nginx".
+	#
+	# 2 and 3 cannot come from the install tree: auto/install delegates them to
+	# `make install` in the generated MakeMaker tree, which puts the XS object
+	# in INSTALLSITEARCH -- one directory deeper than the path nginx adds to
+	# @INC -- so DynaLoader would never find it. Both come from blib instead,
+	# with the XS object placed at <@INC dir>/auto/nginx/. Same reasoning as the
+	# container images; see the comment in Dockerfile.
+	amove usr/lib/tengine/modules/ngx_http_perl_module.so
+	install -D -m 0644 \
+		"$builddir"/objs/src/http/modules/perl/blib/lib/nginx.pm \
+		"$subpkgdir"/usr/lib/tengine/perl/nginx.pm
+	install -D -m 0755 \
+		"$builddir"/objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+		"$subpkgdir"/usr/lib/tengine/perl/auto/nginx/nginx.so
 }
 
 sha512sums="SKIP"

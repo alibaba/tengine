@@ -8,7 +8,8 @@ Build-Depends: debhelper (>= 10),
                libpcre2-dev | libpcre3-dev,
                cmake (>= 3.5),
                g++,
-               perl
+               perl,
+               libperl-dev
 Standards-Version: 4.5.1
 Homepage: https://tengine.taobao.org/
 Vcs-Git: https://github.com/alibaba/tengine.git
@@ -32,3 +33,16 @@ Description: Tengine HTTP and reverse proxy server
  HTTP/3, and the LuaJIT based Lua scripting stack. Tongsuo is linked
  statically, so this package does not follow the system OpenSSL and has to be
  rebuilt to pick up TLS security fixes.
+
+Package: tengine-module-perl
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, tengine (= ${binary:Version})
+Description: Perl module for Tengine
+ ngx_http_perl_module for Tengine, providing the perl, perl_set and
+ perl_modules directives.
+ .
+ The module is dynamic and is NOT loaded automatically. Add
+ .
+   load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;
+ .
+ to the main context of /etc/tengine/tengine.conf to enable it.
