@@ -446,9 +446,12 @@ detect_family() {
 # Commands that turn a bare distro image into a working build host.
 #
 # The full feature set adds three build-time needs on every platform: CMake
-# (>= 3.5, for xquic), a C++ compiler (xquic links libstdc++) and Perl (Tongsuo
-# configures itself with it). curl is needed to fetch the dependency sources
-# when the caller did not prime <outdir>/deps beforehand.
+# (>= 3.5, for xquic), a C++ compiler (xquic links libstdc++) and Perl -- both
+# the interpreter, which Tongsuo configures itself with, and its development
+# headers plus libperl, which ngx_http_perl_module compiles against. Only SUSE
+# keeps the two in one package; everywhere else the headers are a separate one
+# (perl-devel, libperl-dev, perl-dev). curl is needed to fetch the dependency
+# sources when the caller did not prime <outdir>/deps beforehand.
 bootstrap_cmd() {
     case "$1" in
         rpm)
@@ -465,8 +468,12 @@ if command -v dnf >/dev/null 2>&1; then
     # module stream, so asking for the package name gets filtered out entirely.
     # Requesting the perl(...) virtual provides instead lets rpm resolve each
     # module to whatever package happens to carry it.
+    # perl-devel and ExtUtils::Embed are for ngx_http_perl_module rather than
+    # Tongsuo: the embedded interpreter compiles against the perl headers and
+    # links libperl, which the RHEL family splits out of the base perl package.
     dnf -y install rpm-build gcc gcc-c++ make cmake tar findutils diffutils $_curl \
         perl "perl(FindBin)" "perl(IPC::Cmd)" "perl(lib)" \
+        perl-devel "perl(ExtUtils::Embed)" \
         openssl-devel zlib-devel systemd "$_pcre"
 else
     # CentOS 7 is EOL; its mirrors moved to vault.centos.org
@@ -477,8 +484,10 @@ else
     # its generated Makefile reach for several of them (IPC::Cmd, Data::Dumper,
     # ...) and el7 splits every one into its own package, so pulling them in
     # one by one just moves the failure to the next module.
+    # perl-devel is already one of perl-core's dependencies, but it is listed
+    # here too because ngx_http_perl_module -- not Tongsuo -- is what needs it.
     yum -y install rpm-build gcc gcc-c++ make tar findutils diffutils curl \
-        perl-core openssl-devel zlib-devel pcre-devel systemd
+        perl-core perl-devel openssl-devel zlib-devel pcre-devel systemd
     # el7 packages CMake 2.8 and xquic needs >= 3.5. The usual answer, cmake3,
     # lives only in EPEL 7 -- itself EOL, with a dead metalink and nothing but
     # an archive mirror left, so pulling it in means rewriting a second set of
@@ -495,7 +504,7 @@ EOS
             echo 'zypper --non-interactive --no-gpg-checks install rpm-build gcc gcc-c++ make cmake tar findutils curl perl libopenssl-devel zlib-devel pcre2-devel systemd-rpm-macros'
             ;;
         deb)
-            echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev'
+            echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl libperl-dev curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev'
             ;;
         apk)
             echo 'apk add --no-cache alpine-sdk cmake perl curl linux-headers openssl-dev pcre2-dev zlib-dev'
