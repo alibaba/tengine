@@ -54,17 +54,17 @@ jobs:
     # aarch64 runs on native ARM runners: QEMU emulation would make a single
     # Tengine compile take 5-10x longer and risk the job timeout.
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
-    # Only el7 on aarch64 is best effort: CentOS 7 is EOL and its mirrors moved
-    # to vault.centos.org, whose main tree is x86_64-only -- the aarch64 archive
-    # lives under a different /altarch path that the bootstrap rewrite does not
-    # cover, so that combination cannot succeed at all.
+    # No target is best effort, el7 included -- a failure anywhere here is real
+    # news rather than an expected casualty.
     #
-    # el7 on x86_64 is NOT exempt. The full feature set was verified to build
-    # with gcc 4.8.5 (Tongsuo's OpenSSL 3.0 base and xquic's -std=gnu11 with its
-    # own -Werror both compile fine); the only real obstacle was CMake, which
-    # bootstrap now installs from Kitware's static tarball. A failure there is
-    # therefore real news, not an expected casualty.
-    continue-on-error: ${{ matrix.target == 'el7' && matrix.arch == 'aarch64' }}
+    # CentOS 7 is EOL and its mirrors moved to vault.centos.org, which the
+    # bootstrap rewrites the repo files for. That covers aarch64 as well: the
+    # rewrite only replaces the host part of each baseurl, and the /altarch/
+    # path the aarch64 images carry in theirs exists on vault too, so yum
+    # resolves the AltArch tree there unaided. The full feature set builds with
+    # gcc 4.8.5 (Tongsuo's OpenSSL 3.0 base and xquic's -std=gnu11 with its own
+    # -Werror both compile fine); the one real obstacle was CMake, which
+    # bootstrap installs from Kitware's static tarball.
     # Tongsuo is compiled twice, plus xquic, LuaJIT and Tengine itself.
     timeout-minutes: 150
     strategy:
@@ -188,9 +188,16 @@ jobs:
             dist/*.apk
           if-no-files-found: error
 
-  # Smoke-test one RPM and one DEB per architecture: install the package, check
+  # Smoke-test one package of every format per architecture: install it, check
   # the binary name and config path, that the config actually parses, and that
   # the three bundled subsystems really are in the build.
+  #
+  # All three formats are covered because the parts under test are three
+  # independent implementations, not one shared script: the spec, debian/rules
+  # and the APKBUILD each lay out the private libdir and split the perl
+  # subpackage on their own. Alpine is the odd one out twice over -- musl, and
+  # the only format whose subpackages are carved out of the install tree by hand
+  # (amove plus two install calls in mod_perl()).
   verify:
     needs: package
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
@@ -202,6 +209,8 @@ jobs:
           - { arch: aarch64, target: el9,        image: 'rockylinux:9', kind: rpm }
           - { arch: x86_64,  target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
           - { arch: aarch64, target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
+          - { arch: x86_64,  target: alpine324,  image: 'alpine:3.24',  kind: apk }
+          - { arch: aarch64, target: alpine324,  image: 'alpine:3.24',  kind: apk }
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -212,10 +221,14 @@ jobs:
         run: |
           docker run --rm -v "$PWD/pkgs:/pkgs:ro" ${{ matrix.image }} sh -euc '
             export DEBIAN_FRONTEND=noninteractive
-            # `uname -m` keeps the glob off the .src.rpm that rpmbuild -ba emits
+            # `uname -m` keeps the glob off the .src.rpm that rpmbuild -ba emits.
+            # --allow-untrusted is unconditional for the apk: the build signs
+            # with a key this container has no public half of -- a throwaway one
+            # when APK_PRIVKEY is unset, the release key otherwise.
             case "${{ matrix.kind }}" in
                 rpm) dnf -y install /pkgs/*."$(uname -m)".rpm ;;
                 deb) apt-get update -qq && apt-get install -y /pkgs/*.deb ;;
+                apk) apk add --no-cache --allow-untrusted /pkgs/*.apk ;;
             esac
             test -x /usr/sbin/tengine
             test -f /etc/tengine/tengine.conf
