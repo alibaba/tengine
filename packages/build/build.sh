@@ -346,7 +346,12 @@ build_deb() {
         -exec cp {} "$OUTDIR/" \;
     [ "$KEEP_BUILDDIR" = yes ] || rm -rf "$work"
     info "artifacts:"
-    ls -1 "$OUTDIR"/*.deb "$OUTDIR"/*.ddeb 2>/dev/null
+    # Exactly one of the two globs matches on any given target -- Debian emits
+    # no .ddeb at all -- and an unmatched glob reaches ls verbatim, which then
+    # exits 2. Being the last command of the function, that status is what the
+    # whole build returns under set -e, failing a build whose packages are
+    # already sitting in $OUTDIR.
+    ls -1 "$OUTDIR"/*.deb "$OUTDIR"/*.ddeb 2>/dev/null || true
 }
 
 # ------------------------------------------------------------------ apk build
