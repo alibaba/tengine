@@ -331,10 +331,14 @@ build_deb() {
     info "dpkg-buildpackage tengine_$debversion"
     ( cd "$debtop" && dpkg-buildpackage -b -uc -us )
 
-    find "$work" -maxdepth 1 -name '*.deb' -exec cp {} "$OUTDIR/" \;
+    # Ubuntu's debhelper names the automatic debug-symbol package
+    # tengine-dbgsym_*.ddeb while Debian's uses a plain .deb, so a glob for
+    # .deb alone silently drops the symbols on every Ubuntu target.
+    find "$work" -maxdepth 1 \( -name '*.deb' -o -name '*.ddeb' \) \
+        -exec cp {} "$OUTDIR/" \;
     [ "$KEEP_BUILDDIR" = yes ] || rm -rf "$work"
     info "artifacts:"
-    ls -1 "$OUTDIR"/*.deb
+    ls -1 "$OUTDIR"/*.deb "$OUTDIR"/*.ddeb 2>/dev/null
 }
 
 # ------------------------------------------------------------------ apk build
