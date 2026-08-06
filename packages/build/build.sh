@@ -33,6 +33,14 @@
 #     --platform ARCH   docker --platform, e.g. linux/arm64
 #     --keep            keep intermediate build trees
 #
+# Environment:
+#     TENGINE_APK_PRIVKEY   path to a persistent abuild RSA key used to sign the
+#                           apk. Without it abuild signs with a throwaway key
+#                           generated on the spot, so the package can only be
+#                           installed with --allow-untrusted. Ignored by the rpm
+#                           and deb recipes, which are signed after the build --
+#                           see packages/build/sign-release.sh.
+#
 # Produced artifacts land in --outdir, e.g.
 #     tengine-3.2.0-20260604232239.el7u2.x86_64.rpm
 #     tengine_3.2.0-20260604232239~bookworm_amd64.deb
@@ -366,9 +374,36 @@ build_apk() {
         "$work/APKBUILD" > "$work/APKBUILD.new"
     mv "$work/APKBUILD.new" "$work/APKBUILD"
 
+    # Signing key. TENGINE_APK_PRIVKEY points at a persistent private key, which
+    # is what makes the resulting apk installable without --allow-untrusted once
+    # its public half is in /etc/apk/keys. Without it abuild would still sign,
+    # but with a throwaway key generated right here that nobody can verify
+    # against -- fine for a local build, useless for a published one.
+    #
     # -i would install the public key through doas, which the alpine build image
     # does not carry; the build runs as root, so place it directly instead.
-    if [ ! -f "$HOME/.abuild/abuild.conf" ]; then
+    if [ -n "${TENGINE_APK_PRIVKEY:-}" ]; then
+        [ -f "$TENGINE_APK_PRIVKEY" ] || \
+            die "TENGINE_APK_PRIVKEY=$TENGINE_APK_PRIVKEY does not exist"
+        # abuild derives the public key name by appending .pub, and records the
+        # basename in the apk so `apk` knows which /etc/apk/keys entry to use.
+        mkdir -p "$HOME/.abuild"
+        keyname=$(basename "$TENGINE_APK_PRIVKEY")
+        cp "$TENGINE_APK_PRIVKEY" "$HOME/.abuild/$keyname"
+        chmod 600 "$HOME/.abuild/$keyname"
+        if [ -f "$TENGINE_APK_PRIVKEY.pub" ]; then
+            cp "$TENGINE_APK_PRIVKEY.pub" "$HOME/.abuild/$keyname.pub"
+        else
+            # Derive it, so only the private half has to be handed to the build.
+            openssl rsa -in "$HOME/.abuild/$keyname" -pubout \
+                -out "$HOME/.abuild/$keyname.pub" 2>/dev/null \
+                || die "cannot derive the public key from $TENGINE_APK_PRIVKEY"
+        fi
+        echo "PACKAGER_PRIVKEY=\"$HOME/.abuild/$keyname\"" > "$HOME/.abuild/abuild.conf"
+        cp "$HOME/.abuild/$keyname.pub" /etc/apk/keys/
+        info "signing apk with $keyname"
+    elif [ ! -f "$HOME/.abuild/abuild.conf" ]; then
+        info "no TENGINE_APK_PRIVKEY; signing with a throwaway key (apk will need --allow-untrusted)"
         abuild-keygen -a -n
         cp "$HOME"/.abuild/*.rsa.pub /etc/apk/keys/
     fi
@@ -510,7 +545,17 @@ run_docker_target() {
     if [ -n "$PLATFORM" ]; then
         set -- "$@" --platform "$PLATFORM"
     fi
-    set -- "$@" -v "$SRC_ROOT:/src:ro" -v "$OUTDIR:/out" -w / "$image"
+    set -- "$@" -v "$SRC_ROOT:/src:ro" -v "$OUTDIR:/out"
+    # The apk signing key, if one was provided. Mounted read-only under a fixed
+    # path so the key's location on the host stays out of the container.
+    if [ -n "${TENGINE_APK_PRIVKEY:-}" ]; then
+        [ -f "$TENGINE_APK_PRIVKEY" ] || \
+            die "TENGINE_APK_PRIVKEY=$TENGINE_APK_PRIVKEY does not exist"
+        key_name=$(basename "$TENGINE_APK_PRIVKEY")
+        set -- "$@" -v "$TENGINE_APK_PRIVKEY:/key/$key_name:ro" \
+                    -e "TENGINE_APK_PRIVKEY=/key/$key_name"
+    fi
+    set -- "$@" -w / "$image"
 
     # Pull up front rather than letting `run` do it implicitly: a full matrix
     # makes dozens of anonymous registry pulls, and a timeout or a rate limit

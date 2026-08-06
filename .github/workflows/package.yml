@@ -105,6 +105,26 @@ jobs:
           name: deps
           path: dist/deps
 
+      # An apk is signed by abuild during the build, with an RSA key that is not
+      # GPG -- unlike rpm, it cannot be signed afterwards. So the key has to be
+      # placed here rather than in the release job. Without the secret, build.sh
+      # falls back to a throwaway key and the apk needs --allow-untrusted, which
+      # is how it behaved before signing existed.
+      - name: place the apk signing key
+        if: startsWith(matrix.target, 'alpine')
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; apk packages will carry a throwaway signature"
+              exit 0
+          fi
+          install -d -m 0700 "$HOME/apk-key"
+          printf '%s\n' "$APK_PRIVKEY" > "$HOME/apk-key/tengine-packaging.rsa"
+          chmod 600 "$HOME/apk-key/tengine-packaging.rsa"
+          echo "TENGINE_APK_PRIVKEY=$HOME/apk-key/tengine-packaging.rsa" >> "$GITHUB_ENV"
+
       # The runner architecture already selects the image variant, so no
       # --platform is needed here.
       - name: build ${{ matrix.target }} (${{ matrix.arch }})
@@ -260,8 +280,60 @@ jobs:
           pattern: tengine-*
           path: artifacts
 
+      # Before the checksums are taken, because rpmsign rewrites the package to
+      # embed the signature in its header. A no-op when the secret is absent,
+      # which is what keeps forks building.
+      - name: sign the rpm packages
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          if [ -n "${GPG_PRIVATE_KEY:-}" ]; then
+              sudo apt-get update -qq && sudo apt-get install -y rpm
+          fi
+          packages/build/sign-release.sh rpms artifacts
+
       - name: flatten artifacts into a release directory
         run: packages/build/collect-release.sh --indir artifacts --outdir release
+
+      # Signs the checksum files rather than the packages: this is what covers
+      # the deb packages, which have no in-band signature outside a repository.
+      - name: sign the checksum files and export the public key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          sums=release/SHA256SUMS
+          if [ -f release-debug/SHA256SUMS.debug ]; then
+              sums="$sums release-debug/SHA256SUMS.debug"
+          fi
+          # shellcheck disable=SC2086 # deliberate word splitting
+          packages/build/sign-release.sh detach $sums
+          packages/build/sign-release.sh pubkey release/tengine-packaging-key.asc
+
+      # apk verifies against the public half of the abuild RSA key, which is a
+      # different key from the GPG one above. Derive and publish it so an
+      # installer can drop it in /etc/apk/keys and skip --allow-untrusted.
+      - name: export the apk public key
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; no apk public key to publish"
+              exit 0
+          fi
+          printf '%s\n' "$APK_PRIVKEY" > /tmp/apk.rsa
+          chmod 600 /tmp/apk.rsa
+          # The file name matters: apk looks for the exact basename that abuild
+          # recorded in the package, so it has to match the key placed above.
+          openssl rsa -in /tmp/apk.rsa -pubout \
+              -out release/tengine-packaging.rsa.pub
+          rm -f /tmp/apk.rsa
 
       - name: classify the tag and write the release notes
         id: notes
@@ -320,11 +392,13 @@ jobs:
           apt install ./$sample_deb
           \`\`\`
 
-          Alpine:
+          Alpine (drop the key first, or pass \`--allow-untrusted\` instead):
 
           \`\`\`sh
+          curl -fLo /etc/apk/keys/tengine-packaging.rsa.pub \\
+              $base_url/tengine-packaging.rsa.pub
           curl -fLO $base_url/$sample_apk
-          apk add --allow-untrusted ./$sample_apk
+          apk add ./$sample_apk
           \`\`\`
 
           ## Container images
@@ -367,9 +441,30 @@ jobs:
 
           ## Verify
 
+          Checksums:
+
           \`\`\`sh
           curl -fLO $base_url/SHA256SUMS
           sha256sum -c SHA256SUMS
+          \`\`\`
+
+          The checksum file itself is signed, which is what covers the deb
+          packages -- they carry no in-band signature, since Debian's trust
+          model signs a repository rather than individual files:
+
+          \`\`\`sh
+          curl -fLO $base_url/SHA256SUMS.asc
+          curl -fLO $base_url/tengine-packaging-key.asc
+          gpg --import tengine-packaging-key.asc
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          \`\`\`
+
+          The rpm packages are signed in-band with the same key, so once it is
+          imported into rpm they verify individually:
+
+          \`\`\`sh
+          rpm --import $base_url/tengine-packaging-key.asc
+          rpm --checksig $sample_rpm
           \`\`\`
           EOF
 

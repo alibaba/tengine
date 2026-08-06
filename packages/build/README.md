@@ -34,6 +34,17 @@ tengine_3.2.0-20260604232239~bookworm_amd64.deb
 tengine-3.2.0_p20260604232239-r0.apk
 ```
 
+每个目标除主包外还产出两类子包：
+
+| 子包 | rpm | deb | apk |
+|---|---|---|---|
+| perl 模块 | `tengine-module-perl` | `tengine-module-perl` | `tengine-mod-perl` |
+| 调试符号 | `tengine-debuginfo`<br>`tengine-debugsource` | `tengine-dbgsym`<br>（Ubuntu 为 `.ddeb`） | `tengine-dbg` |
+
+`ngx_http_perl_module` 单独成包是为了让主包不必依赖 libperl。它是动态模块且
+**默认不加载**，需在主配置中显式 `load_module`。调试符号包在发布时分流到独立
+目录，见 [collect-release.sh](collect-release.sh)。
+
 版本号 `3.2.0` 自动取自 `src/core/nginx.h` 的 `TENGINE_VERSION`，
 Release 为构建时间戳（可用 `--timestamp` 固定）。
 
@@ -246,6 +257,88 @@ Change visibility → **Public**
 
 Release assets 无此问题，公开仓库的附件天然匿名可下。
 
+另一项一次性操作是**配置签名密钥**，见下节。密钥未配置时 CI 照常构建并发布，
+只是产物不带签名。
+
+## 包签名
+
+三种格式的信任模型不同，因此用了两把互不相干的密钥：
+
+| 格式 | 签什么 | 密钥 | 在哪一步签 |
+|---|---|---|---|
+| rpm | 包体（写进 header） | GPG | release job，**取校验和之前** |
+| apk | 包体 | abuild 的 **RSA**（非 GPG） | package job，构建时由 abuild 完成 |
+| deb | — | — | 不签 |
+
+**deb 不签是有意为之，不是遗漏。** `dpkg-sig` 早已废弃，Debian 的信任模型是签
+仓库的 `Release` 文件，而这需要先有一个包仓库。在仓库建起来之前，覆盖 deb 的唯一
+手段是下面的校验和签名。
+
+此外 `SHA256SUMS` 与 `SHA256SUMS.debug` 各有一份 detached GPG 签名（`.asc`），
+这是三种格式通用的兜底校验途径。
+
+### 生成并配置密钥（一次性）
+
+GPG 密钥，用于 rpm 包体与校验和：
+
+```sh
+gpg --batch --gen-key <<'EOF'
+Key-Type: RSA
+Key-Length: 4096
+Name-Real: Tengine Packaging
+Name-Email: tengine@taobao.net
+Expire-Date: 0
+Passphrase: <改成你的口令>
+EOF
+
+gpg --armor --export-secret-keys tengine@taobao.net   # -> secret GPG_PRIVATE_KEY
+gpg --list-keys --with-colons tengine@taobao.net \
+    | awk -F: '$1=="pub"{print $5}'                   # -> variable GPG_KEY_ID
+```
+
+abuild 的 RSA 密钥，用于 apk：
+
+```sh
+openssl genrsa -out tengine-packaging.rsa 4096        # -> secret APK_PRIVKEY
+```
+
+在仓库的 Settings → Secrets and variables → Actions 中配置：
+
+| 名称 | 类型 | 内容 |
+|---|---|---|
+| `GPG_PRIVATE_KEY` | secret | 上面导出的 ASCII armored 私钥全文 |
+| `GPG_PASSPHRASE` | secret | GPG 私钥口令（无口令则不设） |
+| `GPG_KEY_ID` | variable | 长格式 key id；钥匙环里只有一把时可省略 |
+| `APK_PRIVKEY` | secret | `tengine-packaging.rsa` 全文 |
+
+> 文件名 `tengine-packaging.rsa` 不可随意改：abuild 会把 basename 记进 apk，
+> `apk` 据此在 `/etc/apk/keys/` 里找对应公钥。改名需同步改 CI 与安装说明。
+
+两把公钥都会作为 release 资产自动发布（`tengine-packaging-key.asc` 与
+`tengine-packaging.rsa.pub`），无需手工上传。
+
+### 本地试签
+
+`sign-release.sh` 在 `GPG_PRIVATE_KEY` 未设置时**所有子命令都是 no-op 且返回 0**，
+这正是 fork 无密钥仍能构建的原因。本地试签：
+
+```sh
+export GPG_PRIVATE_KEY="$(gpg --armor --export-secret-keys tengine@taobao.net)"
+export GPG_PASSPHRASE=...
+packages/build/sign-release.sh rpms dist          # 签目录下所有 rpm
+packages/build/sign-release.sh detach dist/SHA256SUMS
+packages/build/sign-release.sh pubkey /tmp/key.asc
+```
+
+apk 侧则是给 `build.sh` 指一个私钥：
+
+```sh
+TENGINE_APK_PRIVKEY=$PWD/tengine-packaging.rsa packages/build/build.sh apk
+```
+
+未指定时 `build.sh` 仍会签，但用的是当场生成的一次性密钥——等同未签名，
+安装时必须 `--allow-untrusted`。
+
 ### 本机构建
 
 ```sh
@@ -378,7 +471,10 @@ packages/build/
 ├── deps.env              第三方依赖版本、仓库与 sha256（唯一真源）
 ├── fetch-deps.sh         下载 + 校验依赖源码（--print-checksums 用于升级）
 ├── build-deps.sh         编译 Tongsuo / xquic / LuaJIT / resty 库，产出 deps-env.sh
-├── collect-release.sh    把 36 份 artifact 扁平成 Release 目录 + SHA256SUMS
+├── collect-release.sh    把各 artifact 扁平成 Release 目录 + SHA256SUMS
+│                         （调试符号分流到 <outdir>-debug + SHA256SUMS.debug）
+├── sign-release.sh       GPG 签名：rpm 包体、校验和 detached 签名、导出公钥
+│                         （无 GPG_PRIVATE_KEY 时全部 no-op，fork 照常构建）
 ├── conf/
 │   ├── tengine.conf      主配置（FHS 绝对路径 + lua_package_path/cpath）
 │   ├── conf.d/default.conf   含注释版 HTTP/3 与 NTLS 示例
