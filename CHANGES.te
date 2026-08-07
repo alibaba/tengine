@@ -153,6 +153,10 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Bugfix: set the pipe buffer size only on Linux (drawing)
 
+    *) Bugfix: warn when the xquic session ticket key cannot be read, instead
+       of silently letting each worker fall back to a random key, which makes
+       0-RTT always fail with more than one worker [XQUIC] (lianglli)
+
 
 Changes with Tengine 3.1.0                                         27 Oct 2023
 

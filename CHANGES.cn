@@ -47,6 +47,7 @@ Tengine 3.2.0 [2026-07-31]
 * Bugfix: 适配HTTP/3 XQUIC模块到xquic v1.9.1接口 (drawing)
 * Bugfix: 修复ssl_certificate_compression在Tongsuo下的编译问题 (lianglli)
 * Bugfix: 仅在Linux上设置管道缓冲区大小 (drawing)
+* Bugfix: xquic会话票据密钥读取失败时输出警告，此前各worker会静默退化为各自随机生成的密钥，导致多worker下0-RTT始终失败 [XQUIC] (lianglli)
 
 
 Tengine 3.1.0 [2023-10-27]
