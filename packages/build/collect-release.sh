@@ -20,13 +20,19 @@
 # separate repo. The directory is a sibling rather than a subdirectory so that
 # a plain "<outdir>/*" glob still expands to files only.
 #
-# Two artifact naming quirks have to be handled, or files would silently
-# overwrite each other once the per-job directories are merged:
+# Three artifact naming quirks have to be handled, or files would silently
+# overwrite each other once the per-job directories are merged -- or, in the
+# deb case, arrive under a name the checksum file does not know:
 #
 #   * apk file names carry neither the architecture nor anything identifying the
 #     Alpine release they were built on, so every alpine target and architecture
 #     would produce the same name. Both are appended here, which is what lets the
 #     release ship one apk per Alpine version.
+#   * deb versions carry the distro codename after a tilde (3.2.0-<ts>~bookworm),
+#     but GitHub rewrites "~" to "." in release asset names. The tilde spelling
+#     is therefore renamed away here, before the checksums are taken -- see the
+#     comment at the rename itself for why the package's own version is left
+#     alone.
 #   * every architecture's job produces a .src.rpm of the same sources, but rpm
 #     stamps the build platform into the header, so the two are not byte-equal
 #     and a checksum comparison cannot dedupe them. One per target is what a
@@ -104,6 +110,18 @@ for jobdir in "$INDIR"/*; do
         srcrpm=no
         case "$base" in
             *.apk)     base="${base%.apk}.$target.$arch.apk" ;;
+            # GitHub serves a release asset under a name with "~" replaced by
+            # ".", so a deb built as ...-<ts>~bookworm_amd64.deb is downloaded
+            # as ...-<ts>.bookworm_amd64.deb. Taking the checksums from the
+            # original spelling would make "sha256sum -c SHA256SUMS" fail for
+            # every deb -- and fail invisibly under --ignore-missing, which
+            # skips names it cannot find. Renaming here keeps the checksum file
+            # and the download in agreement.
+            #
+            # Only the file name changes. The version inside the package still
+            # carries the tilde, which is what apt compares, and what keeps a
+            # codename build sorting below the plain version.
+            *.deb|*.ddeb) base=$(printf '%s' "$base" | tr '~' '.') ;;
             *.src.rpm) srcrpm=yes ;;
         esac
 
