@@ -51,6 +51,12 @@ Release 为构建时间戳（可用 `--timestamp` 固定）。
 deb 版本号带 `~<codename>` 后缀（`~bookworm`、`~noble`……）：deb 的版本与文件名
 本身都不含发行版标识，六个 debian/ubuntu 目标会产出完全同名的文件，扁平化到
 同一个 Release 时互相覆盖，`apt` 也无法区分。`~` 排序低于无后缀，是 Debian 惯例。
+
+发布时 [collect-release.sh](collect-release.sh) 会把 deb **文件名**里的 `~` 换成 `.`。
+GitHub 上传 release 附件时会做同样的替换，不提前换掉的话 `SHA256SUMS` 记的名字与
+下载到的文件不一致，`sha256sum -c` 对每个 deb 都失败（且在 `--ignore-missing` 下
+静默跳过）。包内的 `Version:` 字段仍保留 `~`，`apt` 比较的是后者，排序不受影响。
+
 apk 文件名不含架构，发布时由 [collect-release.sh](collect-release.sh) 补 `.x86_64` /
 `.aarch64`。
 
