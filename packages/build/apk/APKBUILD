@@ -18,13 +18,15 @@ arch="all"
 # Tengine and the resty Lua libraries are BSD-2-Clause, Tongsuo and xquic are
 # Apache-2.0, LuaJIT is MIT.
 license="BSD-2-Clause AND Apache-2.0 AND MIT"
+# xquic links libstdc++ and so needs a C++ compiler, but g++ is deliberately
+# absent here: it comes with build-base, which abuild installs on its own, and
+# abuild's sanity check warns about naming it a second time.
 makedepends="
 	linux-headers
 	openssl-dev
 	pcre2-dev
 	zlib-dev
 	cmake
-	g++
 	perl
 	perl-dev
 	"
