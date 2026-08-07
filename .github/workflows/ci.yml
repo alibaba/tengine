@@ -151,6 +151,11 @@ jobs:
      - name: upstream check HTTP parser unit tests
        run: |
          make -C modules/ngx_http_upstream_check_module/tests
+     # Stand-alone: stubs the handful of ngx types it needs, so it runs here even
+     # though this job does not build the xquic module.
+     - name: xquic key file unit tests
+       run: |
+         make -C modules/ngx_http_xquic_module/test/unit
 
   # Separate build that enables the native ngx_http_tunnel_module explicitly
   # (--with-http_tunnel_module; it is off by default) and does NOT link

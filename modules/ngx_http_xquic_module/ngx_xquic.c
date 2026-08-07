@@ -12,6 +12,7 @@
 #include <ngx_xquic_intercom.h>
 #include <ngx_xquic_recv.h>
 #include <ngx_xquic_send.h>
+#include <ngx_xquic_file.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -80,30 +81,8 @@ ngx_xquic_get_time()
 }
 
 
-/* TODO: close file */
-ngx_int_t 
-ngx_xquic_read_file_data( char * data, size_t data_len, char *filename)
-{
-    FILE * fp = fopen(filename, "rb");
-
-    if(fp == NULL){
-        return -1;
-    }
-    fseek(fp, 0 , SEEK_END);
-    size_t total_len  = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    if(total_len > data_len){
-        return -1;
-    }
-
-    size_t read_len = fread(data, 1, total_len, fp);
-    if (read_len != total_len){
-
-        return -1;
-    }
-
-    return read_len;
-}
+/* ngx_xquic_read_file_data() lives in ngx_xquic_file.h so that it can be
+ * covered by the stand-alone unit test under test/unit/ */
 
 
 /* run main logic */
@@ -293,13 +272,25 @@ ngx_xquic_engine_init(ngx_cycle_t *cycle)
                                                        sizeof(g_session_ticket_key), 
                                                        g_ticket_file);
 
-        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, 
-                      "|xquic|ngx_xquic_engine_init: ticket_key_len=%i|", ticket_key_len); 
-
         if(ticket_key_len < 0){
+            /*
+             * Without a shared key, each worker falls back to a randomly
+             * generated session ticket key of its own. A ticket issued by one
+             * worker then fails to decrypt on any other worker, so 0-RTT is
+             * always rejected once more than one worker is running. Warn here
+             * rather than degrade silently at debug level.
+             */
+            ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                          "|xquic|ngx_xquic_engine_init: cannot read session ticket key "
+                          "\"%s\", 0-RTT will be unavailable with multiple workers|",
+                          g_ticket_file);
+
             engine_ssl_config->session_ticket_key_data = NULL;
             engine_ssl_config->session_ticket_key_len = 0;
         } else {
+            ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0,
+                          "|xquic|ngx_xquic_engine_init: ticket_key_len=%d|", ticket_key_len);
+
             engine_ssl_config->session_ticket_key_data = ngx_pcalloc(cycle->pool, (size_t)ticket_key_len);
             if (engine_ssl_config->session_ticket_key_data == NULL) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, 
