@@ -534,6 +534,8 @@ ngx_int_t ngx_http_upstream_merge_ssl_passwords(ngx_conf_t *cf,
     ngx_http_upstream_conf_t *conf, ngx_http_upstream_conf_t *prev);
 #endif
 
+void ngx_http_upstream_upgraded_write_upstream(ngx_http_request_t *r,
+    ngx_http_upstream_t *u);
 
 #define ngx_http_conf_upstream_srv_conf(uscf, module)                         \
     uscf->srv_conf[module.ctx_index]
