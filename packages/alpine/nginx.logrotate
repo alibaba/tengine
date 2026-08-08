@@ -1,0 +1,8 @@
+/var/log/nginx/*.log {
+	missingok
+	sharedscripts
+	postrotate
+		/etc/init.d/nginx --quiet --ifstarted reopen
+	endscript
+}
+
