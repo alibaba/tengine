@@ -16,10 +16,14 @@ ngx_murmur_hash2(u_char *data, size_t len)
     h = 0 ^ len;
 
     while (len >= 4) {
+#if (NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED)
+        k = *((uint32_t *)data);
+#else 
         k  = data[0];
         k |= data[1] << 8;
         k |= data[2] << 16;
         k |= data[3] << 24;
+#endif        
 
         k *= 0x5bd1e995;
         k ^= k >> 24;
