@@ -6,7 +6,7 @@ Installation
 
 ```
 aptitude install build-essential debhelper make autoconf automake patch \
- dpkg-dev fakeroot pbuilder gnupg dh-make libssl-dev libpcre3-dev      
+ dpkg-dev fakeroot pbuilder gnupg dh-make libssl-dev libpcre3-dev zlib1g-dev
 ```
 
 2. build package     
