@@ -1717,6 +1717,8 @@ ngx_dyups_mark_upstream_delete(ngx_http_dyups_srv_conf_t *duscf)
     ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
                   "[dyups] delete upstream \"%V\"", &duscf->upstream->host);
 
+    ngx_http_upstream_keepalive_clear_cache_connections(uscf);
+
     ngx_dyups_del_upstream_top_filter(umcf, uscf);
 
     us = uscf->servers->elts;
