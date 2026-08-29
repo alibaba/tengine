@@ -1341,6 +1341,7 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
         sscf->server[i].check_index = peer->check_index;
 #endif
         if (sscf->flag & NGX_HTTP_SESSION_STICKY_PLAIN) {
+#if (T_NGX_HTTP_UPSTREAM_ID)
             if (peer->id.len == 0) {
                 sscf->server[i].sid.data = peer->name.data;
                 sscf->server[i].sid.len = peer->name.len;
@@ -1349,7 +1350,10 @@ ngx_http_upstream_session_sticky_init_upstream(ngx_conf_t *cf,
 
             sscf->server[i].sid.data = peer->id.data;
             sscf->server[i].sid.len = peer->id.len;
-
+#else
+            sscf->server[i].sid.data = peer->name.data;
+            sscf->server[i].sid.len = peer->name.len;
+#endif
         } else if (ngx_http_upstream_session_sticky_set_sid(
                                                 cf, &sscf->server[i]) != NGX_OK)
         {
