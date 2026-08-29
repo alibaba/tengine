@@ -23,6 +23,9 @@ typedef struct {
     ngx_uint_t        generation;
     ngx_array_t      *argv;
     ngx_open_file_t  *open_fd;        /* the fd of pipe left open in master */
+#if (T_NGX_HAVE_F_SETPIPE_SZ)
+    ngx_int_t        pipe_size;       /* fcntl can adjust size of pipe*/
+#endif
 
     unsigned          type:1;         /* 1: write, 0: read */
     unsigned          configured:1;

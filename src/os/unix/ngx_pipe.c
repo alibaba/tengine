@@ -59,12 +59,47 @@ ngx_conf_open_pipe(ngx_cycle_t *cycle, ngx_str_t *cmd, const char *type)
     ngx_uint_t        i, j, numargs = 0;
     ngx_array_t      *argv_out;
 
+#if (T_NGX_HAVE_F_SETPIPE_SZ)
+    u_char          *sp;
+    ngx_int_t        pipe_size = 0;
+#endif
+
     dup = ngx_pnalloc(cycle->pool, cmd->len + 1);
     if (dup == NULL) {
         return NULL;
     }
 
     (void) ngx_cpystrn(dup, cmd->data, cmd->len + 1);
+
+#if (T_NGX_HAVE_F_SETPIPE_SZ)
+    if (ngx_strncmp(cmd->data, "size:", 5) == 0) {
+        cmd->len -= sizeof("size:") - 1;
+        cmd->data += sizeof("size:") - 1;
+
+        if (cmd->len <= 0) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                        "The size configuration of log pipe is incorrect");
+            return NULL;
+        }
+
+        for (sp = cmd->data; *sp != ':'; sp++) {}
+
+        pipe_size = ngx_atoi(cmd->data, sp - cmd->data);
+        if (pipe_size <= 0) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                        "The size configuration of log pipe is incorrect, size:%d",
+                        pipe_size);
+            return NULL;
+        }
+
+        cmd->data = sp;
+        cmd->len -= pipe_size;
+
+        if (cmd->len <= 0) {
+            return NULL;
+        }
+    }
+#endif
 
     for (cp = cmd->data; *cp == ' ' || *cp == '\t'; cp++);
     ct = cp;
@@ -180,6 +215,10 @@ ngx_conf_open_pipe(ngx_cycle_t *cycle, ngx_str_t *cmd, const char *type)
     ngx_pipes[use].type = ti;
     ngx_pipes[use].generation = ngx_pipe_generation;
     ngx_pipes[use].configured = 1;
+#if (T_NGX_HAVE_F_SETPIPE_SZ)
+    ngx_pipes[use].pipe_size = pipe_size;
+#endif
+
 
     return &ngx_pipes[use];
 }
@@ -250,6 +289,25 @@ ngx_open_pipes(ngx_cycle_t *cycle)
                           ngx_pipes[i].cmd);
             return NGX_ERROR;
         }
+
+#if (T_NGX_HAVE_F_SETPIPE_SZ)
+        if (ngx_pipes[i].pipe_size > 0) {
+            if (fcntl(ngx_pipes[i].open_fd->fd, F_SETPIPE_SZ, ngx_pipes[i].pipe_size) == -1) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                            "fcntl(F_SETPIPE_SZ) %d failed",
+                            ngx_pipes[i].pipe_size);
+                return NGX_ERROR;
+            } else {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                            "fcntl(F_SETPIPE_SZ) %d succeed",
+                            ngx_pipes[i].pipe_size);
+            }
+        } else if (ngx_pipes[i].pipe_size < 0) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                            "fcntl(F_SETPIPE_SZ) %d failed, unexpected < 0", 
+                            ngx_pipes[i].pipe_size);
+        } /* else, pipe_size == 0, pipe_size no change*/
+#endif
 
         if (ngx_nonblocking(ngx_pipes[i].open_fd->fd) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
