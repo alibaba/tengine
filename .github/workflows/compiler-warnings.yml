@@ -1,0 +1,247 @@
+name: compiler warnings
+
+# Guards the one class of breakage that no test can catch and that arrives
+# without anyone touching the code: a new compiler release adding a diagnostic.
+#
+# nginx and tengine hardcode -Werror (auto/cc/gcc:169, auto/cc/clang:92) and
+# gcc's "-W" (auto/cc/gcc:141) is the old spelling of -Wextra, which clang
+# passes outright (auto/cc/clang:79). So every warning a compiler adds to
+# -Wextra is a hard build failure here, on the first file that trips it.
+# -Wunterminated-string-initialization, new in gcc 15 and clang 21, is the
+# worked example: it hit the HPACK-encoded byte sequences in
+# src/http/v2/ngx_http_v2_filter_module.c.
+#
+# Every other workflow pins ubuntu-24.04, whose gcc 13 / clang 18 will never
+# emit those, so none of them would have caught it. This one runs on
+# ubuntu-26.04 (gcc 15, clang 21) and previews the release after that. The
+# schedule is not decoration -- the trigger for this failure mode is a compiler
+# release, not a commit, so a workflow that only runs on push can sit green for
+# months and then break the release pipeline in package.yml, where the distro
+# toolchains do move.
+#
+# Bumping the runner label and the "next" compiler versions is a deliberate,
+# manual step; nothing here tracks "latest" implicitly.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    # Weekly, Monday 03:17 UTC. Off the hour on purpose -- the top of the hour
+    # is heavily oversubscribed on hosted runners and scheduled runs get delayed.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The gate. Newest released toolchains, -Werror left exactly as configure
+  # assembles it: a diagnostic anywhere fails the job. Safe to make a required
+  # status check.
+  strict:
+   name: warnings are errors (${{ matrix.cc }}, ${{ matrix.variant.label }})
+   runs-on: "ubuntu-26.04"
+   strategy:
+     fail-fast: false
+     matrix:
+       cc: [ gcc, clang ]
+       # Both halves of the T_NGX_SERVER_INFO #if have to be compiled by a new
+       # compiler, not just one. The HPACK constants are the illustration:
+       # ngx_http_v2_filter_module.c defines nginx[6] under T_NGX_SERVER_INFO
+       # and nginx[5] without it, so a build that only ever sees the default
+       # value leaves the other array unexamined. test-nginx-core.yml is the
+       # only workflow that switches the macro off, and it does so on the old
+       # toolchain. Dropping --with-debug in the same variant is a second win:
+       # it takes the NGX_DEBUG code out and raises the optimisation level,
+       # which is what the dataflow-driven warnings need to fire at all.
+       variant:
+         - { label: debug,   configure: --with-debug, cc_opt: '' }
+         - { label: release, configure: '',           cc_opt: '-D T_NGX_SERVER_INFO=0' }
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         # pcre2, not pcre3: PCRE1 is gone from the archive in this release, and
+         # auto/lib/pcre/conf prefers PCRE2 anyway.
+         sudo apt install -y libpcre2-dev zlib1g-dev libssl-dev
+     - name: build
+       env:
+         CC: ${{ matrix.cc }}
+         NGX_EXTRA_CC_OPT: ${{ matrix.variant.cc_opt }}
+       run: |
+         .github/scripts/configure-warning-scan.sh ${{ matrix.variant.configure }}
+         make -j"$(nproc)"
+
+  # -Werror stops the build on the first diagnostic, which tells you something
+  # broke but not how much. This job answers "how many, and where" in a single
+  # run -- the question that had to be answered by hand for the HPACK fix.
+  # Advisory by construction: it never fails on warnings, it reports them.
+  inventory:
+   name: warning inventory (${{ matrix.cc }})
+   runs-on: "ubuntu-26.04"
+   continue-on-error: true
+   strategy:
+     fail-fast: false
+     matrix:
+       cc: [ gcc, clang ]
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt install -y libpcre2-dev zlib1g-dev libssl-dev
+     - name: build, collecting every warning
+       env:
+         CC: ${{ matrix.cc }}
+         # NGX_CC_OPT is appended after the -Werror that auto/cc/* adds, and the
+         # last of a conflicting pair wins, so this demotes them back to
+         # warnings. test-asan.yml relies on the same ordering.
+         NGX_EXTRA_CC_OPT: -Wno-error
+       run: |
+         # Four modules the strict job leaves out are added here, because this
+         # job reports instead of failing. mod_common and mod_strategy are
+         # compiled by no other workflow at all, and mod_common is not
+         # -Werror-clean today; mod_dubbo (with mod_config, as
+         # test-nginx-core.yml pairs them) is C++, so it is the only place gcc
+         # 15's C++ front end gets exercised. -lstdc++ comes from its config,
+         # and needs nothing installed.
+         .github/scripts/configure-warning-scan.sh --with-debug \
+           --add-module=./modules/mod_common \
+           --add-module=./modules/mod_strategy \
+           --add-module=./modules/mod_config \
+           --add-module=./modules/mod_dubbo
+         # -k as well as -Wno-error: a genuine error in one file must not stop
+         # the rest of the tree from being compiled, or the inventory is partial.
+         set +o pipefail
+         make -k -j"$(nproc)" 2>&1 | tee build.log || true
+     - name: summarise
+       run: |
+         {
+           echo "## ${{ matrix.cc }}"
+           echo
+           echo "### by warning family"
+           echo '```'
+           grep -oE '\[-W[a-z0-9-]+\]' build.log | sort | uniq -c | sort -rn || echo '(none)'
+           echo '```'
+           echo "### sites"
+           echo '```'
+           grep -E '(warning|error):' build.log | sort -u || echo '(none)'
+           echo '```'
+         } >> "$GITHUB_STEP_SUMMARY"
+     - uses: actions/upload-artifact@v7
+       if: always()
+       with:
+         name: build-log-${{ matrix.cc }}
+         path: build.log
+         retention-days: 14
+
+  # Early warning. The compilers one release ahead of the gate, from this
+  # runner's own archive -- no PPA, no third-party image. Non-blocking on
+  # purpose: a diagnostic that a prerelease compiler invented is not a reason to
+  # red-wall every pull request, it is a reason to know before the toolchain
+  # becomes the default somewhere. Read it on the weekly run.
+  next:
+   name: next toolchain (${{ matrix.cc.pkg }})
+   runs-on: "ubuntu-26.04"
+   continue-on-error: true
+   strategy:
+     fail-fast: false
+     matrix:
+       cc:
+         - { pkg: gcc-16,   bin: gcc-16 }
+         - { pkg: clang-22, bin: clang-22 }
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt install -y libpcre2-dev zlib1g-dev libssl-dev ${{ matrix.cc.pkg }}
+     - name: build with -Werror
+       env:
+         CC: ${{ matrix.cc.bin }}
+       run: |
+         .github/scripts/configure-warning-scan.sh --with-debug
+         make -j"$(nproc)"
+
+  # The jobs above cannot reach ngx_tongsuo_ntls, ngx_http_xquic_module,
+  # ngx_http_lua_module or ngx_zstd, because each needs a library no distro
+  # ships. This one builds the pinned dependency stack and then compiles the
+  # feature set the releases ship -- packages/build/configure-args.sh is the
+  # same single source of truth that package.yml and the Dockerfiles use. Three
+  # things are added on top of the package defaults, all to widen the compiled
+  # surface rather than to mirror a shipped build: --with-debug, zstd and perl.
+  #
+  # That closes a real hole rather than a theoretical one. package.yml already
+  # has an "ubuntu2604" target, so the release pipeline *does* compile all of
+  # this with gcc 15 -- but package.yml only runs on a tag push or by hand, so
+  # today the first thing to discover a new diagnostic is the release itself.
+  #
+  # -Werror is kept for Tengine and deliberately removed for the dependencies:
+  # TENGINE_DEP_CFLAGS pins Tongsuo and xquic to gnu17 and demotes their errors,
+  # so this job stays a statement about code this repository owns. Whether
+  # Tongsuo 8.4 and xquic 1.9.6 themselves survive gcc 15's C23 default is a
+  # separate question, and package.yml's ubuntu2604 target is where it belongs.
+  strict-release:
+   name: release feature set (${{ matrix.cc }})
+   runs-on: "ubuntu-26.04"
+   # Tongsuo is compiled twice (once for xquic, once by Tengine's own configure),
+   # plus xquic, LuaJIT and Tengine.
+   timeout-minutes: 90
+   # Non-blocking until it has been seen green on a real runner: the dependency
+   # stack has never been built on this image, and an apt package name or a
+   # CMake/OpenSSL incompatibility here would block every pull request for a
+   # reason unrelated to warnings. Promote it to a required check -- and drop
+   # this line -- once the first scheduled run passes.
+   continue-on-error: true
+   strategy:
+     fail-fast: false
+     matrix:
+       cc: [ gcc, clang ]
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         # cmake for xquic, libzstd-dev for ngx_zstd, libperl-dev for the perl
+         # module (both off in the package defaults, both turned on below --
+         # the point here is compiled source, not the shipped default set).
+         # No libssl-dev: Tongsuo is this build's OpenSSL.
+         sudo apt install -y libpcre2-dev zlib1g-dev libzstd-dev libperl-dev cmake
+     # The tarballs are checksum-pinned in packages/build/deps.env, so the cache
+     # key is that file: a version bump invalidates it on its own.
+     - uses: actions/cache@v4
+       with:
+         path: dist/deps
+         key: deps-${{ hashFiles('packages/build/deps.env') }}
+     - name: fetch pinned dependency sources
+       # --outdir spelled out so it is visibly the path cached above.
+       run: packages/build/fetch-deps.sh --outdir dist/deps
+     - name: build Tongsuo, xquic and the Lua stack
+       env:
+         CC: ${{ matrix.cc }}
+         # Not Tengine's flags -- see the note on the job.
+         TENGINE_DEP_CFLAGS: -std=gnu17 -Wno-error
+       run: packages/build/build-deps.sh --jobs "$(nproc)"
+     - name: build tengine with -Werror
+       env:
+         CC: ${{ matrix.cc }}
+         TENGINE_WITH_ZSTD: 'yes'
+         TENGINE_WITH_PERL: 'yes'
+       run: |
+         set -eu
+         # deps-env.sh exports TENGINE_TONGSUO_SRC / _XQUIC_INC / _XQUIC_LIB,
+         # which configure-args.sh turns into the matching configure switches.
+         . dist/deps-build/deps-env.sh
+         args=$(sh packages/build/configure-args.sh)
+         # Tongsuo gets the dialect pin here too: this is the second Tongsuo
+         # build, the one auto/lib/openssl/make drives from Tengine's Makefile.
+         # It never sees Tengine's CFLAGS, so -Werror is not at stake either way.
+         ./configure $args \
+           --with-debug \
+           --with-ld-opt="$(sh packages/build/configure-args.sh --print-ld-opt)" \
+           --with-openssl-opt="$(sh packages/build/configure-args.sh --print-openssl-opt) -std=gnu17"
+         grep -m1 '^CFLAGS' objs/Makefile
+         make -j"$(nproc)"

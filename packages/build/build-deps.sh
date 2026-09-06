@@ -39,6 +39,18 @@
 # The caller copies <staging> into its own buildroot and sources deps-env.sh
 # before calling ./configure.
 #
+# Environment:
+#     TENGINE_DEP_CFLAGS   extra C flags appended to the Tongsuo and xquic
+#                          builds only -- never to Tengine's own.  Empty by
+#                          default, so the packages are unaffected.  This is the
+#                          escape hatch for compilers newer than those two
+#                          pinned releases were written against: the jobs in
+#                          .github/workflows/compiler-warnings.yml pass
+#                          "-std=gnu17 -Wno-error" so that a diagnostic gcc 15
+#                          or clang 21 invented inside third-party code, or the
+#                          C23-by-default dialect switch in gcc 15, cannot be
+#                          mistaken for a finding about Tengine.
+#
 
 set -eu
 
@@ -55,6 +67,7 @@ ENV_RELATIVE_TO=""
 WITH_TONGSUO=yes
 WITH_XQUIC=yes
 WITH_LUA=yes
+: "${TENGINE_DEP_CFLAGS:=}"
 
 die() { printf '%s: error: %s\n' "${0##*/}" "$*" >&2; exit 1; }
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -204,8 +217,10 @@ if [ "$WITH_TONGSUO" = yes ]; then
         # rebuilds this tree from scratch anyway. Building apps/ and test/ would
         # add a large amount of compile time -- painful with an el7-era gcc --
         # and one more chance to fail on code the package never ships.
+        # shellcheck disable=SC2086  # deliberate word splitting of the flags
         ( cd "$tongsuo_src" && ./config --prefix=/usr/local/tongsuo \
-            enable-ntls no-shared no-tests -fPIC && make -j"$JOBS" build_libs )
+            enable-ntls no-shared no-tests -fPIC $TENGINE_DEP_CFLAGS \
+            && make -j"$JOBS" build_libs )
     fi
 
     emit "export TENGINE_TONGSUO_SRC=$(env_path "$tongsuo_src")"
@@ -234,6 +249,11 @@ if [ "$WITH_XQUIC" = yes ]; then
         if ! ${CC:-cc} --version 2>/dev/null | grep -qi clang; then
             xqc_cflags="$xqc_cflags -Wno-dangling-pointer -Wno-stringop-truncation"
         fi
+        # Appended last so a caller can override the dialect and demote the
+        # -Werror that xquic's own CMakeLists turns on.  Only when non-empty, so
+        # the default leaves the flags byte-identical to what the packages have
+        # always been built with.
+        [ -z "$TENGINE_DEP_CFLAGS" ] || xqc_cflags="$xqc_cflags $TENGINE_DEP_CFLAGS"
 
         mkdir -p "$xquic_src/build"
         # Force the Makefiles generator: newer CMake (Alpine 3.23+/CMake 4.x)
