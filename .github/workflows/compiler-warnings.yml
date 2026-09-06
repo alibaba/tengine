@@ -101,16 +101,12 @@ jobs:
          # warnings. test-asan.yml relies on the same ordering.
          NGX_EXTRA_CC_OPT: -Wno-error
        run: |
-         # Four modules the strict job leaves out are added here, because this
-         # job reports instead of failing. mod_common and mod_strategy are
-         # compiled by no other workflow at all, and mod_common is not
-         # -Werror-clean today; mod_dubbo (with mod_config, as
-         # test-nginx-core.yml pairs them) is C++, so it is the only place gcc
-         # 15's C++ front end gets exercised. -lstdc++ comes from its config,
-         # and needs nothing installed.
+         # mod_dubbo is C++ (with mod_config, as test-nginx-core.yml pairs them),
+         # so this is the only place a new compiler's C++ front end gets
+         # exercised -- worth reporting on, but not worth failing the blocking
+         # job over. -lstdc++ comes from its config and needs nothing installed.
+         # mod_common, which mod_dubbo needs, is already in the shared script.
          .github/scripts/configure-warning-scan.sh --with-debug \
-           --add-module=./modules/mod_common \
-           --add-module=./modules/mod_strategy \
            --add-module=./modules/mod_config \
            --add-module=./modules/mod_dubbo
          # -k as well as -Wno-error: a genuine error in one file must not stop

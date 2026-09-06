@@ -21,11 +21,10 @@
 # --with-openssl-async is out for the same reason: it needs the async API of a
 # particular OpenSSL, and the runner's system OpenSSL moves under us.
 #
-# mod_common, mod_strategy, mod_config and mod_dubbo need no library the runner
-# lacks, but they are added by the inventory job rather than here: mod_common is
-# not -Werror-clean today (-Wsign-compare and a const-discarding assignment in
-# ngx_comm_shm.c), and no workflow has ever compiled it, so making it blocking
-# would fail this job for pre-existing reasons rather than for a new diagnostic.
+# mod_config and mod_dubbo need no library the runner lacks either, but they go
+# to the inventory job rather than here, because mod_dubbo is C++: that job is
+# the only place a new compiler's C++ front end gets exercised, and it reports
+# instead of failing.
 
 set -e
 
@@ -65,6 +64,8 @@ $CC --version
     --with-stream_ssl_preread_module \
     --with-stream_sni \
     --add-module=./modules/mod_append_header \
+    --add-module=./modules/mod_common \
+    --add-module=./modules/mod_strategy \
     --add-module=./modules/ngx_backtrace_module \
     --add-module=./modules/ngx_debug_pool \
     --add-module=./modules/ngx_debug_timer \

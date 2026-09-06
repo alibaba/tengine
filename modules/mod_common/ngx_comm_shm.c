@@ -387,7 +387,7 @@ void * ngx_shm_lockless_hash_get(ngx_shm_lockless_hash_t * table, void * elem)
     ngx_uint_t             hash;
     ngx_shm_lockless_hash_node_t   *node;
     ngx_shm_lockless_hash_bucket_t * bucket = NULL;
-    ngx_int_t               i;
+    ngx_uint_t              i;
 
     if (table == NULL) {
         return NULL;
@@ -436,13 +436,13 @@ ngx_shm_hash_get_by_node(ngx_queue_t *node)
 #define MAX_PATH_TRIE_SEGMENT   64
 
 int ngx_shm_trie_node_compar_func(const void * p1, const void* p2) {
-    ngx_shm_path_trie_node_t * n1 = p1;
-    ngx_shm_path_trie_node_t * n2 = p2;
+    const ngx_shm_path_trie_node_t * n1 = p1;
+    const ngx_shm_path_trie_node_t * n2 = p2;
     return ngx_comm_strcasecmp(&n1->segment, &n2->segment);
 }
 
 ngx_uint_t ngx_shm_trie_node_hash_func(const void * p) {
-    ngx_shm_path_trie_node_t * n = p;
+    const ngx_shm_path_trie_node_t * n = p;
     return ngx_hash_key_lc(n->segment.data, n->segment.len);
 }
 
@@ -547,7 +547,7 @@ ngx_shm_trie_add(ngx_shm_path_trie_t *trie, ngx_str_t *path, void *data)
 void*
 ngx_shm_trie_search(ngx_shm_path_trie_t *trie, ngx_str_t *path)
 {
-    ngx_int_t   i, segment_n, rc;
+    ngx_int_t   i, segment_n;
     ngx_str_t   segments[MAX_PATH_TRIE_SEGMENT];
 
     if (trie == NULL) {

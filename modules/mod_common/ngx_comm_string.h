@@ -48,7 +48,7 @@ comm_atoll_with_trim(u_char *line, size_t n);
  * @param dst  destination string
  * @return  Returns an integer, equal returns 0, src<dst returns a negative number, src>dst returns a positive number
  */
-ngx_int_t ngx_comm_strcasecmp(ngx_str_t * src, ngx_str_t * dst);
+ngx_int_t ngx_comm_strcasecmp(const ngx_str_t * src, const ngx_str_t * dst);
 
 /**
  * @brief String copy and convert to uppercase
