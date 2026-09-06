@@ -186,12 +186,6 @@ jobs:
    # Tongsuo is compiled twice (once for xquic, once by Tengine's own configure),
    # plus xquic, LuaJIT and Tengine.
    timeout-minutes: 90
-   # Non-blocking until it has been seen green on a real runner: the dependency
-   # stack has never been built on this image, and an apt package name or a
-   # CMake/OpenSSL incompatibility here would block every pull request for a
-   # reason unrelated to warnings. Promote it to a required check -- and drop
-   # this line -- once the first scheduled run passes.
-   continue-on-error: true
    strategy:
      fail-fast: false
      matrix:
