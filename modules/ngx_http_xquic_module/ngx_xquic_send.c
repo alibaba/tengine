@@ -348,7 +348,7 @@ ngx_xquic_server_mp_send_mmsg(uint64_t path_id,
     ngx_xquic_path_t          *path = NULL;
     ngx_socket_t               fd = (ngx_socket_t)-1;
     ngx_connection_t          *ngx_conn = NULL;
-    xqc_cid_t                 *cid;
+    xqc_cid_t                 *cid = NULL;
     u_char                     text[NGX_SOCKADDR_STRLEN];
     ngx_str_t                  addr_text;
 
@@ -390,7 +390,7 @@ ngx_xquic_server_mp_send_mmsg(uint64_t path_id,
         }
     }
 
-    if (fd == (ngx_socket_t)-1 || ngx_conn == NULL) {
+    if (fd == (ngx_socket_t)-1 || ngx_conn == NULL || cid == NULL) {
         ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0,
                     "|xquic|ngx_xquic_server_mp_send_mmsg|can't get fd|%uL|", path_id);   
 
