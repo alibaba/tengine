@@ -78,8 +78,8 @@ jobs:
        run: |
          sudo make install
 
-# TODO: fix tests so they don't depend on /usr/local/tengine/logs/
-#       so we can run `make`, `make test`, `make install`.
+     # TODO: fix tests so they don't depend on /usr/local/tengine/logs/
+     #       so we can run `make`, `make test`, `make install`.
 
      - name: build
        env:
