@@ -131,7 +131,7 @@ else
 cat << END
 
 $0: error: SSL modules require the OpenSSL library.
-You can either do not enable the modules, or install the OpenSSL library
+You can either disable the modules, or install the OpenSSL library
 into the system, or build the OpenSSL library statically from the source
 with nginx by using --with-openssl=<path> option.
 

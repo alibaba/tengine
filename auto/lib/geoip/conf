@@ -89,7 +89,7 @@ else
 cat << END
 
 $0: error: the GeoIP module requires the GeoIP library.
-You can either do not enable the module or install the library.
+You can either disable the module or install the library.
 
 END
 
