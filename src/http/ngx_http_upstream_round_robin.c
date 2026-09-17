@@ -220,6 +220,17 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
 
+#if (NGX_HTTP_UPSTREAM_CHECK)
+                /*
+                 * A peer resolved at run time has no address to probe at
+                 * configuration time, so it takes no part in health checking.
+                 * Marking the index invalid matters: the peer is pcalloc'ed,
+                 * so leaving it at 0 would make this peer follow the health of
+                 * whichever peer got index 0.
+                 */
+                peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
+
 #if (NGX_HTTP_UPSTREAM_SID)
                 if (ngx_http_upstream_create_sid(cf, &peer[n], &server[i].sid)
                     != NGX_OK)
@@ -384,6 +395,17 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].fail_timeout = server[i].fail_timeout;
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
+
+#if (NGX_HTTP_UPSTREAM_CHECK)
+                /*
+                 * A peer resolved at run time has no address to probe at
+                 * configuration time, so it takes no part in health checking.
+                 * Marking the index invalid matters: the peer is pcalloc'ed,
+                 * so leaving it at 0 would make this peer follow the health of
+                 * whichever peer got index 0.
+                 */
+                peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
 
 #if (NGX_HTTP_UPSTREAM_SID)
                 if (ngx_http_upstream_create_sid(cf, &peer[n], &server[i].sid)

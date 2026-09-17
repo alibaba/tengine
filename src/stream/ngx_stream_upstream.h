@@ -167,6 +167,16 @@ ngx_stream_upstream_srv_conf_t *ngx_stream_upstream_add(ngx_conf_t *cf,
     uscf->srv_conf[module.ctx_index]
 
 
+#if (NGX_STREAM_UPSTREAM_CHECK)
+
+ngx_uint_t ngx_stream_upstream_check_add_peer(ngx_conf_t *cf,
+    ngx_stream_upstream_srv_conf_t *us, ngx_addr_t *peer);
+
+ngx_uint_t ngx_stream_upstream_check_peer_down(ngx_uint_t index);
+
+#endif
+
+
 extern ngx_module_t  ngx_stream_upstream_module;
 
 

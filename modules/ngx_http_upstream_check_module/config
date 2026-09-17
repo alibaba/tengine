@@ -4,7 +4,7 @@ ngx_feature_run=no
 ngx_feature_incs=
 ngx_feature_libs=
 ngx_feature_path="$ngx_addon_dir"
-ngx_feature_deps="$ngx_addon_dir/ngx_http_upstream_check_module.h $ngx_addon_dir/ngx_http_upstream_check_http_parse.h"
+ngx_feature_deps="$ngx_addon_dir/ngx_upstream_check_module.h $ngx_addon_dir/ngx_http_upstream_check_module.h $ngx_addon_dir/ngx_http_upstream_check_http_parse.h $ngx_addon_dir/ngx_upstream_check_send_parse.h"
 ngx_check_src="$ngx_addon_dir/ngx_http_upstream_check_module.c"
 ngx_feature_test="int a;"
 . auto/feature
@@ -21,6 +21,34 @@ else
     $0: error: the ngx_http_upstream_check_module addon error.
 END
     exit 1
+fi
+
+#
+# Active health checks for stream upstreams. Only a configuration shell: the
+# probe machinery lives in the HTTP-side source above and is shared, so the
+# stream module cannot be built without it.
+#
+if [ $STREAM != NO ]; then
+
+    if [ $STREAM = DYNAMIC ]; then
+        cat << END
+    $0: error: ngx_stream_upstream_check_module does not support building the
+    stream module dynamically, because it shares the health-check core with
+    ngx_http_upstream_check_module, which is linked statically.
+END
+        exit 1
+    fi
+
+    have=NGX_STREAM_UPSTREAM_CHECK . auto/have
+
+    ngx_module_name=ngx_stream_upstream_check_module
+    ngx_module_type=STREAM
+    ngx_module_link=ADDON
+    ngx_module_incs=$ngx_addon_dir
+    ngx_module_deps="$ngx_feature_deps"
+    ngx_module_srcs="$ngx_addon_dir/ngx_stream_upstream_check_module.c"
+
+    . auto/module
 fi
 
 ngx_feature="compiler structure-packing pragma"

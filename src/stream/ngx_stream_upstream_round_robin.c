@@ -196,6 +196,16 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].fail_timeout = server[i].fail_timeout;
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
+#if (NGX_STREAM_UPSTREAM_CHECK)
+                /*
+                 * A peer resolved at run time has no address to probe at
+                 * configuration time, so it takes no part in health checking.
+                 * Marking the index invalid matters: the peer is pcalloc'ed,
+                 * so leaving it at 0 would make this peer follow the health of
+                 * whichever peer got index 0.
+                 */
+                peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
                 *rpeerp = &peer[n];
                 rpeerp = &peer[n].next;
                 n++;
@@ -216,6 +226,16 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].fail_timeout = server[i].fail_timeout;
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
+
+#if (NGX_STREAM_UPSTREAM_CHECK)
+                if (!server[i].down) {
+                    peer[n].check_index =
+                        ngx_stream_upstream_check_add_peer(cf, us,
+                                                          &server[i].addrs[j]);
+                } else {
+                    peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+                }
+#endif
 
                 *peerp = &peer[n];
                 peerp = &peer[n].next;
@@ -321,6 +341,16 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].fail_timeout = server[i].fail_timeout;
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
+#if (NGX_STREAM_UPSTREAM_CHECK)
+                /*
+                 * A peer resolved at run time has no address to probe at
+                 * configuration time, so it takes no part in health checking.
+                 * Marking the index invalid matters: the peer is pcalloc'ed,
+                 * so leaving it at 0 would make this peer follow the health of
+                 * whichever peer got index 0.
+                 */
+                peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
                 *rpeerp = &peer[n];
                 rpeerp = &peer[n].next;
                 n++;
@@ -341,6 +371,16 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
                 peer[n].fail_timeout = server[i].fail_timeout;
                 peer[n].down = server[i].down;
                 peer[n].server = server[i].name;
+
+#if (NGX_STREAM_UPSTREAM_CHECK)
+                if (!server[i].down) {
+                    peer[n].check_index =
+                        ngx_stream_upstream_check_add_peer(cf, us,
+                                                          &server[i].addrs[j]);
+                } else {
+                    peer[n].check_index = (ngx_uint_t) NGX_ERROR;
+                }
+#endif
 
                 *peerp = &peer[n];
                 peerp = &peer[n].next;
@@ -540,6 +580,9 @@ ngx_stream_upstream_create_round_robin_peer(ngx_stream_session_t *s,
         peer[0].max_fails = 1;
         peer[0].fail_timeout = 10;
         peers->peer = peer;
+#if (NGX_STREAM_UPSTREAM_CHECK)
+        peer[0].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
 
     } else {
         peerp = &peers->peer;
@@ -575,6 +618,9 @@ ngx_stream_upstream_create_round_robin_peer(ngx_stream_session_t *s,
             peer[i].fail_timeout = 10;
             *peerp = &peer[i];
             peerp = &peer[i].next;
+#if (NGX_STREAM_UPSTREAM_CHECK)
+            peer[i].check_index = (ngx_uint_t) NGX_ERROR;
+#endif
         }
     }
 
@@ -642,6 +688,12 @@ ngx_stream_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
         if (peer->max_conns && peer->conns >= peer->max_conns) {
             goto failed;
         }
+
+#if (NGX_STREAM_UPSTREAM_CHECK)
+        if (ngx_stream_upstream_check_peer_down(peer->check_index)) {
+            goto failed;
+        }
+#endif
 
         rrp->current = peer;
         ngx_stream_upstream_rr_peer_ref(peers, peer);
@@ -741,6 +793,12 @@ ngx_stream_upstream_get_peer(ngx_stream_upstream_rr_peer_data_t *rrp)
         if (peer->down) {
             continue;
         }
+
+#if (NGX_STREAM_UPSTREAM_CHECK)
+        if (ngx_stream_upstream_check_peer_down(peer->check_index)) {
+            continue;
+        }
+#endif
 
         if (peer->max_fails
             && peer->fails >= peer->max_fails
