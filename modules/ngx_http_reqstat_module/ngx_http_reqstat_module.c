@@ -1268,13 +1268,13 @@ ngx_http_reqstat_rbtree_lookup(ngx_shm_zone_t *shm_zone, ngx_str_t *val)
 
     hash = ngx_murmur_hash2(val->data, val->len);
 
-    node = ctx->sh->rbtree.root;
-    sentinel = ctx->sh->rbtree.sentinel;
-
     tp = ngx_timeofday();
     now = (ngx_msec_t) (tp->sec * 1000 + tp->msec);
 
     ngx_shmtx_lock(&ctx->shpool->mutex);
+
+    node = ctx->sh->rbtree.root;
+    sentinel = ctx->sh->rbtree.sentinel;
 
     while (node != sentinel) {
 
