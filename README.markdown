@@ -8,7 +8,7 @@
 
 [![GitHub license](https://img.shields.io/github/license/alibaba/tengine.svg)](https://github.com/alibaba/tengine/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/alibaba/tengine.svg)](https://github.com/alibaba/tengine/stargazers)
-[![GitHub stars](https://img.shields.io/badge/contributions-welcome-orange.svg)](https://github.com/alibaba/tengine/blob/main/CONTRIBUTING.md)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-orange.svg)](https://github.com/alibaba/tengine/issues/new/choose)
 [![Build Status](https://github.com/alibaba/tengine/actions/workflows/ci.yml/badge.svg)](https://github.com/alibaba/tengine/actions/workflows/ci.yml)
 
 </div>
