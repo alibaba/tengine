@@ -592,7 +592,7 @@ Connection: keep-alive
 
 ####Description
 
-The implementation of GET_APPID gets appid of the specified TFS application. Appid is returned in JSON format. Each application can get a unique appid corresponding to its appkdy. This appid is a required paramter in each Custom TFS operation. You can consider this as a namespace in TFS.
+The implementation of GET_APPID gets appid of the specified TFS application. Appid is returned in JSON format. Each application can get a unique appid corresponding to its appkdy. This appid is a required parameter in each Custom TFS operation. You can consider this as a namespace in TFS.
 
 ####Syntax
 
