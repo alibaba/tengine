@@ -2474,6 +2474,19 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 
     /* headers complete: set up body draining from the coalesced buffer bytes */
 
+    if (ctx->http_headers.bad_framing
+        || (ctx->http_headers.seen_te && !ctx->http_headers.chunked))
+    {
+        /*
+         * The body length is unknown: the Content-Length is invalid, or a
+         * Transfer-Encoding whose final coding is not chunked delimits the
+         * body by connection close. Do not reuse the connection.
+         */
+        c->error = 1;
+        peer->recv_body_pending = 0;
+        goto parse_done;
+    }
+
     if (ctx->http_headers.chunked) {
         peer->recv_body_chunked = 1;
         peer->recv_chunk_state = sw_chunk_size;
@@ -2500,7 +2513,7 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
                                             &peer->recv_body_remaining);
     if (rc == NGX_ERROR) {
         /*
-         * Malformed chunk framing. The verdict is already decided from the
+         * Malformed body framing. The verdict is already decided from the
          * status line, but the connection cannot be reused safely.
          */
         c->error = 1;
