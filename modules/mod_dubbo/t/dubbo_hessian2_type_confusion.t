@@ -205,9 +205,8 @@ like(http_get('/null'), qr!^HTTP/1\.1 502 !,
 	'null payload rejected');
 
 # A map whose key is an Integer rather than a String: the entry is skipped,
-# the remaining entries still decode.  Here the map has only the bad key, so
-# the result is an empty map -- which the response handler turns into a 200
-# with an empty body.
+# the remaining entries still decode.  The "status" entry carries the 200;
+# without it the response handler would default to a 502.
 like(http_get('/non_string_key'), qr!^HTTP/1\.1 200 !,
 	'map with non-string key skipped');
 
@@ -278,17 +277,19 @@ sub dubbo_daemon {
 		# null object ('N')
 		m_null => $flag . 'N',
 
-		# a map whose only key is an Integer (0x91 = int 1), not a
-		# String: the entry is skipped, leaving an empty result
+		# a map whose first key is an Integer (0x91 = int 1), not a
+		# String: that entry is skipped, the "status" entry survives
 		m_non_string_key => $flag . 'H'
 			. "\x91"
 			. "\x03" . '200'
+			. "\x06" . 'status' . "\x03" . '200'
 			. 'Z',
 
 		# a map whose "body" value is a String rather than a ByteArray:
 		# the generic Object::to_string() path still decodes it
 		m_body_not_bytes => $flag . 'H'
 			. "\x04" . 'body' . "\x05" . 'hello'
+			. "\x06" . 'status' . "\x03" . '200'
 			. 'Z',
 	);
 
