@@ -17,6 +17,11 @@ class Object;
  */
 class hessian2_input {
     public:
+        // nesting limit for containers read by read_object() and read_map();
+        // a payload of repeated map tags would otherwise recurse until the
+        // stack is exhausted
+        static const uint32_t MAX_NESTING_DEPTH = 64;
+
         hessian2_input(const std::string* data);
         hessian2_input(const char* data, uint32_t size);
         ~hessian2_input() {}
@@ -89,6 +94,9 @@ class hessian2_input {
         const char* _begin;
         const char* _curr;
         const char* _end;
+
+        // current container nesting depth, kept by read_object()/read_map()
+        uint32_t _depth;
 
         std::vector<Object*> _refs_list;
 };

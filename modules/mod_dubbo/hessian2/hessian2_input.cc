@@ -10,11 +10,25 @@ namespace hessian {
 
 using namespace std;
 
+namespace {
+
+// raises the nesting depth for the lifetime of a container read and lowers
+// it again on every way out, including a thrown io_exception
+struct depth_guard {
+    explicit depth_guard(uint32_t& depth) : _depth(depth) { ++_depth; }
+    ~depth_guard() { --_depth; }
+
+    uint32_t& _depth;
+};
+
+}
+
 hessian2_input::hessian2_input(const std::string* data)
-  : _begin(data->c_str()), _curr(_begin), _end(_begin + data->length()) {}
+  : _begin(data->c_str()), _curr(_begin), _end(_begin + data->length()),
+    _depth(0) {}
 
 hessian2_input::hessian2_input(const char* data, uint32_t size)
-  : _begin(data), _curr(data), _end(data + size) {}
+  : _begin(data), _curr(data), _end(data + size), _depth(0) {}
 
 void hessian2_input::read_null() {
   uint8_t tag = parse_8bit();
@@ -960,7 +974,8 @@ int64_t hessian2_input::read_utc_date() {
 
 std::string* hessian2_input::read_utf8_string(std::string *dest)
 {
-    Safeguard<string> safeguard(dest);
+    // guard only what is allocated here: a caller's dest is the caller's
+    Safeguard<string> safeguard;
     if (dest == NULL) {
         dest = new string();
         safeguard.reset(dest);
@@ -1276,11 +1291,12 @@ string* hessian2_input::read_chunked_utf8_string(string* dest) {
         return dest;
     }
 
+    // guard only what is allocated here: a caller's dest is the caller's
+    Safeguard<string> safeguard;
     if (dest == NULL) {
         dest = new string();
+        safeguard.reset(dest);
     }
-
-    Safeguard<string> safeguard(dest);
 
     while (tag == 'R') {
         uint16_t char_size = parse_16bit();
@@ -1565,15 +1581,28 @@ Object* hessian2_input::read_list(const string& classname) {
 }
 
 Object* hessian2_input::read_map(const string& classname) {
+    if (_depth >= MAX_NESTING_DEPTH) {
+        throw error("hessian2_input::read_map(): maximum nesting depth exceeded");
+    }
+    depth_guard guard(_depth);
+
     uint8_t tag = parse_8bit();
     string type;
 
     switch (tag) {
         case 'H':
+            // an untyped map carries no type string; fall back to the
+            // default classname just like an empty typed-map type below
+            type = Map::DEFAULT_CLASSNAME;
             break;
         case 'M':
             {
                 string *tmp = read_utf8_string();
+                // read_utf8_string() returns NULL for 'N', and a map type
+                // can never be null
+                if (tmp == NULL) {
+                    throw error("hessian2_input::read_map(): null map type");
+                }
                 type = *tmp;
                 delete tmp;
                 if (type.empty()) {
@@ -1610,6 +1639,11 @@ Object* hessian2_input::read_map(const string& classname) {
 }
 
 pair<Object*, bool> hessian2_input::read_object() {
+    if (_depth >= MAX_NESTING_DEPTH) {
+        throw error("hessian2_input::read_object(): maximum nesting depth exceeded");
+    }
+    depth_guard guard(_depth);
+
     uint8_t tag = peek();
 
     switch(tag) {
@@ -1710,11 +1744,17 @@ pair<Object*, bool> hessian2_input::read_object() {
         case 77:
             return pair<Object*, bool>(read_map(), true);
         case 78:
+            // consume the tag like every other branch: read_object() only
+            // peeks, and leaving 'N' in the stream makes a map entry loop
+            // re-read it forever
+            read_null();
             return pair<Object*, bool>(NULL, true);
         case 79:
             throw io_exception("unsupported readObjectInstance");
         case 81:
-            return pair<Object*, bool>(read_ref(), true);
+            // a ref borrows an object owned elsewhere (an enclosing map or
+            // a previous entry); deleting it here would double-free it
+            return pair<Object*, bool>(read_ref(), false);
         case 82:
         case 83:
             return pair<Object*, bool>(new String(read_utf8_string(), true), true);
@@ -1922,6 +1962,10 @@ int32_t hessian2_input::add_ref(Object* object) {
 }
 
 Object* hessian2_input::read_ref() {
+    uint8_t tag = parse_8bit();
+    if (tag != 'Q') {
+        throw expect("ref", tag);
+    }
     return get_ref_object(parse_32bit());
 }
 
@@ -1940,7 +1984,10 @@ double hessian2_input::parse_double() {
 }
 
 void hessian2_input::parse_utf8_string(uint32_t char_size, string* dest) {
-    if (_curr + char_size - 1 >= _end) {
+    // char_size counts chars, not bytes: this only rules out a length that
+    // cannot fit even at one byte per char. Each multi-byte sequence is
+    // bounds-checked on its own below.
+    if (char_size > (uint32_t) (_end - _curr)) {
         throw error("hessian2_input::parse_utf8_string(): will reach EOF");
     }
 
@@ -1952,19 +1999,25 @@ void hessian2_input::parse_utf8_string(uint32_t char_size, string* dest) {
         }
 
         int ch = (uint8_t) *_curr++;
+        int trail;
 
         if (ch < 0x80) {
-            dest->push_back(ch);
+            trail = 0;
         } else if ((ch & 0xe0) == 0xc0) {
-            dest->push_back(ch);
-            dest->push_back(*_curr++);
+            trail = 1;
         } else if ((ch & 0xf0) == 0xe0) {
-            dest->push_back(ch);
-            dest->push_back(*_curr++);
-            dest->push_back(*_curr++);
+            trail = 2;
         } else {
             throw error("bad utf-8 encoding");
         }
+
+        if (_end - _curr < trail) {
+            throw error("hessian2_input::parse_utf8_string(): truncated utf-8 sequence");
+        }
+
+        dest->push_back(ch);
+        dest->append(_curr, trail);
+        _curr += trail;
     }
 }
 

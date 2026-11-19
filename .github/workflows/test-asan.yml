@@ -45,6 +45,8 @@ jobs:
             --with-debug \
             --with-http_ssl_module \
             --with-http_v2_module \
+            --add-module=./modules/mod_dubbo \
+            --add-module=./modules/ngx_multi_upstream_module \
             --with-cc-opt="-fsanitize=address -fno-omit-frame-pointer -g -O1 -Wno-error" \
             --with-ld-opt="-fsanitize=address"
          make -j2
@@ -70,4 +72,5 @@ jobs:
            nginx-tests/upstream_zone_ssl.t \
            nginx-tests/proxy_next_upstream.t \
            tengine-tests/upstream_resolve_empty.t \
-           tengine-tests/upstream_resolve_shrink.t
+           tengine-tests/upstream_resolve_shrink.t \
+           ../../modules/mod_dubbo/t
