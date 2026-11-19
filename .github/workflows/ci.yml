@@ -50,6 +50,14 @@ jobs:
          CXX: ${{ matrix.compiler.CXX }}
        run: |
          make -C modules/mod_dubbo/tests
+     # The flow control tests extract the production functions themselves and
+     # revert each part of the CVE-2026-123007 fix in turn, so a dropped hunk
+     # fails here even without a built tengine.
+     - name: HTTP/2 flow control unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/http/v2/tests
      - name: 'checkout luajit2'
        uses: actions/checkout@v7
        with:
