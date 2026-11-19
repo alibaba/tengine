@@ -327,6 +327,10 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+#if (NGX_CONTROL_API)
+    ngx_control_preinit();
+#endif
+
     if (ngx_preinit_modules() != NGX_OK) {
         return 1;
     }
@@ -409,7 +413,7 @@ main(int argc, char *const *argv)
 #endif
 
 #if (NGX_CONTROL_API)
-    if (ngx_process == NGX_PROCESS_SINGLE) {
+    if (ngx_control_api_enabled && ngx_process == NGX_PROCESS_SINGLE) {
         ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
                       "control API unavailable in single process mode");
 
@@ -1316,6 +1320,29 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 
     ngx_memcpy(ngx_cpymem(ccf->oldpid.data, ccf->pid.data, ccf->pid.len),
                NGX_OLDPID_EXT, sizeof(NGX_OLDPID_EXT));
+
+
+    if (ccf->working_directory.len) {
+        ngx_file_info_t  fi;
+
+        if (ngx_conf_full_name(cycle, &ccf->working_directory, 0) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_file_info(ccf->working_directory.data, &fi) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          ngx_file_info_n " \"%s\" failed",
+                          ccf->working_directory.data);
+            return NGX_CONF_ERROR;
+        }
+
+        if (!ngx_is_dir(&fi)) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                          "\"%s\" is not a directory",
+                          ccf->working_directory.data);
+            return NGX_CONF_ERROR;
+        }
+    }
 
 
 #if !(NGX_WIN32)

@@ -1031,6 +1031,8 @@ ngx_stream_upstream_set_round_robin_peer_session(ngx_peer_connection_t *pc,
         p = ngx_ssl_session_buffer;
         ssl_session = d2i_SSL_SESSION(NULL, &p, len);
 
+        ngx_explicit_memzero(ngx_ssl_session_buffer, len);
+
         rc = ngx_ssl_set_session(pc->connection, ssl_session);
 
         ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
@@ -1085,7 +1087,7 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
 
         /* do not cache too big session */
 
-        if (len > NGX_SSL_MAX_SESSION_SIZE) {
+        if (len <= 0 || len > NGX_SSL_MAX_SESSION_SIZE) {
             return;
         }
 
@@ -1113,6 +1115,9 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
 
                 ngx_stream_upstream_rr_peer_unlock(peers, peer);
                 ngx_stream_upstream_rr_peers_unlock(peers);
+
+                ngx_explicit_memzero(ngx_ssl_session_buffer, len);
+
                 return;
             }
 
@@ -1123,6 +1128,8 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
 
         ngx_stream_upstream_rr_peer_unlock(peers, peer);
         ngx_stream_upstream_rr_peers_unlock(peers);
+
+        ngx_explicit_memzero(ngx_ssl_session_buffer, len);
 
         return;
     }
