@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite proxy/)->plan(47);
+my $t = Test::Nginx->new()->has(qw/http rewrite proxy/)->plan(49);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -171,6 +171,19 @@ local $TODO = 'not yet' unless $t->has_version('1.29.6');
 unlike($r, qr/X-Cookie-Qux:/, '$cookie_qux');
 
 }
+
+# request cookies, a cookie without a name before the one requested
+
+$r = get('/', 'Cookie: foo; foo=1; bar=2');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.31.9');
+
+like($r, qr/X-Cookie-Foo: 1/, '$cookie_foo after a cookie without a name');
+
+}
+
+like($r, qr/X-Cookie-Bar: 2/, '$cookie_bar after a cookie without a name');
 
 # response headers, $http_*
 

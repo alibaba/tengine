@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(8);
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(9);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -67,6 +67,13 @@ like(http_get('/length-and-transfer-encoding'), qr/502 Bad/,
 	'length and transfer encoding');
 like(http_get('/transfer-encoding-and-length'), qr/502 Bad/,
 	'transfer encoding and length');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.31.9');
+
+like(http_get('/no-colon'), qr/502 Bad/, 'no colon');
+
+}
 
 like(http_get('/duplicate-expires'), qr/Expires: foo(?!.*bar)/s,
 	'duplicate expires ignored');
@@ -152,6 +159,14 @@ sub http_daemon {
 				'Transfer-Encoding: chunked' . CRLF .
 				'Content-Length: 0' . CRLF . CRLF .
 				'0' . CRLF . CRLF;
+
+		} elsif ($uri eq '/no-colon') {
+
+			print $client
+				'HTTP/1.1 200 OK' . CRLF .
+				'Foo' . CRLF .
+				'Connection: close' . CRLF .
+				'Content-Length: 0' . CRLF . CRLF;
 
 		} elsif ($uri eq '/duplicate-expires') {
 

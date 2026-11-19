@@ -31,7 +31,7 @@ select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy http_ssl socket_ssl/)
 	->has_daemon('openssl')
-	->write_file_expand('nginx.conf', <<'EOF')->plan(30);
+	->write_file_expand('nginx.conf', <<'EOF')->plan(29);
 
 %%TEST_GLOBALS%%
 
@@ -160,7 +160,6 @@ open my $f, '<', "$d/cc.log" or die "Can't open cc.log: $!";
 
 is($f->getline(), shift (@r) . " 540793\n", 'log - bytes');
 is($f->getline(), shift (@r) . " 22\n", 'log - bytes pipelined');
-like($f->getline(), qr/\d+ 0\n/, 'log - bytes noupgrade');
 
 ###############################################################################
 

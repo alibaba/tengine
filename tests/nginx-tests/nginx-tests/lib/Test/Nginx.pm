@@ -123,6 +123,7 @@ sub has_module($) {
 			=> '--with-http_auth_request_module',
 		realip	=> '--with-http_realip_module',
 		sub	=> '--with-http_sub_module',
+		json	=> '--with-http_json_module',
 		charset	=> '(?s)^(?!.*--without-http_charset_module)',
 		gzip	=> '(?s)^(?!.*--without-http_gzip_module)',
 		ssi	=> '(?s)^(?!.*--without-http_ssi_module)',
@@ -173,6 +174,8 @@ sub has_module($) {
 		imap	=> '(?s)^(?!.*--without-mail_imap_module)',
 		smtp	=> '(?s)^(?!.*--without-mail_smtp_module)',
 		pcre	=> '(?s)^(?!.*--without-pcre)',
+		control_api
+			=> '--with-control-api',
 		split_clients
 			=> '(?s)^(?!.*--without-http_split_clients_module)',
 		tunnel	=> '(?s)^(?!.*--without-http_tunnel_module)',
@@ -407,8 +410,9 @@ sub run(;$) {
 		my @globals = $self->{_test_globals} ?
 			() : ('-g', "pid $testdir/nginx.pid; "
 			. "error_log $testdir/error.log debug;");
+		my @args = @{$self->{_args} || []};
 		exec($NGINX, '-p', "$testdir/", '-c', 'nginx.conf',
-			'-e', 'error.log', @globals)
+			'-e', 'error.log', @args, @globals)
 			or die "Unable to exec(): $!\n";
 	}
 
@@ -424,6 +428,12 @@ sub run(;$) {
 	}
 
 	$self->{_started} = 1;
+	return $self;
+}
+
+sub args {
+	my ($self, @args) = @_;
+	$self->{_args} = \@args;
 	return $self;
 }
 
