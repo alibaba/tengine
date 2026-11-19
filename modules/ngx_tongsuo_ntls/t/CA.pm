@@ -249,12 +249,23 @@ sub make_sm2_end_certs($$) {
     my ($t, $tag) = @_;
     my $d = $t->testdir();
 
+    # Tongsuo 8.5.0 enables the GB/T 20518 keyUsage check by default and
+    # rejects NTLS certificates without a keyUsage extension, so the
+    # self-signed sign/enc certificates must carry the proper usage bits.
     $t->write_file('openssl.conf', <<EOF);
 [ req ]
 default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
+
+[ sign_ext ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature
+
+[ enc_ext ]
+basicConstraints = CA:FALSE
+keyUsage = keyAgreement, keyEncipherment, dataEncipherment
 EOF
 
     foreach my $name ('sign', 'enc') {
@@ -262,7 +273,8 @@ EOF
             . ">>$d/openssl.out 2>&1") == 0 or die "Can't create key: $!\n";
 
         system("$openssl req -x509 -new -key $d/${tag}_$name.key "
-            . "-config $d/openssl.conf -subj /CN=${tag}_$name/ "
+            . "-config $d/openssl.conf -extensions ${name}_ext "
+            . "-subj /CN=${tag}_$name/ "
             . "-out $d/${tag}_$name.crt -keyout $d/${tag}_$name.key "
             . ">>$d/openssl.out 2>&1") == 0
             or die "Can't create certificate for ${tag}_$name: $!\n";
