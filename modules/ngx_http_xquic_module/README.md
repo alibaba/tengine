@@ -34,9 +34,9 @@ API 的兼容边界。使用发布包时应优先选择表中的推荐组合；A
 代表未经测试的版本组合具备完整的运行时兼容性。
 
 ```shell
-# 下载 Tongsuo，示例中下载 8.4.0 版本
-wget -c "https://github.com/Tongsuo-Project/Tongsuo/archive/refs/tags/8.4.0.tar.gz"
-tar -xf 8.4.0.tar.gz
+# Download Tongsuo; 8.5.0 in this example
+wget -c "https://github.com/Tongsuo-Project/Tongsuo/archive/refs/tags/8.5.0.tar.gz"
+tar -xf 8.5.0.tar.gz
 
 # Download xquic 1.9.8, the version verified against the current Tengine API
 wget -c "https://github.com/alibaba/xquic/archive/refs/tags/v1.9.8.tar.gz"
@@ -46,7 +46,7 @@ tar -xf v1.9.8.tar.gz
 git clone git@github.com:alibaba/tengine.git
 
 # 编译 Tongsuo
-cd Tongsuo-8.4.0
+cd Tongsuo-8.5.0
 ./config --prefix=/usr/local/babassl
 make
 make install
@@ -77,7 +77,7 @@ cd tengine
   --with-http_v2_module \
   --without-http_rewrite_module \
   --add-module=modules/ngx_http_xquic_module \
-  --with-openssl="../Tongsuo-8.4.0"
+  --with-openssl="../Tongsuo-8.5.0"
 
 make
 make install

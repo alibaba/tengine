@@ -404,7 +404,7 @@ upstream_session_sticky、upstream_vnswrr、user_agent、multi_upstream、slab_s
 
 | 依赖 | 版本 | 说明 |
 |---|---|---|
-| Tongsuo | `8.4.0` | OpenSSL 3.0.3 基线；`enable-ntls no-shared -fPIC` |
+| Tongsuo | `8.5.0` | OpenSSL 3.5.4 base; `enable-ntls no-shared -fPIC` |
 | xquic | `v1.9.8` | cmake `-DSSL_TYPE=babassl`, needs CMake >= 3.5 |
 | luajit2 | `v2.1-20260724` | openresty fork，`CFLAGS=-fPIC` |
 | lua-resty-core | `v0.1.32` | **必需**，缺它 tengine 直接起不来 |

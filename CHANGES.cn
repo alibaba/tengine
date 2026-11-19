@@ -33,6 +33,7 @@ Tengine 3.2.0 [2026-07-31]
 * Change: ngx_http_tunnel_module改为可选编译，避免与ngx_http_proxy_connect_module冲突 (lianglli)
 * Change: 合入nginx官方测试集并补充Tengine定制测试用例 (lianglli)
 * Change: 软件包与CI使用的xquic基线升级到v1.9.8，模块仍兼容v1.8.0至v1.9.8这一代接口，modules/ngx_http_xquic_module/README.md新增各Tengine版本经验证的xquic版本对照表 [XQUIC] (Yanmei-Liu)
+* Change: 软件包与CI使用的Tongsuo基线升级到8.5.0，其OpenSSL基线由8.4.0的3.0.3变为3.5.4 (lianglli)
 * Bugfix: 修复ngx_http_upstream_check_module在HTTP健康检查复用长连接时未排空响应体的问题 (lianglli)
 * Bugfix: 修复unix socket类型的upstream server配置check port=时被永久判定为存活，导致backup无法接管的问题 (lianglli)
 * Bugfix: 修复round-robin初始化时重复链接peer导致backup peer自环的问题 (lianglli)

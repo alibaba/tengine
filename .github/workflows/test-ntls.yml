@@ -67,7 +67,10 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Tongsuo-Project/Tongsuo
-          ref: 8.4-stable
+          # Release tag, not a branch head: keep in sync with
+          # packages/build/deps.env so this job and the packages compile the
+          # exact same Tongsuo.
+          ref: 8.5.0
           path: Tongsuo
       - name: build Tongsuo
         working-directory: Tongsuo
