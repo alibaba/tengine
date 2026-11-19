@@ -110,7 +110,9 @@ test_typed_map_null_type(void)
 /*
  * The path of the original report: read_object() -> read_map() ->
  * read_object() -> read_map(), with the null-typed map nested in an outer
- * map, both as a key and as a value.
+ * map, both as a key and as a value. Every payload here reaches the null
+ * type through a map entry of its own, so what these check is the type of
+ * the inner map and nothing else.
  */
 static void
 test_nested_typed_map_null_type(void)
@@ -118,10 +120,10 @@ test_nested_typed_map_null_type(void)
     CHECK(decode_object(PAYLOAD("HMN")) == THREW_IO,
           "null-typed map nested as a key is rejected");
 
-    CHECK(decode_object(PAYLOAD("MMN")) == THREW_IO,
+    CHECK(decode_object(PAYLOAD("M\x03" "foo" "\x01k" "MN")) == THREW_IO,
           "null-typed map nested in a typed map is rejected");
 
-    CHECK(decode_object(PAYLOAD("HNMN")) == THREW_IO,
+    CHECK(decode_object(PAYLOAD("H\x01k" "MN")) == THREW_IO,
           "null-typed map nested as a value is rejected");
 }
 
