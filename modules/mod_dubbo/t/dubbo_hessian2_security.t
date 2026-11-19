@@ -4,12 +4,15 @@
 
 # Security tests for the mod_dubbo hessian2 codec, on both directions:
 #
-#  - request side: dubbo_pass_set hands request-derived values ($arg_x) to
+#  - request side: dubbo_pass_set hands request-derived values ($uri) to
 #    the encoder. A value ending in an incomplete multi-byte UTF-8 sequence
-#    (e.g. %C3) used to make write_utf8_string() read past the value buffer
-#    and carry the over-read bytes into the Dubbo request. The backend here
-#    checks the encoded bytes it actually receives, so the cases fail even
-#    without a sanitizer build; under ASan the over-read itself is reported.
+#    (e.g. ...%C3%A9%C3) used to make write_utf8_string() read past the
+#    value buffer and carry the over-read bytes into the Dubbo request. The
+#    backend here checks the encoded bytes it actually receives, so the
+#    cases fail even without a sanitizer build; under ASan the over-read
+#    itself is reported. ($arg_* is not URL-decoded, and a lone %C3 in the
+#    request line is rejected with 400 before any module runs, hence $uri
+#    with a complete char ahead of the cut one.)
 #
 #  - response side: a payload of repeated map-start tags used to recurse
 #    read_object()/read_map() until the stack was exhausted, killing the
@@ -72,23 +75,23 @@ http {
         server_name  localhost;
 
         location /enc_ok {
-            dubbo_pass_set args $arg_x;
+            dubbo_pass_set args $uri;
             dubbo_pass test.Service 1.0.0 m_enc_ok u_enc;
         }
 
         location /enc_cut2 {
-            dubbo_pass_set args $arg_x;
+            dubbo_pass_set args $uri;
             dubbo_pass test.Service 1.0.0 m_enc_cut2 u_enc;
         }
 
         location /enc_cut3 {
-            dubbo_pass_set args $arg_x;
+            dubbo_pass_set args $uri;
             dubbo_pass test.Service 1.0.0 m_enc_cut3 u_enc;
         }
 
-        location /enc_empty {
-            dubbo_pass_set args $arg_x;
-            dubbo_pass test.Service 1.0.0 m_enc_empty u_enc;
+        location /enc_cut4 {
+            dubbo_pass_set args $uri;
+            dubbo_pass test.Service 1.0.0 m_enc_cut4 u_enc;
         }
 
         location /deep {
@@ -109,24 +112,24 @@ $t->run()->waitforsocket('127.0.0.1:' . port(8081));
 ###############################################################################
 
 # a complete 2-byte char in the argument keeps its encoding
-like(http_get('/enc_ok?x=hello%C3%A9'),
+like(http_get('/enc_ok/%C3%A9'),
 	qr!^HTTP/1\.1 200 .*\x0d\x0a\x0d\x0aok$!s,
 	'well-formed multi-byte argument');
 
 # the value ends in a 2-byte lead: only the complete chars may be encoded
-like(http_get('/enc_cut2?x=AAAA%C3'),
+like(http_get('/enc_cut2/AAAA%C3%A9%C3'),
 	qr!^HTTP/1\.1 200 .*\x0d\x0a\x0d\x0aok$!s,
 	'argument cut inside a 2-byte char');
 
 # the value ends inside a 3-byte char
-like(http_get('/enc_cut3?x=AAAA%E4%B8'),
+like(http_get('/enc_cut3/AAAA%C3%A9%E4%B8'),
 	qr!^HTTP/1\.1 200 .*\x0d\x0a\x0d\x0aok$!s,
 	'argument cut inside a 3-byte char');
 
-# the whole value is one incomplete sequence: an empty string, no over-read
-like(http_get('/enc_empty?x=%C3'),
+# the value ends inside a 4-byte char
+like(http_get('/enc_cut4/AAAA%C3%A9%F0%90%80'),
 	qr!^HTTP/1\.1 200 .*\x0d\x0a\x0d\x0aok$!s,
-	'argument made of a lone lead byte');
+	'argument cut inside a 4-byte char');
 
 # 100000 nested map tags: the nesting limit must reject the payload
 like(http_get('/deep'), qr!^HTTP/1\.1 502 !, 'deeply nested response');
@@ -168,13 +171,15 @@ sub dubbo_daemon {
 		. "\x06" . 'status' . "\x03" . '200'
 		. 'Z';
 
-	# the encoded "args" entry each m_enc_* request must carry:
-	# key "args" (4 chars), then the value with its char count
+	# the encoded "args" entry each m_enc_* request must carry: key
+	# "args" (4 chars), then the value. The value is the decoded $uri, so
+	# it starts with the location prefix; only its tail is pinned here.
+	# A cut trailing sequence must be dropped, not counted as a char.
 	my %expect = (
-		m_enc_ok    => "\x04" . 'args' . "\x06" . 'hello' . "\xc3\xa9",
-		m_enc_cut2  => "\x04" . 'args' . "\x04" . 'AAAA',
-		m_enc_cut3  => "\x04" . 'args' . "\x04" . 'AAAA',
-		m_enc_empty => "\x04" . 'args' . "\x00",
+		m_enc_ok   => "\x04" . 'args' . "\x09" . '/enc_ok/' . "\xc3\xa9",
+		m_enc_cut2 => "\x04" . 'args' . "\x0f" . '/enc_cut2/AAAA' . "\xc3\xa9",
+		m_enc_cut3 => "\x04" . 'args' . "\x0f" . '/enc_cut3/AAAA' . "\xc3\xa9",
+		m_enc_cut4 => "\x04" . 'args' . "\x0f" . '/enc_cut4/AAAA' . "\xc3\xa9",
 	);
 
 	my %replies = (
@@ -232,7 +237,7 @@ sub dubbo_daemon {
 				next if $flags & 0x20;
 
 				my ($method) = $payload =~
-					/(m_(?:enc_ok|enc_cut2|enc_cut3|enc_empty|deep|ok))/;
+					/(m_(?:enc_ok|enc_cut2|enc_cut3|enc_cut4|deep|ok))/;
 				next unless defined $method;
 
 				my $reply;
