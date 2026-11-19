@@ -6,9 +6,13 @@
  * Stand-alone unit tests for hessian2_input::read_map(), focused on the type
  * of a typed map ('M'): it is read with read_utf8_string(), which returns
  * NULL for the null tag 'N', and read_map() must not dereference that.
+ * Also covers the Exception deserializer's "cause" field, which is read
+ * through read_object() and rejected when it is not an Exception.
  *
  * Built and run by the Makefile in this directory, against the codec sources
- * the module ships; nothing here requires a built tengine.
+ * the module ships; nothing here requires a built tengine. The cases run in
+ * the main process, so LeakSanitizer judges them at exit: a rejected payload
+ * must not leave the objects decoded before the rejection behind.
  */
 
 #include <stdio.h>
@@ -127,6 +131,29 @@ test_nested_typed_map_null_type(void)
           "null-typed map nested as a value is rejected");
 }
 
+/* --- Exception with a cause that is not an Exception ------------------ */
+
+/*
+ * The Exception deserializer reads "cause" with read_object() and rejects a
+ * value that is not an Exception. The decoded value never reaches
+ * set_cause(), so the rejection path must free it itself; the cases run in
+ * the main process and LeakSanitizer reports it if it does not.
+ */
+static void
+test_exception_non_exception_cause(void)
+{
+    CHECK(decode_object(PAYLOAD("M\x13" "java.lang.Exception"
+                                "S\x00\x05" "cause" "\x01v" "z"))
+          == THREW_IO,
+          "a string cause is rejected");
+
+    CHECK(decode_object(PAYLOAD("M\x13" "java.lang.Exception"
+                                "S\x00\x0d" "detailMessage" "\x02" "ok"
+                                "S\x00\x05" "cause" "\x01v" "z"))
+          == THREW_IO,
+          "a string cause after a detailMessage is rejected");
+}
+
 static void
 test_typed_map_truncated_type(void)
 {
@@ -209,6 +236,7 @@ main(void)
 {
     test_typed_map_null_type();
     test_nested_typed_map_null_type();
+    test_exception_non_exception_cause();
     test_typed_map_truncated_type();
     test_well_formed_maps();
     test_read_utf8_string_null();

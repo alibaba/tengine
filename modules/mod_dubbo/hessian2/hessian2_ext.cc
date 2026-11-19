@@ -181,6 +181,11 @@ static Object* exception_deserialize(const string& type, hessian2_input& hin) {
                 if (pointer_of<Exception>(cause)) {
                     ex->set_cause((Exception*) cause, ret.second);
                 } else {
+                    // the cause never reached set_cause(), so the exception's
+                    // delete chain does not own it
+                    if (ret.second) {
+                        delete cause;
+                    }
                     throw io_exception("can not cast cause to Exception: " + ex->classname());
                 }
             } else if (key == "stackTrace") {

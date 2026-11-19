@@ -1628,7 +1628,17 @@ Object* hessian2_input::read_map(const string& classname) {
 
         while ((tag = peek()) != 'Z') {
             pair<Object*, bool> ret_key = read_object();
-            pair<Object*, bool> ret_val = read_object();
+            pair<Object*, bool> ret_val;
+            try {
+                ret_val = read_object();
+            } catch (...) {
+                // the key never reached map->put(), so the map's delete
+                // chain does not own it; a borrowed ref stays with its owner
+                if (ret_key.second) {
+                    delete ret_key.first;
+                }
+                throw;
+            }
             map->put(ret_key.first, ret_val.first, ret_key.second, ret_val.second);
         }
 
