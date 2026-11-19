@@ -1,0 +1,151 @@
+#
+# Tengine container image, Alpine (musl) flavour.
+#
+# Mirrors the Debian Dockerfile step for step; the differences are the package
+# manager, musl's lack of backtrace() (ngx_backtrace_module is therefore left
+# out, as in the apk package) and the single base image for both stages.
+#
+#     docker build -f Dockerfile.alpine -t tengine:alpine .
+#     docker build -f Dockerfile.alpine -t tengine:alpine-perl --target perl .
+#
+# See the Debian Dockerfile for why the perl variant costs one apk package
+# rather than a second full compile.
+#
+
+# Tracks the newest Alpine the nginx official images are built on, so the
+# published tags line up with theirs. .github/scripts/image-tags.sh parses the
+# version out of BASE_IMAGE to derive the "-alpineX.Y" image tags -- keep the
+# "alpine:<major>.<minor>" shape when bumping this.
+ARG BASE_IMAGE=alpine:3.24
+ARG RUNTIME_IMAGE=alpine:3.24
+
+FROM ${BASE_IMAGE} AS builder
+
+# cmake + g++ are for xquic, perl configures Tongsuo, curl fetches the pinned
+# dependency tarballs. perl-dev carries the headers and ExtUtils::Embed that
+# auto/lib/perl/conf refuses to build without.
+RUN apk add --no-cache \
+        build-base cmake perl perl-dev curl ca-certificates \
+        linux-headers openssl-dev pcre2-dev zlib-dev
+
+WORKDIR /usr/src/tengine
+COPY . .
+
+# --libdir is the *installed* location on purpose: ngx_http_xquic_module
+# records it as libxquic.so's runtime path, so it must not point at this
+# throwaway build tree.
+RUN set -eux; \
+    sh packages/build/fetch-deps.sh --outdir /tmp/deps; \
+    sh packages/build/build-deps.sh \
+        --srcdir /tmp/deps \
+        --workdir /tmp/deps-build \
+        --staging /tmp/deps-staging \
+        --libdir /usr/lib/tengine \
+        --datadir /usr/share/tengine
+
+# ngx_backtrace_module needs backtrace() from execinfo.h, which musl does not
+# provide -- its config aborts configure outright. -Werror comes from
+# auto/cc/gcc and has to be relaxed, as in the packages.
+RUN set -eux; \
+    . /tmp/deps-build/deps-env.sh; \
+    export TENGINE_LIBDIR=/usr/lib; \
+    export TENGINE_WITH_BACKTRACE=no; \
+    export TENGINE_WITH_PERL=yes; \
+    ./configure \
+        $(sh packages/build/configure-args.sh) \
+        --with-cc-opt="-Wno-error" \
+        --with-ld-opt="$(sh packages/build/configure-args.sh --print-ld-opt)" \
+        --with-openssl-opt="$(sh packages/build/configure-args.sh --print-openssl-opt)"; \
+    make -j"$(nproc)"; \
+    make install DESTDIR=/out; \
+    cp -a /tmp/deps-staging/. /out/
+
+# Same post-install fixups as the distro packages: ship the packaged
+# tengine.conf instead of the in-tree one, resolve the libdir placeholder
+# in lua_package_cpath, and drop /run (a tmpfs at runtime).
+RUN set -eux; \
+    rm -f /out/etc/tengine/*.default; \
+    install -p -m 0644 packages/build/conf/tengine.conf /out/etc/tengine/tengine.conf; \
+    install -d -m 0755 /out/etc/tengine/conf.d; \
+    install -p -m 0644 packages/build/conf/conf.d/default.conf /out/etc/tengine/conf.d/default.conf; \
+    sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' /out/etc/tengine/tengine.conf; \
+    rm -rf /out/run /out/var/run
+
+# Set the perl payload aside for the "perl" stage: the nginx module, nginx.pm
+# and the XS object it dlopens. The latter two come from blib and the XS object
+# goes to <@INC dir>/auto/nginx/ -- see the Debian Dockerfile for why neither
+# can be taken from /out.
+RUN set -eux; \
+    ls -l objs/src/http/modules/perl/blib/lib \
+          objs/src/http/modules/perl/blib/arch/auto/nginx; \
+    install -d /out-perl/usr/lib/tengine/modules; \
+    mv /out/usr/lib/tengine/modules/ngx_http_perl_module.so \
+       /out-perl/usr/lib/tengine/modules/; \
+    install -d /out-perl/usr/lib/tengine/perl/auto/nginx; \
+    install -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
+        /out-perl/usr/lib/tengine/perl/nginx.pm; \
+    install -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+        /out-perl/usr/lib/tengine/perl/auto/nginx/nginx.so; \
+    rm -rf /out/usr/lib/tengine/perl
+
+
+FROM ${RUNTIME_IMAGE} AS runtime
+
+ARG TENGINE_VERSION=dev
+LABEL org.opencontainers.image.title="Tengine" \
+      org.opencontainers.image.description="Tengine web server with Tongsuo (NTLS), xquic (QUIC/HTTP-3) and Lua" \
+      org.opencontainers.image.version="${TENGINE_VERSION}" \
+      org.opencontainers.image.url="https://tengine.taobao.org/" \
+      org.opencontainers.image.source="https://github.com/alibaba/tengine" \
+      org.opencontainers.image.licenses="BSD-2-Clause AND Apache-2.0 AND MIT"
+
+# libstdc++ is required because libxquic links against it. Tongsuo is linked
+# statically, so no OpenSSL runtime package is needed.
+RUN set -eux; \
+    apk add --no-cache pcre2 zlib libstdc++ ca-certificates tzdata; \
+    addgroup -S tengine; \
+    adduser -S -D -H -G tengine -s /sbin/nologin -h /var/cache/tengine \
+        -g "Tengine web server" tengine
+
+COPY --from=builder /out/ /
+
+RUN set -eux; \
+    install -d -m 0755 -o tengine -g tengine /var/log/tengine; \
+    install -d -m 0700 -o tengine -g tengine /var/cache/tengine; \
+    ln -sf /dev/stdout /var/log/tengine/access.log; \
+    ln -sf /dev/stderr /var/log/tengine/error.log; \
+    /usr/sbin/tengine -t
+
+# 443/udp carries QUIC / HTTP-3.
+EXPOSE 80 443 443/udp
+
+# SIGQUIT is Tengine's graceful shutdown signal.
+STOPSIGNAL SIGQUIT
+
+CMD ["/usr/sbin/tengine", "-g", "daemon off;"]
+
+
+# --------------------------------------------------------------- perl variant
+# Mirrors the Debian one; on Alpine the runtime package is just "perl", which
+# brings libperl.so with it.
+FROM runtime AS perl
+
+RUN apk add --no-cache perl
+
+COPY --from=builder /out-perl/ /
+
+# Prepending with printf+cat rather than `sed -i 1i`: BusyBox sed does not
+# expand \n in inserted text, so the Debian and Alpine images would end up with
+# different files.
+RUN set -eux; \
+    { printf 'load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;\n\n'; \
+      cat /etc/tengine/tengine.conf; } > /tmp/tengine.conf; \
+    cat /tmp/tengine.conf > /etc/tengine/tengine.conf; \
+    rm -f /tmp/tengine.conf; \
+    /usr/sbin/tengine -t
+
+
+# ------------------------------------------------------------ default variant
+# Last stage on purpose, so a plain build with no --target stays the default
+# image. See the Debian Dockerfile.
+FROM runtime AS default

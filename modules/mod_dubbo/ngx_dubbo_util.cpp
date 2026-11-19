@@ -167,7 +167,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
             }
             if (sKey) {
                 string p = sKey->to_string();
-                kv->key.data = (u_char*)ngx_palloc(pool, sKey->size());
+                kv->key.data = (u_char*)ngx_palloc(pool, p.length());
                 if (kv->key.data == NULL) {
                     return NGX_ERROR;
                 }
@@ -193,7 +193,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
 
             if (bValue) {
                 string p = bValue->to_string();
-                kv->value.data = (u_char*)ngx_palloc(pool, bValue->size());
+                kv->value.data = (u_char*)ngx_palloc(pool, p.length());
                 if (kv->value.data == NULL) {
                     return NGX_ERROR;
                 }

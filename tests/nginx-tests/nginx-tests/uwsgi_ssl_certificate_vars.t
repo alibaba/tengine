@@ -130,7 +130,7 @@ sleep 1 if $^O eq 'MSWin32';
 $t->write_file('password', '3.example.com');
 $t->write_file('index.html', '');
 
-$t->try_run('no upstream ssl_certificate variables')->plan(4);
+$t->run()->plan(4);
 
 ###############################################################################
 

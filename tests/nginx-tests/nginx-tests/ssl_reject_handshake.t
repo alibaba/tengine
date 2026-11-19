@@ -22,7 +22,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl sni socket_ssl/)
 	->has_daemon('openssl')->plan(7);
 
@@ -49,8 +48,6 @@ http {
 
     server {
         listen       127.0.0.1:8080;
-
-
         server_name  virtual;
 
         ssl_certificate localhost.crt;
@@ -99,8 +96,6 @@ foreach my $name ('localhost') {
 }
 
 $t->write_file('index.html', '');
-
-
 $t->run();
 
 ###############################################################################
@@ -110,8 +105,6 @@ $t->run();
 like(get('default', 8080), qr/unrecognized name/, 'default rejected');
 like(get(undef, 8080), qr/unrecognized name/, 'absent sni rejected');
 like(get('virtual', 8080), qr/virtual/, 'virtual accepted');
-
-
 
 # non-default server "virtual2" rejected
 
@@ -131,12 +124,7 @@ sub get {
 		SSL_hostname => $host
 	)
 		or return "$@";
-
 	return $r;
 }
-
-
-
-
 
 ###############################################################################

@@ -167,4 +167,4 @@ include命令主要用于指定一个文件，这个文件里面包含了对应�
 注意事项
 ===========
 
-在Tengine-2.3.0版本后废弃Tengine的dso_tool工具以及dso配置指令，若之前有使用Tengine的dso功能、则可以切换到Nginx官方的load_module指令,详细文档[参考1](http://nginx.org/en/docs/ngx_core_module.html#load_module) 和 [参考2](https://www.nginx.com/resources/wiki/extending/converting/#compiling-dynamic)。
+在Tengine-2.3.0版本后废弃Tengine的dso_tool工具以及dso配置指令，若之前有使用Tengine的dso功能、则可以切换到Nginx官方的load_module指令,详细文档[参考1](https://nginx.org/en/docs/ngx_core_module.html#load_module) 和 [参考2](https://www.nginx.com/resources/wiki/extending/converting/#compiling-dynamic)。

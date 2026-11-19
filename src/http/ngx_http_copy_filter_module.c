@@ -170,6 +170,8 @@ ngx_http_copy_aio_handler(ngx_output_chain_ctx_t *ctx, ngx_file_t *file)
     file->aio->data = r;
     file->aio->handler = ngx_http_copy_aio_event_handler;
 
+    ngx_add_timer(&file->aio->event, 60000);
+
     r->main->blocked++;
     r->aio = 1;
     ctx->aio = 1;
@@ -192,12 +194,32 @@ ngx_http_copy_aio_event_handler(ngx_event_t *ev)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http aio: \"%V?%V\"", &r->uri, &r->args);
 
+    if (ev->timedout) {
+        ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                      "aio operation took too long");
+        ev->timedout = 0;
+        return;
+    }
+
+    if (ev->timer_set) {
+        ngx_del_timer(ev);
+    }
+
     r->main->blocked--;
     r->aio = 0;
 
-    r->write_event_handler(r);
+    if (r->main->terminated) {
+        /*
+         * trigger connection event handler if the request was
+         * terminated
+         */
 
-    ngx_http_run_posted_requests(c);
+        c->write->handler(c->write);
+
+    } else {
+        r->write_event_handler(r);
+        ngx_http_run_posted_requests(c);
+    }
 }
 
 #endif
@@ -264,6 +286,8 @@ ngx_http_copy_thread_handler(ngx_thread_task_t *task, ngx_file_t *file)
         return NGX_ERROR;
     }
 
+    ngx_add_timer(&task->event, 60000);
+
     r->main->blocked++;
     r->aio = 1;
 
@@ -288,6 +312,17 @@ ngx_http_copy_thread_event_handler(ngx_event_t *ev)
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "http thread: \"%V?%V\"", &r->uri, &r->args);
 
+    if (ev->timedout) {
+        ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                      "thread operation took too long");
+        ev->timedout = 0;
+        return;
+    }
+
+    if (ev->timer_set) {
+        ngx_del_timer(ev);
+    }
+
     r->main->blocked--;
     r->aio = 0;
 
@@ -305,11 +340,11 @@ ngx_http_copy_thread_event_handler(ngx_event_t *ev)
 
 #endif
 
-    if (r->done) {
+    if (r->done || r->main->terminated) {
         /*
          * trigger connection event handler if the subrequest was
-         * already finalized; this can happen if the handler is used
-         * for sendfile() in threads
+         * already finalized (this can happen if the handler is used
+         * for sendfile() in threads), or if the request was terminated
          */
 
         c->write->handler(c->write);

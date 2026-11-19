@@ -90,8 +90,6 @@ $t->run();
 #
 # with a single worker process it is only the 2nd test that fails
 
-local $TODO = 'not yet' unless $t->has_version('1.23.2');
-
 my $key = get_ticket_key_name();
 
 select undef, undef, undef, 0.5;

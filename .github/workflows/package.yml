@@ -1,0 +1,495 @@
+name: package tengine
+
+# Builds native packages for the mainstream distro images. Manual/tag only:
+# every target compiles Tongsuo (twice -- once for xquic, once through Tengine's
+# own configure), xquic, LuaJIT and Tengine, which is far too heavy for a push.
+#
+# On a tag push the packages are also published as GitHub release assets, which
+# is what makes them permanently and anonymously downloadable; workflow
+# artifacts expire after 90 days and require a login.
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: 'RPM dist tag override (e.g. .el7u2), empty for distro default'
+        required: false
+        default: ''
+  push:
+    tags:
+      # 3.x tags are bare version numbers (3.1.0, 3.2.0-rc1); 2.x used a
+      # "tengine-" prefix. Both are accepted -- the version is derived by
+      # stripping that prefix when present, so either shape yields the same
+      # package and image versions.
+      - '[0-9]+.[0-9]+.[0-9]+*'
+      - 'tengine-*'
+
+jobs:
+  # A single timestamp for the whole run: the matrix jobs run on separate
+  # runners, so each computing its own date would give every artifact a
+  # different Release. This job also downloads the pinned third-party sources
+  # once so that all 40 matrix jobs build from the identical bytes instead of
+  # each re-fetching them.
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      timestamp: ${{ steps.ts.outputs.value }}
+    steps:
+      - name: pin build timestamp
+        id: ts
+        run: echo "value=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+
+      - name: fetch and verify the pinned dependency sources
+        run: packages/build/fetch-deps.sh --outdir dist/deps
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deps
+          path: dist/deps
+          if-no-files-found: error
+
+  package:
+    needs: prepare
+    # aarch64 runs on native ARM runners: QEMU emulation would make a single
+    # Tengine compile take 5-10x longer and risk the job timeout.
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    # No target is best effort, el7 included -- a failure anywhere here is real
+    # news rather than an expected casualty.
+    #
+    # CentOS 7 is EOL and its mirrors moved to vault.centos.org, which the
+    # bootstrap rewrites the repo files for. That covers aarch64 as well: the
+    # rewrite only replaces the host part of each baseurl, and the /altarch/
+    # path the aarch64 images carry in theirs exists on vault too, so yum
+    # resolves the AltArch tree there unaided. The full feature set builds with
+    # gcc 4.8.5 (Tongsuo's OpenSSL 3.0 base and xquic's -std=gnu11 with its own
+    # -Werror both compile fine); the one real obstacle was CMake, which
+    # bootstrap installs from Kitware's static tarball.
+    # Tongsuo is compiled twice, plus xquic, LuaJIT and Tengine itself.
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+        target:
+          - el7
+          - el8
+          - el9
+          - el10
+          - anolis8
+          - anolis23
+          - openeuler2203
+          - openeuler2403
+          - sles15
+          - sles16
+          - debian11
+          - debian12
+          - debian13
+          - ubuntu2204
+          - ubuntu2404
+          - ubuntu2604
+          - alpine321
+          - alpine322
+          - alpine323
+          - alpine324
+    steps:
+      - uses: actions/checkout@v7
+
+      # build.sh looks for the dependency tarballs here and skips downloading
+      # anything whose checksum already matches, so this doubles as an offline
+      # cache for the container build.
+      - uses: actions/download-artifact@v8
+        with:
+          name: deps
+          path: dist/deps
+
+      # An apk is signed by abuild during the build, with an RSA key that is not
+      # GPG -- unlike rpm, it cannot be signed afterwards. So the key has to be
+      # placed here rather than in the release job. Without the secret, build.sh
+      # falls back to a throwaway key and the apk needs --allow-untrusted, which
+      # is how it behaved before signing existed.
+      - name: place the apk signing key
+        if: startsWith(matrix.target, 'alpine')
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; apk packages will carry a throwaway signature"
+              exit 0
+          fi
+          install -d -m 0700 "$HOME/apk-key"
+          printf '%s\n' "$APK_PRIVKEY" > "$HOME/apk-key/tengine-packaging.rsa"
+          chmod 600 "$HOME/apk-key/tengine-packaging.rsa"
+          echo "TENGINE_APK_PRIVKEY=$HOME/apk-key/tengine-packaging.rsa" >> "$GITHUB_ENV"
+
+      # The runner architecture already selects the image variant, so no
+      # --platform is needed here.
+      - name: build ${{ matrix.target }} (${{ matrix.arch }})
+        run: |
+          packages/build/build.sh docker ${{ matrix.target }} \
+            --timestamp ${{ needs.prepare.outputs.timestamp }} \
+            ${{ inputs.dist_tag && format('--dist {0}', inputs.dist_tag) || '' }}
+
+      # The dist tag is what keeps two builds of the same distro family apart in
+      # a release directory, so assert it reached the file name instead of
+      # leaving that to whoever downloads the artifact. Two groups matter:
+      # openEuler and SLES images leave %dist empty and build.sh fills it in;
+      # Anolis is trusted to define its own, which is only an assumption until
+      # something checks it.
+      - name: list artifacts
+        run: |
+          set -eu
+          ls -lh dist/
+          case "${{ matrix.target }}" in
+              sles15)        want=.sles15 ;;
+              sles16)        want=.sles16 ;;
+              openeuler2203) want=.oe2203 ;;
+              openeuler2403) want=.oe2403 ;;
+              anolis8)       want=.an8    ;;
+              anolis23)      want=.an23   ;;
+              *)             want=        ;;
+          esac
+          if [ -n "$want" ]; then
+              ls dist/ | grep -qF -- "$want" \
+                  || { echo "MISSING dist tag '$want' in the package names above"; exit 1; }
+              echo "ok: package names carry $want"
+          fi
+
+          # Debian names the automatic debug-symbol package tengine-dbgsym_*.deb
+          # and Ubuntu names it *.ddeb, so a collection glob that covers only one
+          # of the two drops the symbols on half the deb targets without failing
+          # anything. Assert both families actually shipped one.
+          case "${{ matrix.target }}" in
+              debian*|ubuntu*)
+                  ls dist/ | grep -q '^tengine-dbgsym_.*\.d\?deb$' \
+                      || { echo "MISSING debug symbol package in the list above"; exit 1; }
+                  echo "ok: debug symbols packaged"
+                  ;;
+          esac
+
+          # Every format builds ngx_http_perl_module into its own subpackage:
+          # tengine-module-perl for rpm/deb, tengine-mod-perl on Alpine, which
+          # uses the -mod- convention. A perl toolchain that went missing from a
+          # build image would otherwise just silently drop the subpackage.
+          ls dist/ | grep -qE '^tengine-mod(ule)?-perl[-_]' \
+              || { echo "MISSING perl subpackage in the list above"; exit 1; }
+          echo "ok: perl subpackage built"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tengine-${{ matrix.target }}-${{ matrix.arch }}
+          path: |
+            dist/*.rpm
+            dist/*.deb
+            dist/*.ddeb
+            dist/*.apk
+          if-no-files-found: error
+
+  # Smoke-test one package of every format per architecture: install it, check
+  # the binary name and config path, that the config actually parses, and that
+  # the three bundled subsystems really are in the build.
+  #
+  # All three formats are covered because the parts under test are three
+  # independent implementations, not one shared script: the spec, debian/rules
+  # and the APKBUILD each lay out the private libdir and split the perl
+  # subpackage on their own. Alpine is the odd one out twice over -- musl, and
+  # the only format whose subpackages are carved out of the install tree by hand
+  # (amove plus two install calls in mod_perl()).
+  verify:
+    needs: package
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64,  target: el9,        image: 'rockylinux:9', kind: rpm }
+          - { arch: aarch64, target: el9,        image: 'rockylinux:9', kind: rpm }
+          - { arch: x86_64,  target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
+          - { arch: aarch64, target: ubuntu2404, image: 'ubuntu:24.04', kind: deb }
+          - { arch: x86_64,  target: alpine324,  image: 'alpine:3.24',  kind: apk }
+          - { arch: aarch64, target: alpine324,  image: 'alpine:3.24',  kind: apk }
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: tengine-${{ matrix.target }}-${{ matrix.arch }}
+          path: pkgs
+
+      - name: install and check (${{ matrix.kind }}, ${{ matrix.arch }})
+        run: |
+          docker run --rm -v "$PWD/pkgs:/pkgs:ro" ${{ matrix.image }} sh -euc '
+            export DEBIAN_FRONTEND=noninteractive
+            # `uname -m` keeps the glob off the .src.rpm that rpmbuild -ba emits.
+            # --allow-untrusted is unconditional for the apk: the build signs
+            # with a key this container has no public half of -- a throwaway one
+            # when APK_PRIVKEY is unset, the release key otherwise.
+            case "${{ matrix.kind }}" in
+                rpm) dnf -y install /pkgs/*."$(uname -m)".rpm ;;
+                deb) apt-get update -qq && apt-get install -y /pkgs/*.deb ;;
+                apk) apk add --no-cache --allow-untrusted /pkgs/*.apk ;;
+            esac
+            test -x /usr/sbin/tengine
+            test -f /etc/tengine/tengine.conf
+            # -V only succeeds if the dynamic linker resolved the bundled
+            # libxquic.so and libluajit, i.e. it also tests the recorded rpath.
+            /usr/sbin/tengine -V 2>&1 | tee /tmp/banner
+            for mod in ngx_tongsuo_ntls ngx_http_xquic_module ngx_http_lua_module; do
+                grep -q "$mod" /tmp/banner || { echo "MISSING: $mod"; exit 1; }
+            done
+            # Tongsuo keeps OPENSSL_VERSION_TEXT as "OpenSSL 3.0.3 ..." and
+            # nginx never prints TONGSUO_VERSION_TEXT, so the banner cannot
+            # distinguish it from a stock OpenSSL. enable-ntls in the configure
+            # arguments can, and it is what ngx_tongsuo_ntls needs.
+            grep -q "enable-ntls" /tmp/banner || { echo "MISSING: Tongsuo NTLS"; exit 1; }
+            # configure records its arguments verbatim, so an absolute path to
+            # the dependency build tree would be printed by -V on every
+            # installed system forever -- including whichever home directory
+            # the package happened to be built in. build-deps.sh
+            # --env-relative-to keeps those three arguments relative.
+            ! grep -qE -- "--with-(openssl|xquic-(inc|lib))=/" /tmp/banner \
+                || { echo "LEAK: absolute build path in banner"; exit 1; }
+            # resty.core is loaded during startup, so a passing -t also proves
+            # lua_package_path points at the packaged lualib directory.
+            /usr/sbin/tengine -t
+            #
+            # The perl subpackage came in with the glob above. Loading it is the
+            # only way to prove the XS object sits where DynaLoader looks: a
+            # perl_set directive makes the module build its interpreter during
+            # configuration parsing, and a missing or misplaced
+            # perl/auto/nginx/nginx.so fails there with "Cant locate loadable
+            # object for module nginx". The module .so lives in lib64 on the
+            # RHEL family and lib on Debian, hence the glob.
+            # The sub returns a bare number so this whole script stays free of
+            # single quotes, which the shell layers around it would eat.
+            mod=$(ls /usr/lib*/tengine/modules/ngx_http_perl_module.so)
+            printf "%s\n" \
+                "load_module $mod;" \
+                "events {}" \
+                "http {" \
+                "    perl_set \$answer \"sub { return 42; }\";" \
+                "    server { listen 8080; }" \
+                "}" > /tmp/perl.conf
+            /usr/sbin/tengine -t -c /tmp/perl.conf
+          '
+
+  # Publish every package as a release asset. Unlike workflow artifacts these
+  # never expire and need no GitHub login to download. Runs for release and
+  # pre-release tags alike; a pre-release tag is only marked as such.
+  release:
+    needs: [package, verify]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # "tengine-*" matches the per-target package artifacts and skips the
+      # dependency-source artifact.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: tengine-*
+          path: artifacts
+
+      # Before the checksums are taken, because rpmsign rewrites the package to
+      # embed the signature in its header. A no-op when the secret is absent,
+      # which is what keeps forks building.
+      - name: sign the rpm packages
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          if [ -n "${GPG_PRIVATE_KEY:-}" ]; then
+              sudo apt-get update -qq && sudo apt-get install -y rpm
+          fi
+          packages/build/sign-release.sh rpms artifacts
+
+      - name: flatten artifacts into a release directory
+        run: packages/build/collect-release.sh --indir artifacts --outdir release
+
+      # Signs the checksum files rather than the packages: this is what covers
+      # the deb packages, which have no in-band signature outside a repository.
+      - name: sign the checksum files and export the public key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -eu
+          sums=release/SHA256SUMS
+          if [ -f release-debug/SHA256SUMS.debug ]; then
+              sums="$sums release-debug/SHA256SUMS.debug"
+          fi
+          # shellcheck disable=SC2086 # deliberate word splitting
+          packages/build/sign-release.sh detach $sums
+          packages/build/sign-release.sh pubkey release/tengine-packaging-key.asc
+
+      # apk verifies against the public half of the abuild RSA key, which is a
+      # different key from the GPG one above. Derive and publish it so an
+      # installer can drop it in /etc/apk/keys and skip --allow-untrusted.
+      - name: export the apk public key
+        env:
+          APK_PRIVKEY: ${{ secrets.APK_PRIVKEY }}
+        run: |
+          set -eu
+          if [ -z "${APK_PRIVKEY:-}" ]; then
+              echo "APK_PRIVKEY not set; no apk public key to publish"
+              exit 0
+          fi
+          printf '%s\n' "$APK_PRIVKEY" > /tmp/apk.rsa
+          chmod 600 /tmp/apk.rsa
+          # The file name matters: apk looks for the exact basename that abuild
+          # recorded in the package, so it has to match the key placed above.
+          openssl rsa -in /tmp/apk.rsa -pubout \
+              -out release/tengine-packaging.rsa.pub
+          rm -f /tmp/apk.rsa
+
+      - name: classify the tag and write the release notes
+        id: notes
+        run: |
+          set -eu
+          version=${GITHUB_REF_NAME#tengine-}
+
+          # Keep this rule identical to the one in docker.yml.
+          case "$(printf '%s' "$version" | tr '[:upper:]' '[:lower:]')" in
+              *-rc*|*rc[0-9]*|*-beta*|*-alpha*|*-pre*) prerelease=true ;;
+              *)                                       prerelease=false ;;
+          esac
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          # Past releases are titled "Tengine-3.1.0"; the tag itself is bare.
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
+          # A sample package name for each install snippet, so the notes always
+          # point at a file that actually exists in this release. Match the main
+          # package explicitly rather than by a bare glob: the subpackages sort
+          # ahead of it under the C locale ("tengine-module-perl_" before
+          # "tengine_", "-" being 0x2D and "_" 0x5F), so a bare glob would
+          # advertise a subpackage instead. Requiring a digit right after the
+          # name is what separates the two.
+          sample_rpm=$(cd release && ls -1 tengine-[0-9]*.el9.x86_64.rpm 2>/dev/null | head -n 1 || true)
+          [ -n "$sample_rpm" ] || sample_rpm=$(cd release && ls -1 tengine-[0-9]*.x86_64.rpm | head -n 1)
+          sample_deb=$(cd release && ls -1 tengine_[0-9]*_amd64.deb | head -n 1)
+          sample_apk=$(cd release && ls -1 tengine-[0-9]*.x86_64.apk | head -n 1)
+          base_url="${{ github.server_url }}/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}"
+
+          cat > notes.md <<EOF
+          Tengine $version packages and container images.
+
+          Every artifact here is built with the full feature set: **Tongsuo**
+          (NTLS / TLCP, Chinese cryptography), **xquic** (QUIC and HTTP/3) and the
+          **LuaJIT** scripting stack, all from the versions pinned in
+          \`packages/build/deps.env\`. Tongsuo is linked statically, so these
+          builds do not follow the system OpenSSL.
+
+          The server installs as \`/usr/sbin/tengine\`, configured through
+          \`/etc/tengine/tengine.conf\`, and can coexist with a distro nginx.
+
+          ## Install
+
+          RPM (RHEL / Rocky / Alma / Anolis / openEuler / SLES):
+
+          \`\`\`sh
+          dnf install $base_url/$sample_rpm
+          \`\`\`
+
+          DEB (Debian / Ubuntu -- the \`~codename\` suffix picks the right build):
+
+          \`\`\`sh
+          curl -fLO $base_url/$sample_deb
+          apt install ./$sample_deb
+          \`\`\`
+
+          Alpine (drop the key first, or pass \`--allow-untrusted\` instead):
+
+          \`\`\`sh
+          curl -fLo /etc/apk/keys/tengine-packaging.rsa.pub \\
+              $base_url/tengine-packaging.rsa.pub
+          curl -fLO $base_url/$sample_apk
+          apk add ./$sample_apk
+          \`\`\`
+
+          ## Container images
+
+          \`\`\`sh
+          docker pull ghcr.io/$owner/tengine:$version
+          docker pull ghcr.io/$owner/tengine:$version-alpine
+          \`\`\`
+
+          Both are multi-arch (amd64 + arm64). As with the nginx official
+          images, the minor and major series of this version, the floating
+          \`latest\` / \`alpine\` aliases and a base-suffixed variant of each
+          (\`-trixie\`, \`-alpine<ver>\`) are published as well -- a pre-release
+          only gets the version-pinned tags.
+
+          A \`-perl\` variant of each image adds \`ngx_http_perl_module\`
+          (\`$version-perl\`, \`$version-alpine-perl\`, and the same rolling
+          aliases). The module is already loaded in the shipped configuration,
+          so \`perl\`, \`perl_set\` and \`perl_modules\` work out of the box.
+
+          ## Perl module
+
+          \`ngx_http_perl_module\` ships as a separate subpackage
+          (\`tengine-module-perl\`, \`tengine-mod-perl\` on Alpine) so the base
+          install does not pull in libperl. It is dynamic and not loaded by
+          default; add
+
+          \`\`\`nginx
+          load_module /usr/lib/tengine/modules/ngx_http_perl_module.so;
+          \`\`\`
+
+          to the main context (\`/usr/lib64\` on the RHEL family).
+
+          ## Debug symbols
+
+          The \`-debuginfo\` / \`-debugsource\` (rpm), \`-dbgsym\` (deb) and
+          \`-dbg\` (apk) packages are listed alongside the runtime packages and
+          are only needed to read a core dump or attach a debugger. They have
+          their own checksum file, \`SHA256SUMS.debug\`.
+
+          ## Verify
+
+          Checksums:
+
+          \`\`\`sh
+          curl -fLO $base_url/SHA256SUMS
+          sha256sum -c SHA256SUMS
+          \`\`\`
+
+          The checksum file itself is signed, which is what covers the deb
+          packages -- they carry no in-band signature, since Debian's trust
+          model signs a repository rather than individual files:
+
+          \`\`\`sh
+          curl -fLO $base_url/SHA256SUMS.asc
+          curl -fLO $base_url/tengine-packaging-key.asc
+          gpg --import tengine-packaging-key.asc
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          \`\`\`
+
+          The rpm packages are signed in-band with the same key, so once it is
+          imported into rpm they verify individually:
+
+          \`\`\`sh
+          rpm --import $base_url/tengine-packaging-key.asc
+          rpm --checksig $sample_rpm
+          \`\`\`
+          EOF
+
+      # Release assets are one flat list, so both directories are named here.
+      # collect-release.sh keeps them siblings rather than nesting the debug one,
+      # which is what lets each glob expand to files only.
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: Tengine-${{ steps.notes.outputs.version }}
+          files: |
+            release/*
+            release-debug/*
+          body_path: notes.md
+          prerelease: ${{ steps.notes.outputs.prerelease }}
+          fail_on_unmatched_files: true

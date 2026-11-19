@@ -584,7 +584,9 @@ ngx_http_write_request_body(ngx_http_request_t *r)
 
         rb->temp_file = tf;
 
-        if (rb->bufs == NULL) {
+        if (rb->bufs == NULL
+            || (!ngx_buf_in_memory(rb->bufs->buf) && rb->bufs->buf->last_buf))
+        {
             /* empty body with r->request_body_in_file_only */
 
             if (ngx_create_temp_file(&tf->file, tf->path, tf->pool,
@@ -874,7 +876,7 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
 
         for ( ;; ) {
 
-            rc = ngx_http_parse_chunked(r, b, rb->chunked);
+            rc = ngx_http_parse_chunked(r, b, rb->chunked, 0);
 
             if (rc == NGX_OK) {
 
@@ -1135,7 +1137,7 @@ ngx_http_request_body_chunked_filter(ngx_http_request_t *r, ngx_chain_t *in)
                            cl->buf->file_pos,
                            cl->buf->file_last - cl->buf->file_pos);
 
-            rc = ngx_http_parse_chunked(r, cl->buf, rb->chunked);
+            rc = ngx_http_parse_chunked(r, cl->buf, rb->chunked, 0);
 
             if (rc == NGX_OK) {
 
@@ -1280,6 +1282,12 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_http_request_body_t   *rb;
 
     rb = r->request_body;
+
+#if (T_NGX_HTTP_STAT_TIME)
+    if (r == r->main) {
+        r->stat_time.req_recv_finished_time = ngx_current_msec;
+    }
+#endif
 
     ll = &rb->bufs;
 

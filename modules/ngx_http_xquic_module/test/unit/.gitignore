@@ -1,0 +1,5 @@
+# build artifacts of the stand-alone unit tests
+test_xquic_read_file_data
+test_xquic_ssl_conf
+*.dSYM/
+*.o

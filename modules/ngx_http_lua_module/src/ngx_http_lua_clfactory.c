@@ -91,7 +91,7 @@
  * | Int               | At which line this function is defined
  * | [linedefined]     |
  * ---------------------
- * | Int               | At while line this function definition ended
+ * | Int               | At which line this function definition ended
  * | [lastlinedefined] |
  * ---------------------
  * | Char              | Number of upvalues referenced by this function
@@ -128,7 +128,7 @@
  * | Vector            | Debug lineinfo vector
  * | [lineinfo]        | Empty vector here if debug info is stripped
  * ---------------------
- * | Int               | Number of local variable in this function
+ * | Int               | Number of local variables in this function
  * | [sizelocvars]     | 0 if debug info is stripped
  * ---------------------
  * | String            | ------------------------------------

@@ -76,12 +76,7 @@ IO::Select->new($s)->can_read(3);
 
 $t->reload();
 
-TODO: {
-local $TODO = 'not yet' if $^O eq 'linux' and !$t->has_version('1.23.1');
-
 like(http_end($s), qr/AND-THIS/, 'zero available - buffered');
-
-}
 
 $s = http_get('/unbuffered', start => 1);
 IO::Select->new($s)->can_read(3);
@@ -89,8 +84,6 @@ IO::Select->new($s)->can_read(3);
 $t->stop();
 
 like(http_end($s), qr/AND-THIS/, 'zero available - unbuffered');
-
-$t->todo_alerts() if $^O eq 'linux' and !$t->has_version('1.23.1');
 
 ###############################################################################
 

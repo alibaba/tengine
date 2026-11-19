@@ -50,6 +50,7 @@ http {
         location /protocol {
             return 200 $ssl_protocol;
         }
+
         location /name {
             return 200 $ssl_session_reused:$ssl_server_name;
         }
@@ -63,19 +64,12 @@ http {
         ssl_certificate example.com.crt;
 
         location / {
-
-
-
             return 200 $server_name:$ssl_server_name;
         }
     }
 }
 
 EOF
-
-
-
-
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
@@ -144,21 +138,16 @@ like(get('/name', 'localhost', $ctx), qr/^r:localhost$/m,
 
 sub test_tls13 {
 	get('/protocol', 'localhost') =~ /TLSv1.3/;
-
-
-
 }
 
 sub get_cert_cn {
 	my ($host) = @_;
 	my $s = http('', start => 1, SSL => 1, SSL_hostname => $host);
-
 	return $s->dump_peer_certificate();
 }
 
 sub get_host {
 	my ($host, $sni) = @_;
-
 	return http(
 		"GET / HTTP/1.0\nHost: $host\n\n",
 		SSL => 1,

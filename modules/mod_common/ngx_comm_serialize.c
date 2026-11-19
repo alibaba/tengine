@@ -205,18 +205,14 @@ ngx_serialize_read_uint64(u_char **pos, uint32_t * left, uint64_t * value)
         return NGX_ERROR;
     }
 
-    if (__BYTE_ORDER == __LITTLE_ENDIAN)
-    {
-        uint64_t val = *(uint64_t*)(*pos);
-        *value = (((uint64_t)htonl((uint32_t)((val << 32) >> 32))) << 32) | (unsigned int)htonl((int)(val >> 32));
-    }
-    else if (__BYTE_ORDER == __BIG_ENDIAN)
-    {
-        *value = *(uint64_t*)(*pos);
-    }
-    else {
-        return NGX_ERROR;
-    }
+    /*
+     * two network-order halves, as ngx_serialize_read_uint32() does above;
+     * ntohl() already accounts for the host byte order, so the glibc-only
+     * __BYTE_ORDER macros are not needed here
+     */
+
+    *value = ((uint64_t) ntohl(*(uint32_t*)(*pos)) << 32)
+             | ntohl(*(uint32_t*)(*pos + 4));
 
     *pos += sizeof(*value);
     *left -= sizeof(*value);

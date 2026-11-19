@@ -61,7 +61,7 @@
 
 **上下文:** `http, server, location`
 
-定义哪些[MIME types](http://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。  
+定义哪些[MIME types](https://en.wikipedia.org/wiki/MIME_type)类型的响应可以被处理。  
 目前只能处理html格式的页面，js和css只针对于html内嵌的代码，不支持处理单独的js和css页面。  
 如果这样配置 `trim_type text/javascript;`，js代码将被作为html代码来处理而出错。
 <br/>
@@ -147,7 +147,7 @@
 + 其他正常html注释直接删除.  `<!--  -->`
     
 ### javascript  
-借鉴 jsmin 的处理规则 (http://www.crockford.com/javascript/jsmin.html)  
+借鉴 jsmin 的处理规则 (https://www.crockford.com/javascript/jsmin.html)  
 `<script type="text/javascript">` 或者 `<script>` 标签认为是javascript。  
 ##### 空白符  
 + '('，'['，'{'，';'，','，'>'，'=' 后的 '\n'，'\t'，空格 直接删除。
@@ -167,10 +167,10 @@
 + 删除单行注释。  `//`  
 + 删除多行注释。  `/*   */`  
 注意：javascript也有一种条件注释，不过貌似用得很少，jsmin直接删除的，trim也是直接删除。  
-http://en.wikipedia.org/wiki/Conditional_comment  
+https://en.wikipedia.org/wiki/Conditional_comment  
 
 ### css  
-借鉴 YUI Compressor 的处理规则 (http://yui.github.io/yuicompressor/css.html)   
+借鉴 YUI Compressor 的处理规则 (https://yui.github.io/yuicompressor/css.html)   
 `<style type="text/css">` 或者 `<style>` 标签认为是css。  
 ##### 空白符  
 + ';'，'>'，'{'，'}'，':'，',' 前后的 '\n'，'\t'，空格 直接删除。  

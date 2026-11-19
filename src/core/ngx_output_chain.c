@@ -117,7 +117,10 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 
                 ngx_debug_point();
 
-                ctx->in = ctx->in->next;
+                cl = ctx->in;
+                ctx->in = cl->next;
+
+                ngx_free_chain(ctx->pool, cl);
 
                 continue;
             }
@@ -203,7 +206,10 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
             /* delete the completed buf from the ctx->in chain */
 
             if (ngx_buf_size(ctx->in->buf) == 0) {
-                ctx->in = ctx->in->next;
+                cl = ctx->in;
+                ctx->in = cl->next;
+
+                ngx_free_chain(ctx->pool, cl);
             }
 
             cl = ngx_alloc_chain_link(ctx->pool);
@@ -546,6 +552,11 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
             dst->flush = src->flush;
             dst->last_buf = src->last_buf;
             dst->last_in_chain = src->last_in_chain;
+
+        } else {
+            dst->flush = 0;
+            dst->last_buf = 0;
+            dst->last_in_chain = 0;
         }
 
     } else {
@@ -642,6 +653,11 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
             dst->flush = src->flush;
             dst->last_buf = src->last_buf;
             dst->last_in_chain = src->last_in_chain;
+
+        } else {
+            dst->flush = 0;
+            dst->last_buf = 0;
+            dst->last_in_chain = 0;
         }
     }
 

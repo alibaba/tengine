@@ -69,7 +69,7 @@ http {
 
         # ranges with two /16 networks
         # the latter network has greater two least octets
-        # (see 1301a58b5dac for details)
+        # (see f927ab882 for details)
         10.10.3.0-10.11.2.255  foo;
         10.12.3.0-10.13.2.255  foo2;
         delete                 10.10.3.0-10.11.2.255;

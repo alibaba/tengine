@@ -86,7 +86,7 @@ Install
 Install this module from source:
 
 ```
-$ wget http://nginx.org/download/nginx-1.13.4.tar.gz
+$ wget https://nginx.org/download/nginx-1.13.4.tar.gz
 $ tar -xzvf nginx-1.13.4.tar.gz
 $ cd nginx-1.13.4/
 $ ./configure --add-module=/path/to/ngx_slab_stat

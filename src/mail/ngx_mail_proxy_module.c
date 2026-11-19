@@ -17,7 +17,7 @@ typedef struct {
     ngx_flag_t  pass_error_message;
     ngx_flag_t  xclient;
     ngx_flag_t  smtp_auth;
-    ngx_flag_t  proxy_protocol;
+    ngx_uint_t  proxy_protocol;
     size_t      buffer_size;
     ngx_msec_t  timeout;
 } ngx_mail_proxy_conf_t;
@@ -38,6 +38,14 @@ static void ngx_mail_proxy_close_session(ngx_mail_session_t *s);
 static void *ngx_mail_proxy_create_conf(ngx_conf_t *cf);
 static char *ngx_mail_proxy_merge_conf(ngx_conf_t *cf, void *parent,
     void *child);
+
+
+static ngx_conf_enum_t  ngx_mail_proxy_protocol_versions[] = {
+    { ngx_string("off"), 0 },
+    { ngx_string("on"), 1 },
+    { ngx_string("v2"), 2 },
+    { ngx_null_string, 0 }
+};
 
 
 static ngx_command_t  ngx_mail_proxy_commands[] = {
@@ -85,11 +93,11 @@ static ngx_command_t  ngx_mail_proxy_commands[] = {
       NULL },
 
     { ngx_string("proxy_protocol"),
-      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_FLAG,
-      ngx_conf_set_flag_slot,
+      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
       NGX_MAIL_SRV_CONF_OFFSET,
       offsetof(ngx_mail_proxy_conf_t, proxy_protocol),
-      NULL },
+      &ngx_mail_proxy_protocol_versions },
 
       ngx_null_command
 };
@@ -531,6 +539,7 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
     ngx_int_t                  rc;
     ngx_str_t                  line, auth, encoded;
     ngx_buf_t                 *b;
+    uintptr_t                  n;
     ngx_connection_t          *c;
     ngx_mail_session_t        *s;
     ngx_mail_proxy_conf_t     *pcf;
@@ -627,6 +636,10 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
                           CRLF) - 1
                    + s->connection->addr_text.len + s->login.len + s->host.len;
 
+        n = ngx_escape_uri(NULL, s->login.data, s->login.len,
+                           NGX_ESCAPE_MAIL_XTEXT);
+        line.len += n * 2;
+
 #if (NGX_HAVE_INET6)
         if (s->connection->sockaddr->sa_family == AF_INET6) {
             line.len += sizeof("IPV6:") - 1;
@@ -654,7 +667,14 @@ ngx_mail_proxy_smtp_handler(ngx_event_t *rev)
 
         if (s->login.len && !pcf->smtp_auth) {
             p = ngx_cpymem(p, " LOGIN=", sizeof(" LOGIN=") - 1);
-            p = ngx_copy(p, s->login.data, s->login.len);
+
+            if (n == 0) {
+                p = ngx_copy(p, s->login.data, s->login.len);
+
+            } else {
+                p = (u_char *) ngx_escape_uri(p, s->login.data, s->login.len,
+                                              NGX_ESCAPE_MAIL_XTEXT);
+            }
         }
 
         p = ngx_cpymem(p, " NAME=", sizeof(" NAME=") - 1);
@@ -882,6 +902,7 @@ ngx_mail_proxy_write_handler(ngx_event_t *wev)
 
     if (ngx_handle_write_event(wev, 0) != NGX_OK) {
         ngx_mail_proxy_internal_server_error(s);
+        return;
     }
 
     if (c->read->ready) {
@@ -894,17 +915,25 @@ static ngx_int_t
 ngx_mail_proxy_send_proxy_protocol(ngx_mail_session_t *s)
 {
     u_char            *p;
-    ssize_t            n, size;
+    size_t             size;
+    ssize_t            n;
     ngx_connection_t  *c;
-    u_char             buf[NGX_PROXY_PROTOCOL_V1_MAX_HEADER];
+    static u_char      buf[NGX_PROXY_PROTOCOL_MAX_HEADER];
 
     s->connection->log->action = "sending PROXY protocol header to upstream";
 
     ngx_log_debug0(NGX_LOG_DEBUG_MAIL, s->connection->log, 0,
                    "mail proxy send PROXY protocol header");
 
-    p = ngx_proxy_protocol_write(s->connection, buf,
-                                 buf + NGX_PROXY_PROTOCOL_V1_MAX_HEADER);
+    if (s->proxy->proxy_protocol == 2) {
+        p = ngx_proxy_protocol_v2_write(s->connection, buf,
+                                        buf + sizeof(buf), NULL);
+
+    } else {
+        p = ngx_proxy_protocol_write(s->connection, buf,
+                                     buf + sizeof(buf));
+    }
+
     if (p == NULL) {
         ngx_mail_proxy_internal_server_error(s);
         return NGX_ERROR;
@@ -930,7 +959,7 @@ ngx_mail_proxy_send_proxy_protocol(ngx_mail_session_t *s)
         return NGX_ERROR;
     }
 
-    if (n != size) {
+    if (n != (ssize_t) size) {
 
         /*
          * PROXY protocol specification:
@@ -1019,12 +1048,36 @@ ngx_mail_proxy_read_response(ngx_mail_session_t *s, ngx_uint_t state)
             break;
 
         case ngx_imap_passwd:
+
+            /*
+             * untagged CAPABILITY response (draft-crispin-imapv-16),
+             * known to be sent by SmarterMail and Gmail
+             */
+
+            if (p[0] == '*' && p[1] == ' ') {
+                p += 2;
+
+                while (p < b->last - 1) {
+                    if (p[0] == CR && p[1] == LF) {
+                        p += 2;
+                        break;
+                    }
+
+                    p++;
+                }
+
+                if (b->last - p < 4) {
+                    return NGX_AGAIN;
+                }
+            }
+
             if (ngx_strncmp(p, s->tag.data, s->tag.len) == 0) {
                 p += s->tag.len;
                 if (p[0] == 'O' && p[1] == 'K') {
                     return NGX_OK;
                 }
             }
+
             break;
         }
 
@@ -1348,7 +1401,7 @@ ngx_mail_proxy_create_conf(ngx_conf_t *cf)
     pcf->pass_error_message = NGX_CONF_UNSET;
     pcf->xclient = NGX_CONF_UNSET;
     pcf->smtp_auth = NGX_CONF_UNSET;
-    pcf->proxy_protocol = NGX_CONF_UNSET;
+    pcf->proxy_protocol = NGX_CONF_UNSET_UINT;
     pcf->buffer_size = NGX_CONF_UNSET_SIZE;
     pcf->timeout = NGX_CONF_UNSET_MSEC;
 
@@ -1366,7 +1419,7 @@ ngx_mail_proxy_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->pass_error_message, prev->pass_error_message, 0);
     ngx_conf_merge_value(conf->xclient, prev->xclient, 1);
     ngx_conf_merge_value(conf->smtp_auth, prev->smtp_auth, 0);
-    ngx_conf_merge_value(conf->proxy_protocol, prev->proxy_protocol, 0);
+    ngx_conf_merge_uint_value(conf->proxy_protocol, prev->proxy_protocol, 0);
     ngx_conf_merge_size_value(conf->buffer_size, prev->buffer_size,
                               (size_t) ngx_pagesize);
     ngx_conf_merge_msec_value(conf->timeout, prev->timeout, 24 * 60 * 60000);

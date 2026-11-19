@@ -21,30 +21,34 @@ sub new {
 	bless $self, shift @_;
 
 	my $port = {@_}->{'SSL'} ? 8995 : 8110;
+
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
 		alarm(8);
-	$self->{_socket} = IO::Socket::INET->new(
-		Proto => "tcp",
-			PeerAddr => "127.0.0.1:" . port($port),
-		@_
-	)
-		or die "Can't connect to nginx: $!\n";
 
-	if ({@_}->{'SSL'}) {
-		require IO::Socket::SSL;
+		$self->{_socket} = IO::Socket::INET->new(
+			Proto => "tcp",
+			PeerAddr => "127.0.0.1:" . port($port),
+			@_
+		)
+			or die "Can't connect to nginx: $!\n";
+
+		if ({@_}->{'SSL'}) {
+			require IO::Socket::SSL;
 			IO::Socket::SSL->start_SSL(
 				$self->{_socket},
 				SSL_verify_mode =>
 					IO::Socket::SSL::SSL_VERIFY_NONE(),
 				@_
 			)
-			or die $IO::Socket::SSL::SSL_ERROR . "\n";
+				or die $IO::Socket::SSL::SSL_ERROR . "\n";
+
 			my $s = $self->{_socket};
 			log_in("ssl cipher: " . $s->get_cipher());
 			log_in("ssl cert: " . $s->peer_certificate('issuer'));
 		}
+
 		alarm(0);
 	};
 	alarm(0);
@@ -57,6 +61,7 @@ sub new {
 
 	return $self;
 }
+
 sub DESTROY {
 	my $self = shift;
 	$self->{_socket}->close();
@@ -131,6 +136,7 @@ sub can_read {
 	my ($self, $timo) = @_;
 	IO::Select->new($self->{_socket})->can_read($timo || 3);
 }
+
 sub socket {
 	my ($self) = @_;
 	$self->{_socket};

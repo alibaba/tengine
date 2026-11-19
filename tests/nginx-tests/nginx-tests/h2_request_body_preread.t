@@ -39,8 +39,10 @@ http {
 
     limit_req_zone   $binary_remote_addr  zone=req:1m rate=20r/m;
 
+    http2 on;
+
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         listen       127.0.0.1:8081;
         server_name  localhost;
 
@@ -59,7 +61,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8082 http2;
+        listen       127.0.0.1:8082;
         server_name  localhost;
 
         http2_body_preread_size 0;
@@ -76,7 +78,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8083 http2;
+        listen       127.0.0.1:8083;
         server_name  localhost;
 
         location / {
@@ -89,10 +91,7 @@ http {
 EOF
 
 $t->write_file('t', '');
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

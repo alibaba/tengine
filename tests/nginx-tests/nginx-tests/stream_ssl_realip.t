@@ -24,7 +24,6 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/stream stream_return stream_realip/)
 	->has(qw/stream_ssl socket_ssl/)
 	->has_daemon('openssl')

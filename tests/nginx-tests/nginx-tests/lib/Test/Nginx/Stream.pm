@@ -43,26 +43,28 @@ sub new {
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
 		alarm(8);
 
-	$self->{_socket} = IO::Socket::INET->new(
-		Proto => "tcp",
-		PeerAddr => '127.0.0.1',
-		@_
-	)
-		or die "Can't connect to nginx: $!\n";
+		$self->{_socket} = IO::Socket::INET->new(
+			Proto => "tcp",
+			PeerAddr => '127.0.0.1',
+			@_
+		)
+			or die "Can't connect to nginx: $!\n";
 
-	if ({@_}->{'SSL'}) {
-		require IO::Socket::SSL;
+		if ({@_}->{'SSL'}) {
+			require IO::Socket::SSL;
 			IO::Socket::SSL->start_SSL(
 				$self->{_socket},
 				SSL_verify_mode =>
 					IO::Socket::SSL::SSL_VERIFY_NONE(),
 				@_
 			)
-			or die $IO::Socket::SSL::SSL_ERROR . "\n";
+				or die $IO::Socket::SSL::SSL_ERROR . "\n";
+
 			my $s = $self->{_socket};
 			log_in("ssl cipher: " . $s->get_cipher());
 			log_in("ssl cert: " . $s->peer_certificate('issuer'));
 		}
+
 		alarm(0);
 	};
 	alarm(0);
@@ -74,6 +76,7 @@ sub new {
 
 	return $self;
 }
+
 sub DESTROY {
 	my $self = shift;
 	$self->{_socket}->close();
@@ -111,6 +114,13 @@ sub read {
 		my $n = $s->sysread($buf, 1024);
 		next if !defined $n && $!{EWOULDBLOCK};
 		last;
+	}
+
+	if (!defined $buf && ref $self->{_socket} eq 'IO::Socket::SSL'
+		&& $IO::Socket::SSL::VERSION >= 2.091
+		&& $IO::Socket::SSL::VERSION <= 2.095)
+	{
+		$buf = '';
 	}
 
 	log_in($buf);
@@ -162,6 +172,7 @@ sub socket {
 	my ($self) = @_;
 	$self->{_socket};
 }
+
 ###############################################################################
 
 1;

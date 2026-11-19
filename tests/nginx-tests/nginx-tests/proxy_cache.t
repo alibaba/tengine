@@ -115,7 +115,7 @@ like(http_gzip_request('/empty.html'),
 	'empty get stale');
 
 # no client connection close with response on non-cacheable HEAD requests
-# see 545b5e4d83b2 in nginx for detailed explanation
+# see 573ec98d2 in nginx for detailed explanation
 
 my $s = http(<<EOF, start => 1);
 HEAD /big.html?e=1 HTTP/1.1

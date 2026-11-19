@@ -41,19 +41,21 @@ stream {
         %%PORT_8082%% 1;
         %%PORT_8083%% 2;
         %%PORT_8084%% 3;
+        %%PORT_8086%% 3;
         %%PORT_8085%% "";
     }
 
     proxy_ssl on;
     proxy_ssl_session_reuse off;
 
+    proxy_ssl_certificate $cert.example.com.crt;
+    proxy_ssl_certificate_key $cert.example.com.key;
+    proxy_ssl_password_file password;
+
     server {
         listen      127.0.0.1:8082;
         listen      127.0.0.1:8083;
         proxy_pass  127.0.0.1:8080;
-
-        proxy_ssl_certificate $cert.example.com.crt;
-        proxy_ssl_certificate_key $cert.example.com.key;
     }
 
     server {
@@ -63,6 +65,11 @@ stream {
         proxy_ssl_certificate $cert.example.com.crt;
         proxy_ssl_certificate_key $cert.example.com.key;
         proxy_ssl_password_file password;
+    }
+
+    server {
+        listen      127.0.0.1:8086;
+        proxy_pass  127.0.0.1:8081;
     }
 
     server {
@@ -146,7 +153,7 @@ sleep 1 if $^O eq 'MSWin32';
 $t->write_file('password', '3.example.com');
 $t->write_file('index.html', '');
 
-$t->try_run('no upstream ssl_certificate variables')->plan(4);
+$t->run()->plan(5);
 
 ###############################################################################
 
@@ -156,6 +163,16 @@ like(http_get('/', socket => IO::Socket::INET->new('127.0.0.1:' . port(8083))),
 	qr/X-Verify: FAILED/ms, 'variable - fail certificate');
 like(http_get('/', socket => IO::Socket::INET->new('127.0.0.1:' . port(8084))),
 	qr/X-Verify: SUCCESS/ms, 'variable - with encrypted key');
+
+TODO: {
+todo_skip 'leaves coredump', 1 unless $t->has_version('1.27.5')
+	or $ENV{TEST_NGINX_UNSAFE};
+
+like(http_get('/', socket => IO::Socket::INET->new('127.0.0.1:' . port(8086))),
+	qr/X-Verify: SUCCESS/ms, 'variable - with encrypted key optimized');
+
+}
+
 like(http_get('/', socket => IO::Socket::INET->new('127.0.0.1:' . port(8085))),
 	qr/X-Verify: NONE/ms, 'variable - no certificate');
 

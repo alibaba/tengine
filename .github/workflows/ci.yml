@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+   # Explicit job name so the reported status check is unique across workflows:
+   # test-nginx-core.yml and test-ntls.yml declare a job with the same id, and
+   # required status checks are matched by name only, without a workflow prefix.
+   name: test tengine (${{ matrix.compiler.compiler }})
    runs-on: "ubuntu-24.04"
    strategy:
      fail-fast: false
@@ -16,16 +20,32 @@ jobs:
          - { compiler: GNU,  CC: gcc,  CXX: g++}
          - { compiler: LLVM, CC: clang, CXX: clang++}
    steps:
-     - uses: actions/checkout@v3
+     - uses: actions/checkout@v7
      - name: get dependencies
        run: |
          sudo apt update
          sudo apt remove nginx libgd3
          sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+     # Stand-alone unit tests: each stubs the handful of ngx types it needs, so
+     # neither depends on a built tengine -- and the xquic ones run even though
+     # this job does not build the xquic module. Kept ahead of the build so a
+     # failing build cannot mask them, and so they fail fast.
+     - name: upstream check HTTP parser unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C modules/ngx_http_upstream_check_module/tests
+     - name: xquic key file and certificate conf unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C modules/ngx_http_xquic_module/test/unit
      - name: 'checkout luajit2'
-       uses: actions/checkout@v3
+       uses: actions/checkout@v7
        with:
          repository: openresty/luajit2
+         # Pinned (the LuaJIT fork ngx_http_lua_module requires); keep in sync with packages/build/deps.env.
+         ref: v2.1-20260724
          path: luajit2
      - name: 'build luajit2'
        working-directory: luajit2
@@ -33,27 +53,33 @@ jobs:
          make
          sudo make install
      - name: 'checkout lua-resty-lrucache'
-       uses: actions/checkout@v3
+       uses: actions/checkout@v7
        with:
          repository: openresty/lua-resty-lrucache
+         # Pinned (resty.core's dependency); keep in sync with packages/build/deps.env.
+         ref: v0.15
          path: lua-resty-lrucache
      - name: 'build lua-resty-lrucache'
        working-directory: lua-resty-lrucache
        run: |
          sudo make install
      - name: 'checkout lua-resty-core'
-       uses: actions/checkout@v3
+       uses: actions/checkout@v7
        with:
          repository: openresty/lua-resty-core
-         ref: v0.1.27
+         # lua-resty-core pins the ngx_lua version with a strict equality check
+         # (lib/resty/core/base.lua), so it must match modules/ngx_http_lua_module
+         # exactly: 0.10.29 only accepts v0.1.32. Keep in sync with
+         # packages/build/deps.env, which pins the same pair for the packages.
+         ref: v0.1.32
          path: lua-resty-core
      - name: 'build lua-resty-core'
        working-directory: lua-resty-core
        run: |
          sudo make install
 
-# TODO: fix tests so they don't depend on /usr/local/nginx/logs/
-#       so we can run `make`, `make test`, `make install`.
+     # TODO: fix tests so they don't depend on /usr/local/tengine/logs/
+     #       so we can run `make`, `make test`, `make install`.
 
      - name: build
        env:
@@ -105,18 +131,86 @@ jobs:
      - name: tengine test cases using nginx-tests lib
        working-directory: tests/nginx-tests
        env:
-         TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
        run: |
          sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
          prove -v -Inginx-tests/lib tengine-tests/
+         # Upstream's own zone/resolve cases, run here on purpose: this build has
+         # every private macro on, while test-nginx-core.yml -- the only job that
+         # runs nginx-tests/ -- compiles the private round robin code out with
+         # "-D T_NGX_HTTP_UPSTREAM_RANDOM=0". Without this step a crash in that
+         # code (peers->number reaching 0 when a resolver removes every peer) is
+         # covered by no job at all. These cases need no module beyond this build.
+         prove -v -Inginx-tests/lib \
+           nginx-tests/upstream_resolve.t \
+           nginx-tests/upstream_resolve_reload.t \
+           nginx-tests/upstream_service.t \
+           nginx-tests/upstream_sticky_resolve.t \
+           nginx-tests/upstream_zone.t \
+           nginx-tests/upstream_zone_ssl.t
          prove -v -Inginx-tests/lib ../../modules/ngx_http_proxy_connect_module/t
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_timer/t
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_conn/t
          prove -v -Inginx-tests/lib ../../modules/ngx_slab_stat/t
+         # test-ntls.yml is where these actually run: it builds xquic and
+         # points TEST_XQUIC_CLIENT at the client binary. Here the module is
+         # not built, so every case in the directory must skip_all on
+         # has(xquic) -- which is exactly what this invocation guards. A case
+         # added without that guard fails here on "unknown directive xquic_*"
+         # long before anyone notices it in the ntls workflow.
+         prove -v -Inginx-tests/lib ../../modules/ngx_http_xquic_module/t
      - name: tengine test cases using test-nginx lib
        working-directory: tests/test-nginx
        run: |
          sudo cpanm --notest Shell Test::Base Test::LongString List::MoreUtils LWP::UserAgent HTTP::Response  > build.log 2>&1 || (cat build.log && exit 1)
          mkdir t
-         PATH=/usr/local/nginx/sbin:$PATH \
+         # test-nginx resolves the binary with its own can_run(), which only
+         # joins each PATH entry with the given name -- an absolute path in
+         # TEST_NGINX_BINARY can never match. Pass the bare name and put the
+         # install dir on PATH. (nginx-tests execs the value directly, so the
+         # steps above can and do use an absolute path.)
+         PATH=/usr/local/tengine/sbin:$PATH TEST_NGINX_BINARY=tengine \
          prove -v -Itest-nginx/lib cases/
+         # the cases/ prove above is non-recursive, so the upstream_check cases
+         # live in a subdir that was never exercised; invoke them explicitly.
+         # ssl_hello_check.t stays out on purpose -- see the note in that file.
+         PATH=/usr/local/tengine/sbin:$PATH TEST_NGINX_BINARY=tengine \
+         prove -v -Itest-nginx/lib \
+           cases/ngx_http_upstream_check_module/http_check.t \
+           cases/ngx_http_upstream_check_module/http_check_keepalive_body.t \
+           cases/ngx_http_upstream_check_module/tcp_check.t \
+           cases/ngx_http_upstream_check_module/unix_socket_check.t \
+           cases/ngx_http_upstream_check_module/websocket.t \
+           cases/ngx_http_upstream_check_module/check_interface.t
+  # Separate build that enables the native ngx_http_tunnel_module explicitly
+  # (--with-http_tunnel_module; it is off by default) and does NOT link
+  # ngx_http_proxy_connect_module, so the upstream tunnel*.t cases actually run
+  # (has('tunnel') is true here) instead of being skipped. The two CONNECT
+  # implementations cannot be linked together, so this must be its own job.
+  native-tunnel-test:
+   name: test tengine native tunnel
+   runs-on: "ubuntu-24.04"
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx libgd3
+         sudo apt install -y libpcre3 libpcre3-dev libssl-dev cpanminus
+     - name: build tengine with native http_tunnel_module (no proxy_connect)
+       run: |
+         ./configure \
+            --with-http_ssl_module \
+            --with-http_tunnel_module
+         make -j2
+         sudo make install
+     - name: run native tunnel test cases
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
+       run: |
+         sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
+         prove -v -Inginx-tests/lib \
+           tengine-tests/tunnel.t \
+           tengine-tests/tunnel_auth_basic.t \
+           tengine-tests/tunnel_next_upstream.t

@@ -4,7 +4,7 @@ This module can be used to update your upstream-list without reloadding Nginx.
 
 ## Example
 
-file: conf/nginx.conf
+file: conf/tengine.conf
 
 `ATTENTION`: You MUST use nginx variable to do proxy_pass
 
@@ -275,5 +275,5 @@ content_by_lua '
 ### Module Compatibility
 
 * [lua-upstream-nginx-module](https://github.com/agentzh/lua-upstream-nginx-module): You can use `lua-upstream-nginx-module` to get more detail infomation of upstream.
-* [upstream check module](http://tengine.taobao.org/document/http_upstream_check.html): To make upstream check module work well with dyups module, you should use `./modules/ngx_http_upstream_check_module`.
+* [upstream check module](https://tengine.taobao.org/document/http_upstream_check.html): To make upstream check module work well with dyups module, you should use `./modules/ngx_http_upstream_check_module`.
 

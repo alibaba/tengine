@@ -81,7 +81,7 @@ comm_atoll_with_trim(u_char *line, size_t n)
 }
 
 
-ngx_int_t ngx_comm_strcasecmp(ngx_str_t * src, ngx_str_t * dst) {
+ngx_int_t ngx_comm_strcasecmp(const ngx_str_t * src, const ngx_str_t * dst) {
     if (src->len != dst->len) {
         return src->len - dst->len;
     }

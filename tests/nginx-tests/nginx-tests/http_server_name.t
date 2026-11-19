@@ -80,7 +80,7 @@ http {
 
     server {
         listen       127.0.0.1:8080;
-        server_name  ~^(?P<name>.+)\Q.example.com\E$;
+        server_name  ~^(?P<name>[a-z]+)\Q.example.com\E$;
 
         location / {
             add_header X-Server $server_name;
@@ -170,56 +170,66 @@ $t->run();
 
 ###############################################################################
 
-like(http_server('xxx'), qr/X-Server: localhost/, 'default');
-unlike(http_server(), qr/X-Server/, 'empty');
+is(get_server('xxx'), 'localhost', 'default');
+is(get_server(), undef, 'empty');
 
-like(http_server('www.example.com'), qr/\QX-Server: www.example.com/,
+is(get_server('www.example.com'), 'www.example.com',
 	'www.example.com');
-like(http_server('WWW.EXAMPLE.COM'), qr/\QX-Server: www.example.com/,
+is(get_server('WWW.EXAMPLE.COM'), 'www.example.com',
 	'www.example.com uppercase');
 
-like(http_server('example.com'), qr/\QX-Server: ~^EXAMPLE\.COM$/,
+is(get_server('example.com'), '~^EXAMPLE\.COM$',
 	'example.com regex');
-like(http_server('EXAMPLE.COM'), qr/\QX-Server: ~^EXAMPLE\.COM$/,
+is(get_server('EXAMPLE.COM'), '~^EXAMPLE\.COM$',
 	'example.com regex uppercase');
 
-like(http_server('blah.example.com'), qr/X-Match: blah/,
+is(get_match('blah.example.com'), 'blah',
 	'(P<name>.*).example.com named capture');
-like(http_server('BLAH.EXAMPLE.COM'), qr/X-Match: blah/,
+is(get_match('BLAH.EXAMPLE.COM'), 'blah',
 	'(P<name>.*).example.com named capture uppercase');
 
-like(http_server('www01.example.com'), qr/X-Match: www01/,
+is(get_match('www01.example.com'), 'www01',
 	'\p{N} in named capture');
-like(http_server('WWW01.EXAMPLE.COM'), qr/X-Match: www01/,
+is(get_match('WWW01.EXAMPLE.COM'), 'www01',
 	'\p{N} in named capture uppercase');
 
-like(http_server('many.example.com'), qr/\QX-Server: many.example.com/,
+is(get_server('many.example.com'), 'many.example.com',
 	'name row - first');
-like(http_server('many2.example.com'), qr/\QX-Server: many.example.com/,
+is(get_server('many2.example.com'), 'many.example.com',
 	'name row - second');
 
-like(http_server('many3.example.com'), qr/\QX-Server: many3.example.com/,
+is(get_server('many3.example.com'), 'many3.example.com',
 	'name list - first');
-like(http_server('many4.example.com'), qr/\QX-Server: many3.example.com/,
+is(get_server('many4.example.com'), 'many3.example.com',
 	'name list - second');
 
-like(http_server('www.wc.example.com'),
-	qr/\QX-Server: *.wc.example.com/, 'wildcard first');
-like(http_server('www.pref.wc.example.com'),
-	qr/\QX-Server: *.pref.wc.example.com/, 'wildcard first most specific');
-like(http_server('wc2.example.net'),
-	qr/\QX-Server: wc2.example.*/, 'wildcard last');
-like(http_server('wc2.example.com.pref'),
-	qr/\QX-Server: wc2.example.com.*/, 'wildcard last most specific');
+is(get_server('www.wc.example.com'),
+	'*.wc.example.com', 'wildcard first');
+is(get_server('www.pref.wc.example.com'),
+	'*.pref.wc.example.com', 'wildcard first most specific');
+is(get_server('wc2.example.net'),
+	'wc2.example.*', 'wildcard last');
+is(get_server('wc2.example.com.pref'),
+	'wc2.example.com.*', 'wildcard last most specific');
 
-like(http_server('www.dot.example.com'), qr/\QX-Server: dot.example.com/,
+is(get_server('www.dot.example.com'), 'dot.example.com',
 	'wildcard dot');
-like(http_server('dot.example.com'), qr/\QX-Server: dot.example.com/,
+is(get_server('dot.example.com'), 'dot.example.com',
 	'wildcard dot empty');
 
 ###############################################################################
 
-sub http_server {
+sub get_server {
+	get(@_) =~ /X-Server: (.+)\x0d/m;
+	return $1;
+}
+
+sub get_match {
+	get(@_) =~ /X-Match: (.+)\x0d/m;
+	return $1;
+}
+
+sub get {
 	my ($host) = @_;
 
 	my $str = 'GET / HTTP/1.0' . CRLF .

@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # (C) cfsego
+# Copyright (C) 2014 Alibaba Group Holding Limited
 
 # Tests for request statistics features.
 

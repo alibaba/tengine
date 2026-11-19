@@ -69,7 +69,9 @@ ngx_http_lua_server_rewrite_handler(ngx_http_request_t *r)
         }
 
         if (rc == NGX_DECLINED) {
-            if (r->header_sent) {
+            if (r->header_sent
+                || (r->headers_out.status != 0 && ctx->out != NULL))
+            {
                 dd("header already sent");
 
                 /* response header was already generated in rewrite_by_lua*,
@@ -307,7 +309,9 @@ ngx_http_lua_server_rewrite_by_chunk(lua_State *L, ngx_http_request_t *r)
     }
 
     if (rc == NGX_OK || rc == NGX_DECLINED) {
-        if (r->header_sent) {
+        if (r->header_sent
+            || (r->headers_out.status != 0 && ctx->out != NULL))
+        {
             dd("header already sent");
 
             /* response header was already generated in rewrite_by_lua*,

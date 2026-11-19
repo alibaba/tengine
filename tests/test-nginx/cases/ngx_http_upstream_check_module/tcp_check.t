@@ -1,5 +1,13 @@
 # vi:filetype=perl
 
+# Blocks whose expectation depends on a peer being up wait in "--- init" first:
+# peers start out down (default_down defaults to true) and the first check only
+# fires after a random delay of up to max(interval, 1s), while the framework
+# sends its request roughly 100ms after the server starts. Those blocks also use
+# a shorter check interval so the wait can stay short. Blocks that expect 502,
+# that bypass the checked upstream, or that have no check directive are left
+# untouched.
+
 use lib 'lib';
 use Test::Nginx::LWP;
 
@@ -19,7 +27,7 @@ __DATA__
         server 127.0.0.1:1971;
         server 127.0.0.1:1972;
 
-        check interval=3000 rise=1 fall=1 timeout=1000;
+        check interval=500 rise=1 fall=1 timeout=1000;
     }
 
     server {
@@ -36,6 +44,7 @@ __DATA__
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -48,7 +57,7 @@ GET /
         server 127.0.0.1:1972;
         ip_hash;
 
-        check interval=3000 rise=1 fall=1 timeout=1000 type=tcp;
+        check interval=500 rise=1 fall=1 timeout=1000 type=tcp;
     }
 
     server {
@@ -65,6 +74,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -105,7 +115,7 @@ GET /
         server 127.0.0.1:1972;
         least_conn;
 
-        check interval=3000 rise=1 fall=5 timeout=1000 type=tcp;
+        check interval=500 rise=1 fall=5 timeout=1000 type=tcp;
     }
 
     server {
@@ -122,6 +132,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$
@@ -186,7 +197,7 @@ GET /
         server 127.0.0.1:1970;
 
         check_keepalive_requests 10;
-        check interval=2000 rise=1 fall=1 timeout=1000 type=tcp;
+        check interval=500 rise=1 fall=1 timeout=1000 type=tcp;
     }
 
     server {
@@ -203,6 +214,7 @@ GET /
         proxy_pass http://test;
     }
 
+--- init: sleep 2;
 --- request
 GET /
 --- response_body_like: ^<(.*)>$

@@ -45,6 +45,7 @@ struct ngx_listening_s {
     ngx_str_t           addr_text;
 
     int                 type;
+    int                 protocol;
 
     int                 backlog;
     int                 rcvbuf;
@@ -122,6 +123,8 @@ struct ngx_listening_s {
     unsigned            xudp:1;
 #endif
 
+    unsigned            change_protocol:1;
+
     unsigned            deferred_accept:1;
     unsigned            delete_deferred:1;
     unsigned            add_deferred:1;
@@ -144,7 +147,8 @@ typedef enum {
     NGX_ERROR_ERR,
     NGX_ERROR_INFO,
     NGX_ERROR_IGNORE_ECONNRESET,
-    NGX_ERROR_IGNORE_EINVAL
+    NGX_ERROR_IGNORE_EINVAL,
+    NGX_ERROR_IGNORE_EMSGSIZE
 } ngx_connection_log_error_e;
 
 

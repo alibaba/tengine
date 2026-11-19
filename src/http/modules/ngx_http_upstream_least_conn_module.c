@@ -129,12 +129,26 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
 
     ngx_http_upstream_rr_peers_wlock(peers);
 
+#if (NGX_HTTP_UPSTREAM_ZONE)
+    if (peers->config && rrp->config != *peers->config) {
+        goto busy;
+    }
+#endif
+
     best = NULL;
     total = 0;
 
 #if (NGX_SUPPRESS_WARN)
     many = 0;
     p = 0;
+#endif
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    best = ngx_http_upstream_get_rr_peer_by_sid(rrp, pc->hint, &p, 0);
+
+    if (best) {
+        goto best_chosen;
+    }
 #endif
 
     for (peer = peers->peer, i = 0;
@@ -258,6 +272,10 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
 
     best->current_weight -= total;
 
+#if (NGX_HTTP_UPSTREAM_SID)
+best_chosen:
+#endif
+
     if (now - best->checked > best->fail_timeout) {
         best->checked = now;
     }
@@ -265,13 +283,19 @@ ngx_http_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
     pc->sockaddr = best->sockaddr;
     pc->socklen = best->socklen;
     pc->name = &best->name;
+
+#if (NGX_HTTP_UPSTREAM_SID)
+    pc->sid = &best->sid;
+#endif
+
 #if (T_NGX_HTTP_DYNAMIC_RESOLVE) 
-    pc->host = &best->host;
+    pc->dyn_resolve_host = &best->dyn_resolve_host;
 #endif
 
     best->conns++;
 
     rrp->current = best;
+    ngx_http_upstream_rr_peer_ref(peers, best);
 
     n = p / (8 * sizeof(uintptr_t));
     m = (uintptr_t) 1 << p % (8 * sizeof(uintptr_t));
@@ -308,6 +332,10 @@ failed:
         ngx_http_upstream_rr_peers_wlock(peers);
     }
 
+#if (NGX_HTTP_UPSTREAM_ZONE)
+busy:
+#endif
+
     ngx_http_upstream_rr_peers_unlock(peers);
 
     pc->name = peers->name;
@@ -331,6 +359,7 @@ ngx_http_upstream_least_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     uscf->peer.init_upstream = ngx_http_upstream_init_least_conn;
 
     uscf->flags = NGX_HTTP_UPSTREAM_CREATE
+                  |NGX_HTTP_UPSTREAM_MODIFY
                   |NGX_HTTP_UPSTREAM_WEIGHT
                   |NGX_HTTP_UPSTREAM_MAX_CONNS
                   |NGX_HTTP_UPSTREAM_MAX_FAILS

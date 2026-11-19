@@ -144,6 +144,11 @@ if ($uwsgihelp !~ /--wsgi-file/) {
 	push @uwsgiopts, '--plugin', 'python3';
 }
 
+if ($uwsgihelp =~ /--ssl-enable-tlsv1/) {
+	# uwsgi disables TLSv1 by default since 2.0.17.1
+	push @uwsgiopts, '--ssl-enable-tlsv1';
+}
+
 open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run_daemon('uwsgi', @uwsgiopts,
 	'--ssl-socket', '127.0.0.1:' . port(8081) . ",$crt1,$key1",

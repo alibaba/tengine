@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # (C) diaoliang
+# Copyright (C) 2012 Alibaba Group Holding Limited
 
 # Tests for nginx limit_req module.
 

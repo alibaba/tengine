@@ -81,9 +81,6 @@ like(http_get('/var?b=127.0.0.1:' . port(8081)), qr/SEE-THIS/,
 	'scgi with variables');
 like(http_get('/var?b=u'), qr/SEE-THIS/, 'scgi with variables to upstream');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 my $r = http(<<EOF);
 GET / HTTP/1.0
 Host: localhost
@@ -105,8 +102,6 @@ like($r, qr/X-Cookie: foo; bar; bazz/,
 	'scgi with multiple Cookie headers');
 like($r, qr/X-Foo: foo, bar, bazz/,
 	'scgi with multiple unknown headers');
-
-}
 
 ###############################################################################
 

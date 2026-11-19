@@ -19,8 +19,9 @@
 #ifdef NGX_HTTP_LUA_USE_OCSP
 static int ngx_http_lua_ssl_empty_status_callback(ngx_ssl_conn_t *ssl_conn,
     void *data);
-#endif
 
+static long ngx_http_lua_ssl_stapling_time(ASN1_GENERALIZEDTIME *asn1time);
+#endif
 
 int
 ngx_http_lua_ffi_ssl_get_ocsp_responder_from_der_chain(
@@ -262,7 +263,7 @@ failed:
 int
 ngx_http_lua_ffi_ssl_validate_ocsp_response(const u_char *resp,
     size_t resp_len, const char *chain_data, size_t chain_len,
-    u_char *errbuf, size_t *errbuf_size)
+    u_char *errbuf, size_t *errbuf_size, long *valid)
 {
 #ifndef NGX_HTTP_LUA_USE_OCSP
 
@@ -279,7 +280,7 @@ ngx_http_lua_ffi_ssl_validate_ocsp_response(const u_char *resp,
     OCSP_RESPONSE         *ocsp = NULL;
     OCSP_BASICRESP        *basic = NULL;
     STACK_OF(X509)        *chain = NULL;
-    ASN1_GENERALIZEDTIME  *thisupdate, *nextupdate;
+    ASN1_GENERALIZEDTIME  *thisupdate = NULL, *nextupdate = NULL;
 
     ocsp = d2i_OCSP_RESPONSE(NULL, &resp, resp_len);
     if (ocsp == NULL) {
@@ -383,6 +384,16 @@ ngx_http_lua_ffi_ssl_validate_ocsp_response(const u_char *resp,
         goto error;
     }
 
+    if (nextupdate) {
+        *valid = ngx_http_lua_ssl_stapling_time(nextupdate);
+        if (*valid == NGX_ERROR) {
+            *errbuf_size = ngx_snprintf(errbuf, *errbuf_size,
+                                        "invalid nextUpdate time "
+                                        "in certificate status") - errbuf;
+            goto error;
+        }
+    }
+
     sk_X509_free(chain);
     X509_free(cert);
     X509_free(issuer);
@@ -436,6 +447,40 @@ static int
 ngx_http_lua_ssl_empty_status_callback(ngx_ssl_conn_t *ssl_conn, void *data)
 {
     return SSL_TLSEXT_ERR_OK;
+}
+
+
+static long
+ngx_http_lua_ssl_stapling_time(ASN1_GENERALIZEDTIME *asn1time)
+{
+    BIO     *bio;
+    char    *value;
+    size_t   len;
+    time_t   time;
+
+    /*
+     * OpenSSL doesn't provide a way to convert ASN1_GENERALIZEDTIME
+     * into long.  To do this, we use ASN1_GENERALIZEDTIME_print(),
+     * which uses the "MMM DD HH:MM:SS YYYY [GMT]" format (e.g.,
+     * "Feb  3 00:55:52 2015 GMT"), and parse the result.
+     */
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        return NGX_ERROR;
+    }
+
+    /* fake weekday prepended to match C asctime() format */
+
+    BIO_write(bio, "Tue ", sizeof("Tue ") - 1);
+    ASN1_GENERALIZEDTIME_print(bio, asn1time);
+    len = BIO_get_mem_data(bio, &value);
+
+    time = ngx_parse_http_time((u_char *) value, len);
+
+    BIO_free(bio);
+
+    return time;
 }
 #endif
 

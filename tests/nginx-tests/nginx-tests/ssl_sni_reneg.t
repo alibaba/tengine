@@ -24,8 +24,6 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl socket_ssl_sni/)
 	->has_daemon('openssl')->plan(8);
 
@@ -43,7 +41,7 @@ http {
 
     ssl_certificate_key localhost.key;
     ssl_certificate localhost.crt;
-    ssl_protocols TLSv1.2;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
 
     server {
         listen       127.0.0.1:8443 ssl;
@@ -83,11 +81,10 @@ foreach my $name ('localhost') {
 
 $t->run();
 
-
-
 ###############################################################################
 
 my ($s, $ssl);
+
 $s = http('', start => 1, SSL => 1);
 ok($s, 'connection');
 
@@ -102,6 +99,7 @@ $s->print('GET / HTTP/1.0' . CRLF);
 # While not exactly correct, it looks like there is no other way to
 # trigger renegotiation with IO::Socket::SSL, and this seems to be
 # good enough for tests.
+
 $ssl = $s->_get_ssl_object();
 ok(Net::SSLeay::renegotiate($ssl), 'renegotiation');
 ok(Net::SSLeay::set_tlsext_host_name($ssl, 'localhost'), 'SNI');
@@ -128,6 +126,7 @@ $s->print('GET / HTTP/1.0' . CRLF);
 # While not exactly correct, it looks like there is no other way to
 # trigger renegotiation with IO::Socket::SSL, and this seems to be
 # good enough for tests.
+
 $ssl = $s->_get_ssl_object();
 ok(Net::SSLeay::renegotiate($ssl), 'renegotiation');
 ok(Net::SSLeay::set_tlsext_host_name($ssl, 'localhost'), 'SNI');
@@ -139,9 +138,3 @@ ok(!http_end($s), 'virtual servers');
 }
 
 ###############################################################################
-
-
-
-
-
-

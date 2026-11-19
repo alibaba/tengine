@@ -49,6 +49,10 @@
 #if (NGX_THREADS)
 #include "ngx_http_lua_worker_thread.h"
 #endif
+#if (NGX_HTTP_V3)
+#include <ngx_event_quic.h>
+#include <ngx_event_quic_connection.h>
+#endif
 
 
 #if 1
@@ -549,6 +553,10 @@ ngx_http_lua_send_header_if_needed(ngx_http_request_t *r,
         if (!ctx->buffering) {
             dd("sending headers");
             rc = ngx_http_send_header(r);
+            if (r->filter_finalize) {
+                ngx_http_set_ctx(r, ctx, ngx_http_lua_module);
+            }
+
             ctx->header_sent = 1;
             return rc;
         }
@@ -598,6 +606,12 @@ ngx_http_lua_send_chain_link(ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx,
 
     if (r->header_only) {
         ctx->eof = 1;
+
+        if (!r->request_body && r == r->main) {
+            if (ngx_http_discard_request_body(r) != NGX_OK) {
+                return NGX_ERROR;
+            }
+        }
 
         if (ctx->buffering) {
             return ngx_http_lua_send_http10_headers(r, ctx);
@@ -754,10 +768,6 @@ ngx_http_lua_send_http10_headers(ngx_http_request_t *r,
         }
 
         r->headers_out.content_length_n = size;
-
-        if (r->headers_out.content_length) {
-            r->headers_out.content_length->hash = 0;
-        }
     }
 
 send:
@@ -1673,6 +1683,12 @@ no_parent:
 
 done:
 
+#ifdef HAVE_PROXY_SSL_PATCH
+    if (ctx->context == NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY) {
+        return NGX_OK;
+    }
+#endif
+
     if (ctx->entered_content_phase
         && r->connection->fd != (ngx_socket_t) -1)
     {
@@ -2427,6 +2443,12 @@ ngx_http_lua_handle_exit(lua_State *L, ngx_http_request_t *r,
     if (r->connection->fd == (ngx_socket_t) -1) {  /* fake request */
         return ctx->exit_code;
     }
+
+#ifdef HAVE_PROXY_SSL_PATCH
+    if (ctx->context == NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY) {
+        return ctx->exit_code;
+    }
+#endif
 
 #if 1
     if (!r->header_sent
@@ -3669,11 +3691,45 @@ void
 ngx_http_lua_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 {
     ngx_http_lua_ctx_t              *ctx;
+#if (NGX_HTTP_SSL)
+#ifdef HAVE_PROXY_SSL_PATCH
+    ngx_http_upstream_t             *u;
+    ngx_connection_t                *c;
+    ngx_http_lua_ssl_ctx_t          *cctx;
+#endif
+#endif
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
     if (ctx && ctx->cur_co_ctx) {
         ngx_http_lua_cleanup_pending_operation(ctx->cur_co_ctx);
     }
+
+#if (NGX_HTTP_SSL)
+#ifdef HAVE_PROXY_SSL_PATCH
+    u = r->upstream;
+    if (u) {
+        c = u->peer.connection;
+        if (c && c->ssl) {
+            cctx = ngx_http_lua_ssl_get_ctx(c->ssl->connection);
+            if (cctx && cctx->pool) {
+                if (rc == NGX_ERROR || rc >= NGX_HTTP_SPECIAL_RESPONSE) {
+                    cctx->exit_code = 0;
+                }
+
+                if (r->main->count > cctx->original_request_count) {
+                    r->main->count--;
+                    return;
+                }
+
+                ngx_destroy_pool(cctx->pool);
+                cctx->pool = NULL;
+
+                return;
+            }
+        }
+    }
+#endif
+#endif
 
     if (r->connection->fd != (ngx_socket_t) -1) {
         ngx_http_finalize_request(r, rc);
@@ -3826,6 +3882,18 @@ ngx_http_lua_close_fake_connection(ngx_connection_t *c)
     c->read->closed = 1;
     c->write->closed = 1;
 
+    /* When destroying the pool, the registered clean callbacks will be
+     * executed. If the ngx_connection_t is freed before these callbacks are
+     * run, and a new ngx_connection_t is created within a clean callback,
+     * it is possible for the freed ngx_connection_t to be reused again.
+     * If this reused ngx_connection_t is destroyed again within the clean
+     * callback logic, it may result in other clean callbacks holding a
+     * ngx_connection_t that has already been destroyed.
+     */
+    if (pool) {
+        ngx_destroy_pool(pool);
+    }
+
     /* we temporarily use a valid fd (0) to make ngx_free_connection happy */
 
     c->fd = 0;
@@ -3840,10 +3908,6 @@ ngx_http_lua_close_fake_connection(ngx_connection_t *c)
 
     if (ngx_cycle->files) {
         ngx_cycle->files[0] = saved_c;
-    }
-
-    if (pool) {
-        ngx_destroy_pool(pool);
     }
 }
 
@@ -4403,6 +4467,86 @@ ngx_http_lua_copy_escaped_header(ngx_http_request_t *r,
 }
 
 
+ngx_int_t
+ngx_http_lua_decode_base64mime(ngx_str_t *dst, ngx_str_t *src)
+{
+    size_t          i;
+    u_char         *d, *s, ch;
+    size_t          data_len = 0;
+    u_char          buf[4];
+    size_t          buf_len = 0;
+    static u_char   basis[] = {
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 62, 77, 77, 77, 63,
+        52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 77, 77, 77, 77, 77, 77,
+        77,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 77, 77, 77, 77, 77,
+        77, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+        41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 77, 77, 77, 77, 77,
+
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
+        77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77
+    };
+
+    for (i = 0; i < src->len; i++) {
+        ch = src->data[i];
+        if (ch == '=') {
+            break;
+        }
+
+        if (basis[ch] == 77) {
+            continue;
+        }
+
+        data_len++;
+    }
+
+    if (data_len % 4 == 1) {
+        return NGX_ERROR;
+    }
+
+    s = src->data;
+    d = dst->data;
+
+    for (i = 0; i < src->len; i++) {
+        if (s[i] == '=') {
+            break;
+        }
+
+        if (basis[s[i]] == 77) {
+            continue;
+        }
+
+        buf[buf_len++] = s[i];
+        if (buf_len == 4) {
+            *d++ = (u_char) (basis[buf[0]] << 2 | basis[buf[1]] >> 4);
+            *d++ = (u_char) (basis[buf[1]] << 4 | basis[buf[2]] >> 2);
+            *d++ = (u_char) (basis[buf[2]] << 6 | basis[buf[3]]);
+            buf_len = 0;
+        }
+    }
+
+    if (buf_len > 1) {
+        *d++ = (u_char) (basis[buf[0]] << 2 | basis[buf[1]] >> 4);
+    }
+
+    if (buf_len > 2) {
+        *d++ = (u_char) (basis[buf[1]] << 4 | basis[buf[2]] >> 2);
+    }
+
+    dst->len = d - dst->data;
+
+    return NGX_OK;
+}
+
+
 ngx_addr_t *
 ngx_http_lua_parse_addr(lua_State *L, u_char *text, size_t len)
 {
@@ -4474,5 +4618,70 @@ ngx_http_lua_parse_addr(lua_State *L, u_char *text, size_t len)
     return addr;
 }
 
+
+void
+ngx_http_lua_ffi_bypass_if_checks(ngx_http_request_t *r)
+{
+    r->disable_not_modified = 1;
+}
+
+
+#if (HAVE_QUIC_SSL_LUA_YIELD_PATCH && NGX_HTTP_V3)
+void
+ngx_http_lua_resume_quic_ssl_handshake(ngx_connection_t *c)
+{
+    ngx_int_t        rc, sslerr;
+    ngx_ssl_conn_t  *ssl_conn;
+
+    if (c == NULL || c->ssl == NULL || c->ssl->connection == NULL) {
+        return;
+    }
+
+    if (!c->udp || c->read == NULL
+        || c->read->handler != ngx_quic_input_handler)
+    {
+        return;
+    }
+
+    ssl_conn = c->ssl->connection;
+
+    /* Openresty ssl lua scripts are triggered by registering callbacks into
+     * openssl. If a lua script calls a yield api during execution, openssl's
+     * SSL_do_handshake will return a specific error code. The application
+     * should not treat these codes as fatal. The lua script will resume on
+     * yield-related events until it finishes. After completion,
+     * SSL_do_handshake should be called again to advance openssl's state
+     * machine.
+     *
+     * Note that nginx quic and openresty ssl lua scripts are independent. When
+     * openresty ssl lua runs, the client is waiting for a server response, so
+     * nginx quic does not affect the execution of the lua script. After the lua
+     * script finishes, SSL_do_handshake is called again, and nginx quic's
+     * registered callback continues the handshake.
+     */
+    rc = SSL_do_handshake(ssl_conn);
+    sslerr = SSL_get_error(ssl_conn, rc);
+
+    if (rc <= 0 && sslerr != SSL_ERROR_WANT_READ
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+        && sslerr != SSL_ERROR_WANT_X509_LOOKUP
+#endif
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
+        && sslerr != SSL_ERROR_WANT_CLIENT_HELLO_CB
+#endif
+    ) {
+        /* If a fatal error occurs or lua script exits with error during quic
+         * handshake, the quic connection will be closed immediately.
+         */
+        ngx_quic_close_connection(c, NGX_ERROR);
+
+    } else {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "lua resuming quic ssl handshake: rc %d, err %d, will "
+                       "continue driving handshake or next lua script phase",
+                       rc, sslerr);
+    }
+}
+#endif
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

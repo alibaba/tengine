@@ -38,7 +38,7 @@ events {
 }
 
 mail {
-    proxy_pass_error_message  on;
+    proxy_pass_error_message  off;
     proxy_timeout  15s;
     auth_http  http://127.0.0.1:8080/mail/auth;
 
@@ -67,6 +67,9 @@ http {
             if ($userpass = 'te\\"st@example.com:se\\"cret') {
                 set $reply OK;
             }
+            if ($userpass = 'capability@example.com:secret') {
+                set $reply OK;
+            }
 
             set $userpass "$http_auth_user:$http_auth_salt:$http_auth_pass";
             if ($userpass ~ '^test@example.com:<.*@.*>:0{32}$') {
@@ -93,7 +96,7 @@ http {
 EOF
 
 $t->run_daemon(\&Test::Nginx::IMAP::imap_test_daemon);
-$t->run()->plan(29);
+$t->run()->plan(31);
 
 $t->waitforsocket('127.0.0.1:' . port(8144));
 
@@ -112,6 +115,20 @@ $s->check(qr/^a02 NO/, 'login with bad password');
 
 $s->send('a03 LOGIN test@example.com secret');
 $s->ok('login');
+
+# login with untagged capability
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.27.3');
+
+$s = Test::Nginx::IMAP->new();
+$s->read();
+
+$s->send('a04 LOGIN capability@example.com secret');
+$s->check(qr/^\* CAPABILITY /, 'untagged capability');
+$s->ok('login after capability');
+
+}
 
 # auth
 
@@ -223,13 +240,7 @@ $s->read();
 
 $s->send('a01 LOGIN {18+}' . CRLF
 	. 'te\"st@example.com' . ' "se\\\\\"cret"');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->ok('backslash in literal');
-
-}
 
 # pipelining
 
@@ -239,22 +250,13 @@ $s->read();
 $s->send('a01 INVALID COMMAND WITH ARGUMENTS' . CRLF
 	. 'a02 NOOP');
 $s->check(qr/^a01 BAD/, 'pipelined invalid command');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 $s->ok('pipelined noop after invalid command');
-
-}
 
 $s->send('a03 FOOBAR {10+}' . CRLF
 	. 'test test ' . CRLF
 	. 'a04 NOOP');
 $s->check(qr/^a03 BAD/, 'invalid with non-sync literal');
 $s->check(qr/^(a04 |$)/, 'literal not command');
-
-TODO: {
-todo_skip('not yet', 2) unless $t->has_version('1.21.0');
 
 # skipped without a fix, since with level-triggered event methods
 # this hogs cpu till the connection is closed by the backend server,
@@ -267,7 +269,5 @@ $s->send('a01 LOGIN test@example.com secret' . CRLF
 	. 'a02 LOGOUT');
 $s->ok('pipelined login');
 $s->ok('pipelined logout');
-
-}
 
 ###############################################################################

@@ -6,7 +6,7 @@ Name
 Description
 ===========
 
-* This module implements an asynchronous client of TFS(Taobao File System), providing RESTful API to it. [TFS](http://tfs.taobao.org) is a distributed file system developed by Taobao Inc.
+* This module implements an asynchronous client of TFS(Taobao File System), providing RESTful API to it. TFS is a distributed file system developed by Taobao Inc.
 
 This module is not built by default, it should be enabled with the `--with-http_tfs_module` configuration parameter.
 

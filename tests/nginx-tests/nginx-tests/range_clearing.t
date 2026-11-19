@@ -62,8 +62,6 @@ $t->run()->plan(3);
 
 ###############################################################################
 
-local $TODO = 'not yet' unless $t->has_version('1.23.1');
-
 like(http_get_range('/', 'Range: bytes=0-4'),
 	qr/ 206 (?!.*stub)/s, 'content range cleared - range request');
 like(http_get_range('/', 'Range: bytes=0-2,4-'),

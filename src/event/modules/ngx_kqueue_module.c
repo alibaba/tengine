@@ -10,6 +10,15 @@
 #include <ngx_event.h>
 
 
+/* NetBSD up to 10.0 incompatibly defines kevent.udata as "intptr_t" */
+
+#if (__NetBSD__ && __NetBSD_Version__ < 1000000000)
+#define NGX_KQUEUE_UDATA_T
+#else
+#define NGX_KQUEUE_UDATA_T  (void *)
+#endif
+
+
 typedef struct {
     ngx_uint_t  changes;
     ngx_uint_t  events;
@@ -195,7 +204,7 @@ ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         kev.flags = EV_ADD|EV_ENABLE;
         kev.fflags = 0;
         kev.data = timer;
-        kev.udata = 0;
+        kev.udata = NGX_KQUEUE_UDATA_T (uintptr_t) 0;
 
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
@@ -241,7 +250,7 @@ ngx_kqueue_notify_init(ngx_log_t *log)
     notify_kev.data = 0;
     notify_kev.flags = EV_ADD|EV_CLEAR;
     notify_kev.fflags = 0;
-    notify_kev.udata = 0;
+    notify_kev.udata = NGX_KQUEUE_UDATA_T (uintptr_t) 0;
 
     if (kevent(ngx_kqueue, &notify_kev, 1, NULL, 0, NULL) == -1) {
         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
@@ -433,8 +442,8 @@ ngx_kqueue_set_event(ngx_event_t *ev, ngx_int_t filter, ngx_uint_t flags)
     if (filter == EVFILT_VNODE) {
         kev->fflags = NOTE_DELETE|NOTE_WRITE|NOTE_EXTEND
                                  |NOTE_ATTRIB|NOTE_RENAME
-#if (__FreeBSD__ == 4 && __FreeBSD_version >= 430000) \
-    || __FreeBSD_version >= 500018
+#if (__FreeBSD__ == 4 && __FreeBSD_version >= 430000)                         \
+     || __FreeBSD_version >= 500018
                                  |NOTE_REVOKE
 #endif
                       ;

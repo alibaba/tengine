@@ -1,0 +1,164 @@
+# Contributor: Tengine Team <tengine@taobao.net>
+# Maintainer: Tengine Team <tengine@taobao.net>
+#
+# Alpine (musl) package for Tengine.  Built by packages/build/build.sh, which
+# drops the source tarball next to this file and runs `abuild checksum && abuild -r`.
+#
+# _upstream_ver is the plain upstream version and must match the top level
+# directory inside the tarball; pkgver may additionally carry a _p<timestamp>
+# suffix injected by build.sh so every build is uniquely versioned.
+#
+pkgname=tengine
+_upstream_ver=3.2.0
+pkgver=3.2.0
+pkgrel=0
+pkgdesc="Tengine HTTP and reverse proxy server with Tongsuo, xquic and Lua"
+url="https://tengine.taobao.org/"
+arch="all"
+# Tengine and the resty Lua libraries are BSD-2-Clause, Tongsuo and xquic are
+# Apache-2.0, LuaJIT is MIT.
+license="BSD-2-Clause AND Apache-2.0 AND MIT"
+# xquic links libstdc++ and so needs a C++ compiler, but g++ is deliberately
+# absent here: it comes with build-base, which abuild installs on its own, and
+# abuild's sanity check warns about naming it a second time.
+makedepends="
+	linux-headers
+	openssl-dev
+	pcre2-dev
+	zlib-dev
+	cmake
+	perl
+	perl-dev
+	"
+install="$pkgname.pre-install $pkgname.post-install"
+# -dbg has to come first: abuild splits subpackages in order and the debug
+# symbols must be taken before anything else moves the binaries away. It is
+# what makes Alpine match the other two formats, which produce debug packages
+# (rpm -debuginfo, deb -dbgsym) without being asked.
+subpackages="$pkgname-dbg $pkgname-doc $pkgname-openrc $pkgname-mod-perl:mod_perl"
+# tengine-deps.tar.gz holds the pinned Tongsuo / xquic / LuaJIT / resty
+# tarballs; abuild unpacks it to $srcdir/deps.
+source="$pkgname-$_upstream_ver.tar.gz
+	$pkgname-deps.tar.gz
+	tengine.openrc
+	tengine.logrotate
+	tengine.conf
+	default.conf
+	"
+builddir="$srcdir/$pkgname-$_upstream_ver"
+options="!check"	# no upstream test suite wired into the build
+
+build() {
+	# ngx_backtrace_module needs backtrace() from execinfo.h, which musl
+	# does not provide -- its config aborts configure outright, so keep it
+	# out of the Alpine feature set.
+	#
+	# The tree defaults to -Werror (auto/cc/gcc); relax it so an arbitrary
+	# gcc version cannot break packaging.
+	export TENGINE_LIBDIR=/usr/lib
+	export TENGINE_WITH_BACKTRACE=no
+	# ngx_http_perl_module ships as the tengine-mod-perl subpackage.
+	export TENGINE_WITH_PERL=yes
+
+	# Tongsuo, xquic and LuaJIT come from the pinned sources in $srcdir/deps.
+	# --libdir is the installed path because ngx_http_xquic_module records it
+	# as libxquic.so's runtime path.
+	sh packages/build/build-deps.sh \
+		--srcdir "$srcdir/deps" \
+		--workdir "$srcdir/deps-build" \
+		--staging "$srcdir/deps-staging" \
+		--libdir /usr/lib/tengine \
+		--datadir /usr/share/tengine \
+		--env-relative-to "$PWD"
+
+	. "$srcdir"/deps-build/deps-env.sh
+
+	./configure \
+		$(sh packages/build/configure-args.sh) \
+		--with-cc-opt="$CFLAGS -Wno-error" \
+		--with-ld-opt="$LDFLAGS $(sh packages/build/configure-args.sh --print-ld-opt)" \
+		--with-openssl-opt="$(sh packages/build/configure-args.sh --print-openssl-opt)"
+
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+
+	# The bundled libxquic.so / libluajit and the Lua modules are staged with
+	# their final absolute paths already in place.
+	cp -a "$srcdir"/deps-staging/. "$pkgdir"/
+
+	# make install ships the in-tree conf/tengine.conf plus *.default copies;
+	# replace them with the packaged tengine.conf, which adds the conf.d layout.
+	rm -f "$pkgdir"/etc/tengine/*.default
+	install -D -m 0644 "$srcdir"/tengine.conf \
+		"$pkgdir"/etc/tengine/tengine.conf
+	# lua_package_cpath carries a libdir placeholder; apk always uses /usr/lib.
+	sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' \
+		"$pkgdir"/etc/tengine/tengine.conf
+	install -D -m 0644 "$srcdir"/default.conf \
+		"$pkgdir"/etc/tengine/conf.d/default.conf
+	install -D -m 0644 "$srcdir"/tengine.logrotate \
+		"$pkgdir"/etc/logrotate.d/tengine
+
+	sed -e 's|%%PREFIX%%|/usr/share/tengine|' \
+	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
+	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
+	    -e 's|%%ERROR_LOG_PATH%%|/var/log/tengine/error.log|' \
+	    man/tengine.8 > tengine.8
+	install -D -m 0644 tengine.8 \
+		"$pkgdir"/usr/share/man/man8/tengine.8
+
+	install -D -m 0755 "$srcdir"/tengine.openrc \
+		"$pkgdir"/etc/init.d/tengine
+
+	# No -o/-g here: the tengine user only comes into being when the package is
+	# installed, so resolving the name at build time fails. .post-install takes
+	# ownership once the directories are on disk, the same way the deb does.
+	install -d -m 0700 "$pkgdir"/var/cache/tengine
+	install -d -m 0755 "$pkgdir"/var/log/tengine
+	install -d -m 0755 "$pkgdir"/usr/lib/tengine/modules
+
+	# /run is a tmpfs; make install creates it because of --pid-path
+	rm -rf "$pkgdir"/run "$pkgdir"/var/run
+
+	install -D -m 0644 LICENSE \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+
+	# MakeMaker bookkeeping from the perl module's install rule; the real
+	# payload is staged by the mod_perl split function below.
+	rm -rf "$pkgdir"/usr/lib/tengine/perl "$pkgdir"/usr/share/man/man3
+}
+
+mod_perl() {
+	pkgdesc="Perl module for Tengine"
+	depends="$pkgname=$pkgver-r$pkgrel"
+
+	# The perl payload is three files and only the module .so is placed
+	# correctly by the build:
+	#
+	#   1. ngx_http_perl_module.so  - nginx's own install rule honours DESTDIR,
+	#      so this one really is under $pkgdir.
+	#   2. nginx.pm                 - loaded through the single @INC entry that
+	#      --with-perl_modules_path compiled into the binary.
+	#   3. auto/nginx/nginx.so      - the XS object nginx.pm's XSLoader::load()
+	#      dlopens. Without it the interpreter dies during perl_parse() with
+	#      "Can't locate loadable object for module nginx".
+	#
+	# 2 and 3 cannot come from the install tree: auto/install delegates them to
+	# `make install` in the generated MakeMaker tree, which puts the XS object
+	# in INSTALLSITEARCH -- one directory deeper than the path nginx adds to
+	# @INC -- so DynaLoader would never find it. Both come from blib instead,
+	# with the XS object placed at <@INC dir>/auto/nginx/. Same reasoning as the
+	# container images; see the comment in Dockerfile.
+	amove usr/lib/tengine/modules/ngx_http_perl_module.so
+	install -D -m 0644 \
+		"$builddir"/objs/src/http/modules/perl/blib/lib/nginx.pm \
+		"$subpkgdir"/usr/lib/tengine/perl/nginx.pm
+	install -D -m 0755 \
+		"$builddir"/objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+		"$subpkgdir"/usr/lib/tengine/perl/auto/nginx/nginx.so
+}
+
+sha512sums="SKIP"

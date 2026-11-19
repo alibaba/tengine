@@ -109,26 +109,28 @@ struct ngx_udpv2_packets_hdr_st
 
 
 /**
- *  初始化udpv2所需的数据结构
+ * Initialize data structures required by udpv2.
  * */
 
 void ngx_event_udpv2_init_listening(ngx_listening_t *ls);
 
 /**
- *  分发流量到处理流量的连接
- *  当未找到合适的处理连接时，执行ls->udp_accept_handler(urp) or  ngx_event_udpv2_create_udp_connection
+ * Dispatch traffic to the connection that handles it.
+ * When no suitable handling connection is found, fall back to
+ * ls->udp_accept_handler(urp) or ngx_event_udpv2_create_udp_connection.
  * */
 
 void ngx_udpv2_dispatch_traffic(ngx_udpv2_packets_hdr_t *uhdr);
 
 /**
- * 通知所有udpv2批处理数据结束。
+ * Notify the end of all udpv2 batch processing.
  * */
 void ngx_udpv2_process_posted_traffic(void);
 
 /**
- *  分发单个报文到处理流量的连接
- *  当未找到合适的处理连接时，执行ls->udp_accept_handler(urp) or  ngx_event_udpv2_create_udp_connection
+ * Dispatch a single packet to the connection that handles traffic.
+ * When no suitable handling connection is found, fall back to
+ * ls->udp_accept_handler(urp) or ngx_event_udpv2_create_udp_connection.
  * */
 void ngx_udpv2_dispatch_packet(ngx_listening_t *ls, ngx_udpv2_packet_t *upkt, ngx_uint_t flags);
 
@@ -144,7 +146,7 @@ ngx_queue_t * ngx_udpv2_active_writable_queue(ngx_listening_t *ls);
 
 
 /**
- * 在accept的udp模型中，模拟可写事件的核心逻辑。
+ * In the accept-based UDP model, simulate the core logic of a writable event.
  * */
 void ngx_udpv2_write_handler_mainlogic(ngx_event_t *);
 

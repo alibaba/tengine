@@ -11,9 +11,9 @@
 编译安装
 =======
 
-1. TFS模块使用了一个开源的JSON库来支持JSON，请先安装[yajl](http://lloyd.github.com/yajl/)-2.0.1。
+1. TFS模块使用了一个开源的JSON库来支持JSON，请先安装[yajl](https://lloyd.github.io/yajl/)-2.0.1。
 
-2. 下载[nginx](http://www.nginx.org/)或[tengine](http://tengine.taobao.org/)。
+2. 下载[nginx](https://nginx.org/)或[tengine](https://tengine.taobao.org/)。
 
 3. ./configure --add-module=/path/to/nginx-tfs
 

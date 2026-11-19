@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # (C) lizi
+# Copyright (C) 2014 Alibaba Group Holding Limited
 
 # Test for tbpass.
 

@@ -1,0 +1,358 @@
+#!/bin/sh
+#
+# Builds the pinned third-party dependencies (Tongsuo, xquic, LuaJIT and the
+# resty Lua libraries) that the full-feature Tengine build links against.
+# Runs inside whatever build environment the caller set up -- an rpmbuild
+# %build section, a dpkg-buildpackage rules file, an APKBUILD build(), or a
+# Dockerfile builder stage -- so it must not assume any of them.
+#
+#     packages/build/build-deps.sh --libdir /usr/lib64/tengine
+#
+# Options:
+#     --srcdir DIR     where fetch-deps.sh put the tarballs [<root>/dist/deps]
+#     --workdir DIR    scratch build tree            [<root>/dist/deps-build]
+#     --staging DIR    DESTDIR-style tree for the files that must end up in
+#                      the package                        [<workdir>/staging]
+#     --libdir DIR     final absolute path of the private library directory,
+#                      e.g. /usr/lib64/tengine                [/usr/lib/tengine]
+#     --datadir DIR    final absolute path of the shared data dir
+#                                                         [/usr/share/tengine]
+#     --jobs N         parallel make jobs                   [nproc or 4]
+#     --env-relative-to DIR
+#                      write the paths that reach ./configure relative to DIR
+#                      (the directory configure will run in) instead of
+#                      absolutely.  Packagers should always pass this: configure
+#                      records its arguments verbatim, so an absolute build path
+#                      is published by `tengine -V` on every installed system for
+#                      the lifetime of the package.  Relative --with-openssl=..
+#                      style paths are the nginx convention anyway.
+#     --without-tongsuo | --without-xquic | --without-lua
+#
+# On success writes <workdir>/deps-env.sh with the variables the Tengine
+# configure step needs, and populates <staging> with the runtime files:
+#
+#     <staging><libdir>/libxquic.so
+#     <staging><libdir>/libluajit-5.1.so.*
+#     <staging><libdir>/lualib/cjson.so
+#     <staging><datadir>/lualib/**.lua
+#
+# The caller copies <staging> into its own buildroot and sources deps-env.sh
+# before calling ./configure.
+#
+# Environment:
+#     TENGINE_DEP_CFLAGS   extra C flags appended to the Tongsuo and xquic
+#                          builds only -- never to Tengine's own.  Empty by
+#                          default, so the packages are unaffected.  This is the
+#                          escape hatch for compilers newer than those two
+#                          pinned releases were written against: the jobs in
+#                          .github/workflows/compiler-warnings.yml pass
+#                          "-std=gnu17 -Wno-error" so that a diagnostic gcc 15
+#                          or clang 21 invented inside third-party code, or the
+#                          C23-by-default dialect switch in gcc 15, cannot be
+#                          mistaken for a finding about Tengine.
+#
+
+set -eu
+
+SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+SRC_ROOT=$(cd "$SELF_DIR/../.." && pwd)
+
+SRCDIR="$SRC_ROOT/dist/deps"
+WORKDIR="$SRC_ROOT/dist/deps-build"
+STAGING=""
+LIBDIR="/usr/lib/tengine"
+DATADIR="/usr/share/tengine"
+JOBS=""
+ENV_RELATIVE_TO=""
+WITH_TONGSUO=yes
+WITH_XQUIC=yes
+WITH_LUA=yes
+: "${TENGINE_DEP_CFLAGS:=}"
+
+die() { printf '%s: error: %s\n' "${0##*/}" "$*" >&2; exit 1; }
+info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --srcdir)           SRCDIR=$2; shift 2 ;;
+        --workdir)          WORKDIR=$2; shift 2 ;;
+        --staging)          STAGING=$2; shift 2 ;;
+        --libdir)           LIBDIR=$2; shift 2 ;;
+        --datadir)          DATADIR=$2; shift 2 ;;
+        --jobs)             JOBS=$2; shift 2 ;;
+        --env-relative-to)  ENV_RELATIVE_TO=$2; shift 2 ;;
+        --without-tongsuo)  WITH_TONGSUO=no; shift ;;
+        --without-xquic)    WITH_XQUIC=no; shift ;;
+        --without-lua)      WITH_LUA=no; shift ;;
+        -h|--help)          sed -n '3,/^$/p' "$0" | sed -e 's/^#\{1,2\} \{0,1\}//'; exit 0 ;;
+        *)                  die "unknown option: $1" ;;
+    esac
+done
+
+. "$SELF_DIR/deps.env"
+
+[ -n "$STAGING" ] || STAGING="$WORKDIR/staging"
+if [ -z "$JOBS" ]; then
+    JOBS=$( (command -v nproc >/dev/null 2>&1 && nproc) || echo 4)
+fi
+
+# xquic is written in C but links against libstdc++, and its build needs a
+# reasonably modern CMake. el7-era images ship CMake 2.8 as "cmake" and 3.x as
+# "cmake3", so probe both.
+find_cmake() {
+    for c in cmake3 cmake; do
+        command -v "$c" >/dev/null 2>&1 || continue
+        v=$("$c" --version 2>/dev/null | head -n 1 | sed 's/[^0-9.]*\([0-9.]*\).*/\1/')
+        [ -n "$v" ] || continue
+        if [ "$(printf '%s\n3.5\n' "$v" | sort -V | head -n 1)" = "3.5" ]; then
+            echo "$c"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# GitHub tarballs unpack into a single well-known directory, recorded in
+# deps.env so it does not have to be guessed from the tag.
+unpack() {
+    id=$1
+    eval "spec=\${dep_$id:-}"
+    [ -n "$spec" ] || die "unknown dependency id '$id'"
+    # shellcheck disable=SC2086  # deliberate word splitting of the 4 fields
+    set -- $spec
+    tag=$2
+    dir=$3
+
+    tarball="$SRCDIR/$id-$tag.tar.gz"
+    [ -f "$tarball" ] || die "missing $tarball (run packages/build/fetch-deps.sh)"
+
+    if [ ! -d "$WORKDIR/$dir" ]; then
+        info "unpacking $id-$tag"
+        tar -xzf "$tarball" -C "$WORKDIR"
+    fi
+    UNPACKED="$WORKDIR/$dir"
+}
+
+# Only directories that always get content are created here: an empty lualib
+# would end up unpackaged in a --without-lua build and rpmbuild treats that as
+# an error.
+mkdir -p "$WORKDIR" "$STAGING$LIBDIR"
+
+: > "$WORKDIR/deps-env.sh"
+emit() { printf '%s\n' "$1" >> "$WORKDIR/deps-env.sh"; }
+emit "# Generated by packages/build/build-deps.sh -- do not edit."
+
+# Rewrites an absolute path to be relative to --env-relative-to, lexically: no
+# readlink, no realpath --relative-to (missing from busybox). Only the paths
+# that end up on configure's command line go through this; everything this
+# script builds with stays absolute, so a wrong guess here cannot break a
+# build, only leave a path in `tengine -V`.
+env_path() {
+    [ -n "$ENV_RELATIVE_TO" ] || { printf '%s' "$1"; return 0; }
+    case $1 in /*) ;; *) printf '%s' "$1"; return 0 ;; esac
+
+    _target=$1
+    _base=$ENV_RELATIVE_TO
+    _up=""
+    while :; do
+        case $_target in
+            "$_base"/*) break ;;
+        esac
+        _base=${_base%/*}
+        _up="../$_up"
+        # No common ancestor left: keep the absolute path rather than emit
+        # something that resolves to the wrong place.
+        [ -n "$_base" ] || { printf '%s' "$1"; return 0; }
+    done
+    printf '%s' "$_up${_target#"$_base"/}"
+}
+
+# --------------------------------------------------------------------- LuaJIT
+
+if [ "$WITH_LUA" = yes ]; then
+    unpack luajit2
+    luajit_src=$UNPACKED
+    luajit_prefix="$WORKDIR/luajit"
+
+    if [ ! -f "$luajit_prefix/lib/libluajit-5.1.so.2" ]; then
+        info "building LuaJIT"
+        # -fPIC is required: ngx_http_lua_module links libluajit into the
+        # Tengine binary, and cjson.so links against it as well.
+        make -C "$luajit_src" -j"$JOBS" CCDEBUG=-g CFLAGS=-fPIC PREFIX="$luajit_prefix"
+        make -C "$luajit_src" install PREFIX="$luajit_prefix"
+    fi
+
+    luajit_inc=$(ls -d "$luajit_prefix"/include/luajit-* 2>/dev/null | head -n 1)
+    [ -n "$luajit_inc" ] || die "LuaJIT headers not found under $luajit_prefix/include"
+
+    # Ship the shared library inside the package's private libdir. The Tengine
+    # binary finds it at runtime through the rpath added in configure-args.sh.
+    cp -a "$luajit_prefix"/lib/libluajit-5.1.so* "$STAGING$LIBDIR/"
+
+    emit "export LUAJIT_LIB=$luajit_prefix/lib"
+    emit "export LUAJIT_INC=$luajit_inc"
+    emit "export TENGINE_WITH_LUA=yes"
+else
+    emit "export TENGINE_WITH_LUA=no"
+fi
+
+# -------------------------------------------------------------------- Tongsuo
+
+# Tongsuo is needed both as xquic's SSL backend and as Tengine's own OpenSSL
+# (ngx_tongsuo_ntls only defines T_NGX_SSL_NTLS when --with-openssl is used).
+# Its static libraries are built once, consumed by xquic from the source tree,
+# and the tree is then cleaned so Tengine's configure can rebuild it itself --
+# the same sequence as .github/workflows/test-ntls.yml.
+if [ "$WITH_TONGSUO" = yes ]; then
+    unpack tongsuo
+    tongsuo_src=$UNPACKED
+
+    if [ ! -f "$tongsuo_src/libssl.a" ] && [ ! -f "$tongsuo_src/.tengine-cleaned" ]; then
+        info "building Tongsuo (static, NTLS enabled)"
+        # -fPIC is explicit: the archives get linked into libxquic.so, and a
+        # no-shared OpenSSL build does not guarantee position independent code.
+        #
+        # Only the archives are wanted here, so stop at build_libs and skip the
+        # test suite: xquic links libssl.a/libcrypto.a, and Tengine's configure
+        # rebuilds this tree from scratch anyway. Building apps/ and test/ would
+        # add a large amount of compile time -- painful with an el7-era gcc --
+        # and one more chance to fail on code the package never ships.
+        # shellcheck disable=SC2086  # deliberate word splitting of the flags
+        ( cd "$tongsuo_src" && ./config --prefix=/usr/local/tongsuo \
+            enable-ntls no-shared no-tests -fPIC $TENGINE_DEP_CFLAGS \
+            && make -j"$JOBS" build_libs )
+    fi
+
+    emit "export TENGINE_TONGSUO_SRC=$(env_path "$tongsuo_src")"
+    emit "export TENGINE_WITH_TONGSUO=yes"
+else
+    emit "export TENGINE_WITH_TONGSUO=no"
+fi
+
+# ---------------------------------------------------------------------- xquic
+
+if [ "$WITH_XQUIC" = yes ]; then
+    [ "$WITH_TONGSUO" = yes ] || die "--without-tongsuo cannot be combined with xquic (SSL_TYPE=babassl)"
+
+    cmake_bin=$(find_cmake) || die "xquic needs CMake >= 3.5 (install cmake or cmake3)"
+
+    unpack xquic
+    xquic_src=$UNPACKED
+
+    if [ ! -f "$xquic_src/build/libxquic.so" ]; then
+        info "building xquic against Tongsuo"
+        # xquic compiles with -std=gnu11 and trips a handful of warnings that
+        # distro hardening flags would otherwise turn fatal. -Wno-dangling-pointer
+        # and -Wno-stringop-truncation only exist on GCC; clang merely warns
+        # about the unknown option, so gate them on the compiler in use.
+        xqc_cflags="-Wno-deprecated-declarations"
+        if ! ${CC:-cc} --version 2>/dev/null | grep -qi clang; then
+            xqc_cflags="$xqc_cflags -Wno-dangling-pointer -Wno-stringop-truncation"
+        fi
+        # Appended last so a caller can override the dialect and demote the
+        # -Werror that xquic's own CMakeLists turns on.  Only when non-empty, so
+        # the default leaves the flags byte-identical to what the packages have
+        # always been built with.
+        [ -z "$TENGINE_DEP_CFLAGS" ] || xqc_cflags="$xqc_cflags $TENGINE_DEP_CFLAGS"
+
+        mkdir -p "$xquic_src/build"
+        # Force the Makefiles generator: newer CMake (Alpine 3.23+/CMake 4.x)
+        # defaults to Ninja when no -G is given, which is not in makedepends and
+        # makes configure abort with "CMAKE_MAKE_PROGRAM is not set". The build
+        # drives `make xquic` below regardless, so pin the generator to match.
+        ( cd "$xquic_src/build" && "$cmake_bin" .. \
+            -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="$xqc_cflags" \
+            -DXQC_SUPPORT_SENDMMSG_BUILD=1 \
+            -DXQC_ENABLE_BBR2=1 \
+            -DXQC_ENABLE_RENO=1 \
+            -DSSL_TYPE=babassl \
+            -DSSL_PATH="$tongsuo_src" \
+            -DSSL_INC_PATH="$tongsuo_src/include" \
+            -DSSL_LIB_PATH="$tongsuo_src/libssl.a;$tongsuo_src/libcrypto.a" \
+          && make -j"$JOBS" xquic )
+    fi
+
+    cp -a "$xquic_src/build/libxquic.so" "$STAGING$LIBDIR/"
+
+    emit "export TENGINE_XQUIC_INC=$(env_path "$xquic_src/include")"
+    emit "export TENGINE_XQUIC_LIB=$(env_path "$xquic_src/build")"
+    # The module's config hardcodes -Wl,-rpath=<xquic lib>; point that at the
+    # installed location instead of this scratch build tree.
+    emit "export TENGINE_XQUIC_RPATH=$LIBDIR"
+    emit "export TENGINE_WITH_XQUIC=yes"
+else
+    emit "export TENGINE_WITH_XQUIC=no"
+fi
+
+# Tongsuo's tree is handed to Tengine's configure, which builds it again with
+# its own options; drop the objects built for xquic so the two do not mix.
+if [ "$WITH_TONGSUO" = yes ] && [ ! -f "$tongsuo_src/.tengine-cleaned" ]; then
+    info "cleaning Tongsuo tree for Tengine's own build"
+    make -C "$tongsuo_src" clean >/dev/null 2>&1 || true
+    : > "$tongsuo_src/.tengine-cleaned"
+fi
+
+# ----------------------------------------------------------- Lua runtime libs
+
+if [ "$WITH_LUA" = yes ]; then
+    lualib="$STAGING$DATADIR/lualib"
+    clualib="$STAGING$LIBDIR/lualib"
+    mkdir -p "$lualib" "$clualib"
+
+    # Pure Lua libraries: every one of these ships its modules under lib/, so
+    # copying that verbatim is both simpler and more stable across releases
+    # than driving each project's own install target.
+    for id in resty_core resty_lrucache resty_string resty_lock resty_dns resty_http; do
+        unpack "$id"
+        [ -d "$UNPACKED/lib" ] || die "$id: no lib/ directory to install"
+        info "installing Lua modules from $id"
+        cp -R "$UNPACKED/lib/." "$lualib/"
+    done
+
+    # cjson is a C module and has to be compiled against LuaJIT's headers.
+    unpack cjson
+    cjson_src=$UNPACKED
+    if [ ! -f "$cjson_src/cjson.so" ]; then
+        info "building lua-cjson"
+        make -C "$cjson_src" -j"$JOBS" \
+            LUA_INCLUDE_DIR="$luajit_inc" \
+            CFLAGS="-O3 -fPIC -Wall -pedantic -DNDEBUG"
+    fi
+    cp -a "$cjson_src/cjson.so" "$clualib/"
+    # cjson.util is optional but tiny, and scripts that require it break in
+    # confusing ways when it is absent.
+    if [ -f "$cjson_src/lua/cjson/util.lua" ]; then
+        mkdir -p "$lualib/cjson"
+        cp -a "$cjson_src/lua/cjson/util.lua" "$lualib/cjson/"
+    fi
+
+    emit "export TENGINE_LUALIB_DIR=$DATADIR/lualib"
+    emit "export TENGINE_LUA_CLIB_DIR=$LIBDIR/lualib"
+fi
+
+# ------------------------------------------------------------------- licenses
+
+# The package now redistributes several upstream projects, so their licence
+# texts have to travel with it.  Some of the openresty Lua libraries carry no
+# separate licence file and state their (BSD) terms in the README instead, so
+# that is the fallback.
+licdir="$STAGING$DATADIR/licenses"
+mkdir -p "$licdir"
+for id in $TENGINE_DEP_IDS; do
+    eval "spec=\${dep_$id:-}"
+    # shellcheck disable=SC2086
+    set -- $spec
+    dir=$3
+    [ -d "$WORKDIR/$dir" ] || continue
+    for f in LICENSE LICENSE.txt LICENSE.md COPYING COPYRIGHT README.markdown README.md; do
+        if [ -f "$WORKDIR/$dir/$f" ]; then
+            cp -a "$WORKDIR/$dir/$f" "$licdir/$id-$f"
+            break
+        fi
+    done
+done
+
+info "dependency build complete; env written to $WORKDIR/deps-env.sh"
+cat "$WORKDIR/deps-env.sh"

@@ -16,7 +16,13 @@
 typedef enum {
     NGX_INGRESS_SHARED_MEMORY_TYPE_EMPTY        = 0,
     NGX_INGRESS_SHARED_MEMORY_TYPE_SERVICE      = 1,
+    NGX_INGRESS_SHARED_MEMORY_TYPE_SECRET       = 2,  /* ShmSecretCfg: dynamic certificate data */
 } ngx_ingress_shared_memory_type_e;
+
+typedef enum {
+    NGX_INGRESS_SHARED_MEMORY_STATUS_INGRESS      = 0,
+    NGX_INGRESS_SHARED_MEMORY_STATUS_SERVICE      = 1,
+} ngx_ingress_shared_memory_status_type_e;
 
 typedef enum {
     NGX_INGRESS_SHARED_MEMORY_TYPE_SUCCESS      = 0,
@@ -41,7 +47,9 @@ typedef struct {
 ngx_ingress_shared_memory_t *ngx_ingress_shared_memory_create(ngx_str_t *shm_name, ngx_uint_t shm_size, ngx_str_t *lock_file);
 void ngx_ingress_shared_memory_free(ngx_ingress_shared_memory_t *shared);
 
-ngx_int_t ngx_ingress_shared_memory_write_status(ngx_ingress_shared_memory_t *shared, ngx_ingress_shared_memory_status_e status);
+ngx_int_t ngx_ingress_shared_memory_write_status(ngx_ingress_shared_memory_t *shared,
+    ngx_ingress_shared_memory_status_type_e status_type,
+    ngx_ingress_shared_memory_status_e status);
 
 typedef enum {
     ngx_ingress_pb_read_version = 1,
@@ -51,5 +59,6 @@ typedef enum {
 ngx_int_t ngx_ingress_shared_memory_read_pb(ngx_ingress_shared_memory_t *shared, ngx_ingress_shared_memory_config_t *shm_pb_config, ngx_ingress_pb_read_mode_e mode);
 void ngx_ingress_shared_memory_free_pb(ngx_ingress_shared_memory_config_t *shm_pb_config);
 
+#define NGX_INGRESS_METADATA_KEY_API_TYPE           "api-type"
 
 #endif // NGX_INGRESS_PROTOBUF_H

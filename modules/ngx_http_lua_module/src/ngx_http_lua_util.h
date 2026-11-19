@@ -32,6 +32,20 @@
 
 #define NGX_HTTP_LUA_ESCAPE_HEADER_VALUE  8
 
+#ifdef HAVE_PROXY_SSL_PATCH
+
+#define NGX_HTTP_LUA_CONTEXT_YIELDABLE (NGX_HTTP_LUA_CONTEXT_REWRITE         \
+                                | NGX_HTTP_LUA_CONTEXT_SERVER_REWRITE        \
+                                | NGX_HTTP_LUA_CONTEXT_ACCESS                \
+                                | NGX_HTTP_LUA_CONTEXT_CONTENT               \
+                                | NGX_HTTP_LUA_CONTEXT_TIMER                 \
+                                | NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY      \
+                                | NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO      \
+                                | NGX_HTTP_LUA_CONTEXT_SSL_CERT              \
+                                | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH)
+
+#else
+
 #define NGX_HTTP_LUA_CONTEXT_YIELDABLE (NGX_HTTP_LUA_CONTEXT_REWRITE         \
                                 | NGX_HTTP_LUA_CONTEXT_SERVER_REWRITE        \
                                 | NGX_HTTP_LUA_CONTEXT_ACCESS                \
@@ -41,10 +55,40 @@
                                 | NGX_HTTP_LUA_CONTEXT_SSL_CERT              \
                                 | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH)
 
+#endif  /* HAVE_PROXY_SSL_PATCH */
+
 
 /* key in Lua vm registry for all the "ngx.ctx" tables */
 #define ngx_http_lua_ctx_tables_key  "ngx_lua_ctx_tables"
 
+
+#ifdef HAVE_PROXY_SSL_PATCH
+
+#define ngx_http_lua_context_name(c)                                         \
+    ((c) == NGX_HTTP_LUA_CONTEXT_SET ? "set_by_lua*"                         \
+     : (c) == NGX_HTTP_LUA_CONTEXT_REWRITE ? "rewrite_by_lua*"               \
+     : (c) == NGX_HTTP_LUA_CONTEXT_SERVER_REWRITE ? "server_rewrite_by_lua*" \
+     : (c) == NGX_HTTP_LUA_CONTEXT_ACCESS ? "access_by_lua*"                 \
+     : (c) == NGX_HTTP_LUA_CONTEXT_CONTENT ? "content_by_lua*"               \
+     : (c) == NGX_HTTP_LUA_CONTEXT_LOG ? "log_by_lua*"                       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_HEADER_FILTER ? "header_filter_by_lua*"   \
+     : (c) == NGX_HTTP_LUA_CONTEXT_BODY_FILTER ? "body_filter_by_lua*"       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_TIMER ? "ngx.timer"                       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_INIT_WORKER ? "init_worker_by_lua*"       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_EXIT_WORKER ? "exit_worker_by_lua*"       \
+     : (c) == NGX_HTTP_LUA_CONTEXT_BALANCER ? "balancer_by_lua*"             \
+     : (c) == NGX_HTTP_LUA_CONTEXT_PROXY_SSL_VERIFY ?                        \
+                                                 "proxy_ssl_verify_by_lua*"  \
+     : (c) == NGX_HTTP_LUA_CONTEXT_SSL_CLIENT_HELLO ?                        \
+                                                 "ssl_client_hello_by_lua*"  \
+     : (c) == NGX_HTTP_LUA_CONTEXT_SSL_CERT ? "ssl_certificate_by_lua*"      \
+     : (c) == NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE ?                          \
+                                                 "ssl_session_store_by_lua*" \
+     : (c) == NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH ?                          \
+                                                 "ssl_session_fetch_by_lua*" \
+     : "(unknown)")
+
+#else
 
 #define ngx_http_lua_context_name(c)                                         \
     ((c) == NGX_HTTP_LUA_CONTEXT_SET ? "set_by_lua*"                         \
@@ -67,6 +111,8 @@
      : (c) == NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH ?                          \
                                                  "ssl_session_fetch_by_lua*" \
      : "(unknown)")
+
+#endif  /* HAVE_PROXY_SSL_PATCH */
 
 
 #define ngx_http_lua_check_context(L, ctx, flags)                            \
@@ -261,10 +307,15 @@ void ngx_http_lua_cleanup_free(ngx_http_request_t *r,
 #if (NGX_HTTP_LUA_HAVE_SA_RESTART)
 void ngx_http_lua_set_sa_restart(ngx_log_t *log);
 #endif
+ngx_int_t ngx_http_lua_decode_base64mime(ngx_str_t *dst, ngx_str_t *src);
 
 ngx_addr_t *ngx_http_lua_parse_addr(lua_State *L, u_char *text, size_t len);
 
 size_t ngx_http_lua_escape_log(u_char *dst, u_char *src, size_t size);
+
+#if (HAVE_QUIC_SSL_LUA_YIELD_PATCH && NGX_HTTP_V3)
+void ngx_http_lua_resume_quic_ssl_handshake(ngx_connection_t *c);
+#endif
 
 
 static ngx_inline void

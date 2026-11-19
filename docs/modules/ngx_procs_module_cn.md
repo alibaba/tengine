@@ -3,13 +3,6 @@
 
 提供一个让Tengine可以通过写不同模块启动独立进程的机制。
 
-# 代码实例 #
-
-一个时间回送服务器模块，它运行在一个独立的进程里。
-
-http://tengine.taobao.org/examples/ngx_proc_daytime_module
-
-
 # 例子 #
 
     processes {

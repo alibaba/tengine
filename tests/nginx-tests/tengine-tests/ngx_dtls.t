@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright (C) 2019 Alibaba Group Holding Limited
+# Copyright (C) 2020 Alibaba Group Holding Limited
 
 # DTLS test.
 

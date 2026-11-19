@@ -28,7 +28,7 @@ Enables SSL/TLS asynchronous mode for the given virtual server.
 Example
 ==========
 
-file: conf/nginx.conf
+file: conf/tengine.conf
 '''
     http {
         ssl_async  on;

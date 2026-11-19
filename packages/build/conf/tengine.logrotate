@@ -1,0 +1,15 @@
+/var/log/tengine/*.log {
+    daily
+    missingok
+    rotate 52
+    compress
+    delaycompress
+    notifempty
+    create 640 tengine adm
+    sharedscripts
+    postrotate
+        if [ -f /run/tengine.pid ]; then
+            kill -USR1 `cat /run/tengine.pid`
+        fi
+    endscript
+}

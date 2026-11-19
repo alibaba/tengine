@@ -65,24 +65,25 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
 
     if (pc->rcvbuf) {
         if (setsockopt(s, SOL_SOCKET, SO_RCVBUF,
-                       (const void *) &pc->rcvbuf, sizeof(int)) == -1)
+                       (const void *) &pc->rcvbuf, sizeof(int))
+            == -1)
         {
             ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                          "setsockopt(SO_RCVBUF) failed");
-            goto failed;
+                          "setsockopt(SO_RCVBUF, %d) failed, ignored",
+                          pc->rcvbuf);
         }
     }
-#if (T_NGX_SOCKET_BUFFER)
+
     if (pc->sndbuf) {
         if (setsockopt(s, SOL_SOCKET, SO_SNDBUF,
-                       (const void *) &pc->sndbuf, sizeof(int)) == -1)
+                       (const void *) &pc->sndbuf, sizeof(int))
+            == -1)
         {
             ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                          "setsockopt(SO_SNDBUF) failed");
-            goto failed;
+                          "setsockopt(SO_SNDBUF, %d) failed, ignored",
+                          pc->sndbuf);
         }
     }
-#endif
 
     if (pc->so_keepalive) {
         value = 1;

@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+# Copyright (C) 2013 Alibaba Group Holding Limited
+
 # Tests for variable
 
 ###############################################################################

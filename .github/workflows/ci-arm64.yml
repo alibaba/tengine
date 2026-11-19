@@ -7,7 +7,15 @@ on:
 
 jobs:
   build-arm64:
+    name: build arm64 (${{ matrix.compiler.compiler }})
     runs-on: "ubuntu-24.04"
+    # run-on-arch-action caches its QEMU aarch64 image in GHCR when githubToken
+    # is set. Declare the scopes explicitly: with a read-only default token the
+    # cache push fails silently (the action swallows it) and every run rebuilds
+    # the base image from scratch.
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -16,12 +24,14 @@ jobs:
          - { compiler: LLVM, CC: clang, CXX: clang++}
     steps:
       - name: Checkout Tengine
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: 'checkout luajit2'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/luajit2
+          # Pinned (the LuaJIT fork ngx_http_lua_module requires); keep in sync with packages/build/deps.env.
+          ref: v2.1-20260724
           path: luajit2
 
       - name: Compile with ${{ matrix.compiler.compiler }}
@@ -87,4 +97,4 @@ jobs:
               --without-http_upstream_keepalive_module
             make -j4
             make install
-            file /usr/local/nginx/sbin/nginx | grep aarch64
+            file /usr/local/tengine/sbin/tengine | grep aarch64

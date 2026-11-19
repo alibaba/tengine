@@ -89,7 +89,10 @@ like($r, qr/^Expires: fake/m, 'Expires preserved');
 like($r, qr/^Accept-Ranges: parrots/m, 'Accept-Ranges preserved');
 unlike($r, qr/^Something/m, 'other headers stripped');
 
-like(http_post('/proxy?xar=/index.html'), qr/method: GET/,
+# Tengine T_NGX_X_ACCEL_REDIRECT (enabled by default) preserves the
+# original request method name on X-Accel-Redirect instead of resetting
+# it to GET as stock nginx does, so $request_method stays POST here.
+like(http_post('/proxy?xar=/index.html'), qr/method: POST/,
 	'X-Accel-Redirect method name');
 
 # escaped characters

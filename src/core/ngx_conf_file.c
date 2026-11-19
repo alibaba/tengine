@@ -217,6 +217,9 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
         type = parse_file;
 
         if (ngx_dump_config
+#if (NGX_CONTROL_API)
+            || ngx_control_api_enabled
+#endif
 #if (NGX_DEBUG)
             || 1
 #endif
@@ -566,7 +569,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
                 } else {
                     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                        "too long parameter \"%*s...\" started",
-                                       10, start);
+                                       (size_t) 10, start);
                     return NGX_ERROR;
                 }
 

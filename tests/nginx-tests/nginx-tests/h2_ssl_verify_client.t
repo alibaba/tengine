@@ -23,9 +23,11 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()->has(qw/http http_ssl sni http_v2 socket_ssl_alpn/)
 	->has_daemon('openssl');
+
+plan(skip_all => 'no ALPN support in OpenSSL')
+	if $t->has_module('OpenSSL') and not $t->has_feature('openssl:1.0.2');
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -39,6 +41,8 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
+    http2 on;
+
     ssl_certificate_key localhost.key;
     ssl_certificate localhost.crt;
 
@@ -47,7 +51,7 @@ http {
     add_header X-Verify $ssl_client_verify;
 
     server {
-        listen       127.0.0.1:8080 ssl http2;
+        listen       127.0.0.1:8443 ssl;
         server_name  localhost;
 
         ssl_client_certificate client.crt;
@@ -56,7 +60,7 @@ http {
     }
 
     server {
-        listen       127.0.0.1:8080 ssl http2;
+        listen       127.0.0.1:8443 ssl;
         server_name  example.com;
 
         location / { }
@@ -84,14 +88,7 @@ foreach my $name ('localhost', 'client') {
 }
 
 $t->write_file('t', 'SEE-THIS');
-
-open OLDERR, ">&", \*STDERR; close STDERR;
-$t->run();
-open STDERR, ">&", \*OLDERR;
-
-my $s = get_ssl_socket();
-plan(skip_all => 'no alpn') unless $s->alpn_selected();
-$t->plan(3);
+$t->run()->plan(3);
 
 ###############################################################################
 
@@ -103,33 +100,12 @@ is(get('localhost', 'example.com')->{':status'}, '421', 'misdirected');
 
 sub get_ssl_socket {
 	my ($sni) = @_;
-	my $s;
-
-	eval {
-		local $SIG{ALRM} = sub { die "timeout\n" };
-		local $SIG{PIPE} = sub { die "sigpipe\n" };
-		alarm(8);
-		$s = IO::Socket::SSL->new(
-			Proto => 'tcp',
-			PeerAddr => '127.0.0.1',
-			PeerPort => port(8080),
-			SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE(),
-			SSL_alpn_protocols => [ 'h2' ],
-			SSL_hostname => $sni,
-			SSL_cert_file => "$d/client.crt",
-			SSL_key_file => "$d/client.key",
-			SSL_error_trap => sub { die $_[1] }
-		);
-		alarm(0);
-	};
-	alarm(0);
-
-	if ($@) {
-		log_in("died: $@");
-		return undef;
-	}
-
-	return $s;
+	http('', start => 1,
+		SSL => 1,
+		SSL_alpn_protocols => [ 'h2' ],
+		SSL_hostname => $sni,
+		SSL_cert_file => "$d/client.crt",
+		SSL_key_file => "$d/client.key");
 }
 
 sub get {

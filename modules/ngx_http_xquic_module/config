@@ -16,6 +16,8 @@ NGX_ADDON_DEPS="$NGX_ADDON_DEPS \
                 $ngx_addon_dir/ngx_xquic_intercom.h \
                 $ngx_addon_dir/ngx_xquic_recv.h \
                 $ngx_addon_dir/ngx_xquic_send.h \
+                $ngx_addon_dir/ngx_xquic_file.h \
+                $ngx_addon_dir/ngx_xquic_ssl_conf.h \
                 $ngx_addon_dir/ngx_http_v3_stream.h"
 
 NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
@@ -26,13 +28,20 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
                 $ngx_addon_dir/ngx_xquic_recv.c \
                 $ngx_addon_dir/ngx_xquic_send.c \
                 $ngx_addon_dir/ngx_http_v3_stream.c \
-                $ngx_addon_dir/ngx_http_xquic_filter_module.c"
+                $ngx_addon_dir/ngx_http_xquic_filter_module.c \
+                $ngx_addon_dir/ngx_http_xquic_dynamic_cert.c"
 
 CORE_INCS="$CORE_INCS \
            $ngx_addon_dir \
-           $XQUIC_INC"
+           $XQUIC_INC \
+           $ngx_addon_dir/../ngx_http_lua_module/src"
+
+# The runtime path defaults to the link path, which is what a plain source
+# build wants. Packaged builds link against a scratch build tree but have to
+# record the installed location instead, so they pass --with-xquic-rpath.
+ngx_xquic_rpath=${XQUIC_RPATH:-$XQUIC_LIB}
 
 CORE_LIBS="$CORE_LIBS \
-           -L$XQUIC_LIB -lxquic -Wl,-rpath=$XQUIC_LIB -lrt -pthread -lm"
+           -L$XQUIC_LIB -lxquic -Wl,-rpath=$ngx_xquic_rpath -lrt -pthread -lm -lstdc++"
 
 have=T_NGX_XQUIC . auto/have

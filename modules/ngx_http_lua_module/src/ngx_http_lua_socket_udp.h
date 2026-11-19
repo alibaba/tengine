@@ -42,6 +42,8 @@ struct ngx_http_lua_socket_udp_upstream_s {
     ngx_http_request_t              *request;
     ngx_http_lua_udp_connection_t    udp_connection;
 
+    ngx_addr_t                      *local;
+
     ngx_msec_t                       read_timeout;
 
     ngx_http_upstream_resolved_t    *resolved;
@@ -53,7 +55,7 @@ struct ngx_http_lua_socket_udp_upstream_s {
 
     ngx_http_lua_co_ctx_t           *co_ctx;
 
-    unsigned                         waiting; /* :1 */
+    unsigned                         waiting:1; /* :1 */
 };
 
 

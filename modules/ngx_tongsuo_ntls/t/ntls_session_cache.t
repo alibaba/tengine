@@ -47,12 +47,9 @@ http {
     ssl_session_tickets off;
 
     server {
-        listen       127.0.0.1:9031;
+        listen       127.0.0.1:9031 ssl;
         server_name  localhost;
 
-        # Special case for enabled "ssl" directive.
-
-        ssl on;
         ssl_session_cache builtin;
         ssl_session_timeout 1;
 

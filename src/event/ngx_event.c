@@ -376,9 +376,9 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 {
     ngx_connection_t  *c;
 
-    if (lowat) {
-        c = wev->data;
+    c = wev->data;
 
+    if (lowat) {
         if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
             return NGX_ERROR;
         }

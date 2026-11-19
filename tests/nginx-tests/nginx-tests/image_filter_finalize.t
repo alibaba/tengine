@@ -54,7 +54,7 @@ http {
         listen       127.0.0.1:8080;
         server_name  localhost;
 
-        # this used to cause a segmentation fault before 07f028df3879 (1.3.1)
+        # this used to cause a segmentation fault before d2143f11c (1.3.1)
         # http://nginx.org/pipermail/nginx/2011-January/024703.html
 
         location /t1 {
@@ -74,8 +74,8 @@ http {
             return 404;
         }
 
-        # another segfault, introduced in 204b780a89de (1.3.0),
-        # fixed in 07f028df3879 (1.3.1)
+        # another segfault, introduced in e302ed6fc (1.3.0),
+        # fixed in d2143f11c (1.3.1)
 
         location /t2 {
             proxy_pass http://127.0.0.1:8080/big;
@@ -141,11 +141,5 @@ like(http_get('/t2'), qr/HTTP/, 'image filter and store');
 http_get('/slow');
 http_get('/t3');
 like(http_get('/time.log'), qr!/t3:.*, [1-9]\.!, 'upstream response time');
-
-# "aio_write" is used to produce the following alert on some platforms:
-# "readv() failed (9: Bad file descriptor) while reading upstream"
-
-$t->todo_alerts() if $t->read_file('nginx.conf') =~ /aio_write on/
-	and $t->read_file('nginx.conf') =~ /aio threads/;
 
 ###############################################################################

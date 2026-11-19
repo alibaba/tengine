@@ -57,9 +57,6 @@ $t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 like(http_get('/'), qr/200 OK/, 'normal');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.23.0');
-
 like(http_get('/invalid-length'), qr/502 Bad/, 'invalid length');
 like(http_get('/duplicate-length'), qr/502 Bad/, 'duplicate length');
 like(http_get('/unknown-transfer-encoding'), qr/502 Bad/,
@@ -73,8 +70,6 @@ like(http_get('/transfer-encoding-and-length'), qr/502 Bad/,
 
 like(http_get('/duplicate-expires'), qr/Expires: foo(?!.*bar)/s,
 	'duplicate expires ignored');
-
-}
 
 ###############################################################################
 

@@ -289,12 +289,14 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_worker.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_client_helloby.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_certby.c \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_export_keying_material.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_ocsp.c \
             $ngx_addon_dir/src/ngx_http_lua_lex.c \
             $ngx_addon_dir/src/ngx_http_lua_balancer.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_session_storeby.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl_session_fetchby.c \
             $ngx_addon_dir/src/ngx_http_lua_ssl.c \
+            $ngx_addon_dir/src/ngx_http_lua_proxy_ssl_verifyby.c \
             $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.c \
             $ngx_addon_dir/src/ngx_http_lua_input_filters.c \
             $ngx_addon_dir/src/ngx_http_lua_pipe.c \
@@ -354,9 +356,11 @@ HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ngx_http_lua_ssl_certby.h \
             $ngx_addon_dir/src/ngx_http_lua_lex.h \
             $ngx_addon_dir/src/ngx_http_lua_balancer.h \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_export_keying_material.h \
             $ngx_addon_dir/src/ngx_http_lua_ssl_session_storeby.h \
             $ngx_addon_dir/src/ngx_http_lua_ssl_session_fetchby.h \
             $ngx_addon_dir/src/ngx_http_lua_ssl.h \
+            $ngx_addon_dir/src/ngx_http_lua_proxy_ssl_verifyby.h \
             $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.h \
             $ngx_addon_dir/src/ngx_http_lua_input_filters.h \
             $ngx_addon_dir/src/ngx_http_lua_pipe.h \
@@ -460,7 +464,8 @@ ngx_feature_libs=
 ngx_feature_name="NGX_HTTP_LUA_HAVE_SIGNALFD"
 ngx_feature_run=no
 ngx_feature_incs="#include <sys/signalfd.h>"
-ngx_feature_test="sigset_t set; signalfd(-1, &set, SFD_NONBLOCK|SFD_CLOEXEC);"
+ngx_feature_test="sigset_t set = { 0 };
+                  signalfd(-1, &set, SFD_NONBLOCK|SFD_CLOEXEC);"
 SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
 CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
 

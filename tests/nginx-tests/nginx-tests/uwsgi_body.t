@@ -11,6 +11,7 @@ use warnings;
 use strict;
 
 use Test::More;
+use Socket qw/ CRLF /;
 
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
@@ -113,15 +114,13 @@ EOF
 sub http_get_chunked {
 	my ($url, $body) = @_;
 	my $length = sprintf("%x", length $body);
-	return http(<<EOF);
+	$body = $length ? $length . CRLF . $body . CRLF : '';
+	$body .= '0' . CRLF . CRLF;
+	return http(<<EOF . $body);
 GET $url HTTP/1.1
 Host: localhost
 Connection: close
 Transfer-Encoding: chunked
-
-$length
-$body
-0
 
 EOF
 }

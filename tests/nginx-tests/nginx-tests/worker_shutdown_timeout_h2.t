@@ -39,8 +39,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         server_name  localhost;
+
+        http2 on;
 
         location / {
             proxy_pass http://127.0.0.1:8081;
@@ -51,11 +53,7 @@ http {
 EOF
 
 $t->run_daemon(\&http_silent_daemon);
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
-$t->run();
-open STDERR, ">&", \*OLDERR;
-$t->waitforsocket('127.0.0.1:' . port(8081));
+$t->run()->waitforsocket('127.0.0.1:' . port(8081));
 
 ###############################################################################
 

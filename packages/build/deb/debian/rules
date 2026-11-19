@@ -1,0 +1,127 @@
+#!/usr/bin/make -f
+#
+# Debian/Ubuntu packaging rules for Tengine.  The configure arguments come
+# from packages/build/configure-args.sh so this package stays byte-for-byte
+# feature-identical to the RPM and APK builds.
+#
+
+# optimize=-lto: dpkg turns LTO on by default and DPKG_EXPORT_BUILDFLAGS hands
+# it to build-deps.sh as well, so Tongsuo's static archives end up carrying LTO
+# bytecode. gcc then re-runs its analysis while linking libxquic.so, where the
+# -Wno-* that build-deps.sh passes no longer apply, and hardening's -Werror
+# turns a free-nonheap-object warning inside BN_RECP_CTX_free fatal. Nothing
+# in this package benefits from LTO.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+CONFDIR   := debian/tengine/etc/tengine
+PKGDIR    := debian/tengine
+# ngx_http_perl_module and the two perl files it needs ship separately.
+PERLPKGDIR := debian/tengine-module-perl
+
+%:
+	dh $@
+
+# Tongsuo, xquic and the Lua stack are built from the pinned sources that
+# build.sh drops in deps/. --libdir is the installed location on purpose:
+# ngx_http_xquic_module records it as libxquic.so's runtime path.
+#
+# The tree defaults to -Werror (auto/cc/gcc); with dpkg hardening flags and an
+# arbitrary gcc version that is a guaranteed build break, so relax it here.
+override_dh_auto_configure:
+	sh packages/build/build-deps.sh \
+		--srcdir deps \
+		--workdir $(CURDIR)/deps-build \
+		--staging $(CURDIR)/deps-staging \
+		--libdir /usr/lib/tengine \
+		--datadir /usr/share/tengine \
+		--env-relative-to $(CURDIR)
+	. $(CURDIR)/deps-build/deps-env.sh; \
+	export TENGINE_LIBDIR=/usr/lib; \
+	export TENGINE_WITH_PERL=yes; \
+	./configure \
+		$$(sh packages/build/configure-args.sh) \
+		--with-cc-opt="$(CFLAGS) $(CPPFLAGS) -Wno-error" \
+		--with-ld-opt="$(LDFLAGS) $$(sh packages/build/configure-args.sh --print-ld-opt)" \
+		--with-openssl-opt="$$(sh packages/build/configure-args.sh --print-openssl-opt)"
+
+override_dh_auto_test:
+
+override_dh_auto_install:
+	# --destdir is required now that the source builds more than one binary
+	# package: without it dh_auto_install switches to debian/tmp and every
+	# path below, all of which are relative to debian/tengine, would miss.
+	dh_auto_install --destdir=$(PKGDIR)
+	# The bundled libxquic.so / libluajit and the Lua modules are staged with
+	# their final absolute paths already in place.
+	cp -a $(CURDIR)/deps-staging/. $(PKGDIR)/
+	#
+	# Split the perl payload out into tengine-module-perl. It is three files
+	# and only the module .so is placed correctly by the build:
+	#
+	#   1. ngx_http_perl_module.so  - nginx's own install rule honours DESTDIR,
+	#      so this one really is under $(PKGDIR).
+	#   2. nginx.pm                 - loaded through the single @INC entry that
+	#      --with-perl_modules_path compiled into the binary.
+	#   3. auto/nginx/nginx.so      - the XS object nginx.pm's XSLoader::load()
+	#      dlopens. Without it the interpreter dies during perl_parse() with
+	#      "Can't locate loadable object for module nginx".
+	#
+	# 2 and 3 cannot come from the install tree: auto/install delegates them to
+	# `$(MAKE) install` in the generated MakeMaker tree, which puts the XS
+	# object in INSTALLSITEARCH -- one directory deeper than the path nginx adds
+	# to @INC -- so DynaLoader would never find it. Both come from blib instead,
+	# with the XS object placed at <@INC dir>/auto/nginx/. Same reasoning as the
+	# container images; see the comment in Dockerfile.
+	rm -rf $(PKGDIR)/usr/lib/tengine/perl $(PKGDIR)/usr/share/man/man3
+	install -d $(PERLPKGDIR)/usr/lib/tengine/modules
+	mv $(PKGDIR)/usr/lib/tengine/modules/ngx_http_perl_module.so \
+		$(PERLPKGDIR)/usr/lib/tengine/modules/
+	install -d $(PERLPKGDIR)/usr/lib/tengine/perl/auto/nginx
+	install -p -m 0644 objs/src/http/modules/perl/blib/lib/nginx.pm \
+		$(PERLPKGDIR)/usr/lib/tengine/perl/nginx.pm
+	install -p -m 0755 objs/src/http/modules/perl/blib/arch/auto/nginx/nginx.so \
+		$(PERLPKGDIR)/usr/lib/tengine/perl/auto/nginx/nginx.so
+	# make install ships the in-tree conf/tengine.conf plus *.default copies;
+	# replace them with the packaged tengine.conf, which adds the conf.d layout.
+	rm -f $(CONFDIR)/*.default
+	install -p -m 0644 packages/build/conf/tengine.conf \
+		$(CONFDIR)/tengine.conf
+	install -d -m 0755 $(CONFDIR)/conf.d
+	install -p -m 0644 packages/build/conf/conf.d/default.conf \
+		$(CONFDIR)/conf.d/default.conf
+	# lua_package_cpath carries a libdir placeholder; deb always uses /usr/lib.
+	sed -i -e 's|@TENGINE_LIBDIR@|/usr/lib|g' $(CONFDIR)/tengine.conf
+	sed -e 's|%%PREFIX%%|/usr/share/tengine|' \
+	    -e 's|%%PID_PATH%%|/run/tengine.pid|' \
+	    -e 's|%%CONF_PATH%%|/etc/tengine/tengine.conf|' \
+	    -e 's|%%ERROR_LOG_PATH%%|/var/log/tengine/error.log|' \
+	    man/tengine.8 > debian/tengine.8
+	install -D -p -m 0644 debian/tengine.8 \
+		$(PKGDIR)/usr/share/man/man8/tengine.8
+	install -d -m 0700 $(PKGDIR)/var/cache/tengine
+	install -d -m 0755 $(PKGDIR)/var/log/tengine
+	install -d -m 0755 $(PKGDIR)/usr/lib/tengine/modules
+	# /run is a tmpfs; make install creates it because of --pid-path
+	rm -rf $(PKGDIR)/run $(PKGDIR)/var/run
+
+override_dh_installsystemd:
+	dh_installsystemd --name=tengine
+
+# libxquic.so and libluajit are private to this package: -l lets dpkg-shlibdeps
+# resolve the tengine binary against them, --ignore-missing-info keeps it from
+# failing because no package "provides" them, and -X keeps dh_makeshlibs from
+# advertising their sonames system-wide.
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/$(PKGDIR)/usr/lib/tengine \
+		--dpkg-shlibdeps-params=--ignore-missing-info
+
+override_dh_makeshlibs:
+	dh_makeshlibs -X/usr/lib/tengine/
+
+override_dh_clean:
+	dh_clean
+	rm -f debian/tengine.8
+	rm -rf objs deps-build deps-staging

@@ -1,0 +1,111 @@
+ngx_feature_incs="#include <zstd.h>"
+ngx_feature_test="(void) ZSTD_createCCtx();"
+ngx_feature_libs=
+ngx_feature_run=yes
+
+ngx_zstd_opt_I=
+ngx_zstd_opt_L=
+
+if [ -n "$ZSTD_INC" -o -n "$ZSTD_LIB" ]; then
+    ngx_feature="ZStandard static library in $ZSTD_INC and $ZSTD_LIB"
+    ngx_feature_path=$ZSTD_INC
+
+    # we try the static shared library firstly
+    ngx_zstd_opt_I="-I$ZSTD_INC -DZSTD_STATIC_LINKING_ONLY"
+    ngx_zstd_opt_L="$ZSTD_LIB/libzstd.a"
+    SAVED_CC_TAST_FLAGS=$CC_TEST_FLAGS
+    CC_TEST_FLAGS="$ngx_zstd_opt_I $CC_TEST_FLAGS"
+    SAVED_NGX_TEST_LD_OPT=$NGX_TEST_LD_OPT
+    NGX_TEST_LD_OPT="$ngx_zstd_opt_L $NGX_TEST_LD_OPT"
+
+    . auto/feature
+
+    # restore
+    CC_TEST_FLAGS=$SAVED_CC_TAST_FLAGS
+    NGX_TEST_LD_OPT=$SAVED_NGX_TEST_LD_OPT
+
+    if [ $ngx_found = no ]; then
+        # then try the dynamic shared library
+        ngx_feature="ZStandard dynamic library in $ZSTD_INC and $ZSTD_LIB"
+        ngx_zstd_opt_L="-L$ZSTD_LIB -lzstd -Wl,-rpath, $ZSTD_LIB"
+
+        SAVED_CC_TAST_FLAGS=$CC_TEST_FLAGS
+        CC_TEST_FLAGS="$ngx_zstd_opt_I $CC_TEST_FLAGS"
+        SAVED_NGX_TEST_LD_OPT=$NGX_TEST_LD_OPT
+        NGX_TEST_LD_OPT="$ngx_zstd_opt_L $NGX_TEST_LD_OPT"
+
+        . auto/feature
+
+        # restore
+        CC_TEST_FLAGS=$SAVED_CC_TAST_FLAGS
+        NGX_TEST_LD_OPT=$SAVED_NGX_TEST_LD_OPT
+
+        if [ $ngx_found = no ]; then
+            cat << END
+            $0: error: ngx_http_zstd_filter_module requires the ZStandard library, please be sure that "\$ZSTD_INC" and "\$ZSTD_LIB" are set correctly.
+END
+            exit 1
+        fi
+
+    fi
+else
+    # auto-discovery
+    ngx_feature="ZStandard static library"
+    ngx_zstd_opt_I="-DZSTD_STATIC_LINKING_ONLY"
+    ngx_zstd_opt_L="-l:libzstd.a"
+
+    # still we consider the static library firstly
+    SAVED_CC_TAST_FLAGS=$CC_TEST_FLAGS
+    CC_TEST_FLAGS="$ngx_zstd_opt_I $CC_TEST_FLAGS"
+    SAVED_NGX_TEST_LD_OPT=$NGX_TEST_LD_OPT
+    NGX_TEST_LD_OPT="$ngx_zstd_opt_L $NGX_TEST_LD_OPT"
+
+    . auto/feature
+
+    # restore
+    CC_TEST_FLAGS=$SAVED_CC_TAST_FLAGS
+    NGX_TEST_LD_OPT=$SAVED_NGX_TEST_LD_OPT
+
+    if [ $ngx_found = no ]; then
+
+        ngx_feature="ZStandard dynamic library"
+        ngx_zstd_opt_L="-lzstd"
+        SAVED_CC_TAST_FLAGS=$CC_TEST_FLAGS
+        CC_TEST_FLAGS="$ngx_zstd_opt_I $CC_TEST_FLAGS"
+        SAVED_NGX_TEST_LD_OPT=$NGX_TEST_LD_OPT
+        NGX_TEST_LD_OPT="$ngx_zstd_opt_L $NGX_TEST_LD_OPT"
+
+        . auto/feature
+
+        if [ $ngx_found = no ]; then
+            cat << END
+            $0: error: ngx_http_zstd_filter_module requires the ZStandard library.
+END
+            exit 1
+        fi
+
+        # restore
+        CC_TEST_FLAGS=$SAVED_CC_TAST_FLAGS
+        NGX_TEST_LD_OPT=$SAVED_NGX_TEST_LD_OPT
+
+        cat << END
+        $0: warning: ngx_http_zstd_filter_module uses advanced ZStandard APIs (which are still considered experimental) while you are trying to link the dynamic shared library.
+END
+    fi
+
+    # TODO we need more tries for the different OS port.
+fi
+
+CFLAGS="$ngx_zstd_opt_I $CFLAGS"
+NGX_LD_OPT="$ngx_zstd_opt_L $NGX_LD_OPT"
+
+# build the ngx_http_zstd_static_module
+HTTP_ZSTD_SRCS="$ngx_addon_dir/static/ngx_http_zstd_static_module.c"
+
+ngx_addon_name=ngx_http_zstd_static_module
+ngx_module_type=HTTP
+ngx_module_name=ngx_http_zstd_static_module
+ngx_module_incs="$ngx_zstd_opt_I"
+ngx_module_srcs=$HTTP_ZSTD_SRCS
+
+. auto/module

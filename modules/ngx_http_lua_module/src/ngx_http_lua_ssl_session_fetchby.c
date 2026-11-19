@@ -416,7 +416,7 @@ ngx_http_lua_ssl_sess_fetch_aborted(void *data)
 {
     ngx_http_lua_ssl_ctx_t          *cctx = data;
 
-    dd("lua ssl sess_fetch done");
+    dd("lua ssl sess_fetch aborted");
 
     if (cctx->done) {
         /* completed successfully already */

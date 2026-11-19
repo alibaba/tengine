@@ -26,13 +26,13 @@ assignees: ''
 
 ### Ⅴ. Anything else we need to know?
 
-1. If applicable, add nginx  [debug log doc](http://nginx.org/en/docs/debugging_log.html).
+1. If applicable, add nginx  [debug log doc](https://nginx.org/en/docs/debugging_log.html).
 2.
 3.
 
 ### Ⅵ. Environment:
 
-- Tengine version (use `sbin/nginx -V`):
+- Tengine version (use `sbin/tengine -V`):
 - OS (e.g. from /etc/os-release):
 - Kernel (e.g. `uname -a`):
 - Others:

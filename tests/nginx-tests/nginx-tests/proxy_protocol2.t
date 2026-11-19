@@ -41,6 +41,7 @@ http {
     add_header X-IP $remote_addr!$remote_port;
     add_header X-PP $proxy_protocol_addr!$proxy_protocol_port;
     add_header X-PPS $proxy_protocol_server_addr!$proxy_protocol_server_port;
+
     server {
         listen       127.0.0.1:8080 proxy_protocol;
         server_name  localhost;

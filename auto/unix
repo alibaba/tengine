@@ -150,9 +150,9 @@ fi
 
 
 ngx_feature="crypt()"
-ngx_feature_name=
+ngx_feature_name="NGX_HAVE_CRYPT"
 ngx_feature_run=no
-ngx_feature_incs=
+ngx_feature_incs="$NGX_INCLUDE_CRYPT_H"
 ngx_feature_path=
 ngx_feature_libs=
 ngx_feature_test="crypt(\"test\", \"salt\");"
@@ -162,9 +162,9 @@ ngx_feature_test="crypt(\"test\", \"salt\");"
 if [ $ngx_found = no ]; then
 
     ngx_feature="crypt() in libcrypt"
-    ngx_feature_name=
+    ngx_feature_name="NGX_HAVE_CRYPT"
     ngx_feature_run=no
-    ngx_feature_incs=
+    ngx_feature_incs="$NGX_INCLUDE_CRYPT_H"
     ngx_feature_path=
     ngx_feature_libs=-lcrypt
     . auto/feature
@@ -448,6 +448,54 @@ ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_RECVPKTINFO, NULL, 0)"
 . auto/feature
 
 
+# IP packet fragmentation
+
+ngx_feature="IP_MTU_DISCOVER"
+ngx_feature_name="NGX_HAVE_IP_MTU_DISCOVER"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="(void) IP_PMTUDISC_DO;
+                  setsockopt(0, IPPROTO_IP, IP_MTU_DISCOVER, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IPV6_MTU_DISCOVER"
+ngx_feature_name="NGX_HAVE_IPV6_MTU_DISCOVER"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="(void) IPV6_PMTUDISC_DO;
+                  setsockopt(0, IPPROTO_IPV6, IPV6_MTU_DISCOVER, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IP_DONTFRAG"
+ngx_feature_name="NGX_HAVE_IP_DONTFRAG"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_DONTFRAG, NULL, 0)"
+. auto/feature
+
+
+ngx_feature="IPV6_DONTFRAG"
+ngx_feature_name="NGX_HAVE_IPV6_DONTFRAG"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_DONTFRAG, NULL, 0)"
+. auto/feature
+
+
 ngx_feature="TCP_DEFER_ACCEPT"
 ngx_feature_name="NGX_HAVE_DEFERRED_ACCEPT"
 ngx_feature_run=no
@@ -460,18 +508,20 @@ ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_DEFER_ACCEPT, NULL, 0)"
 . auto/feature
 
 
-ngx_feature="TCP_KEEPIDLE"
-ngx_feature_name="NGX_HAVE_KEEPALIVE_TUNABLE"
-ngx_feature_run=no
-ngx_feature_incs="#include <sys/socket.h>
-                  #include <netinet/in.h>
-                  #include <netinet/tcp.h>"
-ngx_feature_path=
-ngx_feature_libs=
-ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_KEEPIDLE, NULL, 0);
-                  setsockopt(0, IPPROTO_TCP, TCP_KEEPINTVL, NULL, 0);
-                  setsockopt(0, IPPROTO_TCP, TCP_KEEPCNT, NULL, 0)"
-. auto/feature
+if test -z "$NGX_KEEPALIVE_CHECKED"; then
+    ngx_feature="TCP_KEEPIDLE"
+    ngx_feature_name="NGX_HAVE_KEEPALIVE_TUNABLE"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/socket.h>
+                      #include <netinet/in.h>
+                      #include <netinet/tcp.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_KEEPIDLE, NULL, 0);
+                      setsockopt(0, IPPROTO_TCP, TCP_KEEPINTVL, NULL, 0);
+                      setsockopt(0, IPPROTO_TCP, TCP_KEEPCNT, NULL, 0)"
+    . auto/feature
+fi
 
 
 ngx_feature="TCP_FASTOPEN"

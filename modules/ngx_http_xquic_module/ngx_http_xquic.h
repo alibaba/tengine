@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023 Alibaba Group Holding Limited
+ * Copyright (C) 2020-2026 Alibaba Group Holding Limited
  */
 
 #ifndef _NGX_HTTP_XQUIC_H_INCLUDED_
@@ -20,6 +20,7 @@
 
 typedef struct ngx_http_xquic_connection_s ngx_http_xquic_connection_t;
 typedef struct ngx_xquic_list_node_s   ngx_xquic_list_node_t;
+typedef struct ngx_xquic_path_s    ngx_xquic_path_t;
 
 
 #define NGX_XQUIC_CONN_NO_ERR           0
@@ -28,6 +29,7 @@ typedef struct ngx_xquic_list_node_s   ngx_xquic_list_node_t;
 #define NGX_XQUIC_CONN_INTERNAL_ERR     3
 #define NGX_XQUIC_CONN_HANDSHAKE_ERR    4
 
+#define NGX_XQUIC_MP_PATH_INDEX      7
 
 
 
@@ -42,6 +44,8 @@ struct ngx_http_xquic_connection_s {
     ngx_http_v3_stream_t           *free_streams;
 
     ngx_xquic_list_node_t         **streams_index;
+
+    ngx_xquic_list_node_t         **path_index;
 
     uint64_t                        connection_id;
     xqc_cid_t                       dcid;
@@ -85,6 +89,22 @@ struct ngx_http_xquic_connection_s {
     void                           *stats_ctx;
 
     xqc_engine_t                   *engine;
+};
+
+
+typedef enum {
+    NGX_XQUIC_PATH_STATE_CLOSED = 0,
+    NGX_XQUIC_PATH_STATE_AVAILABLE
+} ngx_xquic_path_state_e;
+
+struct ngx_xquic_path_s {
+    uint64_t                        path_id;
+    xqc_cid_t                       scid;
+
+    ngx_connection_t               *c;
+    ngx_http_xquic_connection_t    *qc;
+    
+    ngx_xquic_path_state_e          path_state;
 };
 
 
@@ -137,6 +157,11 @@ struct ngx_http_v3_stream_s {
 
     ngx_array_t                  *cookies;
 
+#if (T_HEADER_SIZE)
+    size_t                        req_header_size;
+    size_t                        resp_header_size;
+#endif
+
     size_t                        send_body_max;
     size_t                        send_body_len;
     u_char                       *send_body;
@@ -159,6 +184,7 @@ void ngx_http_v3_finalize_connection(ngx_http_xquic_connection_t *h3c,
 void ngx_http_v3_connection_error(ngx_http_xquic_connection_t *qc, 
     ngx_uint_t err, const char *err_details);
 
+void ngx_http_v3_finalize_paths(ngx_http_xquic_connection_t *qc);
 
 ngx_chain_t *ngx_http_xquic_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit);
 
@@ -173,10 +199,28 @@ ngx_int_t ngx_http_v3_filter_request_body(ngx_http_request_t *r);
 
 void ngx_http_v3_read_client_request_body_handler(ngx_http_request_t *r);
 
+ngx_int_t ngx_xquic_path_create(ngx_http_xquic_connection_t *qc, 
+    xqc_cid_t *connection_id, uint64_t path_id,
+    struct sockaddr *local_sockaddr, socklen_t local_socklen,
+    struct sockaddr *peer_sockaddr, socklen_t peer_socklen);
+
+int ngx_xquic_path_created_notify(xqc_connection_t *conn,
+    const xqc_cid_t *path_scid, uint64_t path_id,
+    void *conn_user_data);
+
+void ngx_xquic_path_removed_notify(const xqc_cid_t *scid, uint64_t path_id,
+    void *conn_user_data);
 
 xqc_int_t ngx_http_v3_cert_cb(const char *sni, void **chain,
     void **cert, void **key, void *conn_user_data);
 
+
+#if (T_NGX_HTTP_SSL_FINGERPRINT)
+
+void ngx_http_v3_ssl_msg_cb(int msg_type, 
+    const void *msg, size_t msg_len, void *user_data);
+
+#endif
 
 #endif /* _NGX_HTTP_XQUIC_H_INCLUDED_ */
 

@@ -1,0 +1,4 @@
+# build artifacts of the stand-alone parser unit tests
+test_check_http_parse
+*.dSYM/
+*.o

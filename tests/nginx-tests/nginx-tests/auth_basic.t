@@ -23,7 +23,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(24)
+my $t = Test::Nginx->new()->has(qw/http auth_basic/)->plan(25)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -53,7 +53,7 @@ http {
                 # prepended with conf_prefix
                 auth_basic_user_file $arg_f;
                 alias %%TESTDIR%%/;
-	    }
+            }
         }
     }
 }
@@ -75,7 +75,8 @@ $t->write_file(
 	'ssha3:' . '{SSHA}Zm9vCg==' . "\n" .
 	'sha:' . '{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=' . "\n" .
 	'sha2:' . '{SHA}_____Mm5Pz8GgiULbPgzG37mj9g=' . "\n" .
-	'sha3:' . '{SHA}Zm9vCg==' . "\n"
+	'sha3:' . '{SHA}Zm9vCg==' . "\n" .
+	'plain2:' . '{PLAIN}password'
 );
 
 $t->run();
@@ -115,6 +116,7 @@ like(http_get_auth('/', 'ssha3', '1'), qr!401 Unauthorized!, 'ssha broken 2');
 like(http_get_auth('/', 'sha2', '1'), qr!401 Unauthorized!, 'sha broken 1');
 like(http_get_auth('/', 'sha3', '1'), qr!401 Unauthorized!, 'sha broken 2');
 
+like(http_get_auth('/', 'plain2', 'password'), qr!SEETHIS!, 'no newline');
 like(http_get_auth('/', 'notfound', '1'), qr!401 Unauthorized!, 'not found');
 like(http_get('/inner/'), qr!SEETHIS!, 'inner off');
 

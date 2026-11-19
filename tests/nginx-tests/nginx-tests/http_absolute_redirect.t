@@ -116,31 +116,21 @@ like(get('on', '/dir'), qr!Location: http://on:$p/dir/\x0d?$!m, 'directory');
 like(get('on', '/i/dir'), qr!Location: http://on:$p/i/dir/\x0d?$!m,
 	'directory alias');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 like(get('on', '/dir%20sp'), qr!Location: http://on:$p/dir%20sp/\x0d?$!m,
 	'directory escaped');
 like(get('on', '/dir%20sp?a=b'),
 	qr!Location: http://on:$p/dir%20sp/\?a=b\x0d?$!m,
 	'directory escaped args');
 
-}
-
 like(get('on', '/auto'), qr!Location: http://on:$p/auto/\x0d?$!m, 'auto');
 like(get('on', '/auto?a=b'), qr!Location: http://on:$p/auto/\?a=b\x0d?$!m,
 	'auto args');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
 
 like(get('on', '/auto%20sp'), qr!Location: http://on:$p/auto%20sp/\x0d?$!m,
 	'auto escaped');
 like(get('on', '/auto%20sp?a=b'),
 	qr!Location: http://on:$p/auto%20sp/\?a=b\x0d?$!m,
 	'auto escaped args');
-
-}
 
 like(get('on', '/return301'), qr!Location: http://on:$p/redirect\x0d?$!m,
 	'return');
@@ -158,29 +148,19 @@ like(get('host', '/return301/port'), qr!Location: http://host/redirect\x0d?$!m,
 like(get('off', '/dir'), qr!Location: /dir/\x0d?$!m, 'off directory');
 like(get('off', '/i/dir'), qr!Location: /i/dir/\x0d?$!m, 'off directory alias');
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
-
 like(get('off', '/dir%20sp'), qr!Location: /dir%20sp/\x0d?$!m,
 	'off directory escaped');
 like(get('off', '/dir%20sp?a=b'), qr!Location: /dir%20sp/\?a=b\x0d?$!m,
 	'off directory escaped args');
 
-}
-
 like(get('off', '/auto'), qr!Location: /auto/\x0d?$!m, 'off auto');
 like(get('off', '/auto?a=b'), qr!Location: /auto/\?a=b\x0d?$!m,
 	'off auto args');
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.0');
 
 like(get('off', '/auto%20sp'), qr!Location: /auto%20sp/\x0d?$!m,
 	'auto escaped');
 like(get('off', '/auto%20sp?a=b'), qr!Location: /auto%20sp/\?a=b\x0d?$!m,
 	'auto escaped args');
-
-}
 
 like(get('off', '/return301'), qr!Location: /redirect\x0d?$!m, 'off return');
 
@@ -191,14 +171,9 @@ like(get('off', '/return301'), qr!Location: /redirect\x0d?$!m, 'off return');
 SKIP: {
 skip 'win32', 1 if $^O eq 'MSWin32';
 
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.1');
-
 like(get('off', '/auto%20%22%23%25%3C%3E%3F%5C%5E%60%7B%7C%7D'),
 	qr!Location: /auto%20%22%23%25%3C%3E%3F%5C%5E%60%7B%7C%7D/\x0d?$!m,
 	'auto escaped strict');
-
-}
 
 }
 

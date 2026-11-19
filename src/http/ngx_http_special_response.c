@@ -10,11 +10,20 @@
 #include <ngx_http.h>
 #include <nginx.h>
 
+#if (T_INGRESS_FAILOVER)
+#include "ngx_ingress_failover.h"
+#endif
+
 
 static ngx_int_t ngx_http_send_error_page(ngx_http_request_t *r,
     ngx_http_err_page_t *err_page);
+#if (T_INGRESS_FAILOVER)
+ngx_int_t ngx_http_send_special_response(ngx_http_request_t *r,
+    ngx_http_core_loc_conf_t *clcf, ngx_uint_t err);
+#else
 static ngx_int_t ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err);
+#endif
 static ngx_int_t ngx_http_send_refresh(ngx_http_request_t *r);
 #if (T_NGX_SERVER_INFO)
 static ngx_buf_t *ngx_http_set_server_info(ngx_http_request_t *r);
@@ -224,6 +233,14 @@ static char ngx_http_error_406_page[] =
 "<head><title>406 Not Acceptable</title></head>" CRLF
 "<body>" CRLF
 "<center><h1>406 Not Acceptable</h1></center>" CRLF
+;
+
+
+static char ngx_http_error_407_page[] =
+"<html>" CRLF
+"<head><title>407 Proxy Authentication Required</title></head>" CRLF
+"<body>" CRLF
+"<center><h1>407 Proxy Authentication Required</h1></center>" CRLF
 ;
 
 
@@ -438,7 +455,7 @@ static ngx_str_t ngx_http_error_pages[] = {
     ngx_string(ngx_http_error_404_page),
     ngx_string(ngx_http_error_405_page),
     ngx_string(ngx_http_error_406_page),
-    ngx_null_string,                     /* 407 */
+    ngx_string(ngx_http_error_407_page),
     ngx_string(ngx_http_error_408_page),
     ngx_string(ngx_http_error_409_page),
     ngx_string(ngx_http_error_410_page),
@@ -527,7 +544,24 @@ ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
-    if (!r->error_page && clcf->error_pages && r->uri_changes != 0) {
+#if (T_INGRESS_FAILOVER)
+    ngx_int_t failover_flag = 0;
+
+    /* do failover checks and transmits */
+    ngx_int_t ret_code = 0;
+    err = ngx_failover_check_and_action_handler(r, error, &ret_code);
+    if (err == NGX_DONE) {
+        return ret_code;
+    } else if (err == NGX_ERROR) {
+        failover_flag = 1;
+    }
+#endif
+
+    if (
+#if (T_INGRESS_FAILOVER)
+        !failover_flag &&
+#endif
+        !r->error_page && clcf->error_pages && r->uri_changes != 0) {
 
         if (clcf->recursive_error_pages == 0) {
             r->error_page = 1;
@@ -743,7 +777,11 @@ ngx_http_send_error_page(ngx_http_request_t *r, ngx_http_err_page_t *err_page)
 }
 
 
+#if (T_INGRESS_FAILOVER)
+ngx_int_t
+#else
 static ngx_int_t
+#endif
 ngx_http_send_special_response(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err)
 {
@@ -811,7 +849,6 @@ ngx_http_send_special_response(ngx_http_request_t *r,
 #else
         r->headers_out.content_length_n = ngx_http_error_pages[err].len + len;
 #endif
-
         if (clcf->msie_padding
             && (r->headers_in.msie || r->headers_in.chrome)
             && r->http_version >= NGX_HTTP_VERSION_10

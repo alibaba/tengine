@@ -24,12 +24,9 @@ use Test::Nginx qw/ :DEFAULT http_end /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()
-
 	->has(qw/http http_ssl geo openssl:1.0.2 socket_ssl_sni/)
 	->has_daemon('openssl');
-
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -168,6 +165,7 @@ like(get('password', 8083), qr/password/, 'ssl_password_file');
 # session reuse
 
 my $s = session('default', 8080);
+
 TODO: {
 local $TODO = 'no TLSv1.3 sessions, old Net::SSLeay'
 	if $Net::SSLeay::VERSION < 1.88 && test_tls13();
@@ -175,14 +173,16 @@ local $TODO = 'no TLSv1.3 sessions, old IO::Socket::SSL'
 	if $IO::Socket::SSL::VERSION < 2.061 && test_tls13();
 
 like(get('default', 8080, $s), qr/default:r/, 'session reused');
+
 TODO: {
-# ticket key name mismatch prevents session resumption
-local $TODO = 'not yet' unless $t->has_version('1.23.2');
 local $TODO = 'no SSL_session_key, old IO::Socket::SSL'
 	if $IO::Socket::SSL::VERSION < 1.965;
+
 like(get('default', 8081, $s), qr/default:r/, 'session id context match');
+
 }
 }
+
 like(get('default', 8082, $s), qr/default:\./, 'session id context distinct');
 
 # errors
@@ -193,8 +193,6 @@ ok(!get('nx', 8084), 'no certificate');
 
 sub get {
 	my $s = get_socket(@_) || return;
-
-
 	return http_end($s);
 }
 
@@ -202,11 +200,13 @@ sub cert {
 	my $s = get_socket(@_) || return;
 	return $s->dump_peer_certificate();
 }
+
 sub session {
 	my $s = get_socket(@_) || return;
 	http_end($s);
 	return $s;
 }
+
 sub get_socket {
 	my ($host, $port, $ctx) = @_;
 	return http_get(
@@ -221,7 +221,6 @@ sub get_socket {
 
 sub test_tls13 {
 	return get('default', 8080) =~ /TLSv1.3/;
-
 }
 
 ###############################################################################

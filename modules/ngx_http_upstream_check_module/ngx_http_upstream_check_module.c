@@ -8,6 +8,21 @@
 #include <ngx_http.h>
 #include <ngx_config.h>
 
+#include "ngx_http_upstream_check_http_parse.h"
+
+
+/*
+ * Phase of the HTTP health-check response parser. The health verdict is
+ * reached as soon as the status line (and, for keepalive, the headers) is
+ * parsed -- it never waits for the body. Draining the body afterwards is the
+ * job of the discard handler, so there is no BODY phase here.
+ */
+enum {
+    NGX_CHECK_PARSE_STATUS_LINE = 0,
+    NGX_CHECK_PARSE_HEADERS,
+    NGX_CHECK_PARSE_DONE
+};
+
 
 typedef struct ngx_http_upstream_check_peer_s ngx_http_upstream_check_peer_t;
 typedef struct ngx_http_upstream_check_srv_conf_s
@@ -78,6 +93,11 @@ typedef struct {
 
     size_t                                   padding;
     size_t                                   length;
+
+    /* HTTP response parse state (reset by reinit before every check) */
+    ngx_uint_t                               parse_phase;    /* NGX_CHECK_PARSE_* */
+    ngx_uint_t                               code_n;         /* remembered status class */
+    ngx_http_check_headers_ctx_t             http_headers;   /* header parse state */
 } ngx_http_upstream_check_ctx_t;
 
 
@@ -155,6 +175,19 @@ struct ngx_http_upstream_check_peer_s {
 
     ngx_http_upstream_check_peer_shm_t      *shm;
     ngx_http_upstream_check_srv_conf_t      *conf;
+
+    /*
+     * HTTP response body drain state, kept across the check cycle (reinit does
+     * not touch it; the parser sets it afresh on every verdict). After the
+     * health verdict the discard handler drains the remaining body here, and
+     * connect_handler refuses to reuse a connection whose body is not yet
+     * fully drained (recv_body_pending), which is what makes keepalive reuse
+     * safe against response-body pollution.
+     */
+    off_t                                    recv_body_remaining;
+    ngx_uint_t                               recv_chunk_state;
+    unsigned                                 recv_body_chunked:1;
+    unsigned                                 recv_body_pending:1;
 
     unsigned                                 delete;
 };
@@ -470,6 +503,7 @@ static void ngx_http_upstream_check_status_prometheus_format(ngx_buf_t *b,
 
 static ngx_int_t ngx_http_upstream_check_addr_change_port(ngx_pool_t *pool,
     ngx_addr_t *dst, ngx_addr_t *src, ngx_uint_t port);
+static ngx_flag_t ngx_http_upstream_check_addr_has_port(ngx_addr_t *addr);
 
 static ngx_check_conf_t *ngx_http_get_check_type_conf(ngx_str_t *str);
 
@@ -925,7 +959,7 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
                    "peer: %V, index: %ui",
                    &us->host, &peer_addr->name, index);
 
-    if (ucscf->port) {
+    if (ucscf->port && ngx_http_upstream_check_addr_has_port(peer_addr)) {
         peer->check_peer_addr = ngx_pcalloc(pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
             return NGX_ERROR;
@@ -935,10 +969,30 @@ ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
                 peer->check_peer_addr, peer_addr, ucscf->port)
             != NGX_OK) {
 
+            ngx_log_error(NGX_LOG_ERR, pool->log, 0,
+                          "http upstream check cannot apply \"port=%ui\" to "
+                          "peer \"%V\" in upstream \"%V\", it is excluded "
+                          "from health checking",
+                          ucscf->port, &peer_addr->name, &us->host);
+
             return NGX_ERROR;
         }
 
     } else {
+        /*
+         * An address without the notion of a port, such as a unix domain
+         * socket, cannot be checked on a different port: ignore "port=" and
+         * check the peer on its own address instead of silently dropping it
+         * out of health checking.
+         */
+        if (ucscf->port) {
+            ngx_log_error(NGX_LOG_WARN, pool->log, 0,
+                          "http upstream check ignores \"port=%ui\" for peer "
+                          "\"%V\" in upstream \"%V\", the peer has no port "
+                          "and is checked on its own address",
+                          ucscf->port, &peer_addr->name, &us->host);
+        }
+
         peer->check_peer_addr = peer->peer_addr;
     }
 
@@ -1009,7 +1063,7 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
     peer->upstream_name = &us->host;
     peer->peer_addr = peer_addr;
 
-    if (ucscf->port) {
+    if (ucscf->port && ngx_http_upstream_check_addr_has_port(peer_addr)) {
         peer->check_peer_addr = ngx_pcalloc(cf->pool, sizeof(ngx_addr_t));
         if (peer->check_peer_addr == NULL) {
             return NGX_ERROR;
@@ -1019,10 +1073,30 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
                 peer->check_peer_addr, peer_addr, ucscf->port)
             != NGX_OK) {
 
+            ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                               "\"check\" cannot apply \"port=%ui\" to peer "
+                               "\"%V\" in upstream \"%V\", it is excluded "
+                               "from health checking",
+                               ucscf->port, &peer_addr->name, &us->host);
+
             return NGX_ERROR;
         }
 
     } else {
+        /*
+         * An address without the notion of a port, such as a unix domain
+         * socket, cannot be checked on a different port: ignore "port=" and
+         * check the peer on its own address instead of silently dropping it
+         * out of health checking.
+         */
+        if (ucscf->port) {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "\"check\" ignores \"port=%ui\" for peer "
+                               "\"%V\" in upstream \"%V\", the peer has no "
+                               "port and is checked on its own address",
+                               ucscf->port, &peer_addr->name, &us->host);
+        }
+
         peer->check_peer_addr = peer->peer_addr;
     }
 
@@ -1030,6 +1104,28 @@ ngx_http_upstream_check_add_peer(ngx_conf_t *cf,
         ngx_murmur_hash2(peer_addr->name.data, peer_addr->name.len);
 
     return peer->index;
+}
+
+
+/*
+ * Whether the address family carries a port that a health check can be
+ * redirected to. Keep the families in sync with the switch in
+ * ngx_http_upstream_check_addr_change_port() below.
+ */
+static ngx_flag_t
+ngx_http_upstream_check_addr_has_port(ngx_addr_t *addr)
+{
+    switch (addr->sockaddr->sa_family) {
+
+    case AF_INET:
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+#endif
+        return 1;
+
+    default:
+        return 0;
+    }
 }
 
 
@@ -1586,7 +1682,17 @@ ngx_http_upstream_check_connect_handler(ngx_event_t *event)
 
     if (peer->pc.connection != NULL) {
         c = peer->pc.connection;
-        if ((rc = ngx_http_upstream_check_peek_one_byte(c)) == NGX_OK) {
+
+        /*
+         * Only reuse a connection whose previous response body was fully
+         * drained. If draining has not finished (recv_body_pending) -- e.g. a
+         * very large body between two checks -- reusing the socket would read
+         * leftover body bytes and corrupt this check's response parsing, so
+         * close it and reconnect instead.
+         */
+        if (!peer->recv_body_pending
+            && (rc = ngx_http_upstream_check_peek_one_byte(c)) == NGX_OK)
+        {
             goto upstream_check_connect_done;
         } else {
             ngx_close_connection(c);
@@ -1689,7 +1795,9 @@ static void
 ngx_http_upstream_check_discard_handler(ngx_event_t *event)
 {
     u_char                          buf[4096];
+    ngx_buf_t                       b;
     ssize_t                         size;
+    ngx_int_t                       rc;
     ngx_connection_t               *c;
     ngx_http_upstream_check_peer_t *peer;
 
@@ -1708,6 +1816,51 @@ ngx_http_upstream_check_discard_handler(ngx_event_t *event)
         size = c->recv(c, buf, 4096);
 
         if (size > 0) {
+            if (!peer->recv_body_pending) {
+                /*
+                 * Nothing is owed on this connection, so whatever arrived is
+                 * unsolicited. Keep discarding it as before.
+                 */
+                continue;
+            }
+
+            /*
+             * Finish draining the response body left over from the last check,
+             * tracking the framing so we know when the connection is clean
+             * again -- that is what lets connect_handler reuse it instead of
+             * reconnecting.
+             */
+            b.start = b.pos = buf;
+            b.last = b.end = buf + size;
+
+            rc = ngx_http_upstream_check_body_drain(&b,
+                                                    peer->recv_body_chunked,
+                                                    &peer->recv_chunk_state,
+                                                    &peer->recv_body_remaining);
+            if (rc == NGX_ERROR) {
+                ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                              "check peer sent a malformed response body, "
+                              "peer: %V ", &peer->check_peer_addr->name);
+                goto check_discard_fail;
+            }
+
+            if (rc == NGX_OK) {
+                peer->recv_body_pending = 0;
+
+                if (b.pos < b.last) {
+                    /*
+                     * Bytes beyond the end of the body: the peer is sending
+                     * something we never asked for, so the socket cannot be
+                     * trusted for the next check.
+                     */
+                    ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                                  "check peer sent %z byte(s) past the response "
+                                  "body, peer: %V ", (ssize_t) (b.last - b.pos),
+                                  &peer->check_peer_addr->name);
+                    goto check_discard_fail;
+                }
+            }
+
             continue;
 
         } else if (size == NGX_AGAIN) {
@@ -1935,7 +2088,24 @@ ngx_http_upstream_check_recv_handler(ngx_event_t *event)
     switch (rc) {
 
     case NGX_AGAIN:
-        /* The peer has closed its half side of the connection. */
+        /*
+         * The response is not complete yet: the status line or headers have not
+         * fully arrived (the verdict never waits for the body). If the peer has
+         * already closed its half of the connection (EOF) the rest will never
+         * come, so fail the check instead of re-arming the read event and
+         * busy-looping on the readable EOF until the check times out. Otherwise
+         * keep the read event armed and wait for more data.
+         */
+        if (c->read->eof) {
+            ngx_log_error(NGX_LOG_ERR, event->log, 0,
+                          "check peer closed connection with an incomplete "
+                          "response, peer: %V ", &peer->check_peer_addr->name);
+            goto check_recv_fail;
+        }
+
+        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+            goto check_recv_fail;
+        }
         return;
 
     case NGX_ERROR:
@@ -1985,6 +2155,15 @@ ngx_http_upstream_check_http_init(ngx_http_upstream_check_peer_t *peer)
 
     ngx_memzero(&ctx->status, sizeof(ngx_http_status_t));
 
+    ctx->parse_phase = NGX_CHECK_PARSE_STATUS_LINE;
+    ctx->code_n = 0;
+    ngx_memzero(&ctx->http_headers, sizeof(ngx_http_check_headers_ctx_t));
+
+    peer->recv_body_pending = 0;
+    peer->recv_body_remaining = 0;
+    peer->recv_chunk_state = sw_chunk_size;
+    peer->recv_body_chunked = 0;
+
     return NGX_OK;
 }
 
@@ -1993,18 +2172,28 @@ static ngx_int_t
 ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
 {
     ngx_int_t                            rc;
+    ngx_buf_t                           *b;
     ngx_uint_t                           code, code_n;
+    ngx_connection_t                    *c;
+    ngx_check_conf_t                    *cf;
     ngx_http_upstream_check_ctx_t       *ctx;
     ngx_http_upstream_check_srv_conf_t  *ucscf;
 
     ucscf = peer->conf;
+    cf = ucscf->check_type_conf;
     ctx = peer->check_data;
+    b = &ctx->recv;
+    c = peer->pc.connection;
 
-    if ((ctx->recv.last - ctx->recv.pos) > 0) {
+    /* Phase 1: status line -> the health verdict is decided here */
 
-        rc = ngx_http_upstream_check_parse_status_line(ctx,
-                                                       &ctx->recv,
-                                                       &ctx->status);
+    if (ctx->parse_phase == NGX_CHECK_PARSE_STATUS_LINE) {
+
+        if ((b->last - b->pos) <= 0) {
+            return NGX_AGAIN;
+        }
+
+        rc = ngx_http_upstream_check_parse_status_line(ctx, b, &ctx->status);
         if (rc == NGX_AGAIN) {
             return rc;
         }
@@ -2025,13 +2214,13 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
         } else if (code >= 300 && code < 400) {
             code_n = NGX_CHECK_HTTP_3XX;
         } else if (code >= 400 && code < 500) {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_4XX;
         } else if (code >= 500 && code < 600) {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_5XX;
         } else {
-            peer->pc.connection->error = 1;
+            c->error = 1;
             code_n = NGX_CHECK_HTTP_ERR;
         }
 
@@ -2039,16 +2228,109 @@ ngx_http_upstream_check_http_parse(ngx_http_upstream_check_peer_t *peer)
                        "http_parse: code_n: %ui, conf: %ui",
                        code_n, ucscf->code.status_alive);
 
-        if (code_n & ucscf->code.status_alive) {
-            return NGX_OK;
-        } else {
-            return NGX_ERROR;
+        ctx->code_n = code_n;
+
+        /*
+         * Fast path -- verdict straight from the status line, no body tracking,
+         * exactly as the original code. Taken when:
+         *   - keepalive reuse is off (socket closed right after; default config
+         *     is thus completely unaffected), or
+         *   - the connection is already marked not-reusable (c->error set for
+         *     4xx/5xx/invalid codes), so draining the body would be pointless.
+         */
+        if (!cf->need_keepalive
+            || ucscf->check_keepalive_requests <= 1
+            || c->error)
+        {
+            return (code_n & ucscf->code.status_alive) ? NGX_OK : NGX_ERROR;
         }
-    } else {
+
+        ctx->parse_phase = NGX_CHECK_PARSE_HEADERS;
+    }
+
+    /*
+     * Phase 2 (keepalive only): parse the headers to learn the body framing.
+     * The verdict does NOT wait for the body -- a healthy backend with a large
+     * or slow body must not be timed out. Once the headers are complete we
+     * consume whatever body bytes already arrived in the buffer (coalesced with
+     * the headers) and hand the remaining body length to the peer so the
+     * discard handler can finish draining it before the connection is reused.
+     */
+
+    rc = ngx_http_upstream_check_parse_headers(b, &ctx->http_headers);
+
+    if (rc == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                      "http parse headers error with peer: %V ",
+                      &peer->check_peer_addr->name);
+        return rc;
+    }
+
+    if (rc == NGX_AGAIN) {
+        /*
+         * Headers incomplete. Compact the receive buffer: keep only the
+         * unparsed tail so a fragmented header never accumulates and never
+         * triggers the buffer enlargement that would reset b->pos and corrupt
+         * the incremental header state held in ctx->http_headers.
+         */
+        if (b->pos < b->last) {
+            ngx_memmove(b->start, b->pos, b->last - b->pos);
+            b->last = b->start + (b->last - b->pos);
+        } else {
+            b->last = b->start;
+        }
+        b->pos = b->start;
         return NGX_AGAIN;
     }
 
-    return NGX_OK;
+    /* headers complete: set up body draining from the coalesced buffer bytes */
+
+    if (ctx->http_headers.chunked) {
+        peer->recv_body_chunked = 1;
+        peer->recv_chunk_state = sw_chunk_size;
+        peer->recv_body_remaining = 0;
+
+    } else if (ctx->http_headers.seen_cl) {
+        peer->recv_body_chunked = 0;
+        peer->recv_body_remaining = ctx->http_headers.content_length;
+
+    } else {
+        /*
+         * Neither Content-Length nor chunked: the body (if any) is delimited by
+         * connection close and cannot be drained for reuse. Drop keepalive on
+         * this connection so clean_event() closes it instead of reusing a
+         * possibly-dirty socket.
+         */
+        c->error = 1;
+        peer->recv_body_pending = 0;
+        goto parse_done;
+    }
+
+    rc = ngx_http_upstream_check_body_drain(b, peer->recv_body_chunked,
+                                            &peer->recv_chunk_state,
+                                            &peer->recv_body_remaining);
+    if (rc == NGX_ERROR) {
+        /*
+         * Malformed chunk framing. The verdict is already decided from the
+         * status line, but the connection cannot be reused safely.
+         */
+        c->error = 1;
+        peer->recv_body_pending = 0;
+
+    } else {
+        /*
+         * NGX_AGAIN means part of the body has not arrived yet; the discard
+         * handler installed by clean_event() drains the rest while the check is
+         * idle, and clears recv_body_pending once it is done.
+         */
+        peer->recv_body_pending = (rc == NGX_AGAIN);
+    }
+
+ parse_done:
+
+    ctx->parse_phase = NGX_CHECK_PARSE_DONE;
+
+    return (ctx->code_n & ucscf->code.status_alive) ? NGX_OK : NGX_ERROR;
 }
 
 
@@ -2779,6 +3061,16 @@ ngx_http_upstream_check_http_reinit(ngx_http_upstream_check_peer_t *peer)
     ctx->state = 0;
 
     ngx_memzero(&ctx->status, sizeof(ngx_http_status_t));
+
+    /*
+     * Reset only the parse state for the next check. The body drain state
+     * (peer->recv_body_*) is deliberately NOT reset here: the discard handler
+     * keeps draining the previous response's body after this reinit, and the
+     * parser rewrites the drain state on the next verdict.
+     */
+    ctx->parse_phase = NGX_CHECK_PARSE_STATUS_LINE;
+    ctx->code_n = 0;
+    ngx_memzero(&ctx->http_headers, sizeof(ngx_http_check_headers_ctx_t));
 }
 
 

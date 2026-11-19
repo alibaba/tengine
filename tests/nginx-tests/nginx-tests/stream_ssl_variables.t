@@ -12,7 +12,6 @@ use strict;
 
 use Test::More;
 
-
 BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
@@ -24,9 +23,7 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 my $t = Test::Nginx->new()
-
 	->has(qw/stream stream_ssl stream_return socket_ssl_sni/)
 	->has_daemon('openssl');
 
@@ -41,6 +38,7 @@ events {
 
 stream {
     %%TEST_GLOBALS_STREAM%%
+
     ssl_certificate_key localhost.key;
     ssl_certificate localhost.crt;
     ssl_session_cache builtin;
@@ -49,7 +47,6 @@ stream {
         listen  127.0.0.1:8080;
         listen  127.0.0.1:8443 ssl;
         return  $ssl_session_reused:$ssl_session_id:$ssl_cipher:$ssl_protocol;
-
     }
 
     server {
@@ -101,6 +98,7 @@ local $TODO = 'no TLSv1.3 sessions, old IO::Socket::SSL'
 	if $IO::Socket::SSL::VERSION < 2.061 && test_tls13();
 local $TODO = 'no TLSv1.3 sessions in LibreSSL'
 	if $t->has_module('LibreSSL') && test_tls13();
+
 $s = stream(
 	PeerAddr => '127.0.0.1:' . port(8443),
 	SSL => 1,
@@ -110,8 +108,10 @@ like($s->read(), qr/^r:(\w{64})?:[\w-]+:(TLS|SSL)v(\d|\.)+$/,
 	'ssl variables - session reused');
 
 }
+
 SKIP: {
 skip 'no sni', 3 unless $t->has_module('sni');
+
 $s = stream(
 	PeerAddr => '127.0.0.1:' . port(8444),
 	SSL => 1,
@@ -119,6 +119,7 @@ $s = stream(
 	SSL_hostname => 'example.com'
 );
 is($s->read(), 'example.com', 'ssl server name');
+
 $s = stream(
 	PeerAddr => '127.0.0.1:' . port(8444),
 	SSL => 1,
@@ -134,15 +135,14 @@ $s = stream(
 is($s->read(), '', 'ssl server name empty');
 
 }
+
 undef $s;
+
 ###############################################################################
 
 sub test_tls13 {
-
 	my $s = stream(PeerAddr => '127.0.0.1:' . port(8443), SSL => 1);
 	$s->read() =~ /TLSv1.3/;
-
-
 }
 
 ###############################################################################

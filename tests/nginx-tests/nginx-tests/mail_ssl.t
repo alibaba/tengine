@@ -27,7 +27,6 @@ select STDOUT; $| = 1;
 
 local $SIG{PIPE} = 'IGNORE';
 
-
 my $t = Test::Nginx->new()->has(qw/mail mail_ssl imap pop3 smtp socket_ssl/)
 	->has_daemon('openssl')->plan(19);
 
@@ -46,22 +45,15 @@ mail {
 
     ssl_password_file password;
 
-    auth_http  http://127.0.0.1:8080;	# unused
-
+    auth_http  http://127.0.0.1:8080; # unused
 
     server {
         listen             127.0.0.1:8143;
         listen             127.0.0.1:8145 ssl;
         protocol           imap;
-
     }
 
     server {
-
-
-
-
-
         listen             127.0.0.1:8148 ssl;
         protocol           imap;
 
@@ -137,12 +129,12 @@ foreach my $name ('localhost', 'inherits') {
 }
 
 $t->write_file('password', 'localhost');
-
 $t->run();
 
 ###############################################################################
 
 my ($s, $ssl);
+
 # simple tests to ensure that nothing broke with ssl_password_file directive
 
 $s = Test::Nginx::IMAP->new();
@@ -151,28 +143,19 @@ $s->ok('greeting');
 $s->send('1 AUTHENTICATE LOGIN');
 $s->check(qr/\+ VXNlcm5hbWU6/, 'login');
 
-
-
-
-
-
-
-
-
-
-
 # ssl_certificate inheritance
 
 $s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8145), SSL => 1);
 $s->ok('greeting ssl');
+
 like($s->socket()->dump_peer_certificate(), qr/CN=localhost/, 'CN');
 
 $s = Test::Nginx::IMAP->new(PeerAddr => '127.0.0.1:' . port(8148), SSL => 1);
 $s->read();
+
 like($s->socket()->dump_peer_certificate(), qr/CN=inherits/, 'CN inner');
 
 # alpn
-
 
 SKIP: {
 skip 'LibreSSL too old', 2
@@ -190,8 +173,6 @@ $s = Test::Nginx::IMAP->new(
 	SSL_alpn_protocols => [ 'imap' ]
 );
 $s->ok('alpn');
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.4');
 
 $s = Test::Nginx::IMAP->new(
 	PeerAddr => '127.0.0.1:' . port(8148),
@@ -199,8 +180,6 @@ $s = Test::Nginx::IMAP->new(
 	SSL_alpn_protocols => [ 'unknown' ]
 );
 ok(!$s->read(), 'alpn rejected');
-
-}
 
 }
 
@@ -283,6 +262,3 @@ $s->send('STARTTLS');
 $s->ok('smtp starttls only');
 
 ###############################################################################
-
-
-

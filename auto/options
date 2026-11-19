@@ -42,6 +42,8 @@ EVENT_FOUND=NO
 EVENT_SELECT=NO
 EVENT_POLL=NO
 
+CONTROL_API=NO
+
 USE_THREADS=NO
 
 NGX_FILE_AIO=NO
@@ -73,6 +75,7 @@ HTTP_AUTH_REQUEST=YES
 HTTP_MIRROR=YES
 HTTP_USERID=YES
 HTTP_SLICE=NO
+HTTP_JSON=NO
 HTTP_AUTOINDEX=YES
 HTTP_RANDOM_INDEX=NO
 HTTP_STATUS=NO
@@ -87,6 +90,7 @@ HTTP_FASTCGI=YES
 HTTP_UWSGI=YES
 HTTP_SCGI=YES
 HTTP_GRPC=YES
+HTTP_TUNNEL=NO
 HTTP_PERL=NO
 HTTP_LUA=NO
 HTTP_MEMCACHED=YES
@@ -103,10 +107,12 @@ HTTP_GZIP_STATIC=NO
 HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_UPSTREAM_LEAST_CONN=YES
+HTTP_UPSTREAM_LEAST_TIME=YES
 HTTP_UPSTREAM_RANDOM=YES
 HTTP_UPSTREAM_KEEPALIVE=YES
 HTTP_UPSTREAM_RBTREE=YES
 HTTP_UPSTREAM_ZONE=YES
+HTTP_UPSTREAM_STICKY=YES
 
 # STUB
 HTTP_STUB_STATUS=YES
@@ -130,13 +136,17 @@ STREAM_GEOIP=NO
 STREAM_MAP=YES
 STREAM_SPLIT_CLIENTS=YES
 STREAM_RETURN=YES
+STREAM_PASS=YES
 STREAM_SET=YES
 STREAM_UPSTREAM_HASH=YES
 STREAM_UPSTREAM_LEAST_CONN=YES
+STREAM_UPSTREAM_LEAST_TIME=YES
 STREAM_UPSTREAM_RANDOM=YES
 STREAM_UPSTREAM_ZONE=YES
 STREAM_SSL_PREREAD=NO
 STREAM_SNI=NO
+
+NGX_DUP_HOST=NO
 
 DYNAMIC_MODULES=
 DYNAMIC_MODULES_SRCS=
@@ -177,6 +187,7 @@ XQUIC_XDP_INC=$XQUIC_XDP_INC
 
 XQUIC_INC=$XQUIC_INC
 XQUIC_LIB=$XQUIC_LIB
+XQUIC_RPATH=$XQUIC_RPATH
 
 USE_LIBXSLT=NO
 USE_LIBGD=NO
@@ -184,6 +195,8 @@ USE_GEOIP=NO
 
 NGX_GOOGLE_PERFTOOLS=NO
 NGX_CPP_TEST=NO
+
+SO_COOKIE_FOUND=NO
 
 NGX_LIBATOMIC=NO
 
@@ -236,6 +249,8 @@ do
 
         --with-file-aio)                 NGX_FILE_AIO=YES           ;;
 
+        --with-control-api)              CONTROL_API=YES            ;;
+
         --with-ipv6)
             NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
 $0: warning: the \"--with-ipv6\" option is deprecated"
@@ -274,6 +289,8 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --with-http_secure_link_module)  HTTP_SECURE_LINK=YES       ;;
         --with-http_degradation_module)  HTTP_DEGRADATION=YES       ;;
         --with-http_slice_module)        HTTP_SLICE=YES             ;;
+        --with-http_json_module)         HTTP_JSON=YES              ;;
+        --with-http_tunnel_module)       HTTP_TUNNEL=YES            ;;
 
         --without-http_charset_module)   HTTP_CHARSET=NO            ;;
         --without-http_gzip_module)      HTTP_GZIP=NO               ;;
@@ -294,6 +311,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_uwsgi_module)     HTTP_UWSGI=NO              ;;
         --without-http_scgi_module)      HTTP_SCGI=NO               ;;
         --without-http_grpc_module)      HTTP_GRPC=NO               ;;
+        --without-http_tunnel_module)    HTTP_TUNNEL=NO             ;;
         --without-http_memcached_module) HTTP_MEMCACHED=NO          ;;
         --without-http_limit_conn_module) HTTP_LIMIT_CONN=NO        ;;
         --without-http_limit_req_module) HTTP_LIMIT_REQ=NO         ;;
@@ -303,10 +321,19 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO ;;
         --without-http_upstream_least_conn_module)
                                          HTTP_UPSTREAM_LEAST_CONN=NO ;;
+        --without-http_upstream_least_time_module)
+                                         HTTP_UPSTREAM_LEAST_TIME=NO ;;
         --without-http_upstream_random_module)
                                          HTTP_UPSTREAM_RANDOM=NO    ;;
         --without-http_upstream_keepalive_module) HTTP_UPSTREAM_KEEPALIVE=NO ;;
         --without-http_upstream_zone_module) HTTP_UPSTREAM_ZONE=NO  ;;
+        --without-http_upstream_sticky_module) HTTP_UPSTREAM_STICKY=NO ;;
+        --without-http_upstream_sticky)
+            HTTP_UPSTREAM_STICKY=NO
+            NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
+$0: warning: the \"--without-http_upstream_sticky\" option is deprecated, \
+use the \"--without-http_upstream_sticky_module\" option instead"
+        ;;
 
         --with-http_perl_module)         HTTP_PERL=YES              ;;
         --with-http_perl_module=dynamic) HTTP_PERL=DYNAMIC          ;;
@@ -319,6 +346,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
 
         --with-xquic-inc=*)              XQUIC_INC="$value"         ;;
         --with-xquic-lib=*)              XQUIC_LIB="$value"         ;;
+        --with-xquic-rpath=*)            XQUIC_RPATH="$value"       ;;
 
         # LUA
         --with-http_lua_module)          HTTP_LUA=YES               ;;
@@ -360,6 +388,7 @@ use the \"--with-mail_ssl_module\" option instead"
         --with-stream_ssl_preread_module)
                                          STREAM_SSL_PREREAD=YES     ;;
         --with-stream_sni)               STREAM_SNI=YES             ;;
+        --with-http_dup_host)            NGX_DUP_HOST=YES           ;;
         --without-stream_limit_conn_module)
                                          STREAM_LIMIT_CONN=NO       ;;
         --without-stream_access_module)  STREAM_ACCESS=NO           ;;
@@ -368,11 +397,14 @@ use the \"--with-mail_ssl_module\" option instead"
         --without-stream_split_clients_module)
                                          STREAM_SPLIT_CLIENTS=NO    ;;
         --without-stream_return_module)  STREAM_RETURN=NO           ;;
+        --without-stream_pass_module)    STREAM_PASS=NO             ;;
         --without-stream_set_module)     STREAM_SET=NO              ;;
         --without-stream_upstream_hash_module)
                                          STREAM_UPSTREAM_HASH=NO    ;;
         --without-stream_upstream_least_conn_module)
                                          STREAM_UPSTREAM_LEAST_CONN=NO ;;
+        --without-stream_upstream_least_time_module)
+                                         STREAM_UPSTREAM_LEAST_TIME=NO ;;
         --without-stream_upstream_random_module)
                                          STREAM_UPSTREAM_RANDOM=NO  ;;
         --without-stream_upstream_zone_module)
@@ -465,12 +497,12 @@ cat << END
   --help                             print this message
 
   --prefix=PATH                      set installation prefix
-  --sbin-path=PATH                   set nginx binary pathname
+  --sbin-path=PATH                   set tengine binary pathname
   --modules-path=PATH                set modules path
-  --conf-path=PATH                   set nginx.conf pathname
+  --conf-path=PATH                   set tengine.conf pathname
   --error-log-path=PATH              set error log pathname
-  --pid-path=PATH                    set nginx.pid pathname
-  --lock-path=PATH                   set nginx.lock pathname
+  --pid-path=PATH                    set tengine.pid pathname
+  --lock-path=PATH                   set tengine.lock pathname
 
   --user=USER                        set non-privileged user for
                                      worker processes
@@ -486,6 +518,8 @@ cat << END
   --without-poll_module              disable poll module
 
   --without-procs                    disable procs module
+
+  --with-control-api                 enable control API
 
   --with-threads                     enable thread pool support
 
@@ -513,6 +547,8 @@ cat << END
   --with-http_secure_link_module     enable ngx_http_secure_link_module
   --with-http_degradation_module     enable ngx_http_degradation_module
   --with-http_slice_module           enable ngx_http_slice_module
+  --with-http_json_module            enable ngx_http_json_module
+  --with-http_tunnel_module          enable ngx_http_tunnel_module
   --with-http_stub_status_module     enable ngx_http_stub_status_module
 
   --without-http_charset_module      disable ngx_http_charset_module
@@ -546,12 +582,16 @@ cat << END
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_upstream_least_conn_module
                                      disable ngx_http_upstream_least_conn_module
+  --without-http_upstream_least_time_module
+                                     disable ngx_http_upstream_least_time_module
   --without-http_upstream_random_module
                                      disable ngx_http_upstream_random_module
   --without-http_upstream_keepalive_module
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_zone_module
                                      disable ngx_http_upstream_zone_module
+  --without-http_upstream_sticky_module
+                                     disable ngx_http_upstream_sticky_module
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-http_perl_module=dynamic    enable dynamic ngx_http_perl_module
@@ -589,6 +629,10 @@ cat << END
 
   --with-xquic-inc=PATH              set XQUIC headers path
   --with-xquic-lib=PATH              set XQUIC library path (where libxquic.so is located)
+  --with-xquic-rpath=PATH            set the runtime path recorded for libxquic.so
+                                     (defaults to --with-xquic-lib; set this when
+                                     packaging, where the build tree and the
+                                     installed location differ)
   --with-xquic-link=PATH             set XQUIC headers link path
 
   --with-stream                      enable TCP/UDP proxy module
@@ -599,6 +643,7 @@ cat << END
   --with-stream_geoip_module=dynamic enable dynamic ngx_stream_geoip_module
   --with-stream_ssl_preread_module   enable ngx_stream_ssl_preread_module
   --with-stream_sni                  enable dynamic server block
+  --with-http_dup_host               allow duplicate Host request headers
   --without-stream_limit_conn_module disable ngx_stream_limit_conn_module
   --without-stream_access_module     disable ngx_stream_access_module
   --without-stream_geo_module        disable ngx_stream_geo_module
@@ -606,11 +651,14 @@ cat << END
   --without-stream_split_clients_module
                                      disable ngx_stream_split_clients_module
   --without-stream_return_module     disable ngx_stream_return_module
+  --without-stream_pass_module       disable ngx_stream_pass_module
   --without-stream_set_module        disable ngx_stream_set_module
   --without-stream_upstream_hash_module
                                      disable ngx_stream_upstream_hash_module
   --without-stream_upstream_least_conn_module
                                      disable ngx_stream_upstream_least_conn_module
+  --without-stream_upstream_least_time_module
+                                     disable ngx_stream_upstream_least_time_module
   --without-stream_upstream_random_module
                                      disable ngx_stream_upstream_random_module
   --without-stream_upstream_zone_module
@@ -667,12 +715,51 @@ if [ ".$NGX_PLATFORM" = ".win32" ]; then
 fi
 
 
-NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/nginx}
+# Tengine 3.2.0 renamed the default install layout from the inherited nginx
+# names to tengine (binary sbin/tengine, config conf/tengine.conf, pid
+# logs/tengine.pid) and the default prefix from /usr/local/nginx to
+# /usr/local/tengine. An install made by an earlier release uses the nginx
+# names, so any of those paths left at its default silently stops lining up
+# with it: "make install" does not replace the old binary, the new binary
+# looks for a tengine.conf that is not there, and it writes its pid to a file
+# the old service scripts do not read. Warn whenever a path is defaulted and
+# an nginx-named install is found where this build would land.
+#
+# With --prefix omitted the previous release installed to /usr/local/nginx;
+# with an explicit prefix it is that prefix that held the old install. Skip
+# the check for --prefix= (no prefix at all), where there is no install tree.
+if [ ".$NGX_PREFIX" != ".!" ] \
+   && { [ -z "$NGX_SBIN_PATH" ] || [ -z "$NGX_CONF_PATH" ] \
+        || [ -z "$NGX_PID_PATH" ]; }
+then
+    if [ -z "$NGX_PREFIX" ]; then
+        ngx_legacy_prefix=/usr/local/nginx
+    else
+        ngx_legacy_prefix=$NGX_PREFIX
+    fi
+
+    if [ -x "$ngx_legacy_prefix/sbin/nginx" ] \
+       || [ -f "$ngx_legacy_prefix/conf/nginx.conf" ]
+    then
+        NGX_POST_CONF_MSG="$NGX_POST_CONF_MSG
+$0: warning: found an existing nginx-named install under \
+\"$ngx_legacy_prefix\". Tengine 3.2.0 defaults to the tengine names, so this \
+build will not replace \"$ngx_legacy_prefix/sbin/nginx\", will not read \
+\"$ngx_legacy_prefix/conf/nginx.conf\", and will write its pid to \
+\"logs/tengine.pid\" instead of \"logs/nginx.pid\". Keep the previous layout \
+by passing --prefix=$ngx_legacy_prefix \
+--sbin-path=$ngx_legacy_prefix/sbin/nginx \
+--conf-path=$ngx_legacy_prefix/conf/nginx.conf \
+--pid-path=$ngx_legacy_prefix/logs/nginx.pid"
+    fi
+fi
+
+NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/tengine}
 NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
-NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
+NGX_CONF_PATH=${NGX_CONF_PATH:-conf/tengine.conf}
 NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
-NGX_PID_PATH=${NGX_PID_PATH:-logs/nginx.pid}
-NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/nginx.lock}
+NGX_PID_PATH=${NGX_PID_PATH:-logs/tengine.pid}
+NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/tengine.lock}
 
 if [ ".$NGX_ERROR_LOG_PATH" = ".stderr" ]; then
     NGX_ERROR_LOG_PATH=

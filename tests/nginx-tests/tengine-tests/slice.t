@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+# Copyright (C) 2012 Alibaba Group Holding Limited
+
 ###############################################################################
 
 use warnings;

@@ -1,0 +1,42 @@
+#
+# Keep the build context small: the Dockerfiles need the source tree, nothing
+# else. Without this the whole .git history plus any local build output would be
+# uploaded to the daemon on every build.
+#
+
+.git
+.github
+.gitignore
+
+# Build output from an in-tree configure/make and from packages/build/build.sh.
+objs
+objs-*
+dist
+Makefile
+*.o
+*.so
+*.a
+
+# Editor and OS clutter.
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# Local working notes -- same patterns .gitignore uses, in case an untracked
+# note is sitting in the tree.
+*_ANALYSIS.md
+*_PLAN.md
+*_NOTES.md
+*_REPORT.md
+*_REVIEW.md
+*_DRAFT.md
+*_MEMO.md
+*_TODO.md
+*.local.md
+*.internal.md
+*.draft.md
+*.wip.md
+.notes
+scratch
+drafts

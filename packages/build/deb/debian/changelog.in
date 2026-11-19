@@ -1,0 +1,5 @@
+tengine (@VERSION@) @SUITE@; urgency=medium
+
+  * Tengine @UPSTREAM_VERSION@ package built from source on @BUILD_DATE@.
+
+ -- Tengine Team <tengine@taobao.net>  @DATE_RFC2822@

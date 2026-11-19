@@ -1,0 +1,73 @@
+name: test tengine with asan
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  # Every other workflow builds without a sanitizer, so a memory error only
+  # shows up when it happens to crash the worker on that runner: an out of
+  # bounds read, a use after free of a shared memory peer or a division by zero
+  # can all pass the suite silently. This job builds with AddressSanitizer and
+  # runs the cases that exercise run time changes of upstream peer sets, where
+  # such errors are most likely. Test::Nginx already asserts "no sanitizer
+  # errors" (it greps the error log for Sanitizer lines, and nginx redirects
+  # stderr there), so the sanitizer report alone fails the case.
+  asan-test:
+   name: test tengine with asan (${{ matrix.compiler.compiler }})
+   runs-on: "ubuntu-24.04"
+   strategy:
+     fail-fast: false
+     matrix:
+       compiler:
+         - { compiler: GNU,  CC: gcc,  CXX: g++}
+         - { compiler: LLVM, CC: clang, CXX: clang++}
+   steps:
+     - uses: actions/checkout@v7
+     - name: get dependencies
+       run: |
+         sudo apt update
+         sudo apt remove nginx
+         sudo apt install -y libpcre3 libpcre3-dev libssl-dev cpanminus
+     - name: build with AddressSanitizer
+       env:
+         CC: ${{ matrix.compiler.CC }}
+         CXX: ${{ matrix.compiler.CXX }}
+       run: |
+         # -O1 keeps the sanitizer reports readable while staying close to the
+         # optimizer behaviour of a release build. No macro is switched off:
+         # the private code paths are what this job is here to check. -Wno-error
+         # only because the sanitizer changes what the optimizer can prove, so it
+         # reports warnings the other jobs (which do enforce -Werror) do not.
+         ./configure \
+            --with-debug \
+            --with-http_ssl_module \
+            --with-http_v2_module \
+            --with-cc-opt="-fsanitize=address -fno-omit-frame-pointer -g -O1 -Wno-error" \
+            --with-ld-opt="-fsanitize=address"
+         make -j2
+         sudo make install
+     - name: run upstream cases under AddressSanitizer
+       working-directory: tests/nginx-tests
+       env:
+         TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
+         # nginx frees its pools only where it has to and keeps allocations
+         # alive until exit by design, so LeakSanitizer reports at shutdown are
+         # expected and would drown the reports this job cares about.
+         ASAN_OPTIONS: detect_leaks=0
+       run: |
+         sudo cpanm --notest Net::DNS::Nameserver > build.log 2>&1 || (cat build.log && exit 1)
+         prove -I nginx-tests/lib \
+           nginx-tests/upstream.t \
+           nginx-tests/upstream_resolve.t \
+           nginx-tests/upstream_resolve_reload.t \
+           nginx-tests/upstream_service.t \
+           nginx-tests/upstream_service_reload.t \
+           nginx-tests/upstream_sticky_resolve.t \
+           nginx-tests/upstream_zone.t \
+           nginx-tests/upstream_zone_ssl.t \
+           nginx-tests/proxy_next_upstream.t \
+           tengine-tests/upstream_resolve_empty.t \
+           tengine-tests/upstream_resolve_shrink.t

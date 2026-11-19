@@ -37,9 +37,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         server_name  localhost;
 
+        http2 on;
         lingering_close off;
 
         error_page 400 = /close;
@@ -54,11 +55,7 @@ http {
 
 EOF
 
-# suppress deprecation warning
-
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -72,9 +69,9 @@ my ($sid, $frames, $frame);
 
 my $s1 = Test::Nginx::HTTP2->new();
 $sid = $s1->new_stream({ headers => [
-        { name => ':method', value => 'GET' },
-        { name => ':path', value => '/' },
-        { name => ':authority', value => 'localhost' }]});
+	{ name => ':method', value => 'GET' },
+	{ name => ':path', value => '/' },
+	{ name => ':authority', value => 'localhost' }]});
 $frames = $s1->read(all => [{ type => 'RST_STREAM' }]);
 
 ($frame) = grep { $_->{type} eq "RST_STREAM" } @$frames;

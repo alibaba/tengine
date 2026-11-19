@@ -157,12 +157,16 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-http_upstream_ip_hash_module)',
 		upstream_least_conn
 			=> '(?s)^(?!.*--without-http_upstream_least_conn_mod)',
+		upstream_least_time
+			=> '(?s)^(?!.*--without-http_upstream_least_time_mod)',
 		upstream_random
 			=> '(?s)^(?!.*--without-http_upstream_random_module)',
 		upstream_keepalive
-			=> '(?s)^(?!.*--without-http_upstream_keepalive_modu)',
+			=> '(?s)(?:--add-module=\S*ngx_http_upstream_keepalive_module|^(?!.*--without-http_upstream_keepalive_modu))',
 		upstream_zone
 			=> '(?s)^(?!.*--without-http_upstream_zone_module)',
+		upstream_sticky
+			=> '(?s)^(?!.*--without-http_upstream_sticky)',
 		http	=> '(?s)^(?!.*--without-http(?!\S))',
 		cache	=> '(?s)^(?!.*--without-http-cache)',
 		pop3	=> '(?s)^(?!.*--without-mail_pop3_module)',
@@ -171,6 +175,7 @@ sub has_module($) {
 		pcre	=> '(?s)^(?!.*--without-pcre)',
 		split_clients
 			=> '(?s)^(?!.*--without-http_split_clients_module)',
+		tunnel	=> '(?s)^(?!.*--without-http_tunnel_module)',
 		stream	=> '--with-stream((?!\S)|=dynamic)',
 		stream_access
 			=> '(?s)^(?!.*--without-stream_access_module)',
@@ -180,6 +185,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-stream_limit_conn_module)',
 		stream_map
 			=> '(?s)^(?!.*--without-stream_map_module)',
+		stream_pass
+			=> '(?s)^(?!.*--without-stream_pass_module)',
 		stream_return
 			=> '(?s)^(?!.*--without-stream_return_module)',
 		stream_set
@@ -192,6 +199,8 @@ sub has_module($) {
 			=> '(?s)^(?!.*--without-stream_upstream_hash_module)',
 		stream_upstream_least_conn
 			=> '(?s)^(?!.*--without-stream_upstream_least_conn_m)',
+		stream_upstream_least_time
+			=> '(?s)^(?!.*--without-stream_upstream_least_time_m)',
 		stream_upstream_random
 			=> '(?s)^(?!.*--without-stream_upstream_random_modul)',
 		stream_upstream_zone
@@ -268,20 +277,22 @@ sub has_feature($) {
 		return 0;
 	}
 
-	if ($feature =~ /^(openssl|libressl):([0-9.]+)/) {
+	if ($feature =~ /^(openssl|libressl):([0-9.]+)([a-z]*)/) {
 		my $library = $1;
 		my $need = $2;
+		my $patch = $3;
 
 		$self->{_configure_args} = `$NGINX -V 2>&1`
 			if !defined $self->{_configure_args};
 
 		return 0 unless
-			$self->{_configure_args} =~ /with $library ([0-9.]+)/i;
+			$self->{_configure_args}
+			=~ /with $library ([0-9.]+)([a-z]*)/i;
 
-		my @v = split(/\./, $1);
+		my @v = (split(/\./, $1), unpack("C*", $2));
 		my ($n, $v);
 
-		for $n (split(/\./, $need)) {
+		for $n (split(/\./, $need), unpack("C*", $patch)) {
 			$v = shift @v || 0;
 			return 0 if $n > $v;
 			return 1 if $v > $n;
@@ -760,7 +771,8 @@ sub test_globals_http() {
 	$s .= "root $self->{_testdir};\n";
 	$s .= "access_log $self->{_testdir}/access.log;\n";
 	$s .= "client_body_temp_path $self->{_testdir}/client_body_temp;\n";
-	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n";
+	$s .= "lua_package_path \"/usr/local/lib/lua/?.lua;;\";\n"
+		if $self->has_module('lua');
 
 	$s .= "fastcgi_temp_path $self->{_testdir}/fastcgi_temp;\n"
 		if $self->has_module('fastcgi');
@@ -856,6 +868,7 @@ sub http_start($;%) {
 	my $s;
 
 	my $port = $extra{SSL} ? 8443 : 8080;
+
 	eval {
 		local $SIG{ALRM} = sub { die "timeout\n" };
 		local $SIG{PIPE} = sub { die "sigpipe\n" };
@@ -867,6 +880,7 @@ sub http_start($;%) {
 			%extra
 		)
 			or die "Can't connect to nginx: $!\n";
+
 		if ($extra{SSL}) {
 			require IO::Socket::SSL;
 			IO::Socket::SSL->start_SSL(
@@ -876,8 +890,12 @@ sub http_start($;%) {
 				%extra
 			)
 				or die $IO::Socket::SSL::SSL_ERROR . "\n";
-			log_in("ssl cipher: " . $s->get_cipher());
-			log_in("ssl cert: " . $s->peer_certificate('issuer'));
+
+			if (!defined $extra{SSL_startHandshake}) {
+				log_in("ssl cipher: " . $s->get_cipher());
+				log_in("ssl cert: "
+					. $s->peer_certificate('issuer'));
+			}
 		}
 
 		log_out($request);
@@ -913,6 +931,7 @@ sub http_end($;%) {
 
 		local $/;
 		$reply = $s->getline();
+
 		$s->close();
 
 		alarm(0);

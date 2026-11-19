@@ -1,4 +1,4 @@
-name: test tengine ntls
+name: test tengine ntls and xquic
 
 on:
   push:
@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+    # Explicit job name so the reported status check is unique across workflows:
+    # ci.yml and test-nginx-core.yml declare a job with the same id, and required
+    # status checks are matched by name only, without a workflow prefix.
+    name: test ntls and xquic (${{ matrix.compiler.compiler }})
     runs-on: "ubuntu-24.04"
     strategy:
       fail-fast: false
@@ -16,16 +20,18 @@ jobs:
           - { compiler: GNU,  CC: gcc,  CXX: g++}
           - { compiler: LLVM, CC: clang, CXX: clang++}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           path: tengine
       - name: get dependencies
         run: |
-          sudo apt install -y libpcre3 libpcre3-dev
+          sudo apt install -y libpcre3 libpcre3-dev libevent-dev cmake
       - name: 'checkout luajit2'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/luajit2
+          # Pinned (the LuaJIT fork ngx_http_lua_module requires); keep in sync with packages/build/deps.env.
+          ref: v2.1-20260724
           path: luajit2
       - name: 'build luajit2'
         working-directory: luajit2
@@ -33,28 +39,35 @@ jobs:
           make
           sudo make install
       - name: 'checkout lua-resty-lrucache'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/lua-resty-lrucache
+          # Pinned (resty.core's dependency); keep in sync with packages/build/deps.env.
+          ref: v0.15
           path: lua-resty-lrucache
       - name: 'build lua-resty-lrucache'
         working-directory: lua-resty-lrucache
         run: |
           sudo make install
       - name: 'checkout lua-resty-core'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: openresty/lua-resty-core
-          ref: v0.1.27
+          # lua-resty-core pins the ngx_lua version with a strict equality check
+          # (lib/resty/core/base.lua), so it must match modules/ngx_http_lua_module
+          # exactly: 0.10.29 only accepts v0.1.32. Keep in sync with
+          # packages/build/deps.env, which pins the same pair for the packages.
+          ref: v0.1.32
           path: lua-resty-core
       - name: 'build lua-resty-core'
         working-directory: lua-resty-core
         run: |
           sudo make install
       - name: checkout Tongsuo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: Tongsuo-Project/Tongsuo
+          ref: 8.4-stable
           path: Tongsuo
       - name: build Tongsuo
         working-directory: Tongsuo
@@ -65,6 +78,37 @@ jobs:
           make -s -j4
           make install_sw
           make clean
+      - name: checkout xquic
+        uses: actions/checkout@v7
+        with:
+          repository: alibaba/xquic
+          # Supported API baseline; keep in sync with packages/build/deps.env.
+          ref: v1.9.6
+          path: xquic
+      - name: build xquic
+        working-directory: xquic
+        env:
+          CC: ${{ matrix.compiler.CC }}
+        run: |
+          mkdir -p build && cd build
+          if [ "${{ matrix.compiler.compiler }}" = "GNU" ]; then
+            CFLAGS="-Wno-deprecated-declarations -Wno-dangling-pointer -Wno-stringop-truncation"
+          else
+            CFLAGS="-Wno-deprecated-declarations"
+          fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DXQC_ENABLE_TESTING=1 \
+            -DXQC_SUPPORT_SENDMMSG_BUILD=1 \
+            -DXQC_ENABLE_BBR2=1 \
+            -DXQC_ENABLE_RENO=1 \
+            -DSSL_TYPE=babassl \
+            -DSSL_PATH=${RUNNER_TEMP}/tongsuo \
+            -DSSL_INC_PATH=${RUNNER_TEMP}/tongsuo/include \
+            -DSSL_LIB_PATH="${RUNNER_TEMP}/tongsuo/lib64/libssl.a;${RUNNER_TEMP}/tongsuo/lib64/libcrypto.a"
+          make -j4
+          sudo cp "libxquic.so" /usr/local/lib/
       - name: build Tengine
         working-directory: tengine
         env:
@@ -78,23 +122,34 @@ jobs:
             --with-pcre \
             --add-module=modules/ngx_tongsuo_ntls \
             --add-module=modules/ngx_http_lua_module \
+            --add-module=modules/ngx_http_xquic_module \
             --with-openssl=../Tongsuo \
             --with-openssl-opt="--api=1.1.1 enable-ntls" \
             --with-http_ssl_module \
             --with-http_v2_module \
             --with-stream \
             --with-stream_ssl_module \
-            --with-stream_sni
+            --with-stream_sni \
+            --with-xquic-inc="../xquic/include" \
+            --with-xquic-lib="../xquic/build"
           make -j2
           sudo make install
-      - name: run test cases
+      - name: run ntls test cases
         working-directory: tengine
         env:
           TEST_OPENSSL_BINARY: ${{ runner.temp }}/tongsuo/bin/tongsuo
-          TEST_NGINX_BINARY: /usr/local/nginx/sbin/nginx
+          TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
           TEST_NGINX_LEAVE: 1
         run: |
           prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_tongsuo_ntls/t
+      - name: run xquic test cases
+        working-directory: tengine
+        env:
+          TEST_XQUIC_CLIENT: ${{ github.workspace }}/xquic/build/test_client
+          TEST_NGINX_BINARY: /usr/local/tengine/sbin/tengine
+          TEST_NGINX_LEAVE: 1
+        run: |
+          prove -Itests/nginx-tests/nginx-tests/lib/ modules/ngx_http_xquic_module/t
       - name: debug
         if: ${{ failure() }}
         run: |

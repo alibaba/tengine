@@ -37,8 +37,10 @@ http {
     %%TEST_GLOBALS_HTTP%%
 
     server {
-        listen       127.0.0.1:8080 http2;
+        listen       127.0.0.1:8080;
         server_name  localhost;
+
+        http2 on;
 
         location / {
             add_trailer X-Var $host;
@@ -60,10 +62,7 @@ EOF
 $t->write_file('index.html', 'SEE-THIS');
 $t->write_file('empty', '');
 $t->write_file('continuation', 'SEE-THIS');
-# suppress deprecation warning
-open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

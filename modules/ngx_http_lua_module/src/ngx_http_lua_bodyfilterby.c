@@ -155,6 +155,10 @@ ngx_http_lua_body_filter_inline(ngx_http_request_t *r, ngx_chain_t *in)
 
     L = ngx_http_lua_get_lua_vm(r, NULL);
 
+    if (!llcf->enable_code_cache) {
+        llcf->body_filter_src_ref = LUA_REFNIL;
+    }
+
     /*  load Lua inline script (w/ cache) sp = 1 */
     rc = ngx_http_lua_cache_loadbuffer(r->connection->log, L,
                                        llcf->body_filter_src.value.data,
@@ -205,6 +209,10 @@ ngx_http_lua_body_filter_file(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     L = ngx_http_lua_get_lua_vm(r, NULL);
+
+    if (!llcf->enable_code_cache) {
+        llcf->body_filter_src_ref = LUA_REFNIL;
+    }
 
     /*  load Lua script file (w/ cache)        sp = 1 */
     rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
@@ -368,6 +376,7 @@ ngx_http_lua_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         }
 
     } else {
+        ctx->context = old_context;
         out = NULL;
     }
 
@@ -532,9 +541,23 @@ ngx_http_lua_body_filter_param_set(lua_State *L, ngx_http_request_t *r,
         if (last) {
             ctx->seen_last_in_filter = 1;
 
-            /* the "in" chain cannot be NULL and we set the "last_buf" or
-             * "last_in_chain" flag in the last buf of "in" */
+            /* the "in" chain cannot be NULL except that we set arg[1] = ""
+             * before arg[2] = true
+             */
+            if (in == NULL) {
+                in = ngx_http_lua_chain_get_free_buf(r->connection->log,
+                                                     r->pool,
+                                                     &ctx->free_bufs, 0);
+                if (in == NULL) {
+                    return luaL_error(L, "no memory");
+                }
 
+                in->buf->tag = (ngx_buf_tag_t) &ngx_http_lua_body_filter;
+                lmcf->body_filter_chain = in;
+            }
+
+            /* we set the "last_buf" or "last_in_chain" flag
+             * in the last buf of "in" */
             for (cl = in; cl; cl = cl->next) {
                 if (cl->next == NULL) {
                     if (r == r->main) {

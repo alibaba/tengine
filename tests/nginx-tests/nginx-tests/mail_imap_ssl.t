@@ -26,7 +26,6 @@ use Test::Nginx::IMAP;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 local $SIG{PIPE} = 'IGNORE';
 
 my $t = Test::Nginx->new()
@@ -210,7 +209,7 @@ my ($cipher, $sslversion);
 $s = Test::Nginx::IMAP->new(SSL => 1);
 $cipher = $s->socket()->get_cipher();
 $sslversion = $s->socket()->get_sslversion();
-	$sslversion =~ s/_/./;
+$sslversion =~ s/_/./;
 
 undef $s;
 
@@ -229,19 +228,7 @@ like($f, qr!^on:SUCCESS:(/?CN=2.example.com):\1:\w+:\w+:[^:]+:s4$!m,
 like($f, qr!^on:SUCCESS:(/?CN=3.example.com):\1:\w+:\w+:[^:]+:s5$!m,
 	'log - trusted cert');
 
-
-TODO: {
-local $TODO = 'not yet' unless $t->has_version('1.21.2');
-
 $f = $t->read_file('auth2.log');
 like($f, qr|^$cipher:$sslversion$|m, 'log - cipher sslversion');
 
-}
-
-
 ###############################################################################
-
-
-
-
-

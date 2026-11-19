@@ -26,7 +26,6 @@ use Test::Nginx::Stream qw/ stream /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-
 plan(skip_all => 'win32') if $^O eq 'MSWin32';
 
 my $t = Test::Nginx->new()->has(qw/stream stream_ssl socket_ssl/)
@@ -105,8 +104,6 @@ foreach my $name ('localhost', 'inherits') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
-
-
 $t->write_file('password', 'localhost');
 $t->write_file('password_many', "wrong$CRLF" . "localhost$CRLF");
 $t->write_file('password_stream', 'inherits');
@@ -128,23 +125,12 @@ $t->waitforsocket('127.0.0.1:' . port(8081));
 ###############################################################################
 
 like(get(8443), qr/200 OK/, 'ssl');
-
 like(get(8444), qr/200 OK/, 'ssl password many');
-
-
 like(get(8445), qr/200 OK/, 'ssl password fifo');
-
-
-
-
-
-
-
 
 # ssl_certificate inheritance
 
 like(cert(8443), qr/CN=localhost/, 'CN');
-
 like(cert(8446), qr/CN=inherits/, 'CN inner');
 
 ###############################################################################
@@ -153,10 +139,12 @@ sub get {
 	my $s = get_socket(@_);
 	return $s->io("GET / HTTP/1.0$CRLF$CRLF");
 }
+
 sub cert {
 	my $s = get_socket(@_);
 	return $s->socket()->dump_peer_certificate();
 }
+
 sub get_socket {
 	my ($port) = @_;
 	return stream(PeerAddr => '127.0.0.1:' . port($port), SSL => 1);
