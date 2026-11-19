@@ -115,7 +115,8 @@ like($ret4, qr/^FAILED.*BEGIN/m, 'bad optional_no_ca cert');
 like($ret5, qr/^SUCCESS.*BEGIN/m, 'good cert');
 like($ret6, qr/^SUCCESS.*BEGIN/m, 'good cert optional');
 like($ret7, qr/^SUCCESS.*BEGIN/m, 'good cert trusted');
-like($ret8, qr/CN = 2.example.com_sign$/m, 'no trusted sent');
+# Accept both "CN = name" and "CN=name" (Tongsuo 8.5.0 nameopt change).
+like($ret8, qr/CN ?= ?2.example.com_sign$/m, 'no trusted sent');
 
 $t->stop();
 
