@@ -92,10 +92,10 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        over, or keep the previous layout by passing --prefix, --sbin-path,
        --conf-path and --pid-path explicitly (lianglli)
 
-    *) Change: update core to Nginx-1.31.5 (lianglli)
+    *) Change: update core to Nginx-1.31.9 (lianglli)
 
     *) Change: the control API listens on the address given by "-L", not the
-       "-l" of nginx 1.31.5, because "-l" already lists all directives in
+       "-l" of nginx 1.31.9, because "-l" already lists all directives in
        Tengine; the control API is built only with --with-control-api
        (lianglli)
 

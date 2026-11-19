@@ -1,3 +1,207 @@
+Changes with nginx 1.31.9                                        18 Nov 2026
+
+    *) Security: a buffer overflow might occur in a worker process when
+       using the "try_files" and "alias" directives in certain
+       configurations (CVE-2026-125283). Thanks to Marc Luchian and
+       Liviu-Alexandru Bud.
+
+    *) Security: a flow control window overflow in HTTP/2 might allow
+       an attacker to cause a segmentation fault in a worker process,
+       or might have potential other impact (CVE-2026-123007). Thanks
+       to Xint.io.
+
+    *) Security: use-after-free might occur in a worker process when
+       using HTTP/2 if worker_connections were not enough
+       (CVE-2026-123633). Thanks to Albert of Vexera AI.
+
+    *) Security: use-after-free might occur in a worker process when
+       using HTTP/3 if worker_connections were not enough
+       (CVE-2026-121810). Thanks to Xint.io.
+
+    *) Security: use-after-free condition might occur if the "resolver"
+       directive was used and the same name was simultaneously resolved
+       in subrequests, allowing an attacker who is able to trigger name
+       resolution to cause segmentation fault in a worker process, or
+       might have potential other impact (CVE-2026-123634). Thanks to
+       Xint.io.
+
+    *) Security: use-after-free might occur in a worker process in the
+       mail proxy server (CVE-2026-113425). Thanks to Xint.io and Maxim
+       Dounin.
+
+    *) Security: in the stream module, an attacker who is able to
+       complete the SSL handshake synchronously might cause client SSL
+       certificates to be verified using the configuration of the
+       default server rather than the virtual server selected by SNI
+       (CVE-2026-120967). Thanks to CERT.PL.
+
+    *) Security: a segmentation fault might occur in a worker process
+       when using PROXY protocol version 2 with dynamic SSL certificate
+       loading (CVE-2026-120993). Thanks to ruokeqx.
+
+    *) Security: the ngx_stream_ssl_preread_module might interpret
+       malformed ClientHello messages differently than other TLS
+       implementations, which might result in bypassing security
+       restrictions (CVE-2026-123640). Thanks to Vivek Parikh of
+       BreachX Zero Day Labs.
+
+    *) Security: worker processes might get caught in an endless loop
+       while reading the request body over SSL (CVE-2026-118899).
+       Thanks to Maxim Dounin.
+
+    *) Change: now header lines without a colon are rejected. Thanks to
+       Maxim Dounin.
+
+    *) Change: now a request is rejected if the chunked request body
+       contains too much framing overhead. Thanks to jskoetsier.
+
+    *) Bugfix: a buffer overflow might occur in a worker process when
+       using a GeoIP database in the MMDB format containing invalid
+       coordinates. Thanks to Y.Horie.
+
+    *) Bugfix: a request might hang if it was proxied while the request
+       body was being discarded. Thanks to Maxim Dounin.
+
+    *) Bugfix: some values of the QPACK static table were decoded
+       incorrectly when using HTTP/3. Thanks to Nexory.
+
+    *) Bugfix: when using HTTP/2, response trailers might delay data of
+       higher priority streams.
+
+    *) Bugfix: the $cookie_... variables and the ngx_http_userid_module
+       handled the "Cookie" request header line incorrectly if it
+       contained a cookie without a name.
+
+    *) Bugfix: non-cacheable variables in the "index" directive might
+       be evaluated incorrectly. Thanks to Maxim Dounin.
+
+    *) Bugfix: OCSP responses for client certificates with uncommon
+       serial numbers might be cached incorrectly when using the
+       "ssl_ocsp_cache" directive. Thanks to Gyejin Lee of QED Audit.
+
+    *) Bugfix: the control API did not respond to requests with a too
+       long request line. Thanks to Daewoo Choi.
+
+
+Changes with nginx 1.31.8                                        21 Oct 2026
+
+    *) Change: Change in internal API: now the JSON parser reports
+       strings with escape sequences as separate events, and the
+       ngx_json_unescape_string() function decodes a string into a
+       separate buffer.
+
+    *) Change: now the path specified in the "working_directory"
+       directive is relative to nginx prefix directory, but not to the
+       current directory.
+
+    *) Bugfix: worker processes exited on start or during
+       reconfiguration if an invalid directory was specified in the
+       "working_directory" directive.
+
+    *) Bugfix: worker processes might be terminated abnormally on a
+       SIGBUS signal when using HTTP/3 on platforms with strict
+       alignment requirements. Thanks to Daewoo Choi.
+
+    *) Bugfix: "recv() failed (5: Input/output error)" alerts might
+       appear in logs when closing SSL connections if kernel TLS was
+       used with OpenSSL 3.2.0 or newer.
+
+    *) Bugfix: nginx could not be built on Solaris if the
+       --with-control-api option was used.
+
+
+Changes with nginx 1.31.7                                        14 Oct 2026
+
+    *) Security: a buffer overflow might occur in a worker process when
+       using the "alias" directive if the request URI was changed by
+       the "rewrite" directive and was then mapped to a file path
+       (CVE-2026-15176).
+
+    *) Security: a buffer overflow might occur in a worker process
+       while evaluating string expressions with variables, which
+       affected the document root calculation and request logging in
+       the http and stream modules (CVE-2026-93479). Thanks to Matt
+       Suiche of Tolmo Inc.
+
+    *) Security: when using HTTP/3 a part of an unknown frame might be
+       treated as the request body, which might result in bypassing the
+       "client_max_body_size" limit or injecting data in the proxied
+       request (CVE-2026-95101). Thanks to Hansol Lee of GOTROOT.
+
+    *) Security: when using TLS session ticket key rotation, one of the
+       keys was left uninitialized, which might allow to forge a
+       session (CVE-2026-97629). Thanks to PhiNode Labs.
+
+    *) Security: when using asynchronous file I/O (AIO), use-after-free
+       might occur in certain configurations if the SSI page has
+       "include virtual" commands (CVE-2026-97205). Thanks to
+       cyberlancer.
+
+    *) Feature: the ngx_http_geoip_module and ngx_stream_geoip_module
+       now support databases in the MaxMind DB (MMDB) format.
+
+    *) Feature: now backend SSL certificates can be verified by IP
+       address. Thanks to Maxim Dounin.
+
+    *) Feature: now QUIC supports reconfiguration and binary upgrade
+       when using the "quic_bpf" directive.
+
+    *) Change: the ngx_http_v2_module now uses the RFC 9218
+       prioritization scheme, and RFC 7540 priority signals are
+       ignored.
+
+    *) Bugfix: a segmentation fault might occur in a worker process or
+       "request count is zero" alerts might appear in logs if the
+       "X-Accel-Redirect" header line was cached and the cached
+       response was then served to a client. Thanks to Jiří Setnička
+       and Maxim Dounin.
+
+    *) Bugfix: a segmentation fault might occur in a worker process if
+       the ngx_http_dav_module was used to handle COPY and MOVE methods
+       in a location with the "alias" directive. Thanks to Maxim
+       Dounin.
+
+    *) Bugfix: QUIC connections might be closed with the "quic flood
+       detected" message in logs if the "http3_stream_buffer_size"
+       directive was set to a small value; the bug had appeared in
+       1.27.5.
+
+    *) Bugfix: closing an SSL connection without close_notify was
+       treated as a clean shutdown, including the case when the
+       connection was reset; now "SSL_read() failed" errors appear in
+       logs in this case. Thanks to Maxim Dounin.
+
+    *) Bugfix: "[crit] SSL_write() failed" messages might appear in
+       logs when an error occurred while reading from an SSL
+       connection.
+
+
+Changes with nginx 1.31.6                                        15 Sep 2026
+
+    *) Security: a heap memory buffer overflow might occur in a worker
+       process under certain configurations when using HTTP/3 with
+       OpenSSL 3.5.0 and earlier (CVE-2026-90439). Thanks to Banny
+       Liao.
+
+    *) Change: now the QUIC transport parameters extension received in
+       an SSL connection is always ignored.
+
+    *) Bugfix: binary upgrade refused to work if the control API socket
+       was specified and the new nginx executable was built with the
+       ngx_http_perl_module.
+
+    *) Bugfix: an error while evaluating a predicate in a predicate
+       location was ignored and the predicate was treated as false.
+
+    *) Bugfix: an error during a nested location lookup might be
+       ignored if locations given by regular expressions or predicates
+       were configured at the current level.
+
+    *) Bugfix: a segmentation fault might occur while reading
+       configuration if the "geo" directive with the "ranges" parameter
+       was used and the corresponding binary base file was corrupted.
+
+
 Changes with nginx 1.31.5                                        02 Sep 2026
 
     *) Feature: control API.
