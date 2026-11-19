@@ -113,7 +113,7 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        cases (lianglli)
 
     *) Change: the xquic baseline used by the packages and by CI moved to
-       v1.9.6; the module stays compatible with the v1.8.0 to v1.9.6 API
+       v1.9.8; the module stays compatible with the v1.8.0 to v1.9.8 API
        generation, and modules/ngx_http_xquic_module/README.md now lists the
        xquic version verified for each Tengine release [XQUIC] (Yanmei-Liu)
 
