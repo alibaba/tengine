@@ -152,6 +152,14 @@ Dingtalk user group: 23394285
 
 [BSD-2-Clause License](https://github.com/alibaba/tengine/blob/master/LICENSE)
 
+## Star History
+
+<p align="center">
+  <a href="https://star-history.com/#alibaba/tengine&Date">
+    <img src="https://api.star-history.com/svg?repos=alibaba/tengine&type=Date" alt="Star History Chart" width="600">
+  </a>
+</p>
+
 <h1 align="center" style="border-bottom: none">
     <a href="https://tengine.taobao.org" target="_blank"><img alt="Tengine" src="/docs/image/tengine-logo.png" width="294"></a>
 </h1>
