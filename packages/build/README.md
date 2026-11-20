@@ -164,16 +164,55 @@ tarball（只需 glibc 2.17，el7 满足）；`build.sh` 会发现这个 CMake �
 artifact —— 36 个矩阵 job 各自下载它，既省 36 次重复下载，又保证全矩阵编译的是
 同一份字节。
 
-`verify` job 另取 4 个组合（el9/ubuntu2404 × x86_64/aarch64）实机装包，校验
-`/usr/sbin/tengine` 与 `/etc/tengine/tengine.conf` 存在、`tengine -V` 输出里含
-`ngx_tongsuo_ntls` / `ngx_http_xquic_module` / `ngx_http_lua_module` 与 `enable-ntls`
-（Tongsuo 特有的 configure 选项）、且不含依赖构建树的绝对路径，`tengine -t` 通过。
+`verify` job 另取 6 个组合（el9 / ubuntu2404 / alpine324 × x86_64/aarch64）实机装包 ——
+rpm、deb、apk 是 spec、`debian/rules`、`APKBUILD` 三套独立实现，私有 libdir 布局与
+perl 子包拆分各写各的，Alpine 还多一层 musl 差异，因此三种格式都要实测。每个组合校验：
+
+- `/usr/sbin/tengine` 与 `/etc/tengine/tengine.conf` 存在；
+- `tengine -V` 的 banner 里含 `ngx_tongsuo_ntls` / `ngx_http_xquic_module` /
+  `ngx_http_lua_module`，并含 `enable-ntls`（Tongsuo 特有的 configure 选项）；
+- banner 与本次 checkout 所 pin 的依赖基线一致，见下文的
+  [check-pinned-versions.sh](../../.github/scripts/check-pinned-versions.sh)；
+- banner 里不含依赖构建树的绝对路径：configure 原样记录参数，绝对路径会被 `-V` 在
+  每一台装了包的机器上永久打印出来（包括当初构建它的那个 home 目录），
+  `build-deps.sh --env-relative-to` 负责把这三个参数保持成相对路径；
+- `tengine -t` 通过；
+- perl 子包（rpm/deb 的 `tengine-module-perl`、apk 的 `tengine-mod-perl`）里的
+  `ngx_http_perl_module.so` 能被 `load_module` 配一条 `perl_set` 真正加载 —— XS
+  对象缺失或放错位置，只在配置解析阶段建解释器时才暴露；该 `.so` 的路径随 libdir
+  而变（RHEL 家族在 `lib64`，deb/apk 在 `lib`），校验时用通配符取它。
+
 注意 banner 里没有可识别 Tongsuo 的版本串：它的 `OPENSSL_VERSION_TEXT` 只是其所基于
 的 OpenSSL 版本号，nginx 也从不打印 `TONGSUO_VERSION_TEXT`。
 
 > `tengine -V` 能跑起来本身就验证了动态链接器解析到了随包的 `libxquic.so` 与
 > `libluajit`，也就是验证了 rpath；`tengine -t` 通过则验证了 `resty.core` 能被
 > 加载（启动即 require），也就是验证了 `lua_package_path`。
+
+上面那些断言证明该有的功能都在产物里，[check-pinned-versions.sh](../../.github/scripts/check-pinned-versions.sh)
+证明产物确实出自本次 checkout 所 pin 的源码：`deps.env` 被回退、buildx 层是旧的、包
+从错误的树里装配出来，都会在发布前失败，而不是发到用户手上。两条发布路径共用它 ——
+`verify` job 为此新增一次 `actions/checkout`，把工作区只读挂成容器里的 `/src`；
+[verify-image.sh](../../.github/scripts/verify-image.sh) 则在三模块与 `enable-ntls`
+断言之后、perl 载荷校验之前调用它。两边都先 checkout，所以脚本读到的两个文件正是
+被测产物对应的那个 commit。
+
+脚本从 stdin 读 `tengine -V` 的 banner，与两处源码对账：
+
+- core 版本取 `src/core/nginx.h` 的 `TENGINE_VERSION` 与 `NGINX_VERSION`。两者来自
+  编译该二进制的那棵树而非 release tag，所以 rc 预发布同样报告 `3.2.0`；
+- Tongsuo 与 xquic 取 `packages/build/deps.env` 每条的第 3 字段，即 tarball 的顶层
+  目录名。configure 会原样记录 `--with-openssl=../deps-build/Tongsuo-8.5.0` 这类
+  路径，因此在 banner 里匹配目录名等价于匹配构建源，依赖升级时脚本无需改动。这条链
+  的起点是 `fetch-deps.sh` 校验的 sha256：checksum 钉死 tarball 内容，tarball 顶层
+  目录就是第 3 字段，`build-deps.sh` 把 configure 指向它。
+
+LuaJIT 不在此列：它经 `--with-cc-opt` / `--with-ld-opt` 传入，各发行版 recipe 自行
+拼装，banner 里没有属于它的稳定路径。
+
+脚本 `set -eu`，输出为纯文本、不含任何转义序列（它同样要跑在 alpine 的 busybox `sh`
+里）；setup 类问题（banner 为空、找不到 `nginx.h` / `deps.env`、字段不足）立即失败，
+版本不匹配则逐条记完再统一退出 —— 一次 CI run 就把所有偏移说全，而不是只报第一个。
 
 ### Release 发布（tag 触发）
 
@@ -245,8 +284,12 @@ Tongsuo + xquic 编译，两个变体在 buildx 里共享全部 builder 层。
   镜像只放模块、要用户自己加载）；这也让 stage 内的 `tengine -t` 真正验证了模块可加载。
 - `nginx.pm` 装在 `/usr/lib/tengine/perl`（`--with-perl_modules_path`），该路径被
   编译进二进制的 `@INC`，`use nginx;` 无需额外配置。
-- 系统包（rpm/deb/apk）**不含** perl 模块：`TENGINE_WITH_PERL` 默认 `no`，因为 spec
-  的 `%files` 没有对应条目，rpmbuild 会因 unpackaged files 直接失败。
+- 系统包（rpm/deb/apk）把 perl 模块拆成**独立子包**：rpm/deb 是 `tengine-module-perl`，
+  apk 是 `tengine-mod-perl`，基础包因此不会被拉上 libperl。三套配方各自显式打开它
+  （spec 由 `%bcond_without perl` 默认开启，`debian/rules` 与 `APKBUILD` 直接
+  `export TENGINE_WITH_PERL=yes`），而 `configure-args.sh` 的默认值仍是 `no`，源码
+  构建行为不变。子包里的模块同样是动态的且默认不加载，需要在 main context 里
+  `load_module`；`verify` job 会实机加载一次，见上文。
 
 发布由 [docker.yml](../../.github/workflows/docker.yml) 负责，触发与打包一致
 （tag `tengine-*` 自动，`workflow_dispatch` 手动且默认只构建不推送）：
@@ -261,7 +304,9 @@ Tongsuo + xquic 编译，两个变体在 buildx 里共享全部 builder 层。
   拉到预发布），但 RC 的版本化 tag 与正式版一样永久留在 ghcr
 - `verify` job 把发布出去的 tag 拉回来跑
   [verify-image.sh](../../.github/scripts/verify-image.sh)：断言三模块编入、Tongsuo
-  在位、`tengine -t` 通过、HTTP 可访问，并真跑一段 Lua
+  在位、banner 与 pin 的依赖基线一致（复用打包一节的
+  [check-pinned-versions.sh](../../.github/scripts/check-pinned-versions.sh)）、
+  `tengine -t` 通过、HTTP 可访问，并真跑一段 Lua
   （`require "resty.core"` + `cjson`）验证 `lua_package_path` / `cpath` 正确；
   `--variant perl` 再额外请求一个 perl handler，用返回的 `$nginx::VERSION` 证明
   `nginx.pm` 确实从编译进 `@INC` 的路径解析成功
@@ -508,8 +553,9 @@ packages/build/
 ├── Dockerfile.alpine     alpine 镜像（多阶段）
 └── .github/
     ├── scripts/
-    │   ├── image-tags.sh         镜像 tag 清单（发行版部分反解自 Dockerfile）
-    │   └── verify-image.sh       镜像冒烟校验（含真跑 Lua）
+    │   ├── check-pinned-versions.sh   banner 与 nginx.h / deps.env 的基线对账
+    │   ├── image-tags.sh              镜像 tag 清单（发行版部分反解自 Dockerfile）
+    │   └── verify-image.sh            镜像冒烟校验（含真跑 Lua 与基线对账）
     └── workflows/
         ├── package.yml   包矩阵 + Release 上传
         └── docker.yml    镜像构建 + ghcr 发布
