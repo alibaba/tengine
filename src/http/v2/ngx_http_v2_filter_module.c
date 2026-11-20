@@ -1301,6 +1301,7 @@ ngx_http_v2_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
             ngx_http_v2_queue_frame(h2c, frame);
 
             h2c->send_window -= frame_size;
+            h2c->send_queued += frame_size;
 
             stream->send_window -= frame_size;
             stream->queued++;
@@ -1696,6 +1697,7 @@ done:
     stream->request->header_size += NGX_HTTP_V2_FRAME_HEADER_SIZE;
 
     h2c->payload_bytes += frame->length;
+    h2c->send_queued -= frame->length;
 
     ngx_http_v2_handle_frame(stream, frame);
 
@@ -1830,6 +1832,7 @@ ngx_http_v2_filter_cleanup(void *data)
     }
 
     h2c->send_window += window;
+    h2c->send_queued -= window;
 }
 
 

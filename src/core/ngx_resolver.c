@@ -106,6 +106,7 @@ static ngx_int_t ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name,
 static ngx_int_t ngx_resolver_set_timeout(ngx_resolver_t *r,
     ngx_resolver_ctx_t *ctx);
 static void ngx_resolver_timeout_handler(ngx_event_t *ev);
+static void ngx_resolver_free_handler(ngx_resolver_ctx_t *ctx);
 static void ngx_resolver_free_node(ngx_resolver_t *r, ngx_resolver_node_t *rn);
 static void *ngx_resolver_alloc(ngx_resolver_t *r, size_t size);
 static void *ngx_resolver_calloc(ngx_resolver_t *r, size_t size);
@@ -726,9 +727,11 @@ ngx_resolve_name_done(ngx_resolver_ctx_t *ctx)
                 w = w->next;
             }
 
-            ngx_log_error(NGX_LOG_ALERT, r->log, 0,
-                          "could not cancel %V resolving", &ctx->name);
+            ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0,
+                           "could not cancel %V resolving", &ctx->name);
         }
+
+        ctx->handler = ngx_resolver_free_handler;
     }
 
 done:
@@ -746,9 +749,12 @@ done:
 
     if (ctx->event) {
         ngx_resolver_free_locked(r, ctx->event);
+        ctx->event = NULL;
     }
 
-    ngx_resolver_free_locked(r, ctx);
+    if (ctx->handler != ngx_resolver_free_handler) {
+        ngx_resolver_free_locked(r, ctx);
+    }
 
     /* unlock alloc mutex */
 
@@ -1358,6 +1364,7 @@ ngx_resolve_addr_done(ngx_resolver_ctx_t *ctx)
             }
         }
 
+#if (NGX_DEBUG)
         {
             u_char     text[NGX_SOCKADDR_STRLEN];
             ngx_str_t  addrtext;
@@ -1366,9 +1373,12 @@ ngx_resolve_addr_done(ngx_resolver_ctx_t *ctx)
             addrtext.len = ngx_sock_ntop(ctx->addr.sockaddr, ctx->addr.socklen,
                                          text, NGX_SOCKADDR_STRLEN, 0);
 
-            ngx_log_error(NGX_LOG_ALERT, r->log, 0,
-                          "could not cancel %V resolving", &addrtext);
+            ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0,
+                           "could not cancel %V resolving", &addrtext);
         }
+#endif
+
+        ctx->handler = ngx_resolver_free_handler;
     }
 
 done:
@@ -1381,9 +1391,12 @@ done:
 
     if (ctx->event) {
         ngx_resolver_free_locked(r, ctx->event);
+        ctx->event = NULL;
     }
 
-    ngx_resolver_free_locked(r, ctx);
+    if (ctx->handler != ngx_resolver_free_handler) {
+        ngx_resolver_free_locked(r, ctx);
+    }
 
     /* unlock alloc mutex */
 
@@ -2706,7 +2719,22 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
                 next->node = NULL;
             }
 
-            (void) ngx_resolve_name_locked(r, ctx, &name);
+            if (ngx_resolve_name_locked(r, ctx, &name) == NGX_ERROR) {
+
+                /* unlock name mutex */
+
+                do {
+                    ctx->state = NGX_ERROR;
+                    ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+                    next = ctx->next;
+
+                    ctx->handler(ctx);
+
+                    ctx = next;
+                } while (ctx);
+
+                return;
+            }
         }
 
         /* unlock name mutex */
@@ -3091,7 +3119,22 @@ ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
                 next->node = NULL;
             }
 
-            (void) ngx_resolve_name_locked(r, ctx, &name);
+            if (ngx_resolve_name_locked(r, ctx, &name) == NGX_ERROR) {
+
+                /* unlock name mutex */
+
+                do {
+                    ctx->state = NGX_ERROR;
+                    ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+                    next = ctx->next;
+
+                    ctx->handler(ctx);
+
+                    ctx = next;
+                } while (ctx);
+
+                return;
+            }
         }
 
         /* unlock name mutex */
@@ -3130,6 +3173,11 @@ ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx, ngx_resolver_node_t *rn)
     ngx_resolver_t           *r;
     ngx_resolver_ctx_t       *cctx;
     ngx_resolver_srv_name_t  *srvs;
+
+    if (ctx->handler == ngx_resolver_free_handler) {
+        ctx->handler(ctx);
+        return;
+    }
 
     r = ctx->resolver;
 
@@ -4259,6 +4307,13 @@ ngx_resolver_timeout_handler(ngx_event_t *ev)
     ctx->state = NGX_RESOLVE_TIMEDOUT;
 
     ctx->handler(ctx);
+}
+
+
+static void
+ngx_resolver_free_handler(ngx_resolver_ctx_t *ctx)
+{
+    ngx_resolver_free(ctx->resolver, ctx);
 }
 
 
