@@ -47,7 +47,7 @@ Tengine has been an open source project since December 2011. It is being activel
 * Protects the server in case system load or memory use goes too high.
 * Multiple CSS or JavaScript requests can be combined into one request to reduce download time.
 * Removes unnecessary white spaces and comments to reduce the size of a page.
-* Active health checks of upstream servers can be performed.
+* Active health checks of upstream servers can be performed, for both HTTP and stream (L4) upstreams.
 * The number of worker processes and CPU affinities can be set automatically.
 * The limit_req module is enhanced with whitelist support and more conditions are allowed in a single location.
 * Enhanced diagnostic information makes it easier to troubleshoot errors.
