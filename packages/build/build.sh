@@ -550,7 +550,32 @@ EOS
             echo 'zypper --non-interactive --no-gpg-checks install rpm-build gcc gcc-c++ make cmake tar findutils curl perl libopenssl-devel zlib-devel pcre2-devel systemd-rpm-macros'
             ;;
         deb)
-            echo 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl libperl-dev curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev'
+            cat <<'EOS'
+export DEBIAN_FRONTEND=noninteractive
+# Debian 11 (bullseye) is past its LTS end of life: deb.debian.org still serves
+# the package indexes but has started deleting the pool files they name, so
+# apt-get install dies on 404s (perl 5.32.1-4+deb11u5 and friends). The frozen
+# full tree lives on archive.debian.org, the security suite included -- point
+# every bullseye source there before updating. Both the one-line sources.list
+# and the deb822 debian.sources layouts are rewritten, and the security host
+# differs between image vintages (security.debian.org vs
+# deb.debian.org/debian-security); the /debian prefix rewrite covers the latter
+# because archive.debian.org keeps the same /debian-security path.
+if grep -q '^VERSION_CODENAME=bullseye' /etc/os-release 2>/dev/null; then
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do
+        [ -f "$f" ] || continue
+        sed -i -e 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' \
+               -e 's|https://deb.debian.org/debian|http://archive.debian.org/debian|g' \
+               -e 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' \
+               -e 's|https://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' \
+               "$f"
+    done
+    # An archived suite never refreshes again; do not let apt treat the age of
+    # its Release file as an error.
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99archive
+fi
+apt-get update -qq && apt-get install -y --no-install-recommends build-essential debhelper cmake perl libperl-dev curl ca-certificates libssl-dev zlib1g-dev libpcre2-dev
+EOS
             ;;
         apk)
             # `apk update` rather than `apk add --no-cache`: unlike rpmbuild and
