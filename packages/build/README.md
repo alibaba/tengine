@@ -147,8 +147,9 @@ Ubuntu 22.04/24.04/26.04、SLES 15 SP6+/16、Alpine 3.21~3.24，均双架构）�
 `vault.centos.org`，其主树只有 x86_64，aarch64 归档在 `/altarch/` 另一路径下，
 bootstrap 的源改写没覆盖，该组合不可能成功。
 
-**`el7` + `x86_64` 不免检。** 完备功能集已实测可用 gcc 4.8.5 编出：Tongsuo 的
-OpenSSL 3.0 基线、xquic 的 `-std=gnu11` 及其自带 `-Werror` 都没有问题。唯一的真实
+**`el7` + `x86_64` 不免检。** 完备功能集上一次实测可用 gcc 4.8.5 编出，当时 pin 的是
+Tongsuo 8.4.0（OpenSSL 3.0.3 基线），xquic 的 `-std=gnu11` 及其自带 `-Werror` 也没有
+问题；8.5.0 把基线抬到 OpenSSL 3.5.4，该组合尚未按新基线重跑。唯一的真实
 障碍是 CMake —— el7 只打包 2.8，而通常的替代 `cmake3` 只存在于同样已 EOL 的
 EPEL 7（metalink 已失效，仅剩归档镜像）。因此 bootstrap 改为直接取 Kitware 的静态
 tarball（只需 glibc 2.17，el7 满足）；`build.sh` 会发现这个 CMake 不属于 rpm，
@@ -165,8 +166,10 @@ artifact —— 36 个矩阵 job 各自下载它，既省 36 次重复下载，�
 
 `verify` job 另取 4 个组合（el9/ubuntu2404 × x86_64/aarch64）实机装包，校验
 `/usr/sbin/tengine` 与 `/etc/tengine/tengine.conf` 存在、`tengine -V` 输出里含
-`ngx_tongsuo_ntls` / `ngx_http_xquic_module` / `ngx_http_lua_module` 与 Tongsuo
-版本串、`tengine -t` 通过。
+`ngx_tongsuo_ntls` / `ngx_http_xquic_module` / `ngx_http_lua_module` 与 `enable-ntls`
+（Tongsuo 特有的 configure 选项）、且不含依赖构建树的绝对路径，`tengine -t` 通过。
+注意 banner 里没有可识别 Tongsuo 的版本串：它的 `OPENSSL_VERSION_TEXT` 只是其所基于
+的 OpenSSL 版本号，nginx 也从不打印 `TONGSUO_VERSION_TEXT`。
 
 > `tengine -V` 能跑起来本身就验证了动态链接器解析到了随包的 `libxquic.so` 与
 > `libluajit`，也就是验证了 rpath；`tengine -t` 通过则验证了 `resty.core` 能被

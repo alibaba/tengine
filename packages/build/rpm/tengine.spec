@@ -431,6 +431,15 @@ exit 0
 %endif
 
 %changelog
+* Thu Nov 19 2026 Tengine Team <tengine@taobao.net> - 3.2.0-3
+- Move the pinned dependency baseline in packages/build/deps.env to Tongsuo
+  8.5.0 and xquic v1.9.8, and build from nginx core 1.31.9. Tongsuo 8.5.0 is
+  based on OpenSSL 3.5.4 rather than the 3.0.3 of 8.4.0, so the statically
+  linked TLS backend this package carries moves forward five minor versions;
+  the enable-ntls build recipe is unchanged. xquic v1.9.8 stays within the
+  engine-scoped API generation ngx_http_xquic_module supports, so no module
+  source changed.
+
 * Thu Jul 30 2026 Tengine Team <tengine@taobao.net> - 3.2.0-2
 - Build Tongsuo (NTLS), xquic (QUIC/HTTP-3) and the Lua stack from pinned
   sources and enable them by default.
