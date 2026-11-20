@@ -109,6 +109,20 @@ sub h2_priority {
 	$self->raw_write(pack("x2C2xNNC", 5, 0x2, $stream, $dep, $w));
 }
 
+sub h2_priority_update {
+	my ($self, $stream, $value, %extra) = @_;
+	my $sid = defined $extra{sid} ? $extra{sid} : 0;
+	my $len = defined $extra{len} ? $extra{len} : 4 + length($value);
+	my $buf = pack_length($len) . pack("CxN2a*", 0x10, $sid, $stream, $value);
+
+	my @bufs = map {
+		$self->raw_write(substr $buf, 0, $_, "");
+		select undef, undef, undef, 0.2;
+	} @{$extra{split}};
+
+	$self->raw_write($buf);
+}
+
 sub h2_window {
 	my ($self, $win, $stream) = @_;
 

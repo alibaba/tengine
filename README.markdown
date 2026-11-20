@@ -20,7 +20,7 @@ Tengine is a high-performance web server and reverse proxy originated by [Taobao
 Tengine has been an open source project since December 2011. It is being actively developed by the Tengine team, whose core members are from Taobao, Sogou and other Internet companies. Tengine is a community effort and everyone is encouraged to [get involved](https://github.com/alibaba/tengine).
 
 ## Features
-* All features of nginx-1.31.5 are inherited, i.e., it is 100% compatible with nginx.
+* All features of nginx-1.31.9 are inherited, i.e., it is 100% compatible with nginx.
 * Dynamically configure the servers, locations and upstreams without reloading or restarting worker processes with [tengine-ingress](https://github.com/alibaba/tengine-ingress), the Kubernetes Ingress controller for Tengine.
 * HTTP/3 support (QUIC v1 and draft-29) with [xquic](https://github.com/alibaba/xquic), including connection management and multiplexing for lower latency and higher resilience to packet loss on unstable networks.
 * High-speed UDP transmission with kernel-bypass.

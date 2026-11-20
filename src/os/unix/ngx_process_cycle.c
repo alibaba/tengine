@@ -917,8 +917,17 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         }
 
         if (initgroups(ccf->username, ccf->group) == -1) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                          "initgroups(%s, %d) failed",
+
+            if (ngx_errno != NGX_EPERM) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              "initgroups(%s, %d) failed",
+                              ccf->username, ccf->group);
+                /* fatal */
+                exit(2);
+            }
+
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "initgroups(%s, %d) failed, ignored",
                           ccf->username, ccf->group);
         }
 
@@ -1067,7 +1076,8 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
                 && c[i].read
                 && !c[i].read->accept
                 && !c[i].read->channel
-                && !c[i].read->resolver)
+                && !c[i].read->resolver
+                && !c[i].read->quic)
             {
                 ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
                               "*%uA open socket #%d left in connection %ui",

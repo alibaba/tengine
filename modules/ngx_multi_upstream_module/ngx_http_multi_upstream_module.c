@@ -735,13 +735,19 @@ ngx_http_multi_upstream_connection_close(ngx_connection_t *c)
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
             "multi: close http upstream connection: %d", c->fd);
 
+    c->destroyed = 1;
+
+    /*
+     * Close the connection before destroying its pool: c->log and the
+     * pool cleanup handlers (the fake request) are allocated from c->pool
+     * and ngx_close_connection() still uses them, so destroying the pool
+     * first is a use-after-free.
+     */
+    ngx_close_connection(c);
+
     if (c->pool) {
         ngx_destroy_pool(c->pool);
     }
-
-    c->destroyed = 1;
-
-    ngx_close_connection(c);
 
     return NGX_OK;
 }

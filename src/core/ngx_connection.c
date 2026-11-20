@@ -612,20 +612,18 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 #endif
             /* TODO: close on exit */
 
-            if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
-                if (ngx_nonblocking(s) == -1) {
+            if (ngx_nonblocking(s) == -1) {
+                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                              ngx_nonblocking_n " %V failed",
+                              &ls[i].addr_text);
+
+                if (ngx_close_socket(s) == -1) {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  ngx_nonblocking_n " %V failed",
+                                  ngx_close_socket_n " %V failed",
                                   &ls[i].addr_text);
-
-                    if (ngx_close_socket(s) == -1) {
-                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                      ngx_close_socket_n " %V failed",
-                                      &ls[i].addr_text);
-                    }
-
-                    return NGX_ERROR;
                 }
+
+                return NGX_ERROR;
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
@@ -1073,10 +1071,6 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 #if (T_NGX_HAVE_XUDP)
     ngx_xudp_terminate_xudp_binding(cycle);
 #endif
-
-    if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
-        return;
-    }
 
     ngx_accept_mutex_held = 0;
     ngx_use_accept_mutex = 0;
@@ -1625,6 +1619,12 @@ ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
     if (err == NGX_EMSGSIZE && c->log_error == NGX_ERROR_IGNORE_EMSGSIZE) {
         return 0;
     }
+
+#if (NGX_LINUX)
+    if (err == NGX_EIO && c->ktls_recv) {
+        return 0;
+    }
+#endif
 
     if (err == 0
         || err == NGX_ECONNRESET

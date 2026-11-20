@@ -92,10 +92,10 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        over, or keep the previous layout by passing --prefix, --sbin-path,
        --conf-path and --pid-path explicitly (lianglli)
 
-    *) Change: update core to Nginx-1.31.5 (lianglli)
+    *) Change: update core to Nginx-1.31.9 (lianglli)
 
     *) Change: the control API listens on the address given by "-L", not the
-       "-l" of nginx 1.31.5, because "-l" already lists all directives in
+       "-l" of nginx 1.31.9, because "-l" already lists all directives in
        Tengine; the control API is built only with --with-control-api
        (lianglli)
 
@@ -113,9 +113,13 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        cases (lianglli)
 
     *) Change: the xquic baseline used by the packages and by CI moved to
-       v1.9.6; the module stays compatible with the v1.8.0 to v1.9.6 API
+       v1.9.8; the module stays compatible with the v1.8.0 to v1.9.8 API
        generation, and modules/ngx_http_xquic_module/README.md now lists the
        xquic version verified for each Tengine release [XQUIC] (Yanmei-Liu)
+
+    *) Change: the Tongsuo baseline used by the packages and by CI moved to
+       8.5.0, whose OpenSSL base is 3.5.4 rather than the 3.0.3 of 8.4.0
+       (lianglli)
 
     *) Bugfix: drain the HTTP health-check response body for keepalive-safe
        connection reuse in ngx_http_upstream_check_module (lianglli)

@@ -67,7 +67,10 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Tongsuo-Project/Tongsuo
-          ref: 8.4-stable
+          # Release tag, not a branch head: keep in sync with
+          # packages/build/deps.env so this job and the packages compile the
+          # exact same Tongsuo.
+          ref: 8.5.0
           path: Tongsuo
       - name: build Tongsuo
         working-directory: Tongsuo
@@ -83,7 +86,7 @@ jobs:
         with:
           repository: alibaba/xquic
           # Supported API baseline; keep in sync with packages/build/deps.env.
-          ref: v1.9.6
+          ref: v1.9.8
           path: xquic
       - name: build xquic
         working-directory: xquic

@@ -1,0 +1,6 @@
+# build artifacts of the stand-alone hessian2 unit tests
+# every BINS entry is a test_<name> binary built from test_<name>.cc
+test_*
+!test_*.cc
+*.dSYM/
+*.o

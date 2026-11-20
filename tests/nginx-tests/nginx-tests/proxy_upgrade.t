@@ -28,7 +28,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy ssi/)
-	->write_file_expand('nginx.conf', <<'EOF')->plan(31);
+	->write_file_expand('nginx.conf', <<'EOF')->plan(30);
 
 %%TEST_GLOBALS%%
 
@@ -149,7 +149,6 @@ open my $f, '<', "$d/cc.log" or die "Can't open cc.log: $!";
 
 is($f->getline(), shift (@r) . " 540793 upgrade\n", 'log - bytes');
 is($f->getline(), shift (@r) . " 22 upgrade\n", 'log - bytes pipelined');
-like($f->getline(), qr/\d+ 0 /, 'log - bytes noupgrade');
 
 ###############################################################################
 

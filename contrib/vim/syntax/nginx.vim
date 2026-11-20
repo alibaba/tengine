@@ -123,7 +123,6 @@ syn keyword ngxDirectiveDeprecated contained http2_recv_timeout
 syn keyword ngxDirective contained absolute_redirect
 syn keyword ngxDirective contained accept_mutex
 syn keyword ngxDirective contained accept_mutex_delay
-syn keyword ngxDirective contained acceptex_read
 syn keyword ngxDirective contained access_log
 syn keyword ngxDirective contained add_after_body
 syn keyword ngxDirective contained add_before_body
@@ -328,7 +327,6 @@ syn keyword ngxDirective contained imap_auth
 syn keyword ngxDirective contained imap_capabilities
 syn keyword ngxDirective contained imap_client_buffer
 syn keyword ngxDirective contained index
-syn keyword ngxDirective contained iocp_threads
 syn keyword ngxDirective contained ip_hash
 syn keyword ngxDirective contained js_access
 syn keyword ngxDirective contained js_content
@@ -418,7 +416,6 @@ syn keyword ngxDirective contained pid
 syn keyword ngxDirective contained pop3_auth
 syn keyword ngxDirective contained pop3_capabilities
 syn keyword ngxDirective contained port_in_redirect
-syn keyword ngxDirective contained post_acceptex
 syn keyword ngxDirective contained postpone_gzipping
 syn keyword ngxDirective contained postpone_output
 syn keyword ngxDirective contained preread_buffer_size

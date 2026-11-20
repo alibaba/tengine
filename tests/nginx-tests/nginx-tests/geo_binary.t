@@ -22,8 +22,6 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-plan(skip_all => 'long configuration parsing') unless $ENV{TEST_NGINX_UNSAFE};
-
 my $t = Test::Nginx->new()->has(qw/http geo/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');

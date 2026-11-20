@@ -25,7 +25,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(12)
+my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(13)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -118,16 +118,42 @@ like(get($us2, 8082), qr/x-bar/, 'underscores_in_headers - first');
 
 # always invalid header characters
 
-my $bad3 = 'GET / HTTP/1.0' . CRLF
-	. ':foo: x-bar' . CRLF . CRLF;
-my $bad4 = 'GET / HTTP/1.0' . CRLF
-	. ' foo: x-bar' . CRLF . CRLF;
-my $bad5 = 'GET / HTTP/1.0' . CRLF
-	. "foo\x02: x-bar" . CRLF . CRLF;
+like(
+	http(
+		'GET / HTTP/1.0' . CRLF
+		. ':foo: x-bar' . CRLF . CRLF
+	),
+	qr/400 Bad/, 'colon first'
+);
 
-like(http($bad3), qr/400 Bad/, 'colon first');
-like(http($bad4), qr/400 Bad/, 'space');
-like(http($bad5), qr/400 Bad/, 'control');
+like(
+	http(
+		'GET / HTTP/1.0' . CRLF
+		. ' foo: x-bar' . CRLF . CRLF
+	),
+	qr/400 Bad/, 'space'
+);
+
+like(
+	http(
+		'GET / HTTP/1.0' . CRLF
+		. "foo\x02: x-bar" . CRLF . CRLF
+	),
+	qr/400 Bad/, 'control'
+);
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.31.9');
+
+like(
+	http(
+		'GET / HTTP/1.0' . CRLF
+		. 'foo' . CRLF . CRLF
+	),
+	qr/400 Bad/, 'no colon'
+);
+
+}
 
 ###############################################################################
 

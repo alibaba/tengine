@@ -178,7 +178,7 @@ jobs:
   # -Werror is kept for Tengine and deliberately removed for the dependencies:
   # TENGINE_DEP_CFLAGS pins Tongsuo and xquic to gnu17 and demotes their errors,
   # so this job stays a statement about code this repository owns. Whether
-  # Tongsuo 8.4 and xquic 1.9.6 themselves survive gcc 15's C23 default is a
+  # Tongsuo 8.5 and xquic 1.9.8 themselves survive gcc 15's C23 default is a
   # separate question, and package.yml's ubuntu2604 target is where it belongs.
   strict-release:
    name: release feature set (${{ matrix.cc }})
