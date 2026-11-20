@@ -82,6 +82,12 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
     *) Feature: expose ngx_http_upstream_rbtree_lookup() so that third-party
        modules can look an upstream up by name (lhanjian)
 
+    *) Feature: add active health checks for stream (L4) upstreams with the
+       new ngx_stream_upstream_check_module. The health-check core is
+       generalized out of ngx_http_upstream_check_module and shared, so the
+       HTTP and stream sides use one shared-memory zone, one peer index space
+       and one check_status page (lianglli)
+
     *) Change: the default install layout inherited from nginx is now named
        after Tengine: prefix /usr/local/tengine, binary sbin/tengine,
        configuration conf/tengine.conf, and logs/tengine.pid. This matches
@@ -126,6 +132,30 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Bugfix: a unix socket upstream server combined with "check port=" was
        reported alive forever, so a backup server never took over (lianglli)
+
+    *) Bugfix: inherit the health-check state per peer rather than per
+       address, so the same backend listed in several upstreams, or on both
+       the HTTP and stream side of the shared zone, no longer swaps health
+       state across a reload (lianglli)
+
+    *) Bugfix: fixed missing check_index initialization for "server ...
+       resolve" peers, which made them track the health of the peer at
+       index 0 instead of being probed themselves (lianglli)
+
+    *) Bugfix: bound the health-check HTTP response parsers against untrusted
+       backend bytes: an out-of-bounds read and a mis-detected "chunked" in
+       Transfer-Encoding, oversized or malformed Content-Length and chunk
+       sizes, negative drain lengths, and a chunked-drain infinite loop
+       (lianglli)
+
+    *) Bugfix: fixed memory-safety errors in the mod_dubbo hessian2 decoder:
+       a type confusion on a non-Map response payload, out-of-bounds reads on
+       truncated multi-byte UTF-8, an infinite loop on an unconsumed null
+       tag, double-free of referenced objects, unbounded nesting depth, and
+       leaks of decoded objects on rejected payloads (lianglli)
+
+    *) Bugfix: fixed a use-after-free in ngx_multi_upstream_module when the
+       connection pool was destroyed before the connection closed (lianglli)
 
     *) Bugfix: fixed duplicate peer linking in round-robin init, which made
        a backup peer link to itself (lianglli)

@@ -61,10 +61,12 @@ jobs:
     # bootstrap rewrites the repo files for. That covers aarch64 as well: the
     # rewrite only replaces the host part of each baseurl, and the /altarch/
     # path the aarch64 images carry in theirs exists on vault too, so yum
-    # resolves the AltArch tree there unaided. The full feature set builds with
-    # gcc 4.8.5 (Tongsuo's OpenSSL 3.0 base and xquic's -std=gnu11 with its own
-    # -Werror both compile fine); the one real obstacle was CMake, which
-    # bootstrap installs from Kitware's static tarball.
+    # resolves the AltArch tree there unaided. The full feature set last built
+    # with gcc 4.8.5 against Tongsuo 8.4.0, whose OpenSSL base is 3.0.3; xquic's
+    # -std=gnu11 with its own -Werror compiled fine there too. Tongsuo 8.5.0 moves
+    # that base to OpenSSL 3.5.4, which this matrix has not been re-run against
+    # yet. The one real obstacle was CMake, which bootstrap installs from
+    # Kitware's static tarball.
     # Tongsuo is compiled twice, plus xquic, LuaJIT and Tengine itself.
     timeout-minutes: 150
     strategy:
@@ -212,6 +214,12 @@ jobs:
           - { arch: x86_64,  target: alpine324,  image: 'alpine:3.24',  kind: apk }
           - { arch: aarch64, target: alpine324,  image: 'alpine:3.24',  kind: apk }
     steps:
+      # The tree these packages were built from. check-pinned-versions.sh reads
+      # src/core/nginx.h and packages/build/deps.env out of it and holds the
+      # installed binary's -V banner against them; it is mounted read-only as
+      # /src below.
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v8
         with:
           name: tengine-${{ matrix.target }}-${{ matrix.arch }}
@@ -219,7 +227,7 @@ jobs:
 
       - name: install and check (${{ matrix.kind }}, ${{ matrix.arch }})
         run: |
-          docker run --rm -v "$PWD/pkgs:/pkgs:ro" ${{ matrix.image }} sh -euc '
+          docker run --rm -v "$PWD/pkgs:/pkgs:ro" -v "$PWD:/src:ro" ${{ matrix.image }} sh -euc '
             export DEBIAN_FRONTEND=noninteractive
             # `uname -m` keeps the glob off the .src.rpm that rpmbuild -ba emits.
             # --allow-untrusted is unconditional for the apk: the build signs
@@ -238,11 +246,20 @@ jobs:
             for mod in ngx_tongsuo_ntls ngx_http_xquic_module ngx_http_lua_module; do
                 grep -q "$mod" /tmp/banner || { echo "MISSING: $mod"; exit 1; }
             done
-            # Tongsuo keeps OPENSSL_VERSION_TEXT as "OpenSSL 3.0.3 ..." and
-            # nginx never prints TONGSUO_VERSION_TEXT, so the banner cannot
+            # Tongsuo sets OPENSSL_VERSION_TEXT to the OpenSSL release it is
+            # based on (3.5.4 for the 8.5.0 pinned in packages/build/deps.env)
+            # and nginx never prints TONGSUO_VERSION_TEXT, so the banner cannot
             # distinguish it from a stock OpenSSL. enable-ntls in the configure
             # arguments can, and it is what ngx_tongsuo_ntls needs.
             grep -q "enable-ntls" /tmp/banner || { echo "MISSING: Tongsuo NTLS"; exit 1; }
+            # The checks above prove the promised feature set is in the package;
+            # this one proves the package was built from the sources /src pins --
+            # the runner workspace at the very commit these packages came from.
+            # It compares the banner against src/core/nginx.h and
+            # packages/build/deps.env, so a package assembled from a stale
+            # dependency tarball, or from the wrong tree altogether, fails here
+            # instead of shipping.
+            sh /src/.github/scripts/check-pinned-versions.sh --srcdir /src < /tmp/banner
             # configure records its arguments verbatim, so an absolute path to
             # the dependency build tree would be printed by -V on every
             # installed system forever -- including whichever home directory

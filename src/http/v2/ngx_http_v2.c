@@ -2573,7 +2573,7 @@ ngx_http_v2_state_window_update(ngx_http_v2_connection_t *h2c, u_char *pos,
     }
 
     if (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window - h2c->send_queued) {
-        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+        ngx_log_error(NGX_LOG_ERR, h2c->connection->log, 0,
                       "client violated connection flow control: "
                       "received WINDOW_UPDATE frame "
                       "with window increment %uz "
