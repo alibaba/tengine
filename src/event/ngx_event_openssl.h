@@ -33,8 +33,33 @@
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <openssl/opensslv.h>
 
 #define NGX_SSL_NAME     "OpenSSL"
+
+
+#if (T_NGX_SSL_NTLS)
+/*
+ * Feature-test macros for Tongsuo APIs introduced after 8.3.x, keyed
+ * off the library version so the ngx_tongsuo_ntls module stays
+ * buildable and keeps its existing behaviour on older Tongsuo
+ * releases, with the newer features masked off:
+ *
+ * - force_ntls:            SSL_enable_force_ntls() since 8.4.0
+ * - keyUsage check:        SSL_CTX_set_ntls_cert_key_usage_check() since 8.5.0
+ * - peer enc certificate:  SSL_get0_peer_enc_certificate_ntls() since 8.5.0
+ *
+ * The base NTLS directives (enable_ntls, ssl_sign/enc_certificate)
+ * are available since 8.3.x and need no guard.
+ */
+#if (defined TONGSUO_VERSION_NUMBER && TONGSUO_VERSION_NUMBER >= 0x80400000L)
+#define T_NGX_HAVE_NTLS_FORCE            1
+#endif
+#if (defined TONGSUO_VERSION_NUMBER && TONGSUO_VERSION_NUMBER >= 0x80500000L)
+#define T_NGX_HAVE_NTLS_KEY_USAGE_CHECK  1
+#define T_NGX_HAVE_NTLS_PEER_ENC_CERT    1
+#endif
+#endif
 
 
 #if (defined LIBRESSL_VERSION_NUMBER && OPENSSL_VERSION_NUMBER == 0x20000000L)
@@ -394,6 +419,12 @@ ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+#if (T_NGX_SSL_NTLS)
+ngx_int_t ngx_ssl_get_raw_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+#endif
 ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,

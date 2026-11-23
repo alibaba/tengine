@@ -853,6 +853,12 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
 #if (T_NGX_SSL_NTLS)
             if (sscf->enable_ntls) {
                 SSL_enable_ntls(c->ssl->connection);
+
+#if (T_NGX_HAVE_NTLS_FORCE)
+                if (sscf->force_ntls) {
+                    SSL_enable_force_ntls(c->ssl->connection);
+                }
+#endif
             }
 #endif
 

@@ -24,6 +24,19 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Security: fixed an out-of-bounds read in mod_dubbo (orbisai0security)
 
+    *) Feature: add new directive ssl_force_ntls to serve NTLS (TLCP) only
+       on a listen port, rejecting plain TLS connections, in both the http
+       and stream ssl modules (zhsnew)
+
+    *) Feature: add new directive ssl_ntls_cert_key_usage_check to relax
+       or enforce the Tongsuo 8.5.0 GB/T 20518 sign/enc certificate
+       keyUsage check, in both the http and stream ssl modules (zhsnew)
+
+    *) Feature: add new variables $ssl_client_enc_cert and
+       $ssl_client_raw_enc_cert, exposing the peer encryption certificate
+       of a TLCP mutual handshake in the http and stream ssl modules
+       (zhsnew)
+
     *) Feature: add new module ngx_zstd for Zstandard response compression
        and serving pre-compressed static files (lianglli)
 
@@ -87,6 +100,11 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        generalized out of ngx_http_upstream_check_module and shared, so the
        HTTP and stream sides use one shared-memory zone, one peer index space
        and one check_status page (lianglli)
+
+    *) Change: the start-up error of the stream ssl module about the
+       missing certificates now also mentions the ssl_enc_certificate and
+       ssl_sign_certificate NTLS directives, aligning it with the http
+       ssl module (zhsnew)
 
     *) Change: the default install layout inherited from nginx is now named
        after Tengine: prefix /usr/local/tengine, binary sbin/tengine,

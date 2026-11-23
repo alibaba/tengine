@@ -161,6 +161,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, enable_ntls),
       NULL },
 
+    { ngx_string("ssl_force_ntls"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, force_ntls),
+      NULL },
+
     { ngx_string("ssl_enc_certificate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -187,6 +194,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       ngx_conf_set_str_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, sign_certificate_key),
+      NULL },
+
+    { ngx_string("ssl_ntls_cert_key_usage_check"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, ntls_cert_key_usage_check),
       NULL },
 #endif
 
@@ -482,6 +496,15 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
       (uintptr_t) ngx_ssl_get_raw_certificate,
       NGX_HTTP_VAR_CHANGEABLE, 0 },
 
+#if (T_NGX_SSL_NTLS)
+    { ngx_string("ssl_client_enc_cert"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_enc_certificate, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_client_raw_enc_cert"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_raw_enc_certificate,
+      NGX_HTTP_VAR_CHANGEABLE, 0 },
+#endif
+
     { ngx_string("ssl_client_escaped_cert"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_escaped_certificate,
       NGX_HTTP_VAR_CHANGEABLE, 0 },
@@ -726,6 +749,8 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
 #endif
 #if (T_NGX_SSL_NTLS)
     sscf->enable_ntls = NGX_CONF_UNSET;
+    sscf->ntls_cert_key_usage_check = NGX_CONF_UNSET;
+    sscf->force_ntls = NGX_CONF_UNSET;
 #endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
     sscf->certificate_compression = NGX_CONF_UNSET;
@@ -831,6 +856,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (T_NGX_SSL_NTLS)
     ngx_conf_merge_value(conf->enable_ntls, prev->enable_ntls, 0);
+    ngx_conf_merge_value(conf->ntls_cert_key_usage_check,
+                         prev->ntls_cert_key_usage_check, NGX_CONF_UNSET);
+    ngx_conf_merge_value(conf->force_ntls, prev->force_ntls, 0);
     ngx_conf_merge_str_value(conf->enc_certificate, prev->enc_certificate, "");
     ngx_conf_merge_str_value(conf->enc_certificate_key,
                          prev->enc_certificate_key, "");
@@ -1031,6 +1059,24 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
             return NGX_CONF_ERROR;
         }
     }
+
+    /*
+     * Tongsuo 8.5.0 enables the GB/T 20518 sign/enc keyUsage check by
+     * default; keep the library default unless the operator explicitly
+     * configures the check, so legacy certificates without keyUsage
+     * extensions can still be permitted on purpose.
+     */
+    if (conf->ntls_cert_key_usage_check != NGX_CONF_UNSET) {
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+        SSL_CTX_set_ntls_cert_key_usage_check(conf->ssl.ctx,
+                                              conf->ntls_cert_key_usage_check);
+#else
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_ntls_cert_key_usage_check\" requires "
+                      "Tongsuo 8.5.0 or later");
+        return NGX_CONF_ERROR;
+#endif
+    }
 #endif
 
     if (ngx_ssl_certificate_compression(cf, &conf->ssl,
@@ -1041,6 +1087,22 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     conf->ssl.buffer_size = conf->buffer_size;
+
+#if (T_NGX_SSL_NTLS)
+#if !(T_NGX_HAVE_NTLS_FORCE)
+    if (conf->force_ntls) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_force_ntls\" requires Tongsuo 8.4.0 or later");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    if (conf->force_ntls && !conf->enable_ntls) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_force_ntls\" requires \"enable_ntls on\"");
+        return NGX_CONF_ERROR;
+    }
+#endif
 
     if (conf->verify) {
 
@@ -1637,6 +1699,48 @@ ngx_http_ssl_init(ngx_conf_t *cf)
 
             cscf = addr[a].default_server;
             sscf = cscf->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
+
+#if (T_NGX_SSL_NTLS)
+            /*
+             * Force mode short-circuits the record-version dispatch
+             * before the ClientHello is parsed, so it is a listen-level
+             * property: it requires "enable_ntls on" in the default
+             * server and is meaningless (and now an error) on a
+             * name-based server sharing the port.
+             */
+            if (sscf->force_ntls && !sscf->enable_ntls) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "\"ssl_force_ntls\" requires \"enable_ntls "
+                              "on\" in the default server of the "
+                              "\"listen ... ssl\" port in %s:%ui",
+                              cscf->file_name, cscf->line);
+                return NGX_ERROR;
+            }
+
+            {
+                ngx_http_ssl_srv_conf_t  *sscf2;
+
+                cscfp = addr[a].servers.elts;
+                for (s = 0; s < addr[a].servers.nelts; s++) {
+
+                    if (cscfp[s] == addr[a].default_server) {
+                        continue;
+                    }
+
+                    sscf2 = ngx_http_get_module_srv_conf(cscfp[s]->ctx,
+                                                       ngx_http_ssl_module);
+
+                    if (sscf2->force_ntls) {
+                        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                                      "\"ssl_force_ntls\" is only allowed "
+                                      "in the default server of the "
+                                      "\"listen ... ssl\" port, in %s:%ui",
+                                      cscfp[s]->file_name, cscfp[s]->line);
+                        return NGX_ERROR;
+                    }
+                }
+            }
+#endif
 
             if (sscf->certificates) {
                 continue;
