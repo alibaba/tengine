@@ -1082,6 +1082,9 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     sscf = ngx_http_get_module_srv_conf(cscf->ctx, ngx_http_ssl_module);
 
     c->ssl->buffer_size = sscf->buffer_size;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    c->ssl->handshake_error_log_level = sscf->handshake_error_log_level;
+#endif
 
     if (sscf->ssl.ctx) {
         if (SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx) == NULL) {
@@ -1240,6 +1243,9 @@ ngx_http_ssl_ctx_reset(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
 
     c->ssl->buffer_size = sscf->buffer_size;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    c->ssl->handshake_error_log_level = sscf->handshake_error_log_level;
+#endif
 
     if (sscf->ssl.ctx) {
         SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);

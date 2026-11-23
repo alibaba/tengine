@@ -2434,6 +2434,9 @@ ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
 
     sc->buffer = ((flags & NGX_SSL_BUFFER) != 0);
     sc->buffer_size = ssl->buffer_size;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    sc->handshake_error_log_level = ssl->handshake_error_log_level;
+#endif
 
     sc->session_ctx = ssl->ctx;
 
@@ -4515,11 +4518,7 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 
             case NGX_ERROR_IGNORE_ECONNRESET:
             case NGX_ERROR_INFO:
-#if (T_NGX_SSL_ERR_LOG_ALI)
-                level = NGX_LOG_ERR;
-#else
                 level = NGX_LOG_INFO;
-#endif
                 break;
 
             case NGX_ERROR_ERR:
@@ -4708,11 +4707,7 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
 
             case NGX_ERROR_IGNORE_ECONNRESET:
             case NGX_ERROR_INFO:
-#if (T_NGX_SSL_ERR_LOG_ALI)
-                level = NGX_LOG_ERR;
-#else
                 level = NGX_LOG_INFO;
-#endif
                 break;
 
             case NGX_ERROR_ERR:
@@ -4726,6 +4721,21 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
     }
 
 #if (T_NGX_SSL_ERR_LOG_ALI)
+    /*
+     * client-side failures which are logged at the info level by default
+     * may be raised with "ssl_handshake_error_log_level", but only while
+     * the handshake is in progress: errors on established connections,
+     * such as a peer resetting the connection in SSL_read(), are expected
+     * in the real world and keep the native level
+     */
+
+    if (level == NGX_LOG_INFO
+        && !c->ssl->handshaked
+        && c->ssl->handshake_error_log_level)
+    {
+        level = c->ssl->handshake_error_log_level;
+    }
+
     /* insert servername into text */
     servername = SSL_get_servername(c->ssl->connection, TLSEXT_NAMETYPE_host_name);
     if (servername == NULL) {

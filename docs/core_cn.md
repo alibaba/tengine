@@ -172,3 +172,17 @@ Context: stream, server
 
 注意:
 详见`server_name`的注意点.
+
+### ssl_handshake_error_log_level
+
+Syntax: **ssl_handshake_error_log_level** info | notice | warn | error;
+
+Default: ssl_handshake_error_log_level info;
+
+Context: http, stream, server
+
+设置 TLS 握手期间客户端常见 SSL 错误的日志级别，可在 `http` 或 `stream` 中配置并由 `server` 继承；SNI 选择虚拟服务器后使用该服务器的配置。此指令由默认开启的 `T_NGX_SSL_ERR_LOG_ALI` 提供。
+
+默认保留原生 `info` 级别。需要采集握手失败时，可配置 `ssl_handshake_error_log_level error;`。该指令只对 `ngx_ssl_connection_error()` 中原本为 `info` 的日志生效，不降低原本为 `error` 或 `crit` 的错误，也不改变上游连接的错误级别。
+
+握手完成后，`SSL_read()`、`SSL_write()` 等操作中的客户端连接重置及 TLS 协议错误保持原生日志级别，不受此指令影响。`error_log` 仍按其配置的阈值过滤日志；客户端 RST 与正常关闭保持区分，不会为减少日志而忽略真实错误。SNI 错误文本增强保持启用。

@@ -34,6 +34,10 @@ typedef struct {
 
     size_t                          buffer_size;
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                      handshake_error_log_level;
+#endif
+
     ssize_t                         builtin_session_cache;
 
     time_t                          session_timeout;
