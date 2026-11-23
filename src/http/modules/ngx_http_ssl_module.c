@@ -92,6 +92,17 @@ static ngx_conf_enum_t  ngx_http_ssl_ocsp[] = {
 };
 
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+static ngx_conf_enum_t  ngx_http_ssl_handshake_error_log_levels[] = {
+    { ngx_string("info"), NGX_LOG_INFO },
+    { ngx_string("notice"), NGX_LOG_NOTICE },
+    { ngx_string("warn"), NGX_LOG_WARN },
+    { ngx_string("error"), NGX_LOG_ERR },
+    { ngx_null_string, 0 }
+};
+#endif
+
+
 static ngx_conf_post_t  ngx_http_ssl_conf_command_post =
     { ngx_http_ssl_conf_command_check };
 
@@ -220,6 +231,15 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, buffer_size),
       &ngx_conf_size_nonzero_post },
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    { ngx_string("ssl_handshake_error_log_level"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, handshake_error_log_level),
+      &ngx_http_ssl_handshake_error_log_levels },
+#endif
 
     { ngx_string("ssl_verify_client"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
@@ -712,6 +732,9 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->early_data = NGX_CONF_UNSET;
     sscf->reject_handshake = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    sscf->handshake_error_log_level = NGX_CONF_UNSET_UINT;
+#endif
     sscf->verify = NGX_CONF_UNSET_UINT;
     sscf->verify_depth = NGX_CONF_UNSET_UINT;
     sscf->certificates = NGX_CONF_UNSET_PTR;
@@ -787,6 +810,11 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->buffer_size, prev->buffer_size,
                          NGX_SSL_BUFSIZE);
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_conf_merge_uint_value(conf->handshake_error_log_level,
+                         prev->handshake_error_log_level, NGX_LOG_INFO);
+#endif
+
     ngx_conf_merge_uint_value(conf->verify, prev->verify, 0);
     ngx_conf_merge_uint_value(conf->verify_depth, prev->verify_depth, 1);
 
@@ -839,6 +867,10 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          prev->stapling_responder, "");
 
     conf->ssl.log = cf->log;
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    conf->ssl.handshake_error_log_level = conf->handshake_error_log_level;
+#endif
 
     if (conf->certificates) {
 

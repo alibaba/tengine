@@ -104,6 +104,9 @@ struct ngx_ssl_s {
 #if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_flag_t                  async_enable;
 #endif
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                  handshake_error_log_level;
+#endif
 
     ngx_array_t                 certs;
 
@@ -131,6 +134,10 @@ struct ngx_ssl_connection_s {
     ngx_ssl_ocsp_t             *ocsp;
 
     u_char                      early_buf;
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                  handshake_error_log_level;
+#endif
 
 #if (T_NGX_SSL_HANDSHAKE_TIME)
     ngx_msec_t                  handshake_start_msec;

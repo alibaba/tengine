@@ -58,6 +58,11 @@ jobs:
          CC: ${{ matrix.compiler.CC }}
        run: |
          make -C src/http/v2/tests
+     - name: SSL error log policy unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/event/tests
      - name: 'checkout luajit2'
        uses: actions/checkout@v7
        with:

@@ -101,6 +101,17 @@ static ngx_conf_enum_t  ngx_stream_ssl_ocsp[] = {
 };
 
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+static ngx_conf_enum_t  ngx_stream_ssl_handshake_error_log_levels[] = {
+    { ngx_string("info"), NGX_LOG_INFO },
+    { ngx_string("notice"), NGX_LOG_NOTICE },
+    { ngx_string("warn"), NGX_LOG_WARN },
+    { ngx_string("error"), NGX_LOG_ERR },
+    { ngx_null_string, 0 }
+};
+#endif
+
+
 static ngx_conf_post_t  ngx_stream_ssl_conf_command_post =
     { ngx_stream_ssl_conf_command_check };
 
@@ -113,6 +124,15 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_stream_ssl_srv_conf_t, handshake_timeout),
       NULL },
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    { ngx_string("ssl_handshake_error_log_level"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_ssl_srv_conf_t, handshake_error_log_level),
+      &ngx_stream_ssl_handshake_error_log_levels },
+#endif
 
     { ngx_string("ssl_certificate"),
       NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_TAKE1,
@@ -761,6 +781,10 @@ ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 
     sscf = ngx_stream_get_module_srv_conf(cscf->ctx, ngx_stream_ssl_module);
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    c->ssl->handshake_error_log_level = sscf->handshake_error_log_level;
+#endif
+
     if (sscf->ssl.ctx) {
         if (SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx) == NULL) {
             goto error;
@@ -1033,6 +1057,9 @@ ngx_stream_ssl_create_srv_conf(ngx_conf_t *cf)
      */
 
     sscf->handshake_timeout = NGX_CONF_UNSET_MSEC;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    sscf->handshake_error_log_level = NGX_CONF_UNSET_UINT;
+#endif
     sscf->certificates = NGX_CONF_UNSET_PTR;
     sscf->certificate_keys = NGX_CONF_UNSET_PTR;
     sscf->certificate_cache = NGX_CONF_UNSET_PTR;
@@ -1075,6 +1102,11 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_msec_value(conf->handshake_timeout,
                          prev->handshake_timeout, 60000);
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_conf_merge_uint_value(conf->handshake_error_log_level,
+                         prev->handshake_error_log_level, NGX_LOG_INFO);
+#endif
 
     ngx_conf_merge_value(conf->session_timeout,
                          prev->session_timeout, 300);
@@ -1148,6 +1180,10 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          prev->stapling_responder, "");
 
     conf->ssl.log = cf->log;
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    conf->ssl.handshake_error_log_level = conf->handshake_error_log_level;
+#endif
 
     if (conf->certificates) {
 
