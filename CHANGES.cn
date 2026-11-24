@@ -8,8 +8,10 @@ Tengine 3.2.0 [2026-07-31]
 * Security: 修复CVE-2026-1642，SSL后端提前返回明文响应时在握手前被解析 (drawing)
 * Security: 修复mod_dubbo的越界读问题 (orbisai0security)
 * Feature: 新增指令ssl_force_ntls，使监听端口只提供NTLS（TLCP）服务并拒绝普通TLS连接，http与stream模块均可用 (zhsnew)
-* Feature: 新增指令ssl_ntls_cert_key_usage_check，用于放宽或强制Tongsuo 8.5.0的GB/T 20518 sign/enc证书keyUsage检查，http与stream模块均可用 (zhsnew)
-* Feature: 新增变量$ssl_client_enc_cert和$ssl_client_raw_enc_cert，用于获取TLCP双向认证中对端的加密证书，http与stream模块均可用 (zhsnew)
+* Feature: 新增指令ssl_ntls_cert_key_usage_check，用于放宽或强制Tongsuo 8.5.0的
+  GB/T 20518 sign/enc证书keyUsage检查，http与stream模块均可用 (zhsnew)
+* Feature: 新增变量$ssl_client_enc_cert和$ssl_client_raw_enc_cert，用于获取TLCP
+  双向认证中对端的加密证书，http与stream模块均可用 (zhsnew)
 * Feature: 新增ngx_zstd模块，支持Zstandard响应压缩和预压缩静态文件 (lianglli)
 * Feature: 新增ngx_http_upstream_iwrr_module模块，时间复杂度O(1)、空间复杂度O(n)的加权轮询 (jizhuozhi)
 * Feature: 新增ngx_http_append_header_module模块，在响应体末尾追加内容 (lianglli)

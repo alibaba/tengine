@@ -66,6 +66,10 @@ static ssize_t ngx_ssl_sendfile(ngx_connection_t *c, ngx_buf_t *file,
 static void ngx_ssl_read_handler(ngx_event_t *rev);
 static void ngx_ssl_shutdown_handler(ngx_event_t *ev);
 static void ngx_ssl_clear_error(ngx_log_t *log);
+static ngx_int_t ngx_ssl_x509_to_pem(ngx_connection_t *c, ngx_pool_t *pool,
+    X509 *cert, ngx_str_t *s);
+static ngx_int_t ngx_ssl_indent_pem(ngx_pool_t *pool, ngx_str_t *cert,
+    ngx_str_t *s);
 
 static ngx_int_t ngx_ssl_session_id_context(ngx_ssl_t *ssl,
     ngx_str_t *sess_ctx, ngx_array_t *certificates);
@@ -6817,11 +6821,84 @@ ngx_ssl_get_ech_outer_server_name(ngx_connection_t *c, ngx_pool_t *pool,
 }
 
 
-ngx_int_t
-ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+static ngx_int_t
+ngx_ssl_x509_to_pem(ngx_connection_t *c, ngx_pool_t *pool, X509 *cert,
+    ngx_str_t *s)
 {
     size_t   len;
     BIO     *bio;
+
+    bio = BIO_new(BIO_s_mem());
+    if (bio == NULL) {
+        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "BIO_new() failed");
+        return NGX_ERROR;
+    }
+
+    if (PEM_write_bio_X509(bio, cert) == 0) {
+        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "PEM_write_bio_X509() failed");
+        BIO_free(bio);
+        return NGX_ERROR;
+    }
+
+    len = BIO_pending(bio);
+    s->len = len;
+
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        BIO_free(bio);
+        return NGX_ERROR;
+    }
+
+    BIO_read(bio, s->data, len);
+
+    BIO_free(bio);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_ssl_indent_pem(ngx_pool_t *pool, ngx_str_t *cert, ngx_str_t *s)
+{
+    u_char      *p;
+    size_t       len;
+    ngx_uint_t   i;
+
+    if (cert->len == 0) {
+        s->len = 0;
+        return NGX_OK;
+    }
+
+    len = cert->len - 1;
+
+    for (i = 0; i < cert->len - 1; i++) {
+        if (cert->data[i] == LF) {
+            len++;
+        }
+    }
+
+    s->len = len;
+    s->data = ngx_pnalloc(pool, len);
+    if (s->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = s->data;
+
+    for (i = 0; i < cert->len - 1; i++) {
+        *p++ = cert->data[i];
+        if (cert->data[i] == LF) {
+            *p++ = '\t';
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
+{
     X509    *cert;
 
     s->len = 0;
@@ -6831,39 +6908,14 @@ ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
         return NGX_OK;
     }
 
-    bio = BIO_new(BIO_s_mem());
-    if (bio == NULL) {
-        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "BIO_new() failed");
+    if (ngx_ssl_x509_to_pem(c, pool, cert, s) != NGX_OK) {
         X509_free(cert);
         return NGX_ERROR;
     }
 
-    if (PEM_write_bio_X509(bio, cert) == 0) {
-        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "PEM_write_bio_X509() failed");
-        goto failed;
-    }
-
-    len = BIO_pending(bio);
-    s->len = len;
-
-    s->data = ngx_pnalloc(pool, len);
-    if (s->data == NULL) {
-        goto failed;
-    }
-
-    BIO_read(bio, s->data, len);
-
-    BIO_free(bio);
     X509_free(cert);
 
     return NGX_OK;
-
-failed:
-
-    BIO_free(bio);
-    X509_free(cert);
-
-    return NGX_ERROR;
 }
 
 
@@ -6874,8 +6926,6 @@ ngx_ssl_get_raw_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
 {
 #if (T_NGX_HAVE_NTLS_PEER_ENC_CERT)
 
-    size_t   len;
-    BIO     *bio;
     X509    *cert;
 
     s->len = 0;
@@ -6886,36 +6936,7 @@ ngx_ssl_get_raw_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
         return NGX_OK;
     }
 
-    bio = BIO_new(BIO_s_mem());
-    if (bio == NULL) {
-        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "BIO_new() failed");
-        return NGX_ERROR;
-    }
-
-    if (PEM_write_bio_X509(bio, cert) == 0) {
-        ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "PEM_write_bio_X509() failed");
-        goto failed;
-    }
-
-    len = BIO_pending(bio);
-    s->len = len;
-
-    s->data = ngx_pnalloc(pool, len);
-    if (s->data == NULL) {
-        goto failed;
-    }
-
-    BIO_read(bio, s->data, len);
-
-    BIO_free(bio);
-
-    return NGX_OK;
-
-failed:
-
-    BIO_free(bio);
-
-    return NGX_ERROR;
+    return ngx_ssl_x509_to_pem(c, pool, cert, s);
 
 #else
 
@@ -6930,44 +6951,51 @@ failed:
 ngx_int_t
 ngx_ssl_get_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
-    u_char      *p;
-    size_t       len;
-    ngx_uint_t   i;
     ngx_str_t    cert;
 
     if (ngx_ssl_get_raw_enc_certificate(c, pool, &cert) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (cert.len == 0) {
-        s->len = 0;
-        return NGX_OK;
+    return ngx_ssl_indent_pem(pool, &cert, s);
+}
+
+
+void
+ngx_ssl_conf_command_key_usage_check(ngx_array_t *commands, ngx_flag_t *value)
+{
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+
+    ngx_str_t     name = ngx_string("enable_ntls_cert_key_usage_check");
+    ngx_uint_t    i;
+    ngx_keyval_t  *cmd;
+
+    /*
+     * "ssl_conf_command enable_ntls_cert_key_usage_check" sets the same
+     * switch as ssl_ntls_cert_key_usage_check, on the SSL_CTX.  It is
+     * applied after the directive and takes precedence over it, but the
+     * value the SNI callback copies to connections is kept per server, so
+     * follow the command here with the matching rules of Tongsuo's
+     * SSL_CONF_cmd(): the name is compared case-insensitively and only
+     * "on" enables the check.  A later command overrides an earlier one.
+     */
+
+    if (commands == NULL) {
+        return;
     }
 
-    len = cert.len - 1;
+    cmd = commands->elts;
 
-    for (i = 0; i < cert.len - 1; i++) {
-        if (cert.data[i] == LF) {
-            len++;
+    for (i = 0; i < commands->nelts; i++) {
+
+        if (cmd[i].key.len == name.len
+            && ngx_strncasecmp(cmd[i].key.data, name.data, name.len) == 0)
+        {
+            *value = ngx_strcmp(cmd[i].value.data, "on") == 0;
         }
     }
 
-    s->len = len;
-    s->data = ngx_pnalloc(pool, len);
-    if (s->data == NULL) {
-        return NGX_ERROR;
-    }
-
-    p = s->data;
-
-    for (i = 0; i < cert.len - 1; i++) {
-        *p++ = cert.data[i];
-        if (cert.data[i] == LF) {
-            *p++ = '\t';
-        }
-    }
-
-    return NGX_OK;
+#endif
 }
 #endif
 
@@ -6975,44 +7003,13 @@ ngx_ssl_get_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 ngx_int_t
 ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
 {
-    u_char      *p;
-    size_t       len;
-    ngx_uint_t   i;
     ngx_str_t    cert;
 
     if (ngx_ssl_get_raw_certificate(c, pool, &cert) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (cert.len == 0) {
-        s->len = 0;
-        return NGX_OK;
-    }
-
-    len = cert.len - 1;
-
-    for (i = 0; i < cert.len - 1; i++) {
-        if (cert.data[i] == LF) {
-            len++;
-        }
-    }
-
-    s->len = len;
-    s->data = ngx_pnalloc(pool, len);
-    if (s->data == NULL) {
-        return NGX_ERROR;
-    }
-
-    p = s->data;
-
-    for (i = 0; i < cert.len - 1; i++) {
-        *p++ = cert.data[i];
-        if (cert.data[i] == LF) {
-            *p++ = '\t';
-        }
-    }
-
-    return NGX_OK;
+    return ngx_ssl_indent_pem(pool, &cert, s);
 }
 
 

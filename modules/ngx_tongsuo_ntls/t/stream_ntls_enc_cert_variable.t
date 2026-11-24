@@ -9,8 +9,8 @@
 # the PEM as-is; both stay empty when no client certificate was sent.
 
 # Note: the variables compile to empty stubs when Tengine is built
-# against Tongsuo 8.4.x; the file is skipped below when the Tongsuo
-# binary reports a version older than 8.5.0.
+# against Tongsuo 8.4.x; the file is skipped below when nginx rejects
+# the gate directive at start-up on Tongsuo older than 8.5.0.
 
 ###############################################################################
 
@@ -33,13 +33,7 @@ select STDOUT; $| = 1;
 
 my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
-my $openssl_version = `$openssl version 2>/dev/null`;
-plan(skip_all => "Tongsuo 8.5.0 or later required, got: $openssl_version")
-    unless $openssl_version =~ /(?:Tongsuo|BabaSSL)\s+([0-9]+)\.([0-9]+)/
-        && ($1 > 8 || ($1 == 8 && $2 >= 5));
-
-my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return/)
-    ->plan(5);
+my $t = Test::Nginx->new()->has(qw/stream stream_ssl stream_return/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -54,13 +48,17 @@ worker_processes 1;  # NOTE: The default value of Tengine worker_processes direc
 
 stream {
     enable_ntls  on;
+    # also gates try_run(): this directive needs Tongsuo 8.5.0, the same
+    # version the enc-certificate variables need, so on older libraries
+    # nginx fails to start here and the file is skipped.
+    ssl_ntls_cert_key_usage_check on;
     ssl_sign_certificate        server_sign.crt;
     ssl_sign_certificate_key    server_sign.key;
     ssl_enc_certificate         server_enc.crt;
     ssl_enc_certificate_key     server_enc.key;
 
     server {
-        listen  127.0.0.1:9168 ssl;
+        listen  127.0.0.1:9138 ssl;
         return  $ssl_client_enc_cert;
 
         ssl_verify_client on;
@@ -68,7 +66,7 @@ stream {
     }
 
     server {
-        listen  127.0.0.1:9169 ssl;
+        listen  127.0.0.1:9139 ssl;
         return  $ssl_client_raw_enc_cert;
 
         ssl_verify_client on;
@@ -76,7 +74,7 @@ stream {
     }
 
     server {
-        listen  127.0.0.1:9170 ssl;
+        listen  127.0.0.1:9143 ssl;
         return  "v=$ssl_client_verify c=[$ssl_client_cert] e=[$ssl_client_enc_cert] r=[$ssl_client_raw_enc_cert]";
 
         ssl_verify_client optional;
@@ -89,7 +87,12 @@ EOF
 make_sm2_ca_subca_end_certs($t, "server");
 make_sm2_ca_subca_end_certs($t, "client");
 
-$t->run();
+# Gate on the nginx binary: ssl_ntls_cert_key_usage_check in the config
+# above is rejected at start-up on Tongsuo older than 8.5.0, so try_run()
+# skips the file there.  The enc-certificate variables need the same
+# version, so this keeps the gate off the openssl CLI version.
+$t->try_run('Tongsuo 8.5.0 required for the enc certificate variables')
+    ->plan(5);
 
 ###############################################################################
 
@@ -112,8 +115,8 @@ sub flatten {
     return $text;
 }
 
-my $enc_out = mtls(9168);
-my $raw_out = mtls(9169);
+my $enc_out = mtls(9138);
+my $raw_out = mtls(9139);
 my $enc_pem = $t->read_file('client_enc.crt');
 
 # the exposed PEM is exactly the client encryption certificate
@@ -134,7 +137,7 @@ unlike(flatten($raw_out), qr/\Q$sign_b64\E/,
 
 # no client certificate: the enc variables stay empty, and the regular
 # $ssl_client_cert is empty as well, so this is not a harness artifact
-my $cmd = "$openssl s_client -connect localhost:9170 -quiet -ign_eof"
+my $cmd = "$openssl s_client -connect localhost:9143 -quiet -ign_eof"
     . " -enable_ntls -ntls -cipher ECC-SM2-SM4-CBC-SM3"
     . " -CAfile $d/server_ca_chain.crt";
 my $none_out = `$cmd < /dev/null 2>/dev/null`;

@@ -1115,6 +1115,16 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 
         SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
 
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+        /*
+         * SSL_set_SSL_CTX() does not carry the NTLS keyUsage switch over
+         * to the connection: the check reads SSL's own field, so the
+         * value selected for the SNI server would be ignored without this.
+         */
+        SSL_set_ntls_cert_key_usage_check(ssl_conn,
+                                          sscf->ntls_cert_key_usage_check);
+#endif
+
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
 #endif

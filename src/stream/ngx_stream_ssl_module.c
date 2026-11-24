@@ -186,7 +186,7 @@ static ngx_command_t  ngx_stream_ssl_commands[] = {
       NULL },
 
     { ngx_string("ssl_force_ntls"),
-      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
+      NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_stream_ssl_srv_conf_t, force_ntls),
@@ -837,6 +837,16 @@ ngx_stream_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 
         SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
 
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+        /*
+         * SSL_set_SSL_CTX() does not carry the NTLS keyUsage switch over
+         * to the connection: the check reads SSL's own field, so the
+         * value selected for the SNI server would be ignored without this.
+         */
+        SSL_set_ntls_cert_key_usage_check(ssl_conn,
+                                          sscf->ntls_cert_key_usage_check);
+#endif
+
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
 #endif
@@ -1169,9 +1179,54 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (T_NGX_SSL_NTLS)
     ngx_conf_merge_value(conf->enable_ntls, prev->enable_ntls, 0);
+
+    /*
+     * Probe "was the directive explicitly set" before resolving the
+     * default: on Tongsuo older than 8.5.0 any explicit use must be
+     * rejected, regardless of on/off.
+     */
     ngx_conf_merge_value(conf->ntls_cert_key_usage_check,
                          prev->ntls_cert_key_usage_check, NGX_CONF_UNSET);
-    ngx_conf_merge_value(conf->force_ntls, prev->force_ntls, 0);
+
+#if !(T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+    if (conf->ntls_cert_key_usage_check != NGX_CONF_UNSET) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_ntls_cert_key_usage_check\" requires "
+                      "Tongsuo 8.5.0 or later");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    /*
+     * Resolve to a definite value for the SNI callback, which copies it
+     * onto the connection with SSL_set_ntls_cert_key_usage_check():
+     * "not configured" must restore the Tongsuo default (on) rather than
+     * inherit whatever the default server had.  The library default is
+     * 1 since 8.5.0.
+     */
+    if (conf->ntls_cert_key_usage_check == NGX_CONF_UNSET) {
+        conf->ntls_cert_key_usage_check = 1;
+    }
+
+    /*
+     * Probe "was the directive explicitly set" before resolving the
+     * default, as with the keyUsage switch above: on Tongsuo older than
+     * 8.4.0 any explicit use must be rejected, regardless of on/off.
+     */
+    ngx_conf_merge_value(conf->force_ntls, prev->force_ntls, NGX_CONF_UNSET);
+
+#if !(T_NGX_HAVE_NTLS_FORCE)
+    if (conf->force_ntls != NGX_CONF_UNSET) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_force_ntls\" requires Tongsuo 8.4.0 or later");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    if (conf->force_ntls == NGX_CONF_UNSET) {
+        conf->force_ntls = 0;
+    }
+
     ngx_conf_merge_str_value(conf->enc_certificate,
                              prev->enc_certificate, "");
     ngx_conf_merge_str_value(conf->enc_certificate_key,
@@ -1374,30 +1429,17 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     /*
-     * Tongsuo 8.5.0 enables the GB/T 20518 sign/enc keyUsage check by
-     * default; keep the library default unless the operator explicitly
-     * configures the check, so legacy certificates without keyUsage
-     * extensions can still be permitted on purpose.
+     * The keyUsage switch reaches a connection through SSL_new() from
+     * the SSL_CTX set here, or through ngx_stream_ssl_servername()
+     * (SNI); the merge stage above resolved it to a definite value and
+     * rejected configurations on Tongsuo older than 8.5.0.
      */
-    if (conf->ntls_cert_key_usage_check != NGX_CONF_UNSET) {
+    if (conf->ntls_cert_key_usage_check != 1) {
 #if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
         SSL_CTX_set_ntls_cert_key_usage_check(conf->ssl.ctx,
                                               conf->ntls_cert_key_usage_check);
-#else
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                      "\"ssl_ntls_cert_key_usage_check\" requires "
-                      "Tongsuo 8.5.0 or later");
-        return NGX_CONF_ERROR;
 #endif
     }
-
-#if !(T_NGX_HAVE_NTLS_FORCE)
-    if (conf->force_ntls) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                      "\"ssl_force_ntls\" requires Tongsuo 8.4.0 or later");
-        return NGX_CONF_ERROR;
-    }
-#endif
 
     if (conf->force_ntls && !conf->enable_ntls) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
@@ -1521,6 +1563,17 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_ssl_conf_commands(cf, &conf->ssl, conf->conf_commands) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
+
+#if (T_NGX_SSL_NTLS)
+    /*
+     * ssl_conf_command is applied last and takes precedence over
+     * ssl_ntls_cert_key_usage_check, as over the other ssl_* settings:
+     * keep the value it left on the SSL_CTX, it is the one the SNI
+     * callback copies to connections.
+     */
+    ngx_ssl_conf_command_key_usage_check(conf->conf_commands,
+                                         &conf->ntls_cert_key_usage_check);
+#endif
 
     return NGX_CONF_OK;
 }

@@ -8,7 +8,7 @@
 # before the ClientHello is parsed), so it is honored on the default
 # server and rejected on name-based servers sharing the port.
 #
-# The forced servers and the dual-stack control server on :9112 offer
+# The forced servers and the dual-stack control server on :9137 offer
 # the same certificate material (RSA for TLS, SM2 sign/enc for NTLS)
 # and the same cipher list, so ssl_force_ntls is their only difference:
 # the "rejects plain TLS" assertions below can be caused by force alone,
@@ -44,12 +44,7 @@ select STDOUT; $| = 1;
 
 my $openssl = $ENV{'TEST_OPENSSL_BINARY'} || "/opt/tongsuo/bin/openssl";
 
-my $openssl_version = `$openssl version 2>/dev/null`;
-plan(skip_all => "Tongsuo 8.4.0 or later required, got: $openssl_version")
-    unless $openssl_version =~ /(?:Tongsuo|BabaSSL)\s+([0-9]+)\.([0-9]+)/
-        && ($1 > 8 || ($1 == 8 && $2 >= 4));
-
-my $t = Test::Nginx->new()->has(qw/http http_ssl/)->plan(13);
+my $t = Test::Nginx->new()->has(qw/http http_ssl/);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -67,7 +62,7 @@ http {
 
     # 1) single forced listener: NTLS only
     server {
-        listen       127.0.0.1:9110 ssl;
+        listen       127.0.0.1:9120 ssl;
         server_name  localhost;
 
         enable_ntls      on;
@@ -87,7 +82,7 @@ http {
 
     # 2) two forced vhosts sharing a forced port, distinct dual-cert pairs
     server {
-        listen       127.0.0.1:9111 ssl;
+        listen       127.0.0.1:9136 ssl;
         server_name  a.local;
 
         enable_ntls      on;
@@ -107,7 +102,7 @@ http {
 
     # b.local serves its own self-signed dual pair, distinct from a.local
     server {
-        listen       127.0.0.1:9111;
+        listen       127.0.0.1:9136;
         server_name  b.local;
 
         enable_ntls      on;
@@ -126,7 +121,7 @@ http {
 
     # 3) dual-stack listener (no force) for comparison
     server {
-        listen       127.0.0.1:9112 ssl;
+        listen       127.0.0.1:9137 ssl;
         server_name  localhost;
 
         enable_ntls      on;
@@ -150,7 +145,9 @@ make_rsa_end_cert($t);
 make_sm2_ca_subca_end_certs($t, "server");
 make_sm2_end_certs($t, "b");
 
-$t->run();
+# On Tongsuo older than 8.4.0 ssl_force_ntls is rejected at start-up,
+# so nginx fails to start and the whole file is skipped.
+$t->try_run('no ssl_force_ntls')->plan(14);
 
 ###############################################################################
 
@@ -178,29 +175,36 @@ sub cli {
 }
 
 # 1) single forced listener
-like(cli(port => 9110, ntls => 1), qr/^one proto=NTLS/m,
+like(cli(port => 9120, ntls => 1), qr/^one proto=NTLS/m,
     'forced listener accepts NTLS');
-unlike(cli(port => 9110, tls => '-tls1_2'), qr/^one proto=/m,
+unlike(cli(port => 9120, tls => '-tls1_2'), qr/^one proto=/m,
     'forced listener rejects plain TLS');
 
 # 2) two forced vhosts by SNI on a forced port.  Each probe sends a Host
 # header matching its SNI name: the handshake certificate is chosen by SNI,
 # but the vhost that answers is chosen by the Host header.
-like(cli(port => 9111, sni => 'a.local', host => 'a.local', ntls => 1),
+like(cli(port => 9136, sni => 'a.local', host => 'a.local', ntls => 1),
     qr/^A a\.local NTLS/m, 'forced vhost A selected by SNI over NTLS');
-like(cli(port => 9111, sni => 'a.local', host => 'a.local', ntls => 1),
+like(cli(port => 9136, sni => 'a.local', host => 'a.local', ntls => 1),
     qr/CN ?= ?server_sign$/m, 'forced vhost A presents its own sign certificate');
-like(cli(port => 9111, sni => 'b.local', host => 'b.local', ntls => 1),
+like(cli(port => 9136, sni => 'b.local', host => 'b.local', ntls => 1),
     qr/^B b\.local NTLS/m, 'forced vhost B selected by SNI over NTLS');
-like(cli(port => 9111, sni => 'b.local', host => 'b.local', ntls => 1),
+like(cli(port => 9136, sni => 'b.local', host => 'b.local', ntls => 1),
     qr/CN ?= ?b_sign$/m, 'forced vhost B presents its own sign certificate');
-unlike(cli(port => 9111, sni => 'b.local', tls => '-tls1_2'),
-    qr/^B b\.local/m, 'forced port rejects plain TLS even by SNI');
+unlike(cli(port => 9136, sni => 'b.local', host => 'b.local', tls => '-tls1_2'),
+    qr/^(A|B) /m, 'forced port rejects plain TLS even by SNI');
+
+# the rejection must be a handshake failure, not an HTTP-level response:
+# without force the TLS probe shares AES ciphersuites with the listener
+# and would complete the handshake, so a handshake error here can only
+# come from force mode.
+like($t->read_file('error.log'), qr/SSL_do_handshake\(\) failed/,
+    'plain TLS on a forced port fails at the handshake');
 
 # 3) dual-stack listener for comparison
-like(cli(port => 9112, ntls => 1), qr/^D proto=NTLS/m,
+like(cli(port => 9137, ntls => 1), qr/^D proto=NTLS/m,
     'dual-stack listener accepts NTLS');
-like(cli(port => 9112, tls => '-tls1_2'), qr/^D proto=TLS/m,
+like(cli(port => 9137, tls => '-tls1_2'), qr/^D proto=TLS/m,
     'dual-stack listener accepts TLS');
 
 # 4) configuration errors, checked with "tengine -t" and a dedicated log
@@ -232,7 +236,7 @@ EOF
 
 my $no_enable = bad_conf('force_no_enable', <<'EOF');
     server {
-        listen       127.0.0.1:9113 ssl;
+        listen       127.0.0.1:9123 ssl;
         server_name  localhost;
 
         ssl_force_ntls   on;
@@ -245,7 +249,7 @@ EOF
 
 my $sni_force = bad_conf('force_sni', <<'EOF');
     server {
-        listen       127.0.0.1:9114 ssl;
+        listen       127.0.0.1:9124 ssl;
         server_name  localhost;
 
         enable_ntls      on;
@@ -256,7 +260,7 @@ my $sni_force = bad_conf('force_sni', <<'EOF');
     }
 
     server {
-        listen       127.0.0.1:9114;
+        listen       127.0.0.1:9124;
         server_name  sni.local;
 
         enable_ntls      on;
