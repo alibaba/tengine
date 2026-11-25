@@ -150,10 +150,12 @@ The same directive is available in the stream module (stream, server).
 Tongsuo 8.5.0 rejects sign/enc certificates without the proper GB/T 20518
 keyUsage bits, on both ends of a TLCP handshake. Set this to off to keep
 accepting legacy certificates that were issued without a keyUsage
-extension. When the directive is absent the Tongsuo default (on since
-8.5.0) is preserved, so existing configurations are unaffected. On
-Tongsuo older than 8.5.0 the directive is rejected at start-up; the
-library performs no such check there.
+extension. When the directive is absent the check keeps its Tongsuo
+default (on since 8.5.0); Tengine writes that value to the SSL_CTX
+itself, so a `system_default` policy in `OPENSSL_CONF` does not turn the
+check off — set the directive to off explicitly. On Tongsuo older than
+8.5.0 the directive is rejected at start-up; the library performs no
+such check there.
 
 The check reads a field of the connection, which SSL_new() copies from
 the SSL_CTX and SSL_set_SSL_CTX() does not carry over. The default

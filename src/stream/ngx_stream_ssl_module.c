@@ -1430,16 +1430,35 @@ ngx_stream_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     /*
      * The keyUsage switch reaches a connection through SSL_new() from
-     * the SSL_CTX set here, or through ngx_stream_ssl_servername()
-     * (SNI); the merge stage above resolved it to a definite value and
-     * rejected configurations on Tongsuo older than 8.5.0.
+     * the SSL_CTX set here, or through ngx_stream_ssl_servername() when
+     * SNI selects another virtual server; the merge stage above resolved
+     * it to a definite value and rejected configurations on Tongsuo
+     * older than 8.5.0.  Set it unconditionally, including the "on" that
+     * an unconfigured server resolves to: Tongsuo applies the OpenSSL
+     * system_default configuration (OPENSSL_CONF) when creating the
+     * SSL_CTX, so a fresh CTX may carry "off" instead of the library
+     * default, and skipping the setter for "on" would let that external
+     * policy accept legacy certificates on connections for which the SNI
+     * callback selects no other virtual server.
      */
-    if (conf->ntls_cert_key_usage_check != 1) {
 #if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
-        SSL_CTX_set_ntls_cert_key_usage_check(conf->ssl.ctx,
-                                              conf->ntls_cert_key_usage_check);
+    SSL_CTX_set_ntls_cert_key_usage_check(conf->ssl.ctx,
+                                          conf->ntls_cert_key_usage_check);
 #endif
+
+    /*
+     * Reset the force switch on the SSL_CTX when the directive is off
+     * (the default): a system_default policy (OPENSSL_CONF) can set
+     * enable_force_ntls=on at CTX creation, and SSL_new() would inherit
+     * it past the directive.  "on" needs no CTX write here: the
+     * per-connection SSL_enable_force_ntls() call already enforces it.
+     * ssl_conf_command is applied below and keeps its precedence.
+     */
+#if (T_NGX_HAVE_NTLS_FORCE)
+    if (!conf->force_ntls) {
+        SSL_CTX_disable_force_ntls(conf->ssl.ctx);
     }
+#endif
 
     if (conf->force_ntls && !conf->enable_ntls) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
