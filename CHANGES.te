@@ -1,3 +1,11 @@
+Upcoming Changes
+
+    *) Change: 将核心升级至 nginx 1.31.10。
+
+    *) Security: 修复写链在没有发送进展时反复重投递写事件的问题
+       (CVE-2026-132779)。
+
+
 Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Security: fixed CVE-2026-49975, HPACK/QPACK header decompression bomb

@@ -1,3 +1,7 @@
+Upcoming Changes
+* Change: 将核心升级至 nginx 1.31.10。
+* Security: 修复写链在没有发送进展时反复重投递写事件的问题 (CVE-2026-132779)。
+
 Tengine 3.2.0 [2026-07-31]
 * Security: 修复CVE-2026-49975，HTTP/1、HTTP/2和HTTP/3的HPACK/QPACK头部解压炸弹 (lianglli)
 * Security: 修复CVE-2026-9256，ngx_http_rewrite_module重叠捕获组导致的堆缓冲区溢出 (lianglli)

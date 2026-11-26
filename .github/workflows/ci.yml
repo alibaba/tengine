@@ -27,7 +27,7 @@ jobs:
          sudo apt remove nginx libgd3
          # libmaxminddb-dev: since nginx 1.31.7 the geoip modules also read
          # MaxMind DB (MMDB) files, so build against both backends.
-         sudo apt install -y libgd-dev libgeoip-dev libmaxminddb-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+         sudo apt install -y libgd-dev libgeoip-dev libmaxminddb-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev libio-socket-ssl-perl openssl
      # Stand-alone unit tests: each stubs the handful of ngx types it needs, so
      # none depends on a built tengine -- and the xquic ones run even though
      # this job does not build the xquic module. Kept ahead of the build so a
@@ -58,6 +58,11 @@ jobs:
          CC: ${{ matrix.compiler.CC }}
        run: |
          make -C src/http/v2/tests
+     - name: HTTP and core write progress unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/http/tests
      - name: SSL error log policy unit tests
        env:
          CC: ${{ matrix.compiler.CC }}
