@@ -1,3 +1,12 @@
+Changes with nginx 1.31.10                                       23 Nov 2026
+
+    *) Security: 修复启用 "ssl_early_data" 时写事件反复重投递造成的 CPU
+       占用过高问题 (CVE-2026-132779)。
+
+    *) Bugfix: 修复通过 TLS 连接后端时写事件反复重投递造成的 CPU
+       占用过高问题。
+
+
 Changes with nginx 1.31.9                                        18 Nov 2026
 
     *) Security: a buffer overflow might occur in a worker process when
