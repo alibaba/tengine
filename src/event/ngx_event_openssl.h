@@ -37,6 +37,17 @@
 #define NGX_SSL_NAME     "OpenSSL"
 
 
+/*
+ * T_NGX_HAVE_NTLS_FORCE, T_NGX_HAVE_NTLS_KEY_USAGE_CHECK and
+ * T_NGX_HAVE_NTLS_PEER_ENC_CERT are defined by the ngx_tongsuo_ntls
+ * module's config script after detecting the corresponding APIs in the
+ * Tongsuo the build is linked against, so 8.5.0 pre-releases (which
+ * report the same TONGSUO_VERSION_NUMBER as the release but lack the
+ * APIs) are handled correctly.  The base NTLS directives (enable_ntls,
+ * ssl_sign/enc_certificate) are available since 8.3.x and need no guard.
+ */
+
+
 #if (defined LIBRESSL_VERSION_NUMBER && OPENSSL_VERSION_NUMBER == 0x20000000L)
 #undef OPENSSL_VERSION_NUMBER
 #if (LIBRESSL_VERSION_NUMBER >= 0x3050000fL)
@@ -394,6 +405,14 @@ ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+#if (T_NGX_SSL_NTLS)
+ngx_int_t ngx_ssl_get_raw_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+void ngx_ssl_conf_command_key_usage_check(ngx_array_t *commands,
+    ngx_flag_t *value);
+#endif
 ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,

@@ -1,3 +1,87 @@
 if [ $USE_OPENSSL = YES ]; then
     have=T_NGX_SSL_NTLS . auto/have
 fi
+
+# Feature tests for Tongsuo APIs introduced after 8.3.x.  The version
+# number cannot be used: 8.5.0 pre-releases report the same
+# TONGSUO_VERSION_NUMBER as the release but lack the APIs, so detect
+# each API from its declaration in the library headers.
+#
+# The detection greps the header instead of compiling and linking a
+# probe: at configure time a bundled Tongsuo may not have been
+# configured or built yet (auto/lib/openssl/make creates .openssl/ only
+# at make time), so neither a generated ssl.h nor the static libraries
+# are guaranteed to exist.  The declaration is taken from
+# include/openssl/ssl.h.in when present (the source the build generates
+# ssl.h from, so it follows the checked-out version) and from
+# include/openssl/ssl.h otherwise (8.3.x, where ssl.h is checked in).
+# The 8.5.0 pre-releases declare only SSL_enable_force_ntls(), exactly
+# like 8.4.0, while the release also declares the keyUsage and
+# peer-enc-certificate functions.
+#
+# Without --with-openssl the library is already installed, so each API is
+# probed by compiling and linking against it, the way auto/lib/openssl/conf
+# looks up the OpenSSL library itself.
+
+ngx_ntls_ssl_h=
+if [ "$OPENSSL" != NONE ]; then
+    ngx_ntls_ssl_h="$OPENSSL/include/openssl/ssl.h.in"
+    if [ ! -f "$ngx_ntls_ssl_h" ]; then
+        ngx_ntls_ssl_h="$OPENSSL/include/openssl/ssl.h"
+    fi
+fi
+
+ngx_ntls_have() {
+    if [ -n "$ngx_ntls_ssl_h" -a -f "$ngx_ntls_ssl_h" ] \
+        && grep -q "$1" "$ngx_ntls_ssl_h"; then
+        echo "checking for $2 ... found"
+        have=$3 . auto/have
+    else
+        echo "checking for $2 ... not found"
+    fi
+}
+
+if [ "$OPENSSL" != NONE ]; then
+    ngx_ntls_have "SSL_enable_force_ntls" \
+        "Tongsuo SSL_enable_force_ntls()" T_NGX_HAVE_NTLS_FORCE
+    ngx_ntls_have "SSL_CTX_set_ntls_cert_key_usage_check" \
+        "Tongsuo SSL_CTX_set_ntls_cert_key_usage_check()" \
+        T_NGX_HAVE_NTLS_KEY_USAGE_CHECK
+    ngx_ntls_have "SSL_get0_peer_enc_certificate_ntls" \
+        "Tongsuo SSL_get0_peer_enc_certificate_ntls()" \
+        T_NGX_HAVE_NTLS_PEER_ENC_CERT
+else
+
+    ngx_feature="Tongsuo SSL_enable_force_ntls()"
+    ngx_feature_name=T_NGX_HAVE_NTLS_FORCE
+    ngx_feature_run=no
+    ngx_feature_incs="#include <openssl/ssl.h>"
+    ngx_feature_path=
+    ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
+    ngx_feature_test="SSL_enable_force_ntls(NULL)"
+    . auto/feature
+
+    ngx_feature="Tongsuo SSL_CTX_set_ntls_cert_key_usage_check()"
+    ngx_feature_name=T_NGX_HAVE_NTLS_KEY_USAGE_CHECK
+    ngx_feature_run=no
+    ngx_feature_incs="#include <openssl/ssl.h>"
+    ngx_feature_path=
+    ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
+    ngx_feature_test="SSL_CTX_set_ntls_cert_key_usage_check(NULL, 1)"
+    . auto/feature
+
+    # the function is declared with warn_unused_result: under -Werror the
+    # probe has to use the return value, or gcc would fail the probe itself
+    ngx_feature="Tongsuo SSL_get0_peer_enc_certificate_ntls()"
+    ngx_feature_name=T_NGX_HAVE_NTLS_PEER_ENC_CERT
+    ngx_feature_run=no
+    ngx_feature_incs="#include <openssl/ssl.h>"
+    ngx_feature_path=
+    ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
+    ngx_feature_test="if (SSL_get0_peer_enc_certificate_ntls(NULL) == NULL) {
+                          return 1;
+                      }
+                      return 0"
+    . auto/feature
+
+fi
