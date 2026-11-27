@@ -117,7 +117,7 @@ port(8983, socket => 1)->close();
 
 $t->run_daemon(\&dns_daemon, port(8984), $t);
 
-$t->run()->plan(38);
+$t->run()->plan(39);
 
 $t->waitforfile($t->testdir . '/' . port(8981));
 $t->waitforfile($t->testdir . '/' . port(8982));
@@ -160,6 +160,13 @@ like(http_host_header('cname-a.example.net', '/'), qr/200 OK/, 'CNAME + A');
 like(http_host_header('cname2.example.net', '/'), qr/502 Bad/, 'CNAME bad');
 like(http_host_header('long.example.net', '/'), qr/200 OK/, 'long label');
 like(http_host_header('long2.example.net', '/'), qr/200 OK/, 'long name');
+
+TODO: {
+local $TODO = 'not yet' unless $t->has_version('1.31.11');
+
+like(http_host_header('long3.example.net', '/'), qr/502 Bad/, 'too long name');
+
+}
 
 # take into account DNAME
 
@@ -466,6 +473,19 @@ sub reply_handler {
 		push @rdata, rd_addr($ttl, '127.0.0.1');
 
 	} elsif ($name eq 'long2.example.net') {
+		# 255 octets in wire format
+
+		push @rdata, pack("n3N n(CA*)4x", 0xc00c, CNAME, IN, $ttl, 255,
+			63, 'a' x 63, 63, 'a' x 63, 63, 'a' x 63, 61, 'a' x 61);
+
+	} elsif (($name eq 'a' x 63 . '.' . 'a' x 63 . '.' . 'a' x 63 . '.'
+			. 'a' x 61) && $type == A)
+	{
+		push @rdata, rd_addr($ttl, '127.0.0.1');
+
+	} elsif ($name eq 'long3.example.net') {
+		# 257 octets in wire format, exceeds 255 octets limit
+
 		push @rdata, pack("n3N n(CA63)4x", 0xc00c, CNAME, IN, $ttl, 257,
 			63, 'a' x 63, 63, 'a' x 63, 63, 'a' x 63, 63, 'a' x 63);
 

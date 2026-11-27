@@ -55,13 +55,15 @@
 
 ## check ##
 
-Syntax: **check** `interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|http|ssl_hello|mysql|ajp] [port=check_port]`
+Syntax: **check** `interval=milliseconds [fall=count] [rise=count] [timeout=milliseconds] [default_down=true|false] [type=tcp|http|ssl_hello|mysql|ajp|send|udp] [port=check_port]`
 
 Default: 如果没有配置参数，默认值是：`interval=30000 fall=5 rise=2 timeout=1000 default_down=true type=tcp`
 
-Context: `upstream`
+Context: `upstream`（`http` 和 `stream` 下均可）
 
 该指令可以打开后端服务器的健康检查功能。
+
+在 `stream` 的 upstream 中只接受与协议无关的检查类型：`tcp`、`ssl_hello`、`mysql`、`send` 和 `udp`。在那里配置 `http`、`fastcgi` 或 `ajp` 会报配置错误；反过来在 `http` 的 upstream 中配置 `udp` 也会报错。详见下面的「stream 四层健康检查」。
 
 指令后面的参数意义是：
 
@@ -77,6 +79,8 @@ Context: `upstream`
  - `fastcgi`：发送fsatcgi请求，通过后端的回复包的状态来判断后端是否存活。
  - `mysql`: 向mysql服务器连接，通过接收服务器的greeting包来判断后端是否存活。
  - `ajp`：向后端发送AJP协议的Cping包，通过接收Cpong包来判断后端是否存活。
+ - `send`：发送 `check_send` 指定的固定字节串，并在回包中查找 `check_expect_response` 指定的字节串。与协议无关，适用于本模块不认识的私有协议。
+ - `udp`：`send` 的 UDP 变体，仅 `stream` 可用。详见下面的 `check_send`。
 * `port`: 指定后端服务器的检查端口。你可以指定不同于真实服务的后端服务器的端口，比如后端提供的是443端口的应用，你可以去检查80端口的状态来判断后端健康状况。默认是0，表示跟后端server提供真实服务的端口一样。该选项出现于Tengine-1.4.0。
 
 
@@ -107,15 +111,49 @@ Context: `upstream`
 
 ## check\_fastcgi\_param ##
 
-Syntax: **check\_fastcgi\_params** `parameter`:`value`
+Syntax: **check\_fastcgi\_param** `parameter` `value`
 
-Default: `REQUEST_METHOD: GET`
-         `REQUEST_URI: /`
-         `SCRIPT_FILENAME: index.php'
+Default: `REQUEST_METHOD GET`
+         `REQUEST_URI /`
+         `SCRIPT_FILENAME index.php`
 
 Context: `upstream`
 
 该指令可以配置fastcgi健康检查包发送的请求的header项。
+
+## check\_send ##
+
+Syntax: **check\_send** `bytes`
+
+Default: 无，默认不发送任何内容
+
+Context: `upstream`（`http` 和 `stream` 下均可）
+
+`send` 与 `udp` 检查类型发送的探测内容。只对这两种类型有效，且必须写在 `check` 之后。
+
+除了配置解析器本身已支持的 `\r`、`\n`、`\t`、`\\` 转义之外，还支持 `\xHH`，因此二进制心跳包也能直接写出来：
+
+    upstream redis {
+        server 127.0.0.1:6379;
+
+        check interval=3000 rise=2 fall=3 timeout=1000 type=send;
+        check_send            "PING\r\n";
+        check_expect_response "+PONG";
+    }
+
+对 `type=udp` 需要注意：UDP 没有握手，单纯探测端口说明不了任何问题，因此只能依据 `timeout` 之内是否收到回包来判活。它的 `timeout` 要配得比 TCP 检查宽松。另外，关闭的 UDP 端口通常比静默的端口更快被发现——前者触发的 ICMP port unreachable 会让检查立即失败，而不必等到超时。
+
+## check\_expect\_response ##
+
+Syntax: **check\_expect\_response** `bytes`
+
+Default: 无，默认收到任何回包即认为存活
+
+Context: `upstream`（`http` 和 `stream` 下均可）
+
+`send` 或 `udp` 检查判定存活所需的字节串，出现在回包的任意位置即可。转义规则与 `check_send` 相同。不配置时，只要收到任何数据就算存活。
+
+如果期望的字节始终没有出现，检查会在 `timeout` 到期时失败——也就是说 `timeout` 决定了"回错内容或不回内容"多久被发现。
 
 ## check\_http\_expect\_alive ##
 
@@ -133,9 +171,11 @@ Syntax: **check\_shm\_size** `size`
 
 Default: `1M`
 
-Context: `http`
+Context: `http`、`stream`
 
 所有的后端服务器健康检查状态都存于共享内存中，该指令可以设置共享内存的大小。默认是1M，如果你有1千台以上的服务器并在配置的时候出现了错误，就可能需要扩大该内存的大小。
+
+`http` 与 `stream` 的后端共用同一块共享内存。若两个块中都配置了该指令，取两者中较大的值。
 
 ## check\_status ##
 
@@ -182,6 +222,7 @@ Context: `location`
                 <th>Fall counts</th>
                 <th>Check type</th>
                 <th>Check port</th>
+                <th>Protocol</th>
             </tr>
             <tr>
                 <td>0</td>
@@ -192,6 +233,7 @@ Context: `location`
                 <td>0</td>
                 <td>http</td>
                 <td>80</td>
+                <td>http</td>
             </tr>
         </table>
     </body>
@@ -199,7 +241,7 @@ Context: `location`
 
 下面是csv格式页面的例子：
 
-    0,backend,192.168.0.1:80,up,46,0,http,80
+    0,backend,192.168.0.1:80,up,46,0,http,80,http
 
 下面是json格式页面的例子：
 
@@ -207,6 +249,69 @@ Context: `location`
       "total": 1,
       "generation": 3,
       "server": [
-       {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80}
+       {"index": 0, "upstream": "backend", "name": "106.187.48.116:80", "status": "up", "rise": 58, "fall": 0, "type": "http", "port": 80, "protocol": "http"}
       ]
      }}
+
+最后一个 `Protocol` 字段表示该后端是由 `http` 还是 `stream` 的 upstream 注册的。它在所有格式中都追加在末尾（CSV 的末列、JSON 的末个成员、prometheus 的额外 label），因此按位置解析旧输出的脚本不受影响。
+
+# stream 四层健康检查 #
+
+`stream` 的 upstream 同样支持主动健康检查。在此之前 nginx 在四层只提供被动检查（`max_fails` / `fail_timeout`）——只有真实流量已经打到故障后端并失败之后才会摘除。
+
+    stream {
+        upstream tcp_cluster {
+            server 192.168.0.1:3306;
+            server 192.168.0.2:3306;
+
+            check interval=3000 rise=2 fall=5 timeout=1000 type=tcp;
+        }
+
+        server {
+            listen 3306;
+            proxy_pass tcp_cluster;
+        }
+    }
+
+    http {
+        server {
+            listen 80;
+
+            # 同一个页面里也会列出上面 stream 的后端
+            location /status {
+                check_status;
+
+                access_log   off;
+                allow SOME.IP.ADD.RESS;
+                deny all;
+            }
+        }
+    }
+
+被标记为 down 的后端会被所有 stream 负载均衡算法跳过：round-robin、`hash`、`least_conn`、`random` 和 `least_time`。
+
+UDP 的 upstream 用 `type=udp` 检查：
+
+    stream {
+        upstream dns_cluster {
+            server 192.168.0.1:53;
+            server 192.168.0.2:53;
+
+            check interval=3000 rise=2 fall=3 timeout=2000 type=udp;
+            check_send            "\x00\x01\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01";
+            check_expect_response "\x00\x01";
+        }
+
+        server {
+            listen     53 udp;
+            proxy_pass dns_cluster;
+        }
+    }
+
+需要注意的限制：
+
+* 只接受与协议无关的检查类型：`tcp`、`ssl_hello`、`mysql`、`send`、`udp`。`http`、`fastcgi`、`ajp` 会报配置错误；而 `udp` 只在这里可用，`http` 下不可用。
+* `check_status` 是 HTTP 的 location handler，只能配在 `http` 里。如果部署中只有 `stream` 块，需要额外起一个 `http` server 才能查看状态页；该页面会同时列出两类后端。
+* `check_keepalive_requests`、`check_http_send`、`check_http_expect_alive`、`check_fastcgi_param` 是 HTTP 专属指令，在 `stream` 中不提供。
+* 运行时解析的后端（`server example.com:3306 resolve;`）不参与主动健康检查，`http` 和 `stream` 两侧都是如此：配置解析阶段还没有可探测的地址。
+* `stream` 模块必须静态编译。`--with-stream=dynamic` 与本 addon 同时使用会在 configure 阶段被拒绝，因为 stream 侧与静态链接的 HTTP 侧共用同一份健康检查核心。

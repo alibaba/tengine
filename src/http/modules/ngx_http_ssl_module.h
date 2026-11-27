@@ -34,6 +34,10 @@ typedef struct {
 
     size_t                          buffer_size;
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                      handshake_error_log_level;
+#endif
+
     ssize_t                         builtin_session_cache;
 
     time_t                          session_timeout;
@@ -74,6 +78,8 @@ typedef struct {
 
 #if (T_NGX_SSL_NTLS)
     ngx_flag_t                      enable_ntls;
+    ngx_flag_t                      ntls_cert_key_usage_check;
+    ngx_flag_t                      force_ntls;
     ngx_str_t                       enc_certificate;
     ngx_str_t                       enc_certificate_key;
     ngx_str_t                       sign_certificate;

@@ -394,7 +394,7 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_proxy_loc_conf_t, upstream.buffer_size),
-      NULL },
+      &ngx_conf_size_nonzero_post },
 
     { ngx_string("proxy_read_timeout"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -1372,6 +1372,9 @@ ngx_http_proxy_create_request(ngx_http_request_t *r)
     } else if (r->headers_in.chunked && r->reading_body) {
         ctx->internal_body_length = -1;
         ctx->internal_chunked = 1;
+
+    } else if (r->discard_body) {
+        ctx->internal_body_length = 0;
 
     } else {
         ctx->internal_body_length = r->headers_in.content_length_n;

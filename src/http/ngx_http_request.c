@@ -354,7 +354,7 @@ ngx_http_init_connection(ngx_connection_t *c)
     }
 
     if (rev->ready) {
-        /* the deferred accept(), iocp */
+        /* the deferred accept() */
 
         if (ngx_use_accept_mutex) {
             ngx_post_event(rev, &ngx_posted_events);
@@ -853,6 +853,12 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
 #if (T_NGX_SSL_NTLS)
             if (sscf->enable_ntls) {
                 SSL_enable_ntls(c->ssl->connection);
+
+#if (T_NGX_HAVE_NTLS_FORCE)
+                if (sscf->force_ntls) {
+                    SSL_enable_force_ntls(c->ssl->connection);
+                }
+#endif
             }
 #endif
 
@@ -1082,6 +1088,9 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     sscf = ngx_http_get_module_srv_conf(cscf->ctx, ngx_http_ssl_module);
 
     c->ssl->buffer_size = sscf->buffer_size;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    c->ssl->handshake_error_log_level = sscf->handshake_error_log_level;
+#endif
 
     if (sscf->ssl.ctx) {
         if (SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx) == NULL) {
@@ -1105,6 +1114,16 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 #endif
 
         SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
+
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+        /*
+         * SSL_set_SSL_CTX() does not carry the NTLS keyUsage switch over
+         * to the connection: the check reads SSL's own field, so the
+         * value selected for the SNI server would be ignored without this.
+         */
+        SSL_set_ntls_cert_key_usage_check(ssl_conn,
+                                          sscf->ntls_cert_key_usage_check);
+#endif
 
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);
@@ -1240,6 +1259,9 @@ ngx_http_ssl_ctx_reset(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
     sscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_ssl_module);
 
     c->ssl->buffer_size = sscf->buffer_size;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    c->ssl->handshake_error_log_level = sscf->handshake_error_log_level;
+#endif
 
     if (sscf->ssl.ctx) {
         SSL_set_SSL_CTX(ssl_conn, sscf->ssl.ctx);
@@ -1266,6 +1288,16 @@ ngx_http_ssl_ctx_reset(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 #endif
 
         SSL_set_options(ssl_conn, SSL_CTX_get_options(sscf->ssl.ctx));
+
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+        /*
+         * SSL_set_SSL_CTX() does not carry the NTLS keyUsage switch over
+         * to the connection: the check reads SSL's own field, so the
+         * value selected for the SNI server would be ignored without this.
+         */
+        SSL_set_ntls_cert_key_usage_check(ssl_conn,
+                                          sscf->ntls_cert_key_usage_check);
+#endif
 
 #ifdef SSL_OP_NO_RENEGOTIATION
         SSL_set_options(ssl_conn, SSL_OP_NO_RENEGOTIATION);

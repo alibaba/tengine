@@ -83,8 +83,10 @@ my $ret2 = `/bin/echo Q | $openssl s_client -connect localhost:9050 -servername 
 my $ret3 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:9050 -servername server2.com -quiet -ign_eof -enable_ntls -ntls 2>&1`;
 my $ret4 = `/bin/echo -e "GET / HTTP/1.0\r\nHost: server2.com\r\n\r\n" | $openssl s_client -connect localhost:9050 -servername server2.org -quiet -ign_eof -enable_ntls -ntls 2>&1`;
 
-like($ret1, qr/CN = server1_sign$/m, 'default cert');
-like($ret2, qr/CN = server2_sign$/m, 'sni cert');
+# Tongsuo 8.5.0 prints "CN=name" without spaces around '=' in the verify
+# callback output, while older versions print "CN = name"; accept both.
+like($ret1, qr/CN ?= ?server1_sign$/m, 'default cert');
+like($ret2, qr/CN ?= ?server2_sign$/m, 'sni cert');
 like($ret3, qr/^server2.com$/m,
     'host exists, sni exists, and host is equal sni');
 like($ret4, qr/^server2.com$/m, 'host exists, sni not found');

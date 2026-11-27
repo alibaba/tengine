@@ -1412,6 +1412,17 @@ sub parse_frames {
 			($len, $val) = parse_int(substr($buf, $offset));
 			$frame->{first} = $val;
 			$offset += $len;
+			$frame->{ranges} = [];
+			for (1 .. $frame->{count}) {
+				my %range;
+				($len, $val) = parse_int(substr($buf, $offset));
+				$range{gap} = $val;
+				$offset += $len;
+				($len, $val) = parse_int(substr($buf, $offset));
+				$range{length} = $val;
+				$offset += $len;
+				push @{$frame->{ranges}}, \%range;
+			}
 		}
 		if ($type == 4) {
 			$frame->{type} = 'RESET_STREAM';
@@ -1572,8 +1583,15 @@ sub handle_frames {
 	while (my $frame = shift @frames) {
 		my $max = $frame->{largest};
 		my $min = $max - $frame->{first};
+		my @ranges = ([$min, $max]);
 
-		for my $num ($min .. $max) {
+		for my $range (@{$frame->{ranges}}) {
+			$max = $min - $range->{gap} - 2;
+			$min = $max - $range->{length};
+			push @ranges, [$min, $max];
+		}
+
+		for my $num (map { $_->[0] .. $_->[1] } @ranges) {
 			for my $pn (keys %$ack) {
 				delete $ack->{$pn} if $ack->{$pn} == $num;
 			}

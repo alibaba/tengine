@@ -214,6 +214,14 @@ my %backend_cookies;
 my $re = qr/(.*?)\x0d\x0a?/;
 my ($response, $cookie, $backend);
 
+# wait for the servers to be resolved; they share the same name,
+# so all upstreams are resolved by the same query
+
+for (1 .. 50) {
+	last if http_get('/no_sticky') =~ /200 OK/;
+	select undef, undef, undef, 0.1;
+}
+
 # record cookies returned by each backend server for use in tests
 collect_backend_cookies(4, \%backend_cookies);
 

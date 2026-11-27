@@ -254,7 +254,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_core_srv_conf_t, client_header_buffer_size),
-      NULL },
+      &ngx_conf_size_nonzero_post },
 
     { ngx_string("large_client_header_buffers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE2,
@@ -375,7 +375,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_core_loc_conf_t, client_body_buffer_size),
-      NULL },
+      &ngx_conf_size_nonzero_post },
 
 #if (T_DEPRECATED)
     { ngx_string("client_body_buffers"),
@@ -457,7 +457,7 @@ static ngx_command_t  ngx_http_core_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_core_loc_conf_t, subrequest_output_buffer_size),
-      NULL },
+      &ngx_conf_size_nonzero_post },
 
     { ngx_string("aio"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -1632,7 +1632,7 @@ ngx_http_core_find_location(ngx_http_request_t *r)
         rc = ngx_http_core_find_location(r);
     }
 
-    if (rc == NGX_OK || rc == NGX_DONE) {
+    if (rc == NGX_OK || rc == NGX_DONE || rc == NGX_ERROR) {
         return rc;
     }
 
@@ -1676,8 +1676,11 @@ ngx_http_core_find_location(ngx_http_request_t *r)
                            "test location: \"%V\"", &(*clcfp)->name);
 
             vv = ngx_http_get_flushed_variable(r, (*clcfp)->predicate - 1);
+            if (vv == NULL) {
+                return NGX_ERROR;
+            }
 
-            if (vv && vv->len && (vv->len != 1 || vv->data[0] != '0')) {
+            if (vv->len && (vv->len != 1 || vv->data[0] != '0')) {
                 r->loc_conf = (*clcfp)->loc_conf;
 
                 /* look up nested locations */
@@ -2175,10 +2178,16 @@ ngx_http_map_uri_to_path(ngx_http_request_t *r, ngx_str_t *path,
 
     alias = clcf->alias;
 
-    if (alias && !r->valid_location) {
+    if (alias && (!r->valid_location || r->uri_changed)) {
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                       "\"alias\" cannot be used in location \"%V\" "
                       "where URI was rewritten", &clcf->name);
+        return NULL;
+    }
+
+    if (alias > r->uri.len && alias != NGX_MAX_SIZE_T_VALUE) {
+        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                      "URI shorter than aliased URI part");
         return NULL;
     }
 

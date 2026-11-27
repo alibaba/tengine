@@ -17,6 +17,8 @@
 
 set -eu
 
+SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+
 IMAGE=""
 VARIANT=default
 while [ $# -gt 0 ]; do
@@ -57,14 +59,26 @@ for mod in ngx_tongsuo_ntls ngx_http_xquic_module ngx_http_lua_module; do
     esac
 done
 
-# Tongsuo reports itself through OPENSSL_VERSION_TEXT ("OpenSSL 3.0.3 ...") and
-# nginx never prints TONGSUO_VERSION_TEXT, so the banner alone cannot tell it
+# Tongsuo reports itself through OPENSSL_VERSION_TEXT, which carries the OpenSSL
+# release it is based on (3.5.4 for the 8.5.0 pinned in packages/build/deps.env),
+# and nginx never prints TONGSUO_VERSION_TEXT, so the banner alone cannot tell it
 # apart from a stock OpenSSL. The configure arguments can: enable-ntls is a
 # Tongsuo-only option and is what ngx_tongsuo_ntls actually needs.
 case "$banner" in
     *enable-ntls*) ok "built against Tongsuo with NTLS enabled" ;;
     *) fail "no enable-ntls in the configure arguments: NTLS is not really in this build" ;;
 esac
+
+# --------------------------------------------------------------- pinned sources
+
+# Everything above proves the promised feature set is in the image; this proves
+# the image was built from the sources this checkout pins -- the Tengine and
+# nginx core versions of src/core/nginx.h and the Tongsuo and xquic releases of
+# packages/build/deps.env. Both docker.yml paths run actions/checkout before
+# calling this script, so those two files describe exactly the commit the image
+# under test came from. Without the check a stale buildx layer or a tag cut from
+# the wrong commit would still pass every assertion above.
+printf '%s\n' "$banner" | "$SELF_DIR/check-pinned-versions.sh"
 
 # ---------------------------------------------------------------- perl payload
 

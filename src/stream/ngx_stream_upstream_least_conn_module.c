@@ -149,6 +149,12 @@ ngx_stream_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
             continue;
         }
 
+#if (NGX_STREAM_UPSTREAM_CHECK)
+        if (ngx_stream_upstream_check_peer_down(peer->check_index)) {
+            continue;
+        }
+#endif
+
         if (peer->max_fails
             && peer->fails >= peer->max_fails
             && now - peer->checked <= peer->fail_timeout)
@@ -203,6 +209,12 @@ ngx_stream_upstream_get_least_conn_peer(ngx_peer_connection_t *pc, void *data)
             if (peer->down) {
                 continue;
             }
+
+#if (NGX_STREAM_UPSTREAM_CHECK)
+            if (ngx_stream_upstream_check_peer_down(peer->check_index)) {
+                continue;
+            }
+#endif
 
             if (peer->conns * best->weight != best->conns * peer->weight) {
                 continue;

@@ -90,6 +90,10 @@ struct ngx_stream_upstream_rr_peer_s {
     ngx_uint_t                       inflight_reqs;
 #endif
 
+#if (NGX_STREAM_UPSTREAM_CHECK)
+    ngx_uint_t                       check_index;
+#endif
+
 #if (T_NGX_STREAM_UPSTREAM_RR_PEER_SPARE)
     NGX_COMPAT_BEGIN(25)
 #else

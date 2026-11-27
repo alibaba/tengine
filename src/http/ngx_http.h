@@ -42,6 +42,7 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_xquic.h>
 #endif
 #if (NGX_HTTP_V2)
+#include <ngx_http_priority.h>
 #include <ngx_http_v2.h>
 #endif
 #if (NGX_HTTP_CACHE)

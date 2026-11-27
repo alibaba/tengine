@@ -11,10 +11,12 @@ jobs:
   # shows up when it happens to crash the worker on that runner: an out of
   # bounds read, a use after free of a shared memory peer or a division by zero
   # can all pass the suite silently. This job builds with AddressSanitizer and
-  # runs the cases that exercise run time changes of upstream peer sets, where
-  # such errors are most likely. Test::Nginx already asserts "no sanitizer
-  # errors" (it greps the error log for Sanitizer lines, and nginx redirects
-  # stderr there), so the sanitizer report alone fails the case.
+  # runs the cases that exercise run time changes of upstream peer sets and the
+  # health-check response parsers, where such errors are most likely: both read
+  # data another process produced, and the health check reads bytes straight
+  # off a socket the checked peer controls. Test::Nginx already asserts "no
+  # sanitizer errors" (it greps the error log for Sanitizer lines, and nginx
+  # redirects stderr there), so the sanitizer report alone fails the case.
   asan-test:
    name: test tengine with asan (${{ matrix.compiler.compiler }})
    runs-on: "ubuntu-24.04"
@@ -45,6 +47,9 @@ jobs:
             --with-debug \
             --with-http_ssl_module \
             --with-http_v2_module \
+            --add-module=./modules/mod_dubbo \
+            --add-module=./modules/ngx_multi_upstream_module \
+            --add-module=./modules/ngx_http_upstream_check_module \
             --with-cc-opt="-fsanitize=address -fno-omit-frame-pointer -g -O1 -Wno-error" \
             --with-ld-opt="-fsanitize=address"
          make -j2
@@ -70,4 +75,6 @@ jobs:
            nginx-tests/upstream_zone_ssl.t \
            nginx-tests/proxy_next_upstream.t \
            tengine-tests/upstream_resolve_empty.t \
-           tengine-tests/upstream_resolve_shrink.t
+           tengine-tests/upstream_resolve_shrink.t \
+           tengine-tests/upstream_check_http_framing.t \
+           ../../modules/mod_dubbo/t

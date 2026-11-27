@@ -1,537 +1,555 @@
+待发布变更
+* 变更： 将核心升级至 nginx 1.31.10。
+* 安全： 修复写链在没有发送进展时反复重投递写事件的问题 (CVE-2026-132779)。
+
 Tengine 3.2.0 [2026-07-31]
-* Security: 修复CVE-2026-49975，HTTP/1、HTTP/2和HTTP/3的HPACK/QPACK头部解压炸弹 (lianglli)
-* Security: 修复CVE-2026-9256，ngx_http_rewrite_module重叠捕获组导致的堆缓冲区溢出 (lianglli)
-* Security: 修复CVE-2026-42945，ngx_http_rewrite_module转义错误导致的缓冲区溢出 (drawing)
-* Security: 修复CVE-2026-42946，ngx_http_scgi_module和ngx_http_uwsgi_module解析被切分的状态行时越界读 (drawing)
-* Security: 修复CVE-2026-42934，ngx_http_charset_module的recode_from_utf8()越界读 (drawing)
-* Security: 修复CVE-2026-40701，ngx_http_ssl_module的OCSP解析器释放后使用 (drawing)
-* Security: 修复CVE-2026-1642，SSL后端提前返回明文响应时在握手前被解析 (drawing)
-* Security: 修复mod_dubbo的越界读问题 (orbisai0security)
-* Feature: 新增ngx_zstd模块，支持Zstandard响应压缩和预压缩静态文件 (lianglli)
-* Feature: 新增ngx_http_upstream_iwrr_module模块，时间复杂度O(1)、空间复杂度O(n)的加权轮询 (jizhuozhi)
-* Feature: 新增ngx_http_append_header_module模块，在响应体末尾追加内容 (lianglli)
-* Feature: HTTP/3连接管理与多路复用优化，降低延迟并提升弱网下的抗丢包能力 [XQUIC] (lianglli)
-* Feature: 基于tengine-ingress，允许按响应状态码动态配置故障转移到备用upstream或重定向，新增变量$ingress_failover_count (lianglli)
-* Feature: 新增请求与upstream各阶段的计时统计变量，如$request_recv_time、$response_send_time、$server_rt和$upstream_first_pkg_time (lianglli)
-* Feature: 新增变量$request_start_time (drawing)
-* Feature: 新增指令proxy_sndbuf_size和proxy_rcvbuf_size (drawing)
-* Feature: 新增指令pipe_size，设置异步日志管道的缓冲区大小 (drawing)
-* Feature: 优化大规模upstream的round-robin选择性能，新增指令rr_discarded_range (lianglli)
-* Feature: upstream组内无可用server时返回502而非500，新增指令upstream_change_no_server_status (lianglli)
-* Feature: SSL握手错误日志中记录客户端SNI域名 (lianglli)
-* Feature: 新增application/x-www-form-urlencoded的转义与反转义支持 (lianglli)
-* Feature: X-Accel-Redirect内部跳转时保留客户端原始请求方法名 (lianglli)
-* Feature: 新增configure选项--with-http_dup_host，允许客户端发送重复的Host请求头 (lianglli)
-* Feature: 新增发行版软件包(rpm、deb和apk)与多架构容器镜像，默认构建完备功能集——Tongsuo、xquic和Lua (lianglli)
-* Feature: 新增configure选项--with-xquic-rpath，将xquic运行时查找路径与链接路径解耦 (lianglli)
-* Feature: 公开ngx_http_upstream_rbtree_lookup()，便于第三方模块按名字查找upstream (lhanjian)
-* Change: 自助编译的默认安装路径由沿用nginx的命名改为tengine：前缀/usr/local/tengine、二进制sbin/tengine、配置conf/tengine.conf、pid文件logs/tengine.pid，与rpm、deb、apk包及容器镜像保持一致。旧版本安装在原路径下，make install不会覆盖它，旧二进制会继续运行；切换后请自行删除旧安装，或通过--prefix、--sbin-path、--conf-path、--pid-path显式保留原有布局 (lianglli)
-* Change: 升级core代码到Nginx-1.31.5版本 (lianglli)
-* Change: control API的监听地址用-L指定，而非nginx 1.31.5的-l，因为Tengine的-l已用于列出所有指令；control API仅在--with-control-api时编译 (lianglli)
-* Change: 升级ngx_http_lua_module到0.10.29版本，支持PCRE2并与pin的lua-resty-core版本匹配，此前仅有PCRE2的环境下编译失败 (lianglli)
-* Change: 默认拥塞控制算法由CUBIC改为BBR [XQUIC] (lurker-Chen)
-* Change: ngx_http_tunnel_module改为可选编译，避免与ngx_http_proxy_connect_module冲突 (lianglli)
-* Change: 合入nginx官方测试集并补充Tengine定制测试用例 (lianglli)
-* Change: 软件包与CI使用的xquic基线升级到v1.9.6，模块仍兼容v1.8.0至v1.9.6这一代接口，modules/ngx_http_xquic_module/README.md新增各Tengine版本经验证的xquic版本对照表 [XQUIC] (Yanmei-Liu)
-* Bugfix: 修复ngx_http_upstream_check_module在HTTP健康检查复用长连接时未排空响应体的问题 (lianglli)
-* Bugfix: 修复unix socket类型的upstream server配置check port=时被永久判定为存活，导致backup无法接管的问题 (lianglli)
-* Bugfix: 修复round-robin初始化时重复链接peer导致backup peer自环的问题 (lianglli)
-* Bugfix: 修复random负载均衡初始化时空peer组导致的除零问题 (lianglli)
-* Bugfix: 修复round-robin首次选择跳过第一个peer的问题 (lianglli)
-* Bugfix: 修复动态域名解析的upstream peer未保持resolver返回地址顺序的问题 (lianglli)
-* Bugfix: 修复SNI虚拟主机场景下ssl_protocols选择错误的问题 (lianglli)
-* Bugfix: 修复客户端证书校验回调中未检查OCSP状态的问题 (lianglli)
-* Bugfix: 修复Stream模块未始终构建server_names哈希导致SNI匹配失败的问题 (lianglli)
-* Bugfix: 修复HTTP/2和HTTP/3响应忽略server_tag指令的问题 (drawing)
-* Bugfix: 修复HTTP/3的$ssl_handshake_time变量问题 (drawing)
-* Bugfix: 修复HTTP/3中upstream结束后请求未正确关闭的问题 [XQUIC] (lurker-Chen)
-* Bugfix: 修复ngx_http_lua_module中ngx.location.capture返回504的问题 (YeLi)
-* Bugfix: 适配HTTP/3 XQUIC模块到xquic v1.9.1接口 (drawing)
-* Bugfix: 修复ssl_certificate_compression在Tongsuo下的编译问题 (lianglli)
-* Bugfix: 仅在Linux上设置管道缓冲区大小 (drawing)
-* Bugfix: xquic会话票据密钥读取失败时输出警告，此前各worker会静默退化为各自随机生成的密钥，导致多worker下0-RTT始终失败 [XQUIC] (lianglli)
+* 安全： 修复CVE-2026-49975，HTTP/1、HTTP/2和HTTP/3的HPACK/QPACK头部解压炸弹 (lianglli)
+* 安全： 修复CVE-2026-9256，ngx_http_rewrite_module重叠捕获组导致的堆缓冲区溢出 (lianglli)
+* 安全： 修复CVE-2026-42945，ngx_http_rewrite_module转义错误导致的缓冲区溢出 (drawing)
+* 安全： 修复CVE-2026-42946，ngx_http_scgi_module和ngx_http_uwsgi_module解析被切分的状态行时越界读 (drawing)
+* 安全： 修复CVE-2026-42934，ngx_http_charset_module的recode_from_utf8()越界读 (drawing)
+* 安全： 修复CVE-2026-40701，ngx_http_ssl_module的OCSP解析器释放后使用 (drawing)
+* 安全： 修复CVE-2026-1642，SSL后端提前返回明文响应时在握手前被解析 (drawing)
+* 安全： 修复mod_dubbo的越界读问题 (orbisai0security)
+* 功能： 新增指令ssl_force_ntls，使监听端口只提供NTLS（TLCP）服务并拒绝普通TLS连接，http与stream模块均可用 (zhsnew)
+* 功能： 新增指令ssl_ntls_cert_key_usage_check，用于放宽或强制Tongsuo 8.5.0的
+  GB/T 20518 sign/enc证书keyUsage检查，http与stream模块均可用 (zhsnew)
+* 功能： 新增变量$ssl_client_enc_cert和$ssl_client_raw_enc_cert，用于获取TLCP
+  双向认证中对端的加密证书，http与stream模块均可用 (zhsnew)
+* 功能： 新增ngx_zstd模块，支持Zstandard响应压缩和预压缩静态文件 (lianglli)
+* 功能： 新增ngx_http_upstream_iwrr_module模块，时间复杂度O(1)、空间复杂度O(n)的加权轮询 (jizhuozhi)
+* 功能： 新增ngx_http_append_header_module模块，在响应体末尾追加内容 (lianglli)
+* 功能： HTTP/3连接管理与多路复用优化，降低延迟并提升弱网下的抗丢包能力 [XQUIC] (lianglli)
+* 功能： 基于tengine-ingress，允许按响应状态码动态配置故障转移到备用upstream或重定向，新增变量$ingress_failover_count (lianglli)
+* 功能： 新增请求与upstream各阶段的计时统计变量，如$request_recv_time、$response_send_time、$server_rt和$upstream_first_pkg_time (lianglli)
+* 功能： 新增变量$request_start_time (drawing)
+* 功能： 新增指令proxy_sndbuf_size和proxy_rcvbuf_size (drawing)
+* 功能： 新增指令pipe_size，设置异步日志管道的缓冲区大小 (drawing)
+* 功能： 优化大规模upstream的round-robin选择性能，新增指令rr_discarded_range (lianglli)
+* 功能： upstream组内无可用server时返回502而非500，新增指令upstream_change_no_server_status (lianglli)
+* 功能： SSL握手错误日志中记录客户端SNI域名 (lianglli)
+* 功能： 新增application/x-www-form-urlencoded的转义与反转义支持 (lianglli)
+* 功能： X-Accel-Redirect内部跳转时保留客户端原始请求方法名 (lianglli)
+* 功能： 新增configure选项--with-http_dup_host，允许客户端发送重复的Host请求头 (lianglli)
+* 功能： 新增发行版软件包(rpm、deb和apk)与多架构容器镜像，默认构建完备功能集——Tongsuo、xquic和Lua (lianglli)
+* 功能： 新增configure选项--with-xquic-rpath，将xquic运行时查找路径与链接路径解耦 (lianglli)
+* 功能： 公开ngx_http_upstream_rbtree_lookup()，便于第三方模块按名字查找upstream (lhanjian)
+* 功能： 新增ngx_stream_upstream_check_module模块，为stream（四层）upstream提供主动健康检查；健康检查核心从ngx_http_upstream_check_module泛化并共享，HTTP与stream两侧共用一份共享内存zone、一套peer索引空间和一个check_status状态页 (lianglli)
+* 变更： stream ssl模块缺证书的启动报错同时提示ssl_enc_certificate与ssl_sign_certificate，与http模块文案对齐 (zhsnew)
+* 变更： 自助编译的默认安装路径由沿用nginx的命名改为tengine：前缀/usr/local/tengine、二进制sbin/tengine、配置conf/tengine.conf、pid文件logs/tengine.pid，与rpm、deb、apk包及容器镜像保持一致。旧版本安装在原路径下，make install不会覆盖它，旧二进制会继续运行；切换后请自行删除旧安装，或通过--prefix、--sbin-path、--conf-path、--pid-path显式保留原有布局 (lianglli)
+* 变更： 升级核心代码到Nginx-1.31.9版本 (lianglli)
+* 变更： control API的监听地址用-L指定，而非nginx 1.31.9的-l，因为Tengine的-l已用于列出所有指令；control API仅在--with-control-api时编译 (lianglli)
+* 变更： 升级ngx_http_lua_module到0.10.29版本，支持PCRE2并与固定的lua-resty-core版本匹配，此前仅有PCRE2的环境下编译失败 (lianglli)
+* 变更： 默认拥塞控制算法由CUBIC改为BBR [XQUIC] (lurker-Chen)
+* 变更： ngx_http_tunnel_module改为可选编译，避免与ngx_http_proxy_connect_module冲突 (lianglli)
+* 变更： 合入nginx官方测试集并补充Tengine定制测试用例 (lianglli)
+* 变更： 软件包与CI使用的xquic基线升级到v1.9.8，模块仍兼容v1.8.0至v1.9.8这一代接口，modules/ngx_http_xquic_module/README.md新增各Tengine版本经验证的xquic版本对照表 [XQUIC] (Yanmei-Liu)
+* 变更： 软件包与CI使用的Tongsuo基线升级到8.5.0，其OpenSSL基线由8.4.0的3.0.3变为3.5.4 (lianglli)
+* 修复： 修复ngx_http_upstream_check_module在HTTP健康检查复用长连接时未排空响应体的问题 (lianglli)
+* 修复： 修复unix socket类型的upstream server配置check port=时被永久判定为存活，导致backup无法接管的问题 (lianglli)
+* 修复： 健康检查状态改为按peer而非按地址继承，同一后端被多个upstream列出、或同时位于共用zone的HTTP与stream两侧时，reload后不再互相串换健康状态 (lianglli)
+* 修复： 修复"server ... resolve"动态解析peer未初始化check_index，导致其跟随index 0那个peer的健康状态、自身从未被探测的问题 (lianglli)
+* 修复： 收紧健康检查HTTP响应解析器对不可信对端字节的处理：Transfer-Encoding越界读与"chunked"误判、Content-Length与chunk size超长或非法、负数排空长度以及chunked排空死循环 (lianglli)
+* 修复： 修复mod_dubbo hessian2解码器的多处内存安全问题：非Map响应payload的类型混淆、截断多字节UTF-8的越界读、null标签未消费导致的死循环、引用对象重复释放、嵌套深度无限制以及拒绝payload时已解码对象泄漏 (lianglli)
+* 修复： 修复ngx_multi_upstream_module在连接关闭前先销毁内存池导致的释放后使用问题 (lianglli)
+* 修复： 修复round-robin初始化时重复链接peer导致backup peer自环的问题 (lianglli)
+* 修复： 修复random负载均衡初始化时空peer组导致的除零问题 (lianglli)
+* 修复： 修复round-robin首次选择跳过第一个peer的问题 (lianglli)
+* 修复： 修复动态域名解析的upstream peer未保持resolver返回地址顺序的问题 (lianglli)
+* 修复： 修复私有round-robin优化在"server ... resolve"于运行时增删peer时导致的崩溃：首次成功解析前的除零，以及缓存的旧位置错误索引tried位图 (lianglli)
+* 修复： 修复SNI虚拟主机场景下ssl_protocols选择错误的问题 (lianglli)
+* 修复： 修复客户端证书校验回调中未检查OCSP状态的问题 (lianglli)
+* 修复： 修复Stream模块未始终构建server_names哈希导致SNI匹配失败的问题 (lianglli)
+* 修复： 修复HTTP/2和HTTP/3响应忽略server_tag指令的问题 (drawing)
+* 修复： 修复HTTP/3的$ssl_handshake_time变量问题 (drawing)
+* 修复： 修复HTTP/3中upstream结束后请求未正确关闭的问题 [XQUIC] (lurker-Chen)
+* 修复： 修复ngx_http_lua_module中ngx.location.capture返回504的问题 (YeLi)
+* 修复： 适配HTTP/3 XQUIC模块到xquic v1.9.1接口 (drawing)
+* 修复： 修复ssl_certificate_compression在Tongsuo下的编译问题 (lianglli)
+* 修复： 仅在Linux上设置管道缓冲区大小 (drawing)
+* 修复： xquic会话票据密钥读取失败时输出警告，此前各worker会静默退化为各自随机生成的密钥，导致多worker下0-RTT始终失败 [XQUIC] (lianglli)
 
 
 Tengine 3.1.0 [2023-10-27]
-* Security: 修复HTTP2安全漏洞CVE-2023-44487 (lianglli) 
-* Feature: 基于tengine-ingress，允许动态配置不同域名的多个TLS协议版本 (lianglli)
-* Feature: 基于tengine-ingress，允许动态配置基于多个Header值的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许动态配置基于多个Cookie值的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许动态配置基于多个Query参数值的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许动态配置基于Header取模的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许动态配置基于Cookie取模的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许动态配置基于Query取模的高级路由 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Header (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息追加Header (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Query参数 (lianglli, dreamwind1985)
-* Feature: 基于tengine-ingress，允许高级路由动态配置流量染色，响应消息增加Header (lianglli, dreamwind1985)
-* Feature: 新增listen选项https_allow_http，允许TLS端口处理HTTP请求 (drawing)
-* Feature: 新增ngx_http_debug_conn_module模块，调试连接信息 (hongxiaolong)
-* Bugfix: 修复HTTP/3 Lua模块证书回调问题 (drawing)
-* Bugfix: 修复HTTP/3 XQUIC模块连接句柄泄漏问题 (dreamwind1985)
-* Bugfix: 修复HTTP/3 XQUIC模块静态证书匹配问题 (lurker-Chen)
-* Bugfix: 修复HTTP/3 XQUIC模块调用ngx_http_find_virtual_server的crash问题 (morf)
-* Bugfix: 修复异步SSL模块使用thread_pool的crash问题 (zhsnew)
-* Bugfix: 修复ngx_http_grpc_module模块使用ngx_tongsuo_ntls的编译问题 (dongbeiouba)
-* Bugfix: 修复ngx_http_debug_conn_module模块的单元测试问题 (chobits)
-* Bugfix: 修复ngx_getcpuinfo的日志问题 (fuchencong)
+* 安全： 修复HTTP2安全漏洞CVE-2023-44487 (lianglli)
+* 功能： 基于tengine-ingress，允许动态配置不同域名的多个TLS协议版本 (lianglli)
+* 功能： 基于tengine-ingress，允许动态配置基于多个Header值的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许动态配置基于多个Cookie值的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许动态配置基于多个Query参数值的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许动态配置基于Header取模的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许动态配置基于Cookie取模的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许动态配置基于Query取模的高级路由 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Header (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息追加Header (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许高级路由动态配置流量染色，请求消息增加Query参数 (lianglli, dreamwind1985)
+* 功能： 基于tengine-ingress，允许高级路由动态配置流量染色，响应消息增加Header (lianglli, dreamwind1985)
+* 功能： 新增listen选项https_allow_http，允许TLS端口处理HTTP请求 (drawing)
+* 功能： 新增ngx_http_debug_conn_module模块，调试连接信息 (hongxiaolong)
+* 修复： 修复HTTP/3 Lua模块证书回调问题 (drawing)
+* 修复： 修复HTTP/3 XQUIC模块连接句柄泄漏问题 (dreamwind1985)
+* 修复： 修复HTTP/3 XQUIC模块静态证书匹配问题 (lurker-Chen)
+* 修复： 修复HTTP/3 XQUIC模块调用ngx_http_find_virtual_server的crash问题 (morf)
+* 修复： 修复异步SSL模块使用thread_pool的crash问题 (zhsnew)
+* 修复： 修复ngx_http_grpc_module模块使用ngx_tongsuo_ntls的编译问题 (dongbeiouba)
+* 修复： 修复ngx_http_debug_conn_module模块的单元测试问题 (chobits)
+* 修复： 修复ngx_getcpuinfo的日志问题 (fuchencong)
 
 
 Tengine 3.0.0 [2023-07-06]
-* Feature: 支持域名，证书，路由的动态无损生效 [tengine-ingress] (drawing, lianglli)
-* Feature: 支持HTTP/3 (QUIC v1和draft-29)[XQUIC] (lurker-Chen, Kulsk, lianglli)
-* Feature: 支持bypass内核的用户态高性能UDP转发 [XUDP] (D-Wythe, fengidri)
-* Feature: 支持基于header，header值和服务权重的高级路由动态无损生效 [tengine-ingress] (drawing, lianglli)
-* Feature: 支持配置timeout，强制HTTPS，CORS和robots的动态无损生效 [tengine-ingress] (drawing, lianglli)
-* Change: 升级core代码到Nginx-1.24.0稳定版本 (lianglli)
-* Bugfix: 修复ssl_async开启时ngx_ssl_shutdown导致的coredump问题 (foxriver1025)
+* 功能： 支持域名，证书，路由的动态无损生效 [tengine-ingress] (drawing, lianglli)
+* 功能： 支持HTTP/3 (QUIC v1和draft-29)[XQUIC] (lurker-Chen, Kulsk, lianglli)
+* 功能： 支持绕过内核的用户态高性能UDP转发 [XUDP] (D-Wythe, fengidri)
+* 功能： 支持基于header，header值和服务权重的高级路由动态无损生效 [tengine-ingress] (drawing, lianglli)
+* 功能： 支持配置timeout，强制HTTPS，CORS和robots的动态无损生效 [tengine-ingress] (drawing, lianglli)
+* 变更： 升级核心代码到Nginx-1.24.0稳定版本 (lianglli)
+* 修复： 修复ssl_async开启时ngx_ssl_shutdown导致的崩溃问题 (foxriver1025)
 
 
 Tengine 2.4.1 [2023-06-08]
-* Change: 更新ngx_http_proxy_connect_module模块到v0.0.4 (chobits)
-* Bugfix: 修复stream_set模块编译错误 (chobits)
-* Bugfix: 修复NTLS证书检测，将sign/enc证书移到upstream，增加ngx_tongsuo_ntls模块 (dongbeiouba)
-* Bugfix: 修复当开启ssl_async功能后，客户端无法接受到正确数据包的问题 (oyaya)
+* 变更： 更新ngx_http_proxy_connect_module模块到v0.0.4 (chobits)
+* 修复： 修复stream_set模块编译错误 (chobits)
+* 修复： 修复NTLS证书检测，将sign/enc证书移到upstream，增加ngx_tongsuo_ntls模块 (dongbeiouba)
+* 修复： 修复当开启ssl_async功能后，客户端无法接受到正确数据包的问题 (oyaya)
 
 
 Tengine 2.4.0 [2023-02-08]
-* Feature: 更新到nginx官方1.22.1版本 (jiuzhoucui)
+* 功能： 更新到nginx官方1.22.1版本 (jiuzhoucui)
 
 
 Tengine 2.3.4 [2022-10-18]
-* Feature: 增加新模块ngx_openssl_ntls，以支持NTLS协议 (dongbeiouba)
-* Change: 将ngx_openssl_ntls模块中依赖的SSL库从BabaSSL更新为Tongsuo (wa5i)
-* Bugfix: 修复CVE-2021-23017 (chobits)
-* Bugfix: 修复upstream check模块在upstream配置块中使用zone指令时导致的死锁 (zjd87)
-* Bugfix：修复upstream check编译错误 (RocFang)
-* Bugfix: 修复dubbo编译报错 (MengqiWu)
+* 功能： 增加新模块ngx_openssl_ntls，以支持NTLS协议 (dongbeiouba)
+* 变更： 将ngx_openssl_ntls模块中依赖的SSL库从BabaSSL更新为Tongsuo (wa5i)
+* 修复： 修复CVE-2021-23017 (chobits)
+* 修复： 修复upstream check模块在upstream配置块中使用zone指令时导致的死锁 (zjd87)
+* 修复：修复upstream check编译错误 (RocFang)
+* 修复： 修复dubbo编译报错 (MengqiWu)
 
 
 Tengine 2.3.3 [2021-03-25]
-* Feature: 支持dtlsv1和dtlsv1.2 (mrpre)
-* Feature: ngx_http_upstream_check_module模块增加prometheus格式和json属性 (dkrutsko)
-* Feature: mod_dubbo模块支持dubbo_pass中使用变量 (spacewander)
-* Change: 升级core代码版本到Nginx-1.18.0 (lianglli)
-* Change: 文档README增加Tengine钉钉群号 (cnmade)
-* Change: 更新mod_dubbo模块的说明文档 (spacewander)
-* Bugfix: 修复mod_dubbo模块解码int32错误的问题 (spacewander)
-* Bugfix: 修复mod_dubbo模块解码整型payload出现core dump的问题(spacewander)
-* Bugfix: 修复ngx_http_lua_module模块在debug日志级别下的内存泄漏问题 (hawkxiang)
-* Bugfix: 修复ngx_multi_upstream_module模块未释放fake请求的问题 (spacewander)
-* Bugfix: 修复ngx_http_upstream_check_module模块中的共享内存互斥锁问题 (scriptkids)
-* Bugfix: 去除ngx_http_upstream_check_module模块中冗余的健康检查 (scriptkids)
-* Bugfix: 删除ngx_multi_upstream_module模块日志相关的重复代码 (spacewander)
-* Bugfix: 修复ngx_http_upstream_dyups_module读消息且打开健康检查导致CPU负载过高的问题 (zjd87)
-* Bugfix: 修复ngx_http_upstream_vnswrr_module不支持dynamic_resolve指令的问题 (wangfakang)
-* Bugfix: 修复limit_req_zone指令在多个变量中使用的问题 (wangfakang)
-* Bugfix: 修复master进程偶现core dump问题 (wangfakang)
-* Bugfix: 修复rewrite字符串含'\0'引起的内存泄漏问题 (hongxiaolong)
-* Bugfix: 删除mod_dubbo模块未使用的变量hex_str (Weiliang-Li)
-* Bugfix: 修复keep-alive请求未发送完整导致400错误响应的问题 (fishgege)
+* 功能： 支持dtlsv1和dtlsv1.2 (mrpre)
+* 功能： ngx_http_upstream_check_module模块增加prometheus格式和json属性 (dkrutsko)
+* 功能： mod_dubbo模块支持dubbo_pass中使用变量 (spacewander)
+* 变更： 升级核心代码版本到Nginx-1.18.0 (lianglli)
+* 变更： 文档README增加Tengine钉钉群号 (cnmade)
+* 变更： 更新mod_dubbo模块的说明文档 (spacewander)
+* 修复： 修复mod_dubbo模块解码int32错误的问题 (spacewander)
+* 修复： 修复mod_dubbo模块解码整型payload出现崩溃的问题(spacewander)
+* 修复： 修复ngx_http_lua_module模块在debug日志级别下的内存泄漏问题 (hawkxiang)
+* 修复： 修复ngx_multi_upstream_module模块未释放fake请求的问题 (spacewander)
+* 修复： 修复ngx_http_upstream_check_module模块中的共享内存互斥锁问题 (scriptkids)
+* 修复： 去除ngx_http_upstream_check_module模块中冗余的健康检查 (scriptkids)
+* 修复： 删除ngx_multi_upstream_module模块日志相关的重复代码 (spacewander)
+* 修复： 修复ngx_http_upstream_dyups_module读消息且打开健康检查导致CPU负载过高的问题 (zjd87)
+* 修复： 修复ngx_http_upstream_vnswrr_module不支持dynamic_resolve指令的问题 (wangfakang)
+* 修复： 修复limit_req_zone指令在多个变量中使用的问题 (wangfakang)
+* 修复： 修复master进程偶现崩溃问题 (wangfakang)
+* 修复： 修复rewrite字符串含'\0'引起的内存泄漏问题 (hongxiaolong)
+* 修复： 删除mod_dubbo模块未使用的变量hex_str (Weiliang-Li)
+* 修复： 修复keep-alive请求未发送完整导致400错误响应的问题 (fishgege)
 
 
 Tengine 2.3.2 [2019-08-20]
-* Security: 修复HTTP2安全漏洞CVE-2019-9511, CVE-2019-9513和CVE-2019-9516 (wangfakang)
-* Feature: 支持后端Dubbo协议 (MenqqiWu)
-* Feature: upstream支持VNSWRR高效负载均衡算法 (wangfakang)
-* Feature: dynamic_resolve模块支持IPv6 (wangfakang)
-* Change: proxy_connect模块支持动态编译并增加调试日志 (chobits)
-* Change: 升级core代码版本到Nginx-1.17.3 (wangfakang)
-* Change: 更新健康检查模块使用文档 (zhangqx2010)
-* Change: 更新README文档(Lin-Buo-Ren)
-* Bugfix: 修复健康检查模块的JSON输出格式问题 (IYism)
-* Bugfix: 修复ngx-lua模块在init_worker_by_lua*指令下的问题 (wangfakang)
-* Bugfix: 修复dyups模块与OpenSSL兼容性问题 (wangfakang)
+* 安全： 修复HTTP2安全漏洞CVE-2019-9511, CVE-2019-9513和CVE-2019-9516 (wangfakang)
+* 功能： 支持后端Dubbo协议 (MenqqiWu)
+* 功能： upstream支持VNSWRR高效负载均衡算法 (wangfakang)
+* 功能： dynamic_resolve模块支持IPv6 (wangfakang)
+* 变更： proxy_connect模块支持动态编译并增加调试日志 (chobits)
+* 变更： 升级核心代码版本到Nginx-1.17.3 (wangfakang)
+* 变更： 更新健康检查模块使用文档 (zhangqx2010)
+* 变更： 更新README文档(Lin-Buo-Ren)
+* 修复： 修复健康检查模块的JSON输出格式问题 (IYism)
+* 修复： 修复ngx-lua模块在init_worker_by_lua*指令下的问题 (wangfakang)
+* 修复： 修复dyups模块与OpenSSL兼容性问题 (wangfakang)
 
 
 Tengine 2.3.1 [2019-06-18]
-* Feature: stream ssl模块新增$ssl_handshakd_time变量 [mrpre]
-* Feature: upstream check模块支持websocket健康检查 (mrpre)
-* Change: round robin负载均衡算法采用随机起点 (wangfakang)
-* Change: 升级http lua模块到v0.10.14 (mrpre)
-* Change: 升级dyups模块到yzprofile/dyups的最新主干版本 (chobits)
-* Change: 升级Nginx版本到Nginx-1.16.0(MenqqiWu)
-* Change: 支持reqstatus模块的dso编译 (chobits)
-* Change: 支持upstream dynamic模块的dso编译 (wangfakang)
-* Change: 支持trim模块的dso编译 (wangfakang)
-* Change: 支持footer模块的dso编译 (wangfakang)
-* Change: 支持user_agent模块的dso编译 (wangfakang)
-* Change: 支持concat模块的dso编译 (mathieu-aubin)
-* Bugfix: 修复部分服务端返回的HTTP头部服务端版本信息  (AstroProfundis)
-* Bugfix: 修复"-m"参数显示dynamic module的问题 (wangfakang)
-* Bugfix: 修复limit_req指令的参数检查 (wangfakang)
-* Bugfix: 修复reqstatus在macOS下的兼容性问题 (chobits)
+* 功能： stream ssl模块新增$ssl_handshakd_time变量 [mrpre]
+* 功能： upstream check模块支持websocket健康检查 (mrpre)
+* 变更： round robin负载均衡算法采用随机起点 (wangfakang)
+* 变更： 升级http lua模块到v0.10.14 (mrpre)
+* 变更： 升级dyups模块到yzprofile/dyups的最新主干版本 (chobits)
+* 变更： 升级Nginx版本到Nginx-1.16.0(MenqqiWu)
+* 变更： 支持reqstatus模块的dso编译 (chobits)
+* 变更： 支持upstream dynamic模块的dso编译 (wangfakang)
+* 变更： 支持trim模块的dso编译 (wangfakang)
+* 变更： 支持footer模块的dso编译 (wangfakang)
+* 变更： 支持user_agent模块的dso编译 (wangfakang)
+* 变更： 支持concat模块的dso编译 (mathieu-aubin)
+* 修复： 修复部分服务端返回的HTTP头部服务端版本信息  (AstroProfundis)
+* 修复： 修复"-m"参数显示动态模块的问题 (wangfakang)
+* 修复： 修复limit_req指令的参数检查 (wangfakang)
+* 修复： 修复reqstatus在macOS下的兼容性问题 (chobits)
 
 
 Tengine 2.3.0 [2019-03-25]
-* Feature: 新增proxy_connect模块，可以支持HTTP的CONNECT方法 [chobits]
-* Feature: Stream模块server配置块支持server_name指令 [mrpre]
-* Feature: reqstat模块新增req_status_lazy指令 [taoyuanyuan]
-* Feature: 新增http2指令，可以在server配置块中控制http2开关 [jinjiu]
-* Feature: 新增ssl_handshake_time变量，统计SSL握手时间 [jinjiu]
-* Feature: limit_req_zone指令的rate参数支持变量模式 [Alaaask]
-* Change: 更新debug_pool模块，适配Nginx官方1.15.9 [chobits]
-* Change: 更新reuse_port、dso、limit_req指令使用文档 [chobits, wangfakang]
-* Change: 合并官方limit_req逻辑，当对应key所有的变量值为空才跳过统计 [chobits]
-* Change: 删除reuse_port、dso、slice指令，统一使用Nginx官方对应的功能 [wangfakang]
-* Change: 适配并合并官方1.15.9测试用列 [chobits, wangfakang]
-* Change: 对Tengine自身模块全部剥离到modules目录下，减少对core的入侵 [chobits, wangfakang]
-* Change: 升级合并官方1.15.9代码，并同步官方新功能如Stream、gRPC等 [chobits, wangfakang]
-* Change: 更新Lua模块至v0.10.14rc4 [wangfakang]
-* Change: 更新dyups文档 [lf1029698952]
-* Change: 对core代码的修改全部使用宏区分开 [chobits, wangfakang, fankeke, hongxiaolong, imkeeper]
-* Change: 恢复accpte_filter功能 [wangfakang]
-* Bugfix: 修复dyups模块在和高版本OpenSSL一起编译的报错问题 [wangfakang]
-* Bugfix: 修复dyups模块init_number初始化逻辑 [FengXingYuXin]
-* Bugfix: 修复rollback日志进程在reload时可能导致日志写到滚动后的文件里面 [MengqiWu]
-* Bugfix: 修复ssl_verify_client_exception指令导致的coredump问题 [chobits]
-* Bugfix: 修复dyups、session_sticky模块在升级core代码后导致的coredump问题 [wangfakang]
-* Bugfix: 修复limit_req、http2模块的编译错误 [hongxiaolong]
-* Bugfix: 修复日志pipe进程在关闭监听socket时误删除监听Unix domain文件 [wangfakang]
-* Bugfix: 修复静态加载OpenSSL库时导致async openssl无法检测 [mrpre]
-* Bugfix: 修复ngx_http_top_input_body_filter被删除的问题 [chobits]
-* Bugfix: 修复reuse_port和accept_mutex指令冲突问题 [innomentats]
-* Bugfix: 修复在高版本GCC下的编译报错问题 [wangfakang]
+* 功能： 新增proxy_connect模块，可以支持HTTP的CONNECT方法 [chobits]
+* 功能： Stream模块server配置块支持server_name指令 [mrpre]
+* 功能： reqstat模块新增req_status_lazy指令 [taoyuanyuan]
+* 功能： 新增http2指令，可以在server配置块中控制http2开关 [jinjiu]
+* 功能： 新增ssl_handshake_time变量，统计SSL握手时间 [jinjiu]
+* 功能： limit_req_zone指令的rate参数支持变量模式 [Alaaask]
+* 变更： 更新debug_pool模块，适配Nginx官方1.15.9 [chobits]
+* 变更： 更新reuse_port、dso、limit_req指令使用文档 [chobits, wangfakang]
+* 变更： 合并官方limit_req逻辑，当对应key所有的变量值为空才跳过统计 [chobits]
+* 变更： 删除reuse_port、dso、slice指令，统一使用Nginx官方对应的功能 [wangfakang]
+* 变更： 适配并合并官方1.15.9测试用列 [chobits, wangfakang]
+* 变更： 对Tengine自身模块全部剥离到modules目录下，减少对核心的侵入 [chobits, wangfakang]
+* 变更： 升级合并官方1.15.9代码，并同步官方新功能如Stream、gRPC等 [chobits, wangfakang]
+* 变更： 更新Lua模块至v0.10.14rc4 [wangfakang]
+* 变更： 更新dyups文档 [lf1029698952]
+* 变更： 对核心代码的修改全部使用宏区分开 [chobits, wangfakang, fankeke, hongxiaolong, imkeeper]
+* 变更： 恢复accpte_filter功能 [wangfakang]
+* 修复： 修复dyups模块在和高版本OpenSSL一起编译的报错问题 [wangfakang]
+* 修复： 修复dyups模块init_number初始化逻辑 [FengXingYuXin]
+* 修复： 修复rollback日志进程在reload时可能导致日志写到滚动后的文件里面 [MengqiWu]
+* 修复： 修复ssl_verify_client_exception指令导致的崩溃问题 [chobits]
+* 修复： 修复dyups、session_sticky模块在升级核心代码后导致的崩溃问题 [wangfakang]
+* 修复： 修复limit_req、http2模块的编译错误 [hongxiaolong]
+* 修复： 修复日志pipe进程在关闭监听socket时误删除监听Unix domain文件 [wangfakang]
+* 修复： 修复静态加载OpenSSL库时导致async openssl无法检测 [mrpre]
+* 修复： 修复ngx_http_top_input_body_filter被删除的问题 [chobits]
+* 修复： 修复reuse_port和accept_mutex指令冲突问题 [innomentats]
+* 修复： 修复在高版本GCC下的编译报错问题 [wangfakang]
 
 
 Tengine 2.2.3 [2018-11-11]
-* Security: 修复安全漏洞CVE-2018-16843，CVE-2018-16844和CVE-2018-16845 [chobits]
+* 安全： 修复安全漏洞CVE-2018-16843，CVE-2018-16844和CVE-2018-16845 [chobits]
 
 
 Tengine 2.2.2 [2018-01-26]
-* Feature: 支持异步OpenSSL，可使用相关硬件(如：QAT)进行SSL的卸载 [mrpre]
-* Feature: 支持TLS1.3，TLS握手0-RTT [jlijian3] 
-* Feature: upstream配置块里面支持include指令 [wangfakang] 
-* Change：更新并修复测试用例 [wangfakang]
-* Change: 恢复ssl_verify_client_exception指令 [jinjiu]  
-* Change: 更新Debian相关软件包版本号 [PeterDaveHello]
-* Change: 更新README文档 [taoyuanyuan]
-* Bugfix: 修复upstream_check模块在reload时可能触发段错误 [yongjianchn]
-* Bugfix: 修复pipe模块在FreeBSD系统中编译报错问题 [MengqiWu]
+* 功能： 支持异步OpenSSL，可使用相关硬件(如：QAT)进行SSL的卸载 [mrpre]
+* 功能： 支持TLS1.3，TLS握手0-RTT [jlijian3]
+* 功能： upstream配置块里面支持include指令 [wangfakang]
+* 变更：更新并修复测试用例 [wangfakang]
+* 变更： 恢复ssl_verify_client_exception指令 [jinjiu]
+* 变更： 更新Debian相关软件包版本号 [PeterDaveHello]
+* 变更： 更新README文档 [taoyuanyuan]
+* 修复： 修复upstream_check模块在reload时可能触发段错误 [yongjianchn]
+* 修复： 修复pipe模块在FreeBSD系统中编译报错问题 [MengqiWu]
 
 
 Tengine 2.2.1 [2017-09-27]
-* Security: Nginx range过滤器整形溢出漏洞(CVE–2017–7529) [hongxiaolong]
-* Feature: 新增ngx_slab_stat模块，可获取NGINX/Tengine共享内存池的slab和空闲页状态信 [hongxiaolong]
-* Feature: pipe指令新增rollback参数，可基于时间、文件大小等维度进行日志回滚功能 [MengqiWu]
-* Feature: 新增dns cache功能，可避免dns服务不可用时导致Tengine无法正常启停 [wangfakang]
-* Feature: 新增sysguard_cpu指令，基于cpu保护维度来限制用户的请求 [wangfakang]
-* Change: 更新range filter模块，避免启始位置为负数 [jinjiu]
-* Change: 同步nginx官方1.13.4版本的ngx_slab，为了启用slab相关统计信息 [hongxiaolong]
-* Change: 更新http2相关测试文件：Nginx.pm和HTTP2.pm [chobits]
-* Change: 更新http2模块，同步nginx官方1.11.6版本http2 [PeterDaveHello]
-* Change: 更新tengine core文档 [chobits]
-* Change: 去掉在OS X系统中废弃使用OpenSSL library时的警告信息 [chobits]
-* Change: 更新travis.yml配置文件 [PeterDaveHello]
-* Bugfix: 修复proxy_upstream_tries，避免lua子请求会多重试一次后端 [wangfakang]
-* Bugfix：修复reuse_port和accept_mutex的冲突 [gwtony]
-* Bugfix：修复reuse_port在worker_processes设置为auto时不生效 [wangfakang]
-* Bugfix: 修复开启reuse_port后执行nginx -t失败问题 [chobits]
-* Bugfix: 修复pipe模块返回值异常情况 [chobits]
-* Bugfix: 修复configure检测报错 [chobits]
-* Bugfix：修复aio选项在freebsd系统中缺少检查的问题 [chobits]
+* 安全： Nginx range过滤器整形溢出漏洞(CVE–2017–7529) [hongxiaolong]
+* 功能： 新增ngx_slab_stat模块，可获取NGINX/Tengine共享内存池的slab和空闲页状态信 [hongxiaolong]
+* 功能： pipe指令新增rollback参数，可基于时间、文件大小等维度进行日志回滚功能 [MengqiWu]
+* 功能： 新增dns cache功能，可避免dns服务不可用时导致Tengine无法正常启停 [wangfakang]
+* 功能： 新增sysguard_cpu指令，基于cpu保护维度来限制用户的请求 [wangfakang]
+* 变更： 更新range filter模块，避免启始位置为负数 [jinjiu]
+* 变更： 同步nginx官方1.13.4版本的ngx_slab，为了启用slab相关统计信息 [hongxiaolong]
+* 变更： 更新http2相关测试文件：Nginx.pm和HTTP2.pm [chobits]
+* 变更： 更新http2模块，同步nginx官方1.11.6版本http2 [PeterDaveHello]
+* 变更： 更新tengine核心文档 [chobits]
+* 变更： 去掉在OS X系统中废弃使用OpenSSL库时的警告信息 [chobits]
+* 变更： 更新travis.yml配置文件 [PeterDaveHello]
+* 修复： 修复proxy_upstream_tries，避免lua子请求会多重试一次后端 [wangfakang]
+* 修复：修复reuse_port和accept_mutex的冲突 [gwtony]
+* 修复：修复reuse_port在worker_processes设置为auto时不生效 [wangfakang]
+* 修复： 修复开启reuse_port后执行nginx -t失败问题 [chobits]
+* 修复： 修复pipe模块返回值异常情况 [chobits]
+* 修复： 修复configure检测报错 [chobits]
+* 修复：修复aio选项在freebsd系统中缺少检查的问题 [chobits]
 
 
 Tengine 2.2.0 [2016-11-29]
-* Security: 进程将特殊构造的请求体写到临时文件时会触发段错误 (CVE-2016-4450) [0x7E]
-* Feature:  增加force_exit指令 [aholic, chobits]
-* Feature:  debug pool模块，该模块可以获取nginx内存池的内存使用情况 [chobits]
-* Change:   合并HTTP/2模块，删除SPDY模块 [PeterDaveHello]
-* Change:   支持nginx官方syslog，删除tengine原先支持的syslog功能
-* Change:   合并nginx-1.8.1版本的修改 [lhanjian, magicbear, chobits]
-* Change:   支持EPOLL_EXCLUSIVE [cfsego]
-* Change:   导出API: ngx_http_upstream_check_upstream_down [detailyang]
-* Change:   在TCP健康检查功能中关闭check_keepalive_requests特性 [cynron]
-* Change:   更新reqstatus模块 [cfsego]
-* Bugfix:   删除ngx_http_named_location中重复代码 [innomentats]
-* Bugfix:   修复session-sticky模块的bug [detailyang]
-* Bugfix:   修复rsolve.conf文件解析器的bug [zuopucuen]
-* Bugfix:   修复tfs模块编译警告 [monadbobo]
-* Bugfix:   dynamic_resolver特性在proxy_pass指令使用变量时会触发段错误 [chobits]
-* Bugfix:   修复session-sticky模块设置无效的Set-Cookie值的bug [YanagiEiichi]
-* Bugfix:   修复dyups模块中cf变量未初始化的bug [wangfakang]
-* Bugfix:   修复健康检查模块中含有重复peers的bug [FqqCS, taoyuanyuan]
-* Bugfix:   修复concat模块中错误的javascript内容类型 [IYism]
+* 安全： 进程将特殊构造的请求体写到临时文件时会触发段错误 (CVE-2016-4450) [0x7E]
+* 功能：  增加force_exit指令 [aholic, chobits]
+* 功能：  debug pool模块，该模块可以获取nginx内存池的内存使用情况 [chobits]
+* 变更：   合并HTTP/2模块，删除SPDY模块 [PeterDaveHello]
+* 变更：   支持nginx官方syslog，删除tengine原先支持的syslog功能
+* 变更：   合并nginx-1.8.1版本的修改 [lhanjian, magicbear, chobits]
+* 变更：   支持EPOLL_EXCLUSIVE [cfsego]
+* 变更：   导出API: ngx_http_upstream_check_upstream_down [detailyang]
+* 变更：   在TCP健康检查功能中关闭check_keepalive_requests特性 [cynron]
+* 变更：   更新reqstatus模块 [cfsego]
+* 修复：   删除ngx_http_named_location中重复代码 [innomentats]
+* 修复：   修复session-sticky模块的缺陷 [detailyang]
+* 修复：   修复rsolve.conf文件解析器的缺陷 [zuopucuen]
+* 修复：   修复tfs模块编译警告 [monadbobo]
+* 修复：   dynamic_resolver特性在proxy_pass指令使用变量时会触发段错误 [chobits]
+* 修复：   修复session-sticky模块设置无效的Set-Cookie值的缺陷 [YanagiEiichi]
+* 修复：   修复dyups模块中cf变量未初始化的缺陷 [wangfakang]
+* 修复：   修复健康检查模块中含有重复peers的缺陷 [FqqCS, taoyuanyuan]
+* 修复：   修复concat模块中错误的javascript内容类型 [IYism]
 
 
 Tengine 2.1.1 [2015-08-12]
-* Feature: 支持动态upstream更新 [yzprofile]
-* Feature: 增强ngx_http_reqstat_module模块 [cfsego]
-* Feature: 增加ssl_verify_client_exception指令 [InfoHunter]
-* Change:  降低解析配置的内存消耗 [ilexshen]
-* Change:  trim模块增加$trim_bytes和$trim_original_bytes [taoyuanyuan]
-* Change:  升级debian二进制包的版本到2.1.0 [PeterDaveHello]
-* Change:  将ngx_http_spdy_module模块集成到travis-ci自动编译 [chobits]
-* Change:  更新SPDY/3.1 [chobits]
-* Change:  SPDY时关闭proxy_request_buffering指令 [chobits]
-* Change:  增加编译选项支持设置linker [tanguofu]
-* Bugfix:  修复SPDY的Backport bug [nginx official, ym]
-* Bugfix:  SPDY和SSL模块一起编译时报错 [ym]
-* Bugfix:  修复打开reuseport的bug [monadbobo]
+* 功能： 支持动态upstream更新 [yzprofile]
+* 功能： 增强ngx_http_reqstat_module模块 [cfsego]
+* 功能： 增加ssl_verify_client_exception指令 [InfoHunter]
+* 变更：  降低解析配置的内存消耗 [ilexshen]
+* 变更：  trim模块增加$trim_bytes和$trim_original_bytes [taoyuanyuan]
+* 变更：  升级debian二进制包的版本到2.1.0 [PeterDaveHello]
+* 变更：  将ngx_http_spdy_module模块集成到travis-ci自动编译 [chobits]
+* 变更：  更新SPDY/3.1 [chobits]
+* 变更：  SPDY时关闭proxy_request_buffering指令 [chobits]
+* 变更：  增加编译选项支持设置链接器 [tanguofu]
+* 修复：  修复SPDY回移修复中的缺陷 [nginx official, ym]
+* 修复：  SPDY和SSL模块一起编译时报错 [ym]
+* 修复：  修复打开reuseport的缺陷 [monadbobo]
 
 
 Tengine 2.1.0 [2014-12-19]
-* Feature: 支持SO_REUSEPORT选项，以提升CPU负载均衡性和性能 [monadbobo]
-* Feature: 支持动态解析upstream中出现的域名 [InfoHunter]
-* Feature: rewrite指令支持重定向到命名location [yzprofile]
-* Feature: image_filter指令支持crop_keepx和crop_keepy参数 [Lax]
-* Feature: consistent_hash模块和session_sticky模块支持SSL会话保持 [dinic]
-* Feature: 支持travis-ci.org自动编译 [Jamyn]
-* Feature: 健康检查模块支持FASTCGI检查 [yzprofile]
-* Feature: 增强sysguard模块的功能 [InfoHunter]
-* Feature: 新增变量$normalized_request得到规范化的请求 [yunkai]
-* Feature: dso的include指令支持通配符 [monadbobo]
-* Feature: 新增gzip_clear_etag指令 [taoyuanyuan]
-* Feature: 为log_escape指令添加unprintable参数 [skoo87]
-* Change: 合并nginx-1.6.2版本的修改 [cfsego, taoyuanyuan, chobits]
-* Change: round robin负载均衡算法随机选择某个源站作为循环起点 [taoyuanyuan]
-* Change: 对共享内存中的碎片进行优化 [chobits]
-* Bugfix: SPDY/3关闭连接时去掉drop标志 [chobits]
-* Bugfix: 修复SPDY/3出现连接泄漏的问题 [chobits]
-* Bugfix: 修复limit_req模块将长度超过255个字符的key截断的问题 [chobits]
-* Bugfix: 解析/etc/resolv.conf中的IPv6地址出错 [lifeibo]
-* Bugfix: 通过红黑树查找到错误的upstream [taoyuanyuan]
+* 功能： 支持SO_REUSEPORT选项，以提升CPU负载均衡性和性能 [monadbobo]
+* 功能： 支持动态解析upstream中出现的域名 [InfoHunter]
+* 功能： rewrite指令支持重定向到命名location [yzprofile]
+* 功能： image_filter指令支持crop_keepx和crop_keepy参数 [Lax]
+* 功能： consistent_hash模块和session_sticky模块支持SSL会话保持 [dinic]
+* 功能： 支持travis-ci.org自动编译 [Jamyn]
+* 功能： 健康检查模块支持FASTCGI检查 [yzprofile]
+* 功能： 增强sysguard模块的功能 [InfoHunter]
+* 功能： 新增变量$normalized_request得到规范化的请求 [yunkai]
+* 功能： dso的include指令支持通配符 [monadbobo]
+* 功能： 新增gzip_clear_etag指令 [taoyuanyuan]
+* 功能： 为log_escape指令添加unprintable参数 [skoo87]
+* 变更： 合并nginx-1.6.2版本的修改 [cfsego, taoyuanyuan, chobits]
+* 变更： round robin负载均衡算法随机选择某个源站作为循环起点 [taoyuanyuan]
+* 变更： 对共享内存中的碎片进行优化 [chobits]
+* 修复： SPDY/3关闭连接时去掉drop标志 [chobits]
+* 修复： 修复SPDY/3出现连接泄漏的问题 [chobits]
+* 修复： 修复limit_req模块将长度超过255个字符的key截断的问题 [chobits]
+* 修复： 解析/etc/resolv.conf中的IPv6地址出错 [lifeibo]
+* 修复： 通过红黑树查找到错误的upstream [taoyuanyuan]
 
 
 Tengine 2.0.3 [2014-05-30]
-* Feature: 支持按指定维度(域名，url等)收集Tengine运行状态 [cfsego]
-* Feature: 支持debian、ubuntu打包 [betetrpm, szepeviktor]
-* Change: 合并nginx-1.4.7的修改 [chobits]
-* Change: 使用红黑树优化upstream配置解析和查找 [SarahWang]
-* Change: 更新版权信息
-* Bugfix: 修复session-sticky模块相关问题 [dinic]
-* Bugfix: 修复DSO编译和安装模块的问题 [cfsego]
-* Bugfix: 修复spdy相关问题 [chobits]
+* 功能： 支持按指定维度(域名，url等)收集Tengine运行状态 [cfsego]
+* 功能： 支持debian、ubuntu打包 [betetrpm, szepeviktor]
+* 变更： 合并nginx-1.4.7的修改 [chobits]
+* 变更： 使用红黑树优化upstream配置解析和查找 [SarahWang]
+* 变更： 更新版权信息
+* 修复： 修复session-sticky模块相关问题 [dinic]
+* 修复： 修复DSO编译和安装模块的问题 [cfsego]
+* 修复： 修复spdy相关问题 [chobits]
 
 
 Tengine 2.0.2 [2014-03-28]
-* Bugfix: 在读事件处理完后继续发送SPDY数据 [chobits]
-* Bugfix: CVE-2014-0133以及CVE-2014-0088 [chobits]
+* 修复： 在读事件处理完后继续发送SPDY数据 [chobits]
+* 修复： CVE-2014-0133以及CVE-2014-0088 [chobits]
 
 
 Tengine 2.0.1 [2014-03-06]
-* Feature: 请求体不缓存的机制支持chunked输入 [yaoweibin]
-* Feature: trim模块支持更多规则，支持根据变量启用 [taoyuanyuan]
-* Feature: 利用/etc/resolv.conf自动配置resolver [lifeibo, yaoweibin]
-* Feature: 增加$ascii_变量前缀，可以生成任意ASCII字符 [yzprofile]
-* Feature: 增加"image_filter_crop_offset"指令 [lax]
-* Change: 合并截至nginx-1.4.6版本的所有修改 [chobits, cfsego]
-* Bugfix: 修正使用长连接进行健康检查时报错的问题 [lilbedwin]
-* Bugfix: 修正使用WebSocket时nginx崩溃的问题
+* 功能： 请求体不缓存的机制支持chunked输入 [yaoweibin]
+* 功能： trim模块支持更多规则，支持根据变量启用 [taoyuanyuan]
+* 功能： 利用/etc/resolv.conf自动配置resolver [lifeibo, yaoweibin]
+* 功能： 增加$ascii_变量前缀，可以生成任意ASCII字符 [yzprofile]
+* 功能： 增加"image_filter_crop_offset"指令 [lax]
+* 变更： 合并截至nginx-1.4.6版本的所有修改 [chobits, cfsego]
+* 修复： 修正使用长连接进行健康检查时报错的问题 [lilbedwin]
+* 修复： 修正使用WebSocket时nginx崩溃的问题
           http://trac.nginx.org/nginx/ticket/503 [Hao Chen]
-* Bugfix: 减少nginx处理大文件时的内存消耗 [cfsego]
-* Bugfix: 在未设置URI时，禁用跳转到named locations的重定向
+* 修复： 减少nginx处理大文件时的内存消耗 [cfsego]
+* 修复： 在未设置URI时，禁用跳转到命名位置的重定向
 
 
 Tengine 2.0.0 [2014-01-08]
-* Feature: 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
-* Feature: 支持SPDY v3协议，自动检测同一端口的SPDY请求和HTTP请求 [lilbedwin, chobits]
-* Feature: 支持设置proxy、memcached、fastcgi、scgi、uwsgi在后端失败时的重试次数 [supertcy]
-* Feature: tfs模块在RcServer心跳时汇报访问统计 [zhcn381]
-* Feature: if指令支持比较数值大小：'>'、'<'、'>='、'<=' [flygoast]
-* Feature: 健康检查模块支持长连接检查，增加"check_keepalive_requests"指令 [lilbedwin]
-* Feature: trim模块支持SSI和ESI的注释 [taoyuanyuan]
-* Feature: expires_by_types指令支持使用通配符，例如'text/*'匹配子类型 [zhcn381]
-* Feature: 增加$base64_decode_变量前缀，支持计算指定变量的base64解压结果 [yzprofile]
-* Feature: 增加$md5_encode_变量前缀，支持计算指定变量的md5哈希 [yzprofile]
-* Feature: 增加$time_http变量，支持按http格式输出当前时间 [flygoast]
-* Feature: 增加$full_request变量，取得原始的请求url，包括协议类型和域名 [yzprofile]
-* Feature: 增加$escape_uri_变量前缀，支持对指定变量进行url转义 [yzprofile]
-* Feature: 增加$raw_uri变量，支持取得不含参数的原始uri [flygoast]
-* Feature: 支持按微秒记录子请求的请求时间 [jinglong]
-* Feature: 增加API，支持对url进行base64编码 [lilbedwin]
-* Change: 合并nginx-1.4.4版本的修改 [cfsego]
-* Change: 修改stub_status模块，不对子请求进行统计 [jinglong]
-* Bugfix: 修正footer模块，不处理含有Content-Encoding头的响应 [yaoweibin]
-* Bugfix: 修正client_body_postpone_size指令设置为0时出现的问题 [yaoweibin]
-* Bugfix: 修正Lua模块编译时出现警告 [diwayou]
+* 功能： 增强DSO模块，编译动态模块不再依赖原始编译环境 [monadbobo]
+* 功能： 支持SPDY v3协议，自动检测同一端口的SPDY请求和HTTP请求 [lilbedwin, chobits]
+* 功能： 支持设置proxy、memcached、fastcgi、scgi、uwsgi在后端失败时的重试次数 [supertcy]
+* 功能： tfs模块在RcServer心跳时汇报访问统计 [zhcn381]
+* 功能： if指令支持比较数值大小：'>'、'<'、'>='、'<=' [flygoast]
+* 功能： 健康检查模块支持长连接检查，增加"check_keepalive_requests"指令 [lilbedwin]
+* 功能： trim模块支持SSI和ESI的注释 [taoyuanyuan]
+* 功能： expires_by_types指令支持使用通配符，例如'text/*'匹配子类型 [zhcn381]
+* 功能： 增加$base64_decode_变量前缀，支持计算指定变量的base64解压结果 [yzprofile]
+* 功能： 增加$md5_encode_变量前缀，支持计算指定变量的md5哈希 [yzprofile]
+* 功能： 增加$time_http变量，支持按http格式输出当前时间 [flygoast]
+* 功能： 增加$full_request变量，取得原始的请求url，包括协议类型和域名 [yzprofile]
+* 功能： 增加$escape_uri_变量前缀，支持对指定变量进行url转义 [yzprofile]
+* 功能： 增加$raw_uri变量，支持取得不含参数的原始uri [flygoast]
+* 功能： 支持按微秒记录子请求的请求时间 [jinglong]
+* 功能： 增加API，支持对url进行base64编码 [lilbedwin]
+* 变更： 合并nginx-1.4.4版本的修改 [cfsego]
+* 变更： 修改stub_status模块，不对子请求进行统计 [jinglong]
+* 修复： 修正footer模块，不处理含有Content-Encoding头的响应 [yaoweibin]
+* 修复： 修正client_body_postpone_size指令设置为0时出现的问题 [yaoweibin]
+* 修复： 修正Lua模块编译时出现警告 [diwayou]
 
 
 Tengine-1.5.2 [2013-11-22]
-* Security: 修复CVE-2013-4547安全漏洞
-* Bugfix: 修复limit_req模块中nodelay无效的问题 [cfsego]
-* Bugfix: 修复trim模块在替换javascript异常的问题 [taoyuanyuan]
+* 安全： 修复CVE-2013-4547安全漏洞
+* 修复： 修复limit_req模块中nodelay无效的问题 [cfsego]
+* 修复： 修复trim模块在替换javascript异常的问题 [taoyuanyuan]
 
 
 Tengine-1.5.1 [2013-08-29]
-* Feature: 增加retry_cached_connection指令，可以关闭对后端长连接的无条件重试 [yaoweibin]
-* Feature: sysguard模块的sysguard_load指令中加入ncpu参数 [yzprofile]
-* Bugfix：修复referer模块在https协议时正则匹配失效的问题 [lilbedwin]
-* Bugfix：修复trim模块可能产生0长度块的问题 [taoyuanyuan]
-* Bugfix：修复在使用--without-dso选项时出现的编译错误 [zhuzhaoyuan]
-* Bugfix：修复两个编译警告 [zzjin, diwayou]
+* 功能： 增加retry_cached_connection指令，可以关闭对后端长连接的无条件重试 [yaoweibin]
+* 功能： sysguard模块的sysguard_load指令中加入ncpu参数 [yzprofile]
+* 修复：修复referer模块在https协议时正则匹配失效的问题 [lilbedwin]
+* 修复：修复trim模块可能产生0长度块的问题 [taoyuanyuan]
+* 修复：修复在使用--without-dso选项时出现的编译错误 [zhuzhaoyuan]
+* 修复：修复两个编译警告 [zzjin, diwayou]
 
 
 Tengine-1.5.0 [2013-07-31]
-* Feature: 增加DSO（动态模块加载）兼容性校验机制 [monadbobo]
-* Feature: 增加了请求体不缓存到磁盘的机制，HTTP代理和FastCGI模块收到部分请求体即可以转发给后端服务器 [yaoweibin]
-* Feature: 增加了trim模块，该模块可以自动删除HTML页面中无意义的空白符和注释，减小页面的大小 [taoyuanyuan]
-* Feature: 加入accept filter机制，支持在连接接收以后进行过滤处理 [yzprofile]
-* Feature: 现在server_tag指令可以改变默认错误页面的服务器标识 [zhuzhaoyuan]
-* Bugfix：修复access_log指令中buffer参数失效的问题 [cfsego]
-* Bugfix：修复session_sticky模块在某些情况下没有发出session cookie的问题 [dinic]
+* 功能： 增加DSO（动态模块加载）兼容性校验机制 [monadbobo]
+* 功能： 增加了请求体不缓存到磁盘的机制，HTTP代理和FastCGI模块收到部分请求体即可以转发给后端服务器 [yaoweibin]
+* 功能： 增加了trim模块，该模块可以自动删除HTML页面中无意义的空白符和注释，减小页面的大小 [taoyuanyuan]
+* 功能： 加入accept filter机制，支持在连接接收以后进行过滤处理 [yzprofile]
+* 功能： 现在server_tag指令可以改变默认错误页面的服务器标识 [zhuzhaoyuan]
+* 修复：修复access_log指令中buffer参数失效的问题 [cfsego]
+* 修复：修复session_sticky模块在某些情况下没有发出session cookie的问题 [dinic]
 
 
 Tengine-1.4.6 [2013-05-14]
-* Bugfix：合并nginx-1.2.9的更新，修正CVE-2013-2070带来的安全问题。该安全问题在1.4.0以后开始出现 [yaoweibin]
+* 修复：合并nginx-1.2.9的更新，修正CVE-2013-2070带来的安全问题。该安全问题在1.4.0以后开始出现 [yaoweibin]
 
 
 Tengine-1.4.5 [2013-05-01]
-* Feature：增加一致性hash模块，可以为后端服务器提供一致性hash的负载均衡方法 [dinic]
-* Feature：通过keepalive_timeout指令可以设置后端keepalive连接的超时时间 [jinglong]
-* Feature：加入所有模块静态编译或者所有模块动态编译的编译选项 [monadbobo]
-* Change：更新Lua模块至0.7.19 [jinglong]
-* Change：合并Nginx-1.2.8的更新 [yaoweibin]
-* Bugfix：修正syslog和upstream_check模块在GCC-4.4.5上的编译警告 [magicbear]
+* 功能：增加一致性hash模块，可以为后端服务器提供一致性hash的负载均衡方法 [dinic]
+* 功能：通过keepalive_timeout指令可以设置后端keepalive连接的超时时间 [jinglong]
+* 功能：加入所有模块静态编译或者所有模块动态编译的编译选项 [monadbobo]
+* 变更：更新Lua模块至0.7.19 [jinglong]
+* 变更：合并Nginx-1.2.8的更新 [yaoweibin]
+* 修复：修正syslog和upstream_check模块在GCC-4.4.5上的编译警告 [magicbear]
 
 
 Tengine-1.4.4 [2013-03-21]
-* Feature：增加session_sticky模块，可以为客户端和后端服务器提供会话保持功能 [dinic]
-* Feature：sysguard模块增加空闲内存监控功能 [lifeibo]
-* Feature：geoip模块增加对地区数据库的支持 [jasonlfunk]
-* Feature：log_empty_request指令增加对408响应的空请求支持 [yaoweibin]
-* Change：合并Nginx-1.2.5至Nginx-1.2.7的更新 [cfsego]
-* Change：默认关闭CPU亲缘性 [cfsego]
-* Bugfix：修正在Solaris 11上sysguard和upstream_check模块编译出错的问题 [lifeibo, yaoweibin]
-* Bugfix：修正TFS模块返回值可能错误的问题 [zhcn381]
-* Bugfix: 修正TFS模块上传大文件可能出错的问题 [zhcn381]
+* 功能：增加session_sticky模块，可以为客户端和后端服务器提供会话保持功能 [dinic]
+* 功能：sysguard模块增加空闲内存监控功能 [lifeibo]
+* 功能：geoip模块增加对地区数据库的支持 [jasonlfunk]
+* 功能：log_empty_request指令增加对408响应的空请求支持 [yaoweibin]
+* 变更：合并Nginx-1.2.5至Nginx-1.2.7的更新 [cfsego]
+* 变更：默认关闭CPU亲缘性 [cfsego]
+* 修复：修正在Solaris 11上sysguard和upstream_check模块编译出错的问题 [lifeibo, yaoweibin]
+* 修复：修正TFS模块返回值可能错误的问题 [zhcn381]
+* 修复： 修正TFS模块上传大文件可能出错的问题 [zhcn381]
 
 
 Tengine-1.4.3 [2013-1-21]
-* Feature：增加TFS模块，可以通过RESTful接口与TFS分布式文件系统通信 [zhcn381, monadbobo]
-* Feature：增加$sent_cookie_XXX系列变量，可以获取响应中Set-Cookie头的cookie值 [skoo87]
-* Feature：syslog指令的发送地址支持域名 [cfsego]
-* Change：upstream块中的server指令增加id属性 [yaoweibin]
-* Bugfix：DSO模块修正reload时可能失败的问题 [monadbobo]
-* Bugfix：修复upstream_check模块当超时时间长于检查时间可能导致段错误的问题 [yaoweibin]
-* Bugfix：修复user_agent模块在请求缺少User-Agent头会段错误的问题 [dinic]
-* Bugfix：修复sysguard模块在Mac OS下面不能工作的问题 [lizi]
+* 功能：增加TFS模块，可以通过RESTful接口与TFS分布式文件系统通信 [zhcn381, monadbobo]
+* 功能：增加$sent_cookie_XXX系列变量，可以获取响应中Set-Cookie头的cookie值 [skoo87]
+* 功能：syslog指令的发送地址支持域名 [cfsego]
+* 变更：upstream块中的server指令增加id属性 [yaoweibin]
+* 修复：DSO模块修正reload时可能失败的问题 [monadbobo]
+* 修复：修复upstream_check模块当超时时间长于检查时间可能导致段错误的问题 [yaoweibin]
+* 修复：修复user_agent模块在请求缺少User-Agent头会段错误的问题 [dinic]
+* 修复：修复sysguard模块在Mac OS下面不能工作的问题 [lizi]
 
 
 Tengine-1.4.2 [2012-11-22]
-* Feature：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
-* Feature：增加$unix_time变量，表示当前的时间戳秒数 [yaoweibin]
-* Feature：Makefile中增加test命令以便运行测试用例 [yaoweibin]
-* Feature：sysguard模块可在location里面配置 [lifeibo]
-* Change：合并Nginx-1.2.4和Nginx-1.2.5的更新 [zhuzhaoyuan]
-* Change：增加对input_filter函数返回值的检查，防止第三方模块调用出错 [cfsego]
-* Bugfix：修复limit_req指令不能使用4个参数的问题，感谢LazyZhu的报告 [monadbobo]
-* Bugfix：修复在cygwin下面编译sysinfo文件出错的问题，感谢Cao Peiran的报告 [lifeibo]
-* Bugfix：修复user-agent模块安装时需要拷贝browsers配置文件的问题，感谢Jianbin Xiao的报告 [monadbobo]
-* Bugfix：修复DSO模块RPM打包安装目录出错的问题，感谢Jianbin Xiao和Ren Xiaolei的报告 [monadbobo]
+* 功能：增加--dso-tool-path配置选项，可以选择dso_tool脚本的安装目录 [monadbobo]
+* 功能：增加$unix_time变量，表示当前的时间戳秒数 [yaoweibin]
+* 功能：Makefile中增加test命令以便运行测试用例 [yaoweibin]
+* 功能：sysguard模块可在location里面配置 [lifeibo]
+* 变更：合并Nginx-1.2.4和Nginx-1.2.5的更新 [zhuzhaoyuan]
+* 变更：增加对input_filter函数返回值的检查，防止第三方模块调用出错 [cfsego]
+* 修复：修复limit_req指令不能使用4个参数的问题，感谢LazyZhu的报告 [monadbobo]
+* 修复：修复在cygwin下面编译sysinfo文件出错的问题，感谢Cao Peiran的报告 [lifeibo]
+* 修复：修复user-agent模块安装时需要拷贝browsers配置文件的问题，感谢Jianbin Xiao的报告 [monadbobo]
+* 修复：修复DSO模块RPM打包安装目录出错的问题，感谢Jianbin Xiao和Ren Xiaolei的报告 [monadbobo]
 
 
 Tengine-1.4.1 [2012-10-10]
-* Feature： 添加jemalloc库的支持 [fanjizhao]
-* Feature： 加入$dollar变量, 它的值就是美元符号 [zhuzhaoyuan]
-* Feature： 为worker_cpu_affinity指令加入off选项 [cfsego]
-* Change： 当工作进程异常退出以后，新进程不会绑定CPU亲缘性 [cfsego]
-* Bugfix:  修正在Mac OS操作系统下，Lua模块与LuaJIT动态编译时出现的错误 [monadbobo]
-* Bugfix:  修正动态编译第三方filter模块时出现的模块执行顺序错误 [monadbobo]
+* 功能： 添加jemalloc库的支持 [fanjizhao]
+* 功能： 加入$dollar变量, 它的值就是美元符号 [zhuzhaoyuan]
+* 功能： 为worker_cpu_affinity指令加入off选项 [cfsego]
+* 变更： 当工作进程异常退出以后，新进程不会绑定CPU亲缘性 [cfsego]
+* 修复：  修正在Mac OS操作系统下，Lua模块与LuaJIT动态编译时出现的错误 [monadbobo]
+* 修复：  修正动态编译第三方filter模块时出现的模块执行顺序错误 [monadbobo]
 
 
 Tengine-1.4.0 [2012-09-05]
-* Feature： 增加动态模块加载支持（DSO），要添加一个模块不再需要重新编译tengine了 [monadbobo]
-* Feature： 更新Lua模块到最新的稳定版本 [chaoslawful, agentzh, jinglong]
-* Feature： 为健康检查模块增加json和csv格式的输出 [yaoweibin]
-* Feature： 增加log_empty_request指令，可以用来关掉空请求日志——那些连接了但没发数据的连接 [zhuzhaoyuan]
-* Feature： 给concat模块增加concat_delimiter指令，设置文件间的间隔内容 [dinic]
-* Feature： 增加concat_ignore_file_error指令并允许concat的语法更宽松 [dinic] 
-* Feature： 给error_page指令增加default选项，以恢复所有的错误页面为默认值 [jinglong]
-* Feature： 给proc模块增加priority指令，可设置proc进程的优先级 [yzprofile]
-* Feature： 给proc模块增加delay_start指令，可设置延迟加载时间 [yzprofile]
-* Change： 集成最新nginx稳定版本1.2.3的内容 [zhuzhaoyuan]
-* Bugfix： 修正一个geo模块设了range但是没有默认值时产生的段错误问题 [yzprofile]
-* Bugfix： 修正一个proc模块的空指针问题 [yzprofile]
-* Bugfix： 修正一个健康检查模块的socket泄漏问题 [yaoweibin]
-* Bugfix： 修正limit_req模块的若干问题 [monadbobo]
-* Bugfix： 修正若干日志输出类型错误的问题 [yaoweibin]
-* Bugfix： 修正perl模块和proc一起打开的一个编译错误 [yzprofile]
+* 功能： 增加动态模块加载支持（DSO），要添加一个模块不再需要重新编译tengine了 [monadbobo]
+* 功能： 更新Lua模块到最新的稳定版本 [chaoslawful, agentzh, jinglong]
+* 功能： 为健康检查模块增加json和csv格式的输出 [yaoweibin]
+* 功能： 增加log_empty_request指令，可以用来关掉空请求日志——那些连接了但没发数据的连接 [zhuzhaoyuan]
+* 功能： 给concat模块增加concat_delimiter指令，设置文件间的间隔内容 [dinic]
+* 功能： 增加concat_ignore_file_error指令并允许concat的语法更宽松 [dinic]
+* 功能： 给error_page指令增加default选项，以恢复所有的错误页面为默认值 [jinglong]
+* 功能： 给proc模块增加priority指令，可设置proc进程的优先级 [yzprofile]
+* 功能： 给proc模块增加delay_start指令，可设置延迟加载时间 [yzprofile]
+* 变更： 集成最新nginx稳定版本1.2.3的内容 [zhuzhaoyuan]
+* 修复： 修正一个geo模块设了range但是没有默认值时产生的段错误问题 [yzprofile]
+* 修复： 修正一个proc模块的空指针问题 [yzprofile]
+* 修复： 修正一个健康检查模块的socket泄漏问题 [yaoweibin]
+* 修复： 修正limit_req模块的若干问题 [monadbobo]
+* 修复： 修正若干日志输出类型错误的问题 [yaoweibin]
+* 修复： 修正perl模块和proc一起打开的一个编译错误 [yzprofile]
 
 
 Tengine-1.3.0 [2012-05-25]
-* Feature：加入Lua模块，可以在配置中使用Lua语言 [chaoslawful, agentzh]
-* Feature：加入procs模块，可以更方便的开启独立进程 [yzprofile]
-* Change：user_agent模块中参数nongreedy改名为greedy [dinic]
-* Bugfix：修复syslog指令中因为指针未初始化引起的段错误 [cfsego]
-* Bugfix：修复syslog指令打开--with-ipv6选项引起的编译错误 [cfsego]
+* 功能：加入Lua模块，可以在配置中使用Lua语言 [chaoslawful, agentzh]
+* 功能：加入procs模块，可以更方便的开启独立进程 [yzprofile]
+* 变更：user_agent模块中参数nongreedy改名为greedy [dinic]
+* 修复：修复syslog指令中因为指针未初始化引起的段错误 [cfsego]
+* 修复：修复syslog指令打开--with-ipv6选项引起的编译错误 [cfsego]
 
 
 Tengine-1.2.5 [2012-05-09]
-* Feature：增加upstream_check模块，对后端服务器做主动健康检查，以自动的下线失效的服务器 [yaoweibin]
-* Feature：允许syslog输出日志时指定程序的标识（program identifier） [cfsego]
-* Change：合并nginx-1.0.14至nginx-1.0.15之间的修改 [zhuzhaoyuan]
-* Change：将accept_mutex_delay的默认值从500毫秒更改为100毫秒以提高性能 [zhuzhaoyuan]
-* Bugfix：修复syslog的一个在后端服务器连接不上导致端错误的bug [cfsego]
-* Bugfix：修复access_log可能和buffer参数冲突的bug [cfsego]
+* 功能：增加upstream_check模块，对后端服务器做主动健康检查，以自动的下线失效的服务器 [yaoweibin]
+* 功能：允许syslog输出日志时指定程序的标识 [cfsego]
+* 变更：合并nginx-1.0.14至nginx-1.0.15之间的修改 [zhuzhaoyuan]
+* 变更：将accept_mutex_delay的默认值从500毫秒更改为100毫秒以提高性能 [zhuzhaoyuan]
+* 修复：修复syslog的一个在后端服务器连接不上导致端错误的缺陷 [cfsego]
+* 修复：修复access_log可能和buffer参数冲突的缺陷 [cfsego]
 
 
 Tengine-1.2.4 [2012-03-30]
-* Feature：增加user_agent模块 [dinic]
-* Feature：增加log_escape指令 [agentzh, skoo87]
-* Change：合并nginx-1.0.12至nginx-1.0.14之间的修改 [zhuzhaoyuan]
-* Bugfix：修复limit_req模块的一个bug [liseen.wan]
-* Bugfix：修复subrequest的一个bug [lifeibo]
+* 功能：增加user_agent模块 [dinic]
+* 功能：增加log_escape指令 [agentzh, skoo87]
+* 变更：合并nginx-1.0.12至nginx-1.0.14之间的修改 [zhuzhaoyuan]
+* 修复：修复limit_req模块的一个缺陷 [liseen.wan]
+* 修复：修复subrequest的一个缺陷 [lifeibo]
 
 
 Tengine-1.2.3 [2012-02-27]
-* Feature：增加request_time_cache指令，用来控制是否启用精确的响应时间 [yzprofile]
-* Feature：增加slice模块，获得一个文件的一个片段，可以添加头和尾 [zhuzhaoyuan]
-* Change：合并nginx-1.0.11至nginx-1.0.12之间的修改 [zhuzhaoyuan]
-* Change：去掉无用的user-agent判断 [zhuzhaoyuan]
-* Bugfix：修复upstream中的一个process_header的bug [lifeibo]
-* Bugfix：修复expires_by_types的一个bug [lifeibo]
+* 功能：增加request_time_cache指令，用来控制是否启用精确的响应时间 [yzprofile]
+* 功能：增加slice模块，获得一个文件的一个片段，可以添加头和尾 [zhuzhaoyuan]
+* 变更：合并nginx-1.0.11至nginx-1.0.12之间的修改 [zhuzhaoyuan]
+* 变更：去掉无用的user-agent判断 [zhuzhaoyuan]
+* 修复：修复upstream中的一个process_header的缺陷 [lifeibo]
+* 修复：修复expires_by_types的一个缺陷 [lifeibo]
 
 
 Tengine-1.2.2 [2012-01-11]
-* Feature：增加input body filter机制 [cfsego]
-* Feature：对mail部分支持ssl的dialog [cfsego]
-* Change：合并进nginx-1.0.10至nginx-1.0.11之间的修改 [zhuzhaoyuan]
-* Change：默认关掉lingering_close [zhuzhaoyuan]
-* Bugfix：修正日志管道时的bug [cfsego]
-* Bugfix：修正limit_req的forbid_action无效的bug [monadbobo]
-* Bugfix： 修正backtrace模块backtrace_max_stack_size的问题 [monadbobo]
-* Bugfix：修正内容为空footer模块输出不正确的问题 [dinic]
-* Bugfix：修正syslog时hostname最后一个字母丢失的问题 [cfsego]
+* 功能：增加输入请求体过滤机制 [cfsego]
+* 功能：邮件模块支持SSL对话 [cfsego]
+* 变更：合并进nginx-1.0.10至nginx-1.0.11之间的修改 [zhuzhaoyuan]
+* 变更：默认关掉lingering_close [zhuzhaoyuan]
+* 修复：修正日志管道时的缺陷 [cfsego]
+* 修复：修正limit_req的forbid_action无效的缺陷 [monadbobo]
+* 修复： 修正backtrace模块backtrace_max_stack_size的问题 [monadbobo]
+* 修复：修正内容为空footer模块输出不正确的问题 [dinic]
+* 修复：修正syslog时hostname最后一个字母丢失的问题 [cfsego]
 
 
 Tengine-1.2.1 [2011-12-06]
-* Bugfix：修正默认错误日志和访问日志不存在时启动报错的bug [yzprofile]
+* 修复：修正默认错误日志和访问日志不存在时启动报错的缺陷 [yzprofile]
 
 
 Tengine-1.2.0 [2011-11-29]
-* Feature：错误日志和访问日志支持输出到syslog [cfsego]
-* Feature：错误日志和访问日志支持输出到管道的方式 [cfsego]
-* Feature：增加realloc相关的API，包括内存池 [gongyuan]
-* Feature：HTTP日志支持更多的有关时间的变量 [skoo87]
-* Feature：增加backtrace模块，在coredump时输出调用栈 [monadbobo]
-* Feature：limit_req功能增强，增加白名单，可以有多个条件 [monadbobo]
-* Feature：sysguard模块，load和内存占用偏高时进行保护 [lifeibo]
-* Feature：增加API（ngx_http_header_in/ngx_http_header_out），用来取输入和输出的HTTP头信息 [lifeibo]
-* Feature：增加两个变量$request_time_msec和$request_time_usec，分别是相应时间的毫秒表示和微秒表示 [jinglong]
-* Feature：增加footer模块，可以在HTML末尾添加内容（支持变量） [yunxing]
-* Feature：增加变量$conn_requests，记录当前request是连接上的第几个 [lieyuan]
-* Feature：增加变量$host_comment，插入注释功能，以说明哪台机器产生的请求 [yunxing]
-* Feature：访问日志增加ratio参数，抽样功能，可以减少日志的记录量 [cfsego]
-* Feature：增加server_admin、server_info指令，出错信息提示，更友好的错误页面 [lieyuan]
-* Feature：增加命令行参数-d，把配置文件的内容全部打印出来 [piaoling]
-* Feature：增加指令expires_by_types，可以根据types来设置超时 [lifeibo]
-* Feature：增加命令行参数-l，可以列出所有的directives [dinic]
-* Feature：增加ngx_atoll的api，可以将字符串转换成64位整数，支持32位与64位系统 [lifeibo]
-* Feature：status line（302，405）现在采用RFC 2616的标准 [zhuzhaoyuan]
-* Feature：ngx_escape_uri/ngx_unescape_uri现在支持PHP/Java的编解码格式 [zhuzhaoyuan]
-* Feature：配置文件include多个文件时按照字母顺序进行包含 [zhuzhaoyuan]
-* Feature：error_page指令增强，支持default，可以把把上一级设置的error_page重新设定 [zhuzhaoyuan]
-* Feature：增加对每请求的响应时间的统计（cacti，tsar） [jinglong]
-* Feature：增加指令server_tag，更强大的控制HTTP服务器的Server头是否显示以及内容是什么 [jinglong]
-* Feature：自动调整worker进程的数目和绑定CPU亲缘性 [cfsego]
-* Feature：增加指令ssl_pass_phrase_dialog，SSL对key进行加密功能 [cfsego]
-* Feature：增加-s选项的start参数 [zhuzhaoyuan]
-* Feature：增加-m选项，可以把已编译的模块列出来 [zhuzhaoyuan]
-* Change：更改msie_padding的默认值为关掉 [zhuzhaoyuan]
-* Bugfix：修复open_file_cache在已经检测到缓存文件发生变化后，仍然返回过时的文件状态信息的问题 [cfsego]
-* Bugfix：修复upsteam在subrequest in memory且keepalive时会导致timeout的bug [lifeibo]
-* Bugfix：修复$sent_http_connection和$sent_http_keep_alive记录不正确的问题 [zhongsheng]
-* Bugfix：修正error_page不能发现重复的code的问题，不能正常继承上一级设置的问题 [zhuzhaoyuan]
-* Bugfix：修正Nginx在处理FastCGI时有重复HTTP头会core dump的bug [monadbobo]
-* Bugfix：修正Nginx对CPU亲缘性设置不正确的bug [cfsego]
+* 功能：错误日志和访问日志支持输出到syslog [cfsego]
+* 功能：错误日志和访问日志支持输出到管道的方式 [cfsego]
+* 功能：增加realloc相关的API，包括内存池 [gongyuan]
+* 功能：HTTP日志支持更多的有关时间的变量 [skoo87]
+* 功能：增加backtrace模块，在崩溃时输出调用栈 [monadbobo]
+* 功能：limit_req功能增强，增加白名单，可以有多个条件 [monadbobo]
+* 功能：sysguard模块，在负载和内存占用偏高时进行保护 [lifeibo]
+* 功能：增加API（ngx_http_header_in/ngx_http_header_out），用来取输入和输出的HTTP头信息 [lifeibo]
+* 功能：增加两个变量$request_time_msec和$request_time_usec，分别是相应时间的毫秒表示和微秒表示 [jinglong]
+* 功能：增加footer模块，可以在HTML末尾添加内容（支持变量） [yunxing]
+* 功能：增加变量$conn_requests，记录当前request是连接上的第几个 [lieyuan]
+* 功能：增加变量$host_comment，插入注释功能，以说明哪台机器产生的请求 [yunxing]
+* 功能：访问日志增加ratio参数，抽样功能，可以减少日志的记录量 [cfsego]
+* 功能：增加server_admin、server_info指令，出错信息提示，更友好的错误页面 [lieyuan]
+* 功能：增加命令行参数-d，把配置文件的内容全部打印出来 [piaoling]
+* 功能：增加指令expires_by_types，可以根据内容类型来设置超时 [lifeibo]
+* 功能：增加命令行参数-l，可以列出所有的指令 [dinic]
+* 功能：增加ngx_atoll的API，可以将字符串转换成64位整数，支持32位与64位系统 [lifeibo]
+* 功能：状态行（302，405）现在采用RFC 2616的标准 [zhuzhaoyuan]
+* 功能：ngx_escape_uri/ngx_unescape_uri现在支持PHP/Java的编解码格式 [zhuzhaoyuan]
+* 功能：配置文件include多个文件时按照字母顺序进行包含 [zhuzhaoyuan]
+* 功能：error_page指令增强，支持default，可以把把上一级设置的error_page重新设定 [zhuzhaoyuan]
+* 功能：增加对每请求的响应时间的统计（cacti，tsar） [jinglong]
+* 功能：增加指令server_tag，更强大的控制HTTP服务器的Server头是否显示以及内容是什么 [jinglong]
+* 功能：自动调整worker进程的数目和绑定CPU亲缘性 [cfsego]
+* 功能：增加指令ssl_pass_phrase_dialog，SSL对key进行加密功能 [cfsego]
+* 功能：增加-s选项的start参数 [zhuzhaoyuan]
+* 功能：增加-m选项，可以把已编译的模块列出来 [zhuzhaoyuan]
+* 变更：更改msie_padding的默认值为关掉 [zhuzhaoyuan]
+* 修复：修复open_file_cache在已经检测到缓存文件发生变化后，仍然返回过时的文件状态信息的问题 [cfsego]
+* 修复：修复upsteam在子请求保存在内存中且启用长连接时会导致超时的缺陷 [lifeibo]
+* 修复：修复$sent_http_connection和$sent_http_keep_alive记录不正确的问题 [zhongsheng]
+* 修复：修正error_page不能发现重复的code的问题，不能正常继承上一级设置的问题 [zhuzhaoyuan]
+* 修复：修正Nginx在处理FastCGI时有重复HTTP头会崩溃的缺陷 [monadbobo]
+* 修复：修正Nginx对CPU亲缘性设置不正确的缺陷 [cfsego]

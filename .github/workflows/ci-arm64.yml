@@ -45,7 +45,9 @@ jobs:
           install: |
             set -x
             apt-get update -q -y
-            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
+            # libmaxminddb-dev: since nginx 1.31.7 the geoip modules also read
+            # MaxMind DB (MMDB) files, so arm64 compiles that path too.
+            apt-get install -q -y make gcc g++ clang libgd-dev libgeoip-dev libmaxminddb-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev file
           run: |
             set -x
             cd /tengine

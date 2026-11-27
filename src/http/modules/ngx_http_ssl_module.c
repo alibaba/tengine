@@ -92,6 +92,17 @@ static ngx_conf_enum_t  ngx_http_ssl_ocsp[] = {
 };
 
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+static ngx_conf_enum_t  ngx_http_ssl_handshake_error_log_levels[] = {
+    { ngx_string("info"), NGX_LOG_INFO },
+    { ngx_string("notice"), NGX_LOG_NOTICE },
+    { ngx_string("warn"), NGX_LOG_WARN },
+    { ngx_string("error"), NGX_LOG_ERR },
+    { ngx_null_string, 0 }
+};
+#endif
+
+
 static ngx_conf_post_t  ngx_http_ssl_conf_command_post =
     { ngx_http_ssl_conf_command_check };
 
@@ -150,6 +161,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, enable_ntls),
       NULL },
 
+    { ngx_string("ssl_force_ntls"),
+      NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, force_ntls),
+      NULL },
+
     { ngx_string("ssl_enc_certificate"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -176,6 +194,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       ngx_conf_set_str_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, sign_certificate_key),
+      NULL },
+
+    { ngx_string("ssl_ntls_cert_key_usage_check"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, ntls_cert_key_usage_check),
       NULL },
 #endif
 
@@ -219,7 +244,16 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       ngx_conf_set_size_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, buffer_size),
-      NULL },
+      &ngx_conf_size_nonzero_post },
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    { ngx_string("ssl_handshake_error_log_level"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, handshake_error_log_level),
+      &ngx_http_ssl_handshake_error_log_levels },
+#endif
 
     { ngx_string("ssl_verify_client"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
@@ -461,6 +495,15 @@ static ngx_http_variable_t  ngx_http_ssl_vars[] = {
     { ngx_string("ssl_client_raw_cert"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_raw_certificate,
       NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+#if (T_NGX_SSL_NTLS)
+    { ngx_string("ssl_client_enc_cert"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_enc_certificate, NGX_HTTP_VAR_CHANGEABLE, 0 },
+
+    { ngx_string("ssl_client_raw_enc_cert"), NULL, ngx_http_ssl_variable,
+      (uintptr_t) ngx_ssl_get_raw_enc_certificate,
+      NGX_HTTP_VAR_CHANGEABLE, 0 },
+#endif
 
     { ngx_string("ssl_client_escaped_cert"), NULL, ngx_http_ssl_variable,
       (uintptr_t) ngx_ssl_get_escaped_certificate,
@@ -706,12 +749,17 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
 #endif
 #if (T_NGX_SSL_NTLS)
     sscf->enable_ntls = NGX_CONF_UNSET;
+    sscf->ntls_cert_key_usage_check = NGX_CONF_UNSET;
+    sscf->force_ntls = NGX_CONF_UNSET;
 #endif
     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
     sscf->certificate_compression = NGX_CONF_UNSET;
     sscf->early_data = NGX_CONF_UNSET;
     sscf->reject_handshake = NGX_CONF_UNSET;
     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    sscf->handshake_error_log_level = NGX_CONF_UNSET_UINT;
+#endif
     sscf->verify = NGX_CONF_UNSET_UINT;
     sscf->verify_depth = NGX_CONF_UNSET_UINT;
     sscf->certificates = NGX_CONF_UNSET_PTR;
@@ -787,6 +835,11 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->buffer_size, prev->buffer_size,
                          NGX_SSL_BUFSIZE);
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_conf_merge_uint_value(conf->handshake_error_log_level,
+                         prev->handshake_error_log_level, NGX_LOG_INFO);
+#endif
+
     ngx_conf_merge_uint_value(conf->verify, prev->verify, 0);
     ngx_conf_merge_uint_value(conf->verify_depth, prev->verify_depth, 1);
 
@@ -803,6 +856,54 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
 #if (T_NGX_SSL_NTLS)
     ngx_conf_merge_value(conf->enable_ntls, prev->enable_ntls, 0);
+
+    /*
+     * Probe "was the directive explicitly set" before resolving the
+     * default: on Tongsuo older than 8.5.0 any explicit use must be
+     * rejected, regardless of on/off.
+     */
+    ngx_conf_merge_value(conf->ntls_cert_key_usage_check,
+                         prev->ntls_cert_key_usage_check, NGX_CONF_UNSET);
+
+#if !(T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+    if (conf->ntls_cert_key_usage_check != NGX_CONF_UNSET) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_ntls_cert_key_usage_check\" requires "
+                      "Tongsuo 8.5.0 or later");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    /*
+     * Resolve to a definite value for the SNI callback, which copies it
+     * onto the connection with SSL_set_ntls_cert_key_usage_check():
+     * "not configured" must restore the Tongsuo default (on) rather than
+     * inherit whatever the default server had.  The library default is
+     * 1 since 8.5.0.
+     */
+    if (conf->ntls_cert_key_usage_check == NGX_CONF_UNSET) {
+        conf->ntls_cert_key_usage_check = 1;
+    }
+
+    /*
+     * Probe "was the directive explicitly set" before resolving the
+     * default, as with the keyUsage switch above: on Tongsuo older than
+     * 8.4.0 any explicit use must be rejected, regardless of on/off.
+     */
+    ngx_conf_merge_value(conf->force_ntls, prev->force_ntls, NGX_CONF_UNSET);
+
+#if !(T_NGX_HAVE_NTLS_FORCE)
+    if (conf->force_ntls != NGX_CONF_UNSET) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_force_ntls\" requires Tongsuo 8.4.0 or later");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    if (conf->force_ntls == NGX_CONF_UNSET) {
+        conf->force_ntls = 0;
+    }
+
     ngx_conf_merge_str_value(conf->enc_certificate, prev->enc_certificate, "");
     ngx_conf_merge_str_value(conf->enc_certificate_key,
                          prev->enc_certificate_key, "");
@@ -839,6 +940,10 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          prev->stapling_responder, "");
 
     conf->ssl.log = cf->log;
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    conf->ssl.handshake_error_log_level = conf->handshake_error_log_level;
+#endif
 
     if (conf->certificates) {
 
@@ -999,6 +1104,38 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
             return NGX_CONF_ERROR;
         }
     }
+
+    /*
+     * The keyUsage switch reaches a connection through SSL_new() from
+     * the SSL_CTX set here, or through ngx_http_ssl_servername() when
+     * SNI selects another virtual server; the merge stage above resolved
+     * it to a definite value and rejected configurations on Tongsuo
+     * older than 8.5.0.  Set it unconditionally, including the "on" that
+     * an unconfigured server resolves to: Tongsuo applies the OpenSSL
+     * system_default configuration (OPENSSL_CONF) when creating the
+     * SSL_CTX, so a fresh CTX may carry "off" instead of the library
+     * default, and skipping the setter for "on" would let that external
+     * policy accept legacy certificates on connections for which the SNI
+     * callback selects no other virtual server.
+     */
+#if (T_NGX_HAVE_NTLS_KEY_USAGE_CHECK)
+    SSL_CTX_set_ntls_cert_key_usage_check(conf->ssl.ctx,
+                                          conf->ntls_cert_key_usage_check);
+#endif
+
+    /*
+     * Reset the force switch on the SSL_CTX when the directive is off
+     * (the default): a system_default policy (OPENSSL_CONF) can set
+     * enable_force_ntls=on at CTX creation, and SSL_new() would inherit
+     * it past the directive.  "on" needs no CTX write here: the
+     * per-connection SSL_enable_force_ntls() call already enforces it.
+     * ssl_conf_command is applied below and keeps its precedence.
+     */
+#if (T_NGX_HAVE_NTLS_FORCE)
+    if (!conf->force_ntls) {
+        SSL_CTX_disable_force_ntls(conf->ssl.ctx);
+    }
+#endif
 #endif
 
     if (ngx_ssl_certificate_compression(cf, &conf->ssl,
@@ -1009,6 +1146,14 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     conf->ssl.buffer_size = conf->buffer_size;
+
+#if (T_NGX_SSL_NTLS)
+    if (conf->force_ntls && !conf->enable_ntls) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "\"ssl_force_ntls\" requires \"enable_ntls on\"");
+        return NGX_CONF_ERROR;
+    }
+#endif
 
     if (conf->verify) {
 
@@ -1128,6 +1273,17 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_ssl_conf_commands(cf, &conf->ssl, conf->conf_commands) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
+
+#if (T_NGX_SSL_NTLS)
+    /*
+     * ssl_conf_command is applied last and takes precedence over
+     * ssl_ntls_cert_key_usage_check, as over the other ssl_* settings:
+     * keep the value it left on the SSL_CTX, it is the one the SNI
+     * callback copies to connections.
+     */
+    ngx_ssl_conf_command_key_usage_check(conf->conf_commands,
+                                         &conf->ntls_cert_key_usage_check);
+#endif
 
     return NGX_CONF_OK;
 }
@@ -1605,6 +1761,48 @@ ngx_http_ssl_init(ngx_conf_t *cf)
 
             cscf = addr[a].default_server;
             sscf = cscf->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
+
+#if (T_NGX_SSL_NTLS)
+            /*
+             * Force mode short-circuits the record-version dispatch
+             * before the ClientHello is parsed, so it is a listen-level
+             * property: it requires "enable_ntls on" in the default
+             * server and is meaningless (and now an error) on a
+             * name-based server sharing the port.
+             */
+            if (sscf->force_ntls && !sscf->enable_ntls) {
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "\"ssl_force_ntls\" requires \"enable_ntls "
+                              "on\" in the default server of the "
+                              "\"listen ... ssl\" port in %s:%ui",
+                              cscf->file_name, cscf->line);
+                return NGX_ERROR;
+            }
+
+            {
+                ngx_http_ssl_srv_conf_t  *sscf2;
+
+                cscfp = addr[a].servers.elts;
+                for (s = 0; s < addr[a].servers.nelts; s++) {
+
+                    if (cscfp[s] == addr[a].default_server) {
+                        continue;
+                    }
+
+                    sscf2 = ngx_http_get_module_srv_conf(cscfp[s]->ctx,
+                                                       ngx_http_ssl_module);
+
+                    if (sscf2->force_ntls) {
+                        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                                      "\"ssl_force_ntls\" is only allowed "
+                                      "in the default server of the "
+                                      "\"listen ... ssl\" port, in %s:%ui",
+                                      cscfp[s]->file_name, cscfp[s]->line);
+                        return NGX_ERROR;
+                    }
+                }
+            }
+#endif
 
             if (sscf->certificates) {
                 continue;

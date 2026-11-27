@@ -17,6 +17,10 @@
 typedef struct {
     ngx_msec_t        handshake_timeout;
 
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t        handshake_error_log_level;
+#endif
+
     ngx_flag_t        prefer_server_ciphers;
     ngx_flag_t        certificate_compression;
     ngx_flag_t        reject_handshake;
@@ -69,6 +73,8 @@ typedef struct {
 
 #if (T_NGX_SSL_NTLS)
     ngx_flag_t       enable_ntls;
+    ngx_flag_t       ntls_cert_key_usage_check;
+    ngx_flag_t       force_ntls;
     ngx_str_t        enc_certificate;
     ngx_str_t        enc_certificate_key;
     ngx_str_t        sign_certificate;

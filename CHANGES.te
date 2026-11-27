@@ -1,3 +1,11 @@
+Upcoming Changes
+
+    *) Change: updated core to nginx 1.31.10.
+
+    *) Security: fixed repeated posting of write events when the write chain
+       made no progress (CVE-2026-132779).
+
+
 Changes with Tengine 3.2.0                                         31 Jul 2026
 
     *) Security: fixed CVE-2026-49975, HPACK/QPACK header decompression bomb
@@ -23,6 +31,19 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        an SSL backend was parsed before the handshake (drawing)
 
     *) Security: fixed an out-of-bounds read in mod_dubbo (orbisai0security)
+
+    *) Feature: add new directive ssl_force_ntls to serve NTLS (TLCP) only
+       on a listen port, rejecting plain TLS connections, in both the http
+       and stream ssl modules (zhsnew)
+
+    *) Feature: add new directive ssl_ntls_cert_key_usage_check to relax
+       or enforce the Tongsuo 8.5.0 GB/T 20518 sign/enc certificate
+       keyUsage check, in both the http and stream ssl modules (zhsnew)
+
+    *) Feature: add new variables $ssl_client_enc_cert and
+       $ssl_client_raw_enc_cert, exposing the peer encryption certificate
+       of a TLCP mutual handshake in the http and stream ssl modules
+       (zhsnew)
 
     *) Feature: add new module ngx_zstd for Zstandard response compression
        and serving pre-compressed static files (lianglli)
@@ -82,6 +103,17 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
     *) Feature: expose ngx_http_upstream_rbtree_lookup() so that third-party
        modules can look an upstream up by name (lhanjian)
 
+    *) Feature: add active health checks for stream (L4) upstreams with the
+       new ngx_stream_upstream_check_module. The health-check core is
+       generalized out of ngx_http_upstream_check_module and shared, so the
+       HTTP and stream sides use one shared-memory zone, one peer index space
+       and one check_status page (lianglli)
+
+    *) Change: the start-up error of the stream ssl module about the
+       missing certificates now also mentions the ssl_enc_certificate and
+       ssl_sign_certificate NTLS directives, aligning it with the http
+       ssl module (zhsnew)
+
     *) Change: the default install layout inherited from nginx is now named
        after Tengine: prefix /usr/local/tengine, binary sbin/tengine,
        configuration conf/tengine.conf, and logs/tengine.pid. This matches
@@ -92,10 +124,10 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        over, or keep the previous layout by passing --prefix, --sbin-path,
        --conf-path and --pid-path explicitly (lianglli)
 
-    *) Change: update core to Nginx-1.31.5 (lianglli)
+    *) Change: update core to Nginx-1.31.9 (lianglli)
 
     *) Change: the control API listens on the address given by "-L", not the
-       "-l" of nginx 1.31.5, because "-l" already lists all directives in
+       "-l" of nginx 1.31.9, because "-l" already lists all directives in
        Tengine; the control API is built only with --with-control-api
        (lianglli)
 
@@ -113,15 +145,43 @@ Changes with Tengine 3.2.0                                         31 Jul 2026
        cases (lianglli)
 
     *) Change: the xquic baseline used by the packages and by CI moved to
-       v1.9.6; the module stays compatible with the v1.8.0 to v1.9.6 API
+       v1.9.8; the module stays compatible with the v1.8.0 to v1.9.8 API
        generation, and modules/ngx_http_xquic_module/README.md now lists the
        xquic version verified for each Tengine release [XQUIC] (Yanmei-Liu)
+
+    *) Change: the Tongsuo baseline used by the packages and by CI moved to
+       8.5.0, whose OpenSSL base is 3.5.4 rather than the 3.0.3 of 8.4.0
+       (lianglli)
 
     *) Bugfix: drain the HTTP health-check response body for keepalive-safe
        connection reuse in ngx_http_upstream_check_module (lianglli)
 
     *) Bugfix: a unix socket upstream server combined with "check port=" was
        reported alive forever, so a backup server never took over (lianglli)
+
+    *) Bugfix: inherit the health-check state per peer rather than per
+       address, so the same backend listed in several upstreams, or on both
+       the HTTP and stream side of the shared zone, no longer swaps health
+       state across a reload (lianglli)
+
+    *) Bugfix: fixed missing check_index initialization for "server ...
+       resolve" peers, which made them track the health of the peer at
+       index 0 instead of being probed themselves (lianglli)
+
+    *) Bugfix: bound the health-check HTTP response parsers against untrusted
+       backend bytes: an out-of-bounds read and a mis-detected "chunked" in
+       Transfer-Encoding, oversized or malformed Content-Length and chunk
+       sizes, negative drain lengths, and a chunked-drain infinite loop
+       (lianglli)
+
+    *) Bugfix: fixed memory-safety errors in the mod_dubbo hessian2 decoder:
+       a type confusion on a non-Map response payload, out-of-bounds reads on
+       truncated multi-byte UTF-8, an infinite loop on an unconsumed null
+       tag, double-free of referenced objects, unbounded nesting depth, and
+       leaks of decoded objects on rejected payloads (lianglli)
+
+    *) Bugfix: fixed a use-after-free in ngx_multi_upstream_module when the
+       connection pool was destroyed before the connection closed (lianglli)
 
     *) Bugfix: fixed duplicate peer linking in round-robin init, which made
        a backup peer link to itself (lianglli)
@@ -268,7 +328,7 @@ Changes with Tengine 2.3.4                                         18 Oct 2022
     *) Bugfix: fixed deadlock in the upstream check module with "zone"
        directive configured in upstream block (zjd87)
 
-    *) Bugfix：fixed compilation in the upstream check module (RocFang)
+    *) Bugfix: fixed compilation in the upstream check module (RocFang)
 
     *) Bugfix: fixed compilation error in the dubbo module (MengqiWu)
 

@@ -60,7 +60,8 @@ typedef struct {
     ngx_http_request_t            *r;
     ngx_http_variable_value_t     *values;
     ngx_array_t                    stack;
-    ngx_str_t                      current_key;
+    ngx_str_t                      key_buffer;
+    ngx_uint_t                     in_member;
     ngx_http_json_node_t          *current_node;
     ngx_http_json_node_t          *root;
 } ngx_http_json_state_t;
@@ -392,6 +393,7 @@ ngx_http_json_insert_path(ngx_conf_t *cf, ngx_http_json_node_t *root,
 {
     u_char                *p, *last, *start, *dst;
     ngx_int_t              index;
+    ngx_str_t              raw;
     ngx_uint_t            *term;
     ngx_http_json_seg_t    seg;
     ngx_http_json_node_t  *node;
@@ -523,14 +525,15 @@ ngx_http_json_insert_path(ngx_conf_t *cf, ngx_http_json_node_t *root,
                     return NGX_CONF_ERROR;
                 }
 
-                ngx_memcpy(dst, start, p - start);
+                raw.data = start;
+                raw.len = p - start;
 
                 seg.is_index = 0;
                 seg.key.data = dst;
                 seg.key.len = p - start;
                 seg.index = 0;
 
-                if (ngx_json_unescape_string(&seg.key) != NGX_OK) {
+                if (ngx_json_unescape_string(&seg.key, &raw) != NGX_OK) {
                     goto invalid;
                 }
 
@@ -676,7 +679,9 @@ static ngx_int_t
 ngx_http_json_handler(ngx_json_ctx_t *ctx, ngx_json_event_e event,
     ngx_str_t *token)
 {
-    ngx_str_t               slice, value;
+    size_t                  size;
+    u_char                 *p;
+    ngx_str_t               key, slice, value;
     ngx_uint_t              is_member;
     ngx_http_json_node_t   *node;
     ngx_http_json_state_t  *state;
@@ -697,14 +702,14 @@ ngx_http_json_handler(ngx_json_ctx_t *ctx, ngx_json_event_e event,
 
         if (state->stack.nelts == 0) {
 
-            ngx_str_null(&state->current_key);
+            state->in_member = 0;
             state->current_node = NULL;
 
             return ngx_http_json_push(state, event, token->data, state->root);
         }
 
-        is_member = (state->current_key.data != NULL);
-        ngx_str_null(&state->current_key);
+        is_member = state->in_member;
+        state->in_member = 0;
 
         if (is_member) {
 
@@ -746,47 +751,60 @@ ngx_http_json_handler(ngx_json_ctx_t *ctx, ngx_json_event_e event,
         break;
 
     case NGX_JSON_KEY:
+    case NGX_JSON_KEY_ESCAPED:
 
-        if (ngx_strlchr(token->data, token->data + token->len, '\\') == NULL) {
-            state->current_key = *token;
+        key = *token;
 
-        } else {
-            state->current_key.data = ngx_pstrdup(ctx->pool, token);
-            if (state->current_key.data == NULL) {
-                return NGX_ERROR;
+        if (event == NGX_JSON_KEY_ESCAPED) {
+            if (token->len > state->key_buffer.len) {
+                size = token->len;
+
+                if (state->key_buffer.len <= NGX_MAX_SIZE_T_VALUE / 2) {
+                    size = ngx_max(size, state->key_buffer.len * 2);
+                }
+
+                p = ngx_pnalloc(ctx->pool, size);
+                if (p == NULL) {
+                    return NGX_ERROR;
+                }
+
+                state->key_buffer.data = p;
+                state->key_buffer.len = size;
             }
 
-            state->current_key.len = token->len;
+            key = state->key_buffer;
 
-            if (ngx_json_unescape_string(&state->current_key) != NGX_OK) {
+            if (ngx_json_unescape_string(&key, token) != NGX_OK) {
                 return NGX_ERROR;
             }
         }
 
-        node = ngx_http_json_lookup_key(top->node, &state->current_key);
+        node = ngx_http_json_lookup_key(top->node, &key);
         if (node == NULL) {
-            ngx_str_null(&state->current_key);
+            state->in_member = 0;
             state->current_node = NULL;
             return NGX_JSON_SKIP;
         }
 
+        state->in_member = 1;
         state->current_node = node;
 
         break;
 
     case NGX_JSON_VALUE_STRING:
+    case NGX_JSON_VALUE_STRING_ESCAPED:
     case NGX_JSON_VALUE_NUMBER:
     case NGX_JSON_VALUE_BOOL:
     case NGX_JSON_VALUE_NULL:
 
         if (top == NULL) {
-            ngx_str_null(&state->current_key);
+            state->in_member = 0;
             state->current_node = NULL;
             break;
         }
 
-        is_member = (state->current_key.data != NULL);
-        ngx_str_null(&state->current_key);
+        is_member = state->in_member;
+        state->in_member = 0;
 
         if (is_member) {
 
@@ -805,7 +823,7 @@ ngx_http_json_handler(ngx_json_ctx_t *ctx, ngx_json_event_e event,
             value = *token;
 
             if (ngx_http_json_store(state, node, &value,
-                                          event == NGX_JSON_VALUE_STRING)
+                                    event == NGX_JSON_VALUE_STRING_ESCAPED)
                 != NGX_OK)
             {
                 return NGX_ERROR;
@@ -904,6 +922,18 @@ ngx_http_json_store(ngx_http_json_state_t *state, ngx_http_json_node_t *node,
         val.len = 0;
         val.data = (u_char *) "";
 
+    } else if (unescape) {
+        val.data = ngx_pnalloc(state->r->pool, value->len);
+        if (val.data == NULL) {
+            return NGX_ERROR;
+        }
+
+        val.len = value->len;
+
+        if (ngx_json_unescape_string(&val, value) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
     } else {
         val.data = ngx_pstrdup(state->r->pool, value);
         if (val.data == NULL) {
@@ -911,10 +941,6 @@ ngx_http_json_store(ngx_http_json_state_t *state, ngx_http_json_node_t *node,
         }
 
         val.len = value->len;
-
-        if (unescape && ngx_json_unescape_string(&val) != NGX_OK) {
-            return NGX_ERROR;
-        }
     }
 
     for (i = 0; i < node->ndests; i++) {

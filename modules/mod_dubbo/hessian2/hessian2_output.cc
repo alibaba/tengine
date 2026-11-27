@@ -112,20 +112,28 @@ void hessian2_output::write_utf8_string(const char* str, uint32_t byte_size) {
     size_t i;
     const uint32_t max_chunk_byte_size = 0x8000;
 
-    for (i = 0; i< byte_size; ) {
-        len++;
+    for (i = 0; i < byte_size; ) {
+        size_t seq = 1;
+
         if (str[i] & 0x80) {
             // more than one byte for this char
             if ((str[i] & 0xe0) == 0xc0) {
-                i += 2;
+                seq = 2;
             } else if ((str[i] & 0xf0) == 0xe0) {
-                i += 3;
+                seq = 3;
             } else {
-                i += 4;
+                seq = 4;
             }
-        } else {
-            i++;
         }
+
+        if (i + seq > byte_size) {
+            // incomplete multi-byte sequence at the end of the buffer:
+            // encode only the complete chars, never read past byte_size
+            break;
+        }
+
+        i += seq;
+        len++;
 
         if (len >= max_chunk_byte_size) {
             print_8bit('R');
@@ -140,7 +148,11 @@ void hessian2_output::write_utf8_string(const char* str, uint32_t byte_size) {
         }
     }
 
-    if(len <= 0) {
+    if (len == 0) {
+        // no complete char left for a final chunk: either the buffer held
+        // none at all, or it ended exactly on a chunk boundary; an empty
+        // final chunk keeps the encoding well-formed in both cases
+        print_8bit(0);
         return;
     } else if (len <= 31) {
         print_8bit(len);

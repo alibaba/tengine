@@ -37,6 +37,17 @@
 #define NGX_SSL_NAME     "OpenSSL"
 
 
+/*
+ * T_NGX_HAVE_NTLS_FORCE, T_NGX_HAVE_NTLS_KEY_USAGE_CHECK and
+ * T_NGX_HAVE_NTLS_PEER_ENC_CERT are defined by the ngx_tongsuo_ntls
+ * module's config script after detecting the corresponding APIs in the
+ * Tongsuo the build is linked against, so 8.5.0 pre-releases (which
+ * report the same TONGSUO_VERSION_NUMBER as the release but lack the
+ * APIs) are handled correctly.  The base NTLS directives (enable_ntls,
+ * ssl_sign/enc_certificate) are available since 8.3.x and need no guard.
+ */
+
+
 #if (defined LIBRESSL_VERSION_NUMBER && OPENSSL_VERSION_NUMBER == 0x20000000L)
 #undef OPENSSL_VERSION_NUMBER
 #if (LIBRESSL_VERSION_NUMBER >= 0x3050000fL)
@@ -65,11 +76,6 @@
 #if (OPENSSL_VERSION_NUMBER < 0x10002000L)
 #define SSL_is_server(s)        (s)->server
 #define X509_get_signature_nid(x)    OBJ_obj2nid((x)->sig_alg->algorithm)
-#endif
-
-
-#if (OPENSSL_VERSION_NUMBER < 0x1010000fL)
-#define ASN1_STRING_get0_data(x)     (x)->data
 #endif
 
 
@@ -109,6 +115,9 @@ struct ngx_ssl_s {
 #if (NGX_SSL && NGX_SSL_ASYNC)
     ngx_flag_t                  async_enable;
 #endif
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                  handshake_error_log_level;
+#endif
 
     ngx_array_t                 certs;
 
@@ -136,6 +145,10 @@ struct ngx_ssl_connection_s {
     ngx_ssl_ocsp_t             *ocsp;
 
     u_char                      early_buf;
+
+#if (T_NGX_SSL_ERR_LOG_ALI)
+    ngx_uint_t                  handshake_error_log_level;
+#endif
 
 #if (T_NGX_SSL_HANDSHAKE_TIME)
     ngx_msec_t                  handshake_start_msec;
@@ -392,6 +405,14 @@ ngx_int_t ngx_ssl_get_raw_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
+#if (T_NGX_SSL_NTLS)
+ngx_int_t ngx_ssl_get_raw_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+ngx_int_t ngx_ssl_get_enc_certificate(ngx_connection_t *c, ngx_pool_t *pool,
+    ngx_str_t *s);
+void ngx_ssl_conf_command_key_usage_check(ngx_array_t *commands,
+    ngx_flag_t *value);
+#endif
 ngx_int_t ngx_ssl_get_escaped_certificate(ngx_connection_t *c, ngx_pool_t *pool,
     ngx_str_t *s);
 ngx_int_t ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool,

@@ -25,9 +25,11 @@ jobs:
        run: |
          sudo apt update
          sudo apt remove nginx libgd3
-         sudo apt install -y libgd-dev libgeoip-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev
+         # libmaxminddb-dev: since nginx 1.31.7 the geoip modules also read
+         # MaxMind DB (MMDB) files, so build against both backends.
+         sudo apt install -y libgd-dev libgeoip-dev libmaxminddb-dev libxslt1-dev libpcre3 libpcre3-dev liblua5.1-0-dev lua5.1 libperl-dev cpanminus libssl-dev libio-socket-ssl-perl openssl
      # Stand-alone unit tests: each stubs the handful of ngx types it needs, so
-     # neither depends on a built tengine -- and the xquic ones run even though
+     # none depends on a built tengine -- and the xquic ones run even though
      # this job does not build the xquic module. Kept ahead of the build so a
      # failing build cannot mask them, and so they fail fast.
      - name: upstream check HTTP parser unit tests
@@ -40,6 +42,32 @@ jobs:
          CC: ${{ matrix.compiler.CC }}
        run: |
          make -C modules/ngx_http_xquic_module/test/unit
+     # The hessian2 codec tests run under AddressSanitizer by default: the
+     # regressions they guard are out-of-bounds reads and a stack exhaustion
+     # reachable from request and response bytes.
+     - name: dubbo hessian2 codec unit tests
+       env:
+         CXX: ${{ matrix.compiler.CXX }}
+       run: |
+         make -C modules/mod_dubbo/tests
+     # The flow control tests extract the production functions themselves and
+     # revert each part of the CVE-2026-123007 fix in turn, so a dropped hunk
+     # fails here even without a built tengine.
+     - name: HTTP/2 flow control unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/http/v2/tests
+     - name: HTTP and core write progress unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/http/tests
+     - name: SSL error log policy unit tests
+       env:
+         CC: ${{ matrix.compiler.CC }}
+       run: |
+         make -C src/event/tests
      - name: 'checkout luajit2'
        uses: actions/checkout@v7
        with:
@@ -123,6 +151,7 @@ jobs:
             --add-module=./modules/ngx_http_upstream_session_sticky_module \
             --add-module=./modules/ngx_http_upstream_vnswrr_module \
             --add-module=./modules/ngx_http_user_agent_module \
+            --add-module=./modules/mod_dubbo \
             --add-module=./modules/ngx_multi_upstream_module \
             --add-module=./modules/ngx_slab_stat \
             --without-http_upstream_keepalive_module
@@ -152,6 +181,7 @@ jobs:
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_timer/t
          prove -v -Inginx-tests/lib ../../modules/ngx_debug_conn/t
          prove -v -Inginx-tests/lib ../../modules/ngx_slab_stat/t
+         prove -v -Inginx-tests/lib ../../modules/mod_dubbo/t
          # test-ntls.yml is where these actually run: it builds xquic and
          # points TEST_XQUIC_CLIENT at the client binary. Here the module is
          # not built, so every case in the directory must skip_all on
